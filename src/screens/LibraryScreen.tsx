@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 12 : 12,
+    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 12 : 4,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.1)',
     backgroundColor: colors.darkBackground,

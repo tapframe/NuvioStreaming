@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,9 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { colors } from '../styles';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useNavigation } from '@react-navigation/native';
+import { NavigationProp } from '@react-navigation/native';
+import { RootStackParamList } from '../navigation/AppNavigator';
 
 // Extend Manifest type to include logo
 interface ExtendedManifest extends Manifest {
@@ -31,7 +34,10 @@ interface ExtendedManifest extends Manifest {
 
 const { width } = Dimensions.get('window');
 
+const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
+
 const AddonsScreen = () => {
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const [addons, setAddons] = useState<ExtendedManifest[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -177,8 +183,20 @@ const AddonsScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.darkBackground} />
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor={colors.darkBackground}
+        translucent
+      />
       
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>
+            Addons
+          </Text>
+        </View>
+      </View>
+
       <View style={styles.searchContainer}>
         <MaterialIcons name="search" size={24} color={colors.mediumGray} />
         <TextInput
@@ -361,6 +379,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.darkBackground,
+  },
+  header: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 12 : 4,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: colors.darkBackground,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 32,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    color: colors.white,
   },
   searchContainer: {
     flexDirection: 'row',
