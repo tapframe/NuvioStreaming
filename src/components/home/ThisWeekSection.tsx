@@ -339,14 +339,15 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: '70%',
-    justifyContent: 'space-between',
+    height: '80%',
+    justifyContent: 'flex-end',
     padding: 16,
   },
   badgeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: 12,
   },
   badge: {
     flexDirection: 'row',
@@ -398,7 +399,7 @@ const styles = StyleSheet.create({
   overview: {
     color: colors.lightGray,
     fontSize: 12,
-    marginBottom: 6,
+    marginBottom: 4,
     opacity: 0.8,
   },
   releaseDate: {
