@@ -11,6 +11,7 @@ import {
   StatusBar,
   Animated as RNAnimated,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -27,6 +28,8 @@ interface LibraryItem extends StreamingContent {
   progress?: number;
   lastWatched?: string;
 }
+
+const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
 const SkeletonLoader = () => {
   const pulseAnim = React.useRef(new RNAnimated.Value(0)).current;
@@ -215,7 +218,9 @@ const LibraryScreen = () => {
       />
       
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Library</Text>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Library</Text>
+        </View>
       </View>
 
       <View style={styles.filtersContainer}>
@@ -266,9 +271,16 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
-    backgroundColor: colors.black,
+    paddingVertical: 12,
+    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 12 : 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: colors.darkBackground,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   headerTitle: {
     fontSize: 32,

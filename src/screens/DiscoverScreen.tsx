@@ -10,6 +10,7 @@ import {
   StatusBar,
   Dimensions,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -61,6 +62,8 @@ const COMMON_GENRES = [
   'Western'
 ];
 
+const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
+
 const DiscoverScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const [selectedCategory, setSelectedCategory] = useState<Category>(CATEGORIES[0]);
@@ -79,14 +82,15 @@ const DiscoverScreen = () => {
     header: {
       paddingHorizontal: 16,
       paddingVertical: 12,
+      paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 12 : 12,
       borderBottomWidth: 1,
       borderBottomColor: 'rgba(255,255,255,0.1)',
       backgroundColor: colors.darkBackground,
     },
     headerContent: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
       alignItems: 'center',
+      justifyContent: 'space-between',
     },
     headerTitle: {
       fontSize: 32,
@@ -95,15 +99,8 @@ const DiscoverScreen = () => {
       color: colors.white,
     },
     searchButton: {
-      padding: 8,
-    },
-    searchIconContainer: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: colors.transparentLight,
+      padding: 4,
+      marginLeft: 16,
     },
     categoryContainer: {
       paddingVertical: 12,
@@ -486,13 +483,12 @@ const DiscoverScreen = () => {
               onPress={handleSearchPress} 
               style={styles.searchButton}
             >
-              <View style={styles.searchIconContainer}>
-                <MaterialIcons 
-                  name="search" 
-                  size={24} 
-                  color={colors.white}
-                />
-              </View>
+              <MaterialIcons 
+                name="search" 
+                size={24} 
+                color={colors.white}
+                style={{ opacity: 0.7 }}
+              />
             </TouchableOpacity>
           </View>
         </View>

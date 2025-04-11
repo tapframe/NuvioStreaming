@@ -448,8 +448,8 @@ const MainTabs = () => {
             }}
           />
         ),
-        header: () => <NuvioHeader routeName={route.name} />,
-        headerShown: true,
+        header: () => route.name === 'Home' ? <NuvioHeader routeName={route.name} /> : null,
+        headerShown: route.name === 'Home',
       })}
     >
       <Tab.Screen 

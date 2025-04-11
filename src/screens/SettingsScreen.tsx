@@ -23,6 +23,8 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 
 const { width } = Dimensions.get('window');
 
+const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
+
 interface SettingItemProps {
   title: string;
   description: string;
@@ -136,9 +138,11 @@ const SettingsScreen: React.FC = () => {
       <View style={[styles.header, { 
         borderBottomColor: isDarkMode ? colors.border : 'rgba(0,0,0,0.08)'
       }]}>
-        <Text style={[styles.headerTitle, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
-          Settings
-        </Text>
+        <View style={styles.headerContent}>
+          <Text style={[styles.headerTitle, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
+            Settings
+          </Text>
+        </View>
       </View>
       <ScrollView 
         style={styles.scrollView}
@@ -254,13 +258,21 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 16,
     paddingVertical: 12,
+    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 12 : 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
-    marginBottom: 8,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: colors.darkBackground,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 32,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    color: colors.white,
   },
   scrollView: {
     flex: 1,

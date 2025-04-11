@@ -8,29 +8,23 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-interface NuvioHeaderProps {
-  routeName: string;
-}
-
-export const NuvioHeader: React.FC<NuvioHeaderProps> = ({ routeName }) => {
+export const NuvioHeader = () => {
   const navigation = useNavigation<NavigationProp>();
 
   return (
     <View style={styles.container}>
       <View style={styles.contentContainer}>
         <Text style={styles.title}>NUVIO</Text>
-        {routeName === 'Home' && (
-          <TouchableOpacity
-            style={styles.searchButton}
-            onPress={() => navigation.navigate('Search')}
-          >
-            <MaterialCommunityIcons 
-              name="magnify" 
-              size={28} 
-              color={colors.white} 
-            />
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={styles.searchButton}
+          onPress={() => navigation.navigate('Search')}
+        >
+          <MaterialCommunityIcons 
+            name="magnify" 
+            size={28} 
+            color={colors.white} 
+          />
+        </TouchableOpacity>
       </View>
     </View>
   );
