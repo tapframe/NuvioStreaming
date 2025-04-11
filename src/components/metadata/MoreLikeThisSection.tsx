@@ -1,0 +1,140 @@
+import React from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  Dimensions,
+} from 'react-native';
+import { Image } from 'expo-image';
+import { useNavigation, StackActions } from '@react-navigation/native';
+import { NavigationProp } from '@react-navigation/native';
+import { RootStackParamList } from '../../navigation/AppNavigator';
+import { StreamingContent } from '../../types/metadata';
+import { colors } from '../../styles/colors';
+import { TMDBService } from '../../services/tmdbService';
+import { catalogService } from '../../services/catalogService';
+
+const { width } = Dimensions.get('window');
+const POSTER_WIDTH = (width - 48) / 3.5; // Adjust number for desired items visible
+const POSTER_HEIGHT = POSTER_WIDTH * 1.5;
+
+interface MoreLikeThisSectionProps {
+  recommendations: StreamingContent[];
+  loadingRecommendations: boolean;
+}
+
+export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({ 
+  recommendations, 
+  loadingRecommendations 
+}) => {
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+
+  const handleItemPress = async (item: StreamingContent) => {
+    try {
+      // Extract TMDB ID from the tmdb:123456 format
+      const tmdbId = item.id.replace('tmdb:', '');
+      
+      // Get Stremio ID using catalogService
+      const stremioId = await catalogService.getStremioId(item.type, tmdbId);
+      
+      if (stremioId) {
+        navigation.dispatch(
+          StackActions.push('Metadata', { 
+            id: stremioId, 
+            type: item.type 
+          })
+        );
+      } else {
+        console.error('Could not find Stremio ID for TMDB ID:', tmdbId);
+      }
+    } catch (error) {
+      console.error('Error navigating to recommendation:', error);
+    }
+  };
+
+  const renderItem = ({ item }: { item: StreamingContent }) => (
+    <TouchableOpacity 
+      style={styles.itemContainer}
+      onPress={() => handleItemPress(item)}
+    >
+      <Image
+        source={{ uri: item.poster }}
+        style={styles.poster}
+        contentFit="cover"
+        transition={200}
+      />
+      <Text style={styles.title} numberOfLines={2}>
+        {item.name}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  if (loadingRecommendations) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="small" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (!recommendations || recommendations.length === 0) {
+    return null; // Don't render anything if there are no recommendations
+  }
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.sectionTitle}>More Like This</Text>
+      <FlatList
+        data={recommendations}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.listContentContainer}
+      />
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    marginTop: 28,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.highEmphasis,
+    marginBottom: 12,
+    paddingHorizontal: 24,
+  },
+  listContentContainer: {
+    paddingHorizontal: 24,
+    paddingRight: 48, // Ensure last item has padding
+  },
+  itemContainer: {
+    marginRight: 12,
+    width: POSTER_WIDTH,
+  },
+  poster: {
+    width: POSTER_WIDTH,
+    height: POSTER_HEIGHT,
+    borderRadius: 8,
+    backgroundColor: colors.elevation1,
+    marginBottom: 8,
+  },
+  title: {
+    fontSize: 13,
+    color: colors.mediumEmphasis,
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  loadingContainer: {
+    height: POSTER_HEIGHT + 40, // Approximate height to prevent layout shifts
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+}); 
