@@ -795,6 +795,14 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
           const fetchedTmdbId = await tmdbService.extractTMDBIdFromStremioId(id);
           if (fetchedTmdbId) {
             setTmdbId(fetchedTmdbId);
+            // Fetch certification
+            const certification = await tmdbService.getCertification(type, fetchedTmdbId);
+            if (certification) {
+              setMetadata(prev => prev ? {
+                ...prev,
+                certification
+              } : null);
+            }
           } else {
             console.warn('Could not determine TMDB ID for recommendations.');
           }

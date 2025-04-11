@@ -42,6 +42,7 @@ export interface StreamingContent {
   inLibrary?: boolean;
   directors?: string[];
   creators?: string[];
+  certification?: string;
 }
 
 export interface CatalogContent {
@@ -299,7 +300,8 @@ class CatalogService {
       genres: meta.genres,
       description: meta.description,
       runtime: meta.runtime,
-      inLibrary: this.library[`${meta.type}:${meta.id}`] !== undefined
+      inLibrary: this.library[`${meta.type}:${meta.id}`] !== undefined,
+      certification: meta.certification
     };
   }
 
@@ -407,11 +409,11 @@ class CatalogService {
   }
 
   async searchContentCinemeta(query: string): Promise<StreamingContent[]> {
-    if (!query || query.trim().length < 2) {
+    if (!query) {
       return [];
     }
 
-    const trimmedQuery = query.trim();
+    const trimmedQuery = query.trim().toLowerCase();
     console.log('Searching Cinemeta for:', trimmedQuery);
 
     const addons = await this.getAllAddons();
@@ -421,25 +423,19 @@ class CatalogService {
     const cinemeta = addons.find(addon => addon.id === 'com.linvo.cinemeta');
     
     if (!cinemeta || !cinemeta.catalogs) {
-      console.error('Cinemeta addon not found. Available addons:', addons.map(a => ({ id: a.id, url: a.transportUrl })));
+      console.error('Cinemeta addon not found');
       return [];
     }
-
-    console.log('Found Cinemeta addon:', cinemeta.id);
 
     // Search in both movie and series catalogs simultaneously
     const searchPromises = ['movie', 'series'].map(async (type) => {
       try {
-        console.log(`Searching ${type} catalog with query:`, trimmedQuery);
-        
         // Direct API call to Cinemeta
         const url = `https://v3-cinemeta.strem.io/catalog/${type}/top/search=${encodeURIComponent(trimmedQuery)}.json`;
         console.log('Request URL:', url);
         
-        const response = await axios.get<{ metas: Meta[] }>(url);
+        const response = await axios.get<{ metas: any[] }>(url);
         const metas = response.data.metas || [];
-        
-        console.log(`Found ${metas.length} results for ${type}`);
         
         if (metas && metas.length > 0) {
           const items = metas.map(meta => this.convertMetaToStreamingContent(meta));
@@ -452,15 +448,14 @@ class CatalogService {
 
     await Promise.all(searchPromises);
 
-    console.log('Total results found:', results.length);
-
-    // Sort results by name and ensure uniqueness
-    const uniqueResults = Array.from(
-      new Map(results.map(item => [`${item.type}:${item.id}`, item])).values()
-    );
-    uniqueResults.sort((a, b) => a.name.localeCompare(b.name));
-
-    return uniqueResults;
+    // Remove duplicates while preserving order
+    const seen = new Set();
+    return results.filter(item => {
+      const key = `${item.type}:${item.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 
   async getStremioId(type: string, tmdbId: string): Promise<string | null> {

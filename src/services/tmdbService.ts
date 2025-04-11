@@ -480,6 +480,37 @@ export class TMDBService {
       return null;
     }
   }
+
+  async getCertification(type: string, id: number): Promise<string | null> {
+    try {
+      // Different endpoints for movies and TV shows
+      const endpoint = type === 'movie' ? 'movie' : 'tv';
+      const response = await axios.get(`${BASE_URL}/${endpoint}/${id}/release_dates`, {
+        headers: this.getHeaders()
+      });
+
+      if (response.data && response.data.results) {
+        // Try to find US certification first
+        const usRelease = response.data.results.find((r: any) => r.iso_3166_1 === 'US');
+        if (usRelease && usRelease.release_dates && usRelease.release_dates.length > 0) {
+          const certification = usRelease.release_dates.find((rd: any) => rd.certification)?.certification;
+          if (certification) return certification;
+        }
+
+        // Fallback to any certification if US is not available
+        for (const country of response.data.results) {
+          if (country.release_dates && country.release_dates.length > 0) {
+            const certification = country.release_dates.find((rd: any) => rd.certification)?.certification;
+            if (certification) return certification;
+          }
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching certification:', error);
+      return null;
+    }
+  }
 }
 
 export const tmdbService = TMDBService.getInstance();

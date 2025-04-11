@@ -12,7 +12,7 @@ import {
   StatusBar,
   Keyboard,
   Dimensions,
-  SectionList,
+  ScrollView,
   Animated as RNAnimated,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -27,6 +27,8 @@ import Animated, { FadeIn, FadeOut, SlideInRight } from 'react-native-reanimated
 import { RootStackParamList } from '../navigation/AppNavigator';
 
 const { width } = Dimensions.get('window');
+const HORIZONTAL_ITEM_WIDTH = width * 0.3;
+const HORIZONTAL_POSTER_HEIGHT = HORIZONTAL_ITEM_WIDTH * 1.5;
 const POSTER_WIDTH = 90;
 const POSTER_HEIGHT = 135;
 const RECENT_SEARCHES_KEY = 'recent_searches';
@@ -62,11 +64,11 @@ const SkeletonLoader = () => {
   });
 
   const renderSkeletonItem = () => (
-    <View style={styles.resultItem}>
+    <View style={styles.skeletonVerticalItem}>
       <RNAnimated.View style={[styles.skeletonPoster, { opacity }]} />
-      <View style={styles.itemDetails}>
+      <View style={styles.skeletonItemDetails}>
         <RNAnimated.View style={[styles.skeletonTitle, { opacity }]} />
-        <View style={styles.metaRow}>
+        <View style={styles.skeletonMetaRow}>
           <RNAnimated.View style={[styles.skeletonMeta, { opacity }]} />
           <RNAnimated.View style={[styles.skeletonMeta, { opacity }]} />
         </View>
@@ -88,28 +90,22 @@ const SkeletonLoader = () => {
   );
 };
 
-type SearchFilter = 'all' | 'movie' | 'series';
-
 const SearchScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
-  // Always use dark mode
   const isDarkMode = true;
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<StreamingContent[]>([]);
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<SearchFilter>('all');
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [showRecent, setShowRecent] = useState(true);
 
-  // Set navigation options to hide the header
   React.useLayoutEffect(() => {
     navigation.setOptions({
       headerShown: false,
     });
   }, [navigation]);
 
-  // Load recent searches on mount
   useEffect(() => {
     loadRecentSearches();
   }, []);
@@ -139,28 +135,9 @@ const SearchScreen = () => {
     }
   };
 
-  // Fuzzy search implementation
-  const fuzzyMatch = (str: string, pattern: string): boolean => {
-    pattern = pattern.toLowerCase();
-    str = str.toLowerCase();
-    
-    let patternIdx = 0;
-    let strIdx = 0;
-    
-    while (patternIdx < pattern.length && strIdx < str.length) {
-      if (pattern[patternIdx] === str[strIdx]) {
-        patternIdx++;
-      }
-      strIdx++;
-    }
-    
-    return patternIdx === pattern.length;
-  };
-
-  // Debounced search function with fuzzy search
   const debouncedSearch = useCallback(
     debounce(async (searchQuery: string) => {
-      if (searchQuery.trim().length < 2) {
+      if (!searchQuery.trim()) {
         setResults([]);
         setSearching(false);
         return;
@@ -168,15 +145,7 @@ const SearchScreen = () => {
 
       try {
         const searchResults = await catalogService.searchContentCinemeta(searchQuery);
-        
-        // Apply fuzzy search on the results
-        const fuzzyResults = searchResults.filter(item => 
-          fuzzyMatch(item.name, searchQuery) ||
-          (item.genres && item.genres.some(genre => fuzzyMatch(genre, searchQuery))) ||
-          (item.year && fuzzyMatch(item.year.toString(), searchQuery))
-        );
-        
-        setResults(fuzzyResults);
+        setResults(searchResults);
         await saveRecentSearch(searchQuery);
       } catch (error) {
         console.error('Search failed:', error);
@@ -184,12 +153,12 @@ const SearchScreen = () => {
       } finally {
         setSearching(false);
       }
-    }, 200), // Reduced from 300ms to 200ms for better responsiveness
-    []
+    }, 200),
+    [recentSearches]
   );
 
   useEffect(() => {
-    if (query.trim().length >= 2) {
+    if (query.trim()) {
       setSearching(true);
       setSearched(true);
       setShowRecent(false);
@@ -198,55 +167,16 @@ const SearchScreen = () => {
       setResults([]);
       setSearched(false);
       setShowRecent(true);
+      loadRecentSearches();
     }
-  }, [query, debouncedSearch]);
+  }, [query]);
 
   const handleClearSearch = () => {
     setQuery('');
     setResults([]);
     setSearched(false);
-    setActiveFilter('all');
     setShowRecent(true);
-  };
-
-  const renderSearchFilters = () => {
-    const filters: { id: SearchFilter; label: string; icon: keyof typeof MaterialIcons.glyphMap }[] = [
-      { id: 'all', label: 'All', icon: 'apps' },
-      { id: 'movie', label: 'Movies', icon: 'movie' },
-      { id: 'series', label: 'TV Shows', icon: 'tv' },
-    ];
-
-    return (
-      <View style={styles.filtersContainer}>
-        {filters.map((filter) => (
-          <TouchableOpacity
-            key={filter.id}
-            style={[
-              styles.filterButton,
-              activeFilter === filter.id && styles.filterButtonActive,
-              { borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : colors.border }
-            ]}
-            onPress={() => setActiveFilter(filter.id)}
-          >
-            <MaterialIcons
-              name={filter.icon}
-              size={20}
-              color={activeFilter === filter.id ? colors.primary : (isDarkMode ? colors.lightGray : colors.mediumGray)}
-              style={styles.filterIcon}
-            />
-            <Text
-              style={[
-                styles.filterText,
-                activeFilter === filter.id && styles.filterTextActive,
-                { color: isDarkMode ? colors.white : colors.black }
-              ]}
-            >
-              {filter.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    );
+    loadRecentSearches();
   };
 
   const renderRecentSearches = () => {
@@ -254,14 +184,17 @@ const SearchScreen = () => {
 
     return (
       <View style={styles.recentSearchesContainer}>
-        <Text style={[styles.recentSearchesTitle, { color: isDarkMode ? colors.white : colors.black }]}>
+        <Text style={[styles.carouselTitle, { color: isDarkMode ? colors.white : colors.black }]}>
           Recent Searches
         </Text>
         {recentSearches.map((search, index) => (
           <TouchableOpacity
             key={index}
             style={styles.recentSearchItem}
-            onPress={() => setQuery(search)}
+            onPress={() => {
+              setQuery(search);
+              Keyboard.dismiss();
+            }}
           >
             <MaterialIcons
               name="history"
@@ -281,90 +214,43 @@ const SearchScreen = () => {
     );
   };
 
-  const renderItem = ({ item, index, section }: { item: StreamingContent; index: number; section: { title: string; data: StreamingContent[] } }) => {
+  const renderHorizontalItem = ({ item }: { item: StreamingContent }) => {
     return (
       <TouchableOpacity
-        style={[
-          styles.resultItem,
-          { backgroundColor: isDarkMode ? colors.darkBackground : colors.white }
-        ]}
+        style={styles.horizontalItem}
         onPress={() => {
           navigation.navigate('Metadata', { id: item.id, type: item.type });
         }}
       >
-        <View style={styles.posterContainer}>
+        <View style={styles.horizontalItemPosterContainer}>
           <Image
             source={{ uri: item.poster || PLACEHOLDER_POSTER }}
-            style={styles.poster}
+            style={styles.horizontalItemPoster}
             contentFit="cover"
+            transition={300}
           />
         </View>
-        
-        <View style={styles.itemDetails}>
-          <Text 
-            style={[styles.itemTitle, { color: isDarkMode ? colors.white : colors.black }]}
-            numberOfLines={2}
-          >
-            {item.name}
-          </Text>
-          
-          <View style={styles.metaRow}>
-            {item.year && (
-              <Text style={[styles.yearText, { color: isDarkMode ? colors.lightGray : colors.mediumGray }]}>
-                {item.year}
-              </Text>
-            )}
-            {item.genres && item.genres.length > 0 && (
-              <Text style={[styles.genreText, { color: isDarkMode ? colors.lightGray : colors.mediumGray }]}>
-                {item.genres[0]}
-              </Text>
-            )}
-          </View>
-        </View>
+        <Text 
+          style={[styles.horizontalItemTitle, { color: isDarkMode ? colors.white : colors.black }]}
+          numberOfLines={2}
+        >
+          {item.name}
+        </Text>
       </TouchableOpacity>
     );
   };
+  
+  const movieResults = useMemo(() => {
+    return results.filter(item => item.type === 'movie');
+  }, [results]);
 
-  const renderSectionHeader = ({ section: { title, data } }: { section: { title: string; data: StreamingContent[] } }) => (
-    <View style={[
-      styles.sectionHeader,
-      { backgroundColor: isDarkMode ? colors.darkBackground : colors.lightBackground }
-    ]}>
-      <Text style={[styles.sectionTitle, { color: isDarkMode ? colors.white : colors.black }]}>
-        {title} ({data.length})
-      </Text>
-    </View>
-  );
+  const seriesResults = useMemo(() => {
+    return results.filter(item => item.type === 'series');
+  }, [results]);
 
-  // Categorize results
-  const categorizedResults = useMemo(() => {
-    if (!results.length) return [];
-
-    const movieResults = results.filter(item => item.type === 'movie');
-    const seriesResults = results.filter(item => item.type === 'series');
-
-    const sections = [];
-    
-    if (activeFilter === 'all' || activeFilter === 'movie') {
-      if (movieResults.length > 0) {
-        sections.push({
-          title: 'Movies',
-          data: movieResults,
-        });
-      }
-    }
-    
-    if (activeFilter === 'all' || activeFilter === 'series') {
-      if (seriesResults.length > 0) {
-        sections.push({
-          title: 'TV Shows',
-          data: seriesResults,
-        });
-      }
-    }
-
-    return sections;
-  }, [results, activeFilter]);
+  const hasResultsToShow = useMemo(() => {
+     return movieResults.length > 0 || seriesResults.length > 0;
+  }, [movieResults, seriesResults]);
 
   return (
     <SafeAreaView style={[
@@ -420,11 +306,9 @@ const SearchScreen = () => {
         </View>
       </View>
 
-      {renderSearchFilters()}
-
       {searching ? (
         <SkeletonLoader />
-      ) : searched && categorizedResults.length === 0 ? (
+      ) : searched && !hasResultsToShow ? (
         <View style={styles.emptyContainer}>
           <MaterialIcons 
             name="search-off" 
@@ -445,19 +329,43 @@ const SearchScreen = () => {
           </Text>
         </View>
       ) : (
-        <>
-          {renderRecentSearches()}
-          <SectionList
-            sections={categorizedResults}
-            renderItem={renderItem}
-            renderSectionHeader={renderSectionHeader}
-            keyExtractor={item => `${item.type}-${item.id}`}
-            contentContainerStyle={styles.resultsList}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            stickySectionHeadersEnabled={true}
-          />
-        </>
+        <ScrollView 
+          style={styles.scrollView} 
+          contentContainerStyle={styles.scrollViewContent}
+          keyboardShouldPersistTaps="handled"
+          onScrollBeginDrag={Keyboard.dismiss}
+        >
+          {!query.trim() && renderRecentSearches()}
+
+          {movieResults.length > 0 && (
+            <View style={styles.carouselContainer}>
+              <Text style={styles.carouselTitle}>Movies ({movieResults.length})</Text>
+              <FlatList
+                data={movieResults}
+                renderItem={renderHorizontalItem}
+                keyExtractor={item => `movie-${item.id}`}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalListContent}
+              />
+            </View>
+          )}
+
+          {seriesResults.length > 0 && (
+            <View style={styles.carouselContainer}>
+              <Text style={styles.carouselTitle}>TV Shows ({seriesResults.length})</Text>
+              <FlatList
+                data={seriesResults}
+                renderItem={renderHorizontalItem}
+                keyExtractor={item => `series-${item.id}`}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalListContent}
+              />
+            </View>
+          )}
+          
+        </ScrollView>
       )}
     </SafeAreaView>
   );
@@ -498,95 +406,64 @@ const styles = StyleSheet.create({
   clearButton: {
     padding: 4,
   },
-  filtersContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    gap: 8,
+  scrollView: {
+    flex: 1,
   },
-  filterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.darkGray,
-    backgroundColor: 'transparent',
-    gap: 6,
+  scrollViewContent: {
+    paddingBottom: 20,
   },
-  filterButtonActive: {
-    backgroundColor: colors.primary + '20',
-    borderColor: colors.primary,
+  carouselContainer: {
+    marginBottom: 24,
   },
-  filterIcon: {
-    marginRight: 2,
-  },
-  filterText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  filterTextActive: {
-    color: colors.primary,
-    fontWeight: '600',
-  },
-  sectionHeader: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
-  },
-  sectionTitle: {
+  carouselTitle: {
     fontSize: 18,
     fontWeight: '700',
+    color: colors.white,
+    marginBottom: 12,
+    paddingHorizontal: 16,
   },
-  resultsList: {
-    padding: 16,
+  horizontalListContent: {
+    paddingHorizontal: 16,
+    paddingRight: 8,
   },
-  resultItem: {
-    flexDirection: 'row',
-    marginBottom: 16,
-    borderRadius: 12,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  horizontalItem: {
+    width: HORIZONTAL_ITEM_WIDTH,
+    marginRight: 12,
   },
-  posterContainer: {
-    width: POSTER_WIDTH,
-    height: POSTER_HEIGHT,
+  horizontalItemPosterContainer: {
+    width: HORIZONTAL_ITEM_WIDTH,
+    height: HORIZONTAL_POSTER_HEIGHT,
     borderRadius: 8,
     overflow: 'hidden',
     backgroundColor: colors.darkBackground,
+    marginBottom: 8,
   },
-  poster: {
+  horizontalItemPoster: {
     width: '100%',
     height: '100%',
   },
-  itemDetails: {
-    flex: 1,
-    marginLeft: 16,
-    justifyContent: 'center',
+  horizontalItemTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    lineHeight: 18,
+    textAlign: 'left',
   },
-  itemTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    lineHeight: 22,
+  recentSearchesContainer: {
+    paddingHorizontal: 0,
+    paddingBottom: 16,
   },
-  metaRow: {
+  recentSearchItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
   },
-  yearText: {
-    fontSize: 14,
+  recentSearchIcon: {
+    marginRight: 12,
   },
-  genreText: {
-    fontSize: 14,
+  recentSearchText: {
+    fontSize: 16,
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,
@@ -617,48 +494,45 @@ const styles = StyleSheet.create({
   skeletonContainer: {
     padding: 16,
   },
+  skeletonVerticalItem: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
   skeletonPoster: {
     width: POSTER_WIDTH,
     height: POSTER_HEIGHT,
     borderRadius: 8,
-    overflow: 'hidden',
     backgroundColor: colors.darkBackground,
   },
+  skeletonItemDetails: {
+    flex: 1,
+    marginLeft: 16,
+    justifyContent: 'center',
+  },
+  skeletonMetaRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
   skeletonTitle: {
-    height: 22,
+    height: 20,
+    width: '80%',
     marginBottom: 8,
     backgroundColor: colors.darkBackground,
+    borderRadius: 4,
   },
   skeletonMeta: {
     height: 14,
+    width: '30%',
     backgroundColor: colors.darkBackground,
+    borderRadius: 4,
   },
   skeletonSectionHeader: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
-  },
-  recentSearchesContainer: {
-    padding: 16,
-  },
-  recentSearchesTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  recentSearchItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
-  },
-  recentSearchIcon: {
-    marginRight: 12,
-  },
-  recentSearchText: {
-    fontSize: 16,
+    height: 24,
+    width: '40%',
+    backgroundColor: colors.darkBackground,
+    marginBottom: 16,
+    borderRadius: 4,
   },
 });
 

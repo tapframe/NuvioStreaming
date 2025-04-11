@@ -229,17 +229,18 @@ const CalendarScreen = () => {
     fetchCalendarData();
   }, [fetchCalendarData]);
   
-  const handleSeriesPress = useCallback((seriesId: string) => {
+  const handleSeriesPress = useCallback((seriesId: string, episode?: CalendarEpisode) => {
     navigation.navigate('Metadata', {
       id: seriesId,
-      type: 'series'
+      type: 'series',
+      episodeId: episode ? `${episode.seriesId}:${episode.season}:${episode.episode}` : undefined
     });
   }, [navigation]);
   
   const handleEpisodePress = useCallback((episode: CalendarEpisode) => {
     // For series without episode dates, just go to the series page
     if (!episode.releaseDate) {
-      handleSeriesPress(episode.seriesId);
+      handleSeriesPress(episode.seriesId, episode);
       return;
     }
     
@@ -273,7 +274,7 @@ const CalendarScreen = () => {
           activeOpacity={0.7}
         >
           <TouchableOpacity
-            onPress={() => handleSeriesPress(item.seriesId)}
+            onPress={() => handleSeriesPress(item.seriesId, item)}
             activeOpacity={0.7}
           >
             <Image

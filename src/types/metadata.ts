@@ -1,10 +1,11 @@
 import { TMDBEpisode } from '../services/tmdbService';
 
 // Types for route params
-export interface RouteParams {
+export type RouteParams = {
   id: string;
   type: string;
-}
+  episodeId?: string;
+};
 
 // Stream related types
 export interface Stream {
@@ -92,6 +93,7 @@ export interface StreamingContent {
   releaseInfo?: string;
   directors?: string[];
   creators?: string[];
+  certification?: string;
 }
 
 // Navigation types

@@ -10,6 +10,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../styles/colors';
 import { NuvioHeader } from '../components/NuvioHeader';
+import { Stream } from '../types/streams';
 
 // Import screens with their proper types
 import HomeScreen from '../screens/HomeScreen';
@@ -30,15 +31,50 @@ import NotificationSettingsScreen from '../screens/NotificationSettingsScreen';
 // Stack navigator types
 export type RootStackParamList = {
   MainTabs: undefined;
-  Metadata: { id: string; type: string };
-  Streams: { id: string; type: string; episodeId?: string };
-  Player: { uri: string; title?: string; season?: number; episode?: number; episodeTitle?: string; quality?: string; year?: number; streamProvider?: string };
-  Catalog: { id: string; type: string; addonId?: string; name?: string; genreFilter?: string };
-  Addons: undefined;
+  Home: undefined;
+  Discover: undefined;
+  Library: undefined;
+  Settings: undefined;
   Search: undefined;
-  ShowRatings: { showId: number };
-  CatalogSettings: undefined;
   Calendar: undefined;
+  Metadata: { 
+    id: string; 
+    type: string;
+    episodeId?: string;
+  };
+  Streams: { 
+    id: string; 
+    type: string;
+    episodeId?: string;
+  };
+  VideoPlayer: { 
+    id: string; 
+    type: string; 
+    stream: Stream;
+    episodeId?: string;
+  };
+  Player: { 
+    uri: string; 
+    title?: string; 
+    season?: number; 
+    episode?: number; 
+    episodeTitle?: string; 
+    quality?: string; 
+    year?: number; 
+    streamProvider?: string;
+    id?: string;
+    type?: string;
+    episodeId?: string;
+  };
+  Catalog: { id: string; type: string; addonId?: string; name?: string; genreFilter?: string };
+  Credits: { mediaId: string; mediaType: string };
+  ShowRatings: { showId: number };
+  Account: undefined;
+  Payment: undefined;
+  PrivacyPolicy: undefined;
+  About: undefined;
+  Addons: undefined;
+  CatalogSettings: undefined;
   NotificationSettings: undefined;
 };
 
@@ -448,7 +484,7 @@ const MainTabs = () => {
             }}
           />
         ),
-        header: () => route.name === 'Home' ? <NuvioHeader routeName={route.name} /> : null,
+        header: () => route.name === 'Home' ? <NuvioHeader /> : null,
         headerShown: route.name === 'Home',
       })}
     >

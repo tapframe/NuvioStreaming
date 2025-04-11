@@ -27,6 +27,7 @@ import { tmdbService } from '../services/tmdbService';
 import { stremioService } from '../services/stremioService';
 import { VideoPlayerService } from '../services/videoPlayerService';
 import { useSettings } from '../hooks/useSettings';
+import QualityBadge from '../components/metadata/QualityBadge';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -136,22 +137,12 @@ const StreamCard = memo(({ stream, onPress, index, torrentProgress, isLoading, s
           </View>
           
           <View style={styles.streamMetaRow}>
-            {quality && (
-              <View style={[styles.chip, { backgroundColor: colors.info }]}>
-                <Text style={styles.chipText}>{quality}p</Text>
-              </View>
-            )}
-            
-            {isHDR && (
-              <View style={[styles.chip, { backgroundColor: colors.success }]}>
-                <Text style={styles.chipText}>HDR</Text>
-              </View>
+            {quality && quality >= "720" && (
+              <QualityBadge type="HD" />
             )}
             
             {isDolby && (
-              <View style={[styles.chip, { backgroundColor: colors.warning }]}>
-                <Text style={styles.chipText}>DOLBY</Text>
-              </View>
+              <QualityBadge type="VISION" />
             )}
             
             {size && (
@@ -583,7 +574,10 @@ export const StreamsScreen = () => {
                 episode: type === 'series' ? currentEpisode?.episode_number : undefined,
                 quality: stream.title?.match(/(\d+)p/)?.[1] || undefined,
                 year: metadata?.year,
-                streamProvider: stream.name
+                streamProvider: stream.name,
+                id,
+                type,
+                episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined
               });
             }
           } else {
@@ -596,7 +590,10 @@ export const StreamsScreen = () => {
               episode: type === 'series' ? currentEpisode?.episode_number : undefined,
               quality: stream.title?.match(/(\d+)p/)?.[1] || undefined,
               year: metadata?.year,
-              streamProvider: stream.name
+              streamProvider: stream.name,
+              id,
+              type,
+              episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined
             });
           }
         }
@@ -715,7 +712,10 @@ export const StreamsScreen = () => {
                 episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
                 season: type === 'series' ? currentEpisode?.season_number : undefined,
                 episode: type === 'series' ? currentEpisode?.episode_number : undefined,
-                year: metadata?.year
+                year: metadata?.year,
+                id,
+                type,
+                episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined
               });
             }
           } else {
@@ -726,7 +726,10 @@ export const StreamsScreen = () => {
               episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
               season: type === 'series' ? currentEpisode?.season_number : undefined,
               episode: type === 'series' ? currentEpisode?.episode_number : undefined,
-              year: metadata?.year
+              year: metadata?.year,
+              id,
+              type,
+              episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined
             });
           }
           

@@ -147,9 +147,11 @@ export const ThisWeekSection = () => {
   const handleEpisodePress = (episode: ThisWeekEpisode) => {
     // For upcoming episodes, go to the metadata screen
     if (!episode.isReleased) {
+      const episodeId = `${episode.seriesId}:${episode.season}:${episode.episode}`;
       navigation.navigate('Metadata', {
         id: episode.seriesId,
-        type: 'series'
+        type: 'series',
+        episodeId
       });
       return;
     }

@@ -2,12 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { View, TouchableOpacity, StyleSheet, Text, Dimensions, Modal, Pressable, StatusBar, Platform, ScrollView, Animated, StyleProp, ViewStyle } from 'react-native';
 import Video from 'react-native-video';
 import { Ionicons } from '@expo/vector-icons';
-import { Slider } from 'react-native-awesome-slider';
+import Slider from '@react-native-community/slider';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSharedValue, runOnJS } from 'react-native-reanimated';
-// Remove Gesture Handler imports
-// import { PinchGestureHandler, State, PinchGestureHandlerGestureEvent } from 'react-native-gesture-handler';
-// Import for navigation bar hiding
+// Remove reanimated import since we're not using shared values anymore
 import { NativeModules } from 'react-native';
 // Import immersive mode package
 import RNImmersiveMode from 'react-native-immersive-mode';
@@ -16,6 +13,9 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 // Import navigation hooks
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { storageService } from '../services/storageService';
+// Add throttle/debounce imports
+import { debounce } from 'lodash';
 
 // Define the TrackPreferenceType for audio/text tracks
 type TrackPreferenceType = 'system' | 'disabled' | 'title' | 'language' | 'index';
@@ -35,6 +35,9 @@ interface VideoPlayerProps {
   quality?: string;
   year?: number;
   streamProvider?: string;
+  id?: string;  // Add id for the content
+  type?: string; // Add type (movie/series)
+  episodeId?: string; // Add episodeId for series episodes
 }
 
 // Match the react-native-video AudioTrack type
@@ -73,7 +76,10 @@ const VideoPlayer = () => {
     episodeTitle,
     quality,
     year,
-    streamProvider
+    streamProvider,
+    id,  // Extract id
+    type, // Extract type
+    episodeId // Extract episodeId
   } = route.params;
 
   // Provide a fallback test URL in development mode if URI is empty or invalid
@@ -89,7 +95,10 @@ const VideoPlayer = () => {
     episodeTitle,
     quality,
     year,
-    streamProvider
+    streamProvider,
+    id,
+    type,
+    episodeId
   });
 
   // Validate URI
@@ -122,9 +131,7 @@ const VideoPlayer = () => {
   const [resizeMode, setResizeMode] = useState<ResizeModeType>('contain'); // State for resize mode
   const [showAspectRatioMenu, setShowAspectRatioMenu] = useState(false); // New state for aspect ratio menu
   const videoRef = useRef<any>(null);
-  const progress = useSharedValue(0);
-  const min = useSharedValue(0);
-  const max = useSharedValue(duration);
+  const [sliderValue, setSliderValue] = useState(0);
 
   // Add state for the direct UI menus
   const [showAudioOptions, setShowAudioOptions] = useState(false);
@@ -135,6 +142,80 @@ const VideoPlayer = () => {
 
   // Add a new state variable to track buffering progress
   const [bufferedProgress, setBufferedProgress] = useState(0);
+
+  // Add state for tracking if initial seek is done
+  const [initialSeekDone, setInitialSeekDone] = useState(false);
+  const lastProgressUpdate = useRef<number>(0);
+  const PROGRESS_UPDATE_INTERVAL = 5000; // Update every 5 seconds
+
+  // Add ref for tracking if slider is being dragged
+  const isSliderDragging = useRef(false);
+  // Add last onProgress update time to throttle updates
+  const lastProgressUpdateTime = useRef(0);
+
+  // Load initial progress when component mounts
+  useEffect(() => {
+    const loadProgress = async () => {
+      if (id && type) {
+        const savedProgress = await storageService.getWatchProgress(id, type, episodeId);
+        if (savedProgress && savedProgress.currentTime > 0) {
+          // Only seek if we're not too close to the end
+          const threshold = savedProgress.duration * 0.9; // 90% threshold
+          if (savedProgress.currentTime < threshold) {
+            setCurrentTime(savedProgress.currentTime);
+            if (videoRef.current) {
+              videoRef.current.seek(savedProgress.currentTime);
+            }
+          }
+        }
+      }
+    };
+
+    loadProgress();
+  }, [id, type, episodeId]);
+
+  // Save progress periodically and when component unmounts
+  useEffect(() => {
+    const saveProgress = async () => {
+      if (id && type && duration > 0) {
+        const now = Date.now();
+        // Only update if enough time has passed since last update
+        if (now - lastProgressUpdate.current >= PROGRESS_UPDATE_INTERVAL) {
+          const progressPercent = (currentTime / duration) * 100;
+          
+          // If progress is >= 95%, consider it complete and remove progress
+          if (progressPercent >= 95) {
+            await storageService.removeWatchProgress(id, type, episodeId);
+          } else {
+            await storageService.setWatchProgress(id, type, {
+              currentTime,
+              duration,
+              lastUpdated: now
+            }, episodeId);
+          }
+          
+          lastProgressUpdate.current = now;
+        }
+      }
+    };
+
+    // Save progress periodically
+    const progressInterval = setInterval(saveProgress, PROGRESS_UPDATE_INTERVAL);
+
+    // Save progress when component unmounts
+    return () => {
+      clearInterval(progressInterval);
+      saveProgress();
+    };
+  }, [id, type, episodeId, currentTime, duration]);
+
+  // Handle video completion
+  const onEnd = async () => {
+    if (id && type) {
+      // Remove progress when video is finished
+      await storageService.removeWatchProgress(id, type, episodeId);
+    }
+  };
 
   // Update the component mount effect to start auto-hide timer
   useEffect(() => {
@@ -209,8 +290,10 @@ const VideoPlayer = () => {
   };
 
   useEffect(() => {
-    max.value = duration;
-  }, [duration]);
+    if (duration > 0 && currentTime > 0) {
+      setSliderValue(currentTime);
+    }
+  }, [duration, currentTime]);
 
   const formatTime = (seconds: number) => {
     if (isNaN(seconds)) return '0:00';
@@ -295,23 +378,49 @@ const VideoPlayer = () => {
   // Add dependencies that should reset the timer
   }, [currentTime]);
 
-  const onSliderValueChange = (value: number) => {
-    if (videoRef.current) {
-      const newTime = Math.floor(value);
-      
-      // If seeking forward, preload the buffer at the new position
-      const isFastForward = newTime > currentTime;
-      
-      if (isFastForward) {
-        // Reset buffered progress when seeking forward
-        setBufferedProgress(newTime);
+  // Create a debounced version of the seek function to prevent excessive seeking
+  const debouncedSeek = useRef(
+    debounce((time: number) => {
+      if (videoRef.current) {
+        videoRef.current.seek(time);
       }
-      
-      videoRef.current.seek(newTime);
-      setCurrentTime(newTime);
-      progress.value = newTime;
-      startHideControlsTimer();
+    }, 50)
+  ).current;
+
+  // Modify slider value change handler for community slider
+  const onSliderValueChange = (value: number) => {
+    setSliderValue(value);
+    setCurrentTime(value);
+  };
+
+  const onSlidingComplete = (value: number) => {
+    if (!videoRef.current) return;
+    
+    const newTime = Math.floor(value);
+    
+    // Update UI immediately for responsive feel
+    setCurrentTime(newTime);
+    setSliderValue(newTime);
+    
+    // Seek to the new position
+    videoRef.current.seek(newTime);
+    
+    // Reset buffered progress indicator if seeking forward
+    const isFastForward = newTime > currentTime;
+    if (isFastForward) {
+      setBufferedProgress(newTime);
     }
+    
+    // Reset timer for auto-hiding controls
+    startHideControlsTimer();
+    
+    // Reset slider dragging state
+    isSliderDragging.current = false;
+  };
+
+  // Set slider being touched
+  const onSlidingStart = () => {
+    isSliderDragging.current = true;
   };
 
   const togglePlayback = () => {
@@ -324,39 +433,41 @@ const VideoPlayer = () => {
       const newTime = Math.max(0, Math.min(currentTime + seconds, duration));
       videoRef.current.seek(newTime);
       setCurrentTime(newTime);
-      progress.value = newTime;
+      setSliderValue(newTime);
       startHideControlsTimer();
     }
   };
 
-  // Update the onProgress handler to better manage buffering
+  // Optimize the onProgress handler to throttle updates
   const onProgress = (data: { currentTime: number, playableDuration?: number, seekableDuration?: number }) => {
-    const newTime = Math.floor(data.currentTime);
-    // Only update when the second changes to avoid excessive state updates
-    if (Math.floor(currentTime) !== newTime) {
-      setCurrentTime(data.currentTime);
-      progress.value = data.currentTime;
+    // Skip updates during dragging for smoother UX
+    if (isSliderDragging.current) return;
+    
+    // Throttle updates to reduce render cycles (process at most every 250ms)
+    const now = Date.now();
+    if (now - lastProgressUpdateTime.current < 250) {
+      return;
     }
     
-    // Update buffered progress with the maximum available duration
+    lastProgressUpdateTime.current = now;
+    
+    const newTime = data.currentTime;
+    
+    // Only update when there's a meaningful change (at least 0.5 second difference)
+    if (Math.abs(currentTime - newTime) >= 0.5) {
+      setCurrentTime(newTime);
+      setSliderValue(newTime);
+    }
+    
+    // Update buffered progress more efficiently
     if (data.playableDuration) {
-      // Use the maximum of the current buffer and the new buffer to prevent "shrinking" when seeking
+      // Use a functional update to ensure we're working with the latest state
       setBufferedProgress(prev => Math.max(prev, data.playableDuration || 0));
-    }
-    
-    // Log buffering stats in development mode
-    if (__DEV__ && data.seekableDuration) {
-      console.log(
-        `Buffering stats - Current: ${formatTime(data.currentTime)}, ` +
-        `Buffered: ${formatTime(data.playableDuration || 0)}, ` +
-        `Seekable: ${formatTime(data.seekableDuration)}`
-      );
     }
   };
 
   const onLoad = (data: { duration: number }) => {
     setDuration(data.duration);
-    max.value = data.duration;
   };
 
   const onAudioTracks = (data: { audioTracks: AudioTrack[] }) => {
@@ -542,8 +653,9 @@ const VideoPlayer = () => {
           resizeMode={resizeMode}
           onLoad={onLoad}
           onProgress={onProgress}
+          onEnd={onEnd}
           rate={playbackSpeed}
-          progressUpdateInterval={100}  // More frequent updates for better progress tracking
+          progressUpdateInterval={500}  // Less frequent updates (500ms vs 100ms)
           selectedAudioTrack={selectedAudioTrack !== null ? 
             { type: 'index', value: selectedAudioTrack } as any : 
             undefined
@@ -552,7 +664,7 @@ const VideoPlayer = () => {
           selectedTextTrack={selectedTextTrack as any}
           onTextTracks={onTextTracks}
           
-          // Add caching functionality
+          // Optimize buffer configuration for smoother playback
           bufferConfig={{
             minBufferMs: 15000,         // 15 seconds minimum buffer
             maxBufferMs: 50000,         // 50 seconds maximum buffer
@@ -561,10 +673,14 @@ const VideoPlayer = () => {
           }}
           repeat={false}                // Don't loop the video
           
-          // Add cache control
+          // Performance optimization settings
           ignoreSilentSwitch="ignore"   // Keep playing when the app is in the background
           playInBackground={false}      // Don't play when app is in background
+          reportBandwidth={false}       // Disable bandwidth reporting to reduce overhead
           disableFocus={false}          // Stay focused
+          
+          // Only render when actively used to save resources
+          renderToHardwareTextureAndroid={true}
           
           onBuffer={(buffer) => {
             console.log('Buffering:', buffer.isBuffering);
@@ -572,7 +688,6 @@ const VideoPlayer = () => {
           
           onError={(error) => {
             console.error('Video playback error:', error);
-            // Display error details for debugging
             alert(`Video Error: ${error.error.errorString} (Code: ${error.error.errorCode})`);
           }}
         />
@@ -637,35 +752,42 @@ const VideoPlayer = () => {
               style={styles.bottomGradient}
             >
               <View style={styles.bottomControls}>
-                {/* Slider */}
+                {/* Slider - replaced with community slider */}
                 <View style={styles.sliderContainer}>
-                  {/* Buffer indicator */}
+                  {/* Buffer indicator - only render if needed */}
                   {bufferedProgress > 0 && (
                     <View style={[
                       styles.bufferIndicator, 
                       { 
-                        width: `${(bufferedProgress / duration) * 100}%`,
-                        maxWidth: '100%'
+                        width: `${Math.min((bufferedProgress / (duration || 1)) * 100, 100)}%`
                       }
                     ]} 
                     />
                   )}
-                  <Slider
-                    progress={progress}
-                    minimumValue={min}
-                    maximumValue={max}
-                    style={styles.slider}
-                    onValueChange={onSliderValueChange}
-                    theme={{
-                      minimumTrackTintColor: '#E50914',
-                      maximumTrackTintColor: 'rgba(255, 255, 255, 0.3)',
-                      bubbleBackgroundColor: '#E50914',
-                      cacheTrackTintColor: 'rgba(229, 9, 20, 0.5)',
-                    }}
-                  />
-                  <Text style={styles.duration}>
-                    {formatTime(currentTime)} / {formatTime(duration)}
-                  </Text>
+                  
+                  <View style={styles.sliderRow}>
+                    <Text style={styles.currentTime}>
+                      {formatTime(currentTime)}
+                    </Text>
+                    
+                    <Slider
+                      style={styles.slider}
+                      value={sliderValue}
+                      minimumValue={0}
+                      maximumValue={duration > 0 ? duration : 1}
+                      step={0.1}
+                      minimumTrackTintColor="#E50914"
+                      maximumTrackTintColor="rgba(255, 255, 255, 0.3)"
+                      thumbTintColor="#E50914"
+                      onValueChange={onSliderValueChange}
+                      onSlidingStart={onSlidingStart}
+                      onSlidingComplete={onSlidingComplete}
+                    />
+                    
+                    <Text style={styles.durationText}>
+                      {formatTime(duration)}
+                    </Text>
+                  </View>
                 </View>
 
                 {/* Bottom Buttons Row */}
@@ -943,25 +1065,40 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     position: 'relative',
   },
+  sliderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+  },
   bufferIndicator: {
     position: 'absolute',
-    height: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     top: 14, // Position to align with the slider track
-    left: 0,
+    left: 24, // Account for the currentTime text
+    right: 24, // Account for the duration text  
     zIndex: 1,
-    borderRadius: 1.5,
+    borderRadius: 2,
   },
   slider: {
-    width: '100%',
-    height: 30,
+    flex: 1,
+    height: 40,
+    marginHorizontal: 8,
   },
-  duration: {
+  currentTime: {
     color: 'white',
     fontSize: 12,
-    marginTop: 4,
-    opacity: 0.9,
     fontWeight: '500',
+    opacity: 0.9,
+    width: 40, // Fix width to prevent layout shifts
+    textAlign: 'right',
+  },
+  durationText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '500',
+    opacity: 0.9,
+    width: 40, // Fix width to prevent layout shifts
   },
   bottomButtons: {
     flexDirection: 'row',
@@ -1142,37 +1279,6 @@ const styles = StyleSheet.create({
   },
   selectedOptionText: {
     fontWeight: 'bold',
-  },
-  sliderBubble: {
-    backgroundColor: '#E50914',
-    borderRadius: 4,
-    padding: 4,
-    position: 'absolute',
-    bottom: 25,
-  },
-  sliderBubbleText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  customThumb: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: 'rgba(229, 9, 20, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 2,
-  },
-  thumbInner: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'white',
   },
 });
 

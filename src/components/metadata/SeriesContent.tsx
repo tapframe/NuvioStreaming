@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, useWindowDimensions, useColorScheme } from 'react-native';
 import { Image } from 'expo-image';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { colors } from '../../styles/colors';
 import { Episode } from '../../types/metadata';
 import { tmdbService } from '../../services/tmdbService';
+import { storageService } from '../../services/storageService';
+import { useFocusEffect } from '@react-navigation/native';
 
 interface SeriesContentProps {
   episodes: Episode[];
@@ -13,7 +15,7 @@ interface SeriesContentProps {
   onSeasonChange: (season: number) => void;
   onSelectEpisode: (episode: Episode) => void;
   groupedEpisodes?: { [seasonNumber: number]: Episode[] };
-  metadata?: { poster?: string };
+  metadata?: { poster?: string; id?: string };
 }
 
 // Add placeholder constant at the top
@@ -33,6 +35,39 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   const { width } = useWindowDimensions();
   const isTablet = width > 768;
   const isDarkMode = useColorScheme() === 'dark';
+  const [episodeProgress, setEpisodeProgress] = useState<{ [key: string]: { currentTime: number; duration: number } }>({});
+
+  const loadEpisodesProgress = async () => {
+    if (!metadata?.id) return;
+    
+    const allProgress = await storageService.getAllWatchProgress();
+    const progress: { [key: string]: { currentTime: number; duration: number } } = {};
+    
+    episodes.forEach(episode => {
+      const episodeId = episode.stremioId || `${metadata.id}:${episode.season_number}:${episode.episode_number}`;
+      const key = `series:${metadata.id}:${episodeId}`;
+      if (allProgress[key]) {
+        progress[episodeId] = {
+          currentTime: allProgress[key].currentTime,
+          duration: allProgress[key].duration
+        };
+      }
+    });
+    
+    setEpisodeProgress(progress);
+  };
+
+  // Initial load of watch progress
+  useEffect(() => {
+    loadEpisodesProgress();
+  }, [episodes, metadata?.id]);
+
+  // Refresh watch progress when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      loadEpisodesProgress();
+    }, [episodes, metadata?.id])
+  );
 
   if (loadingSeasons) {
     return (
@@ -134,7 +169,15 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
         year: 'numeric'
       });
     };
+
+    // Get episode progress
+    const episodeId = episode.stremioId || `${metadata?.id}:${episode.season_number}:${episode.episode_number}`;
+    const progress = episodeProgress[episodeId];
+    const progressPercent = progress ? (progress.currentTime / progress.duration) * 100 : 0;
     
+    // Don't show progress bar if episode is complete (>= 95%)
+    const showProgress = progress && progressPercent < 95;
+
     return (
       <TouchableOpacity
         key={episode.id}
@@ -151,6 +194,21 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
           <View style={styles.episodeNumberBadge}>
             <Text style={styles.episodeNumberText}>{episodeString}</Text>
           </View>
+          {showProgress && (
+            <View style={styles.progressBarContainer}>
+              <View 
+                style={[
+                  styles.progressBar,
+                  { width: `${progressPercent}%` }
+                ]} 
+              />
+            </View>
+          )}
+          {progressPercent >= 95 && (
+            <View style={styles.completedBadge}>
+              <MaterialIcons name="check" size={12} color={colors.white} />
+            </View>
+          )}
         </View>
 
         <View style={styles.episodeInfo}>
@@ -397,5 +455,45 @@ const styles = StyleSheet.create({
   selectedSeasonButtonText: {
     color: colors.text,
     fontWeight: '700',
+  },
+  progressBarContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: colors.primary,
+  },
+  progressTextContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  progressText: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  completedBadge: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    backgroundColor: colors.success,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
 }); 

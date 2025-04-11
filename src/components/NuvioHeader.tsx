@@ -5,6 +5,7 @@ import { colors } from '../styles/colors';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
+import { LinearGradient } from 'expo-linear-gradient';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -13,28 +14,46 @@ export const NuvioHeader = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.contentContainer}>
-        <Text style={styles.title}>NUVIO</Text>
-        <TouchableOpacity
-          style={styles.searchButton}
-          onPress={() => navigation.navigate('Search')}
-        >
-          <MaterialCommunityIcons 
-            name="magnify" 
-            size={28} 
-            color={colors.white} 
-          />
-        </TouchableOpacity>
-      </View>
+      <LinearGradient
+        colors={[
+          '#000000',
+          'rgba(0, 0, 0, 0.95)',
+          'rgba(0, 0, 0, 0.8)',
+          'rgba(0, 0, 0, 0.2)',
+          'transparent'
+        ]}
+        locations={[0, 0.3, 0.6, 0.8, 1]}
+        style={styles.gradient}
+      >
+        <View style={styles.contentContainer}>
+          <Text style={styles.title}>NUVIO</Text>
+          <TouchableOpacity
+            style={styles.searchButton}
+            onPress={() => navigation.navigate('Search')}
+          >
+            <MaterialCommunityIcons 
+              name="magnify" 
+              size={28} 
+              color={colors.white} 
+            />
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.darkBackground,
-    height: Platform.OS === 'ios' ? 96 : 80,
-    paddingTop: Platform.OS === 'ios' ? 48 : 32,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
+  gradient: {
+    height: Platform.OS === 'ios' ? 100 : 90,
+    paddingTop: Platform.OS === 'ios' ? 40 : 24,
   },
   contentContainer: {
     flexDirection: 'row',

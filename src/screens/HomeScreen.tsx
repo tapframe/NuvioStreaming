@@ -15,7 +15,6 @@ import {
   ScrollView,
   Platform,
   Image,
-  Vibration,
   Modal,
   Pressable
 } from 'react-native';
@@ -48,6 +47,7 @@ import {
 } from 'react-native-gesture-handler';
 import { useCatalogContext } from '../contexts/CatalogContext';
 import { ThisWeekSection } from '../components/home/ThisWeekSection';
+import * as Haptics from 'expo-haptics';
 
 // Define interfaces for our data
 interface Category {
@@ -216,7 +216,6 @@ const ContentItem = ({ item: initialItem, onPress }: ContentItemProps) => {
 
   const handleLongPress = useCallback(() => {
     setMenuVisible(true);
-    Vibration.vibrate(50);
   }, []);
 
   const handlePress = useCallback(() => {
@@ -366,6 +365,16 @@ const HomeScreen = () => {
   const [loadingImages, setLoadingImages] = useState(true);
   const maxRetries = 3;
   const { lastUpdate } = useCatalogContext();
+  const [isSaved, setIsSaved] = useState(false);
+
+  useEffect(() => {
+    StatusBar.setTranslucent(true);
+    StatusBar.setBackgroundColor('transparent');
+    return () => {
+      StatusBar.setTranslucent(false);
+      StatusBar.setBackgroundColor(colors.darkBackground);
+    };
+  }, []);
 
   // Pre-warm the metadata screen
   useEffect(() => {
@@ -522,6 +531,43 @@ const HomeScreen = () => {
     loadContent(true);
   }, [loadContent, lastUpdate]);
 
+  // Check if content is in library
+  useEffect(() => {
+    if (featuredContent) {
+      const checkLibrary = async () => {
+        const items = await catalogService.getLibraryItems();
+        setIsSaved(items.some(item => item.id === featuredContent.id));
+      };
+      checkLibrary();
+    }
+  }, [featuredContent]);
+
+  // Subscribe to library updates
+  useEffect(() => {
+    const unsubscribe = catalogService.subscribeToLibraryUpdates((items) => {
+      if (featuredContent) {
+        setIsSaved(items.some(item => item.id === featuredContent.id));
+      }
+    });
+
+    return () => unsubscribe();
+  }, [featuredContent]);
+
+  const handleSaveToLibrary = useCallback(async () => {
+    if (!featuredContent) return;
+    
+    try {
+      if (isSaved) {
+        await catalogService.removeFromLibrary(featuredContent.type, featuredContent.id);
+      } else {
+        await catalogService.addToLibrary(featuredContent);
+      }
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (error) {
+      console.error('Error updating library:', error);
+    }
+  }, [featuredContent, isSaved]);
+
   const handleCategoryChange = (categoryId: string) => {
     setSelectedCategory(categoryId);
   };
@@ -539,7 +585,9 @@ const HomeScreen = () => {
       title: featuredContent.name,
       year: featuredContent.year,
       quality: stream.title?.match(/(\d+)p/)?.[1] || undefined,
-      streamProvider: stream.name
+      streamProvider: stream.name,
+      id: featuredContent.id,
+      type: featuredContent.type
     });
   }, [featuredContent, navigation]);
 
@@ -547,14 +595,7 @@ const HomeScreen = () => {
     if (!featuredContent) return null;
 
     return (
-      <TouchableOpacity
-        style={styles.featuredContainer}
-        activeOpacity={0.9}
-        onPress={() => navigation.navigate('Metadata', { 
-          id: featuredContent.id, 
-          type: featuredContent.type
-        })}
-      >
+      <View style={styles.featuredContainer}>
         <ImageBackground
           source={{ uri: featuredContent.banner || featuredContent.poster }}
           style={styles.featuredBanner}
@@ -563,15 +604,15 @@ const HomeScreen = () => {
           <LinearGradient
             colors={[
               'transparent',
-              `${colors.darkBackground}26`,
-              `${colors.darkBackground}40`,
-              `${colors.darkBackground}B3`,
-              `${colors.darkBackground}E6`,
+              'rgba(0,0,0,0.2)',
+              'rgba(0,0,0,0.6)',
+              'rgba(0,0,0,0.8)',
               colors.darkBackground
             ]}
-            locations={[0, 0.3, 0.5, 0.7, 0.85, 1]}
+            locations={[0, 0.3, 0.6, 0.8, 1]}
             style={styles.featuredGradient}
           >
+            <View style={{ flex: 1 }} />
             <View style={styles.featuredContent}>
               {featuredContent.logo ? (
                 <ExpoImage
@@ -579,51 +620,39 @@ const HomeScreen = () => {
                   style={styles.featuredLogo}
                   contentFit="contain"
                   transition={200}
-                  cachePolicy="memory-disk"
                 />
               ) : (
                 <Text style={styles.featuredTitle}>{featuredContent.name}</Text>
               )}
 
-              {featuredContent.genres && featuredContent.genres.length > 0 && (
-                <View style={styles.genreContainer}>
-                  {featuredContent.genres.slice(0, 3).map((genre, index, array) => (
-                    <React.Fragment key={index}>
-                      <Text style={styles.genreText}>{genre}</Text>
-                      {index < array.length - 1 && (
-                        <Text style={styles.genreDot}>•</Text>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </View>
-              )}
-              
-              <View style={styles.featuredMeta}>
-                {featuredContent.year && (
-                  <View style={styles.yearChip}>
-                    <Text style={styles.yearText}>{featuredContent.year}</Text>
-                  </View>
-                )}
-                {featuredContent.imdbRating && (
-                  <View style={styles.ratingContainer}>
-                    <Image 
-                      source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/IMDB_Logo_2016.svg/575px-IMDB_Logo_2016.svg.png' }}
-                      style={styles.imdbLogo}
-                    />
-                    <Text style={styles.ratingText}>{featuredContent.imdbRating}</Text>
-                  </View>
-                )}
+              <View style={styles.genreContainer}>
+                {featuredContent.genres?.slice(0, 3).map((genre, index, array) => (
+                  <React.Fragment key={index}>
+                    <Text style={styles.genreText}>{genre}</Text>
+                    {index < array.length - 1 && (
+                      <Text style={styles.genreDot}>•</Text>
+                    )}
+                  </React.Fragment>
+                ))}
               </View>
 
-              {featuredContent.description && (
-                <Text style={styles.description} numberOfLines={3}>
-                  {featuredContent.description}
-                </Text>
-              )}
-
               <View style={styles.featuredButtons}>
-                <TouchableOpacity
-                  style={[styles.featuredButton, styles.playButton]}
+                <TouchableOpacity 
+                  style={styles.myListButton}
+                  onPress={handleSaveToLibrary}
+                >
+                  <MaterialIcons 
+                    name={isSaved ? "bookmark" : "bookmark-border"} 
+                    size={24} 
+                    color={colors.white} 
+                  />
+                  <Text style={styles.myListButtonText}>
+                    {isSaved ? "Saved" : "Save"}
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.playButton}
                   onPress={() => {
                     if (featuredContent) {
                       navigation.navigate('Streams', { 
@@ -633,25 +662,25 @@ const HomeScreen = () => {
                     }
                   }}
                 >
-                  <MaterialIcons name="play-arrow" color="#000000" size={24} />
+                  <MaterialIcons name="play-arrow" size={24} color={colors.black} />
                   <Text style={styles.playButtonText}>Play</Text>
                 </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[styles.featuredButton, styles.infoButton]}
+
+                <TouchableOpacity 
+                  style={styles.infoButton}
                   onPress={() => navigation.navigate('Metadata', {
                     id: featuredContent?.id, 
                     type: featuredContent?.type
                   })}
                 >
-                  <MaterialIcons name="info-outline" color="#FFFFFF" size={20} />
-                  <Text style={styles.infoButtonText}>More Info</Text>
+                  <MaterialIcons name="info-outline" size={24} color={colors.white} />
+                  <Text style={styles.infoButtonText}>Info</Text>
                 </TouchableOpacity>
               </View>
             </View>
           </LinearGradient>
         </ImageBackground>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -705,7 +734,7 @@ const HomeScreen = () => {
 
   if (loading && !refreshing) {
     return (
-      <SafeAreaView style={[styles.container]}>
+      <View style={[styles.container]}>
         <StatusBar
           barStyle="light-content"
           backgroundColor="transparent"
@@ -720,18 +749,17 @@ const HomeScreen = () => {
             <SkeletonCatalog key={index} />
           ))}
         </ScrollView>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container]}>
+    <View style={[styles.container]}>
       <StatusBar
         barStyle="light-content"
         backgroundColor="transparent"
         translucent
       />
-
       <ScrollView
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.text} />
@@ -761,14 +789,14 @@ const HomeScreen = () => {
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const { width, height } = Dimensions.get('window');
 const POSTER_WIDTH = (width - 40) / 2.7;
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create<any>({
   container: {
     flex: 1,
     backgroundColor: colors.darkBackground,
@@ -783,17 +811,10 @@ const styles = StyleSheet.create({
   },
   featuredContainer: {
     width: '100%',
-    height: height * 0.75,
-    marginTop: -(StatusBar.currentHeight || 0),
+    height: height * 0.65,
+    marginTop: 0,
     marginBottom: 0,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    overflow: 'hidden',
-    elevation: 0,
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
+    position: 'relative',
   },
   featuredBanner: {
     width: '100%',
@@ -802,131 +823,112 @@ const styles = StyleSheet.create({
   featuredGradient: {
     width: '100%',
     height: '100%',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
   },
   featuredContent: {
     padding: 24,
-    paddingBottom: 24,
+    paddingBottom: 16,
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'flex-end',
+    gap: 8,
   },
   featuredLogo: {
-    width: width * 0.6,
+    width: width * 0.7,
     height: 100,
     marginBottom: 0,
-    alignSelf: 'flex-start',
-    backgroundColor: colors.transparent,
-    minHeight: 60,
-    maxHeight: 100,
+    alignSelf: 'center',
   },
   featuredTitle: {
-    color: colors.highEmphasis,
+    color: colors.white,
     fontSize: 32,
     fontWeight: '900',
-    marginBottom: 16,
+    marginBottom: 0,
+    textAlign: 'center',
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
-    letterSpacing: -0.5,
-  },
-  description: {
-    color: colors.mediumEmphasis,
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: 20,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
   genreContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'center',
+    marginBottom: 0,
     flexWrap: 'wrap',
+    gap: 4,
   },
   genreText: {
-    color: colors.highEmphasis,
-    fontSize: 14,
+    color: colors.white,
+    fontSize: 13,
     fontWeight: '500',
-    opacity: 0.8,
+    opacity: 0.9,
   },
   genreDot: {
-    color: colors.highEmphasis,
-    fontSize: 14,
-    marginHorizontal: 8,
-    opacity: 0.6,
-  },
-  yearChip: {
-    backgroundColor: colors.elevation3,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  yearText: {
-    color: colors.highEmphasis,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  featuredMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    marginTop: 4,
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.elevation3,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  ratingText: {
-    color: colors.highEmphasis,
-    marginLeft: 4,
-    fontWeight: '700',
+    color: colors.white,
     fontSize: 13,
+    marginHorizontal: 4,
+    opacity: 0.6,
   },
   featuredButtons: {
     flexDirection: 'row',
-    gap: 16,
-    marginTop: 12,
-  },
-  featuredButton: {
+    alignItems: 'flex-end',
+    justifyContent: 'space-evenly',
+    width: '100%',
     flex: 1,
+    maxHeight: 60,
+    paddingTop: 12,
+  },
+  playButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
+    paddingHorizontal: 24,
     borderRadius: 100,
+    backgroundColor: colors.white,
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
+    flex: 0,
+    width: 150,
   },
-  playButton: {
-    backgroundColor: colors.white,
+  myListButton: {
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 0,
+    gap: 6,
+    width: 40,
+    height: 41,
+    flex: null,
+  },
+  infoButton: {
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 0,
+    gap: 4,
+    width: 40,
+    height: 39,
+    flex: null,
   },
   playButtonText: {
     color: colors.black,
-    fontWeight: '700',
+    fontWeight: '600',
     marginLeft: 8,
     fontSize: 16,
   },
-  infoButton: {
-    backgroundColor: colors.elevation2,
-    borderWidth: 2,
-    borderColor: colors.white,
+  myListButtonText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: '500',
   },
   infoButtonText: {
     color: colors.white,
-    marginLeft: 8,
-    fontWeight: '700',
-    fontSize: 16,
+    fontSize: 12,
+    fontWeight: '500',
   },
   catalogContainer: {
     marginBottom: 24,

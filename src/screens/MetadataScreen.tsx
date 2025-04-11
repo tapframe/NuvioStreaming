@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
@@ -24,6 +24,7 @@ import { CastSection } from '../components/metadata/CastSection';
 import { SeriesContent } from '../components/metadata/SeriesContent';
 import { MovieContent } from '../components/metadata/MovieContent';
 import { MoreLikeThisSection } from '../components/metadata/MoreLikeThisSection';
+import AgeBadge from '../components/metadata/AgeBadge';
 import { RouteParams, Episode } from '../types/metadata';
 import Animated, {
   useAnimatedStyle,
@@ -41,6 +42,7 @@ import { RouteProp } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { TMDBService } from '../services/tmdbService';
+import { storageService } from '../services/storageService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -51,10 +53,13 @@ const springConfig = {
   stiffness: 100
 };
 
+// Add debug log for storageService
+console.log('[MetadataScreen] StorageService instance:', storageService);
+
 const MetadataScreen = () => {
-  const route = useRoute<RouteProp<Record<string, RouteParams>, string>>();
+  const route = useRoute<RouteProp<Record<string, RouteParams & { episodeId?: string }>, string>>();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
-  const { id, type } = route.params;
+  const { id, type, episodeId } = route.params;
 
   const {
     metadata,
@@ -88,23 +93,319 @@ const MetadataScreen = () => {
   const heroHeight = useSharedValue(height * 0.75);
   const contentTranslateY = useSharedValue(50);
 
+  // Add state for watch progress
+  const [watchProgress, setWatchProgress] = useState<{
+    currentTime: number;
+    duration: number;
+    lastUpdated: number;
+    episodeId?: string;
+  } | null>(null);
+
+  // Debug log for route params
+  console.log('[MetadataScreen] Component mounted with route params:', { id, type, episodeId });
+
+  // Function to get episode details from episodeId
+  const getEpisodeDetails = useCallback((episodeId: string) => {
+    // Try to parse from format "seriesId:season:episode"
+    const parts = episodeId.split(':');
+    if (parts.length === 3) {
+      const [, seasonNum, episodeNum] = parts;
+      // Find episode in our local episodes array
+      const episode = episodes.find(
+        ep => ep.season_number === parseInt(seasonNum) && 
+              ep.episode_number === parseInt(episodeNum)
+      );
+      
+      if (episode) {
+        return {
+          seasonNumber: seasonNum,
+          episodeNumber: episodeNum,
+          episodeName: episode.name
+        };
+      }
+    }
+
+    // If not found by season/episode, try stremioId
+    const episodeByStremioId = episodes.find(ep => ep.stremioId === episodeId);
+    if (episodeByStremioId) {
+      return {
+        seasonNumber: episodeByStremioId.season_number.toString(),
+        episodeNumber: episodeByStremioId.episode_number.toString(),
+        episodeName: episodeByStremioId.name
+      };
+    }
+
+    return null;
+  }, [episodes]);
+
+  const loadWatchProgress = useCallback(async () => {
+    try {
+      if (id && type) {
+        if (type === 'series') {
+          const allProgress = await storageService.getAllWatchProgress();
+          
+          // Function to get episode number from episodeId
+          const getEpisodeNumber = (epId: string) => {
+            const parts = epId.split(':');
+            if (parts.length === 3) {
+              return {
+                season: parseInt(parts[1]),
+                episode: parseInt(parts[2])
+              };
+            }
+            return null;
+          };
+
+          // Get all episodes for this series with progress
+          const seriesProgresses = Object.entries(allProgress)
+            .filter(([key]) => key.includes(`${type}:${id}:`))
+            .map(([key, value]) => ({
+              episodeId: key.split(`${type}:${id}:`)[1],
+              progress: value
+            }))
+            .filter(({ episodeId, progress }) => {
+              const progressPercent = (progress.currentTime / progress.duration) * 100;
+              return progressPercent > 0;
+            });
+
+          // If we have a specific episodeId in route params
+          if (episodeId) {
+            const progress = await storageService.getWatchProgress(id, type, episodeId);
+            if (progress) {
+              const progressPercent = (progress.currentTime / progress.duration) * 100;
+              
+              // If current episode is finished (≥95%), try to find next unwatched episode
+              if (progressPercent >= 95) {
+                const currentEpNum = getEpisodeNumber(episodeId);
+                if (currentEpNum && episodes.length > 0) {
+                  // Find the next episode
+                  const nextEpisode = episodes.find(ep => {
+                    // First check in same season
+                    if (ep.season_number === currentEpNum.season && ep.episode_number > currentEpNum.episode) {
+                      const epId = ep.stremioId || `${id}:${ep.season_number}:${ep.episode_number}`;
+                      const epProgress = seriesProgresses.find(p => p.episodeId === epId);
+                      if (!epProgress) return true;
+                      const percent = (epProgress.progress.currentTime / epProgress.progress.duration) * 100;
+                      return percent < 95;
+                    }
+                    // Then check next seasons
+                    if (ep.season_number > currentEpNum.season) {
+                      const epId = ep.stremioId || `${id}:${ep.season_number}:${ep.episode_number}`;
+                      const epProgress = seriesProgresses.find(p => p.episodeId === epId);
+                      if (!epProgress) return true;
+                      const percent = (epProgress.progress.currentTime / epProgress.progress.duration) * 100;
+                      return percent < 95;
+                    }
+                    return false;
+                  });
+
+                  if (nextEpisode) {
+                    const nextEpisodeId = nextEpisode.stremioId || 
+                      `${id}:${nextEpisode.season_number}:${nextEpisode.episode_number}`;
+                    const nextProgress = await storageService.getWatchProgress(id, type, nextEpisodeId);
+                    if (nextProgress) {
+                      setWatchProgress({ ...nextProgress, episodeId: nextEpisodeId });
+                    } else {
+                      setWatchProgress({ currentTime: 0, duration: 0, lastUpdated: Date.now(), episodeId: nextEpisodeId });
+                    }
+                    return;
+                  }
+                }
+                // If no next episode found or current episode is finished, show no progress
+                setWatchProgress(null);
+                return;
+              }
+              
+              // If current episode is not finished, show its progress
+              setWatchProgress({ ...progress, episodeId });
+            } else {
+              setWatchProgress(null);
+            }
+          } else {
+            // Find the first unfinished episode
+            const unfinishedEpisode = episodes.find(ep => {
+              const epId = ep.stremioId || `${id}:${ep.season_number}:${ep.episode_number}`;
+              const progress = seriesProgresses.find(p => p.episodeId === epId);
+              if (!progress) return true;
+              const percent = (progress.progress.currentTime / progress.progress.duration) * 100;
+              return percent < 95;
+            });
+
+            if (unfinishedEpisode) {
+              const epId = unfinishedEpisode.stremioId || 
+                `${id}:${unfinishedEpisode.season_number}:${unfinishedEpisode.episode_number}`;
+              const progress = await storageService.getWatchProgress(id, type, epId);
+              if (progress) {
+                setWatchProgress({ ...progress, episodeId: epId });
+              } else {
+                setWatchProgress({ currentTime: 0, duration: 0, lastUpdated: Date.now(), episodeId: epId });
+              }
+            } else {
+              setWatchProgress(null);
+            }
+          }
+        } else {
+          // For movies
+          const progress = await storageService.getWatchProgress(id, type, episodeId);
+          if (progress && progress.currentTime > 0) {
+            const progressPercent = (progress.currentTime / progress.duration) * 100;
+            if (progressPercent >= 95) {
+              setWatchProgress(null);
+            } else {
+              setWatchProgress({ ...progress, episodeId });
+            }
+          } else {
+            setWatchProgress(null);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[MetadataScreen] Error loading watch progress:', error);
+      setWatchProgress(null);
+    }
+  }, [id, type, episodeId, episodes]);
+
+  // Initial load
+  useEffect(() => {
+    loadWatchProgress();
+  }, [loadWatchProgress]);
+
+  // Refresh when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadWatchProgress();
+    }, [loadWatchProgress])
+  );
+
+  // Function to get play button text
+  const getPlayButtonText = useCallback(() => {
+    if (!watchProgress || watchProgress.currentTime <= 0) {
+      return 'Play';
+    }
+
+    // Consider episode complete if progress is >= 95%
+    const progressPercent = (watchProgress.currentTime / watchProgress.duration) * 100;
+    if (progressPercent >= 95) {
+      return 'Play';
+    }
+
+    return 'Resume';
+  }, [watchProgress]);
+
+  // Update the watch progress display
+  const renderWatchProgress = () => {
+    if (!watchProgress) {
+      return null;
+    }
+
+    const progressPercent = (watchProgress.currentTime / watchProgress.duration) * 100;
+    const formattedTime = new Date(watchProgress.lastUpdated).toLocaleDateString();
+    let episodeInfo = '';
+
+    if (type === 'series' && watchProgress.episodeId) {
+      const details = getEpisodeDetails(watchProgress.episodeId);
+      if (details) {
+        episodeInfo = ` • S${details.seasonNumber}:E${details.episodeNumber}${details.episodeName ? ` - ${details.episodeName}` : ''}`;
+      }
+    }
+
+    return (
+      <View style={styles.watchProgressContainer}>
+        <View style={styles.watchProgressBar}>
+          <View 
+            style={[
+              styles.watchProgressFill, 
+              { width: `${progressPercent}%` }
+            ]} 
+          />
+        </View>
+        <Text style={styles.watchProgressText}>
+          {progressPercent >= 95 ? 'Watched' : `${Math.round(progressPercent)}% watched`}{episodeInfo} • Last watched on {formattedTime}
+        </Text>
+      </View>
+    );
+  };
+
+  // Update the action buttons section
+  const ActionButtons = () => (
+    <View style={styles.actionButtons}>
+      <TouchableOpacity
+        style={[styles.actionButton, styles.playButton]}
+        onPress={handleShowStreams}
+      >
+        <MaterialIcons 
+          name={watchProgress && watchProgress.currentTime > 0 ? "play-circle-outline" : "play-arrow"} 
+          size={24} 
+          color="#000" 
+        />
+        <Text style={styles.playButtonText}>
+          {getPlayButtonText()}
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.actionButton, styles.infoButton]}
+        onPress={toggleLibrary}
+      >
+        <MaterialIcons
+          name={inLibrary ? 'bookmark' : 'bookmark-border'}
+          size={24}
+          color="#fff"
+        />
+        <Text style={styles.infoButtonText}>
+          {inLibrary ? 'Saved' : 'Save'}
+        </Text>
+      </TouchableOpacity>
+
+      {type === 'series' && (
+        <TouchableOpacity
+          style={[styles.iconButton]}
+          onPress={async () => {
+            const tmdb = TMDBService.getInstance();
+            const tmdbId = await tmdb.extractTMDBIdFromStremioId(id);
+            if (tmdbId) {
+              navigation.navigate('ShowRatings', { showId: tmdbId });
+            } else {
+              console.error('Could not find TMDB ID for show');
+            }
+          }}
+        >
+          <MaterialIcons name="star-rate" size={24} color="#fff" />
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
   // Handler functions
   const handleShowStreams = useCallback(() => {
-    if (type === 'series' && episodes.length > 0) {
-      const firstEpisode = episodes[0];
-      const episodeId = firstEpisode.stremioId || `${id}:${firstEpisode.season_number}:${firstEpisode.episode_number}`;
-      navigation.navigate('Streams', {
-        id,
-        type,
-        episodeId
-      });
-    } else {
-      navigation.navigate('Streams', {
-        id,
-        type
-      });
+    if (type === 'series') {
+      // If we have watch progress with an episodeId, use that
+      if (watchProgress?.episodeId) {
+        navigation.navigate('Streams', { 
+          id, 
+          type, 
+          episodeId: watchProgress.episodeId 
+        });
+        return;
+      }
+      
+      // If we have a specific episodeId from route params, use that
+      if (episodeId) {
+        navigation.navigate('Streams', { id, type, episodeId });
+        return;
+      }
+      
+      // Otherwise, if we have episodes, start with the first one
+      if (episodes.length > 0) {
+        const firstEpisode = episodes[0];
+        const newEpisodeId = firstEpisode.stremioId || `${id}:${firstEpisode.season_number}:${firstEpisode.episode_number}`;
+        navigation.navigate('Streams', { id, type, episodeId: newEpisodeId });
+        return;
+      }
     }
-  }, [navigation, id, type, episodes]);
+    
+    navigation.navigate('Streams', { id, type, episodeId });
+  }, [navigation, id, type, episodes, episodeId, watchProgress]);
 
   const handleSelectCastMember = (castMember: any) => {
     // TODO: Implement cast member selection
@@ -380,6 +681,9 @@ const MetadataScreen = () => {
                     <Text style={styles.titleText}>{metadata.name}</Text>
                   )}
 
+                  {/* Watch Progress */}
+                  {renderWatchProgress()}
+
                   {/* Genre Tags */}
                   {metadata.genres && metadata.genres.length > 0 && (
                     <View style={styles.genreContainer}>
@@ -395,47 +699,7 @@ const MetadataScreen = () => {
                   )}
 
                   {/* Action Buttons */}
-                  <View style={styles.actionButtons}>
-                    <TouchableOpacity
-                      style={[styles.actionButton, styles.playButton]}
-                      onPress={handleShowStreams}
-                    >
-                      <MaterialIcons name="play-arrow" size={24} color="#000" />
-                      <Text style={styles.playButtonText}>Play</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[styles.actionButton, styles.infoButton]}
-                      onPress={toggleLibrary}
-                    >
-                      <MaterialIcons
-                        name={inLibrary ? 'bookmark' : 'bookmark-border'}
-                        size={24}
-                        color="#fff"
-                      />
-                      <Text style={styles.infoButtonText}>
-                        {inLibrary ? 'Saved' : 'Save'}
-                      </Text>
-                    </TouchableOpacity>
-
-                    {type === 'series' && (
-                      <TouchableOpacity
-                        style={[styles.iconButton]}
-                        onPress={async () => {
-                          const tmdb = TMDBService.getInstance();
-                          const tmdbId = await tmdb.extractTMDBIdFromStremioId(id);
-                          if (tmdbId) {
-                            navigation.navigate('ShowRatings', { showId: tmdbId });
-                          } else {
-                            // TODO: Show error toast
-                            console.error('Could not find TMDB ID for show');
-                          }
-                        }}
-                      >
-                        <MaterialIcons name="star-rate" size={24} color="#fff" />
-                      </TouchableOpacity>
-                    )}
-                  </View>
+                  <ActionButtons />
                 </Animated.View>
               </LinearGradient>
             </ImageBackground>
@@ -446,14 +710,13 @@ const MetadataScreen = () => {
             {/* Meta Info */}
             <View style={styles.metaInfo}>
               {metadata.year && (
-                <View style={styles.metaChip}>
-                  <Text style={styles.metaChipText}>{metadata.year}</Text>
-                </View>
+                <Text style={styles.metaText}>{metadata.year}</Text>
               )}
               {metadata.runtime && (
-                <View style={styles.metaChip}>
-                  <Text style={styles.metaChipText}>{metadata.runtime}</Text>
-                </View>
+                <Text style={styles.metaText}>{metadata.runtime}</Text>
+              )}
+              {metadata.certification && (
+                <AgeBadge rating={metadata.certification} />
               )}
               {metadata.imdbRating && (
                 <View style={styles.ratingContainer}>
@@ -698,24 +961,17 @@ const styles = StyleSheet.create({
   metaInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 16,
+    paddingHorizontal: 24,
     marginBottom: 16,
-    flexWrap: 'wrap',
-    paddingHorizontal: 16,
-    paddingTop: 16,
   },
-  metaChip: {
-    backgroundColor: colors.elevation3,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  metaChipText: {
-    color: colors.highEmphasis,
-    fontSize: 12,
-    fontWeight: '600',
+  metaText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+    opacity: 0.9,
   },
   ratingContainer: {
     flexDirection: 'row',
@@ -723,7 +979,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.elevation3,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 4,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
   },
@@ -868,6 +1124,30 @@ const styles = StyleSheet.create({
     color: colors.lightGray,
     fontSize: 14,
     flex: 1,
+  },
+  watchProgressContainer: {
+    marginTop: 8,
+    marginBottom: 16,
+    width: '100%',
+    alignItems: 'center',
+  },
+  watchProgressBar: {
+    width: '80%',
+    height: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 1.5,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  watchProgressFill: {
+    height: '100%',
+    backgroundColor: colors.primary,
+    borderRadius: 1.5,
+  },
+  watchProgressText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    textAlign: 'center',
   },
 });
 

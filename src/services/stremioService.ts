@@ -18,6 +18,7 @@ export interface Meta {
   cast?: string[];
   director?: string;
   writer?: string;
+  certification?: string;
 }
 
 export interface Stream {
