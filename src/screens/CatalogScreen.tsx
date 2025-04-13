@@ -11,8 +11,7 @@ import {
   RefreshControl,
   Dimensions,
 } from 'react-native';
-import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { Meta, stremioService } from '../services/stremioService';
@@ -25,9 +24,20 @@ type CatalogScreenProps = {
   navigation: StackNavigationProp<RootStackParamList, 'Catalog'>;
 };
 
+// Consistent spacing variables
+const SPACING = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+};
+
+// Screen dimensions and grid layout
 const { width } = Dimensions.get('window');
 const NUM_COLUMNS = 3;
-const ITEM_WIDTH = width / NUM_COLUMNS - 20;
+const ITEM_MARGIN = SPACING.sm;
+const ITEM_WIDTH = (width - (SPACING.md * 2) - (ITEM_MARGIN * 2 * NUM_COLUMNS)) / NUM_COLUMNS;
 
 const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   const { addonId, type, id, name, genreFilter } = route.params;
@@ -172,58 +182,85 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
       <TouchableOpacity
         style={styles.item}
         onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type })}
+        activeOpacity={0.7}
       >
         <Image
           source={{ uri: item.poster || 'https://via.placeholder.com/300x450/cccccc/666666?text=No+Image' }}
           style={styles.poster}
           contentFit="cover"
+          transition={200}
         />
-        <Text
-          style={styles.title}
-          numberOfLines={2}
-        >
-          {item.name}
-        </Text>
-        {item.releaseInfo && (
+        <View style={styles.itemContent}>
           <Text
-            style={styles.releaseInfo}
+            style={styles.title}
+            numberOfLines={2}
           >
-            {item.releaseInfo}
+            {item.name}
           </Text>
-        )}
+          {item.releaseInfo && (
+            <Text style={styles.releaseInfo}>
+              {item.releaseInfo}
+            </Text>
+          )}
+        </View>
       </TouchableOpacity>
     );
   }, [navigation]);
 
+  const renderEmptyState = () => (
+    <View style={styles.centered}>
+      <Text style={styles.emptyText}>
+        No content found for the selected genre
+      </Text>
+      <TouchableOpacity
+        style={styles.button}
+        onPress={handleRefresh}
+      >
+        <Text style={styles.buttonText}>Try Again</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderErrorState = () => (
+    <View style={styles.centered}>
+      <Text style={styles.errorText}>
+        {error}
+      </Text>
+      <TouchableOpacity
+        style={styles.button}
+        onPress={() => loadItems(1)}
+      >
+        <Text style={styles.buttonText}>Retry</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderLoadingState = () => (
+    <View style={styles.centered}>
+      <ActivityIndicator size="large" color={colors.primary} />
+    </View>
+  );
+
   if (loading && items.length === 0) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor={colors.darkBackground} />
+        {renderLoadingState()}
+      </SafeAreaView>
     );
   }
 
   if (error && items.length === 0) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <Text style={{ color: colors.white }}>
-          {error}
-        </Text>
-        <TouchableOpacity
-          style={styles.retryButton}
-          onPress={() => loadItems(1)}
-        >
-          <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor={colors.darkBackground} />
+        {renderErrorState()}
+      </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[
-      styles.container,
-      { backgroundColor: colors.darkBackground }
-    ]}>
+    <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.darkBackground} />
       {items.length > 0 ? (
         <FlatList
@@ -249,20 +286,9 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
             ) : null
           }
           contentContainerStyle={styles.list}
+          columnWrapperStyle={styles.columnWrapper}
         />
-      ) : (
-        <View style={styles.centered}>
-          <Text style={{ color: colors.white, fontSize: 16, marginBottom: 10 }}>
-            No content found for the selected genre
-          </Text>
-          <TouchableOpacity
-            style={styles.retryButton}
-            onPress={handleRefresh}
-          >
-            <Text style={styles.retryText}>Try Again</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      ) : renderEmptyState()}
     </SafeAreaView>
   );
 };
@@ -272,59 +298,73 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.darkBackground,
   },
-  header: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
-  },
   list: {
-    padding: 10,
+    padding: SPACING.md,
+  },
+  columnWrapper: {
+    justifyContent: 'space-between',
   },
   item: {
     width: ITEM_WIDTH,
-    margin: 5,
+    marginBottom: SPACING.md,
+    borderRadius: 8,
     overflow: 'hidden',
   },
   poster: {
     width: '100%',
     aspectRatio: 2/3,
-    borderRadius: 4,
+    borderRadius: 8,
     backgroundColor: colors.transparentLight,
   },
+  itemContent: {
+    padding: SPACING.xs,
+  },
   title: {
-    marginTop: 5,
+    marginTop: SPACING.xs,
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     color: colors.white,
+    lineHeight: 18,
   },
   releaseInfo: {
     fontSize: 12,
-    marginTop: 2,
+    marginTop: SPACING.xs,
     color: colors.lightGray,
   },
   footer: {
-    padding: 20,
+    padding: SPACING.lg,
     alignItems: 'center',
   },
-  retryButton: {
-    marginTop: 15,
-    padding: 10,
+  button: {
+    marginTop: SPACING.md,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.xl,
     backgroundColor: colors.primary,
-    borderRadius: 5,
+    borderRadius: 8,
+    elevation: 2,
   },
-  retryText: {
+  buttonText: {
     color: colors.white,
-    fontWeight: '500',
+    fontWeight: '600',
+    fontSize: 16,
   },
   centered: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.darkBackground,
+    padding: SPACING.xl,
+  },
+  emptyText: {
+    color: colors.white,
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: SPACING.md,
+  },
+  errorText: {
+    color: colors.white,
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: SPACING.md,
   },
 });
 

@@ -770,7 +770,12 @@ const HomeScreen = () => {
         <View style={styles.catalogHeader}>
           <View style={styles.titleContainer}>
             <Text style={styles.catalogTitle}>{item.name}</Text>
-            <View style={styles.titleUnderline} />
+            <LinearGradient
+              colors={[colors.primary, colors.secondary]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.titleUnderline}
+            />
           </View>
           <TouchableOpacity
             onPress={() => 
@@ -1041,9 +1046,8 @@ const styles = StyleSheet.create<any>({
     position: 'absolute',
     bottom: -4,
     left: 0,
-    width: 40,
+    width: 60,
     height: 3,
-    backgroundColor: colors.primary,
     borderRadius: 1.5,
   },
   seeAllButton: {

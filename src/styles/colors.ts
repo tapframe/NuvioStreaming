@@ -1,7 +1,7 @@
 // Color palette for the app following Material Design 3
 export const colors = {
   // Primary colors
-  primary: '#00A4A4', // Brighter, more vibrant teal
+  primary: '#2d9cdb', // Brighter, more vibrant teal
   secondary: '#FF6B6B', // Coral color that complements teal
   
   // Background colors - Deep dark theme

@@ -1123,22 +1123,17 @@ const styles = StyleSheet.create({
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.elevation3,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
   },
   imdbLogo: {
-    width: 40,
-    height: 20,
-    marginRight: 6,
+    width: 35,
+    height: 18,
+    marginRight: 4,
   },
   ratingText: {
-    color: '#fff',
+    color: colors.text,
     fontWeight: '700',
-    fontSize: 13,
+    fontSize: 15,
+    letterSpacing: 0.3,
   },
   descriptionContainer: {
     marginBottom: 16,

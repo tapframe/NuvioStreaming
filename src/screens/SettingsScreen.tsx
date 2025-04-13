@@ -20,6 +20,7 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { colors } from '../styles/colors';
 import { useSettings, DEFAULT_SETTINGS } from '../hooks/useSettings';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { stremioService } from '../services/stremioService';
 
 const { width } = Dimensions.get('window');
 
@@ -222,6 +223,66 @@ const SettingsScreen: React.FC = () => {
             />
           )}
           onPress={() => navigation.navigate('Addons')}
+        />
+        <SettingItem
+          title="Check TMDB Addon"
+          description="Verify TMDB Embed Streams addon installation"
+          icon="bug-report"
+          isDarkMode={isDarkMode}
+          renderControl={() => (
+            <View style={[styles.actionButton, { backgroundColor: colors.primary }]}>
+              <Text style={styles.actionButtonText}>Check</Text>
+            </View>
+          )}
+          onPress={() => {
+            // Check if the addon is installed
+            const installedAddons = stremioService.getInstalledAddons();
+            const tmdbAddon = installedAddons.find(addon => addon.id === 'org.tmdbembedapi');
+            
+            if (tmdbAddon) {
+              // Addon is installed, check its configuration
+              Alert.alert(
+                'TMDB Embed Streams Addon',
+                `Addon is installed:\n\nName: ${tmdbAddon.name}\nID: ${tmdbAddon.id}\nURL: ${tmdbAddon.url}\n\nResources: ${JSON.stringify(tmdbAddon.resources)}\n\nTypes: ${JSON.stringify(tmdbAddon.types)}`,
+                [
+                  { 
+                    text: 'Reinstall', 
+                    onPress: async () => {
+                      try {
+                        // Remove and reinstall the addon
+                        stremioService.removeAddon('org.tmdbembedapi');
+                        await stremioService.installAddon('https://http-addon-production.up.railway.app/manifest.json');
+                        Alert.alert('Success', 'Addon was reinstalled successfully');
+                      } catch (error) {
+                        Alert.alert('Error', `Failed to reinstall addon: ${error}`);
+                      }
+                    } 
+                  },
+                  { text: 'Close', style: 'cancel' }
+                ]
+              );
+            } else {
+              // Addon is not installed, offer to install it
+              Alert.alert(
+                'TMDB Embed Streams Addon',
+                'Addon is not installed. Would you like to install it now?',
+                [
+                  { 
+                    text: 'Install', 
+                    onPress: async () => {
+                      try {
+                        await stremioService.installAddon('https://http-addon-production.up.railway.app/manifest.json');
+                        Alert.alert('Success', 'Addon was installed successfully');
+                      } catch (error) {
+                        Alert.alert('Error', `Failed to install addon: ${error}`);
+                      }
+                    } 
+                  },
+                  { text: 'Cancel', style: 'cancel' }
+                ]
+              );
+            }
+          }}
         />
         <SettingItem
           title="Reset All Settings"

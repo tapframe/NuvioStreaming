@@ -48,6 +48,11 @@ export interface StreamResponse {
   addonName: string;
 }
 
+// Modify the callback signature to include addon ID
+interface StreamCallback {
+  (streams: Stream[] | null, addonId: string | null, addonName: string | null, error: Error | null): void;
+}
+
 interface CatalogFilter {
   title: string;
   value: any;
@@ -446,95 +451,112 @@ class StremioService {
     }
   }
 
-  async getStreams(type: string, id: string, callback?: (streams: Stream[] | null, addonName: string | null, error: Error | null) => void): Promise<StreamResponse[]> {
+  // Modify getStreams to use the new callback signature and rely on callbacks for results
+  async getStreams(type: string, id: string, callback?: StreamCallback): Promise<void> {
     await this.ensureInitialized();
     
     const addons = this.getInstalledAddons();
-    logger.log('Installed addons:', addons.map(a => ({ id: a.id, url: a.url })));
+    logger.log('📌 [getStreams] Installed addons:', addons.map(a => ({ id: a.id, name: a.name, url: a.url })));
     
-    const streamResponses: StreamResponse[] = [];
+    // Check specifically for TMDB Embed addon
+    const tmdbEmbed = addons.find(addon => addon.id === 'org.tmdbembedapi');
+    if (tmdbEmbed) {
+      logger.log('🔍 [getStreams] Found TMDB Embed Streams addon:', {
+        id: tmdbEmbed.id,
+        name: tmdbEmbed.name,
+        url: tmdbEmbed.url,
+        resources: tmdbEmbed.resources,
+        types: tmdbEmbed.types
+      });
+    } else {
+      logger.log('⚠️ [getStreams] TMDB Embed Streams addon not found among installed addons');
+    }
     
     // Find addons that provide streams and sort them by installation order
     const streamAddons = addons
       .filter(addon => {
         if (!addon.resources) {
-          logger.log(`Addon ${addon.id} has no resources`);
+          logger.log(`⚠️ [getStreams] Addon ${addon.id} has no resources`);
           return false;
         }
         
+        // Log the detailed resources structure for debugging
+        // logger.log(`📋 [getStreams] Checking addon ${addon.id} resources:`, JSON.stringify(addon.resources)); // Verbose, uncomment if needed
+        
+        // Check if the addon has a stream resource for this type
         const hasStreamResource = addon.resources.some(
-          resource => resource.name === 'stream' && resource.types.includes(type)
+          resource => {
+            const result = resource.name === 'stream' && resource.types && resource.types.includes(type);
+            // logger.log(`🔎 [getStreams] Addon ${addon.id} resource ${resource.name}: supports ${type}? ${result}`); // Verbose
+            return result;
+          }
         );
         
         if (!hasStreamResource) {
-          logger.log(`Addon ${addon.id} does not support streaming ${type}`);
+          // logger.log(`❌ [getStreams] Addon ${addon.id} does not support streaming ${type}`); // Verbose
+        } else {
+          // logger.log(`✅ [getStreams] Addon ${addon.id} supports streaming ${type}`); // Verbose
         }
         
         return hasStreamResource;
       });
     
-    logger.log('Stream capable addons:', streamAddons.map(a => a.id));
+    logger.log('📊 [getStreams] Stream capable addons:', streamAddons.map(a => a.id));
     
     if (streamAddons.length === 0) {
-      logger.warn('No addons found that can provide streams');
-      return [];
+      logger.warn('⚠️ [getStreams] No addons found that can provide streams');
+      // Optionally call callback with an empty result or specific status?
+      // For now, just return if no addons.
+      return;
     }
 
-    // Create a map to store promises for each addon
-    const addonPromises = new Map<string, Promise<void>>();
-    
-    // Process each addon
-    for (const addon of streamAddons) {
-      const promise = (async () => {
+    // Process each addon and call the callback individually
+    streamAddons.forEach(addon => {
+       // Use an IIFE to create scope for async operation inside forEach
+      (async () => {
         try {
           if (!addon.url) {
-            logger.warn(`Addon ${addon.id} has no URL`);
+            logger.warn(`⚠️ [getStreams] Addon ${addon.id} has no URL`);
+            if (callback) callback(null, addon.id, addon.name, new Error('Addon has no URL'));
             return;
           }
 
           const baseUrl = this.getAddonBaseURL(addon.url);
           const url = `${baseUrl}/stream/${type}/${id}.json`;
           
+          logger.log(`🔗 [getStreams] Requesting streams from ${addon.name} (${addon.id}): ${url}`);
+          
           const response = await this.retryRequest(async () => {
             return await axios.get(url);
           });
 
+          let processedStreams: Stream[] = [];
           if (response.data && response.data.streams) {
-            const processedStreams = this.processStreams(response.data.streams, addon);
-            if (processedStreams.length > 0) {
-              streamResponses.push({
-                addon: addon.id,
-                addonName: addon.name,
-                streams: processedStreams
-              });
-            }
+            logger.log(`✅ [getStreams] Got ${response.data.streams.length} streams from ${addon.name} (${addon.id})`);
+            processedStreams = this.processStreams(response.data.streams, addon);
+            logger.log(`✅ [getStreams] Processed ${processedStreams.length} valid streams from ${addon.name} (${addon.id})`);
+          } else {
+             logger.log(`⚠️ [getStreams] No streams found in response from ${addon.name} (${addon.id})`);
           }
 
           if (callback) {
-            callback(response.data?.streams || null, addon.name, null);
+            // Call callback with processed streams (can be empty array)
+            callback(processedStreams, addon.id, addon.name, null);
           }
         } catch (error) {
-          logger.error(`Failed to get streams from ${addon.name}:`, error);
+          logger.error(`❌ [getStreams] Failed to get streams from ${addon.name} (${addon.id}):`, error);
           if (callback) {
-            callback(null, addon.name, error as Error);
+            // Call callback with error
+            callback(null, addon.id, addon.name, error as Error);
           }
         }
-      })();
-
-      addonPromises.set(addon.id, promise);
-    }
-
-    // Wait for all promises to complete
-    await Promise.all(addonPromises.values());
-
-    // Sort stream responses to maintain installed addon order
-    streamResponses.sort((a, b) => {
-      const indexA = streamAddons.findIndex(addon => addon.id === a.addon);
-      const indexB = streamAddons.findIndex(addon => addon.id === b.addon);
-      return indexA - indexB;
+      })(); // Immediately invoke the async function
     });
 
-    return streamResponses;
+    // No longer waiting here, callbacks handle results asynchronously
+    // Removed: await Promise.all(addonPromises.values());
+    // No longer returning aggregated results
+    // Removed: return streamResponses; 
   }
 
   private async fetchStreamsFromAddon(addon: Manifest, type: string, id: string): Promise<StreamResponse | null> {

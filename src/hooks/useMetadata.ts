@@ -111,7 +111,68 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
   const [recommendations, setRecommendations] = useState<StreamingContent[]>([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
 
-  const processStreamSource = async (sourceType: string, promise: Promise<any>, isEpisode = false) => {
+  const processStremioSource = async (type: string, id: string, isEpisode = false) => {
+    const sourceStartTime = Date.now();
+    const logPrefix = isEpisode ? 'loadEpisodeStreams' : 'loadStreams';
+    const sourceName = 'stremio';
+    
+    logger.log(`🔍 [${logPrefix}:${sourceName}] Starting fetch`);
+
+    try {
+      await stremioService.getStreams(type, id, 
+        (streams, addonId, addonName, error) => {
+          const processTime = Date.now() - sourceStartTime;
+          if (error) {
+            logger.error(`❌ [${logPrefix}:${sourceName}] Error for addon ${addonName} (${addonId}):`, error);
+            // Optionally update state to show error for this specific addon?
+            // For now, just log the error.
+          } else if (streams && addonId && addonName) {
+            logger.log(`✅ [${logPrefix}:${sourceName}] Received ${streams.length} streams from ${addonName} (${addonId}) after ${processTime}ms`);
+            if (streams.length > 0) {
+              const streamsWithAddon = streams.map(stream => ({
+                ...stream,
+                name: stream.name || stream.title || 'Unnamed Stream',
+                addonId: addonId,
+                addonName: addonName
+              }));
+              
+              const updateState = (prevState: GroupedStreams): GroupedStreams => {
+                 logger.log(`🔄 [${logPrefix}:${sourceName}] Updating state for addon ${addonName} (${addonId})`);
+                 return {
+                   ...prevState,
+                   [addonId]: {
+                     addonName: addonName,
+                     streams: streamsWithAddon
+                   }
+                 };
+              };
+              
+              if (isEpisode) {
+                setEpisodeStreams(updateState);
+              } else {
+                setGroupedStreams(updateState);
+              }
+            } else {
+               logger.log(`🤷 [${logPrefix}:${sourceName}] No streams found for addon ${addonName} (${addonId})`);
+            }
+          } else {
+            // Handle case where callback provides null streams without error (e.g., empty results)
+            logger.log(`🏁 [${logPrefix}:${sourceName}] Finished fetching for addon ${addonName} (${addonId}) with no streams after ${processTime}ms`);
+          }
+        }
+      );
+      // The function now returns void, just await to let callbacks fire
+      logger.log(`🏁 [${logPrefix}:${sourceName}] Stremio fetching process initiated`);
+    } catch (error) {
+       // Catch errors from the initial call to getStreams (e.g., initialization errors)
+       logger.error(`❌ [${logPrefix}:${sourceName}] Initial call failed:`, error);
+       // Maybe update state to show a general Stremio error?
+    }
+    // Note: This function completes when getStreams returns, not when all callbacks have fired.
+    // Loading indicators should probably be managed based on callbacks completing.
+  };
+
+  const processExternalSource = async (sourceType: string, promise: Promise<any>, isEpisode = false) => {
     const sourceStartTime = Date.now();
     const logPrefix = isEpisode ? 'loadEpisodeStreams' : 'loadStreams';
     
@@ -120,35 +181,26 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
       const result = await promise;
       logger.log(`✅ [${logPrefix}:${sourceType}] Completed in ${Date.now() - sourceStartTime}ms`);
       
-      // If we have results, update immediately
       if (Object.keys(result).length > 0) {
-        // Calculate total streams for logging
-        const totalStreams = Object.values(result).reduce((acc, group: any) => {
-          return acc + (group.streams?.length || 0);
-        }, 0);
-        
+        const totalStreams = Object.values(result).reduce((acc, group: any) => acc + (group.streams?.length || 0), 0);
         logger.log(`📦 [${logPrefix}:${sourceType}] Found ${totalStreams} streams`);
         
-        // Update state for this source
+        const updateState = (prevState: GroupedStreams) => {
+          logger.log(`🔄 [${logPrefix}:${sourceType}] Updating state with ${Object.keys(result).length} providers`);
+          return { ...prevState, ...result };
+        };
+
         if (isEpisode) {
-          setEpisodeStreams(prev => {
-            const newState = {...prev, ...result};
-            console.log(`🔄 [${logPrefix}:${sourceType}] Updating state with ${Object.keys(result).length} providers`);
-            return newState;
-          });
+          setEpisodeStreams(updateState);
         } else {
-          setGroupedStreams(prev => {
-            const newState = {...prev, ...result};
-            console.log(`🔄 [${logPrefix}:${sourceType}] Updating state with ${Object.keys(result).length} providers`);
-            return newState;
-          });
+          setGroupedStreams(updateState);
         }
       } else {
-        console.log(`⚠️ [${logPrefix}:${sourceType}] No streams found`);
+        logger.log(`⚠️ [${logPrefix}:${sourceType}] No streams found`);
       }
       return result;
     } catch (error) {
-      console.error(`❌ [${logPrefix}:${sourceType}] Error:`, error);
+      logger.error(`❌ [${logPrefix}:${sourceType}] Error:`, error);
       return {};
     }
   };
@@ -346,43 +398,17 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
         console.log('ℹ️ [loadStreams] Using ID as TMDB ID:', tmdbId);
       }
 
-      console.log('🔄 [loadStreams] Starting parallel stream requests');
+      console.log('🔄 [loadStreams] Starting stream requests');
       
-      // Create an array to store all fetching promises
       const fetchPromises = [];
 
-      // Start Stremio request
-      const stremioPromise = processStreamSource('stremio', (async () => {
-        const newGroupedStreams: GroupedStreams = {};
-        try {
-          const responses = await stremioService.getStreams(type, id);
-          responses.forEach(response => {
-            const addonId = response.addon;
-            if (addonId && response.streams.length > 0) {
-              const streamsWithAddon = response.streams.map(stream => ({
-                ...stream,
-                name: stream.name || stream.title || 'Unnamed Stream',
-                addonId: response.addon,
-                addonName: response.addonName
-              }));
-              
-              newGroupedStreams[addonId] = {
-                addonName: response.addonName,
-                streams: streamsWithAddon
-              };
-            }
-          });
-          return newGroupedStreams;
-        } catch (error) {
-          console.error('❌ [loadStreams:stremio] Error fetching Stremio streams:', error);
-          return {};
-        }
-      })(), false);
-      fetchPromises.push(stremioPromise);
+      // Start Stremio request using the new callback method
+      // We don't push this promise anymore, as results are handled by callback
+      processStremioSource(type, id, false);
 
       // Start Source 1 request if we have a TMDB ID
       if (tmdbId) {
-        const source1Promise = processStreamSource('source1', (async () => {
+        const source1Promise = processExternalSource('source1', (async () => {
           try {
             const streams = await fetchExternalStreams(
               `https://nice-month-production.up.railway.app/embedsu/${tmdbId}`,
@@ -408,7 +434,7 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
 
       // Start Source 2 request if we have a TMDB ID
       if (tmdbId) {
-        const source2Promise = processStreamSource('source2', (async () => {
+        const source2Promise = processExternalSource('source2', (async () => {
           try {
             const streams = await fetchExternalStreams(
               `https://vidsrc-api-js-phz6.onrender.com/embedsu/${tmdbId}`,
@@ -432,12 +458,12 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
         fetchPromises.push(source2Promise);
       }
 
-      // Wait for all promises to complete - but we already showed results as they arrived
+      // Wait only for external promises now
       const results = await Promise.allSettled(fetchPromises);
       const totalTime = Date.now() - startTime;
-      console.log(`✅ [loadStreams] All requests completed in ${totalTime}ms`);
+      console.log(`✅ [loadStreams] External source requests completed in ${totalTime}ms (Stremio continues in background)`);
       
-      const sourceTypes = ['stremio', 'source1', 'source2'];
+      const sourceTypes = ['source1', 'source2']; // Removed 'stremio'
       results.forEach((result, index) => {
         const source = sourceTypes[Math.min(index, sourceTypes.length - 1)];
         console.log(`📊 [loadStreams:${source}] Status: ${result.status}`);
@@ -447,18 +473,19 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
       });
 
       console.log('🧮 [loadStreams] Summary:');
-      console.log('  Total time:', totalTime + 'ms');
+      console.log('  Total time for external sources:', totalTime + 'ms');
       
-      // Log the final states
-      console.log('📦 [loadStreams] Final streams count:', 
+      // Log the final states - this might not include all Stremio addons yet
+      console.log('📦 [loadStreams] Current combined streams count:', 
         Object.keys(groupedStreams).length > 0 ? 
         Object.values(groupedStreams).reduce((acc, group: any) => acc + group.streams.length, 0) :
         0
       );
 
-      // Cache the final streams state
+      // Cache the final streams state - Note: This might be incomplete if Stremio addons are slow
       setGroupedStreams(prev => {
-        cacheService.setStreams(id, type, prev);
+        // We might want to reconsider when exactly to cache or mark loading as fully complete
+        // cacheService.setStreams(id, type, prev); // Maybe cache incrementally in callback?
         setPreloadedStreams(prev);
         return prev;
       });
@@ -467,9 +494,11 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
       console.error('❌ [loadStreams] Failed to load streams:', error);
       setError('Failed to load streams');
     } finally {
+      // Loading is now complete when external sources finish, Stremio updates happen independently.
+      // We need a better way to track overall completion if we want a final 'FINISHED' log.
       const endTime = Date.now() - startTime;
-      console.log(`🏁 [loadStreams] FINISHED in ${endTime}ms`);
-      setLoadingStreams(false);
+      console.log(`🏁 [loadStreams] External sources FINISHED in ${endTime}ms`);
+      setLoadingStreams(false); // Mark loading=false, but Stremio might still be working
     }
   };
 
@@ -500,43 +529,17 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
       const episodeQuery = `?s=${season}&e=${episode}`;
       console.log(`ℹ️ [loadEpisodeStreams] Episode query: ${episodeQuery}`);
 
-      console.log('🔄 [loadEpisodeStreams] Starting parallel stream requests');
+      console.log('🔄 [loadEpisodeStreams] Starting stream requests');
       
-      // Create an array to store all fetching promises
       const fetchPromises = [];
       
-      // Start Stremio request
-      const stremioPromise = processStreamSource('stremio', (async () => {
-        const newGroupedStreams: GroupedStreams = {};
-        try {
-          const responses = await stremioService.getStreams('series', episodeId);
-          responses.forEach(response => {
-            const addonId = response.addon;
-            if (addonId && response.streams.length > 0) {
-              const streamsWithAddon = response.streams.map(stream => ({
-                ...stream,
-                name: stream.name || stream.title || 'Unnamed Stream',
-                addonId: response.addon,
-                addonName: response.addonName
-              }));
-              
-              newGroupedStreams[addonId] = {
-                addonName: response.addonName,
-                streams: streamsWithAddon
-              };
-            }
-          });
-          return newGroupedStreams;
-        } catch (error) {
-          console.error('❌ [loadEpisodeStreams:stremio] Error fetching Stremio streams:', error);
-          return {};
-        }
-      })(), true);
-      fetchPromises.push(stremioPromise);
+      // Start Stremio request using the new callback method
+      // We don't push this promise anymore
+      processStremioSource('series', episodeId, true);
 
       // Start Source 1 request if we have a TMDB ID
       if (tmdbId) {
-        const source1Promise = processStreamSource('source1', (async () => {
+        const source1Promise = processExternalSource('source1', (async () => {
           try {
             const streams = await fetchExternalStreams(
               `https://nice-month-production.up.railway.app/embedsu/${tmdbId}${episodeQuery}`,
@@ -563,7 +566,7 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
 
       // Start Source 2 request if we have a TMDB ID
       if (tmdbId) {
-        const source2Promise = processStreamSource('source2', (async () => {
+        const source2Promise = processExternalSource('source2', (async () => {
           try {
             const streams = await fetchExternalStreams(
               `https://vidsrc-api-js-phz6.onrender.com/embedsu/${tmdbId}${episodeQuery}`,
@@ -588,12 +591,12 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
         fetchPromises.push(source2Promise);
       }
 
-      // Wait for all promises to complete - but we already showed results as they arrived
+      // Wait only for external promises now
       const results = await Promise.allSettled(fetchPromises);
       const totalTime = Date.now() - startTime;
-      console.log(`✅ [loadEpisodeStreams] All requests completed in ${totalTime}ms`);
+      console.log(`✅ [loadEpisodeStreams] External source requests completed in ${totalTime}ms (Stremio continues in background)`);
       
-      const sourceTypes = ['stremio', 'source1', 'source2'];
+      const sourceTypes = ['source1', 'source2']; // Removed 'stremio'
       results.forEach((result, index) => {
         const source = sourceTypes[Math.min(index, sourceTypes.length - 1)];
         console.log(`📊 [loadEpisodeStreams:${source}] Status: ${result.status}`);
@@ -603,18 +606,18 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
       });
 
       console.log('🧮 [loadEpisodeStreams] Summary:');
-      console.log('  Total time:', totalTime + 'ms');
+      console.log('  Total time for external sources:', totalTime + 'ms');
       
-      // Log the final states
-      console.log('📦 [loadEpisodeStreams] Final streams count:', 
+      // Log the final states - might not include all Stremio addons yet
+      console.log('📦 [loadEpisodeStreams] Current combined streams count:', 
         Object.keys(episodeStreams).length > 0 ? 
-        Object.values(episodeStreams).reduce((acc, group: any) => acc + group.streams.length, 0) :
+        Object.values(episodeStreams).reduce((acc, group: any) => acc + group.streams.length, 0) : 
         0
       );
 
-      // Cache the final streams state
+      // Cache the final streams state - Might be incomplete
       setEpisodeStreams(prev => {
-        // Cache episode streams
+        // Cache episode streams - maybe incrementally?
         setPreloadedEpisodeStreams(currentPreloaded => ({ 
           ...currentPreloaded, 
           [episodeId]: prev 
@@ -626,9 +629,10 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
       console.error('❌ [loadEpisodeStreams] Failed to load episode streams:', error);
       setError('Failed to load episode streams');
     } finally {
-      const totalTime = Date.now() - startTime;
-      console.log(`🏁 [loadEpisodeStreams] FINISHED in ${totalTime}ms`);
-      setLoadingEpisodeStreams(false);
+      // Loading is now complete when external sources finish
+      const endTime = Date.now() - startTime;
+      console.log(`🏁 [loadEpisodeStreams] External sources FINISHED in ${endTime}ms`);
+      setLoadingEpisodeStreams(false); // Mark loading=false, but Stremio might still be working
     }
   };
 

@@ -69,25 +69,6 @@ const StreamCard = memo(({ stream, onPress, index, torrentProgress, isLoading, s
   const displayTitle = stream.name || stream.title || 'Unnamed Stream';
   const displayAddonName = stream.title || '';
 
-  const entering = useMemo(() => 
-    FadeInDown
-      .delay(50 + Math.min(index, 10) * 30)
-      .springify()
-      .damping(15)
-      .mass(0.9)
-  , [index]);
-
-  const handlePress = useCallback(() => {
-    logger.log('StreamCard pressed:', {
-      isTorrent,
-      isDebrid,
-      hasProgress: !!torrentProgress,
-      url: stream.url,
-      behaviorHints: stream.behaviorHints
-    });
-    onPress();
-  }, [isTorrent, isDebrid, torrentProgress, stream.url, stream.behaviorHints, onPress]);
-
   // Only disable if it's a torrent that's not debrid and not currently downloading
   const isDisabled = isTorrent && !isDebrid && !torrentProgress && !stream.behaviorHints?.notWebReady;
 
@@ -95,107 +76,109 @@ const StreamCard = memo(({ stream, onPress, index, torrentProgress, isLoading, s
   const isDownloading = !!torrentProgress && isTorrent;
 
   return (
-    <Animated.View entering={entering}>
-      <TouchableOpacity 
-        style={[
-          styles.streamCard, 
-          isDisabled && styles.streamCardDisabled,
-          isLoading && styles.streamCardLoading
-        ]} 
-        onPress={handlePress}
-        disabled={isDisabled || isLoading}
-      >
-        <View style={styles.streamDetails}>
-          <View style={styles.streamNameRow}>
-            <View style={styles.streamTitleContainer}>
-              <Text style={styles.streamName}>
-                {displayTitle}
+    <TouchableOpacity 
+      style={[
+        styles.streamCard, 
+        isDisabled && styles.streamCardDisabled,
+        isLoading && styles.streamCardLoading
+      ]} 
+      onPress={onPress}
+      disabled={isDisabled || isLoading}
+      activeOpacity={0.7}
+    >
+      <View style={styles.streamDetails}>
+        <View style={styles.streamNameRow}>
+          <View style={styles.streamTitleContainer}>
+            <Text style={styles.streamName}>
+              {displayTitle}
+            </Text>
+            {displayAddonName && displayAddonName !== displayTitle && (
+              <Text style={styles.streamAddonName}>
+                {displayAddonName}
               </Text>
-              {displayAddonName && displayAddonName !== displayTitle && (
-                <Text style={styles.streamAddonName}>
-                  {displayAddonName}
-                </Text>
-              )}
-            </View>
-            
-            {/* Show loading indicator if stream is loading */}
-            {isLoading && (
-              <View style={styles.loadingIndicator}>
-                <ActivityIndicator size="small" color={colors.primary} />
-                <Text style={styles.loadingText}>
-                  {statusMessage || "Loading..."}
-                </Text>
-              </View>
-            )}
-            
-            {/* Show download indicator for active downloads */}
-            {isDownloading && (
-              <View style={styles.downloadingIndicator}>
-                <ActivityIndicator size="small" color={colors.primary} />
-                <Text style={styles.downloadingText}>Downloading...</Text>
-              </View>
             )}
           </View>
           
-          <View style={styles.streamMetaRow}>
-            {quality && quality >= "720" && (
-              <QualityBadge type="HD" />
-            )}
-            
-            {isDolby && (
-              <QualityBadge type="VISION" />
-            )}
-            
-            {size && (
-              <View style={[styles.chip, { backgroundColor: colors.darkGray }]}>
-                <Text style={styles.chipText}>{size}</Text>
-              </View>
-            )}
-            
-            {isTorrent && !isDebrid && (
-              <View style={[styles.chip, { backgroundColor: colors.error }]}>
-                <Text style={styles.chipText}>TORRENT</Text>
-              </View>
-            )}
-            
-            {isDebrid && (
-              <View style={[styles.chip, { backgroundColor: colors.success }]}>
-                <Text style={styles.chipText}>DEBRID</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Render progress bar if there's progress */}
-          {torrentProgress && (
-            <View style={styles.progressContainer}>
-              <View 
-                style={[
-                  styles.progressBar, 
-                  { width: `${torrentProgress.bufferProgress}%` }
-                ]} 
-              />
-              <Text style={styles.progressText}>
-                {`${Math.round(torrentProgress.bufferProgress)}% • ${Math.round(torrentProgress.downloadSpeed / 1024)} KB/s • ${torrentProgress.seeds} seeds`}
+          {/* Show loading indicator if stream is loading */}
+          {isLoading && (
+            <View style={styles.loadingIndicator}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={styles.loadingText}>
+                {statusMessage || "Loading..."}
               </Text>
+            </View>
+          )}
+          
+          {/* Show download indicator for active downloads */}
+          {isDownloading && (
+            <View style={styles.downloadingIndicator}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={styles.downloadingText}>Downloading...</Text>
             </View>
           )}
         </View>
         
-        <View style={styles.streamAction}>
-          <MaterialIcons 
-            name="play-arrow" 
-            size={24} 
-            color={isDisabled ? colors.textMuted : colors.primary} 
-          />
+        <View style={styles.streamMetaRow}>
+          {quality && quality >= "720" && (
+            <QualityBadge type="HD" />
+          )}
+          
+          {isDolby && (
+            <QualityBadge type="VISION" />
+          )}
+          
+          {size && (
+            <View style={[styles.chip, { backgroundColor: colors.darkGray }]}>
+              <Text style={styles.chipText}>{size}</Text>
+            </View>
+          )}
+          
+          {isTorrent && !isDebrid && (
+            <View style={[styles.chip, { backgroundColor: colors.error }]}>
+              <Text style={styles.chipText}>TORRENT</Text>
+            </View>
+          )}
+          
+          {isDebrid && (
+            <View style={[styles.chip, { backgroundColor: colors.success }]}>
+              <Text style={styles.chipText}>DEBRID</Text>
+            </View>
+          )}
         </View>
-      </TouchableOpacity>
-    </Animated.View>
+
+        {/* Render progress bar if there's progress */}
+        {torrentProgress && (
+          <View style={styles.progressContainer}>
+            <View 
+              style={[
+                styles.progressBar, 
+                { width: `${torrentProgress.bufferProgress}%` }
+              ]} 
+            />
+            <Text style={styles.progressText}>
+              {`${Math.round(torrentProgress.bufferProgress)}% • ${Math.round(torrentProgress.downloadSpeed / 1024)} KB/s • ${torrentProgress.seeds} seeds`}
+            </Text>
+          </View>
+        )}
+      </View>
+      
+      <View style={styles.streamAction}>
+        <MaterialIcons 
+          name="play-arrow" 
+          size={24} 
+          color={isDisabled ? colors.textMuted : colors.primary} 
+        />
+      </View>
+    </TouchableOpacity>
   );
 }, (prevProps, nextProps) => {
-  // Custom comparison to prevent unnecessary re-renders
-  return prevProps.stream.url === nextProps.stream.url &&
-         prevProps.index === nextProps.index &&
-         prevProps.torrentProgress?.bufferProgress === nextProps.torrentProgress?.bufferProgress;
+  // Simplified memo comparison that won't interfere with onPress
+  return (
+    prevProps.stream.url === nextProps.stream.url &&
+    prevProps.isLoading === nextProps.isLoading &&
+    prevProps.torrentProgress?.bufferProgress === nextProps.torrentProgress?.bufferProgress &&
+    prevProps.statusMessage === nextProps.statusMessage
+  );
 });
 
 const QualityTag = React.memo(({ text, color }: { text: string; color: string }) => (
@@ -260,6 +243,26 @@ export const StreamsScreen = () => {
   const { id, type, episodeId } = route.params;
   const { settings } = useSettings();
 
+  // Log the stream details and installed addons for debugging
+  useEffect(() => {
+    // Log installed addons
+    const installedAddons = stremioService.getInstalledAddons();
+    console.log('📦 [StreamsScreen] INSTALLED ADDONS:', installedAddons.map(addon => ({
+      id: addon.id,
+      name: addon.name,
+      version: addon.version,
+      resources: addon.resources,
+      types: addon.types
+    })));
+
+    // Log request details
+    console.log('🎬 [StreamsScreen] REQUEST DETAILS:', {
+      id,
+      type,
+      episodeId: episodeId || 'none'
+    });
+  }, [id, type, episodeId]);
+
   // Add timing logs
   const [loadStartTime, setLoadStartTime] = useState(0);
   const [providerLoadTimes, setProviderLoadTimes] = useState<{[key: string]: number}>({});
@@ -277,6 +280,20 @@ export const StreamsScreen = () => {
     setSelectedEpisode,
     groupedEpisodes,
   } = useMetadata({ id, type });
+
+  // Log stream results when they arrive
+  useEffect(() => {
+    const streams = type === 'series' ? episodeStreams : groupedStreams;
+    console.log('🔍 [StreamsScreen] STREAM RESULTS:', {
+      totalProviders: Object.keys(streams).length,
+      providers: Object.keys(streams),
+      streamCounts: Object.entries(streams).map(([provider, data]) => ({
+        provider,
+        addonName: data.addonName,
+        streams: data.streams.length
+      }))
+    });
+  }, [episodeStreams, groupedStreams, type]);
 
   const [selectedProvider, setSelectedProvider] = React.useState('all');
   const [availableProviders, setAvailableProviders] = React.useState<Set<string>>(new Set());
@@ -555,18 +572,17 @@ export const StreamsScreen = () => {
           if (settings.useExternalPlayer) {
             logger.log('Using external player for URL:', stream.url);
             // Use VideoPlayerService to launch external player
-            try {
-              const videoPlayerService = VideoPlayerService;
-              await videoPlayerService.playVideo(stream.url, {
-                useExternalPlayer: true,
-                title: metadata?.name || '',
-                episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
-                episodeNumber: type === 'series' ? `S${currentEpisode?.season_number}E${currentEpisode?.episode_number}` : undefined,
-                releaseDate: metadata?.year?.toString(),
-              });
-            } catch (externalPlayerError) {
-              logger.error('External player error:', externalPlayerError);
-              // Fallback to built-in player if external player fails
+            const videoPlayerService = VideoPlayerService;
+            const launched = await videoPlayerService.playVideo(stream.url, {
+              useExternalPlayer: true,
+              title: metadata?.name || '',
+              episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
+              episodeNumber: type === 'series' ? `S${currentEpisode?.season_number}E${currentEpisode?.episode_number}` : undefined,
+              releaseDate: metadata?.year?.toString(),
+            });
+
+            if (!launched) {
+              logger.log('External player launch failed, falling back to built-in player');
               navigation.navigate('Player', {
                 uri: stream.url,
                 title: metadata?.name || '',
@@ -695,18 +711,17 @@ export const StreamsScreen = () => {
           if (settings.useExternalPlayer) {
             logger.log('[StreamsScreen] Using external player for torrent video path:', videoPath);
             // Use VideoPlayerService to launch external player
-            try {
-              const videoPlayerService = VideoPlayerService;
-              await videoPlayerService.playVideo(`file://${videoPath}`, {
-                useExternalPlayer: true,
-                title: metadata?.name || '',
-                episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
-                episodeNumber: type === 'series' ? `S${currentEpisode?.season_number}E${currentEpisode?.episode_number}` : undefined,
-                releaseDate: metadata?.year?.toString(),
-              });
-            } catch (externalPlayerError) {
-              logger.error('[StreamsScreen] External player error:', externalPlayerError);
-              // Fallback to built-in player if external player fails
+            const videoPlayerService = VideoPlayerService;
+            const launched = await videoPlayerService.playVideo(`file://${videoPath}`, {
+              useExternalPlayer: true,
+              title: metadata?.name || '',
+              episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
+              episodeNumber: type === 'series' ? `S${currentEpisode?.season_number}E${currentEpisode?.episode_number}` : undefined,
+              releaseDate: metadata?.year?.toString(),
+            });
+
+            if (!launched) {
+              logger.log('[StreamsScreen] External player launch failed, falling back to built-in player');
               navigation.navigate('Player', {
                 uri: `file://${videoPath}`,
                 title: metadata?.name || '',
@@ -869,6 +884,7 @@ export const StreamsScreen = () => {
     
     return (
       <StreamCard 
+        key={`${stream.url}-${index}`}
         stream={stream} 
         onPress={() => handleStreamPress(stream)} 
         index={index}
@@ -881,7 +897,7 @@ export const StreamsScreen = () => {
 
   const renderSectionHeader = useCallback(({ section }: { section: { title: string } }) => (
     <Animated.View
-      entering={FadeInDown.delay(150).springify()}
+      entering={FadeIn.duration(300)}
     >
       <Text style={styles.streamGroupTitle}>{section.title}</Text>
     </Animated.View>
@@ -1060,7 +1076,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 1,
+    zIndex: 2,
   },
   backButton: {
     flexDirection: 'row',
@@ -1078,6 +1094,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.darkBackground,
     paddingTop: 20,
+    zIndex: 0,
   },
   streamsMainContentMovie: {
     paddingTop: Platform.OS === 'android' ? 90 : 100,
@@ -1113,6 +1130,7 @@ const styles = StyleSheet.create({
   streamsContent: {
     flex: 1,
     width: '100%',
+    zIndex: 1,
   },
   streamsContainer: {
     paddingHorizontal: 16,
@@ -1142,6 +1160,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.05)',
     width: '100%',
+    zIndex: 1,
   },
   streamCardDisabled: {
     backgroundColor: colors.elevation2,
