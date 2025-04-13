@@ -93,7 +93,7 @@ const MetadataScreen = () => {
   // Animation values
   const screenScale = useSharedValue(0.8);
   const screenOpacity = useSharedValue(0);
-  const heroHeight = useSharedValue(height * 0.45);
+  const heroHeight = useSharedValue(height * 0.5);
   const contentTranslateY = useSharedValue(50);
 
   // Add state for watch progress
@@ -655,7 +655,7 @@ const MetadataScreen = () => {
   React.useEffect(() => {
     screenScale.value = withSpring(1, springConfig);
     screenOpacity.value = withSpring(1, springConfig);
-    heroHeight.value = withSpring(height * 0.45, springConfig);
+    heroHeight.value = withSpring(height * 0.5, springConfig);
     contentTranslateY.value = withSpring(0, springConfig);
   }, []);
 
@@ -1049,14 +1049,14 @@ const styles = StyleSheet.create({
   },
   heroSection: {
     width: '100%',
-    height: height * 0.45,
+    height: height * 0.5,
     backgroundColor: colors.black,
     overflow: 'hidden',
   },
   heroImage: {
-    width: '110%',
+    width: '100%',
     height: '100%',
-    top: '-5%',
+    top: '0%',
     transform: [{ scale: 1 }],
   },
   heroGradient: {
