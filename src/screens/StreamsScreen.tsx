@@ -913,58 +913,70 @@ export const StreamsScreen = () => {
 
       {type === 'series' && currentEpisode && (
         <Animated.View style={[styles.streamsHeroContainer, heroStyle]}>
-          <ImageBackground
-            source={episodeImage ? { uri: episodeImage } : undefined}
-            style={styles.streamsHeroBackground}
-            fadeDuration={0}
-            resizeMode="cover"
+          <Animated.View
+            entering={FadeIn.duration(600).springify()}
+            style={StyleSheet.absoluteFill}
           >
-            <LinearGradient
-              colors={[
-                'rgba(0,0,0,0)',
-                'rgba(0,0,0,0.4)',
-                'rgba(0,0,0,0.7)',
-                'rgba(0,0,0,0.85)',
-                'rgba(0,0,0,0.95)',
-                colors.darkBackground
-              ]}
-              locations={[0, 0.3, 0.5, 0.7, 0.85, 1]}
-              style={styles.streamsHeroGradient}
+            <Animated.View 
+              entering={FadeIn.duration(800).delay(100).springify().withInitialValues({
+                transform: [{ scale: 1.05 }]
+              })}
+              style={StyleSheet.absoluteFill}
             >
-              <View style={styles.streamsHeroContent}>
-                <View style={styles.streamsHeroInfo}>
-                  <Text style={styles.streamsHeroEpisodeNumber}>
-                    {currentEpisode.episodeString}
-                  </Text>
-                  <Text style={styles.streamsHeroTitle} numberOfLines={1}>
-                    {currentEpisode.name}
-                  </Text>
-                  {currentEpisode.overview && (
-                    <Text style={styles.streamsHeroOverview} numberOfLines={2}>
-                      {currentEpisode.overview}
-                    </Text>
-                  )}
-                  <View style={styles.streamsHeroMeta}>
-                    <Text style={styles.streamsHeroReleased}>
-                      {tmdbService.formatAirDate(currentEpisode.air_date)}
-                    </Text>
-                    {currentEpisode.vote_average > 0 && (
-                      <View style={styles.streamsHeroRating}>
-                        <Image
-                          source={{ uri: TMDB_LOGO }}
-                          style={styles.tmdbLogo}
-                          contentFit="contain"
-                        />
-                        <Text style={styles.streamsHeroRatingText}>
-                          {currentEpisode.vote_average.toFixed(1)}
+              <ImageBackground
+                source={episodeImage ? { uri: episodeImage } : undefined}
+                style={styles.streamsHeroBackground}
+                fadeDuration={0}
+                resizeMode="cover"
+              >
+                <LinearGradient
+                  colors={[
+                    'rgba(0,0,0,0)',
+                    'rgba(0,0,0,0.4)',
+                    'rgba(0,0,0,0.7)',
+                    'rgba(0,0,0,0.85)',
+                    'rgba(0,0,0,0.95)',
+                    colors.darkBackground
+                  ]}
+                  locations={[0, 0.3, 0.5, 0.7, 0.85, 1]}
+                  style={styles.streamsHeroGradient}
+                >
+                  <View style={styles.streamsHeroContent}>
+                    <View style={styles.streamsHeroInfo}>
+                      <Text style={styles.streamsHeroEpisodeNumber}>
+                        {currentEpisode.episodeString}
+                      </Text>
+                      <Text style={styles.streamsHeroTitle} numberOfLines={1}>
+                        {currentEpisode.name}
+                      </Text>
+                      {currentEpisode.overview && (
+                        <Text style={styles.streamsHeroOverview} numberOfLines={2}>
+                          {currentEpisode.overview}
                         </Text>
+                      )}
+                      <View style={styles.streamsHeroMeta}>
+                        <Text style={styles.streamsHeroReleased}>
+                          {tmdbService.formatAirDate(currentEpisode.air_date)}
+                        </Text>
+                        {currentEpisode.vote_average > 0 && (
+                          <View style={styles.streamsHeroRating}>
+                            <Image
+                              source={{ uri: TMDB_LOGO }}
+                              style={styles.tmdbLogo}
+                              contentFit="contain"
+                            />
+                            <Text style={styles.streamsHeroRatingText}>
+                              {currentEpisode.vote_average.toFixed(1)}
+                            </Text>
+                          </View>
+                        )}
                       </View>
-                    )}
+                    </View>
                   </View>
-                </View>
-              </View>
-            </LinearGradient>
-          </ImageBackground>
+                </LinearGradient>
+              </ImageBackground>
+            </Animated.View>
+          </Animated.View>
         </Animated.View>
       )}
 

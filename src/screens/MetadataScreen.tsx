@@ -782,6 +782,7 @@ const MetadataScreen = () => {
         translucent={true}
         backgroundColor="transparent"
         barStyle="light-content"
+        animated={true}
       />
       <Animated.View style={containerAnimatedStyle}>
         <ScrollView
@@ -804,13 +805,13 @@ const MetadataScreen = () => {
               <LinearGradient
                 colors={[
                   `${colors.darkBackground}00`,
-                  `${colors.darkBackground}15`,
-                  `${colors.darkBackground}40`,
-                  `${colors.darkBackground}B3`,
-                  `${colors.darkBackground}E6`,
+                  `${colors.darkBackground}20`,
+                  `${colors.darkBackground}50`,
+                  `${colors.darkBackground}C0`,
+                  `${colors.darkBackground}F8`,
                   colors.darkBackground
                 ]}
-                locations={[0, 0.3, 0.5, 0.7, 0.85, 1]}
+                locations={[0, 0.4, 0.65, 0.8, 0.9, 1]}
                 style={styles.heroGradient}
               >
                 <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.heroContent}>
@@ -989,7 +990,8 @@ const MetadataScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: Platform.OS === 'ios' ? 0 : StatusBar.currentHeight || 0,
+    backgroundColor: 'transparent',
+    paddingTop: 0,
   },
   scrollView: {
     flex: 1,
@@ -1052,9 +1054,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   heroImage: {
-    width: '100%',
-    height: '105%',
-    top: '-2.5%',
+    width: '110%',
+    height: '100%',
+    top: '-5%',
     transform: [{ scale: 1 }],
   },
   heroGradient: {
