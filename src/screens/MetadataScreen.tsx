@@ -87,11 +87,13 @@ const MetadataScreen = () => {
   const [isFullDescriptionOpen, setIsFullDescriptionOpen] = useState(false);
   const fullDescriptionAnimation = useSharedValue(0);
   const [textTruncated, setTextTruncated] = useState(false);
+  const descriptionHeight = useSharedValue(0);
+  const fullTextHeight = useSharedValue(0);
 
   // Animation values
   const screenScale = useSharedValue(0.8);
   const screenOpacity = useSharedValue(0);
-  const heroHeight = useSharedValue(height * 0.75);
+  const heroHeight = useSharedValue(height * 0.45);
   const contentTranslateY = useSharedValue(50);
 
   // Add state for watch progress
@@ -653,7 +655,7 @@ const MetadataScreen = () => {
   React.useEffect(() => {
     screenScale.value = withSpring(1, springConfig);
     screenOpacity.value = withSpring(1, springConfig);
-    heroHeight.value = withSpring(height * 0.75, springConfig);
+    heroHeight.value = withSpring(height * 0.45, springConfig);
     contentTranslateY.value = withSpring(0, springConfig);
   }, []);
 
@@ -664,6 +666,40 @@ const MetadataScreen = () => {
     // 2. Coming from StreamsScreen - goes back to Calendar/ThisWeek
     navigation.goBack();
   }, [navigation]);
+
+  const descriptionAnimatedStyle = useAnimatedStyle(() => ({
+    height: descriptionHeight.value,
+    opacity: interpolate(
+      descriptionHeight.value,
+      [0, fullTextHeight.value],
+      [0, 1],
+      Extrapolate.CLAMP
+    )
+  }));
+
+  // Function to handle text layout and store full height
+  const handleTextLayout = ({ nativeEvent: { lines } }: { nativeEvent: { lines: any[] } }) => {
+    if (!showFullDescription) {
+      setTextTruncated(lines.length > 3);
+      // Calculate height for 3 lines (24 is the lineHeight)
+      descriptionHeight.value = 3 * 24;
+    }
+    // Store full text height
+    fullTextHeight.value = lines.length * 24;
+  };
+
+  // Function to toggle description expansion with animation
+  const toggleDescription = () => {
+    setShowFullDescription(!showFullDescription);
+    descriptionHeight.value = withSpring(
+      !showFullDescription ? fullTextHeight.value : 3 * 24,
+      {
+        damping: 15,
+        stiffness: 100,
+        mass: 0.8
+      }
+    );
+  };
 
   if (loading) {
     return (
@@ -863,20 +899,17 @@ const MetadataScreen = () => {
             {/* Description */}
             {metadata.description && (
               <View style={styles.descriptionContainer}>
-                <Text
-                  style={styles.description}
-                  numberOfLines={showFullDescription ? undefined : 3}
-                  onTextLayout={({ nativeEvent: { lines } }) => {
-                    if (!showFullDescription) {
-                      setTextTruncated(lines.length > 3);
-                    }
-                  }}
-                >
-                  {`${metadata.description}`}
-                </Text>
+                <Animated.View style={descriptionAnimatedStyle}>
+                  <Text
+                    style={styles.description}
+                    onTextLayout={handleTextLayout}
+                  >
+                    {`${metadata.description}`}
+                  </Text>
+                </Animated.View>
                 {textTruncated && (
                   <TouchableOpacity
-                    onPress={() => setShowFullDescription(!showFullDescription)}
+                    onPress={toggleDescription}
                     style={styles.showMoreButton}
                   >
                     <Text style={styles.showMoreText}>
@@ -1014,7 +1047,7 @@ const styles = StyleSheet.create({
   },
   heroSection: {
     width: '100%',
-    height: height * 0.75,
+    height: height * 0.45,
     backgroundColor: colors.black,
     overflow: 'hidden',
   },
@@ -1030,16 +1063,16 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   heroContent: {
-    padding: 24,
+    padding: 16,
     paddingTop: 12,
-    paddingBottom: 16,
+    paddingBottom: 12,
   },
   genreContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: 12,
     width: '100%',
   },
   genreText: {
@@ -1056,15 +1089,15 @@ const styles = StyleSheet.create({
   },
   titleLogo: {
     width: width * 0.65,
-    height: 90,
+    height: 70,
     marginBottom: 0,
     alignSelf: 'center',
   },
   titleText: {
     color: colors.highEmphasis,
-    fontSize: 34,
+    fontSize: 28,
     fontWeight: '900',
-    marginBottom: 16,
+    marginBottom: 12,
     textShadowColor: 'rgba(0,0,0,0.75)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
@@ -1073,9 +1106,9 @@ const styles = StyleSheet.create({
   metaInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-    paddingHorizontal: 24,
-    marginBottom: 16,
+    gap: 12,
+    paddingHorizontal: 16,
+    marginBottom: 12,
   },
   metaText: {
     color: colors.text,
@@ -1106,7 +1139,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   descriptionContainer: {
-    marginBottom: 28,
+    marginBottom: 16,
     paddingHorizontal: 16,
   },
   description: {
@@ -1132,9 +1165,9 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
     alignItems: 'center',
-    marginBottom: -16,
+    marginBottom: -12,
     justifyContent: 'center',
     width: '100%',
   },
@@ -1142,7 +1175,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
+    paddingVertical: 10,
     borderRadius: 100,
     elevation: 4,
     shadowColor: '#000',
@@ -1242,8 +1275,8 @@ const styles = StyleSheet.create({
     lineHeight: 20
   },
   watchProgressContainer: {
-    marginTop: 8,
-    marginBottom: 12,
+    marginTop: 6,
+    marginBottom: 8,
     width: '100%',
     alignItems: 'center',
     overflow: 'hidden'

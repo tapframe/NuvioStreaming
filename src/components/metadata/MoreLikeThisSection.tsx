@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useNavigation, StackActions } from '@react-navigation/native';
@@ -37,7 +38,8 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
       // Extract TMDB ID from the tmdb:123456 format
       const tmdbId = item.id.replace('tmdb:', '');
       
-      // Get Stremio ID using catalogService
+      // Get Stremio ID directly using catalogService
+      // The catalogService.getStremioId method already handles the conversion internally
       const stremioId = await catalogService.getStremioId(item.type, tmdbId);
       
       if (stremioId) {
@@ -48,10 +50,15 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
           })
         );
       } else {
-        console.error('Could not find Stremio ID for TMDB ID:', tmdbId);
+        throw new Error('Could not find Stremio ID');
       }
     } catch (error) {
       console.error('Error navigating to recommendation:', error);
+      Alert.alert(
+        'Error',
+        'Unable to load this content. Please try again later.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
@@ -101,19 +108,21 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 28,
+    marginTop: 16,
     marginBottom: 16,
+    paddingLeft: 0,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '800',
     color: colors.highEmphasis,
     marginBottom: 12,
-    paddingHorizontal: 24,
+    marginTop: 8,
+    paddingHorizontal: 16,
   },
   listContentContainer: {
-    paddingHorizontal: 24,
-    paddingRight: 48, // Ensure last item has padding
+    paddingHorizontal: 16,
+    paddingRight: 32, // Ensure last item has padding
   },
   itemContainer: {
     marginRight: 12,

@@ -5,7 +5,7 @@ export const colors = {
   secondary: '#FF6B6B', // Coral color that complements teal
   
   // Background colors - Deep dark theme
-  darkBackground: '#050808', // Very deep dark with subtle teal undertone
+  darkBackground: '#020404', // Even deeper dark with subtle teal undertone
   lightBackground: '#FFFFFF', // Light theme background
   
   // Text colors - Following Material Design contrast ratios
@@ -18,8 +18,8 @@ export const colors = {
   
   // Basic colors with teal undertones
   white: '#FFFFFF',
-  black: '#050808',
-  darkGray: '#0F1414', // Darker gray with teal undertone
+  black: '#020404',
+  darkGray: '#0A0C0C', // Darker gray with teal undertone
   mediumGray: 'rgba(255, 255, 255, 0.6)', // Medium emphasis text
   lightGray: 'rgba(255, 255, 255, 0.38)', // Disabled text
   
@@ -32,10 +32,10 @@ export const colors = {
   // Transparent colors
   transparent: 'transparent',
   transparentLight: 'rgba(255, 255, 255, 0.08)', // Material dark surface overlay
-  transparentDark: 'rgba(5, 8, 8, 0.7)', // Darker overlay with subtle teal tint
+  transparentDark: 'rgba(2, 4, 4, 0.7)', // Darker overlay with subtle teal tint
   
   // Additional properties
-  background: '#050808', // Very deep dark
+  background: '#020404', // Very deep dark
   
   // UI elements
   border: 'rgba(255, 255, 255, 0.12)', // Material dark theme divider
