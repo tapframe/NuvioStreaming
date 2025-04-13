@@ -6,6 +6,7 @@ import { tmdbService } from '../services/tmdbService';
 import { cacheService } from '../services/cacheService';
 import { Cast, Episode, GroupedEpisodes, GroupedStreams } from '../types/metadata';
 import { TMDBService } from '../services/tmdbService';
+import { logger } from '../utils/logger';
 
 // Constants for timeouts and retries
 const API_TIMEOUT = 10000; // 10 seconds
@@ -31,7 +32,7 @@ const loadWithFallback = async <T>(
   try {
     return await withTimeout(loadFn(), timeout, fallback);
   } catch (error) {
-    console.error('Loading failed, using fallback:', error);
+    logger.error('Loading failed, using fallback:', error);
     return fallback;
   }
 };
@@ -115,9 +116,9 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
     const logPrefix = isEpisode ? 'loadEpisodeStreams' : 'loadStreams';
     
     try {
-      console.log(`🔍 [${logPrefix}:${sourceType}] Starting fetch`);
+      logger.log(`🔍 [${logPrefix}:${sourceType}] Starting fetch`);
       const result = await promise;
-      console.log(`✅ [${logPrefix}:${sourceType}] Completed in ${Date.now() - sourceStartTime}ms`);
+      logger.log(`✅ [${logPrefix}:${sourceType}] Completed in ${Date.now() - sourceStartTime}ms`);
       
       // If we have results, update immediately
       if (Object.keys(result).length > 0) {
@@ -126,7 +127,7 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
           return acc + (group.streams?.length || 0);
         }, 0);
         
-        console.log(`📦 [${logPrefix}:${sourceType}] Found ${totalStreams} streams`);
+        logger.log(`📦 [${logPrefix}:${sourceType}] Found ${totalStreams} streams`);
         
         // Update state for this source
         if (isEpisode) {

@@ -1,4 +1,4 @@
-package com.stremio.expo
+package com.nuvio.app
 
 import android.app.Application
 import android.content.res.Configuration

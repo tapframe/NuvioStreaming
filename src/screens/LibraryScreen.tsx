@@ -22,6 +22,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { catalogService } from '../services/catalogService';
 import type { StreamingContent } from '../services/catalogService';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { logger } from '../utils/logger';
 
 // Types
 interface LibraryItem extends StreamingContent {
@@ -103,7 +104,7 @@ const LibraryScreen = () => {
         const items = await catalogService.getLibraryItems();
         setLibraryItems(items);
       } catch (error) {
-        console.error('Failed to load library:', error);
+        logger.error('Failed to load library:', error);
       } finally {
         setLoading(false);
       }

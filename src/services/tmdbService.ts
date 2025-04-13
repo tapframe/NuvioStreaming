@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { logger } from '../utils/logger';
 
 // TMDB API configuration
 const API_KEY = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0MzljNDc4YTc3MWYzNWMwNTAyMmY5ZmVhYmNjYTAxYyIsIm5iZiI6MTcwOTkxMTEzNS4xNCwic3ViIjoiNjVlYjJjNWYzODlkYTEwMTYyZDgyOWU0Iiwic2NvcGVzIjpbImFwaV9yZWFkIl0sInZlcnNpb24iOjF9.gosBVl1wYUbePOeB9WieHn8bY9x938-GSGmlXZK_UVM';
@@ -49,6 +50,22 @@ export interface TMDBShow {
   }[];
 }
 
+export interface TMDBTrendingResult {
+  id: number;
+  title?: string;
+  name?: string;
+  overview: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  release_date?: string;
+  first_air_date?: string;
+  genre_ids: number[];
+  external_ids?: {
+    imdb_id: string | null;
+    [key: string]: any;
+  };
+}
+
 export class TMDBService {
   private static instance: TMDBService;
   private static ratingCache: Map<string, number | null> = new Map();
@@ -89,7 +106,7 @@ export class TMDBService {
       });
       return response.data.results;
     } catch (error) {
-      console.error('Failed to search TV show:', error);
+      logger.error('Failed to search TV show:', error);
       return [];
     }
   }
@@ -107,7 +124,7 @@ export class TMDBService {
       });
       return response.data;
     } catch (error) {
-      console.error('Failed to get TV show details:', error);
+      logger.error('Failed to get TV show details:', error);
       return null;
     }
   }
@@ -129,7 +146,7 @@ export class TMDBService {
       );
       return response.data;
     } catch (error) {
-      console.error('Failed to get episode external IDs:', error);
+      logger.error('Failed to get episode external IDs:', error);
       return null;
     }
   }
@@ -165,7 +182,7 @@ export class TMDBService {
       TMDBService.ratingCache.set(cacheKey, rating);
       return rating;
     } catch (error) {
-      console.error('Failed to get IMDb rating:', error);
+      logger.error('Failed to get IMDb rating:', error);
       // Cache the failed result too to prevent repeated failed requests
       TMDBService.ratingCache.set(cacheKey, null);
       return null;
@@ -220,7 +237,7 @@ export class TMDBService {
 
       return season;
     } catch (error) {
-      console.error('Failed to get season details:', error);
+      logger.error('Failed to get season details:', error);
       return null;
     }
   }
@@ -245,7 +262,7 @@ export class TMDBService {
       );
       return response.data;
     } catch (error) {
-      console.error('Failed to get episode details:', error);
+      logger.error('Failed to get episode details:', error);
       return null;
     }
   }
@@ -264,7 +281,7 @@ export class TMDBService {
       const tmdbId = await this.findTMDBIdByIMDB(imdbId);
       return tmdbId;
     } catch (error) {
-      console.error('Failed to extract TMDB ID from Stremio ID:', error);
+      logger.error('Failed to extract TMDB ID from Stremio ID:', error);
       return null;
     }
   }
@@ -297,7 +314,7 @@ export class TMDBService {
       
       return null;
     } catch (error) {
-      console.error('Failed to find TMDB ID by IMDB ID:', error);
+      logger.error('Failed to find TMDB ID by IMDB ID:', error);
       return null;
     }
   }
@@ -334,7 +351,7 @@ export class TMDBService {
       await Promise.all(seasonPromises);
       return allEpisodes;
     } catch (error) {
-      console.error('Failed to get all episodes:', error);
+      logger.error('Failed to get all episodes:', error);
       return {};
     }
   }
@@ -395,7 +412,7 @@ export class TMDBService {
         crew: response.data.crew || []
       };
     } catch (error) {
-      console.error('Failed to fetch credits:', error);
+      logger.error('Failed to fetch credits:', error);
       return { cast: [], crew: [] };
     }
   }
@@ -410,7 +427,7 @@ export class TMDBService {
       });
       return response.data;
     } catch (error) {
-      console.error('Failed to fetch person details:', error);
+      logger.error('Failed to fetch person details:', error);
       return null;
     }
   }
@@ -428,14 +445,14 @@ export class TMDBService {
       );
       return response.data;
     } catch (error) {
-      console.error('Failed to get show external IDs:', error);
+      logger.error('Failed to get show external IDs:', error);
       return null;
     }
   }
 
   async getRecommendations(type: 'movie' | 'tv', tmdbId: string): Promise<any[]> {
     if (!API_KEY) {
-      console.error('TMDB API key not set');
+      logger.error('TMDB API key not set');
       return [];
     }
     try {
@@ -445,7 +462,7 @@ export class TMDBService {
       });
       return response.data.results || [];
     } catch (error) {
-      console.error(`Error fetching TMDB ${type} recommendations for ID ${tmdbId}:`, error);
+      logger.error(`Error fetching TMDB ${type} recommendations for ID ${tmdbId}:`, error);
       return [];
     }
   }
@@ -463,7 +480,7 @@ export class TMDBService {
       });
       return response.data.results;
     } catch (error) {
-      console.error('Failed to search multi:', error);
+      logger.error('Failed to search multi:', error);
       return [];
     }
   }
@@ -476,7 +493,7 @@ export class TMDBService {
       });
       return response.data;
     } catch (error) {
-      console.error('Error fetching movie details:', error);
+      logger.error('Error fetching movie details:', error);
       return null;
     }
   }
@@ -507,8 +524,51 @@ export class TMDBService {
       }
       return null;
     } catch (error) {
-      console.error('Error fetching certification:', error);
+      logger.error('Error fetching certification:', error);
       return null;
+    }
+  }
+
+  /**
+   * Get trending movies or TV shows
+   * @param type 'movie' or 'tv'
+   * @param timeWindow 'day' or 'week'
+   */
+  async getTrending(type: 'movie' | 'tv', timeWindow: 'day' | 'week'): Promise<TMDBTrendingResult[]> {
+    try {
+      const response = await axios.get(`${BASE_URL}/trending/${type}/${timeWindow}`, {
+        headers: this.getHeaders(),
+        params: {
+          language: 'en-US',
+        },
+      });
+
+      // Get external IDs for each trending item
+      const results = response.data.results || [];
+      const resultsWithExternalIds = await Promise.all(
+        results.map(async (item: TMDBTrendingResult) => {
+          try {
+            const externalIdsResponse = await axios.get(
+              `${BASE_URL}/${type}/${item.id}/external_ids`,
+              {
+                headers: this.getHeaders(),
+              }
+            );
+            return {
+              ...item,
+              external_ids: externalIdsResponse.data
+            };
+          } catch (error) {
+            logger.error(`Failed to get external IDs for ${type} ${item.id}:`, error);
+            return item;
+          }
+        })
+      );
+
+      return resultsWithExternalIds;
+    } catch (error) {
+      logger.error(`Failed to get trending ${type} content:`, error);
+      return [];
     }
   }
 }

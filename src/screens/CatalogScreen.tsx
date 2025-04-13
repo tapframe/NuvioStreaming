@@ -18,6 +18,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { Meta, stremioService } from '../services/stremioService';
 import { colors } from '../styles';
 import { Image } from 'expo-image';
+import { logger } from '../utils/logger';
 
 type CatalogScreenProps = {
   route: RouteProp<RootStackParamList, 'Catalog'>;
@@ -104,12 +105,12 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
                   foundItems = true;
                 }
               } catch (error) {
-                console.log(`Failed to load items from ${manifest.name} catalog ${catalog.id}:`, error);
+                logger.log(`Failed to load items from ${manifest.name} catalog ${catalog.id}:`, error);
                 // Continue with other catalogs
               }
             }
           } catch (error) {
-            console.log(`Failed to process addon ${manifest.name}:`, error);
+            logger.log(`Failed to process addon ${manifest.name}:`, error);
             // Continue with other addons
           }
         }
@@ -140,7 +141,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load catalog items');
-      console.error('Failed to load catalog:', err);
+      logger.error('Failed to load catalog:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);

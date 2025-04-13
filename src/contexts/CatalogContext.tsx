@@ -1,26 +1,48 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import { StreamingContent } from '../services/catalogService';
 
 interface CatalogContextType {
   lastUpdate: number;
   refreshCatalogs: () => void;
+  addToLibrary: (content: StreamingContent) => void;
+  removeFromLibrary: (type: string, id: string) => void;
+  libraryItems: StreamingContent[];
 }
 
 const CatalogContext = createContext<CatalogContextType>({
   lastUpdate: Date.now(),
   refreshCatalogs: () => {},
+  addToLibrary: () => {},
+  removeFromLibrary: () => {},
+  libraryItems: []
 });
 
 export const useCatalogContext = () => useContext(CatalogContext);
 
 export const CatalogProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [lastUpdate, setLastUpdate] = useState(Date.now());
+  const [libraryItems, setLibraryItems] = useState<StreamingContent[]>([]);
 
   const refreshCatalogs = useCallback(() => {
     setLastUpdate(Date.now());
   }, []);
 
+  const addToLibrary = useCallback((content: StreamingContent) => {
+    setLibraryItems(prev => [...prev, content]);
+  }, []);
+
+  const removeFromLibrary = useCallback((type: string, id: string) => {
+    setLibraryItems(prev => prev.filter(item => !(item.id === id && item.type === type)));
+  }, []);
+
   return (
-    <CatalogContext.Provider value={{ lastUpdate, refreshCatalogs }}>
+    <CatalogContext.Provider value={{ 
+      lastUpdate, 
+      refreshCatalogs,
+      addToLibrary,
+      removeFromLibrary,
+      libraryItems
+    }}>
       {children}
     </CatalogContext.Provider>
   );

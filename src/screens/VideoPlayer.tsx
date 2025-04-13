@@ -16,6 +16,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { storageService } from '../services/storageService';
 // Add throttle/debounce imports
 import { debounce } from 'lodash';
+import { logger } from '../utils/logger';
 
 // Define the TrackPreferenceType for audio/text tracks
 type TrackPreferenceType = 'system' | 'disabled' | 'title' | 'language' | 'index';
@@ -87,7 +88,7 @@ const VideoPlayer = () => {
   const uri = __DEV__ && (!routeUri || routeUri.trim() === '') ? developmentTestUrl : routeUri;
 
   // Log received props for debugging
-  console.log("VideoPlayer received route params:", {
+  logger.log("VideoPlayer received route params:", {
     uri,
     title,
     season,
@@ -104,10 +105,10 @@ const VideoPlayer = () => {
   // Validate URI
   useEffect(() => {
     if (!uri) {
-      console.error("Empty or null URI received in VideoPlayer");
+      logger.error("Empty or null URI received in VideoPlayer");
       alert("Error: No video URL provided");
     } else {
-      console.log("Video URI:", uri);
+      logger.log("Video URI:", uri);
     }
   }, [uri]);
 
@@ -249,7 +250,7 @@ const VideoPlayer = () => {
         ScreenOrientation.OrientationLock.LANDSCAPE
       );
     } catch (error) {
-      console.error("Failed to lock orientation:", error);
+      logger.error("Failed to lock orientation:", error);
     }
   };
 
@@ -258,7 +259,7 @@ const VideoPlayer = () => {
     try {
       await ScreenOrientation.unlockAsync();
     } catch (error) {
-      console.error("Failed to unlock orientation:", error);
+      logger.error("Failed to unlock orientation:", error);
     }
   };
 
@@ -478,7 +479,7 @@ const VideoPlayer = () => {
   };
 
   const onTextTracks = (e: Readonly<{ textTracks: TextTrack[] }>) => {
-    console.log("Detected Text Tracks:", e.textTracks);
+    logger.log("Detected Text Tracks:", e.textTracks);
     setTextTracks(e.textTracks || []);
   };
 
@@ -486,13 +487,13 @@ const VideoPlayer = () => {
   const cycleAspectRatio = () => {
     const currentIndex = resizeModes.indexOf(resizeMode);
     const nextIndex = (currentIndex + 1) % resizeModes.length;
-    console.log(`Changing aspect ratio from ${resizeMode} to ${resizeModes[nextIndex]}`);
+    logger.log(`Changing aspect ratio from ${resizeMode} to ${resizeModes[nextIndex]}`);
     setResizeMode(resizeModes[nextIndex]);
   };
 
   // Function for Back button
   const handleBackPress = () => {
-    console.log("Close button pressed");
+    logger.log("Close button pressed");
     
     // Pause video before leaving
     setPaused(true);
@@ -515,7 +516,7 @@ const VideoPlayer = () => {
         }, 350); // Increase delay to ensure orientation reset completes
       })
       .catch(error => {
-        console.error("Error resetting orientation:", error);
+        logger.error("Error resetting orientation:", error);
         // Navigate back anyway after a short delay
         disableImmersiveMode(); // Try disabling again
         setTimeout(() => {
@@ -683,11 +684,11 @@ const VideoPlayer = () => {
           renderToHardwareTextureAndroid={true}
           
           onBuffer={(buffer) => {
-            console.log('Buffering:', buffer.isBuffering);
+            logger.log('Buffering:', buffer.isBuffering);
           }}
           
           onError={(error) => {
-            console.error('Video playback error:', error);
+            logger.error('Video playback error:', error);
             alert(`Video Error: ${error.error.errorString} (Code: ${error.error.errorCode})`);
           }}
         />

@@ -17,6 +17,7 @@ import { RouteProp } from '@react-navigation/native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import axios from 'axios';
 import Animated, { FadeIn, SlideInRight, withTiming, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import { logger } from '../utils/logger';
 
 type RootStackParamList = {
   ShowRatings: { showId: number };
@@ -228,7 +229,7 @@ const ShowRatingsScreen = ({ route }: Props) => {
         }
       }
     } catch (error) {
-      console.error('Error fetching TVMaze data:', error);
+      logger.error('Error fetching TVMaze data:', error);
     }
   };
 
@@ -273,7 +274,7 @@ const ShowRatingsScreen = ({ route }: Props) => {
         setLoadingProgress((loadedCount / totalToLoad) * 100);
       }
     } catch (error) {
-      console.error('Error loading more seasons:', error);
+      logger.error('Error loading more seasons:', error);
     } finally {
       setLoadingProgress(0);
       setLoadingSeasons(false);
@@ -314,7 +315,7 @@ const ShowRatingsScreen = ({ route }: Props) => {
           setVisibleSeasonRange({ start: 0, end: initialEnd });
         }
       } catch (error) {
-        console.error('Error fetching show data:', error);
+        logger.error('Error fetching show data:', error);
       } finally {
         setLoading(false);
       }

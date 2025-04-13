@@ -129,6 +129,8 @@ class CacheService {
   }
 
   public cacheMetadataScreen(id: string, type: string, data: any) {
+    if (!id || !type) return;
+    
     const key = `${type}:${id}`;
     
     // If this item is already in cache, just update it
@@ -141,7 +143,9 @@ class CacheService {
     // If we've reached the limit, remove the oldest item
     if (this.metadataScreenCache.size >= this.MAX_METADATA_SCREENS) {
       const firstKey = this.metadataScreenCache.keys().next().value;
-      this.metadataScreenCache.delete(firstKey);
+      if (firstKey) {
+        this.metadataScreenCache.delete(firstKey);
+      }
     }
 
     // Add the new item

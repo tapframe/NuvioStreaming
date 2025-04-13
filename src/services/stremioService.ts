@@ -1,5 +1,6 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { logger } from '../utils/logger';
 
 // Basic types for Stremio
 export interface Meta {
@@ -163,7 +164,7 @@ class StremioService {
       
       this.initialized = true;
     } catch (error) {
-      console.error('Failed to initialize addons:', error);
+      logger.error('Failed to initialize addons:', error);
       // Install defaults as fallback
       await this.installDefaultAddons();
       this.initialized = true;
@@ -184,7 +185,7 @@ class StremioService {
         return await request();
       } catch (error: any) {
         lastError = error;
-        console.warn(`Request failed (attempt ${attempt + 1}/${retries + 1}):`, {
+        logger.warn(`Request failed (attempt ${attempt + 1}/${retries + 1}):`, {
           message: error.message,
           code: error.code,
           isAxiosError: error.isAxiosError,
@@ -193,7 +194,7 @@ class StremioService {
         
         if (attempt < retries) {
           const backoffDelay = delay * Math.pow(2, attempt);
-          console.log(`Retrying in ${backoffDelay}ms...`);
+          logger.log(`Retrying in ${backoffDelay}ms...`);
           await new Promise(resolve => setTimeout(resolve, backoffDelay));
         }
       }
@@ -211,7 +212,7 @@ class StremioService {
       }
       await this.saveInstalledAddons();
     } catch (error) {
-      console.error('Failed to install default addons:', error);
+      logger.error('Failed to install default addons:', error);
     }
   }
 
@@ -220,7 +221,7 @@ class StremioService {
       const addonsArray = Array.from(this.installedAddons.values());
       await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(addonsArray));
     } catch (error) {
-      console.error('Failed to save addons:', error);
+      logger.error('Failed to save addons:', error);
     }
   }
 
@@ -248,7 +249,7 @@ class StremioService {
       
       return manifest;
     } catch (error) {
-      console.error(`Failed to fetch manifest from ${url}:`, error);
+      logger.error(`Failed to fetch manifest from ${url}:`, error);
       throw new Error(`Failed to fetch addon manifest from ${url}`);
     }
   }
@@ -298,7 +299,7 @@ class StremioService {
           result[addon.id] = items;
         }
       } catch (error) {
-        console.error(`Failed to fetch catalog from ${addon.name}:`, error);
+        logger.error(`Failed to fetch catalog from ${addon.name}:`, error);
       }
     });
     
@@ -315,7 +316,7 @@ class StremioService {
       baseUrl = `https://${baseUrl}`;
     }
     
-    console.log('Addon base URL:', baseUrl);
+    logger.log('Addon base URL:', baseUrl);
     return baseUrl;
   }
 
@@ -379,7 +380,7 @@ class StremioService {
       }
       return [];
     } catch (error) {
-      console.error(`Failed to fetch catalog from ${manifest.name}:`, error);
+      logger.error(`Failed to fetch catalog from ${manifest.name}:`, error);
       throw error;
     }
   }
@@ -403,7 +404,7 @@ class StremioService {
             return response.data.meta;
           }
         } catch (error) {
-          console.warn(`Failed to fetch meta from ${baseUrl}:`, error);
+          logger.warn(`Failed to fetch meta from ${baseUrl}:`, error);
           continue; // Try next URL
         }
       }
@@ -432,15 +433,15 @@ class StremioService {
             return response.data.meta;
           }
         } catch (error) {
-          console.warn(`Failed to fetch meta from ${addon.name}:`, error);
+          logger.warn(`Failed to fetch meta from ${addon.name}:`, error);
           continue; // Try next addon
         }
       }
       
-      console.warn('No metadata found from any addon');
+      logger.warn('No metadata found from any addon');
       return null;
     } catch (error) {
-      console.error('Error in getMetaDetails:', error);
+      logger.error('Error in getMetaDetails:', error);
       return null;
     }
   }
@@ -449,7 +450,7 @@ class StremioService {
     await this.ensureInitialized();
     
     const addons = this.getInstalledAddons();
-    console.log('Installed addons:', addons.map(a => ({ id: a.id, url: a.url })));
+    logger.log('Installed addons:', addons.map(a => ({ id: a.id, url: a.url })));
     
     const streamResponses: StreamResponse[] = [];
     
@@ -457,7 +458,7 @@ class StremioService {
     const streamAddons = addons
       .filter(addon => {
         if (!addon.resources) {
-          console.log(`Addon ${addon.id} has no resources`);
+          logger.log(`Addon ${addon.id} has no resources`);
           return false;
         }
         
@@ -466,16 +467,16 @@ class StremioService {
         );
         
         if (!hasStreamResource) {
-          console.log(`Addon ${addon.id} does not support streaming ${type}`);
+          logger.log(`Addon ${addon.id} does not support streaming ${type}`);
         }
         
         return hasStreamResource;
       });
     
-    console.log('Stream capable addons:', streamAddons.map(a => a.id));
+    logger.log('Stream capable addons:', streamAddons.map(a => a.id));
     
     if (streamAddons.length === 0) {
-      console.warn('No addons found that can provide streams');
+      logger.warn('No addons found that can provide streams');
       return [];
     }
 
@@ -487,7 +488,7 @@ class StremioService {
       const promise = (async () => {
         try {
           if (!addon.url) {
-            console.warn(`Addon ${addon.id} has no URL`);
+            logger.warn(`Addon ${addon.id} has no URL`);
             return;
           }
 
@@ -513,7 +514,7 @@ class StremioService {
             callback(response.data?.streams || null, addon.name, null);
           }
         } catch (error) {
-          console.error(`Failed to get streams from ${addon.name}:`, error);
+          logger.error(`Failed to get streams from ${addon.name}:`, error);
           if (callback) {
             callback(null, addon.name, error as Error);
           }
@@ -538,21 +539,21 @@ class StremioService {
 
   private async fetchStreamsFromAddon(addon: Manifest, type: string, id: string): Promise<StreamResponse | null> {
     if (!addon.url) {
-      console.warn(`Addon ${addon.id} has no URL defined`);
+      logger.warn(`Addon ${addon.id} has no URL defined`);
       return null;
     }
     
     const baseUrl = this.getAddonBaseURL(addon.url);
     const url = `${baseUrl}/stream/${type}/${id}.json`;
     
-    console.log(`Fetching streams from URL: ${url}`);
+    logger.log(`Fetching streams from URL: ${url}`);
     
     try {
       // Increase timeout for debrid services
       const timeout = addon.id.toLowerCase().includes('torrentio') ? 30000 : 10000;
       
       const response = await this.retryRequest(async () => {
-        console.log(`Making request to ${url} with timeout ${timeout}ms`);
+        logger.log(`Making request to ${url} with timeout ${timeout}ms`);
         return await axios.get(url, { 
           timeout,
           headers: {
@@ -564,7 +565,7 @@ class StremioService {
       
       if (response.data && response.data.streams && Array.isArray(response.data.streams)) {
         const streams = this.processStreams(response.data.streams, addon);
-        console.log(`Successfully processed ${streams.length} streams from ${addon.id}`);
+        logger.log(`Successfully processed ${streams.length} streams from ${addon.id}`);
         
         return {
           streams,
@@ -572,7 +573,7 @@ class StremioService {
           addonName: addon.name
         };
       } else {
-        console.warn(`Invalid response format from ${addon.id}:`, response.data);
+        logger.warn(`Invalid response format from ${addon.id}:`, response.data);
       }
     } catch (error: any) {
       const errorDetails = {
@@ -585,7 +586,7 @@ class StremioService {
         status: error.response?.status,
         responseData: error.response?.data
       };
-      console.error('Failed to fetch streams from addon:', errorDetails);
+      logger.error('Failed to fetch streams from addon:', errorDetails);
       
       // Re-throw the error with more context
       throw new Error(`Failed to fetch streams from ${addon.name}: ${error.message}`);

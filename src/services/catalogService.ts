@@ -2,6 +2,7 @@ import { stremioService, Meta, Manifest } from './stremioService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { TMDBService } from './tmdbService';
+import { logger } from '../utils/logger';
 
 export interface StreamingAddon {
   id: string;
@@ -82,7 +83,7 @@ class CatalogService {
         this.library = JSON.parse(storedLibrary);
       }
     } catch (error) {
-      console.error('Failed to load library:', error);
+      logger.error('Failed to load library:', error);
     }
   }
 
@@ -90,7 +91,7 @@ class CatalogService {
     try {
       await AsyncStorage.setItem(this.LIBRARY_KEY, JSON.stringify(this.library));
     } catch (error) {
-      console.error('Failed to save library:', error);
+      logger.error('Failed to save library:', error);
     }
   }
 
@@ -101,7 +102,7 @@ class CatalogService {
         this.recentContent = JSON.parse(storedRecentContent);
       }
     } catch (error) {
-      console.error('Failed to load recent content:', error);
+      logger.error('Failed to load recent content:', error);
     }
   }
 
@@ -109,7 +110,7 @@ class CatalogService {
     try {
       await AsyncStorage.setItem(this.RECENT_CONTENT_KEY, JSON.stringify(this.recentContent));
     } catch (error) {
-      console.error('Failed to save recent content:', error);
+      logger.error('Failed to save recent content:', error);
     }
   }
 
@@ -193,7 +194,7 @@ class CatalogService {
                 });
               }
             } catch (error) {
-              console.error(`Failed to get catalog ${catalog.id} for addon ${addon.id}:`, error);
+              logger.error(`Failed to get catalog ${catalog.id} for addon ${addon.id}:`, error);
             }
           }
         }
@@ -238,7 +239,7 @@ class CatalogService {
             });
           }
         } catch (error) {
-          console.error(`Failed to get catalog ${catalog.id} for addon ${addon.id}:`, error);
+          logger.error(`Failed to get catalog ${catalog.id} for addon ${addon.id}:`, error);
         }
       }
     }
@@ -259,7 +260,7 @@ class CatalogService {
           await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));
         } catch (error) {
           lastError = error;
-          console.error(`Attempt ${i + 1} failed to get content details for ${type}:${id}:`, error);
+          logger.error(`Attempt ${i + 1} failed to get content details for ${type}:${id}:`, error);
           await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));
         }
       }
@@ -281,7 +282,7 @@ class CatalogService {
       
       return null;
     } catch (error) {
-      console.error(`Failed to get content details for ${type}:${id}:`, error);
+      logger.error(`Failed to get content details for ${type}:${id}:`, error);
       return null;
     }
   }
@@ -389,7 +390,7 @@ class CatalogService {
                 results.push(...items);
               }
             } catch (error) {
-              console.error(`Search failed for ${catalog.id} in addon ${addon.id}:`, error);
+              logger.error(`Search failed for ${catalog.id} in addon ${addon.id}:`, error);
             }
           })();
           
@@ -414,7 +415,7 @@ class CatalogService {
     }
 
     const trimmedQuery = query.trim().toLowerCase();
-    console.log('Searching Cinemeta for:', trimmedQuery);
+    logger.log('Searching Cinemeta for:', trimmedQuery);
 
     const addons = await this.getAllAddons();
     const results: StreamingContent[] = [];
@@ -423,7 +424,7 @@ class CatalogService {
     const cinemeta = addons.find(addon => addon.id === 'com.linvo.cinemeta');
     
     if (!cinemeta || !cinemeta.catalogs) {
-      console.error('Cinemeta addon not found');
+      logger.error('Cinemeta addon not found');
       return [];
     }
 
@@ -432,7 +433,7 @@ class CatalogService {
       try {
         // Direct API call to Cinemeta
         const url = `https://v3-cinemeta.strem.io/catalog/${type}/top/search=${encodeURIComponent(trimmedQuery)}.json`;
-        console.log('Request URL:', url);
+        logger.log('Request URL:', url);
         
         const response = await axios.get<{ metas: any[] }>(url);
         const metas = response.data.metas || [];
@@ -442,7 +443,7 @@ class CatalogService {
           results.push(...items);
         }
       } catch (error) {
-        console.error(`Cinemeta search failed for ${type}:`, error);
+        logger.error(`Cinemeta search failed for ${type}:`, error);
       }
     });
 
@@ -474,7 +475,7 @@ class CatalogService {
       }
       return null;
     } catch (error) {
-      console.error('Error getting Stremio ID:', error);
+      logger.error('Error getting Stremio ID:', error);
       return null;
     }
   }

@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "stremio-expo",
-    "slug": "stremio-expo",
+    "name": "Nuvio",
+    "slug": "nuvio",
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/icon.png",
@@ -29,7 +29,7 @@
         "INTERNET",
         "WAKE_LOCK"
       ],
-      "package": "com.stremio.expo"
+      "package": "com.nuvio.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"

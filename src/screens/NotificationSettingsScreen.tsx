@@ -15,6 +15,7 @@ import { colors } from '../styles/colors';
 import { notificationService, NotificationSettings } from '../services/notificationService';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
+import { logger } from '../utils/logger';
 
 const NotificationSettingsScreen = () => {
   const navigation = useNavigation();
@@ -36,7 +37,7 @@ const NotificationSettingsScreen = () => {
         const savedSettings = await notificationService.getSettings();
         setSettings(savedSettings);
       } catch (error) {
-        console.error('Error loading notification settings:', error);
+        logger.error('Error loading notification settings:', error);
       } finally {
         setLoading(false);
       }
@@ -84,7 +85,7 @@ const NotificationSettingsScreen = () => {
       // Update local state
       setSettings(updatedSettings);
     } catch (error) {
-      console.error('Error updating notification settings:', error);
+      logger.error('Error updating notification settings:', error);
       Alert.alert('Error', 'Failed to update notification settings');
     }
   };
@@ -111,7 +112,7 @@ const NotificationSettingsScreen = () => {
               await notificationService.cancelAllNotifications();
               Alert.alert('Success', 'All notifications have been reset');
             } catch (error) {
-              console.error('Error resetting notifications:', error);
+              logger.error('Error resetting notifications:', error);
               Alert.alert('Error', 'Failed to reset notifications');
             }
           },
@@ -147,7 +148,7 @@ const NotificationSettingsScreen = () => {
         Alert.alert('Error', 'Failed to schedule test notification. Make sure notifications are enabled.');
       }
     } catch (error) {
-      console.error('Error scheduling test notification:', error);
+      logger.error('Error scheduling test notification:', error);
       Alert.alert('Error', 'Failed to schedule test notification');
     }
   };

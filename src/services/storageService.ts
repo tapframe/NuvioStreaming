@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { logger } from '../utils/logger';
 
 interface WatchProgress {
   currentTime: number;
@@ -33,7 +34,7 @@ class StorageService {
       const key = this.getWatchProgressKey(id, type, episodeId);
       await AsyncStorage.setItem(key, JSON.stringify(progress));
     } catch (error) {
-      console.error('Error saving watch progress:', error);
+      logger.error('Error saving watch progress:', error);
     }
   }
 
@@ -47,7 +48,7 @@ class StorageService {
       const data = await AsyncStorage.getItem(key);
       return data ? JSON.parse(data) : null;
     } catch (error) {
-      console.error('Error getting watch progress:', error);
+      logger.error('Error getting watch progress:', error);
       return null;
     }
   }
@@ -61,7 +62,7 @@ class StorageService {
       const key = this.getWatchProgressKey(id, type, episodeId);
       await AsyncStorage.removeItem(key);
     } catch (error) {
-      console.error('Error removing watch progress:', error);
+      logger.error('Error removing watch progress:', error);
     }
   }
 
@@ -77,7 +78,7 @@ class StorageService {
         return acc;
       }, {} as Record<string, WatchProgress>);
     } catch (error) {
-      console.error('Error getting all watch progress:', error);
+      logger.error('Error getting all watch progress:', error);
       return {};
     }
   }

@@ -26,6 +26,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { logger } from '../utils/logger';
 
 // Extend Manifest type to include logo
 interface ExtendedManifest extends Manifest {
@@ -58,7 +59,7 @@ const AddonsScreen = () => {
       const installedAddons = await stremioService.getInstalledAddonsAsync();
       setAddons(installedAddons);
     } catch (error) {
-      console.error('Failed to load addons:', error);
+      logger.error('Failed to load addons:', error);
       Alert.alert('Error', 'Failed to load addons');
     } finally {
       setLoading(false);
@@ -79,7 +80,7 @@ const AddonsScreen = () => {
       setShowAddModal(false);
       setShowConfirmModal(true);
     } catch (error) {
-      console.error('Failed to fetch addon details:', error);
+      logger.error('Failed to fetch addon details:', error);
       Alert.alert('Error', 'Failed to fetch addon details');
     } finally {
       setInstalling(false);
@@ -98,7 +99,7 @@ const AddonsScreen = () => {
       loadAddons();
       Alert.alert('Success', 'Addon installed successfully');
     } catch (error) {
-      console.error('Failed to install addon:', error);
+      logger.error('Failed to install addon:', error);
       Alert.alert('Error', 'Failed to install addon');
     } finally {
       setInstalling(false);

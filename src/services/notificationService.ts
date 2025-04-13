@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { parseISO, differenceInHours, isToday, addDays } from 'date-fns';
 import { stremioService } from './stremioService';
+import { logger } from '../utils/logger';
 
 // Define notification storage keys
 const NOTIFICATION_STORAGE_KEY = 'stremio-notifications';
@@ -92,7 +93,7 @@ class NotificationService {
         this.settings = { ...DEFAULT_NOTIFICATION_SETTINGS, ...JSON.parse(storedSettings) };
       }
     } catch (error) {
-      console.error('Error loading notification settings:', error);
+      logger.error('Error loading notification settings:', error);
     }
   }
 
@@ -100,7 +101,7 @@ class NotificationService {
     try {
       await AsyncStorage.setItem(NOTIFICATION_SETTINGS_KEY, JSON.stringify(this.settings));
     } catch (error) {
-      console.error('Error saving notification settings:', error);
+      logger.error('Error saving notification settings:', error);
     }
   }
 
@@ -112,7 +113,7 @@ class NotificationService {
         this.scheduledNotifications = JSON.parse(storedNotifications);
       }
     } catch (error) {
-      console.error('Error loading scheduled notifications:', error);
+      logger.error('Error loading scheduled notifications:', error);
     }
   }
 
@@ -120,7 +121,7 @@ class NotificationService {
     try {
       await AsyncStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(this.scheduledNotifications));
     } catch (error) {
-      console.error('Error saving scheduled notifications:', error);
+      logger.error('Error saving scheduled notifications:', error);
     }
   }
 
@@ -184,7 +185,7 @@ class NotificationService {
       
       return notificationId;
     } catch (error) {
-      console.error('Error scheduling notification:', error);
+      logger.error('Error scheduling notification:', error);
       return null;
     }
   }
@@ -219,7 +220,7 @@ class NotificationService {
       // Save updated list
       await this.saveScheduledNotifications();
     } catch (error) {
-      console.error('Error canceling notification:', error);
+      logger.error('Error canceling notification:', error);
     }
   }
 
@@ -229,7 +230,7 @@ class NotificationService {
       this.scheduledNotifications = [];
       await this.saveScheduledNotifications();
     } catch (error) {
-      console.error('Error canceling all notifications:', error);
+      logger.error('Error canceling all notifications:', error);
     }
   }
 
@@ -277,7 +278,7 @@ class NotificationService {
       
       await this.scheduleMultipleEpisodeNotifications(notificationItems);
     } catch (error) {
-      console.error(`Error updating notifications for series ${seriesId}:`, error);
+      logger.error(`Error updating notifications for series ${seriesId}:`, error);
     }
   }
 }

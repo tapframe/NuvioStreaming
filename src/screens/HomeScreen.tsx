@@ -48,6 +48,8 @@ import {
 import { useCatalogContext } from '../contexts/CatalogContext';
 import { ThisWeekSection } from '../components/home/ThisWeekSection';
 import * as Haptics from 'expo-haptics';
+import { tmdbService } from '../services/tmdbService';
+import { logger } from '../utils/logger';
 
 // Define interfaces for our data
 interface Category {
@@ -213,6 +215,7 @@ const ContentItem = ({ item: initialItem, onPress }: ContentItemProps) => {
   const [localItem, setLocalItem] = useState(initialItem);
   const [isWatched, setIsWatched] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   const handleLongPress = useCallback(() => {
     setMenuVisible(true);
@@ -276,11 +279,24 @@ const ContentItem = ({ item: initialItem, onPress }: ContentItemProps) => {
             contentFit="cover"
             transition={200}
             cachePolicy="memory-disk"
+            recyclingKey={`poster-${localItem.id}`}
+            onLoadStart={() => {
+              setImageLoaded(false);
+              setImageError(false);
+            }}
             onLoadEnd={() => setImageLoaded(true)}
+            onError={() => {
+              setImageError(true);
+              setImageLoaded(true);
+            }}
           />
-          {!imageLoaded && (
+          {(!imageLoaded || imageError) && (
             <View style={[styles.loadingOverlay, { backgroundColor: colors.elevation2 }]}>
-              <ActivityIndicator color={colors.primary} size="small" />
+              {!imageError ? (
+                <ActivityIndicator color={colors.primary} size="small" />
+              ) : (
+                <MaterialIcons name="broken-image" size={24} color={colors.lightGray} />
+              )}
             </View>
           )}
           {isWatched && (
@@ -352,6 +368,29 @@ const SkeletonFeatured = () => (
   </View>
 );
 
+// Add genre mapping
+const GENRE_MAP: { [key: number]: string } = {
+  28: 'Action',
+  12: 'Adventure',
+  16: 'Animation',
+  35: 'Comedy',
+  80: 'Crime',
+  99: 'Documentary',
+  18: 'Drama',
+  10751: 'Family',
+  14: 'Fantasy',
+  36: 'History',
+  27: 'Horror',
+  10402: 'Music',
+  9648: 'Mystery',
+  10749: 'Romance',
+  878: 'Sci-Fi',
+  10770: 'TV Movie',
+  53: 'Thriller',
+  10752: 'War',
+  37: 'Western'
+};
+
 const HomeScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const isDarkMode = useColorScheme() === 'dark';
@@ -366,6 +405,39 @@ const HomeScreen = () => {
   const maxRetries = 3;
   const { lastUpdate } = useCatalogContext();
   const [isSaved, setIsSaved] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const currentIndexRef = useRef(0);
+
+  // Add auto-rotation effect
+  useEffect(() => {
+    if (allFeaturedContent.length === 0) return;
+
+    const rotateContent = () => {
+      currentIndexRef.current = (currentIndexRef.current + 1) % allFeaturedContent.length;
+      setFeaturedContent(allFeaturedContent[currentIndexRef.current]);
+    };
+
+    const intervalId = setInterval(rotateContent, 15000); // 15 seconds
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [allFeaturedContent]);
+
+  // Cleanup function for ongoing operations
+  const cleanup = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cleanup();
+    };
+  }, [cleanup]);
 
   useEffect(() => {
     StatusBar.setTranslucent(true);
@@ -386,23 +458,9 @@ const HomeScreen = () => {
     };
   }, [navigation]);
 
-  // Function to rotate featured content
-  const rotateFeaturedContent = useCallback(() => {
-    if (allFeaturedContent.length > 0) {
-      const currentIndex = allFeaturedContent.findIndex(item => item.id === featuredContent?.id);
-      const nextIndex = (currentIndex + 1) % allFeaturedContent.length;
-      setFeaturedContent(allFeaturedContent[nextIndex]);
-    }
-  }, [allFeaturedContent, featuredContent]);
-
-  // Set up rotation interval
-  useEffect(() => {
-    const interval = setInterval(rotateFeaturedContent, 20000); // Rotate every 20 seconds
-    return () => clearInterval(interval);
-  }, [rotateFeaturedContent]);
-
-  // Function to preload images
   const preloadImages = useCallback(async (content: StreamingContent[]) => {
+    if (!content.length) return;
+    
     try {
       setLoadingImages(true);
       const imagePromises = content.map(item => {
@@ -428,108 +486,112 @@ const HomeScreen = () => {
     }
   }, []);
 
-  const loadContent = useCallback(async (forceRefresh = false) => {
+  const loadFeaturedContent = useCallback(async () => {
     try {
-      if (!forceRefresh && !loading && !refreshing) {
-        setLoading(true);
-      }
+      const trendingResults = await tmdbService.getTrending('movie', 'day');
       
-      // Helper function to delay execution
-      const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-      
-      // Try loading content with retries
-      let attempt = 0;
-      while (attempt < maxRetries) {
-        try {
-          // Clear existing catalogs when forcing refresh
-          if (forceRefresh) {
-            setCatalogs([]);
-            setAllFeaturedContent([]);
-            setFeaturedContent(null);
-          }
-
-          // Load catalogs from service
-          const homeCatalogs = await catalogService.getHomeCatalogs();
-          
-          // If no catalogs found, wait and retry
-          if (homeCatalogs.length === 0) {
-            attempt++;
-            console.log(`No catalogs found, retrying... (attempt ${attempt})`);
-            await delay(2000);
-            continue;
-          }
-
-          // Create a map to store unique catalogs by their content
-          const uniqueCatalogsMap = new Map();
-          
-          homeCatalogs.forEach(catalog => {
-            const contentKey = catalog.items.map(item => item.id).sort().join(',');
-            if (!uniqueCatalogsMap.has(contentKey)) {
-              uniqueCatalogsMap.set(contentKey, catalog);
-            }
+      if (trendingResults.length > 0) {
+        const formattedContent: StreamingContent[] = trendingResults
+          .filter(item => item.title || item.name) // Filter out items without a name
+          .map(item => {
+            const yearString = (item.release_date || item.first_air_date)?.substring(0, 4);
+            return {
+              id: `tmdb:${item.id}`,
+              type: 'movie',
+              name: item.title || item.name || 'Unknown Title',
+              poster: tmdbService.getImageUrl(item.poster_path) || '',
+              banner: tmdbService.getImageUrl(item.backdrop_path) || '',
+              logo: item.external_ids?.imdb_id ? `https://images.metahub.space/logo/medium/${item.external_ids.imdb_id}/img` : undefined,
+              description: item.overview || '',
+              year: yearString ? parseInt(yearString, 10) : undefined,
+              genres: item.genre_ids.map(id => GENRE_MAP[id] || id.toString()),
+              inLibrary: false,
+            };
           });
 
-          const uniqueCatalogs = Array.from(uniqueCatalogsMap.values());
-          const popularCatalog = uniqueCatalogs.find(catalog => 
-            catalog.name.toLowerCase().includes('popular') || 
-            catalog.name.toLowerCase().includes('top') ||
-            catalog.id.toLowerCase().includes('top')
-          );
+        setAllFeaturedContent(formattedContent);
+        // Randomly select a featured item
+        const randomIndex = Math.floor(Math.random() * formattedContent.length);
+        setFeaturedContent(formattedContent[randomIndex]);
+      }
+    } catch (error) {
+      logger.error('Failed to load featured content:', error);
+    }
+  }, []);
 
-          // Set catalogs showing all unique content
-          setCatalogs(uniqueCatalogs);
+  const loadCatalogs = useCallback(async () => {
+    // Create new abort controller for this load operation
+    cleanup();
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
 
-          // Set featured content and preload images
-          if (popularCatalog && popularCatalog.items.length > 0) {
-            setAllFeaturedContent(popularCatalog.items);
-            const randomIndex = Math.floor(Math.random() * popularCatalog.items.length);
-            setFeaturedContent(popularCatalog.items[randomIndex]);
-            
-            // Preload images for featured content and first few items of each catalog
-            const contentToPreload = [
-              ...popularCatalog.items.slice(0, 5),
-              ...uniqueCatalogs.flatMap(catalog => catalog.items.slice(0, 3))
-            ];
-            await preloadImages(contentToPreload);
-          } else if (uniqueCatalogs.length > 0 && uniqueCatalogs[0].items.length > 0) {
-            setAllFeaturedContent(uniqueCatalogs[0].items);
-            setFeaturedContent(uniqueCatalogs[0].items[0]);
-            
-            // Preload images for first catalog
-            await preloadImages(uniqueCatalogs[0].items.slice(0, 5));
-          }
+    try {
+      // Load catalogs from service
+      const homeCatalogs = await catalogService.getHomeCatalogs();
+      
+      if (signal.aborted) return;
 
-          return;
-        } catch (error) {
-          attempt++;
-          console.error(`Failed to load content (attempt ${attempt}):`, error);
-          if (attempt < maxRetries) {
-            await delay(2000);
-          }
-        }
+      // If no catalogs found, wait and retry
+      if (!homeCatalogs?.length) {
+        console.log('No catalogs found');
+        return;
       }
 
-      console.error('All attempts to load content failed');
-      setCatalogs([]);
-      setAllFeaturedContent([]);
-      setFeaturedContent(null);
+      // Create a map to store unique catalogs by their content
+      const uniqueCatalogsMap = new Map();
+      
+      homeCatalogs.forEach(catalog => {
+        const contentKey = catalog.items.map(item => item.id).sort().join(',');
+        if (!uniqueCatalogsMap.has(contentKey)) {
+          uniqueCatalogsMap.set(contentKey, catalog);
+        }
+      });
 
+      if (signal.aborted) return;
+
+      const uniqueCatalogs = Array.from(uniqueCatalogsMap.values());
+      setCatalogs(uniqueCatalogs);
+
+      return;
+    } catch (error) {
+      console.error('Error in loadCatalogs:', error);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (!signal.aborted) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  }, [maxRetries, preloadImages, loading, refreshing]);
+  }, [maxRetries, cleanup]);
 
-  // Reset retry count when refreshing manually
+  useEffect(() => {
+    const loadInitialData = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([
+          loadFeaturedContent(),
+          loadCatalogs(),
+        ]);
+      } catch (error) {
+        logger.error('Error loading initial data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadInitialData();
+  }, [loadFeaturedContent, loadCatalogs, lastUpdate]);
+
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    loadContent(true);
-  }, [loadContent]);
-
-  // Load content initially and when lastUpdate changes
-  useEffect(() => {
-    loadContent(true);
-  }, [loadContent, lastUpdate]);
+    Promise.all([
+      loadFeaturedContent(),
+      loadCatalogs(),
+    ]).catch(error => {
+      logger.error('Error during refresh:', error);
+    }).finally(() => {
+      setRefreshing(false);
+    });
+  }, [loadFeaturedContent, loadCatalogs]);
 
   // Check if content is in library
   useEffect(() => {
@@ -668,10 +730,19 @@ const HomeScreen = () => {
 
                 <TouchableOpacity 
                   style={styles.infoButton}
-                  onPress={() => navigation.navigate('Metadata', {
-                    id: featuredContent?.id, 
-                    type: featuredContent?.type
-                  })}
+                  onPress={async () => {
+                    if (featuredContent) {
+                      // Convert TMDB ID to Stremio ID
+                      const tmdbId = featuredContent.id.replace('tmdb:', '');
+                      const stremioId = await catalogService.getStremioId(featuredContent.type, tmdbId);
+                      if (stremioId) {
+                        navigation.navigate('Metadata', {
+                          id: stremioId,
+                          type: featuredContent.type
+                        });
+                      }
+                    }
+                  }}
                 >
                   <MaterialIcons name="info-outline" size={24} color={colors.white} />
                   <Text style={styles.infoButtonText}>Info</Text>
@@ -719,7 +790,7 @@ const HomeScreen = () => {
         <FlatList
           data={item.items}
           renderItem={renderContentItem}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => `${item.id}-${item.type}`}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.catalogList}
@@ -727,6 +798,15 @@ const HomeScreen = () => {
           decelerationRate="fast"
           snapToAlignment="start"
           ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
+          initialNumToRender={4}
+          maxToRenderPerBatch={4}
+          windowSize={5}
+          removeClippedSubviews={Platform.OS === 'android'}
+          getItemLayout={(data, index) => ({
+            length: POSTER_WIDTH + 10,
+            offset: (POSTER_WIDTH + 10) * index,
+            index,
+          })}
         />
       </View>
     );
@@ -780,6 +860,10 @@ const HomeScreen = () => {
             renderItem={renderCatalog}
             keyExtractor={(item, index) => `${item.addon}-${item.id}-${index}`}
             scrollEnabled={false}
+            removeClippedSubviews={false}
+            initialNumToRender={3}
+            maxToRenderPerBatch={3}
+            windowSize={5}
           />
         ) : (
           <View style={styles.emptyCatalog}>

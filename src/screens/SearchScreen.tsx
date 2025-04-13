@@ -25,6 +25,7 @@ import debounce from 'lodash/debounce';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, { FadeIn, FadeOut, SlideInRight } from 'react-native-reanimated';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { logger } from '../utils/logger';
 
 const { width } = Dimensions.get('window');
 const HORIZONTAL_ITEM_WIDTH = width * 0.3;
@@ -117,7 +118,7 @@ const SearchScreen = () => {
         setRecentSearches(JSON.parse(savedSearches));
       }
     } catch (error) {
-      console.error('Failed to load recent searches:', error);
+      logger.error('Failed to load recent searches:', error);
     }
   };
 
@@ -131,7 +132,7 @@ const SearchScreen = () => {
       setRecentSearches(newRecentSearches);
       await AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newRecentSearches));
     } catch (error) {
-      console.error('Failed to save recent search:', error);
+      logger.error('Failed to save recent search:', error);
     }
   };
 
@@ -148,7 +149,7 @@ const SearchScreen = () => {
         setResults(searchResults);
         await saveRecentSearch(searchQuery);
       } catch (error) {
-        console.error('Search failed:', error);
+        logger.error('Search failed:', error);
         setResults([]);
       } finally {
         setSearching(false);

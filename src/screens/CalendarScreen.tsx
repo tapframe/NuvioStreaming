@@ -26,6 +26,7 @@ import { format, parseISO, isThisWeek, isAfter, startOfToday, addWeeks, isBefore
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { CalendarSection } from '../components/calendar/CalendarSection';
 import { tmdbService } from '../services/tmdbService';
+import { logger } from '../utils/logger';
 
 const { width } = Dimensions.get('window');
 
@@ -52,7 +53,7 @@ interface CalendarSection {
 const CalendarScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { libraryItems, loading: libraryLoading } = useLibrary();
-  console.log(`[Calendar] Initial load - Library has ${libraryItems?.length || 0} items, loading: ${libraryLoading}`);
+  logger.log(`[Calendar] Initial load - Library has ${libraryItems?.length || 0} items, loading: ${libraryLoading}`);
   const [calendarData, setCalendarData] = useState<CalendarSection[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -60,13 +61,13 @@ const CalendarScreen = () => {
   const [filteredEpisodes, setFilteredEpisodes] = useState<CalendarEpisode[]>([]);
 
   const fetchCalendarData = useCallback(async () => {
-    console.log("[Calendar] Starting to fetch calendar data");
+    logger.log("[Calendar] Starting to fetch calendar data");
     setLoading(true);
     
     try {
       // Filter for only series in library
       const seriesItems = libraryItems.filter(item => item.type === 'series');
-      console.log(`[Calendar] Library items: ${libraryItems.length}, Series items: ${seriesItems.length}`);
+      logger.log(`[Calendar] Library items: ${libraryItems.length}, Series items: ${seriesItems.length}`);
       
       let allEpisodes: CalendarEpisode[] = [];
       let seriesWithoutEpisodes: CalendarEpisode[] = [];
@@ -74,12 +75,12 @@ const CalendarScreen = () => {
       // For each series, fetch upcoming episodes
       for (const series of seriesItems) {
         try {
-          console.log(`[Calendar] Fetching episodes for series: ${series.name} (${series.id})`);
+          logger.log(`[Calendar] Fetching episodes for series: ${series.name} (${series.id})`);
           const metadata = await stremioService.getMetaDetails(series.type, series.id);
-          console.log(`[Calendar] Metadata fetched:`, metadata ? 'success' : 'null');
+          logger.log(`[Calendar] Metadata fetched:`, metadata ? 'success' : 'null');
           
           if (metadata?.videos && metadata.videos.length > 0) {
-            console.log(`[Calendar] Series ${series.name} has ${metadata.videos.length} videos`);
+            logger.log(`[Calendar] Series ${series.name} has ${metadata.videos.length} videos`);
             // Filter for upcoming episodes or recently released
             const today = startOfToday();
             const fourWeeksLater = addWeeks(today, 4);
@@ -161,7 +162,7 @@ const CalendarScreen = () => {
             });
           }
         } catch (error) {
-          console.error(`Error fetching episodes for ${series.name}:`, error);
+          logger.error(`Error fetching episodes for ${series.name}:`, error);
         }
       }
       
@@ -185,7 +186,7 @@ const CalendarScreen = () => {
           !isThisWeek(parseISO(episode.releaseDate))
       );
       
-      console.log(`[Calendar] Episodes summary: All episodes: ${allEpisodes.length}, This Week: ${thisWeekEpisodes.length}, Upcoming: ${upcomingEpisodes.length}, Recent: ${recentEpisodes.length}, No Schedule: ${seriesWithoutEpisodes.length}`);
+      logger.log(`[Calendar] Episodes summary: All episodes: ${allEpisodes.length}, This Week: ${thisWeekEpisodes.length}, Upcoming: ${upcomingEpisodes.length}, Recent: ${recentEpisodes.length}, No Schedule: ${seriesWithoutEpisodes.length}`);
       
       const sections: CalendarSection[] = [];
       
@@ -207,7 +208,7 @@ const CalendarScreen = () => {
       
       setCalendarData(sections);
     } catch (error) {
-      console.error('Error fetching calendar data:', error);
+      logger.error('Error fetching calendar data:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -216,10 +217,10 @@ const CalendarScreen = () => {
   
   useEffect(() => {
     if (libraryItems.length > 0 && !libraryLoading) {
-      console.log(`[Calendar] Library loaded with ${libraryItems.length} items, fetching calendar data`);
+      logger.log(`[Calendar] Library loaded with ${libraryItems.length} items, fetching calendar data`);
       fetchCalendarData();
     } else if (!libraryLoading) {
-      console.log(`[Calendar] Library loaded but empty (${libraryItems.length} items)`);
+      logger.log(`[Calendar] Library loaded but empty (${libraryItems.length} items)`);
       setLoading(false);
     }
   }, [libraryItems, libraryLoading, fetchCalendarData]);
@@ -358,11 +359,11 @@ const CalendarScreen = () => {
     [...acc, ...section.data], [] as CalendarEpisode[]);
   
   // Log when rendering with relevant state info
-  console.log(`[Calendar] Rendering: loading=${loading}, calendarData sections=${calendarData.length}, allEpisodes=${allEpisodes.length}`);
+  logger.log(`[Calendar] Rendering: loading=${loading}, calendarData sections=${calendarData.length}, allEpisodes=${allEpisodes.length}`);
   
   // Handle date selection from calendar
   const handleDateSelect = useCallback((date: Date) => {
-    console.log(`[Calendar] Date selected: ${format(date, 'yyyy-MM-dd')}`);
+    logger.log(`[Calendar] Date selected: ${format(date, 'yyyy-MM-dd')}`);
     setSelectedDate(date);
     
     // Filter episodes for the selected date
@@ -372,13 +373,13 @@ const CalendarScreen = () => {
       return isSameDay(episodeDate, date);
     });
     
-    console.log(`[Calendar] Filtered episodes for selected date: ${filtered.length}`);
+    logger.log(`[Calendar] Filtered episodes for selected date: ${filtered.length}`);
     setFilteredEpisodes(filtered);
   }, [allEpisodes]);
 
   // Reset date filter
   const clearDateFilter = useCallback(() => {
-    console.log(`[Calendar] Clearing date filter`);
+    logger.log(`[Calendar] Clearing date filter`);
     setSelectedDate(null);
     setFilteredEpisodes([]);
   }, []);
@@ -444,7 +445,7 @@ const CalendarScreen = () => {
           <MaterialIcons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Calendar</Text>
-        <View style={{ width: 40 }} /> {/* Empty view for balance */}
+        <View style={{ width: 40 }} />
       </View>
       
       {selectedDate && filteredEpisodes.length > 0 && (

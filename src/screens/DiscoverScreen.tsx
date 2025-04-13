@@ -21,6 +21,7 @@ import { Image } from 'expo-image';
 import Animated, { FadeIn, FadeOut, SlideInRight, Layout } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { logger } from '../utils/logger';
 
 interface Category {
   id: string;
@@ -307,7 +308,7 @@ const DiscoverScreen = () => {
         setCatalogs([{ genre, items: content }]);
       }
     } catch (error) {
-      console.error('Failed to load content:', error);
+      logger.error('Failed to load content:', error);
       setCatalogs([]);
       setAllContent([]);
     } finally {

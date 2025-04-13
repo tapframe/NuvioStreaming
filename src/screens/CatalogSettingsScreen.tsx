@@ -14,6 +14,7 @@ import { colors } from '../styles';
 import { stremioService } from '../services/stremioService';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useCatalogContext } from '../contexts/CatalogContext';
+import { logger } from '../utils/logger';
 
 interface CatalogSetting {
   addonId: string;
@@ -112,7 +113,7 @@ const CatalogSettingsScreen = () => {
       
       setSettings(sortedCatalogs);
     } catch (error) {
-      console.error('Failed to load catalog settings:', error);
+      logger.error('Failed to load catalog settings:', error);
     } finally {
       setLoading(false);
     }
@@ -131,7 +132,7 @@ const CatalogSettingsScreen = () => {
       await AsyncStorage.setItem(CATALOG_SETTINGS_KEY, JSON.stringify(settingsObj));
       refreshCatalogs(); // Trigger catalog refresh after saving settings
     } catch (error) {
-      console.error('Failed to save catalog settings:', error);
+      logger.error('Failed to save catalog settings:', error);
     }
   };
 

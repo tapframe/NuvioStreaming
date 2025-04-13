@@ -44,6 +44,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { torrentService } from '../services/torrentService';
 import { TorrentProgress } from '../services/torrentService';
+import { logger } from '../utils/logger';
 
 const TMDB_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tmdb.new.logo.svg/512px-Tmdb.new.logo.svg.png?20200406190906';
 const HDR_ICON = 'https://uxwing.com/wp-content/themes/uxwing/download/video-photography-multimedia/hdr-icon.png';
@@ -77,7 +78,7 @@ const StreamCard = memo(({ stream, onPress, index, torrentProgress, isLoading, s
   , [index]);
 
   const handlePress = useCallback(() => {
-    console.log('StreamCard pressed:', {
+    logger.log('StreamCard pressed:', {
       isTorrent,
       isDebrid,
       hasProgress: !!torrentProgress,
@@ -310,7 +311,7 @@ export const StreamsScreen = () => {
   // Monitor streams loading start
   useEffect(() => {
     if (loadingStreams || loadingEpisodeStreams) {
-      console.log("⏱️ Stream loading started");
+      logger.log("⏱️ Stream loading started");
       const now = Date.now();
       setLoadStartTime(now);
       setProviderLoadTimes({});
@@ -368,7 +369,7 @@ export const StreamsScreen = () => {
       // Update provider status when new streams appear
       setProviderStatus(prev => {
         const loadTime = now - loadStartTime;
-        console.log(`✅ Provider "${parentProvider}" loaded successfully after ${loadTime}ms with ${streams[provider].streams.length} streams`);
+        logger.log(`✅ Provider "${parentProvider}" loaded successfully after ${loadTime}ms with ${streams[provider].streams.length} streams`);
         
         // Only update if it was previously loading
         if (prev[parentProvider]?.loading) {
@@ -409,7 +410,7 @@ export const StreamsScreen = () => {
               timeCompleted: Date.now()
             };
             updated = true;
-            console.log(`⚠️ Provider "${provider}" timed out or failed`);
+            logger.log(`⚠️ Provider "${provider}" timed out or failed`);
             
             // Update the simpler loading state
             setLoadingProviders((prevLoading: {[key: string]: boolean}) => ({...prevLoading, [provider]: false}));
@@ -423,7 +424,7 @@ export const StreamsScreen = () => {
 
   React.useEffect(() => {
     if (type === 'series' && episodeId) {
-      console.log(`🎬 Loading episode streams for: ${episodeId}`);
+      logger.log(`🎬 Loading episode streams for: ${episodeId}`);
       setLoadingProviders({
         'source_1': true, 
         'source_2': true,
@@ -432,7 +433,7 @@ export const StreamsScreen = () => {
       setSelectedEpisode(episodeId);
       loadEpisodeStreams(episodeId);
     } else if (type === 'movie') {
-      console.log(`🎬 Loading movie streams for: ${id}`);
+      logger.log(`🎬 Loading movie streams for: ${id}`);
       setLoadingProviders({
         'source_1': true, 
         'source_2': true,
@@ -506,7 +507,7 @@ export const StreamsScreen = () => {
   const handleStreamPress = useCallback(async (stream: Stream) => {
     try {
       if (stream.url) {
-        console.log('handleStreamPress called with stream:', {
+        logger.log('handleStreamPress called with stream:', {
           url: stream.url,
           behaviorHints: stream.behaviorHints,
           isMagnet: stream.url.startsWith('magnet:'),
@@ -518,7 +519,7 @@ export const StreamsScreen = () => {
         const isMagnet = stream.url.startsWith('magnet:') || stream.behaviorHints?.isMagnetStream;
         
         if (isMagnet) {
-          console.log('Handling magnet link...');
+          logger.log('Handling magnet link...');
           // Check if there's already an active torrent
           if (activeTorrent && activeTorrent !== stream.url) {
             Alert.alert(
@@ -533,7 +534,7 @@ export const StreamsScreen = () => {
                   text: 'Stop and Switch',
                   style: 'destructive',
                   onPress: async () => {
-                    console.log('Stopping current torrent and starting new one');
+                    logger.log('Stopping current torrent and starting new one');
                     await torrentService.stopStreamAndWait();
                     setActiveTorrent(null);
                     setTorrentProgress({});
@@ -545,14 +546,14 @@ export const StreamsScreen = () => {
             return;
           }
 
-          console.log('Starting torrent stream...');
+          logger.log('Starting torrent stream...');
           startTorrentStream(stream);
         } else {
-          console.log('Playing regular stream...');
+          logger.log('Playing regular stream...');
           
           // Check if external player is enabled in settings
           if (settings.useExternalPlayer) {
-            console.log('Using external player for URL:', stream.url);
+            logger.log('Using external player for URL:', stream.url);
             // Use VideoPlayerService to launch external player
             try {
               const videoPlayerService = VideoPlayerService;
@@ -564,7 +565,7 @@ export const StreamsScreen = () => {
                 releaseDate: metadata?.year?.toString(),
               });
             } catch (externalPlayerError) {
-              console.error('External player error:', externalPlayerError);
+              logger.error('External player error:', externalPlayerError);
               // Fallback to built-in player if external player fails
               navigation.navigate('Player', {
                 uri: stream.url,
@@ -599,7 +600,7 @@ export const StreamsScreen = () => {
         }
       }
     } catch (error) {
-      console.error('Stream error:', error);
+      logger.error('Stream error:', error);
       Alert.alert(
         'Playback Error',
         error instanceof Error ? error.message : 'An error occurred while playing the video'
@@ -611,16 +612,16 @@ export const StreamsScreen = () => {
   React.useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       // This runs when returning from the player screen
-      console.log('[StreamsScreen] Screen focused, checking if cleanup needed');
+      logger.log('[StreamsScreen] Screen focused, checking if cleanup needed');
       if (isVideoPlaying) {
-        console.log('[StreamsScreen] Playback ended, cleaning up torrent');
+        logger.log('[StreamsScreen] Playback ended, cleaning up torrent');
         setIsVideoPlaying(false);
         
         // Clean up the torrent when returning from video player
         if (activeTorrent) {
-          console.log('[StreamsScreen] Stopping torrent after playback');
+          logger.log('[StreamsScreen] Stopping torrent after playback');
           torrentService.stopStreamAndWait().catch(error => {
-            console.error('[StreamsScreen] Error during cleanup:', error);
+            logger.error('[StreamsScreen] Error during cleanup:', error);
           });
           setActiveTorrent(null);
           setTorrentProgress({});
@@ -630,11 +631,11 @@ export const StreamsScreen = () => {
 
     return () => {
       unsubscribe();
-      console.log('[StreamsScreen] Component unmounting, cleaning up torrent');
+      logger.log('[StreamsScreen] Component unmounting, cleaning up torrent');
       if (activeTorrent) {
-        console.log('[StreamsScreen] Stopping torrent on unmount');
+        logger.log('[StreamsScreen] Stopping torrent on unmount');
         torrentService.stopStreamAndWait().catch(error => {
-          console.error('[StreamsScreen] Error during cleanup:', error);
+          logger.error('[StreamsScreen] Error during cleanup:', error);
         });
       }
     };
@@ -644,7 +645,7 @@ export const StreamsScreen = () => {
     if (!stream.url) return;
 
     try {
-      console.log('[StreamsScreen] Starting torrent stream with URL:', stream.url);
+      logger.log('[StreamsScreen] Starting torrent stream with URL:', stream.url);
       
       // Make sure any existing stream is fully stopped
       if (activeTorrent && activeTorrent !== stream.url) {
@@ -660,11 +661,11 @@ export const StreamsScreen = () => {
         onProgress: (progress) => {
           // Check if progress object is valid and has data
           if (!progress || Object.keys(progress).length === 0) {
-            console.log('[StreamsScreen] Received empty progress object, ignoring');
+            logger.log('[StreamsScreen] Received empty progress object, ignoring');
             return;
           }
           
-          console.log('[StreamsScreen] Torrent progress update:', {
+          logger.log('[StreamsScreen] Torrent progress update:', {
             url: stream.url,
             progress,
             currentTorrentProgress: torrentProgress[stream.url!]
@@ -684,7 +685,7 @@ export const StreamsScreen = () => {
         }
       });
       
-      console.log('[StreamsScreen] Got video path:', videoPath);
+      logger.log('[StreamsScreen] Got video path:', videoPath);
       
       // Once we have the video file path, play it using VideoPlayer screen
       if (videoPath) {
@@ -692,7 +693,7 @@ export const StreamsScreen = () => {
         
         try {
           if (settings.useExternalPlayer) {
-            console.log('[StreamsScreen] Using external player for torrent video path:', videoPath);
+            logger.log('[StreamsScreen] Using external player for torrent video path:', videoPath);
             // Use VideoPlayerService to launch external player
             try {
               const videoPlayerService = VideoPlayerService;
@@ -704,7 +705,7 @@ export const StreamsScreen = () => {
                 releaseDate: metadata?.year?.toString(),
               });
             } catch (externalPlayerError) {
-              console.error('[StreamsScreen] External player error:', externalPlayerError);
+              logger.error('[StreamsScreen] External player error:', externalPlayerError);
               // Fallback to built-in player if external player fails
               navigation.navigate('Player', {
                 uri: `file://${videoPath}`,
@@ -735,11 +736,11 @@ export const StreamsScreen = () => {
           
           // Note: Cleanup happens in the focus effect when returning from the player
         } catch (playerError) {
-          console.error('[StreamsScreen] Video player navigation error:', playerError);
+          logger.error('[StreamsScreen] Video player navigation error:', playerError);
           setIsVideoPlaying(false);
           
           // Also stop the torrent on player error
-          console.log('[StreamsScreen] Stopping torrent after player error');
+          logger.log('[StreamsScreen] Stopping torrent after player error');
           await torrentService.stopStreamAndWait();
           setActiveTorrent(null);
           setTorrentProgress({});
@@ -748,7 +749,7 @@ export const StreamsScreen = () => {
         }
       } else {
         // If we didn't get a video path, there's a problem
-        console.error('[StreamsScreen] No video path returned from torrent service');
+        logger.error('[StreamsScreen] No video path returned from torrent service');
         Alert.alert(
           'Playback Error',
           'No video file found in torrent'
@@ -759,7 +760,7 @@ export const StreamsScreen = () => {
       }
       
     } catch (error) {
-      console.error('[StreamsScreen] Torrent error:', error);
+      logger.error('[StreamsScreen] Torrent error:', error);
       // Clean up on error
       setIsVideoPlaying(false);
       await torrentService.stopStreamAndWait();

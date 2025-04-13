@@ -43,6 +43,7 @@ import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { TMDBService } from '../services/tmdbService';
 import { storageService } from '../services/storageService';
+import { logger } from '../utils/logger';
 
 const { width, height } = Dimensions.get('window');
 
@@ -54,7 +55,7 @@ const springConfig = {
 };
 
 // Add debug log for storageService
-console.log('[MetadataScreen] StorageService instance:', storageService);
+logger.log('[MetadataScreen] StorageService instance:', storageService);
 
 const MetadataScreen = () => {
   const route = useRoute<RouteProp<Record<string, RouteParams & { episodeId?: string }>, string>>();
@@ -101,8 +102,15 @@ const MetadataScreen = () => {
     episodeId?: string;
   } | null>(null);
 
+  // Add new animated value for creator height
+  const creatorHeight = useSharedValue(0);
+
+  // Add new animated value for watch progress
+  const watchProgressHeight = useSharedValue(0);
+  const watchProgressOpacity = useSharedValue(0);
+
   // Debug log for route params
-  console.log('[MetadataScreen] Component mounted with route params:', { id, type, episodeId });
+  logger.log('[MetadataScreen] Component mounted with route params:', { id, type, episodeId });
 
   // Function to get episode details from episodeId
   const getEpisodeDetails = useCallback((episodeId: string) => {
@@ -260,7 +268,7 @@ const MetadataScreen = () => {
         }
       }
     } catch (error) {
-      console.error('[MetadataScreen] Error loading watch progress:', error);
+      logger.error('[MetadataScreen] Error loading watch progress:', error);
       setWatchProgress(null);
     }
   }, [id, type, episodeId, episodes]);
@@ -292,9 +300,70 @@ const MetadataScreen = () => {
     return 'Resume';
   }, [watchProgress]);
 
-  // Update the watch progress display
+  // Add effect to animate watch progress when it changes
+  useEffect(() => {
+    if (watchProgress && watchProgress.duration > 0) {
+      watchProgressHeight.value = withSpring(48, {
+        mass: 0.3,
+        stiffness: 120,
+        damping: 15,
+        velocity: 0.5
+      });
+      watchProgressOpacity.value = withSpring(1, {
+        mass: 0.2,
+        stiffness: 100,
+        damping: 12
+      });
+    } else {
+      watchProgressHeight.value = withSpring(0, {
+        mass: 0.3,
+        stiffness: 120,
+        damping: 15
+      });
+      watchProgressOpacity.value = withSpring(0, {
+        mass: 0.2,
+        stiffness: 100,
+        damping: 12
+      });
+    }
+  }, [watchProgress]);
+
+  // Add animated style for watch progress
+  const watchProgressAnimatedStyle = useAnimatedStyle(() => {
+    const progress = interpolate(
+      watchProgressHeight.value,
+      [0, 48],
+      [0, 1],
+      Extrapolate.CLAMP
+    );
+
+    return {
+      height: watchProgressHeight.value,
+      opacity: watchProgressOpacity.value,
+      transform: [
+        {
+          translateY: interpolate(
+            progress,
+            [0, 1],
+            [-8, 0],
+            Extrapolate.CLAMP
+          )
+        },
+        {
+          scale: interpolate(
+            progress,
+            [0, 1],
+            [0.95, 1],
+            Extrapolate.CLAMP
+          )
+        }
+      ]
+    };
+  });
+
+  // Update the watch progress render function
   const renderWatchProgress = () => {
-    if (!watchProgress) {
+    if (!watchProgress || watchProgress.duration === 0) {
       return null;
     }
 
@@ -310,7 +379,7 @@ const MetadataScreen = () => {
     }
 
     return (
-      <View style={styles.watchProgressContainer}>
+      <Animated.View style={[styles.watchProgressContainer, watchProgressAnimatedStyle]}>
         <View style={styles.watchProgressBar}>
           <View 
             style={[
@@ -322,7 +391,7 @@ const MetadataScreen = () => {
         <Text style={styles.watchProgressText}>
           {progressPercent >= 95 ? 'Watched' : `${Math.round(progressPercent)}% watched`}{episodeInfo} • Last watched on {formattedTime}
         </Text>
-      </View>
+      </Animated.View>
     );
   };
 
@@ -366,7 +435,7 @@ const MetadataScreen = () => {
             if (tmdbId) {
               navigation.navigate('ShowRatings', { showId: tmdbId });
             } else {
-              console.error('Could not find TMDB ID for show');
+              logger.error('Could not find TMDB ID for show');
             }
           }}
         >
@@ -408,8 +477,7 @@ const MetadataScreen = () => {
   }, [navigation, id, type, episodes, episodeId, watchProgress]);
 
   const handleSelectCastMember = (castMember: any) => {
-    // TODO: Implement cast member selection
-    console.log('Cast member selected:', castMember);
+    logger.log('Cast member selected:', castMember);
   };
 
   const handleEpisodeSelect = (episode: Episode) => {
@@ -483,6 +551,46 @@ const MetadataScreen = () => {
     )
   }));
 
+  // Add animated style for creator container
+  const creatorAnimatedStyle = useAnimatedStyle(() => ({
+    maxHeight: creatorHeight.value,
+    opacity: interpolate(
+      creatorHeight.value,
+      [0, 24],
+      [0, 1],
+      Extrapolate.CLAMP
+    ),
+    transform: [
+      { 
+        translateY: interpolate(
+          creatorHeight.value,
+          [0, 24],
+          [-8, 0],
+          Extrapolate.CLAMP
+        )
+      }
+    ]
+  }));
+
+  // Add effect to animate height when metadata changes
+  useEffect(() => {
+    if (metadata?.directors?.length || metadata?.creators?.length) {
+      creatorHeight.value = withSpring(24, {
+        mass: 0.5,
+        stiffness: 100,
+        damping: 12,
+        velocity: 0.4
+      });
+    } else {
+      creatorHeight.value = withSpring(0, {
+        mass: 0.5,
+        stiffness: 100,
+        damping: 12,
+        velocity: 0.4
+      });
+    }
+  }, [metadata?.directors, metadata?.creators]);
+
   // Debug logs for director/creator data
   React.useEffect(() => {
     if (metadata && metadata.id) {
@@ -493,7 +601,7 @@ const MetadataScreen = () => {
           
           if (tmdbId) {
             const credits = await tmdb.getCredits(tmdbId, type);
-            console.log("Credits data structure:", JSON.stringify(credits).substring(0, 300));
+            logger.log("Credits data structure:", JSON.stringify(credits).substring(0, 300));
             
             // Extract directors for movies
             if (type === 'movie' && credits.crew) {
@@ -507,7 +615,7 @@ const MetadataScreen = () => {
                   ...metadata,
                   directors
                 });
-                console.log("Updated directors:", directors);
+                logger.log("Updated directors:", directors);
               }
             }
             
@@ -528,12 +636,12 @@ const MetadataScreen = () => {
                   ...metadata,
                   creators: creators.slice(0, 3) // Limit to first 3 creators
                 });
-                console.log("Updated creators:", creators.slice(0, 3));
+                logger.log("Updated creators:", creators.slice(0, 3));
               }
             }
           }
         } catch (error) {
-          console.error('Error fetching crew data:', error);
+          logger.error('Error fetching crew data:', error);
         }
       };
       
@@ -731,22 +839,26 @@ const MetadataScreen = () => {
             </View>
 
             {/* Creator/Director Info */}
-            {((metadata.directors && metadata.directors.length > 0) || (metadata.creators && metadata.creators.length > 0)) && (
-              <View style={styles.creatorContainer}>
-                {metadata.directors && metadata.directors.length > 0 && (
-                  <View style={styles.creatorSection}>
-                    <Text style={styles.creatorLabel}>Director{metadata.directors.length > 1 ? 's' : ''}:</Text>
-                    <Text style={styles.creatorText}>{metadata.directors.join(', ')}</Text>
-                  </View>
-                )}
-                {metadata.creators && metadata.creators.length > 0 && (
-                  <View style={styles.creatorSection}>
-                    <Text style={styles.creatorLabel}>Creator{metadata.creators.length > 1 ? 's' : ''}:</Text>
-                    <Text style={styles.creatorText}>{metadata.creators.join(', ')}</Text>
-                  </View>
-                )}
-              </View>
-            )}
+            <Animated.View 
+              style={[
+                styles.creatorContainer,
+                creatorAnimatedStyle,
+                { minHeight: (metadata?.directors?.length || metadata?.creators?.length) ? 'auto' : 0 }
+              ]}
+            >
+              {metadata.directors && metadata.directors.length > 0 && (
+                <View style={styles.creatorSection}>
+                  <Text style={styles.creatorLabel}>Director{metadata.directors.length > 1 ? 's' : ''}:</Text>
+                  <Text style={styles.creatorText}>{metadata.directors.join(', ')}</Text>
+                </View>
+              )}
+              {metadata.creators && metadata.creators.length > 0 && (
+                <View style={styles.creatorSection}>
+                  <Text style={styles.creatorLabel}>Creator{metadata.creators.length > 1 ? 's' : ''}:</Text>
+                  <Text style={styles.creatorText}>{metadata.creators.join(', ')}</Text>
+                </View>
+              )}
+            </Animated.View>
 
             {/* Description */}
             {metadata.description && (
@@ -1108,36 +1220,41 @@ const styles = StyleSheet.create({
   creatorContainer: {
     marginBottom: 2,
     paddingHorizontal: 16,
+    overflow: 'hidden'
   },
   creatorSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
+    height: 20
   },
   creatorLabel: {
     color: colors.white,
     fontSize: 14,
     fontWeight: '600',
     marginRight: 8,
+    lineHeight: 20
   },
   creatorText: {
     color: colors.lightGray,
     fontSize: 14,
     flex: 1,
+    lineHeight: 20
   },
   watchProgressContainer: {
     marginTop: 8,
-    marginBottom: 16,
+    marginBottom: 12,
     width: '100%',
     alignItems: 'center',
+    overflow: 'hidden'
   },
   watchProgressBar: {
-    width: '80%',
+    width: '75%',
     height: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     borderRadius: 1.5,
     overflow: 'hidden',
-    marginBottom: 8,
+    marginBottom: 6
   },
   watchProgressFill: {
     height: '100%',
@@ -1148,6 +1265,8 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 12,
     textAlign: 'center',
+    opacity: 0.9,
+    letterSpacing: 0.2
   },
 });
 

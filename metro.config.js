@@ -8,6 +8,14 @@ module.exports = (() => {
   config.transformer = {
     ...transformer,
     babelTransformerPath: require.resolve('react-native-svg-transformer'),
+    minifierConfig: {
+      compress: {
+        // Remove console.* statements in release builds
+        drop_console: true,
+        // Keep error logging for critical issues
+        pure_funcs: ['console.info', 'console.log', 'console.debug', 'console.warn'],
+      },
+    },
   };
 
   config.resolver = {
