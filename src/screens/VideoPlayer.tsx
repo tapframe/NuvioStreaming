@@ -14,12 +14,16 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { storageService } from '../services/storageService';
+// Import stremioService for subtitles
+import { stremioService, Subtitle } from '../services/stremioService';
 // Add throttle/debounce imports
 import { debounce } from 'lodash';
 import { logger } from '../utils/logger';
+// Import FileSystem
+import * as FileSystem from 'expo-file-system';
 
 // Define the TrackPreferenceType for audio/text tracks
-type TrackPreferenceType = 'system' | 'disabled' | 'title' | 'language' | 'index';
+type TrackPreferenceType = 'system' | 'disabled' | 'title' | 'language' | 'index' | 'uri';
 
 // Define the SelectedTrack type for audio/text tracks
 interface SelectedTrack {
@@ -87,20 +91,22 @@ const VideoPlayer = () => {
   const developmentTestUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
   const uri = __DEV__ && (!routeUri || routeUri.trim() === '') ? developmentTestUrl : routeUri;
 
-  // Log received props for debugging
-  logger.log("VideoPlayer received route params:", {
-    uri,
-    title,
-    season,
-    episode,
-    episodeTitle,
-    quality,
-    year,
-    streamProvider,
-    id,
-    type,
-    episodeId
-  });
+  // Log received props for debugging (only once)
+  useEffect(() => {
+    logger.log("VideoPlayer received route params:", {
+      uri,
+      title,
+      season,
+      episode,
+      episodeTitle,
+      quality,
+      year,
+      streamProvider,
+      id,
+      type,
+      episodeId
+    });
+  }, []);
 
   // Validate URI
   useEffect(() => {
@@ -141,9 +147,6 @@ const VideoPlayer = () => {
   // Add timer ref for auto-hiding controls
   const hideControlsTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Add a new state variable to track buffering progress
-  const [bufferedProgress, setBufferedProgress] = useState(0);
-
   // Add state for tracking if initial seek is done
   const [initialSeekDone, setInitialSeekDone] = useState(false);
   const lastProgressUpdate = useRef<number>(0);
@@ -153,6 +156,12 @@ const VideoPlayer = () => {
   const isSliderDragging = useRef(false);
   // Add last onProgress update time to throttle updates
   const lastProgressUpdateTime = useRef(0);
+
+  // Add state for OpenSubtitles
+  const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
+  const [isLoadingSubtitles, setIsLoadingSubtitles] = useState(false);
+  // Add state to track the index of the active URI subtitle
+  const [selectedUriTrackIndex, setSelectedUriTrackIndex] = useState<number | null>(null);
 
   // Load initial progress when component mounts
   useEffect(() => {
@@ -230,6 +239,11 @@ const VideoPlayer = () => {
     const initialTimer = setTimeout(() => {
       startHideControlsTimer();
     }, 1500);
+    
+    // Load subtitles if id and type are available
+    if (id && type) {
+      loadSubtitles();
+    }
 
     // Disable immersive mode when component unmounts
     return () => {
@@ -289,12 +303,6 @@ const VideoPlayer = () => {
       RNImmersiveMode.fullLayout(false);
     }
   };
-
-  useEffect(() => {
-    if (duration > 0 && currentTime > 0) {
-      setSliderValue(currentTime);
-    }
-  }, [duration, currentTime]);
 
   const formatTime = (seconds: number) => {
     if (isNaN(seconds)) return '0:00';
@@ -390,8 +398,8 @@ const VideoPlayer = () => {
 
   // Modify slider value change handler for community slider
   const onSliderValueChange = (value: number) => {
+    // Only update the slider value, don't update currentTime here
     setSliderValue(value);
-    setCurrentTime(value);
   };
 
   const onSlidingComplete = (value: number) => {
@@ -401,16 +409,9 @@ const VideoPlayer = () => {
     
     // Update UI immediately for responsive feel
     setCurrentTime(newTime);
-    setSliderValue(newTime);
     
     // Seek to the new position
     videoRef.current.seek(newTime);
-    
-    // Reset buffered progress indicator if seeking forward
-    const isFastForward = newTime > currentTime;
-    if (isFastForward) {
-      setBufferedProgress(newTime);
-    }
     
     // Reset timer for auto-hiding controls
     startHideControlsTimer();
@@ -459,12 +460,6 @@ const VideoPlayer = () => {
       setCurrentTime(newTime);
       setSliderValue(newTime);
     }
-    
-    // Update buffered progress more efficiently
-    if (data.playableDuration) {
-      // Use a functional update to ensure we're working with the latest state
-      setBufferedProgress(prev => Math.max(prev, data.playableDuration || 0));
-    }
   };
 
   const onLoad = (data: { duration: number }) => {
@@ -480,7 +475,13 @@ const VideoPlayer = () => {
 
   const onTextTracks = (e: Readonly<{ textTracks: TextTrack[] }>) => {
     logger.log("Detected Text Tracks:", e.textTracks);
-    setTextTracks(e.textTracks || []);
+    // Only set built-in tracks, preserve OpenSubtitles tracks
+    const builtInTracks = e.textTracks || [];
+    setTextTracks(prevTracks => {
+      // Filter out existing built-in tracks (those with index < 100)
+      const openSubtitlesTracks = prevTracks.filter(t => t.index >= 100);
+      return [...builtInTracks, ...openSubtitlesTracks];
+    });
   };
 
   // Toggle through aspect ratio modes
@@ -626,8 +627,67 @@ const VideoPlayer = () => {
     });
   };
 
-  const selectSubtitleTrack = (track: SelectedTrack | null) => {
-    setSelectedTextTrack(track);
+  const selectSubtitleTrack = async (track: SelectedTrack | null) => {
+    // Reset previously selected external subtitle URI if any
+    // Also reset the tracked index
+    if (selectedTextTrack?.type === 'uri') {
+      setSelectedTextTrack(null); // Clear previous selection
+      setSelectedUriTrackIndex(null);
+    }
+
+    // If selecting "Off"
+    if (!track || track.type === 'disabled') {
+      setSelectedTextTrack({ type: 'disabled' });
+      setSelectedUriTrackIndex(null);
+    } 
+    // If selecting a built-in track
+    else if (track.type === 'index' && typeof track.value === 'number' && track.value < 100) {
+      setSelectedTextTrack(track);
+      setSelectedUriTrackIndex(null);
+    }
+    // If selecting an OpenSubtitles track (index >= 100)
+    else if (track.type === 'index' && typeof track.value === 'number' && track.value >= 100) {
+      const subtitleIndex = track.value - 100;
+      const subtitle = subtitles[subtitleIndex];
+      const originalTrackIndex = track.value; // Store the original index (>= 100)
+      
+      if (subtitle && subtitle.url) {
+        try {
+          logger.log(`Attempting to download subtitle from ${subtitle.url}`);
+          const localUri = `${FileSystem.cacheDirectory}${subtitle.id || Date.now()}.srt`;
+          
+          // Download the subtitle file
+          const downloadResult = await FileSystem.downloadAsync(subtitle.url, localUri);
+          
+          if (downloadResult.status === 200) {
+            logger.log(`Subtitle downloaded successfully to ${downloadResult.uri}`);
+            // Set the selected track to the local file URI
+            setSelectedTextTrack({ type: 'uri', value: downloadResult.uri });
+            // Set the index of the active URI track
+            setSelectedUriTrackIndex(originalTrackIndex); 
+          } else {
+            logger.error(`Failed to download subtitle: Status ${downloadResult.status}`);
+            setSelectedTextTrack({ type: 'disabled' }); // Fallback to disabled
+            setSelectedUriTrackIndex(null);
+            alert('Failed to download subtitle.');
+          }
+        } catch (error) {
+          logger.error('Error downloading subtitle:', error);
+          setSelectedTextTrack({ type: 'disabled' }); // Fallback to disabled
+          setSelectedUriTrackIndex(null);
+          alert('Error downloading subtitle.');
+        }
+      } else {
+        logger.warn('Selected OpenSubtitle track has no URL');
+        setSelectedTextTrack({ type: 'disabled' });
+        setSelectedUriTrackIndex(null);
+      }
+    } else {
+      // Handle any other cases or default
+      setSelectedTextTrack(track);
+      setSelectedUriTrackIndex(null); // Ensure reset for non-handled types
+    }
+    
     // Hide the subtitle menu with animation
     Animated.timing(subtitleSlideAnim, {
       toValue: 400,
@@ -636,6 +696,40 @@ const VideoPlayer = () => {
     }).start(() => {
       setShowSubtitleOptions(false);
     });
+  };
+
+  // Function to load subtitles from OpenSubtitles v3 addon
+  const loadSubtitles = async () => {
+    if (!id || !type) return;
+    
+    try {
+      setIsLoadingSubtitles(true);
+      logger.log(`Loading subtitles for ${type} with id ${id}${episodeId ? ` and episodeId ${episodeId}` : ''}`);
+      
+      const subtitlesList = await stremioService.getSubtitles(type, id, episodeId);
+      
+      if (subtitlesList && subtitlesList.length > 0) {
+        logger.log(`Loaded ${subtitlesList.length} subtitles`);
+        setSubtitles(subtitlesList);
+        
+        // Convert OpenSubtitles subtitles to the format expected by react-native-video
+        const convertedTracks: TextTrack[] = subtitlesList.map((sub, index) => ({
+          index: 100 + index, // Use high index values to avoid conflicts
+          title: sub.id,
+          language: sub.lang,
+          type: 'text'
+        }));
+        
+        // Combine with existing text tracks
+        setTextTracks(prevTracks => [...prevTracks, ...convertedTracks]);
+      } else {
+        logger.log('No subtitles found');
+      }
+    } catch (error) {
+      logger.error('Error loading subtitles:', error);
+    } finally {
+      setIsLoadingSubtitles(false);
+    }
   };
 
   return (
@@ -755,17 +849,6 @@ const VideoPlayer = () => {
               <View style={styles.bottomControls}>
                 {/* Slider - replaced with community slider */}
                 <View style={styles.sliderContainer}>
-                  {/* Buffer indicator - only render if needed */}
-                  {bufferedProgress > 0 && (
-                    <View style={[
-                      styles.bufferIndicator, 
-                      { 
-                        width: `${Math.min((bufferedProgress / (duration || 1)) * 100, 100)}%`
-                      }
-                    ]} 
-                    />
-                  )}
-                  
                   <View style={styles.sliderRow}>
                     <Text style={styles.currentTime}>
                       {formatTime(currentTime)}
@@ -831,7 +914,9 @@ const VideoPlayer = () => {
                     <Text style={[styles.bottomButtonText, textTracks.length === 0 && {color: 'grey'}]}>
                       {selectedTextTrack?.type === 'disabled' 
                         ? 'Subtitles (Off)' 
-                        : `Subtitles (${textTracks.find(t => t.index === selectedTextTrack?.value)?.language?.toUpperCase() || 'On'})`}
+                        : `Subtitles (${(selectedTextTrack?.type === 'uri' && selectedUriTrackIndex !== null) 
+                            ? textTracks.find(t => t.index === selectedUriTrackIndex)?.language?.toUpperCase() || 'On' 
+                            : textTracks.find(t => t.index === selectedTextTrack?.value)?.language?.toUpperCase() || 'On'})`}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -928,21 +1013,38 @@ const VideoPlayer = () => {
                         key={track.index}
                         style={[
                           styles.optionItem,
-                          selectedTextTrack?.type === 'index' && selectedTextTrack?.value === track.index && styles.selectedOption
+                          // Updated highlighting logic:
+                          (selectedTextTrack?.type === 'index' && selectedTextTrack?.value === track.index) || 
+                          (selectedUriTrackIndex === track.index) // Highlight if this URI track is active
+                            ? styles.selectedOption 
+                            : null
                         ]}
                         onPress={() => selectSubtitleTrack({ type: 'index', value: track.index })}
                       >
                         <Ionicons 
-                          name={selectedTextTrack?.type === 'index' && selectedTextTrack?.value === track.index ? "radio-button-on" : "radio-button-off"}
+                          // Updated icon logic:
+                          name={((selectedTextTrack?.type === 'index' && selectedTextTrack?.value === track.index) || 
+                                (selectedUriTrackIndex === track.index)) 
+                                  ? "radio-button-on" 
+                                  : "radio-button-off"}
                           size={18}
-                          color={selectedTextTrack?.type === 'index' && selectedTextTrack?.value === track.index ? "#E50914" : "white"}
+                          // Updated color logic:
+                          color={((selectedTextTrack?.type === 'index' && selectedTextTrack?.value === track.index) || 
+                                 (selectedUriTrackIndex === track.index)) 
+                                   ? "#E50914" 
+                                   : "white"}
                           style={{ marginRight: 10 }}
                         />
                         <Text style={[
                           styles.optionItemText,
-                          selectedTextTrack?.type === 'index' && selectedTextTrack?.value === track.index && styles.selectedOptionText
+                          // Updated text style logic:
+                          ((selectedTextTrack?.type === 'index' && selectedTextTrack?.value === track.index) || 
+                           (selectedUriTrackIndex === track.index)) 
+                             ? styles.selectedOptionText 
+                             : null
                         ]}>
                           {track.language ? track.language.toUpperCase() : (track.title || `Track ${track.index + 1}`)}
+                          {track.index >= 100 && ' (OpenSubtitles)'}
                         </Text>
                       </TouchableOpacity>
                     ))}
@@ -1070,16 +1172,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-  },
-  bufferIndicator: {
-    position: 'absolute',
-    height: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    top: 14, // Position to align with the slider track
-    left: 24, // Account for the currentTime text
-    right: 24, // Account for the duration text  
-    zIndex: 1,
-    borderRadius: 2,
   },
   slider: {
     flex: 1,

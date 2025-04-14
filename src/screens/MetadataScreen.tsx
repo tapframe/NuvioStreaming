@@ -24,7 +24,10 @@ import { CastSection } from '../components/metadata/CastSection';
 import { SeriesContent } from '../components/metadata/SeriesContent';
 import { MovieContent } from '../components/metadata/MovieContent';
 import { MoreLikeThisSection } from '../components/metadata/MoreLikeThisSection';
-import AgeBadge from '../components/metadata/AgeBadge';
+import { StreamingContent } from '../services/catalogService';
+import { GroupedStreams } from '../types/streams';
+import { TMDBEpisode } from '../services/tmdbService';
+import { Cast } from '../types/cast';
 import { RouteParams, Episode } from '../types/metadata';
 import Animated, {
   useAnimatedStyle,
@@ -81,14 +84,10 @@ const MetadataScreen = () => {
     setMetadata,
   } = useMetadata({ id, type });
 
-  const [showFullDescription, setShowFullDescription] = useState(false);
   const contentRef = useRef<ScrollView>(null);
   const [lastScrollTop, setLastScrollTop] = useState(0);
   const [isFullDescriptionOpen, setIsFullDescriptionOpen] = useState(false);
   const fullDescriptionAnimation = useSharedValue(0);
-  const [textTruncated, setTextTruncated] = useState(false);
-  const descriptionHeight = useSharedValue(0);
-  const fullTextHeight = useSharedValue(0);
 
   // Animation values
   const screenScale = useSharedValue(0.8);
@@ -112,7 +111,7 @@ const MetadataScreen = () => {
   const watchProgressOpacity = useSharedValue(0);
 
   // Debug log for route params
-  logger.log('[MetadataScreen] Component mounted with route params:', { id, type, episodeId });
+  // logger.log('[MetadataScreen] Component mounted with route params:', { id, type, episodeId });
 
   // Function to get episode details from episodeId
   const getEpisodeDetails = useCallback((episodeId: string) => {
@@ -491,45 +490,6 @@ const MetadataScreen = () => {
     });
   };
 
-  const handleOpenFullDescription = useCallback(() => {
-    setIsFullDescriptionOpen(true);
-    fullDescriptionAnimation.value = withTiming(1, {
-      duration: 300,
-      easing: Easing.bezier(0.33, 0.01, 0, 1),
-    });
-  }, []);
-
-  const handleCloseFullDescription = useCallback(() => {
-    fullDescriptionAnimation.value = withTiming(0, {
-      duration: 250,
-      easing: Easing.bezier(0.33, 0.01, 0, 1),
-    }, () => {
-      runOnJS(setIsFullDescriptionOpen)(false);
-    });
-  }, []);
-
-  const fullDescriptionStyle = useAnimatedStyle(() => {
-    return {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: colors.darkBackground,
-      opacity: fullDescriptionAnimation.value,
-      transform: [
-        {
-          translateY: interpolate(
-            fullDescriptionAnimation.value,
-            [0, 1],
-            [height, 0],
-            Extrapolate.CLAMP
-          ),
-        },
-      ],
-    };
-  });
-
   // Animated styles
   const containerAnimatedStyle = useAnimatedStyle(() => ({
     flex: 1,
@@ -603,7 +563,7 @@ const MetadataScreen = () => {
           
           if (tmdbId) {
             const credits = await tmdb.getCredits(tmdbId, type);
-            logger.log("Credits data structure:", JSON.stringify(credits).substring(0, 300));
+            // logger.log("Credits data structure:", JSON.stringify(credits).substring(0, 300));
             
             // Extract directors for movies
             if (type === 'movie' && credits.crew) {
@@ -617,7 +577,7 @@ const MetadataScreen = () => {
                   ...metadata,
                   directors
                 });
-                logger.log("Updated directors:", directors);
+                // logger.log("Updated directors:", directors);
               }
             }
             
@@ -638,7 +598,7 @@ const MetadataScreen = () => {
                   ...metadata,
                   creators: creators.slice(0, 3) // Limit to first 3 creators
                 });
-                logger.log("Updated creators:", creators.slice(0, 3));
+                // logger.log("Updated creators:", creators.slice(0, 3));
               }
             }
           }
@@ -666,40 +626,6 @@ const MetadataScreen = () => {
     // 2. Coming from StreamsScreen - goes back to Calendar/ThisWeek
     navigation.goBack();
   }, [navigation]);
-
-  const descriptionAnimatedStyle = useAnimatedStyle(() => ({
-    height: descriptionHeight.value,
-    opacity: interpolate(
-      descriptionHeight.value,
-      [0, fullTextHeight.value],
-      [0, 1],
-      Extrapolate.CLAMP
-    )
-  }));
-
-  // Function to handle text layout and store full height
-  const handleTextLayout = ({ nativeEvent: { lines } }: { nativeEvent: { lines: any[] } }) => {
-    if (!showFullDescription) {
-      setTextTruncated(lines.length > 3);
-      // Calculate height for 3 lines (24 is the lineHeight)
-      descriptionHeight.value = 3 * 24;
-    }
-    // Store full text height
-    fullTextHeight.value = lines.length * 24;
-  };
-
-  // Function to toggle description expansion with animation
-  const toggleDescription = () => {
-    setShowFullDescription(!showFullDescription);
-    descriptionHeight.value = withSpring(
-      !showFullDescription ? fullTextHeight.value : 3 * 24,
-      {
-        damping: 15,
-        stiffness: 100,
-        mass: 0.8
-      }
-    );
-  };
 
   if (loading) {
     return (
@@ -861,7 +787,7 @@ const MetadataScreen = () => {
                 <Text style={styles.metaText}>{metadata.runtime}</Text>
               )}
               {metadata.certification && (
-                <AgeBadge rating={metadata.certification} />
+                <Text style={styles.metaText}>{metadata.certification}</Text>
               )}
               {metadata.imdbRating && (
                 <View style={styles.ratingContainer}>
@@ -900,29 +826,9 @@ const MetadataScreen = () => {
             {/* Description */}
             {metadata.description && (
               <View style={styles.descriptionContainer}>
-                <Animated.View style={descriptionAnimatedStyle}>
-                  <Text
-                    style={styles.description}
-                    onTextLayout={handleTextLayout}
-                  >
+                  <Text style={styles.description}>
                     {`${metadata.description}`}
                   </Text>
-                </Animated.View>
-                {textTruncated && (
-                  <TouchableOpacity
-                    onPress={toggleDescription}
-                    style={styles.showMoreButton}
-                  >
-                    <Text style={styles.showMoreText}>
-                      {showFullDescription ? 'See less' : 'See more'}
-                    </Text>
-                    <MaterialIcons
-                      name={showFullDescription ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-                      size={20}
-                      color={colors.textMuted}
-                    />
-                  </TouchableOpacity>
-                )}
               </View>
             )}
 
@@ -957,31 +863,6 @@ const MetadataScreen = () => {
             )}
           </Animated.View>
         </ScrollView>
-
-        {/* Full Description Modal */}
-        {isFullDescriptionOpen && (
-          <Animated.View style={fullDescriptionStyle}>
-            <SafeAreaView style={styles.fullDescriptionContainer}>
-              <View style={styles.fullDescriptionHeader}>
-                <TouchableOpacity
-                  onPress={handleCloseFullDescription}
-                  style={styles.fullDescriptionCloseButton}
-                >
-                  <MaterialIcons name="close" size={24} color={colors.text} />
-                </TouchableOpacity>
-                <Text style={styles.fullDescriptionTitle}>About</Text>
-              </View>
-              <ScrollView
-                style={styles.fullDescriptionContent}
-                showsVerticalScrollIndicator={false}
-              >
-                <Text style={styles.fullDescriptionText}>
-                  {metadata?.description}
-                </Text>
-              </ScrollView>
-            </SafeAreaView>
-          </Animated.View>
-        )}
       </Animated.View>
     </SafeAreaView>
   );

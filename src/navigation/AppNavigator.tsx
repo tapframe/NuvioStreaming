@@ -557,6 +557,11 @@ const AppNavigator = () => {
           <Stack.Screen 
             name="Streams" 
             component={StreamsScreen as any} 
+            options={{
+              headerShown: false,
+              animation: Platform.OS === 'ios' ? 'slide_from_bottom' : 'fade_from_bottom',
+              ...(Platform.OS === 'ios' && { presentation: 'modal' }),
+            }}
           />
           <Stack.Screen 
             name="Player" 

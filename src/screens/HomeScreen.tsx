@@ -904,6 +904,7 @@ const styles = StyleSheet.create<any>({
     marginTop: 0,
     marginBottom: 0,
     position: 'relative',
+    paddingTop: 56,
   },
   featuredBanner: {
     width: '100%',

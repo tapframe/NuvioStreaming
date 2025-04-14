@@ -22,6 +22,15 @@ export interface Meta {
   certification?: string;
 }
 
+export interface Subtitle {
+  id: string;
+  url: string;
+  lang: string;
+  fps?: number;
+  addon?: string;
+  addonName?: string;
+}
+
 export interface Stream {
   name?: string;
   title?: string;
@@ -44,6 +53,12 @@ export interface Stream {
 
 export interface StreamResponse {
   streams: Stream[];
+  addon: string;
+  addonName: string;
+}
+
+export interface SubtitleResponse {
+  subtitles: Subtitle[];
   addon: string;
   addonName: string;
 }
@@ -124,8 +139,8 @@ class StremioService {
   private installedAddons: Map<string, Manifest> = new Map();
   private readonly STORAGE_KEY = 'stremio-addons';
   private readonly DEFAULT_ADDONS = [
-    'https://v3-cinemeta.strem.io/manifest.json'
-    
+    'https://v3-cinemeta.strem.io/manifest.json',
+    'https://opensubtitles-v3.strem.io/manifest.json'
   ];
   private readonly MAX_CONCURRENT_REQUESTS = 3;
   private readonly DEFAULT_PAGE_SIZE = 50;
@@ -719,6 +734,54 @@ class StremioService {
       id,
       items: items.slice(0, limit)
     };
+  }
+
+  async getSubtitles(type: string, id: string, videoId?: string): Promise<Subtitle[]> {
+    await this.ensureInitialized();
+    
+    // Find the OpenSubtitles v3 addon
+    const openSubtitlesAddon = this.getInstalledAddons().find(
+      addon => addon.id === 'org.stremio.opensubtitlesv3'
+    );
+    
+    if (!openSubtitlesAddon) {
+      logger.warn('OpenSubtitles v3 addon not found');
+      return [];
+    }
+    
+    try {
+      const baseUrl = this.getAddonBaseURL(openSubtitlesAddon.url || '');
+      
+      // Construct the query URL with the correct format
+      // For series episodes, use the videoId directly which includes series ID + episode info
+      let url = '';
+      if (type === 'series' && videoId) {
+        // For series, the format should be /subtitles/series/tt12345:1:2.json
+        url = `${baseUrl}/subtitles/${type}/${videoId}.json`;
+      } else {
+        // For movies, the format is /subtitles/movie/tt12345.json
+        url = `${baseUrl}/subtitles/${type}/${id}.json`;
+      }
+      
+      logger.log(`Fetching subtitles from: ${url}`);
+      
+      const response = await this.retryRequest(async () => {
+        return await axios.get(url, { timeout: 10000 });
+      });
+      
+      if (response.data && response.data.subtitles) {
+        // Process and return the subtitles
+        return response.data.subtitles.map((sub: any) => ({
+          ...sub,
+          addon: openSubtitlesAddon.id,
+          addonName: openSubtitlesAddon.name
+        }));
+      }
+    } catch (error) {
+      logger.error('Failed to fetch subtitles:', error);
+    }
+    
+    return [];
   }
 }
 

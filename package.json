@@ -9,8 +9,10 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@expo/metro-runtime": "~4.0.1",
     "@expo/vector-icons": "^14.1.0",
     "@react-native-async-storage/async-storage": "1.23.1",
+    "@react-native-community/blur": "^4.4.1",
     "@react-native-community/slider": "^4.5.6",
     "@react-navigation/bottom-tabs": "^7.3.10",
     "@react-navigation/native": "^7.1.6",
@@ -22,8 +24,11 @@
     "axios": "^1.8.4",
     "date-fns": "^4.1.0",
     "expo": "~52.0.43",
+    "expo-blur": "^14.0.3",
+    "expo-file-system": "^18.0.12",
     "expo-haptics": "~14.0.1",
     "expo-image": "~2.0.7",
+    "expo-intent-launcher": "~12.0.2",
     "expo-linear-gradient": "~14.0.2",
     "expo-notifications": "~0.29.14",
     "expo-screen-orientation": "~8.0.4",
@@ -34,15 +39,15 @@
     "react-native": "0.76.9",
     "react-native-gesture-handler": "~2.20.2",
     "react-native-immersive-mode": "^2.0.2",
+    "react-native-modal": "^14.0.0-rc.1",
     "react-native-paper": "^5.13.1",
     "react-native-reanimated": "~3.16.1",
     "react-native-safe-area-context": "4.12.0",
     "react-native-screens": "~4.4.0",
     "react-native-svg": "^15.8.0",
     "react-native-video": "^6.12.0",
-    "expo-intent-launcher": "~12.0.2",
     "react-native-web": "~0.19.13",
-    "@expo/metro-runtime": "~4.0.1"
+    "subsrt": "^1.1.1"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
