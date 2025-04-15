@@ -1,29 +1,35 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, TouchableOpacity, StyleSheet, Text, Dimensions, Modal, Pressable, StatusBar, Platform, ScrollView, Animated, StyleProp, ViewStyle } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Text, Dimensions, Modal, Pressable, StatusBar, Platform, ScrollView, Animated } from 'react-native';
 import Video from 'react-native-video';
 import { Ionicons } from '@expo/vector-icons';
-import Slider from '@react-native-community/slider';
+import { Slider } from 'react-native-awesome-slider';
 import { LinearGradient } from 'expo-linear-gradient';
-// Remove reanimated import since we're not using shared values anymore
+import { useSharedValue, runOnJS, withTiming } from 'react-native-reanimated';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { RootStackParamList } from '../navigation/AppNavigator';
+// Remove Gesture Handler imports
+// import { PinchGestureHandler, State, PinchGestureHandlerGestureEvent } from 'react-native-gesture-handler';
+// Import for navigation bar hiding
 import { NativeModules } from 'react-native';
 // Import immersive mode package
 import RNImmersiveMode from 'react-native-immersive-mode';
-// Import screen orientation
+// Import screen orientation lock
 import * as ScreenOrientation from 'expo-screen-orientation';
-// Import navigation hooks
-import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
-import { RootStackParamList } from '../navigation/AppNavigator';
+// Import storage service for progress tracking
 import { storageService } from '../services/storageService';
-// Import stremioService for subtitles
-import { stremioService, Subtitle } from '../services/stremioService';
-// Add throttle/debounce imports
-import { debounce } from 'lodash';
 import { logger } from '../utils/logger';
-// Import FileSystem
-import * as FileSystem from 'expo-file-system';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Constants for resume preferences - add after type definitions
+const RESUME_PREF_KEY = '@video_resume_preference';
+const RESUME_PREF = {
+  ALWAYS_ASK: 'always_ask',
+  ALWAYS_RESUME: 'always_resume',
+  ALWAYS_START_OVER: 'always_start_over'
+};
 
 // Define the TrackPreferenceType for audio/text tracks
-type TrackPreferenceType = 'system' | 'disabled' | 'title' | 'language' | 'index' | 'uri';
+type TrackPreferenceType = 'system' | 'disabled' | 'title' | 'language' | 'index';
 
 // Define the SelectedTrack type for audio/text tracks
 interface SelectedTrack {
@@ -40,9 +46,9 @@ interface VideoPlayerProps {
   quality?: string;
   year?: number;
   streamProvider?: string;
-  id?: string;  // Add id for the content
-  type?: string; // Add type (movie/series)
-  episodeId?: string; // Add episodeId for series episodes
+  id?: string;
+  type?: string;
+  episodeId?: string;
 }
 
 // Match the react-native-video AudioTrack type
@@ -67,14 +73,72 @@ interface TextTrack {
 type ResizeModeType = 'contain' | 'cover' | 'stretch' | 'none';
 const resizeModes: ResizeModeType[] = ['contain', 'cover', 'stretch'];
 
-const VideoPlayer = () => {
-  // Get route params from navigation
-  const route = useRoute<RouteProp<RootStackParamList, 'Player'>>();
+// Add language code to name mapping
+const languageMap: {[key: string]: string} = {
+  'en': 'English',
+  'eng': 'English',
+  'es': 'Spanish',
+  'spa': 'Spanish',
+  'fr': 'French',
+  'fre': 'French',
+  'de': 'German',
+  'ger': 'German',
+  'it': 'Italian',
+  'ita': 'Italian',
+  'ja': 'Japanese',
+  'jpn': 'Japanese',
+  'ko': 'Korean',
+  'kor': 'Korean',
+  'zh': 'Chinese',
+  'chi': 'Chinese',
+  'ru': 'Russian',
+  'rus': 'Russian',
+  'pt': 'Portuguese',
+  'por': 'Portuguese',
+  'hi': 'Hindi',
+  'hin': 'Hindi',
+  'ar': 'Arabic',
+  'ara': 'Arabic',
+  'nl': 'Dutch',
+  'dut': 'Dutch',
+  'sv': 'Swedish',
+  'swe': 'Swedish',
+  'no': 'Norwegian',
+  'nor': 'Norwegian',
+  'fi': 'Finnish',
+  'fin': 'Finnish',
+  'da': 'Danish',
+  'dan': 'Danish',
+  'pl': 'Polish',
+  'pol': 'Polish',
+  'tr': 'Turkish',
+  'tur': 'Turkish',
+  'cs': 'Czech',
+  'cze': 'Czech',
+  'hu': 'Hungarian',
+  'hun': 'Hungarian',
+  'el': 'Greek',
+  'gre': 'Greek',
+  'th': 'Thai',
+  'tha': 'Thai',
+  'vi': 'Vietnamese',
+  'vie': 'Vietnamese',
+};
+
+// Function to format language code to readable name
+const formatLanguage = (code?: string): string => {
+  if (!code) return 'Unknown';
+  const normalized = code.toLowerCase();
+  return languageMap[normalized] || code.toUpperCase();
+};
+
+const VideoPlayer: React.FC = () => {
   const navigation = useNavigation();
+  const route = useRoute<RouteProp<RootStackParamList, 'Player'>>();
   
-  // Extract parameters from route
-  const { 
-    uri: routeUri,
+  // Extract props from route.params
+  const {
+    uri,
     title = 'Episode Name',
     season,
     episode,
@@ -82,47 +146,25 @@ const VideoPlayer = () => {
     quality,
     year,
     streamProvider,
-    id,  // Extract id
-    type, // Extract type
-    episodeId // Extract episodeId
+    id,
+    type,
+    episodeId
   } = route.params;
 
-  // Provide a fallback test URL in development mode if URI is empty or invalid
-  const developmentTestUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
-  const uri = __DEV__ && (!routeUri || routeUri.trim() === '') ? developmentTestUrl : routeUri;
-
-  // Log received props for debugging (only once)
-  useEffect(() => {
-    logger.log("VideoPlayer received route params:", {
-      uri,
-      title,
-      season,
-      episode,
-      episodeTitle,
-      quality,
-      year,
-      streamProvider,
-      id,
-      type,
-      episodeId
-    });
-  }, []);
-
-  // Validate URI
-  useEffect(() => {
-    if (!uri) {
-      logger.error("Empty or null URI received in VideoPlayer");
-      alert("Error: No video URL provided");
-    } else {
-      logger.log("Video URI:", uri);
-    }
-  }, [uri]);
-
-  // Animation values for sliding panels
-  const audioSlideAnim = useRef(new Animated.Value(400)).current;
-  const subtitleSlideAnim = useRef(new Animated.Value(400)).current;
-  // Add new fade animation value for controls
-  const controlsFadeAnim = useRef(new Animated.Value(1)).current;
+  // Log received props for debugging
+  logger.log("[VideoPlayer] Received props:", {
+    uri,
+    title,
+    season,
+    episode,
+    episodeTitle,
+    quality,
+    year,
+    streamProvider,
+    id,
+    type,
+    episodeId
+  });
 
   const [paused, setPaused] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -131,150 +173,258 @@ const VideoPlayer = () => {
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
   const [selectedAudioTrack, setSelectedAudioTrack] = useState<number | null>(null);
-  const [showAudioMenu, setShowAudioMenu] = useState(false);
   const [textTracks, setTextTracks] = useState<TextTrack[]>([]);
-  const [selectedTextTrack, setSelectedTextTrack] = useState<SelectedTrack | null>({ type: 'disabled' }); // Default subtitles off
-  const [showSubtitleMenu, setShowSubtitleMenu] = useState(false);
+  const [selectedTextTrack, setSelectedTextTrack] = useState<SelectedTrack | null>({ type: 'disabled' });
   const [resizeMode, setResizeMode] = useState<ResizeModeType>('contain'); // State for resize mode
-  const [showAspectRatioMenu, setShowAspectRatioMenu] = useState(false); // New state for aspect ratio menu
   const videoRef = useRef<any>(null);
-  const [sliderValue, setSliderValue] = useState(0);
+  const progress = useSharedValue(0);
+  const min = useSharedValue(0);
+  const max = useSharedValue(duration);
+  const [showAudioModal, setShowAudioModal] = useState(false);
+  const [showSubtitleModal, setShowSubtitleModal] = useState(false);
 
-  // Add state for the direct UI menus
-  const [showAudioOptions, setShowAudioOptions] = useState(false);
-  const [showSubtitleOptions, setShowSubtitleOptions] = useState(false);
+  // Add state for tracking initial position to seek to
+  const [initialPosition, setInitialPosition] = useState<number | null>(null);
+  const [progressSaveInterval, setProgressSaveInterval] = useState<NodeJS.Timeout | null>(null);
+  const [isInitialSeekComplete, setIsInitialSeekComplete] = useState(false);
 
-  // Add timer ref for auto-hiding controls
-  const hideControlsTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Add state for showing resume overlay
+  const [showResumeOverlay, setShowResumeOverlay] = useState(false);
+  const [resumePosition, setResumePosition] = useState<number | null>(null);
+  
+  // Add state for remembering choice
+  const [rememberChoice, setRememberChoice] = useState(false);
+  const [resumePreference, setResumePreference] = useState<string | null>(null);
 
-  // Add state for tracking if initial seek is done
-  const [initialSeekDone, setInitialSeekDone] = useState(false);
-  const lastProgressUpdate = useRef<number>(0);
-  const PROGRESS_UPDATE_INTERVAL = 5000; // Update every 5 seconds
+  // Add animated value for controls opacity
+  const fadeAnim = useRef(new Animated.Value(1)).current;
 
-  // Add ref for tracking if slider is being dragged
-  const isSliderDragging = useRef(false);
-  // Add last onProgress update time to throttle updates
-  const lastProgressUpdateTime = useRef(0);
+  // Add buffered state
+  const [buffered, setBuffered] = useState<number>(0);
 
-  // Add state for OpenSubtitles
-  const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
-  const [isLoadingSubtitles, setIsLoadingSubtitles] = useState(false);
-  // Add state to track the index of the active URI subtitle
-  const [selectedUriTrackIndex, setSelectedUriTrackIndex] = useState<number | null>(null);
-
-  // Load initial progress when component mounts
+  // Lock screen to landscape when component mounts
   useEffect(() => {
-    const loadProgress = async () => {
-      if (id && type) {
-        const savedProgress = await storageService.getWatchProgress(id, type, episodeId);
-        if (savedProgress && savedProgress.currentTime > 0) {
-          // Only seek if we're not too close to the end
-          const threshold = savedProgress.duration * 0.9; // 90% threshold
-          if (savedProgress.currentTime < threshold) {
-            setCurrentTime(savedProgress.currentTime);
-            if (videoRef.current) {
-              videoRef.current.seek(savedProgress.currentTime);
-            }
-          }
-        }
-      }
+    const lockToLandscape = async () => {
+      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
     };
 
-    loadProgress();
-  }, [id, type, episodeId]);
+    // Lock to landscape
+    lockToLandscape();
 
-  // Save progress periodically and when component unmounts
-  useEffect(() => {
-    const saveProgress = async () => {
-      if (id && type && duration > 0) {
-        const now = Date.now();
-        // Only update if enough time has passed since last update
-        if (now - lastProgressUpdate.current >= PROGRESS_UPDATE_INTERVAL) {
-          const progressPercent = (currentTime / duration) * 100;
-          
-          // If progress is >= 95%, consider it complete and remove progress
-          if (progressPercent >= 95) {
-            await storageService.removeWatchProgress(id, type, episodeId);
-          } else {
-            await storageService.setWatchProgress(id, type, {
-              currentTime,
-              duration,
-              lastUpdated: now
-            }, episodeId);
-          }
-          
-          lastProgressUpdate.current = now;
-        }
-      }
-    };
-
-    // Save progress periodically
-    const progressInterval = setInterval(saveProgress, PROGRESS_UPDATE_INTERVAL);
-
-    // Save progress when component unmounts
-    return () => {
-      clearInterval(progressInterval);
-      saveProgress();
-    };
-  }, [id, type, episodeId, currentTime, duration]);
-
-  // Handle video completion
-  const onEnd = async () => {
-    if (id && type) {
-      // Remove progress when video is finished
-      await storageService.removeWatchProgress(id, type, episodeId);
-    }
-  };
-
-  // Update the component mount effect to start auto-hide timer
-  useEffect(() => {
     // Enable immersive mode when component mounts
     enableImmersiveMode();
-    
-    // Set landscape orientation when component mounts
-    setLandscapeOrientation();
 
-    // Start auto-hide timer when component mounts (after a short delay)
-    const initialTimer = setTimeout(() => {
-      startHideControlsTimer();
-    }, 1500);
-    
-    // Load subtitles if id and type are available
-    if (id && type) {
-      loadSubtitles();
-    }
-
-    // Disable immersive mode when component unmounts
+    // Restore screen orientation and disable immersive mode when component unmounts
     return () => {
-      clearTimeout(initialTimer);
-      if (hideControlsTimerRef.current) {
-        clearTimeout(hideControlsTimerRef.current);
-      }
+      const unlockOrientation = async () => {
+        await ScreenOrientation.unlockAsync();
+      };
+      unlockOrientation();
       disableImmersiveMode();
-      // Reset orientation when component unmounts
-      resetOrientation();
     };
   }, []);
 
-  // Function to set landscape orientation
-  const setLandscapeOrientation = async () => {
-    try {
-      await ScreenOrientation.lockAsync(
-        ScreenOrientation.OrientationLock.LANDSCAPE
-      );
-    } catch (error) {
-      logger.error("Failed to lock orientation:", error);
+  // Load saved watch progress on mount
+  useEffect(() => {
+    const loadWatchProgress = async () => {
+      if (id && type) {
+        try {
+          logger.log(`[VideoPlayer] Checking for saved progress with id=${id}, type=${type}, episodeId=${episodeId || 'none'}`);
+          const savedProgress = await storageService.getWatchProgress(id, type, episodeId);
+          
+          if (savedProgress) {
+            logger.log(`[VideoPlayer] Found saved progress:`, savedProgress);
+            
+            if (savedProgress.currentTime > 0) {
+              // Only auto-resume if less than 95% watched (not effectively complete)
+              const progressPercent = (savedProgress.currentTime / savedProgress.duration) * 100;
+              logger.log(`[VideoPlayer] Progress percent: ${progressPercent.toFixed(2)}%`);
+              
+              if (progressPercent < 95) {
+                logger.log(`[VideoPlayer] Setting initial position to ${savedProgress.currentTime}`);
+                // Set resume position
+                setResumePosition(savedProgress.currentTime);
+                
+                // Check for saved preference
+                const pref = await AsyncStorage.getItem(RESUME_PREF_KEY);
+                if (pref === RESUME_PREF.ALWAYS_RESUME) {
+                  setInitialPosition(savedProgress.currentTime);
+                  logger.log(`[VideoPlayer] Auto-resuming based on saved preference`);
+                } else if (pref === RESUME_PREF.ALWAYS_START_OVER) {
+                  setInitialPosition(0);
+                  logger.log(`[VideoPlayer] Auto-starting from beginning based on saved preference`);
+                } else {
+                  // Only show resume overlay if no preference or ALWAYS_ASK
+                  setShowResumeOverlay(true);
+                }
+              } else {
+                logger.log(`[VideoPlayer] Progress >= 95%, starting from beginning`);
+              }
+            }
+          } else {
+            logger.log(`[VideoPlayer] No saved progress found`);
+          }
+        } catch (error) {
+          logger.error('[VideoPlayer] Error loading watch progress:', error);
+        }
+      } else {
+        logger.log(`[VideoPlayer] Missing id or type, can't load progress. id=${id}, type=${type}`);
+      }
+    };
+
+    loadWatchProgress();
+  }, [id, type, episodeId]);
+
+  // Set up interval to save watch progress periodically (every 5 seconds)
+  useEffect(() => {
+    if (id && type && !paused && duration > 0) {
+      // Clear any existing interval
+      if (progressSaveInterval) {
+        clearInterval(progressSaveInterval);
+      }
+      
+      // Set up new interval to save progress
+      const interval = setInterval(() => {
+        saveWatchProgress();
+      }, 5000);
+      
+      setProgressSaveInterval(interval);
+      
+      // Clean up interval on pause or unmount
+      return () => {
+        clearInterval(interval);
+        setProgressSaveInterval(null);
+      };
+    }
+  }, [id, type, paused, currentTime, duration]);
+
+  // Save progress one more time when component unmounts
+  useEffect(() => {
+    return () => {
+      if (id && type && duration > 0) {
+        saveWatchProgress();
+      }
+    };
+  }, [id, type, currentTime, duration]);
+
+  // Function to save watch progress
+  const saveWatchProgress = async () => {
+    if (id && type && currentTime > 0 && duration > 0) {
+      const progress = {
+        currentTime,
+        duration,
+        lastUpdated: Date.now()
+      };
+      
+      try {
+        await storageService.setWatchProgress(id, type, progress, episodeId);
+        logger.log(`[VideoPlayer] Saved progress: ${currentTime.toFixed(1)}/${duration.toFixed(1)} (${((currentTime/duration)*100).toFixed(1)}%)`);
+      } catch (error) {
+        logger.error('[VideoPlayer] Error saving watch progress:', error);
+      }
+    } else {
+      logger.log(`[VideoPlayer] Cannot save progress: id=${id}, type=${type}, currentTime=${currentTime}, duration=${duration}`);
     }
   };
 
-  // Function to reset orientation
-  const resetOrientation = async () => {
-    try {
-      await ScreenOrientation.unlockAsync();
-    } catch (error) {
-      logger.error("Failed to unlock orientation:", error);
+  useEffect(() => {
+    max.value = duration;
+  }, [duration]);
+
+  const formatTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    
+    if (hours > 0) {
+      return `${hours}:${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    } else {
+      return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
     }
+  };
+
+  const onSliderValueChange = (value: number) => {
+    if (videoRef.current) {
+      const newTime = Math.floor(value);
+      videoRef.current.seek(newTime);
+      setCurrentTime(newTime);
+      progress.value = newTime;
+    }
+  };
+
+  const togglePlayback = () => {
+    setPaused(!paused);
+  };
+
+  const skip = (seconds: number) => {
+    if (videoRef.current) {
+      const newTime = Math.max(0, Math.min(currentTime + seconds, duration));
+      videoRef.current.seek(newTime);
+      setCurrentTime(newTime);
+      progress.value = newTime;
+    }
+  };
+
+  const onProgress = (data: { currentTime: number }) => {
+    setCurrentTime(data.currentTime);
+    progress.value = data.currentTime;
+  };
+
+  const onLoad = (data: { duration: number }) => {
+    setDuration(data.duration);
+    max.value = data.duration;
+    
+    logger.log(`[VideoPlayer] Video loaded with duration: ${data.duration}`);
+    
+    // If we have an initial position to seek to, do it now
+    if (initialPosition !== null && !isInitialSeekComplete && videoRef.current) {
+      logger.log(`[VideoPlayer] Will seek to saved position: ${initialPosition}`);
+      
+      // Seek immediately with a small delay
+      setTimeout(() => {
+        if (videoRef.current) {
+          try {
+            videoRef.current.seek(initialPosition);
+            setCurrentTime(initialPosition);
+            progress.value = initialPosition;
+            setIsInitialSeekComplete(true);
+            logger.log(`[VideoPlayer] Successfully seeked to saved position: ${initialPosition}`);
+          } catch (error) {
+            logger.error('[VideoPlayer] Error seeking to saved position:', error);
+          }
+        } else {
+          logger.error('[VideoPlayer] videoRef is no longer valid when attempting to seek');
+        }
+      }, 1000); // Increase delay to ensure video is fully loaded
+    } else {
+      if (initialPosition === null) {
+        logger.log(`[VideoPlayer] No initial position to seek to`);
+      } else if (isInitialSeekComplete) {
+        logger.log(`[VideoPlayer] Initial seek already completed`);
+      } else {
+        logger.log(`[VideoPlayer] videoRef not available for seeking`);
+      }
+    }
+  };
+
+  const onAudioTracks = (data: { audioTracks: AudioTrack[] }) => {
+    const tracks = data.audioTracks || [];
+    setAudioTracks(tracks);
+    logger.log(`[VideoPlayer] Available audio tracks:`, tracks);
+  };
+
+  const onTextTracks = (e: Readonly<{ textTracks: TextTrack[] }>) => {
+    const tracks = e.textTracks || [];
+    setTextTracks(tracks);
+    logger.log(`[VideoPlayer] Available subtitle tracks:`, tracks);
+  };
+
+  // Toggle through aspect ratio modes
+  const cycleAspectRatio = () => {
+    const currentIndex = resizeModes.indexOf(resizeMode);
+    const nextIndex = (currentIndex + 1) % resizeModes.length;
+    logger.log(`[VideoPlayer] Changing aspect ratio from ${resizeMode} to ${resizeModes[nextIndex]}`);
+    setResizeMode(resizeModes[nextIndex]);
   };
 
   // Function to enable immersive mode
@@ -304,453 +454,202 @@ const VideoPlayer = () => {
     }
   };
 
-  const formatTime = (seconds: number) => {
-    if (isNaN(seconds)) return '0:00';
-    
-    const hours = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-    
-    // For videos longer than an hour, show HH:MM:SS
-    if (hours > 0) {
-      return `${hours}:${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
-    }
-    
-    // For shorter videos, show MM:SS
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-  };
-
-  // Add function to start the auto-hide timer
-  const startHideControlsTimer = () => {
-    // Clear any existing timer first
-    if (hideControlsTimerRef.current) {
-      clearTimeout(hideControlsTimerRef.current);
-    }
-    
-    // Set new timer to hide controls after 3 seconds (faster)
-    hideControlsTimerRef.current = setTimeout(() => {
-      fadeOutControls();
-    }, 3000);
-  };
-
-  // Function to fade in controls
-  const fadeInControls = () => {
-    // Cancel any running fade out animation
-    Animated.timing(controlsFadeAnim, { 
-      toValue: 0, 
-      duration: 0, 
-      useNativeDriver: true 
-    }).stop();
-    
-    // Start fade in animation - make it faster
-    Animated.timing(controlsFadeAnim, {
-      toValue: 1,
-      duration: 150,
-      useNativeDriver: true
-    }).start();
-    
-    setShowControls(true);
-    
-    // Start timer to auto-hide controls
-    startHideControlsTimer();
-  };
-
-  // Function to fade out controls
-  const fadeOutControls = () => {
-    Animated.timing(controlsFadeAnim, {
-      toValue: 0,
-      duration: 150,
-      useNativeDriver: true
-    }).start(() => {
-      setShowControls(false);
-    });
-    
-    // Clear the timer
-    if (hideControlsTimerRef.current) {
-      clearTimeout(hideControlsTimerRef.current);
-      hideControlsTimerRef.current = null;
-    }
-  };
-
-  // Update the useEffect for playback progress to reset timer
-  useEffect(() => {
-    if (showControls) {
-      startHideControlsTimer();
-    }
-    
-    // Cleanup timer on unmount
-    return () => {
-      if (hideControlsTimerRef.current) {
-        clearTimeout(hideControlsTimerRef.current);
-      }
+  // Function to handle closing the video player
+  const handleClose = () => {
+    // First unlock the screen orientation
+    const unlockOrientation = async () => {
+      await ScreenOrientation.unlockAsync();
     };
-  // Add dependencies that should reset the timer
-  }, [currentTime]);
-
-  // Create a debounced version of the seek function to prevent excessive seeking
-  const debouncedSeek = useRef(
-    debounce((time: number) => {
-      if (videoRef.current) {
-        videoRef.current.seek(time);
-      }
-    }, 50)
-  ).current;
-
-  // Modify slider value change handler for community slider
-  const onSliderValueChange = (value: number) => {
-    // Only update the slider value, don't update currentTime here
-    setSliderValue(value);
-  };
-
-  const onSlidingComplete = (value: number) => {
-    if (!videoRef.current) return;
+    unlockOrientation();
     
-    const newTime = Math.floor(value);
-    
-    // Update UI immediately for responsive feel
-    setCurrentTime(newTime);
-    
-    // Seek to the new position
-    videoRef.current.seek(newTime);
-    
-    // Reset timer for auto-hiding controls
-    startHideControlsTimer();
-    
-    // Reset slider dragging state
-    isSliderDragging.current = false;
-  };
-
-  // Set slider being touched
-  const onSlidingStart = () => {
-    isSliderDragging.current = true;
-  };
-
-  const togglePlayback = () => {
-    setPaused(!paused);
-    startHideControlsTimer();
-  };
-
-  const skip = (seconds: number) => {
-    if (videoRef.current) {
-      const newTime = Math.max(0, Math.min(currentTime + seconds, duration));
-      videoRef.current.seek(newTime);
-      setCurrentTime(newTime);
-      setSliderValue(newTime);
-      startHideControlsTimer();
-    }
-  };
-
-  // Optimize the onProgress handler to throttle updates
-  const onProgress = (data: { currentTime: number, playableDuration?: number, seekableDuration?: number }) => {
-    // Skip updates during dragging for smoother UX
-    if (isSliderDragging.current) return;
-    
-    // Throttle updates to reduce render cycles (process at most every 250ms)
-    const now = Date.now();
-    if (now - lastProgressUpdateTime.current < 250) {
-      return;
-    }
-    
-    lastProgressUpdateTime.current = now;
-    
-    const newTime = data.currentTime;
-    
-    // Only update when there's a meaningful change (at least 0.5 second difference)
-    if (Math.abs(currentTime - newTime) >= 0.5) {
-      setCurrentTime(newTime);
-      setSliderValue(newTime);
-    }
-  };
-
-  const onLoad = (data: { duration: number }) => {
-    setDuration(data.duration);
-  };
-
-  const onAudioTracks = (data: { audioTracks: AudioTrack[] }) => {
-    setAudioTracks(data.audioTracks || []);
-    if (selectedAudioTrack === null && data.audioTracks && data.audioTracks.length > 0) {
-      setSelectedAudioTrack(data.audioTracks[0].index);
-    }
-  };
-
-  const onTextTracks = (e: Readonly<{ textTracks: TextTrack[] }>) => {
-    logger.log("Detected Text Tracks:", e.textTracks);
-    // Only set built-in tracks, preserve OpenSubtitles tracks
-    const builtInTracks = e.textTracks || [];
-    setTextTracks(prevTracks => {
-      // Filter out existing built-in tracks (those with index < 100)
-      const openSubtitlesTracks = prevTracks.filter(t => t.index >= 100);
-      return [...builtInTracks, ...openSubtitlesTracks];
-    });
-  };
-
-  // Toggle through aspect ratio modes
-  const cycleAspectRatio = () => {
-    const currentIndex = resizeModes.indexOf(resizeMode);
-    const nextIndex = (currentIndex + 1) % resizeModes.length;
-    logger.log(`Changing aspect ratio from ${resizeMode} to ${resizeModes[nextIndex]}`);
-    setResizeMode(resizeModes[nextIndex]);
-  };
-
-  // Function for Back button
-  const handleBackPress = () => {
-    logger.log("Close button pressed");
-    
-    // Pause video before leaving
-    setPaused(true);
-    
-    // Clear any potentially lingering timers
-    if (hideControlsTimerRef.current) {
-      clearTimeout(hideControlsTimerRef.current);
-      hideControlsTimerRef.current = null;
-    }
-    
-    // Explicitly disable immersive mode before navigation
+    // Disable immersive mode
     disableImmersiveMode();
     
-    // Reset orientation first
-    resetOrientation()
-      .then(() => {
-        // Then navigate back - with a guaranteed callback
-        setTimeout(() => {
-          navigation.goBack();
-        }, 350); // Increase delay to ensure orientation reset completes
-      })
-      .catch(error => {
-        logger.error("Error resetting orientation:", error);
-        // Navigate back anyway after a short delay
-        disableImmersiveMode(); // Try disabling again
-        setTimeout(() => {
-          navigation.goBack();
-        }, 150);
-      });
-      
-    // Safety fallback - if navigation doesn't happen for some reason
-    setTimeout(() => {
-      if (navigation.canGoBack()) {
-        navigation.goBack();
-      }
-    }, 1000);
+    // Navigate back
+    navigation.goBack();
   };
 
-  // Toggle menus
-  const toggleAudioOptions = (e?: any) => {
-    if (e) e.stopPropagation();
-    
-    if (showAudioOptions) {
-      // Hide the audio menu with animation
-      Animated.timing(audioSlideAnim, {
-        toValue: 400,
-        duration: 300,
-        useNativeDriver: true
-      }).start(() => {
-        setShowAudioOptions(false);
-      });
-    } else {
-      // Show the audio menu with animation
-      setShowAudioOptions(true);
-      setShowSubtitleOptions(false);
-      subtitleSlideAnim.setValue(400); // Reset subtitle animation
-      Animated.timing(audioSlideAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true
-      }).start();
+  // Add debug logs for modal visibility
+  useEffect(() => {
+    if (showAudioModal) {
+      logger.log("[VideoPlayer] Audio modal should be visible now");
+      logger.log("[VideoPlayer] Available audio tracks:", audioTracks);
     }
-  };
+  }, [showAudioModal, audioTracks]);
 
-  const toggleSubtitleOptions = (e?: any) => {
-    if (e) e.stopPropagation();
-    
-    if (showSubtitleOptions) {
-      // Hide the subtitle menu with animation
-      Animated.timing(subtitleSlideAnim, {
-        toValue: 400,
-        duration: 300,
-        useNativeDriver: true
-      }).start(() => {
-        setShowSubtitleOptions(false);
-      });
-    } else {
-      // Show the subtitle menu with animation
-      setShowSubtitleOptions(true);
-      setShowAudioOptions(false);
-      audioSlideAnim.setValue(400); // Reset audio animation
-      Animated.timing(subtitleSlideAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true
-      }).start();
+  useEffect(() => {
+    if (showSubtitleModal) {
+      logger.log("[VideoPlayer] Subtitle modal should be visible now");
+      logger.log("[VideoPlayer] Available text tracks:", textTracks);
     }
-  };
+  }, [showSubtitleModal, textTracks]);
 
-  // When user taps on video container, close menus
-  const handleVideoContainerPress = () => {
-    if (showAudioOptions) {
-      // Hide the audio menu with animation
-      Animated.timing(audioSlideAnim, {
-        toValue: 400,
-        duration: 300,
-        useNativeDriver: true
-      }).start(() => {
-        setShowAudioOptions(false);
-      });
-    } else if (showSubtitleOptions) {
-      // Hide the subtitle menu with animation
-      Animated.timing(subtitleSlideAnim, {
-        toValue: 400,
-        duration: 300,
-        useNativeDriver: true
-      }).start(() => {
-        setShowSubtitleOptions(false);
-      });
-    } else {
-      // Toggle controls with fade animation
-      if (showControls) {
-        fadeOutControls();
-      } else {
-        fadeInControls();
+  // Attempt to seek once videoRef is available
+  useEffect(() => {
+    if (initialPosition !== null && !isInitialSeekComplete && videoRef.current) {
+      logger.log(`[VideoPlayer] videoRef is now available, attempting to seek to: ${initialPosition}`);
+      try {
+        videoRef.current.seek(initialPosition);
+        setCurrentTime(initialPosition);
+        progress.value = initialPosition;
+        setIsInitialSeekComplete(true);
+        logger.log(`[VideoPlayer] Successfully seeked to position: ${initialPosition}`);
+      } catch (error) {
+        logger.error('[VideoPlayer] Error seeking to position on ref available:', error);
       }
     }
-  };
+  }, [videoRef.current, initialPosition, isInitialSeekComplete]);
 
-  // Handle selection
-  const selectAudioTrack = (index: number) => {
-    setSelectedAudioTrack(index);
-    // Hide the audio menu with animation
-    Animated.timing(audioSlideAnim, {
-      toValue: 400,
-      duration: 300,
-      useNativeDriver: true
-    }).start(() => {
-      setShowAudioOptions(false);
-    });
-  };
-
-  const selectSubtitleTrack = async (track: SelectedTrack | null) => {
-    // Reset previously selected external subtitle URI if any
-    // Also reset the tracked index
-    if (selectedTextTrack?.type === 'uri') {
-      setSelectedTextTrack(null); // Clear previous selection
-      setSelectedUriTrackIndex(null);
-    }
-
-    // If selecting "Off"
-    if (!track || track.type === 'disabled') {
-      setSelectedTextTrack({ type: 'disabled' });
-      setSelectedUriTrackIndex(null);
-    } 
-    // If selecting a built-in track
-    else if (track.type === 'index' && typeof track.value === 'number' && track.value < 100) {
-      setSelectedTextTrack(track);
-      setSelectedUriTrackIndex(null);
-    }
-    // If selecting an OpenSubtitles track (index >= 100)
-    else if (track.type === 'index' && typeof track.value === 'number' && track.value >= 100) {
-      const subtitleIndex = track.value - 100;
-      const subtitle = subtitles[subtitleIndex];
-      const originalTrackIndex = track.value; // Store the original index (>= 100)
-      
-      if (subtitle && subtitle.url) {
-        try {
-          logger.log(`Attempting to download subtitle from ${subtitle.url}`);
-          const localUri = `${FileSystem.cacheDirectory}${subtitle.id || Date.now()}.srt`;
+  // Load resume preference on mount
+  useEffect(() => {
+    const loadResumePreference = async () => {
+      try {
+        const pref = await AsyncStorage.getItem(RESUME_PREF_KEY);
+        if (pref) {
+          setResumePreference(pref);
+          logger.log(`[VideoPlayer] Loaded resume preference: ${pref}`);
           
-          // Download the subtitle file
-          const downloadResult = await FileSystem.downloadAsync(subtitle.url, localUri);
-          
-          if (downloadResult.status === 200) {
-            logger.log(`Subtitle downloaded successfully to ${downloadResult.uri}`);
-            // Set the selected track to the local file URI
-            setSelectedTextTrack({ type: 'uri', value: downloadResult.uri });
-            // Set the index of the active URI track
-            setSelectedUriTrackIndex(originalTrackIndex); 
-          } else {
-            logger.error(`Failed to download subtitle: Status ${downloadResult.status}`);
-            setSelectedTextTrack({ type: 'disabled' }); // Fallback to disabled
-            setSelectedUriTrackIndex(null);
-            alert('Failed to download subtitle.');
+          // If user has a preference, apply it automatically
+          if (pref === RESUME_PREF.ALWAYS_RESUME && resumePosition !== null) {
+            setShowResumeOverlay(false);
+            setInitialPosition(resumePosition);
+            logger.log(`[VideoPlayer] Auto-resuming based on saved preference`);
+          } else if (pref === RESUME_PREF.ALWAYS_START_OVER) {
+            setShowResumeOverlay(false);
+            setInitialPosition(0);
+            logger.log(`[VideoPlayer] Auto-starting from beginning based on saved preference`);
           }
-        } catch (error) {
-          logger.error('Error downloading subtitle:', error);
-          setSelectedTextTrack({ type: 'disabled' }); // Fallback to disabled
-          setSelectedUriTrackIndex(null);
-          alert('Error downloading subtitle.');
         }
-      } else {
-        logger.warn('Selected OpenSubtitle track has no URL');
-        setSelectedTextTrack({ type: 'disabled' });
-        setSelectedUriTrackIndex(null);
+      } catch (error) {
+        logger.error('[VideoPlayer] Error loading resume preference:', error);
       }
-    } else {
-      // Handle any other cases or default
-      setSelectedTextTrack(track);
-      setSelectedUriTrackIndex(null); // Ensure reset for non-handled types
-    }
+    };
     
-    // Hide the subtitle menu with animation
-    Animated.timing(subtitleSlideAnim, {
-      toValue: 400,
-      duration: 300,
-      useNativeDriver: true
-    }).start(() => {
-      setShowSubtitleOptions(false);
-    });
+    loadResumePreference();
+  }, [resumePosition]);
+
+  // Reset resume preference
+  const resetResumePreference = async () => {
+    try {
+      await AsyncStorage.removeItem(RESUME_PREF_KEY);
+      setResumePreference(null);
+      logger.log(`[VideoPlayer] Reset resume preference`);
+    } catch (error) {
+      logger.error('[VideoPlayer] Error resetting resume preference:', error);
+    }
   };
 
-  // Function to load subtitles from OpenSubtitles v3 addon
-  const loadSubtitles = async () => {
-    if (!id || !type) return;
-    
-    try {
-      setIsLoadingSubtitles(true);
-      logger.log(`Loading subtitles for ${type} with id ${id}${episodeId ? ` and episodeId ${episodeId}` : ''}`);
+  // Handle resume from overlay - modified to save preference
+  const handleResume = async () => {
+    if (resumePosition !== null && videoRef.current) {
+      logger.log(`[VideoPlayer] Resuming from ${resumePosition}`);
       
-      const subtitlesList = await stremioService.getSubtitles(type, id, episodeId);
-      
-      if (subtitlesList && subtitlesList.length > 0) {
-        logger.log(`Loaded ${subtitlesList.length} subtitles`);
-        setSubtitles(subtitlesList);
-        
-        // Convert OpenSubtitles subtitles to the format expected by react-native-video
-        const convertedTracks: TextTrack[] = subtitlesList.map((sub, index) => ({
-          index: 100 + index, // Use high index values to avoid conflicts
-          title: sub.id,
-          language: sub.lang,
-          type: 'text'
-        }));
-        
-        // Combine with existing text tracks
-        setTextTracks(prevTracks => [...prevTracks, ...convertedTracks]);
-      } else {
-        logger.log('No subtitles found');
+      // Save preference if remember choice is checked
+      if (rememberChoice) {
+        try {
+          await AsyncStorage.setItem(RESUME_PREF_KEY, RESUME_PREF.ALWAYS_RESUME);
+          logger.log(`[VideoPlayer] Saved resume preference: ${RESUME_PREF.ALWAYS_RESUME}`);
+        } catch (error) {
+          logger.error('[VideoPlayer] Error saving resume preference:', error);
+        }
       }
-    } catch (error) {
-      logger.error('Error loading subtitles:', error);
-    } finally {
-      setIsLoadingSubtitles(false);
+      
+      // Set initial position to trigger seek
+      setInitialPosition(resumePosition);
+      // Hide overlay
+      setShowResumeOverlay(false);
     }
+  };
+
+  // Handle start from beginning - modified to save preference
+  const handleStartFromBeginning = async () => {
+    logger.log(`[VideoPlayer] Starting from beginning`);
+    
+    // Save preference if remember choice is checked
+    if (rememberChoice) {
+      try {
+        await AsyncStorage.setItem(RESUME_PREF_KEY, RESUME_PREF.ALWAYS_START_OVER);
+        logger.log(`[VideoPlayer] Saved resume preference: ${RESUME_PREF.ALWAYS_START_OVER}`);
+      } catch (error) {
+        logger.error('[VideoPlayer] Error saving resume preference:', error);
+      }
+    }
+    
+    // Hide overlay
+    setShowResumeOverlay(false);
+    // Set initial position to 0
+    setInitialPosition(0);
+    // Make sure we seek to beginning
+    if (videoRef.current) {
+      videoRef.current.seek(0);
+      setCurrentTime(0);
+      progress.value = 0;
+    }
+  };
+
+  // Update the showControls logic to include animation
+  const toggleControls = () => {
+    // Start fade animation
+    Animated.timing(fadeAnim, {
+      toValue: showControls ? 0 : 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+    
+    // Update state
+    setShowControls(!showControls);
+  };
+
+  // Add onBuffer handler to Video component
+  const onBuffer = ({ isBuffering }: { isBuffering: boolean }) => {
+    // You can use this to show a loading indicator if needed
+    logger.log(`[VideoPlayer] Buffering: ${isBuffering}`);
+  };
+
+  // Add onProgress handler to track buffered data
+  const onLoadStart = () => {
+    setBuffered(0);
+  };
+
+  const handleProgress = (data: { currentTime: number, playableDuration: number, seekableDuration?: number }) => {
+    setCurrentTime(data.currentTime);
+    progress.value = data.currentTime;
+    
+    // Ensure playableDuration is always at least equal to currentTime
+    const effectivePlayableDuration = Math.max(data.currentTime, data.playableDuration);
+    setBuffered(effectivePlayableDuration);
+
+    // Calculate buffer ahead (cannot be negative)
+    const bufferAhead = Math.max(0, effectivePlayableDuration - data.currentTime);
+    const bufferPercentage = ((effectivePlayableDuration / (duration || 1)) * 100);
+
+    // Add detailed buffer logging
+    logger.log(`[VideoPlayer] Buffer Status:
+      Current Time: ${data.currentTime.toFixed(2)}s
+      Playable Duration: ${effectivePlayableDuration.toFixed(2)}s
+      Buffered Ahead: ${bufferAhead.toFixed(2)}s
+      Seekable Duration: ${data.seekableDuration?.toFixed(2) || 'N/A'}s
+      Buffer Percentage: ${bufferPercentage.toFixed(1)}%
+    `);
   };
 
   return (
     <View style={styles.container}> 
       <TouchableOpacity
         style={styles.videoContainer}
-        onPress={handleVideoContainerPress}
-        activeOpacity={0.98} // Make touch feedback even more subtle
-        delayPressIn={0} // Remove delay for immediate response
+        onPress={toggleControls}
+        activeOpacity={1}
       >
         <Video
           ref={videoRef}
           source={{ uri }}
           style={styles.video}
-          paused={paused}
+          paused={paused || showResumeOverlay}
           resizeMode={resizeMode}
           onLoad={onLoad}
-          onProgress={onProgress}
-          onEnd={onEnd}
+          onProgress={handleProgress}
           rate={playbackSpeed}
-          progressUpdateInterval={500}  // Less frequent updates (500ms vs 100ms)
+          progressUpdateInterval={250}
           selectedAudioTrack={selectedAudioTrack !== null ? 
             { type: 'index', value: selectedAudioTrack } as any : 
             undefined
@@ -758,309 +657,335 @@ const VideoPlayer = () => {
           onAudioTracks={onAudioTracks}
           selectedTextTrack={selectedTextTrack as any}
           onTextTracks={onTextTracks}
-          
-          // Optimize buffer configuration for smoother playback
-          bufferConfig={{
-            minBufferMs: 15000,         // 15 seconds minimum buffer
-            maxBufferMs: 50000,         // 50 seconds maximum buffer
-            bufferForPlaybackMs: 2500,  // Start playback after 2.5 seconds buffered
-            bufferForPlaybackAfterRebufferMs: 5000  // Resume after rebuffering when we have 5 seconds
-          }}
-          repeat={false}                // Don't loop the video
-          
-          // Performance optimization settings
-          ignoreSilentSwitch="ignore"   // Keep playing when the app is in the background
-          playInBackground={false}      // Don't play when app is in background
-          reportBandwidth={false}       // Disable bandwidth reporting to reduce overhead
-          disableFocus={false}          // Stay focused
-          
-          // Only render when actively used to save resources
-          renderToHardwareTextureAndroid={true}
-          
-          onBuffer={(buffer) => {
-            logger.log('Buffering:', buffer.isBuffering);
-          }}
-          
-          onError={(error) => {
-            logger.error('Video playback error:', error);
-            alert(`Video Error: ${error.error.errorString} (Code: ${error.error.errorCode})`);
-          }}
+          onBuffer={onBuffer}
+          onLoadStart={onLoadStart}
         />
 
-        {/* Controls Overlay - with fade animation */}
-        {showControls && (
-          <Animated.View 
-            style={[
-              styles.controlsContainer,
-              { opacity: controlsFadeAnim }
-            ]}
+        {/* Slider Container with buffer indicator */}
+        <Animated.View style={[styles.sliderContainer, { opacity: fadeAnim }]}>
+          <View style={styles.sliderBackground}>
+            {/* Buffered Progress */}
+            <View style={[styles.bufferProgress, { 
+              width: `${(buffered / (duration || 1)) * 100}%`
+            }]} />
+          </View>
+          <Slider
+            progress={progress}
+            minimumValue={min}
+            maximumValue={max}
+            style={styles.slider}
+            onValueChange={onSliderValueChange}
+            theme={{
+              minimumTrackTintColor: '#E50914',
+              maximumTrackTintColor: 'transparent',
+              bubbleBackgroundColor: '#E50914',
+            }}
+          />
+          <View style={styles.timeDisplay}>
+            <Text style={styles.duration}>{formatTime(currentTime)}</Text>
+            <Text style={styles.duration}>{formatTime(duration)}</Text>
+          </View>
+        </Animated.View>
+
+        {/* Controls Overlay - Using Animated.View */}
+        <Animated.View style={[styles.controlsContainer, { opacity: fadeAnim }]}>
+          {/* Top Gradient & Header */}
+          <LinearGradient
+            colors={['rgba(0,0,0,0.7)', 'transparent']}
+            style={styles.topGradient}
           >
-            {/* Top Gradient & Header */}
+            <View style={styles.header}>
+              {/* Title Section - Enhanced with metadata */}
+              <View style={styles.titleSection}>
+                <Text style={styles.title}>{title}</Text>
+                {/* Show season and episode for series */}
+                {season && episode && (
+                  <Text style={styles.episodeInfo}>
+                    S{season}E{episode} {episodeTitle && `• ${episodeTitle}`}
+                  </Text>
+                )}
+                {/* Show year, quality, and provider */}
+                <View style={styles.metadataRow}>
+                  {year && <Text style={styles.metadataText}>{year}</Text>}
+                  {quality && <View style={styles.qualityBadge}><Text style={styles.qualityText}>{quality}</Text></View>}
+                  {streamProvider && <Text style={styles.providerText}>via {streamProvider}</Text>}
+                </View>
+              </View>
+              <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
+                <Ionicons name="close" size={24} color="white" />
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
+
+          {/* Center Controls (Play/Pause, Skip) */}
+          <View style={styles.controls}>
+            <TouchableOpacity onPress={() => skip(-10)} style={styles.skipButton}>
+              <Ionicons name="play-back" size={24} color="white" />
+              <Text style={styles.skipText}>10</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={togglePlayback} style={styles.playButton}>
+              <Ionicons name={paused ? "play" : "pause"} size={40} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => skip(10)} style={styles.skipButton}>
+              <Ionicons name="play-forward" size={24} color="white" />
+              <Text style={styles.skipText}>10</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Bottom Gradient */}
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.7)']}
+            style={styles.bottomGradient}
+          >
+            <View style={styles.bottomControls}>
+              {/* Bottom Buttons Row */}
+              <View style={styles.bottomButtons}>
+                {/* Speed Button */}
+                <TouchableOpacity style={styles.bottomButton}>
+                  <Ionicons name="speedometer" size={20} color="white" />
+                  <Text style={styles.bottomButtonText}>Speed ({playbackSpeed}x)</Text>
+                </TouchableOpacity>
+
+                {/* Aspect Ratio Button - Added */}
+                <TouchableOpacity style={styles.bottomButton} onPress={cycleAspectRatio}>
+                  <Ionicons name="resize" size={20} color="white" />
+                  <Text style={styles.bottomButtonText}>
+                    Aspect ({resizeMode})
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Audio Button - Updated language display */}
+                <TouchableOpacity 
+                  style={styles.bottomButton} 
+                  onPress={() => setShowAudioModal(true)}
+                  disabled={audioTracks.length <= 1}
+                >
+                  <Ionicons name="volume-high" size={20} color={audioTracks.length <= 1 ? 'grey' : 'white'} />
+                  <Text style={[styles.bottomButtonText, audioTracks.length <= 1 && {color: 'grey'}]}>
+                    {audioTracks.length > 0 && selectedAudioTrack !== null
+                      ? `Audio: ${formatLanguage(audioTracks.find(t => t.index === selectedAudioTrack)?.language)}`
+                      : 'Audio: Default'}
+                  </Text>
+                </TouchableOpacity>
+                
+                {/* Subtitle Button - Updated language display */}
+                <TouchableOpacity 
+                  style={styles.bottomButton}
+                  onPress={() => setShowSubtitleModal(true)}
+                  disabled={textTracks.length === 0}
+                >
+                  <Ionicons name="text" size={20} color={textTracks.length === 0 ? 'grey' : 'white'} />
+                  <Text style={[styles.bottomButtonText, textTracks.length === 0 && {color: 'grey'}]}>
+                    {selectedTextTrack?.type === 'disabled' 
+                      ? 'Subtitles: Off' 
+                      : `Subtitles: ${formatLanguage(textTracks.find(t => t.index === selectedTextTrack?.value)?.language)}`}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </LinearGradient>
+        </Animated.View>
+
+        {/* Resume Overlay */}
+        {showResumeOverlay && resumePosition !== null && (
+          <View style={styles.resumeOverlay}>
             <LinearGradient
-              colors={['rgba(0,0,0,0.7)', 'transparent']}
-              style={styles.topGradient}
+              colors={['rgba(0,0,0,0.9)', 'rgba(0,0,0,0.7)']}
+              style={styles.resumeContainer}
             >
-              <View style={styles.header}>
-                {/* Title Section - Enhanced with metadata */}
-                <View style={styles.titleSection}>
-                  <Text style={styles.title}>{title}</Text>
-                  {/* Show season and episode for series */}
-                  {season && episode && (
-                    <Text style={styles.episodeInfo}>
-                      S{season}E{episode} {episodeTitle && `• ${episodeTitle}`}
+              <View style={styles.resumeContent}>
+                <View style={styles.resumeIconContainer}>
+                  <Ionicons name="play-circle" size={40} color="#E50914" />
+                </View>
+                <View style={styles.resumeTextContainer}>
+                  <Text style={styles.resumeTitle}>Continue Watching</Text>
+                  <Text style={styles.resumeInfo}>
+                    {title}
+                    {season && episode && ` • S${season}E${episode}`}
+                  </Text>
+                  <View style={styles.resumeProgressContainer}>
+                    <View style={styles.resumeProgressBar}>
+                      <View 
+                        style={[
+                          styles.resumeProgressFill, 
+                          { width: `${duration > 0 ? (resumePosition / duration) * 100 : 0}%` }
+                        ]} 
+                      />
+                    </View>
+                    <Text style={styles.resumeTimeText}>
+                      {formatTime(resumePosition)} {duration > 0 ? `/ ${formatTime(duration)}` : ''}
                     </Text>
-                  )}
-                  {/* Show year, quality, and provider */}
-                  <View style={styles.metadataRow}>
-                    {year && <Text style={styles.metadataText}>{year}</Text>}
-                    {quality && <View style={styles.qualityBadge}><Text style={styles.qualityText}>{quality}</Text></View>}
-                    {streamProvider && <Text style={styles.providerText}>via {streamProvider}</Text>}
                   </View>
                 </View>
+              </View>
+
+              {/* Remember choice checkbox */}
+              <TouchableOpacity 
+                style={styles.rememberChoiceContainer}
+                onPress={() => setRememberChoice(!rememberChoice)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.checkboxContainer}>
+                  <View style={[styles.checkbox, rememberChoice && styles.checkboxChecked]}>
+                    {rememberChoice && <Ionicons name="checkmark" size={12} color="white" />}
+                  </View>
+                  <Text style={styles.rememberChoiceText}>Remember my choice</Text>
+                </View>
+                
+                {resumePreference && (
+                  <TouchableOpacity 
+                    onPress={resetResumePreference}
+                    style={styles.resetPreferenceButton}
+                  >
+                    <Text style={styles.resetPreferenceText}>Reset</Text>
+                  </TouchableOpacity>
+                )}
+              </TouchableOpacity>
+
+              <View style={styles.resumeButtons}>
                 <TouchableOpacity 
-                  style={styles.closeButton} 
-                  onPress={handleBackPress}
-                  activeOpacity={0.7}
-                  hitSlop={{ top: 20, right: 20, bottom: 20, left: 20 }}
+                  style={styles.resumeButton} 
+                  onPress={handleStartFromBeginning}
                 >
-                  <Ionicons name="close" size={28} color="white" />
+                  <Ionicons name="refresh" size={16} color="white" style={styles.buttonIcon} />
+                  <Text style={styles.resumeButtonText}>Start Over</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.resumeButton, styles.resumeFromButton]} 
+                  onPress={handleResume}
+                >
+                  <Ionicons name="play" size={16} color="white" style={styles.buttonIcon} />
+                  <Text style={styles.resumeButtonText}>Resume</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>
-
-            {/* Center Controls (Play/Pause, Skip) */}
-            <View style={styles.controls}>
-              <TouchableOpacity onPress={() => skip(-10)}>
-                <Ionicons name="play-back" size={24} color="white" />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={togglePlayback} style={styles.playButton}>
-                <Ionicons name={paused ? "play" : "pause"} size={30} color="white" />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => skip(10)}>
-                <Ionicons name="play-forward" size={24} color="white" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Bottom Gradient & Controls */}
-            <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.7)']}
-              style={styles.bottomGradient}
-            >
-              <View style={styles.bottomControls}>
-                {/* Slider - replaced with community slider */}
-                <View style={styles.sliderContainer}>
-                  <View style={styles.sliderRow}>
-                    <Text style={styles.currentTime}>
-                      {formatTime(currentTime)}
-                    </Text>
-                    
-                    <Slider
-                      style={styles.slider}
-                      value={sliderValue}
-                      minimumValue={0}
-                      maximumValue={duration > 0 ? duration : 1}
-                      step={0.1}
-                      minimumTrackTintColor="#E50914"
-                      maximumTrackTintColor="rgba(255, 255, 255, 0.3)"
-                      thumbTintColor="#E50914"
-                      onValueChange={onSliderValueChange}
-                      onSlidingStart={onSlidingStart}
-                      onSlidingComplete={onSlidingComplete}
-                    />
-                    
-                    <Text style={styles.durationText}>
-                      {formatTime(duration)}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Bottom Buttons Row */}
-                <View style={styles.bottomButtons}>
-                  {/* Speed Button */}
-                  <TouchableOpacity style={styles.bottomButton}>
-                    <Ionicons name="speedometer" size={20} color="white" />
-                    <Text style={styles.bottomButtonText}>Speed ({playbackSpeed}x)</Text>
-                  </TouchableOpacity>
-
-                  {/* Aspect Ratio Button - Added */}
-                  <TouchableOpacity style={styles.bottomButton} onPress={cycleAspectRatio}>
-                    <Ionicons name="resize" size={20} color="white" />
-                    <Text style={styles.bottomButtonText}>
-                      Aspect ({resizeMode})
-                    </Text>
-                  </TouchableOpacity>
-
-                  {/* Audio Button */}
-                  <TouchableOpacity 
-                    style={styles.bottomButton} 
-                    onPress={toggleAudioOptions}
-                    disabled={audioTracks.length <= 1}
-                  >
-                    <Ionicons name="volume-high" size={20} color={audioTracks.length <= 1 ? 'grey' : 'white'} />
-                    <Text style={[styles.bottomButtonText, audioTracks.length <= 1 && {color: 'grey'}]}>
-                      Audio {audioTracks.length > 0 ? 
-                        `(${audioTracks.find(t => t.index === selectedAudioTrack)?.language || 'Default'})` : 
-                        ''}
-                    </Text>
-                  </TouchableOpacity>
-                  
-                  {/* Subtitle Button */}
-                  <TouchableOpacity 
-                    style={styles.bottomButton}
-                    onPress={toggleSubtitleOptions}
-                    disabled={textTracks.length === 0}
-                  >
-                    <Ionicons name="text" size={20} color={textTracks.length === 0 ? 'grey' : 'white'} />
-                    <Text style={[styles.bottomButtonText, textTracks.length === 0 && {color: 'grey'}]}>
-                      {selectedTextTrack?.type === 'disabled' 
-                        ? 'Subtitles (Off)' 
-                        : `Subtitles (${(selectedTextTrack?.type === 'uri' && selectedUriTrackIndex !== null) 
-                            ? textTracks.find(t => t.index === selectedUriTrackIndex)?.language?.toUpperCase() || 'On' 
-                            : textTracks.find(t => t.index === selectedTextTrack?.value)?.language?.toUpperCase() || 'On'})`}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </LinearGradient>
-
-            {/* Audio Options Panel - Slide from Right with Gradient */}
-            {showAudioOptions && (
-              <Animated.View 
-                style={[
-                  styles.slidePanel,
-                  { transform: [{ translateX: audioSlideAnim }] }
-                ]}
-              >
-                <LinearGradient
-                  colors={['rgba(30, 30, 30, 0.9)', 'rgba(20, 20, 20, 0.98)']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.gradientPanel}
-                >
-                  <Text style={styles.optionsPanelTitle}>Audio Track</Text>
-                  <ScrollView style={styles.optionsList}>
-                    {audioTracks.map((track) => (
-                      <TouchableOpacity
-                        key={track.index}
-                        style={[
-                          styles.optionItem,
-                          selectedAudioTrack === track.index && styles.selectedOption
-                        ]}
-                        onPress={() => selectAudioTrack(track.index)}
-                      >
-                        <Ionicons 
-                          name={selectedAudioTrack === track.index ? "radio-button-on" : "radio-button-off"}
-                          size={18}
-                          color={selectedAudioTrack === track.index ? "#E50914" : "white"}
-                          style={{ marginRight: 10 }}
-                        />
-                        <Text style={[
-                          styles.optionItemText,
-                          selectedAudioTrack === track.index && styles.selectedOptionText
-                        ]}>
-                          {track.language ? track.language.toUpperCase() : (track.title || `Track ${track.index + 1}`)}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                  <TouchableOpacity
-                    style={styles.cancelButton}
-                    onPress={() => toggleAudioOptions()}
-                  >
-                    <Text style={styles.cancelButtonText}>Close</Text>
-                  </TouchableOpacity>
-                </LinearGradient>
-              </Animated.View>
-            )}
-
-            {/* Subtitle Options Panel - Slide from Right with Gradient */}
-            {showSubtitleOptions && (
-              <Animated.View 
-                style={[
-                  styles.slidePanel,
-                  { transform: [{ translateX: subtitleSlideAnim }] }
-                ]}
-              >
-                <LinearGradient
-                  colors={['rgba(30, 30, 30, 0.9)', 'rgba(20, 20, 20, 0.98)']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.gradientPanel}
-                >
-                  <Text style={styles.optionsPanelTitle}>Subtitles</Text>
-                  <ScrollView style={styles.optionsList}>
-                    <TouchableOpacity
-                      style={[
-                        styles.optionItem,
-                        selectedTextTrack?.type === 'disabled' && styles.selectedOption
-                      ]}
-                      onPress={() => selectSubtitleTrack({ type: 'disabled' })}
-                    >
-                      <Ionicons 
-                        name={selectedTextTrack?.type === 'disabled' ? "radio-button-on" : "radio-button-off"}
-                        size={18}
-                        color={selectedTextTrack?.type === 'disabled' ? "#E50914" : "white"}
-                        style={{ marginRight: 10 }}
-                      />
-                      <Text style={[
-                        styles.optionItemText,
-                        selectedTextTrack?.type === 'disabled' && styles.selectedOptionText
-                      ]}>Off</Text>
-                    </TouchableOpacity>
-                    
-                    {textTracks.map((track) => (
-                      <TouchableOpacity
-                        key={track.index}
-                        style={[
-                          styles.optionItem,
-                          // Updated highlighting logic:
-                          (selectedTextTrack?.type === 'index' && selectedTextTrack?.value === track.index) || 
-                          (selectedUriTrackIndex === track.index) // Highlight if this URI track is active
-                            ? styles.selectedOption 
-                            : null
-                        ]}
-                        onPress={() => selectSubtitleTrack({ type: 'index', value: track.index })}
-                      >
-                        <Ionicons 
-                          // Updated icon logic:
-                          name={((selectedTextTrack?.type === 'index' && selectedTextTrack?.value === track.index) || 
-                                (selectedUriTrackIndex === track.index)) 
-                                  ? "radio-button-on" 
-                                  : "radio-button-off"}
-                          size={18}
-                          // Updated color logic:
-                          color={((selectedTextTrack?.type === 'index' && selectedTextTrack?.value === track.index) || 
-                                 (selectedUriTrackIndex === track.index)) 
-                                   ? "#E50914" 
-                                   : "white"}
-                          style={{ marginRight: 10 }}
-                        />
-                        <Text style={[
-                          styles.optionItemText,
-                          // Updated text style logic:
-                          ((selectedTextTrack?.type === 'index' && selectedTextTrack?.value === track.index) || 
-                           (selectedUriTrackIndex === track.index)) 
-                             ? styles.selectedOptionText 
-                             : null
-                        ]}>
-                          {track.language ? track.language.toUpperCase() : (track.title || `Track ${track.index + 1}`)}
-                          {track.index >= 100 && ' (OpenSubtitles)'}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                  <TouchableOpacity
-                    style={styles.cancelButton}
-                    onPress={() => toggleSubtitleOptions()}
-                  >
-                    <Text style={styles.cancelButtonText}>Close</Text>
-                  </TouchableOpacity>
-                </LinearGradient>
-              </Animated.View>
-            )}
-          </Animated.View>
+          </View>
         )}
       </TouchableOpacity> 
+
+      {/* Audio Selection Modal - Updated language display */}
+      {showAudioModal && (
+        <View style={styles.fullscreenOverlay}>
+          <View style={styles.enhancedModalContainer}>
+            <View style={styles.enhancedModalHeader}>
+              <Text style={styles.enhancedModalTitle}>Audio</Text>
+              <TouchableOpacity 
+                style={styles.enhancedCloseButton}
+                onPress={() => setShowAudioModal(false)}
+              >
+                <Ionicons name="close" size={24} color="white" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.trackListScrollContainer}>
+              <View style={styles.trackListContainer}>
+                {audioTracks.length > 0 ? audioTracks.map(track => (
+                  <TouchableOpacity
+                    key={track.index}
+                    style={styles.enhancedTrackItem}
+                    onPress={() => {
+                      setSelectedAudioTrack(track.index);
+                      setShowAudioModal(false);
+                    }}
+                  >
+                    <View style={styles.trackInfoContainer}>
+                      <Text style={styles.trackPrimaryText}>
+                        {formatLanguage(track.language) || track.title || `Track ${track.index + 1}`}
+                      </Text>
+                      {(track.title && track.language) && (
+                        <Text style={styles.trackSecondaryText}>{track.title}</Text>
+                      )}
+                      {track.type && <Text style={styles.trackSecondaryText}>{track.type}</Text>}
+                    </View>
+                    {selectedAudioTrack === track.index && (
+                      <View style={styles.selectedIndicatorContainer}>
+                        <Ionicons name="checkmark" size={22} color="#E50914" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                )) : (
+                  <View style={styles.emptyStateContainer}>
+                    <Ionicons name="alert-circle-outline" size={40} color="#888" />
+                    <Text style={styles.emptyStateText}>No audio tracks available</Text>
+                  </View>
+                )}
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      )}
+      
+      {/* Subtitle Selection Modal - Updated language display */}
+      {showSubtitleModal && (
+        <View style={styles.fullscreenOverlay}>
+          <View style={styles.enhancedModalContainer}>
+            <View style={styles.enhancedModalHeader}>
+              <Text style={styles.enhancedModalTitle}>Subtitles</Text>
+              <TouchableOpacity 
+                style={styles.enhancedCloseButton}
+                onPress={() => setShowSubtitleModal(false)}
+              >
+                <Ionicons name="close" size={24} color="white" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.trackListScrollContainer}>
+              <View style={styles.trackListContainer}>
+                {/* Off option with improved design */}
+                <TouchableOpacity
+                  style={styles.enhancedTrackItem}
+                  onPress={() => {
+                    setSelectedTextTrack({ type: 'disabled' });
+                    setShowSubtitleModal(false);
+                  }}
+                >
+                  <View style={styles.trackInfoContainer}>
+                    <Text style={styles.trackPrimaryText}>Off</Text>
+                  </View>
+                  {selectedTextTrack?.type === 'disabled' && (
+                    <View style={styles.selectedIndicatorContainer}>
+                      <Ionicons name="checkmark" size={22} color="#E50914" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+                
+                {/* Available subtitle tracks with improved design */}
+                {textTracks.length > 0 ? textTracks.map(track => (
+                  <TouchableOpacity
+                    key={track.index}
+                    style={styles.enhancedTrackItem}
+                    onPress={() => {
+                      setSelectedTextTrack({ type: 'index', value: track.index });
+                      setShowSubtitleModal(false);
+                    }}
+                  >
+                    <View style={styles.trackInfoContainer}>
+                      <Text style={styles.trackPrimaryText}>
+                        {formatLanguage(track.language) || track.title || `Subtitle ${track.index + 1}`}
+                      </Text>
+                      {(track.title && track.language) && (
+                        <Text style={styles.trackSecondaryText}>{track.title}</Text>
+                      )}
+                      {track.type && <Text style={styles.trackSecondaryText}>{track.type}</Text>}
+                    </View>
+                    {selectedTextTrack?.type === 'index' && 
+                     selectedTextTrack?.value === track.index && (
+                      <View style={styles.selectedIndicatorContainer}>
+                        <Ionicons name="checkmark" size={22} color="#E50914" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                )) : (
+                  <View style={styles.emptyStateContainer}>
+                    <Ionicons name="alert-circle-outline" size={40} color="#888" />
+                    <Text style={styles.emptyStateText}>No subtitle tracks available</Text>
+                  </View>
+                )}
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      )}
     </View> 
   );
 };
@@ -1086,9 +1011,9 @@ const styles = StyleSheet.create({
     paddingBottom: 10, // Add some padding at the bottom of the gradient
   },
   bottomGradient: {
-    paddingBottom: Platform.OS === 'ios' ? 30 : 20, // Adjust bottom padding for safe area
+    paddingBottom: Platform.OS === 'ios' ? 30 : 20,
     paddingHorizontal: 20,
-    paddingTop: 10, // Add some padding at the top of the gradient
+    paddingTop: 20,
   },
   header: {
     flexDirection: 'row',
@@ -1139,59 +1064,80 @@ const styles = StyleSheet.create({
     fontStyle: 'italic', // Italicize provider text
   },
   closeButton: {
-    padding: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    borderRadius: 20,
-    marginRight: -5,
-    marginTop: -5,
-    zIndex: 100,
+    padding: 8,
   },
   controls: {
+    position: 'absolute',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 40,
+    left: 0,
+    right: 0,
+    top: '50%',
+    transform: [{ translateY: -30 }], // Half the height of play button to center it perfectly
+    zIndex: 1000,
   },
   playButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 10,
+  },
+  skipButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  skipText: {
+    color: 'white',
+    fontSize: 12,
+    marginTop: 2,
   },
   bottomControls: {
-    gap: 20,
+    gap: 12,
   },
   sliderContainer: {
-    width: '100%',
-    marginBottom: 8,
-    position: 'relative',
+    position: 'absolute',
+    bottom: 55, // Moved closer to bottom buttons
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
+    zIndex: 1000,
   },
-  sliderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
+  sliderBackground: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 1.5,
+    overflow: 'hidden',
+    marginHorizontal: 20,
+    top: 13.5, // Center with the slider thumb
+  },
+  bufferProgress: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
   },
   slider: {
-    flex: 1,
-    height: 40,
-    marginHorizontal: 8,
+    width: '100%',
+    height: 30,
+    zIndex: 1,
   },
-  currentTime: {
+  timeDisplay: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingHorizontal: 4,
+    marginTop: -4, // Reduced space between slider and time
+    marginBottom: 8, // Added space between time and buttons
+  },
+  duration: {
     color: 'white',
     fontSize: 12,
     fontWeight: '500',
-    opacity: 0.9,
-    width: 40, // Fix width to prevent layout shifts
-    textAlign: 'right',
-  },
-  durationText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '500',
-    opacity: 0.9,
-    width: 40, // Fix width to prevent layout shifts
   },
   bottomButtons: {
     flexDirection: 'row',
@@ -1208,169 +1154,276 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)', 
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  modalContent: {
+    width: '80%',
+    maxHeight: '70%',
+    backgroundColor: '#222',
+    borderRadius: 10,
+    overflow: 'hidden',
     zIndex: 1000,
-  },
-  audioMenuContainer: { 
-    position: 'absolute',
-    backgroundColor: 'rgba(30, 30, 30, 0.9)',
-    borderRadius: 10,
-    padding: 20,
-    width: 300,
-    maxWidth: '80%',
-    alignSelf: 'center',
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
     elevation: 5,
-    zIndex: 1001,
-  },
-  audioMenuTitle: { 
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  audioMenuItem: { 
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  audioMenuItemText: { 
-    color: 'white',
-    fontSize: 14,
-  },
-  subtitleMenuContainer: { 
-    position: 'absolute',
-    backgroundColor: 'rgba(30, 30, 30, 0.9)',
-    borderRadius: 10,
-    padding: 20,
-    width: 300,
-    maxWidth: '80%',
-    alignSelf: 'center',
-    shadowColor: "#000",
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-    zIndex: 1001,
+    shadowOpacity: 0.8,
+    shadowRadius: 5,
   },
-  subtitleMenuTitle: { 
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  subtitleMenuItem: { 
+  modalHeader: {
+    padding: 16,
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    borderBottomColor: '#333',
   },
-  subtitleMenuItemText: { 
-    color: 'white',
-    fontSize: 14,
-  },
-  cancelButton: {
-    marginTop: 15,
-    padding: 12,
-    alignItems: 'center',
-    backgroundColor: 'rgba(229, 9, 20, 0.8)',
-    borderRadius: 8,
-  },
-  cancelButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  modalBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    zIndex: 1000,
-  },
-  // New styles for the inline option panels
-  optionsPanel: {
-    position: 'absolute',
-    top: '30%',
-    left: '50%',
-    marginLeft: -150, // Half of width
-    width: 300,
-    backgroundColor: 'rgba(30, 30, 30, 0.95)',
-    borderRadius: 10,
-    padding: 15,
-    maxHeight: 300,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 8,
-    zIndex: 1001,
-  },
-  optionsPanelTitle: {
+  modalTitle: {
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-    paddingBottom: 10,
   },
-  optionsList: {
-    flex: 1,
-    marginBottom: 10,
+  trackList: {
+    padding: 10,
   },
-  optionItem: {
+  trackItem: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 5,
-    marginVertical: 2,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    padding: 15,
+    borderRadius: 5,
+    marginVertical: 5,
   },
-  optionItemText: {
+  selectedTrackItem: {
+    backgroundColor: 'rgba(229, 9, 20, 0.2)',
+  },
+  trackLabel: {
+    color: 'white',
+    fontSize: 16,
+  },
+  noTracksText: {
+    color: 'white',
+    fontSize: 16,
+    textAlign: 'center',
+    padding: 20,
+  },
+  // New simplified modal styles
+  fullscreenOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2000,
+  },
+  enhancedModalContainer: {
+    width: 300,
+    maxHeight: '70%',
+    backgroundColor: '#181818',
+    borderRadius: 8,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  enhancedModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  enhancedModalTitle: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  enhancedCloseButton: {
+    padding: 4,
+  },
+  trackListScrollContainer: {
+    maxHeight: 350,
+  },
+  trackListContainer: {
+    padding: 6,
+  },
+  enhancedTrackItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 10,
+    marginVertical: 2,
+    borderRadius: 6,
+    backgroundColor: '#222',
+  },
+  trackInfoContainer: {
+    flex: 1,
+    marginRight: 8,
+  },
+  trackPrimaryText: {
     color: 'white',
     fontSize: 14,
     fontWeight: '500',
   },
-  slidePanel: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: 300,
-    right: 0,
-    backgroundColor: 'transparent',
+  trackSecondaryText: {
+    color: '#aaa',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  selectedIndicatorContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(229, 9, 20, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyStateContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  emptyStateText: {
+    color: '#888',
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  // Resume overlay styles
+  resumeOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
     zIndex: 1000,
   },
-  gradientPanel: {
-    flex: 1,
+  resumeContainer: {
+    width: '80%',
+    maxWidth: 500,
+    borderRadius: 12,
     padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  resumeContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  resumeIconContainer: {
+    marginRight: 16,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(229, 9, 20, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  resumeTextContainer: {
+    flex: 1,
+  },
+  resumeTitle: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  resumeInfo: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 14,
+  },
+  resumeProgressContainer: {
+    marginTop: 12,
+  },
+  resumeProgressBar: {
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginBottom: 6,
+  },
+  resumeProgressFill: {
+    height: '100%',
+    backgroundColor: '#E50914',
+  },
+  resumeTimeText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
+  },
+  resumeButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    width: '100%',
+    gap: 12,
+  },
+  resumeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    minWidth: 110,
+    justifyContent: 'center',
+  },
+  buttonIcon: {
+    marginRight: 6,
+  },
+  resumeButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  resumeFromButton: {
+    backgroundColor: '#E50914',
+  },
+  rememberChoiceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    borderTopLeftRadius: 10,
-    borderBottomLeftRadius: 10,
+    marginBottom: 16,
+    paddingHorizontal: 2,
   },
-  selectedOption: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  selectedOptionText: {
+  checkbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 3,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+    marginRight: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: '#E50914',
+    borderColor: '#E50914',
+  },
+  rememberChoiceText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 14,
+  },
+  resetPreferenceButton: {
+    padding: 4,
+  },
+  resetPreferenceText: {
+    color: '#E50914',
+    fontSize: 12,
     fontWeight: 'bold',
   },
 });

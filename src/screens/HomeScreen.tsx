@@ -47,9 +47,11 @@ import {
 } from 'react-native-gesture-handler';
 import { useCatalogContext } from '../contexts/CatalogContext';
 import { ThisWeekSection } from '../components/home/ThisWeekSection';
+import ContinueWatchingSection from '../components/home/ContinueWatchingSection';
 import * as Haptics from 'expo-haptics';
 import { tmdbService } from '../services/tmdbService';
 import { logger } from '../utils/logger';
+import { storageService } from '../services/storageService';
 
 // Define interfaces for our data
 interface Category {
@@ -407,6 +409,7 @@ const HomeScreen = () => {
   const [isSaved, setIsSaved] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const currentIndexRef = useRef(0);
+  const continueWatchingRef = useRef<{ refresh: () => Promise<void> }>(null);
 
   // Add auto-rotation effect
   useEffect(() => {
@@ -563,24 +566,27 @@ const HomeScreen = () => {
     }
   }, [maxRetries, cleanup]);
 
-  useEffect(() => {
-    const loadInitialData = async () => {
-      setLoading(true);
-      try {
-        await Promise.all([
-          loadFeaturedContent(),
-          loadCatalogs(),
-        ]);
-      } catch (error) {
-        logger.error('Error loading initial data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Update loadInitialData to remove continue watching loading
+  const loadInitialData = async () => {
+    setLoading(true);
+    try {
+      await Promise.all([
+        loadFeaturedContent(),
+        loadCatalogs(),
+      ]);
+    } catch (error) {
+      logger.error('Error loading initial data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  // Add back the useEffect for loadInitialData
+  useEffect(() => {
     loadInitialData();
   }, [loadFeaturedContent, loadCatalogs, lastUpdate]);
 
+  // Update handleRefresh to remove continue watching loading
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     Promise.all([
@@ -652,6 +658,30 @@ const HomeScreen = () => {
       type: featuredContent.type
     });
   }, [featuredContent, navigation]);
+
+  // Add a function to refresh the Continue Watching section
+  const refreshContinueWatching = useCallback(() => {
+    if (continueWatchingRef.current) {
+      continueWatchingRef.current.refresh();
+    }
+  }, []);
+
+  // Update the event listener for video playback completion
+  useEffect(() => {
+    const handlePlaybackComplete = () => {
+      refreshContinueWatching();
+    };
+
+    // Listen for playback complete events
+    const unsubscribe = navigation.addListener('focus', () => {
+      // When returning to HomeScreen, refresh Continue Watching
+      refreshContinueWatching();
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [navigation, refreshContinueWatching]);
 
   const renderFeaturedContent = () => {
     if (!featuredContent) {
@@ -853,6 +883,9 @@ const HomeScreen = () => {
 
         {/* This Week Section */}
         <ThisWeekSection />
+
+        {/* Continue Watching Section */}
+        <ContinueWatchingSection ref={continueWatchingRef} />
 
         {/* Catalogs */}
         {catalogs.length > 0 ? (

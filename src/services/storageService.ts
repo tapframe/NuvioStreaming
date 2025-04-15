@@ -10,6 +10,7 @@ interface WatchProgress {
 class StorageService {
   private static instance: StorageService;
   private readonly WATCH_PROGRESS_KEY = '@watch_progress:';
+  private watchProgressSubscribers: (() => void)[] = [];
 
   private constructor() {}
 
@@ -33,9 +34,27 @@ class StorageService {
     try {
       const key = this.getWatchProgressKey(id, type, episodeId);
       await AsyncStorage.setItem(key, JSON.stringify(progress));
+      // Notify subscribers
+      this.notifyWatchProgressSubscribers();
     } catch (error) {
       logger.error('Error saving watch progress:', error);
     }
+  }
+
+  private notifyWatchProgressSubscribers(): void {
+    this.watchProgressSubscribers.forEach(callback => callback());
+  }
+
+  public subscribeToWatchProgressUpdates(callback: () => void): () => void {
+    this.watchProgressSubscribers.push(callback);
+    
+    // Return unsubscribe function
+    return () => {
+      const index = this.watchProgressSubscribers.indexOf(callback);
+      if (index > -1) {
+        this.watchProgressSubscribers.splice(index, 1);
+      }
+    };
   }
 
   public async getWatchProgress(
@@ -61,6 +80,8 @@ class StorageService {
     try {
       const key = this.getWatchProgressKey(id, type, episodeId);
       await AsyncStorage.removeItem(key);
+      // Notify subscribers
+      this.notifyWatchProgressSubscribers();
     } catch (error) {
       logger.error('Error removing watch progress:', error);
     }
