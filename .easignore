@@ -1,0 +1,17 @@
+# General cleanup
+node_modules
+.expo
+build
+dist
+*.log
+
+# Native directories (if you're not customizing them)
+ios
+android
+
+# Big assets (only if unused in app)
+*.mp4
+*.zip
+*.psd
+*.mov
+*.avi 
