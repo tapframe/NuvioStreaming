@@ -52,7 +52,7 @@ const { width, height } = Dimensions.get('window');
 
 // Animation configs
 const springConfig = {
-  damping: 15,
+  damping: 20,
   mass: 1,
   stiffness: 100
 };
@@ -87,7 +87,6 @@ const MetadataScreen = () => {
   const contentRef = useRef<ScrollView>(null);
   const [lastScrollTop, setLastScrollTop] = useState(0);
   const [isFullDescriptionOpen, setIsFullDescriptionOpen] = useState(false);
-  const fullDescriptionAnimation = useSharedValue(0);
 
   // Animation values
   const screenScale = useSharedValue(0.8);
@@ -103,12 +102,15 @@ const MetadataScreen = () => {
     episodeId?: string;
   } | null>(null);
 
-  // Add new animated value for creator height
-  const creatorHeight = useSharedValue(0);
-
   // Add new animated value for watch progress
-  const watchProgressHeight = useSharedValue(0);
   const watchProgressOpacity = useSharedValue(0);
+  const watchProgressScaleY = useSharedValue(0);
+
+  // Add new animated value for logo scale
+  const logoScale = useSharedValue(0);
+
+  // Add new animated value for creator fade-in
+  const creatorOpacity = useSharedValue(0);
 
   // Debug log for route params
   // logger.log('[MetadataScreen] Component mounted with route params:', { id, type, episodeId });
@@ -304,63 +306,84 @@ const MetadataScreen = () => {
   // Add effect to animate watch progress when it changes
   useEffect(() => {
     if (watchProgress && watchProgress.duration > 0) {
-      watchProgressHeight.value = withSpring(48, {
-        mass: 0.3,
-        stiffness: 120,
-        damping: 15,
-        velocity: 0.5
-      });
       watchProgressOpacity.value = withSpring(1, {
         mass: 0.2,
         stiffness: 100,
-        damping: 12
+        damping: 14
       });
-    } else {
-      watchProgressHeight.value = withSpring(0, {
+      watchProgressScaleY.value = withSpring(1, {
         mass: 0.3,
         stiffness: 120,
-        damping: 15
+        damping: 18
       });
+    } else {
       watchProgressOpacity.value = withSpring(0, {
         mass: 0.2,
         stiffness: 100,
-        damping: 12
+        damping: 14
+      });
+      watchProgressScaleY.value = withSpring(0, {
+        mass: 0.3,
+        stiffness: 120,
+        damping: 18
       });
     }
   }, [watchProgress]);
 
   // Add animated style for watch progress
   const watchProgressAnimatedStyle = useAnimatedStyle(() => {
-    const progress = interpolate(
-      watchProgressHeight.value,
-      [0, 48],
+    const translateY = interpolate(
+      watchProgressScaleY.value,
       [0, 1],
+      [-8, 0],
       Extrapolate.CLAMP
     );
 
     return {
-      height: watchProgressHeight.value,
       opacity: watchProgressOpacity.value,
       transform: [
-        {
-          translateY: interpolate(
-            progress,
-            [0, 1],
-            [-8, 0],
-            Extrapolate.CLAMP
-          )
-        },
-        {
-          scale: interpolate(
-            progress,
-            [0, 1],
-            [0.95, 1],
-            Extrapolate.CLAMP
-          )
-        }
+        { translateY: translateY },
+        { scaleY: watchProgressScaleY.value }
       ]
     };
   });
+
+  // Add animated style for logo
+  const logoAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: logoScale.value }],
+    };
+  });
+
+  // Effect to animate logo scale when logo URI is available
+  useEffect(() => {
+    if (metadata?.logo) {
+      logoScale.value = withSpring(1, {
+        damping: 18,
+        stiffness: 120,
+        mass: 0.5
+      });
+    } else {
+      // Optional: Reset scale if logo disappears?
+      // logoScale.value = withTiming(0, { duration: 100 });
+    }
+  }, [metadata?.logo]);
+
+  // Add animated style for creator fade-in
+  const creatorFadeInStyle = useAnimatedStyle(() => {
+    return {
+      opacity: creatorOpacity.value,
+    };
+  });
+
+  // Effect to fade in creator section when data is available
+  useEffect(() => {
+    const hasCreators = metadata?.directors?.length || metadata?.creators?.length;
+    creatorOpacity.value = withTiming(hasCreators ? 1 : 0, { 
+      duration: 300, // Adjust duration as needed
+      easing: Easing.out(Easing.quad), // Use an easing function
+    });
+  }, [metadata?.directors, metadata?.creators]);
 
   // Update the watch progress render function
   const renderWatchProgress = () => {
@@ -513,46 +536,6 @@ const MetadataScreen = () => {
     )
   }));
 
-  // Add animated style for creator container
-  const creatorAnimatedStyle = useAnimatedStyle(() => ({
-    maxHeight: creatorHeight.value,
-    opacity: interpolate(
-      creatorHeight.value,
-      [0, 24],
-      [0, 1],
-      Extrapolate.CLAMP
-    ),
-    transform: [
-      { 
-        translateY: interpolate(
-          creatorHeight.value,
-          [0, 24],
-          [-8, 0],
-          Extrapolate.CLAMP
-        )
-      }
-    ]
-  }));
-
-  // Add effect to animate height when metadata changes
-  useEffect(() => {
-    if (metadata?.directors?.length || metadata?.creators?.length) {
-      creatorHeight.value = withSpring(24, {
-        mass: 0.5,
-        stiffness: 100,
-        damping: 12,
-        velocity: 0.4
-      });
-    } else {
-      creatorHeight.value = withSpring(0, {
-        mass: 0.5,
-        stiffness: 100,
-        damping: 12,
-        velocity: 0.4
-      });
-    }
-  }, [metadata?.directors, metadata?.creators]);
-
   // Debug logs for director/creator data
   React.useEffect(() => {
     if (metadata && metadata.id) {
@@ -615,8 +598,11 @@ const MetadataScreen = () => {
   React.useEffect(() => {
     screenScale.value = withSpring(1, springConfig);
     screenOpacity.value = withSpring(1, springConfig);
-    heroHeight.value = withSpring(height * 0.5, springConfig);
-    contentTranslateY.value = withSpring(0, springConfig);
+    contentTranslateY.value = withSpring(0, {
+      damping: 25,
+      mass: 1,
+      stiffness: 100
+    });
   }, []);
 
   const handleBack = useCallback(() => {
@@ -716,7 +702,7 @@ const MetadataScreen = () => {
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
           onScroll={(e) => {
-            setLastScrollTop(e.nativeEvent.contentOffset.y);
+            // setLastScrollTop(e.nativeEvent.contentOffset.y); // Remove unused onScroll handler logic
           }}
           scrollEventThrottle={16}
         >
@@ -740,14 +726,16 @@ const MetadataScreen = () => {
                 locations={[0, 0.4, 0.65, 0.8, 0.9, 1]}
                 style={styles.heroGradient}
               >
-                <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.heroContent}>
+                <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.heroContent}>
                   {/* Title */}
                   {metadata.logo ? (
-                    <Image
-                      source={{ uri: metadata.logo }}
-                      style={styles.titleLogo}
-                      contentFit="contain"
-                    />
+                    <Animated.View style={logoAnimatedStyle}>
+                      <Image
+                        source={{ uri: metadata.logo }}
+                        style={styles.titleLogo}
+                        contentFit="contain"
+                      />
+                    </Animated.View>
                   ) : (
                     <Text style={styles.titleText}>{metadata.name}</Text>
                   )}
@@ -802,11 +790,10 @@ const MetadataScreen = () => {
             </View>
 
             {/* Creator/Director Info */}
-            <Animated.View 
+            <Animated.View
               style={[
                 styles.creatorContainer,
-                creatorAnimatedStyle,
-                { minHeight: (metadata?.directors?.length || metadata?.creators?.length) ? 'auto' : 0 }
+                creatorFadeInStyle,
               ]}
             >
               {metadata.directors && metadata.directors.length > 0 && (
@@ -1131,7 +1118,6 @@ const styles = StyleSheet.create({
   creatorContainer: {
     marginBottom: 2,
     paddingHorizontal: 16,
-    overflow: 'hidden'
   },
   creatorSection: {
     flexDirection: 'row',
@@ -1157,7 +1143,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     width: '100%',
     alignItems: 'center',
-    overflow: 'hidden'
+    overflow: 'hidden',
+    height: 48,
   },
   watchProgressBar: {
     width: '75%',

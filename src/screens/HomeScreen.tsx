@@ -654,50 +654,46 @@ const HomeScreen = () => {
   }, [featuredContent, navigation]);
 
   const renderFeaturedContent = () => {
-    if (!featuredContent) return null;
+    if (!featuredContent) {
+      return <SkeletonFeatured />;
+    }
 
     return (
-      <View style={styles.featuredContainer}>
+      <TouchableOpacity 
+        activeOpacity={0.8} 
+        onPress={handleSaveToLibrary}
+        style={styles.featuredContainer}
+      >
         <ImageBackground
           source={{ uri: featuredContent.banner || featuredContent.poster }}
-          style={styles.featuredBanner}
+          style={styles.featuredImage}
           resizeMode="cover"
         >
           <LinearGradient
             colors={[
               'transparent',
               'rgba(0,0,0,0.2)',
-              'rgba(0,0,0,0.6)',
               'rgba(0,0,0,0.8)',
-              colors.darkBackground
+              colors.darkBackground,
             ]}
-            locations={[0, 0.3, 0.6, 0.8, 1]}
+            locations={[0, 0.4, 0.7, 1]}
             style={styles.featuredGradient}
           >
-            <View style={{ flex: 1 }} />
-            <View style={styles.featuredContent}>
+            <Animated.View style={styles.featuredContentContainer} entering={FadeIn.duration(500)}>
               {featuredContent.logo ? (
-                <ExpoImage
-                  source={{ uri: featuredContent.logo }}
+                <ExpoImage 
+                  source={{ uri: featuredContent.logo }} 
                   style={styles.featuredLogo}
                   contentFit="contain"
-                  transition={200}
                 />
               ) : (
-                <Text style={styles.featuredTitle}>{featuredContent.name}</Text>
+                <Text style={styles.featuredTitleText}>{featuredContent.name}</Text>
               )}
-
               <View style={styles.genreContainer}>
-                {featuredContent.genres?.slice(0, 3).map((genre, index, array) => (
-                  <React.Fragment key={index}>
-                    <Text style={styles.genreText}>{genre}</Text>
-                    {index < array.length - 1 && (
-                      <Text style={styles.genreDot}>•</Text>
-                    )}
-                  </React.Fragment>
+                {featuredContent.genres?.slice(0, 3).map((genre, index) => (
+                  <Text key={index} style={styles.genreText}>{genre}</Text>
                 ))}
               </View>
-
               <View style={styles.featuredButtons}>
                 <TouchableOpacity 
                   style={styles.myListButton}
@@ -748,10 +744,10 @@ const HomeScreen = () => {
                   <Text style={styles.infoButtonText}>Info</Text>
                 </TouchableOpacity>
               </View>
-            </View>
+            </Animated.View>
           </LinearGradient>
         </ImageBackground>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -1252,6 +1248,25 @@ const styles = StyleSheet.create<any>({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 12,
+  },
+  featuredImage: {
+    width: '100%',
+    height: '100%',
+  },
+  featuredContentContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  featuredTitleText: {
+    color: colors.highEmphasis,
+    fontSize: 28,
+    fontWeight: '900',
+    marginBottom: 8,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+    textAlign: 'center',
+    paddingHorizontal: 16,
   },
 });
 

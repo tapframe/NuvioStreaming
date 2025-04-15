@@ -7,27 +7,35 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { BlurView as ExpoBlurView } from 'expo-blur';
 import { BlurView as CommunityBlurView } from '@react-native-community/blur';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export const NuvioHeader = () => {
   const navigation = useNavigation<NavigationProp>();
   
+  // Determine if running in Expo Go
+  const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
   return (
     <View style={styles.container}>
       <View style={styles.headerContainer}>
         {Platform.OS === 'ios' ? (
           <ExpoBlurView intensity={60} style={styles.blurOverlay} tint="dark" />
         ) : (
-          <View style={styles.androidBlurContainer}>
-            <CommunityBlurView
-              style={styles.androidBlur}
-              blurType="dark"
-              blurAmount={8}
-              overlayColor="rgba(0,0,0,0.4)"
-              reducedTransparencyFallbackColor="black"
-            />
-          </View>
+          isExpoGo ? (
+            <View style={[styles.androidBlurContainer, styles.androidFallbackBlur]} />
+          ) : (
+            <View style={styles.androidBlurContainer}>
+              <CommunityBlurView
+                style={styles.androidBlur}
+                blurType="dark"
+                blurAmount={8}
+                overlayColor="rgba(0,0,0,0.4)"
+                reducedTransparencyFallbackColor="black"
+              />
+            </View>
+          )
         )}
         <View style={styles.contentContainer}>
           <View style={styles.titleContainer}>
@@ -82,6 +90,9 @@ const styles = StyleSheet.create({
   androidBlur: {
     flex: 1,
     backgroundColor: 'transparent',
+  },
+  androidFallbackBlur: {
+    backgroundColor: 'rgba(0,0,0,0.6)',
   },
   contentContainer: {
     flexDirection: 'row',
