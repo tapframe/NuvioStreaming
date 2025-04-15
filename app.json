@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Stremio Expo",
-    "slug": "stremio-expo",
+    "name": "Nuvio",
+    "slug": "nuvio",
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/icon.png",
@@ -30,15 +30,17 @@
         "INTERNET",
         "WAKE_LOCK"
       ],
-      "package": "com.nuvio.app"
+      "package": "com.nuvio.app",
+      "enableSplitAPKs": true
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "extra": {
       "eas": {
-        "projectId": "7a199ed7-d3dc-46df-b39e-2ddf68089981"
+        "projectId": "909107b8-fe61-45ce-b02f-b02510d306a6"
       }
-    }
+    },
+    "owner": "nayifleo"
   }
 }

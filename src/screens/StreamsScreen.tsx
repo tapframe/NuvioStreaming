@@ -11,7 +11,8 @@ import {
   ImageBackground,
   ScrollView,
   StatusBar,
-  Alert
+  Alert,
+  Dimensions
 } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { RouteProp } from '@react-navigation/native';
@@ -49,6 +50,8 @@ import { logger } from '../utils/logger';
 const TMDB_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tmdb.new.logo.svg/512px-Tmdb.new.logo.svg.png?20200406190906';
 const HDR_ICON = 'https://uxwing.com/wp-content/themes/uxwing/download/video-photography-multimedia/hdr-icon.png';
 const DOLBY_ICON = 'https://upload.wikimedia.org/wikipedia/en/thumb/3/3f/Dolby_Vision_%28logo%29.svg/512px-Dolby_Vision_%28logo%29.svg.png?20220908042900';
+
+const { width, height } = Dimensions.get('window');
 
 // Extracted Components
 const StreamCard = memo(({ stream, onPress, index, torrentProgress, isLoading, statusMessage }: { 
@@ -927,6 +930,41 @@ export const StreamsScreen = () => {
         </TouchableOpacity>
       </Animated.View>
 
+      {type === 'movie' && metadata && (
+        <Animated.View style={[styles.movieTitleContainer, heroStyle]}>
+          <ImageBackground
+            source={{ uri: metadata.banner || metadata.poster }}
+            style={styles.movieTitleBackground}
+            resizeMode="cover"
+          >
+            <LinearGradient
+              colors={[
+                'rgba(0,0,0,0.4)',
+                'rgba(0,0,0,0.6)',
+                'rgba(0,0,0,0.8)',
+                colors.darkBackground
+              ]}
+              locations={[0, 0.3, 0.7, 1]}
+              style={styles.movieTitleGradient}
+            >
+              <View style={styles.movieTitleContent}>
+                {metadata.logo ? (
+                  <Image
+                    source={{ uri: metadata.logo }}
+                    style={styles.movieLogo}
+                    contentFit="contain"
+                  />
+                ) : (
+                  <Text style={styles.movieTitle} numberOfLines={2}>
+                    {metadata.name}
+                  </Text>
+                )}
+              </View>
+            </LinearGradient>
+          </ImageBackground>
+        </Animated.View>
+      )}
+
       {type === 'series' && currentEpisode && (
         <Animated.View style={[styles.streamsHeroContainer, heroStyle]}>
           <Animated.View
@@ -1407,6 +1445,41 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginLeft: 8,
     fontWeight: '500',
+  },
+  movieTitleContainer: {
+    width: '100%',
+    height: 180,
+    backgroundColor: colors.black,
+  },
+  movieTitleBackground: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: colors.black,
+  },
+  movieTitleGradient: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 16,
+  },
+  movieTitleContent: {
+    width: '100%',
+    alignItems: 'center',
+    marginTop: Platform.OS === 'android' ? 35 : 45,
+  },
+  movieLogo: {
+    width: width * 0.6,
+    height: 70,
+    marginBottom: 8,
+  },
+  movieTitle: {
+    color: colors.highEmphasis,
+    fontSize: 28,
+    fontWeight: '900',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.75)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+    letterSpacing: -0.5,
   },
 });
 

@@ -64,13 +64,15 @@ export const CastSection: React.FC<CastSectionProps> = ({
               ) : (
                 <MaterialIcons 
                   name="person" 
-                  size={40} 
+                  size={32} 
                   color={colors.textMuted} 
                 />
               )}
             </View>
-            <Text style={styles.castName} numberOfLines={1}>{member.name}</Text>
-            <Text style={styles.castCharacter} numberOfLines={2}>{member.character}</Text>
+            <View style={styles.castTextContainer}>
+              <Text style={styles.castName} numberOfLines={1}>{member.name}</Text>
+              <Text style={styles.castCharacter} numberOfLines={1}>{member.character}</Text>
+            </View>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -82,7 +84,7 @@ const styles = StyleSheet.create({
   loadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    padding: 12,
   },
   castSection: {
     marginTop: 0,
@@ -90,43 +92,47 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: colors.highEmphasis,
-    fontSize: 20,
-    fontWeight: '800',
-    marginBottom: 12,
-    marginTop: 8,
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 10,
     paddingHorizontal: 16,
   },
   castScrollContainer: {
-    marginTop: 8,
+    marginTop: 4,
   },
   castContainer: {
-    marginVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
   },
   castMember: {
-    width: 100,
-    marginRight: 16,
+    width: 80,
+    marginRight: 12,
     alignItems: 'center',
   },
   castImageContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: colors.elevation2,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
-    marginBottom: 8,
+    marginBottom: 6,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
   },
   castImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+  },
+  castTextContainer: {
+    width: '100%',
+    alignItems: 'center',
   },
   castName: {
     color: colors.highEmphasis,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     textAlign: 'center',
   },
@@ -134,6 +140,7 @@ const styles = StyleSheet.create({
     color: colors.mediumEmphasis,
     fontSize: 12,
     textAlign: 'center',
-    marginTop: 4,
+    marginTop: 2,
+    opacity: 0.8,
   },
 }); 
