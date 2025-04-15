@@ -54,7 +54,7 @@ const DOLBY_ICON = 'https://upload.wikimedia.org/wikipedia/en/thumb/3/3f/Dolby_V
 const { width, height } = Dimensions.get('window');
 
 // Extracted Components
-const StreamCard = memo(({ stream, onPress, index, torrentProgress, isLoading, statusMessage }: { 
+const StreamCard = ({ stream, onPress, index, torrentProgress, isLoading, statusMessage }: { 
   stream: Stream; 
   onPress: () => void; 
   index: number;
@@ -174,15 +174,7 @@ const StreamCard = memo(({ stream, onPress, index, torrentProgress, isLoading, s
       </View>
     </TouchableOpacity>
   );
-}, (prevProps, nextProps) => {
-  // Simplified memo comparison that won't interfere with onPress
-  return (
-    prevProps.stream.url === nextProps.stream.url &&
-    prevProps.isLoading === nextProps.isLoading &&
-    prevProps.torrentProgress?.bufferProgress === nextProps.torrentProgress?.bufferProgress &&
-    prevProps.statusMessage === nextProps.statusMessage
-  );
-});
+};
 
 const QualityTag = React.memo(({ text, color }: { text: string; color: string }) => (
   <View style={[styles.chip, { backgroundColor: color }]}>
@@ -1065,39 +1057,32 @@ export const StreamsScreen = () => {
             <Text style={styles.noStreamsText}>No streams available</Text>
           </Animated.View>
         ) : (
-          <SectionList
-            sections={sections}
-            keyExtractor={(item, index) => `${item.url}-${index}`}
-            renderItem={renderItem}
-            renderSectionHeader={renderSectionHeader}
-            stickySectionHeadersEnabled={false}
-            initialNumToRender={8}
-            maxToRenderPerBatch={4}
-            windowSize={5}
-            removeClippedSubviews={true}
-            contentContainerStyle={styles.streamsContainer}
-            style={styles.streamsContent}
-            showsVerticalScrollIndicator={false}
-            bounces={true}
-            overScrollMode="never"
-            getItemLayout={(data, index) => ({
-              length: 86, // Height of each stream card + margin
-              offset: 86 * index,
-              index,
-            })}
-            maintainVisibleContentPosition={{
-              minIndexForVisible: 0,
-              autoscrollToTopThreshold: 10
-            }}
-            ListFooterComponent={
-              isLoading ? (
-                <View style={styles.footerLoading}>
-                  <ActivityIndicator size="small" color={colors.primary} />
-                  <Text style={styles.footerLoadingText}>Loading more sources...</Text>
-                </View>
-              ) : null
-            }
-          />
+          <View collapsable={false} style={{ flex: 1 }}>
+            <SectionList
+              sections={sections}
+              keyExtractor={(item) => item.url || `${item.name}-${item.title}`}
+              renderItem={renderItem}
+              renderSectionHeader={renderSectionHeader}
+              stickySectionHeadersEnabled={false}
+              initialNumToRender={8}
+              maxToRenderPerBatch={4}
+              windowSize={5}
+              removeClippedSubviews={false}
+              contentContainerStyle={styles.streamsContainer}
+              style={styles.streamsContent}
+              showsVerticalScrollIndicator={false}
+              bounces={true}
+              overScrollMode="never"
+              ListFooterComponent={
+                isLoading ? (
+                  <View style={styles.footerLoading}>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Text style={styles.footerLoadingText}>Loading more sources...</Text>
+                  </View>
+                ) : null
+              }
+            />
+          </View>
         )}
       </View>
     </View>
@@ -1115,6 +1100,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 2,
+    pointerEvents: 'box-none',
   },
   backButton: {
     flexDirection: 'row',
@@ -1132,7 +1118,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.darkBackground,
     paddingTop: 20,
-    zIndex: 0,
+    zIndex: 1,
   },
   streamsMainContentMovie: {
     paddingTop: Platform.OS === 'android' ? 90 : 100,
@@ -1168,7 +1154,7 @@ const styles = StyleSheet.create({
   streamsContent: {
     flex: 1,
     width: '100%',
-    zIndex: 1,
+    zIndex: 2,
   },
   streamsContainer: {
     paddingHorizontal: 16,
@@ -1324,6 +1310,7 @@ const styles = StyleSheet.create({
     marginBottom: 0,
     position: 'relative',
     backgroundColor: colors.black,
+    pointerEvents: 'box-none',
   },
   streamsHeroBackground: {
     width: '100%',
@@ -1450,6 +1437,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 180,
     backgroundColor: colors.black,
+    pointerEvents: 'box-none',
   },
   movieTitleBackground: {
     width: '100%',
