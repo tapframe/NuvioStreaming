@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -20,10 +20,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import { colors } from '../styles/colors';
 import { useMetadata } from '../hooks/useMetadata';
-import { CastSection } from '../components/metadata/CastSection';
-import { SeriesContent } from '../components/metadata/SeriesContent';
-import { MovieContent } from '../components/metadata/MovieContent';
-import { MoreLikeThisSection } from '../components/metadata/MoreLikeThisSection';
+import { CastSection as OriginalCastSection } from '../components/metadata/CastSection';
+import { SeriesContent as OriginalSeriesContent } from '../components/metadata/SeriesContent';
+import { MovieContent as OriginalMovieContent } from '../components/metadata/MovieContent';
+import { MoreLikeThisSection as OriginalMoreLikeThisSection } from '../components/metadata/MoreLikeThisSection';
+import { RatingsSection as OriginalRatingsSection } from '../components/metadata/RatingsSection';
 import { StreamingContent } from '../services/catalogService';
 import { GroupedStreams } from '../types/streams';
 import { TMDBEpisode } from '../services/tmdbService';
@@ -40,6 +41,7 @@ import Animated, {
   withSpring,
   FadeIn,
   runOnJS,
+  Layout,
 } from 'react-native-reanimated';
 import { RouteProp } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -47,8 +49,16 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { TMDBService } from '../services/tmdbService';
 import { storageService } from '../services/storageService';
 import { logger } from '../utils/logger';
+import { useGenres } from '../contexts/GenreContext';
 
 const { width, height } = Dimensions.get('window');
+
+// Memoize child components
+const CastSection = React.memo(OriginalCastSection);
+const SeriesContent = React.memo(OriginalSeriesContent);
+const MovieContent = React.memo(OriginalMovieContent);
+const MoreLikeThisSection = React.memo(OriginalMoreLikeThisSection);
+const RatingsSection = React.memo(OriginalRatingsSection);
 
 // Animation configs
 const springConfig = {
@@ -59,6 +69,116 @@ const springConfig = {
 
 // Add debug log for storageService
 logger.log('[MetadataScreen] StorageService instance:', storageService);
+
+// Memoized ActionButtons Component
+const ActionButtons = React.memo(({ 
+  handleShowStreams, 
+  toggleLibrary, 
+  inLibrary, 
+  type, 
+  id, 
+  navigation, 
+  playButtonText 
+}: {
+  handleShowStreams: () => void;
+  toggleLibrary: () => void;
+  inLibrary: boolean;
+  type: 'movie' | 'series';
+  id: string;
+  navigation: NavigationProp<RootStackParamList>;
+  playButtonText: string;
+}) => (
+  <View style={styles.actionButtons}>
+    <TouchableOpacity
+      style={[styles.actionButton, styles.playButton]}
+      onPress={handleShowStreams}
+    >
+      <MaterialIcons 
+        name={playButtonText === 'Resume' ? "play-circle-outline" : "play-arrow"} 
+        size={24} 
+        color="#000" 
+      />
+      <Text style={styles.playButtonText}>
+        {playButtonText}
+      </Text>
+    </TouchableOpacity>
+
+    <TouchableOpacity
+      style={[styles.actionButton, styles.infoButton]}
+      onPress={toggleLibrary}
+    >
+      <MaterialIcons
+        name={inLibrary ? 'bookmark' : 'bookmark-border'}
+        size={24}
+        color="#fff"
+      />
+      <Text style={styles.infoButtonText}>
+        {inLibrary ? 'Saved' : 'Save'}
+      </Text>
+    </TouchableOpacity>
+
+    {type === 'series' && (
+      <TouchableOpacity
+        style={[styles.iconButton]}
+        onPress={async () => {
+          const tmdb = TMDBService.getInstance();
+          const tmdbId = await tmdb.extractTMDBIdFromStremioId(id);
+          if (tmdbId) {
+            navigation.navigate('ShowRatings', { showId: tmdbId });
+          } else {
+            logger.error('Could not find TMDB ID for show');
+          }
+        }}
+      >
+        <MaterialIcons name="star-rate" size={24} color="#fff" />
+      </TouchableOpacity>
+    )}
+  </View>
+));
+
+// Memoized WatchProgress Component
+const WatchProgressDisplay = React.memo(({ 
+  watchProgress, 
+  type, 
+  getEpisodeDetails, 
+  animatedStyle 
+}: {
+  watchProgress: { currentTime: number; duration: number; lastUpdated: number; episodeId?: string } | null;
+  type: 'movie' | 'series';
+  getEpisodeDetails: (episodeId: string) => { seasonNumber: string; episodeNumber: string; episodeName: string } | null;
+  animatedStyle: any;
+}) => {
+  if (!watchProgress || watchProgress.duration === 0) {
+    return null;
+  }
+
+  const progressPercent = (watchProgress.currentTime / watchProgress.duration) * 100;
+  const formattedTime = new Date(watchProgress.lastUpdated).toLocaleDateString();
+  let episodeInfo = '';
+
+  if (type === 'series' && watchProgress.episodeId) {
+    const details = getEpisodeDetails(watchProgress.episodeId);
+    if (details) {
+      episodeInfo = ` • S${details.seasonNumber}:E${details.episodeNumber}${details.episodeName ? ` - ${details.episodeName}` : ''}`;
+    }
+  }
+
+  return (
+    <Animated.View style={[styles.watchProgressContainer, animatedStyle]}>
+      <View style={styles.watchProgressBar}>
+        <View 
+          style={[
+            styles.watchProgressFill, 
+            { width: `${progressPercent}%` }
+          ]} 
+        />
+      </View>
+      <Text style={styles.watchProgressText}>
+        {progressPercent >= 95 ? 'Watched' : `${Math.round(progressPercent)}% watched`}{episodeInfo} • Last watched on {formattedTime}
+      </Text>
+    </Animated.View>
+  );
+});
 
 const MetadataScreen = () => {
   const route = useRoute<RouteProp<Record<string, RouteParams & { episodeId?: string }>, string>>();
@@ -84,6 +204,9 @@ const MetadataScreen = () => {
     setMetadata,
   } = useMetadata({ id, type });
 
+  // Get genres from context
+  const { genreMap, loadingGenres } = useGenres();
+
   const contentRef = useRef<ScrollView>(null);
   const [lastScrollTop, setLastScrollTop] = useState(0);
   const [isFullDescriptionOpen, setIsFullDescriptionOpen] = useState(false);
@@ -106,17 +229,40 @@ const MetadataScreen = () => {
   const watchProgressOpacity = useSharedValue(0);
   const watchProgressScaleY = useSharedValue(0);
 
-  // Add new animated value for logo scale
-  const logoScale = useSharedValue(0);
-
-  // Add new animated value for creator fade-in
-  const creatorOpacity = useSharedValue(0);
+  // Add animated value for logo
+  const logoOpacity = useSharedValue(0);
 
   // Debug log for route params
   // logger.log('[MetadataScreen] Component mounted with route params:', { id, type, episodeId });
 
+  // Fetch logo immediately for TMDB content
+  useEffect(() => {
+    if (metadata && id.startsWith('tmdb:')) {
+      const fetchLogo = async () => {
+        try {
+          const tmdbId = id.split(':')[1];
+          const tmdbType = type === 'series' ? 'tv' : 'movie';
+          const logoUrl = await TMDBService.getInstance().getContentLogo(tmdbType, tmdbId);
+          
+          if (logoUrl) {
+            // Update metadata with logo
+            setMetadata(prevMetadata => ({
+              ...prevMetadata!,
+              logo: logoUrl
+            }));
+            logger.log(`Successfully fetched logo for ${type} ${tmdbId} from TMDB on MetadataScreen`);
+          }
+        } catch (error) {
+          logger.error('Failed to fetch logo in MetadataScreen:', error);
+        }
+      };
+      
+      fetchLogo();
+    }
+  }, [id, type, metadata, setMetadata]);
+
   // Function to get episode details from episodeId
-  const getEpisodeDetails = useCallback((episodeId: string) => {
+  const getEpisodeDetails = useCallback((episodeId: string): { seasonNumber: string; episodeNumber: string; episodeName: string } | null => {
     // Try to parse from format "seriesId:season:episode"
     const parts = episodeId.split(':');
     if (parts.length === 3) {
@@ -274,7 +420,7 @@ const MetadataScreen = () => {
       logger.error('[MetadataScreen] Error loading watch progress:', error);
       setWatchProgress(null);
     }
-  }, [id, type, episodeId, episodes]);
+  }, [id, type, episodeId, episodes, getEpisodeDetails]);
 
   // Initial load
   useEffect(() => {
@@ -328,7 +474,7 @@ const MetadataScreen = () => {
         damping: 18
       });
     }
-  }, [watchProgress]);
+  }, [watchProgress, watchProgressOpacity, watchProgressScaleY]);
 
   // Add animated style for watch progress
   const watchProgressAnimatedStyle = useAnimatedStyle(() => {
@@ -351,123 +497,33 @@ const MetadataScreen = () => {
   // Add animated style for logo
   const logoAnimatedStyle = useAnimatedStyle(() => {
     return {
-      transform: [{ scale: logoScale.value }],
+      opacity: logoOpacity.value,
+      transform: [{ scale: interpolate(
+        logoOpacity.value,
+        [0, 1],
+        [0.95, 1],
+        Extrapolate.CLAMP
+      ) }],
     };
   });
 
-  // Effect to animate logo scale when logo URI is available
+  // Effect to animate logo when it's available
   useEffect(() => {
     if (metadata?.logo) {
-      logoScale.value = withSpring(1, {
-        damping: 18,
-        stiffness: 120,
-        mass: 0.5
+      logoOpacity.value = withTiming(1, {
+        duration: 500,
+        easing: Easing.out(Easing.ease)
       });
     } else {
-      // Optional: Reset scale if logo disappears?
-      // logoScale.value = withTiming(0, { duration: 100 });
+      logoOpacity.value = withTiming(0, {
+        duration: 200,
+        easing: Easing.in(Easing.ease)
+      });
     }
-  }, [metadata?.logo]);
+  }, [metadata?.logo, logoOpacity]);
 
-  // Add animated style for creator fade-in
-  const creatorFadeInStyle = useAnimatedStyle(() => {
-    return {
-      opacity: creatorOpacity.value,
-    };
-  });
-
-  // Effect to fade in creator section when data is available
-  useEffect(() => {
-    const hasCreators = metadata?.directors?.length || metadata?.creators?.length;
-    creatorOpacity.value = withTiming(hasCreators ? 1 : 0, { 
-      duration: 300, // Adjust duration as needed
-      easing: Easing.out(Easing.quad), // Use an easing function
-    });
-  }, [metadata?.directors, metadata?.creators]);
-
-  // Update the watch progress render function
-  const renderWatchProgress = () => {
-    if (!watchProgress || watchProgress.duration === 0) {
-      return null;
-    }
-
-    const progressPercent = (watchProgress.currentTime / watchProgress.duration) * 100;
-    const formattedTime = new Date(watchProgress.lastUpdated).toLocaleDateString();
-    let episodeInfo = '';
-
-    if (type === 'series' && watchProgress.episodeId) {
-      const details = getEpisodeDetails(watchProgress.episodeId);
-      if (details) {
-        episodeInfo = ` • S${details.seasonNumber}:E${details.episodeNumber}${details.episodeName ? ` - ${details.episodeName}` : ''}`;
-      }
-    }
-
-    return (
-      <Animated.View style={[styles.watchProgressContainer, watchProgressAnimatedStyle]}>
-        <View style={styles.watchProgressBar}>
-          <View 
-            style={[
-              styles.watchProgressFill, 
-              { width: `${progressPercent}%` }
-            ]} 
-          />
-        </View>
-        <Text style={styles.watchProgressText}>
-          {progressPercent >= 95 ? 'Watched' : `${Math.round(progressPercent)}% watched`}{episodeInfo} • Last watched on {formattedTime}
-        </Text>
-      </Animated.View>
-    );
-  };
-
-  // Update the action buttons section
-  const ActionButtons = () => (
-    <View style={styles.actionButtons}>
-      <TouchableOpacity
-        style={[styles.actionButton, styles.playButton]}
-        onPress={handleShowStreams}
-      >
-        <MaterialIcons 
-          name={watchProgress && watchProgress.currentTime > 0 ? "play-circle-outline" : "play-arrow"} 
-          size={24} 
-          color="#000" 
-        />
-        <Text style={styles.playButtonText}>
-          {getPlayButtonText()}
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.actionButton, styles.infoButton]}
-        onPress={toggleLibrary}
-      >
-        <MaterialIcons
-          name={inLibrary ? 'bookmark' : 'bookmark-border'}
-          size={24}
-          color="#fff"
-        />
-        <Text style={styles.infoButtonText}>
-          {inLibrary ? 'Saved' : 'Save'}
-        </Text>
-      </TouchableOpacity>
-
-      {type === 'series' && (
-        <TouchableOpacity
-          style={[styles.iconButton]}
-          onPress={async () => {
-            const tmdb = TMDBService.getInstance();
-            const tmdbId = await tmdb.extractTMDBIdFromStremioId(id);
-            if (tmdbId) {
-              navigation.navigate('ShowRatings', { showId: tmdbId });
-            } else {
-              logger.error('Could not find TMDB ID for show');
-            }
-          }}
-        >
-          <MaterialIcons name="star-rate" size={24} color="#fff" />
-        </TouchableOpacity>
-      )}
-    </View>
-  );
+  // Update the watch progress render function - Now uses WatchProgressDisplay component
+  // const renderWatchProgress = () => { ... }; // Removed old inline function
 
   // Handler functions
   const handleShowStreams = useCallback(() => {
@@ -500,18 +556,19 @@ const MetadataScreen = () => {
     navigation.navigate('Streams', { id, type, episodeId });
   }, [navigation, id, type, episodes, episodeId, watchProgress]);
 
-  const handleSelectCastMember = (castMember: any) => {
-    logger.log('Cast member selected:', castMember);
-  };
+  const handleSelectCastMember = useCallback((castMember: any) => {
+    // Potentially navigate to a cast member screen or show details
+    logger.log('Cast member selected:', castMember); 
+  }, []); // Empty dependency array as it doesn't depend on component state/props currently
 
-  const handleEpisodeSelect = (episode: Episode) => {
+  const handleEpisodeSelect = useCallback((episode: Episode) => {
     const episodeId = episode.stremioId || `${id}:${episode.season_number}:${episode.episode_number}`;
     navigation.navigate('Streams', {
       id,
       type,
       episodeId
     });
-  };
+  }, [navigation, id, type]); // Added dependencies
 
   // Animated styles
   const containerAnimatedStyle = useAnimatedStyle(() => ({
@@ -612,6 +669,31 @@ const MetadataScreen = () => {
     // 2. Coming from StreamsScreen - goes back to Calendar/ThisWeek
     navigation.goBack();
   }, [navigation]);
+
+  // Function to render genres (updated to handle string array and use useMemo)
+  const renderGenres = useMemo(() => {
+    if (!metadata?.genres || !Array.isArray(metadata.genres) || metadata.genres.length === 0) {
+      return null;
+    }
+
+    // Since metadata.genres is string[], we display them directly
+    const genresToDisplay: string[] = metadata.genres as string[];
+
+    return (
+      <View style={styles.genreContainer}>
+        {genresToDisplay.slice(0, 4).map((genreName, index, array) => (
+          // Use React.Fragment to avoid extra View wrappers
+          <React.Fragment key={index}>
+            <Text style={styles.genreText}>{genreName}</Text>
+            {/* Add dot separator */}
+            {index < array.length - 1 && (
+              <Text style={styles.genreDot}>•</Text>
+            )}
+          </React.Fragment>
+        ))}
+      </View>
+    );
+  }, [metadata?.genres]); // Dependency on metadata.genres
 
   if (loading) {
     return (
@@ -726,40 +808,45 @@ const MetadataScreen = () => {
                 locations={[0, 0.4, 0.65, 0.8, 0.9, 1]}
                 style={styles.heroGradient}
               >
-                <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.heroContent}>
+                <View style={styles.heroContent}>
                   {/* Title */}
-                  {metadata.logo ? (
-                    <Animated.View style={logoAnimatedStyle}>
-                      <Image
-                        source={{ uri: metadata.logo }}
-                        style={styles.titleLogo}
-                        contentFit="contain"
-                      />
+                  <View style={styles.logoContainer}>
+                    <Animated.View style={[styles.titleLogoContainer, logoAnimatedStyle]}>
+                      {metadata.logo ? (
+                        <Image
+                          source={{ uri: metadata.logo }}
+                          style={styles.titleLogo}
+                          contentFit="contain"
+                          transition={300}
+                        />
+                      ) : (
+                        <Text style={styles.heroTitle}>{metadata.name}</Text>
+                      )}
                     </Animated.View>
-                  ) : (
-                    <Text style={styles.titleText}>{metadata.name}</Text>
-                  )}
+                  </View>
 
                   {/* Watch Progress */}
-                  {renderWatchProgress()}
+                  <WatchProgressDisplay 
+                    watchProgress={watchProgress}
+                    type={type as 'movie' | 'series'}
+                    getEpisodeDetails={getEpisodeDetails}
+                    animatedStyle={watchProgressAnimatedStyle}
+                  />
 
                   {/* Genre Tags */}
-                  {metadata.genres && metadata.genres.length > 0 && (
-                    <View style={styles.genreContainer}>
-                      {metadata.genres.slice(0, 3).map((genre, index, array) => (
-                        <React.Fragment key={index}>
-                          <Text style={styles.genreText}>{genre}</Text>
-                          {index < array.length - 1 && (
-                            <Text style={styles.genreDot}>•</Text>
-                          )}
-                        </React.Fragment>
-                      ))}
-                    </View>
-                  )}
+                  {renderGenres}
 
                   {/* Action Buttons */}
-                  <ActionButtons />
-                </Animated.View>
+                  <ActionButtons 
+                    handleShowStreams={handleShowStreams}
+                    toggleLibrary={toggleLibrary}
+                    inLibrary={inLibrary}
+                    type={type as 'movie' | 'series'}
+                    id={id}
+                    navigation={navigation}
+                    playButtonText={getPlayButtonText()}
+                  />
+                </View>
               </LinearGradient>
             </ImageBackground>
           </Animated.View>
@@ -789,12 +876,18 @@ const MetadataScreen = () => {
               )}
             </View>
 
+            {/* Add RatingsSection right under the main metadata */}
+            {id && (
+              <RatingsSection 
+                imdbId={id}
+                type={type === 'series' ? 'show' : 'movie'} 
+              />
+            )}
+
             {/* Creator/Director Info */}
             <Animated.View
-              style={[
-                styles.creatorContainer,
-                creatorFadeInStyle,
-              ]}
+              entering={FadeIn.duration(500).delay(200)}
+              style={styles.creatorContainer}
             >
               {metadata.directors && metadata.directors.length > 0 && (
                 <View style={styles.creatorSection}>
@@ -812,11 +905,29 @@ const MetadataScreen = () => {
 
             {/* Description */}
             {metadata.description && (
-              <View style={styles.descriptionContainer}>
-                  <Text style={styles.description}>
-                    {`${metadata.description}`}
+              <Animated.View 
+                style={styles.descriptionContainer}
+                layout={Layout.duration(300).easing(Easing.inOut(Easing.ease))}
+              >
+                <TouchableOpacity 
+                  onPress={() => setIsFullDescriptionOpen(!isFullDescriptionOpen)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.description} numberOfLines={isFullDescriptionOpen ? undefined : 3}>
+                    {metadata.description}
                   </Text>
-              </View>
+                  <View style={styles.showMoreButton}>
+                    <Text style={styles.showMoreText}>
+                      {isFullDescriptionOpen ? 'Show Less' : 'Show More'}
+                    </Text>
+                    <MaterialIcons 
+                      name={isFullDescriptionOpen ? "keyboard-arrow-up" : "keyboard-arrow-down"} 
+                      size={18} 
+                      color={colors.textMuted} 
+                    />
+                  </View>
+                </TouchableOpacity>
+              </Animated.View>
             )}
 
             {/* Cast Section */}
@@ -940,22 +1051,33 @@ const styles = StyleSheet.create({
   genreContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
-    width: '100%',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 16,
+    gap: 4,
   },
   genreText: {
-    color: colors.highEmphasis,
-    fontSize: 14,
+    color: colors.text,
+    fontSize: 12,
     fontWeight: '500',
-    opacity: 0.8,
   },
   genreDot: {
-    color: colors.highEmphasis,
-    fontSize: 14,
-    marginHorizontal: 8,
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '500',
     opacity: 0.6,
+    marginHorizontal: 4,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  titleLogoContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
   },
   titleLogo: {
     width: width * 0.65,
@@ -963,7 +1085,7 @@ const styles = StyleSheet.create({
     marginBottom: 0,
     alignSelf: 'center',
   },
-  titleText: {
+  heroTitle: {
     color: colors.highEmphasis,
     fontSize: 28,
     fontWeight: '900',
@@ -1015,18 +1137,13 @@ const styles = StyleSheet.create({
   showMoreButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 10,
-    backgroundColor: colors.elevation1,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    alignSelf: 'flex-start',
+    marginTop: 8,
+    paddingVertical: 4,
   },
   showMoreText: {
-    color: colors.highEmphasis,
+    color: colors.textMuted,
     fontSize: 14,
     marginRight: 4,
-    fontWeight: '500',
   },
   actionButtons: {
     flexDirection: 'row',
@@ -1083,37 +1200,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontWeight: '600',
     fontSize: 16,
-  },
-  fullDescriptionContainer: {
-    flex: 1,
-    backgroundColor: colors.darkBackground,
-  },
-  fullDescriptionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.elevation1,
-    position: 'relative',
-  },
-  fullDescriptionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  fullDescriptionCloseButton: {
-    position: 'absolute',
-    left: 16,
-    padding: 8,
-  },
-  fullDescriptionContent: {
-    flex: 1,
-    padding: 24,
-  },
-  fullDescriptionText: {
-    color: colors.text,
   },
   creatorContainer: {
     marginBottom: 2,

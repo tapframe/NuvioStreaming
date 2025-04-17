@@ -16,7 +16,8 @@ import {
   Image,
   Dimensions,
   ScrollView,
-  useColorScheme
+  useColorScheme,
+  Switch
 } from 'react-native';
 import { stremioService, Manifest } from '../services/stremioService';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -27,6 +28,8 @@ import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { logger } from '../utils/logger';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BlurView } from 'expo-blur';
 
 // Extend Manifest type to include logo
 interface ExtendedManifest extends Manifest {
@@ -41,13 +44,14 @@ const AddonsScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const [addons, setAddons] = useState<ExtendedManifest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [installing, setInstalling] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
   const [addonUrl, setAddonUrl] = useState('');
   const [addonDetails, setAddonDetails] = useState<ExtendedManifest | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const isDarkMode = useColorScheme() === 'dark';
+  const [installing, setInstalling] = useState(false);
+  const [catalogCount, setCatalogCount] = useState(0);
+  const [activeAddons, setActiveAddons] = useState(0);
+  // Force dark mode
+  const isDarkMode = true;
 
   useEffect(() => {
     loadAddons();
@@ -58,6 +62,27 @@ const AddonsScreen = () => {
       setLoading(true);
       const installedAddons = await stremioService.getInstalledAddonsAsync();
       setAddons(installedAddons);
+      setActiveAddons(installedAddons.length);
+      
+      // Count catalogs
+      let totalCatalogs = 0;
+      installedAddons.forEach(addon => {
+        if (addon.catalogs && addon.catalogs.length > 0) {
+          totalCatalogs += addon.catalogs.length;
+        }
+      });
+      
+      // Get catalog settings to determine enabled count
+      const catalogSettingsJson = await AsyncStorage.getItem('catalog_settings');
+      if (catalogSettingsJson) {
+        const catalogSettings = JSON.parse(catalogSettingsJson);
+        const disabledCount = Object.entries(catalogSettings)
+          .filter(([key, value]) => key !== '_lastUpdate' && value === false)
+          .length;
+        setCatalogCount(totalCatalogs - disabledCount);
+      } else {
+        setCatalogCount(totalCatalogs);
+      }
     } catch (error) {
       logger.error('Failed to load addons:', error);
       Alert.alert('Error', 'Failed to load addons');
@@ -66,7 +91,7 @@ const AddonsScreen = () => {
     }
   };
 
-  const handleInstallAddon = async () => {
+  const handleAddAddon = async () => {
     if (!addonUrl) {
       Alert.alert('Error', 'Please enter an addon URL');
       return;
@@ -77,7 +102,6 @@ const AddonsScreen = () => {
       // First fetch the addon manifest
       const manifest = await stremioService.getManifest(addonUrl);
       setAddonDetails(manifest);
-      setShowAddModal(false);
       setShowConfirmModal(true);
     } catch (error) {
       logger.error('Failed to fetch addon details:', error);
@@ -106,9 +130,23 @@ const AddonsScreen = () => {
     }
   };
 
-  const handleConfigureAddon = (addon: ExtendedManifest) => {
-    // TODO: Implement addon configuration
-    Alert.alert('Configure', `Configure ${addon.name}`);
+  const handleToggleAddon = (addon: ExtendedManifest, enabled: boolean) => {
+    // Logic to enable/disable an addon
+    Alert.alert(
+      enabled ? 'Disable Addon' : 'Enable Addon',
+      `Are you sure you want to ${enabled ? 'disable' : 'enable'} ${addon.name}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: enabled ? 'Disable' : 'Enable',
+          style: enabled ? 'destructive' : 'default',
+          onPress: () => {
+            // TODO: Implement actual toggle functionality
+            Alert.alert('Success', `${addon.name} ${enabled ? 'disabled' : 'enabled'}`);
+          },
+        },
+      ]
+    );
   };
 
   const handleRemoveAddon = (addon: ExtendedManifest) => {
@@ -134,154 +172,150 @@ const AddonsScreen = () => {
     const description = item.description || '';
     // @ts-ignore - some addons might have logo property even though it's not in the type
     const logo = item.logo || null;
+    
+    // Format the types into a simple category text
+    const categoryText = types.length > 0 
+      ? types.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(' • ') 
+      : 'No categories';
 
     return (
-      <View style={styles.addonItem}>
-        <View style={styles.addonContent}>
-          <View style={styles.addonIconContainer}>
-            {logo ? (
-              <ExpoImage 
-                source={{ uri: logo }} 
-                style={styles.addonIcon} 
-                contentFit="contain"
-              />
-            ) : (
-              <View style={styles.placeholderIcon}>
-                <MaterialIcons name="extension" size={32} color={colors.mediumGray} />
-              </View>
-            )}
-          </View>
-          
-          <View style={styles.addonInfo}>
+      <View>
+        <View style={styles.addonHeader}>
+          {logo ? (
+            <ExpoImage 
+              source={{ uri: logo }} 
+              style={styles.addonIcon} 
+              contentFit="contain"
+            />
+          ) : (
+            <View style={styles.addonIconPlaceholder}>
+              <MaterialIcons name="extension" size={22} color={colors.mediumGray} />
+            </View>
+          )}
+          <View style={styles.addonTitleContainer}>
             <Text style={styles.addonName}>{item.name}</Text>
-            <Text style={styles.addonType}>
-              {types.join(', ')}
-            </Text>
-            <Text style={styles.addonDescription} numberOfLines={2}>
-              {description}
-            </Text>
+            <View style={styles.addonMetaContainer}>
+              <Text style={styles.addonVersion}>v{item.version || '1.0.0'}</Text>
+              <Text style={styles.addonDot}>•</Text>
+              <Text style={styles.addonCategory}>{categoryText}</Text>
+            </View>
           </View>
+          <Switch
+            value={true} // Default to enabled
+            onValueChange={(value) => handleToggleAddon(item, !value)}
+            trackColor={{ false: colors.elevation1, true: colors.primary }}
+            thumbColor={colors.white}
+            ios_backgroundColor={colors.elevation1}
+          />
         </View>
-
-        <View style={styles.addonActions}>
-          <TouchableOpacity
-            style={styles.configButton}
-            onPress={() => handleConfigureAddon(item)}
-          >
-            <MaterialIcons name="settings" size={24} color={colors.primary} />
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={styles.uninstallButton}
-            onPress={() => handleRemoveAddon(item)}
-          >
-            <Text style={styles.uninstallText}>Uninstall</Text>
-          </TouchableOpacity>
-        </View>
+        
+        <Text style={styles.addonDescription}>
+          {description.length > 100 ? description.substring(0, 100) + '...' : description}
+        </Text>
       </View>
     );
   };
 
+  const StatsCard = ({ value, label }: { value: number; label: string }) => (
+    <View style={styles.statsCard}>
+      <Text style={styles.statsValue}>{value}</Text>
+      <Text style={styles.statsLabel}>{label}</Text>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor={colors.darkBackground}
-        translucent
-      />
+      <StatusBar barStyle="light-content" />
       
+      {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>
-            Addons
-          </Text>
-        </View>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <MaterialIcons name="chevron-left" size={28} color={colors.white} />
+          <Text style={styles.backText}>Settings</Text>
+        </TouchableOpacity>
       </View>
-
-      <View style={styles.searchContainer}>
-        <MaterialIcons name="search" size={24} color={colors.mediumGray} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="You can search anything..."
-          placeholderTextColor={colors.mediumGray}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-      </View>
-
+      
+      <Text style={styles.headerTitle}>Addons</Text>
+      
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
-        <FlatList
-          data={addons}
-          renderItem={renderAddonItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.addonsList}
-          ListEmptyComponent={() => (
-            <View style={styles.emptyContainer}>
-              <MaterialIcons name="extension-off" size={48} color={colors.mediumGray} />
-              <Text style={styles.emptyText}>No addons installed</Text>
-            </View>
-          )}
-        />
-      )}
-
-      {/* Add Addon FAB */}
-      <TouchableOpacity 
-        style={styles.fab}
-        onPress={() => setShowAddModal(true)}
-      >
-        <MaterialIcons name="add" size={24} color={colors.text} />
-      </TouchableOpacity>
-
-      {/* Add Addon URL Modal */}
-      <Modal
-        visible={showAddModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowAddModal(false)}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalContainer}
+        <ScrollView 
+          style={styles.scrollView} 
+          showsVerticalScrollIndicator={false}
+          contentInsetAdjustmentBehavior="automatic"
         >
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add New Addon</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Enter addon URL..."
-              placeholderTextColor={colors.mediumGray}
-              value={addonUrl}
-              onChangeText={setAddonUrl}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalButton}
-                onPress={() => setShowAddModal(false)}
+          {/* Overview Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>OVERVIEW</Text>
+            <View style={styles.statsContainer}>
+              <StatsCard value={addons.length} label="Addons" />
+              <View style={styles.statsDivider} />
+              <StatsCard value={activeAddons} label="Active" />
+              <View style={styles.statsDivider} />
+              <StatsCard value={catalogCount} label="Catalogs" />
+            </View>
+          </View>
+          
+          {/* Add Addon Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>ADD NEW ADDON</Text>
+            <View style={styles.addAddonContainer}>
+              <TextInput
+                style={styles.addonInput}
+                placeholder="Addon URL"
+                placeholderTextColor={colors.mediumGray}
+                value={addonUrl}
+                onChangeText={setAddonUrl}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity 
+                style={[styles.addButton, {opacity: installing || !addonUrl ? 0.6 : 1}]}
+                onPress={handleAddAddon}
+                disabled={installing || !addonUrl}
               >
-                <Text style={styles.modalButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonPrimary]}
-                onPress={handleInstallAddon}
-                disabled={installing}
-              >
-                {installing ? (
-                  <ActivityIndicator size="small" color={colors.text} />
-                ) : (
-                  <Text style={[styles.modalButtonText, styles.modalButtonTextPrimary]}>
-                    Next
-                  </Text>
-                )}
+                <Text style={styles.addButtonText}>
+                  {installing ? 'Loading...' : 'Add Addon'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
-        </KeyboardAvoidingView>
-      </Modal>
+          
+          {/* Installed Addons Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>INSTALLED ADDONS</Text>
+            <View style={styles.addonList}>
+              {addons.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <MaterialIcons name="extension-off" size={32} color={colors.mediumGray} />
+                  <Text style={styles.emptyText}>No addons installed</Text>
+                </View>
+              ) : (
+                addons.map((addon, index) => {
+                  const isLast = index === addons.length - 1;
+                  return (
+                    <View 
+                      key={addon.id} 
+                      style={[
+                        styles.addonItem, 
+                        { marginBottom: isLast ? 32 : 16 }
+                      ]}
+                    >
+                      {renderAddonItem({ item: addon })}
+                    </View>
+                  );
+                })
+              )}
+            </View>
+          </View>
+        </ScrollView>
+      )}
 
       {/* Addon Details Confirmation Modal */}
       <Modal
@@ -293,84 +327,106 @@ const AddonsScreen = () => {
           setAddonDetails(null);
         }}
       >
-        <View style={styles.modalContainer}>
-          <View style={[styles.modalContent, styles.confirmModalContent]}>
+        <BlurView intensity={80} style={styles.modalContainer} tint="dark">
+          <View style={styles.modalContent}>
             {addonDetails && (
               <>
-                <View style={styles.addonHeader}>
-                  {/* @ts-ignore - some addons might have logo property even though it's not in the type */}
-                  {addonDetails.logo ? (
-                    <ExpoImage
-                      source={{ uri: addonDetails.logo }}
-                      style={styles.addonLogo}
-                      contentFit="contain"
-                    />
-                  ) : (
-                    <View style={styles.placeholderLogo}>
-                      <MaterialIcons name="extension" size={48} color={colors.mediumGray} />
-                    </View>
-                  )}
-                  <Text style={styles.addonTitle}>{addonDetails.name}</Text>
-                  <Text style={styles.addonVersion}>Version {addonDetails.version}</Text>
-                </View>
-
-                <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                  <View style={styles.addonDetailsSection}>
-                    <Text style={styles.sectionTitle}>Description</Text>
-                    <Text style={styles.addonDescription}>
-                      {addonDetails.description || 'No description available'}
-                    </Text>
-
-                    <Text style={styles.sectionTitle}>Supported Types</Text>
-                    <View style={styles.typeContainer}>
-                      {(addonDetails.types || []).map((type, index) => (
-                        <View key={index} style={styles.typeChip}>
-                          <Text style={styles.typeText}>{type}</Text>
-                        </View>
-                      ))}
-                    </View>
-
-                    {addonDetails.catalogs && addonDetails.catalogs.length > 0 && (
-                      <>
-                        <Text style={styles.sectionTitle}>Catalogs</Text>
-                        <View style={styles.typeContainer}>
-                          {addonDetails.catalogs.map((catalog, index) => (
-                            <View key={index} style={styles.typeChip}>
-                              <Text style={styles.typeText}>{catalog.type}</Text>
-                            </View>
-                          ))}
-                        </View>
-                      </>
-                    )}
-                  </View>
-                </ScrollView>
-
-                <View style={styles.confirmActions}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Install Addon</Text>
                   <TouchableOpacity
-                    style={[styles.confirmButton, styles.cancelButton]}
                     onPress={() => {
                       setShowConfirmModal(false);
                       setAddonDetails(null);
                     }}
                   >
-                    <Text style={styles.confirmButtonText}>Cancel</Text>
+                    <MaterialIcons name="close" size={24} color={colors.white} />
+                  </TouchableOpacity>
+                </View>
+                
+                <ScrollView 
+                  style={styles.modalScrollContent}
+                  showsVerticalScrollIndicator={false}
+                  bounces={true}
+                >
+                  <View style={styles.addonDetailHeader}>
+                    {/* @ts-ignore */}
+                    {addonDetails.logo ? (
+                      <ExpoImage
+                        source={{ uri: addonDetails.logo }}
+                        style={styles.addonLogo}
+                        contentFit="contain"
+                      />
+                    ) : (
+                      <View style={styles.addonLogoPlaceholder}>
+                        <MaterialIcons name="extension" size={40} color={colors.mediumGray} />
+                      </View>
+                    )}
+                    <Text style={styles.addonDetailName}>{addonDetails.name}</Text>
+                    <Text style={styles.addonDetailVersion}>v{addonDetails.version || '1.0.0'}</Text>
+                  </View>
+                  
+                  <View style={styles.addonDetailSection}>
+                    <Text style={styles.addonDetailSectionTitle}>Description</Text>
+                    <Text style={styles.addonDetailDescription}>
+                      {addonDetails.description || 'No description available'}
+                    </Text>
+                  </View>
+                  
+                  {addonDetails.types && addonDetails.types.length > 0 && (
+                    <View style={styles.addonDetailSection}>
+                      <Text style={styles.addonDetailSectionTitle}>Supported Types</Text>
+                      <View style={styles.addonDetailChips}>
+                        {addonDetails.types.map((type, index) => (
+                          <View key={index} style={styles.addonDetailChip}>
+                            <Text style={styles.addonDetailChipText}>{type}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+                  
+                  {addonDetails.catalogs && addonDetails.catalogs.length > 0 && (
+                    <View style={styles.addonDetailSection}>
+                      <Text style={styles.addonDetailSectionTitle}>Catalogs</Text>
+                      <View style={styles.addonDetailChips}>
+                        {addonDetails.catalogs.map((catalog, index) => (
+                          <View key={index} style={styles.addonDetailChip}>
+                            <Text style={styles.addonDetailChipText}>
+                              {catalog.type} - {catalog.id}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+                </ScrollView>
+                
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.cancelButton]}
+                    onPress={() => {
+                      setShowConfirmModal(false);
+                      setAddonDetails(null);
+                    }}
+                  >
+                    <Text style={styles.modalButtonText}>Cancel</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.confirmButton, styles.installButton]}
+                    style={[styles.modalButton, styles.installButton]}
                     onPress={confirmInstallAddon}
                     disabled={installing}
                   >
                     {installing ? (
-                      <ActivityIndicator size="small" color={colors.text} />
+                      <ActivityIndicator size="small" color={colors.white} />
                     ) : (
-                      <Text style={styles.confirmButtonText}>Install</Text>
+                      <Text style={styles.modalButtonText}>Install</Text>
                     )}
                   </TouchableOpacity>
                 </View>
               </>
             )}
           </View>
-        </View>
+        </BlurView>
       </Modal>
     </SafeAreaView>
   );
@@ -382,294 +438,321 @@ const styles = StyleSheet.create({
     backgroundColor: colors.darkBackground,
   },
   header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 12 : 4,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: colors.darkBackground,
-  },
-  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 8 : 8,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+  },
+  backText: {
+    fontSize: 17,
+    fontWeight: '400',
+    color: colors.primary,
   },
   headerTitle: {
-    fontSize: 32,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    fontSize: 34,
+    fontWeight: '700',
     color: colors.white,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    paddingTop: 8,
   },
-  searchContainer: {
+  scrollView: {
+    flex: 1,
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.mediumGray,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginHorizontal: 16,
+    backgroundColor: colors.elevation2,
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  statsCard: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statsDivider: {
+    width: 1,
+    height: '80%',
+    backgroundColor: 'rgba(150, 150, 150, 0.2)',
+    alignSelf: 'center',
+  },
+  statsValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.white,
+    marginBottom: 4,
+  },
+  statsLabel: {
+    fontSize: 13,
+    color: colors.mediumGray,
+  },
+  addAddonContainer: {
+    marginHorizontal: 16,
+    backgroundColor: colors.elevation2,
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  addonInput: {
+    backgroundColor: colors.elevation1,
+    borderRadius: 8,
+    padding: 12,
+    color: colors.white,
+    marginBottom: 16,
+    fontSize: 15,
+  },
+  addButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+  },
+  addButtonText: {
+    color: colors.white,
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  addonList: {
+    paddingHorizontal: 16,
+  },
+  emptyContainer: {
+    backgroundColor: colors.elevation2,
+    borderRadius: 12,
+    padding: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  emptyText: {
+    marginTop: 8,
+    color: colors.mediumGray,
+    fontSize: 15,
+  },
+  addonItem: {
+    backgroundColor: colors.elevation2,
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  addonHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  addonIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: colors.elevation3,
+  },
+  addonIconPlaceholder: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: colors.elevation3,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addonTitleContainer: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 16,
+  },
+  addonName: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: colors.white,
+    marginBottom: 2,
+  },
+  addonMetaContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.elevation1,
-    margin: 16,
-    padding: 12,
-    borderRadius: 8,
   },
-  searchInput: {
+  addonVersion: {
+    fontSize: 13,
+    color: colors.mediumGray,
+  },
+  addonDot: {
+    fontSize: 13,
+    color: colors.mediumGray,
+    marginHorizontal: 4,
+  },
+  addonCategory: {
+    fontSize: 13,
+    color: colors.mediumGray,
     flex: 1,
-    marginLeft: 8,
-    color: colors.text,
-    fontSize: 16,
+  },
+  addonDescription: {
+    fontSize: 14,
+    color: colors.mediumEmphasis,
+    marginTop: 6,
+    marginBottom: 4,
+    lineHeight: 20,
+    marginLeft: 48, // Align with title, accounting for icon width
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  addonsList: {
-    padding: 16,
-  },
-  addonItem: {
-    backgroundColor: colors.elevation1,
-    borderRadius: 12,
-    marginBottom: 16,
-    padding: 16,
-  },
-  addonContent: {
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
-  addonIconContainer: {
-    width: 48,
-    height: 48,
-    marginRight: 16,
-  },
-  addonIcon: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 8,
-  },
-  placeholderIcon: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: colors.elevation2,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addonInfo: {
-    flex: 1,
-  },
-  addonName: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  addonType: {
-    color: colors.mediumGray,
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  addonDescription: {
-    color: colors.mediumEmphasis,
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  addonActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: colors.elevation2,
-    paddingTop: 16,
-  },
-  configButton: {
-    padding: 8,
-  },
-  uninstallButton: {
-    backgroundColor: 'transparent',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.elevation2,
-  },
-  uninstallText: {
-    color: colors.text,
-    fontSize: 14,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-  },
-  emptyText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: colors.mediumGray,
-    textAlign: 'center',
-  },
-  fab: {
-    position: 'absolute',
-    right: 16,
-    bottom: 90,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 8,
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.30,
-    shadowRadius: 4.65,
-  },
   modalContainer: {
     flex: 1,
-    backgroundColor: colors.darkBackground,
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: colors.elevation1,
-    borderRadius: 12,
-    padding: 20,
+    backgroundColor: colors.elevation2,
+    borderRadius: 14,
     width: '85%',
-    maxWidth: 360,
+    maxHeight: '85%',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.elevation3,
   },
   modalTitle: {
-    color: colors.text,
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: 'bold',
-    marginBottom: 16,
+    color: colors.white,
   },
-  modalInput: {
-    backgroundColor: colors.elevation2,
-    borderRadius: 8,
-    padding: 12,
-    color: colors.text,
-    marginBottom: 24,
+  modalScrollContent: {
+    maxHeight: 400,
   },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  modalButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginLeft: 8,
-  },
-  modalButtonPrimary: {
-    backgroundColor: colors.primary,
-  },
-  modalButtonText: {
-    color: colors.mediumGray,
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  modalButtonTextPrimary: {
-    color: colors.text,
-  },
-  confirmModalContent: {
-    width: '85%',
-    maxWidth: 360,
-    maxHeight: '80%',
-    padding: 0,
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: colors.darkBackground,
-  },
-  addonHeader: {
+  addonDetailHeader: {
     alignItems: 'center',
-    padding: 20,
+    padding: 24,
     borderBottomWidth: 1,
-    borderBottomColor: colors.elevation1,
-    backgroundColor: colors.elevation2,
-    width: '100%',
+    borderBottomColor: colors.elevation3,
   },
   addonLogo: {
     width: 64,
     height: 64,
-    marginBottom: 12,
     borderRadius: 12,
-    backgroundColor: colors.elevation1,
+    marginBottom: 16,
+    backgroundColor: colors.elevation3,
   },
-  placeholderLogo: {
+  addonLogoPlaceholder: {
     width: 64,
     height: 64,
     borderRadius: 12,
-    backgroundColor: colors.elevation1,
+    backgroundColor: colors.elevation3,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
-  addonTitle: {
+  addonDetailName: {
     fontSize: 20,
-    fontWeight: '700',
-    color: colors.text,
+    fontWeight: 'bold',
+    color: colors.white,
     marginBottom: 4,
     textAlign: 'center',
   },
-  addonVersion: {
-    fontSize: 13,
-    color: colors.textMuted,
-    marginBottom: 0,
+  addonDetailVersion: {
+    fontSize: 14,
+    color: colors.mediumGray,
   },
-  addonDetailsSection: {
-    padding: 20,
+  addonDetailSection: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.elevation3,
   },
-  sectionTitle: {
-    fontSize: 15,
+  addonDetailSectionTitle: {
+    fontSize: 16,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.white,
     marginBottom: 8,
-    marginTop: 12,
   },
-  typeContainer: {
+  addonDetailDescription: {
+    fontSize: 15,
+    color: colors.mediumEmphasis,
+    lineHeight: 20,
+  },
+  addonDetailChips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 12,
-    width: '100%',
+    gap: 8,
   },
-  typeChip: {
-    backgroundColor: colors.elevation2,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+  addonDetailChip: {
+    backgroundColor: colors.elevation3,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.elevation3,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
-  typeText: {
-    color: colors.text,
+  addonDetailChipText: {
     fontSize: 13,
+    color: colors.white,
   },
-  confirmActions: {
+  modalActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    padding: 12,
-    gap: 8,
+    padding: 16,
     borderTopWidth: 1,
-    borderTopColor: colors.elevation1,
-    backgroundColor: colors.elevation2,
-    width: '100%',
+    borderTopColor: colors.elevation3,
   },
-  confirmButton: {
+  modalButton: {
+    paddingVertical: 8,
     paddingHorizontal: 16,
-    paddingVertical: 10,
     borderRadius: 8,
-    minWidth: 90,
+    minWidth: 80,
     alignItems: 'center',
   },
   cancelButton: {
     backgroundColor: colors.elevation3,
+    marginRight: 8,
   },
   installButton: {
     backgroundColor: colors.primary,
   },
-  confirmButtonText: {
-    color: colors.text,
-    fontSize: 16,
+  modalButtonText: {
+    color: colors.white,
     fontWeight: '600',
-  },
-  scrollContent: {
-    flexGrow: 1,
   },
 });
 

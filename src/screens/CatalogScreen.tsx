@@ -10,6 +10,7 @@ import {
   StatusBar,
   RefreshControl,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -17,6 +18,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { Meta, stremioService } from '../services/stremioService';
 import { colors } from '../styles';
 import { Image } from 'expo-image';
+import { MaterialIcons } from '@expo/vector-icons';
 import { logger } from '../utils/logger';
 
 type CatalogScreenProps = {
@@ -24,7 +26,7 @@ type CatalogScreenProps = {
   navigation: StackNavigationProp<RootStackParamList, 'Catalog'>;
 };
 
-// Consistent spacing variables
+// Constants for layout
 const SPACING = {
   xs: 4,
   sm: 8,
@@ -33,11 +35,13 @@ const SPACING = {
   xl: 24,
 };
 
+const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
+
 // Screen dimensions and grid layout
 const { width } = Dimensions.get('window');
 const NUM_COLUMNS = 3;
 const ITEM_MARGIN = SPACING.sm;
-const ITEM_WIDTH = (width - (SPACING.md * 2) - (ITEM_MARGIN * 2 * NUM_COLUMNS)) / NUM_COLUMNS;
+const ITEM_WIDTH = (width - (SPACING.lg * 2) - (ITEM_MARGIN * 2 * NUM_COLUMNS)) / NUM_COLUMNS;
 
 const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   const { addonId, type, id, name, genreFilter } = route.params;
@@ -47,7 +51,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Force dark mode instead of using color scheme
+  // Force dark mode
   const isDarkMode = true;
 
   const loadItems = useCallback(async (pageNum: number, shouldRefresh: boolean = false) => {
@@ -160,9 +164,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
 
   useEffect(() => {
     loadItems(1);
-    // Set the header title
-    navigation.setOptions({ title: name || `${type} catalog` });
-  }, [loadItems, navigation, name, type]);
+  }, [loadItems]);
 
   const handleRefresh = useCallback(() => {
     setPage(1);
@@ -185,7 +187,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
         activeOpacity={0.7}
       >
         <Image
-          source={{ uri: item.poster || 'https://via.placeholder.com/300x450/cccccc/666666?text=No+Image' }}
+          source={{ uri: item.poster || 'https://via.placeholder.com/300x450/333333/666666?text=No+Image' }}
           style={styles.poster}
           contentFit="cover"
           transition={200}
@@ -209,8 +211,9 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
 
   const renderEmptyState = () => (
     <View style={styles.centered}>
+      <MaterialIcons name="search-off" size={56} color={colors.mediumGray} />
       <Text style={styles.emptyText}>
-        No content found for the selected genre
+        No content found
       </Text>
       <TouchableOpacity
         style={styles.button}
@@ -223,6 +226,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
 
   const renderErrorState = () => (
     <View style={styles.centered}>
+      <MaterialIcons name="error-outline" size={56} color={colors.mediumGray} />
       <Text style={styles.errorText}>
         {error}
       </Text>
@@ -238,13 +242,24 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   const renderLoadingState = () => (
     <View style={styles.centered}>
       <ActivityIndicator size="large" color={colors.primary} />
+      <Text style={styles.loadingText}>Loading content...</Text>
     </View>
   );
 
   if (loading && items.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor={colors.darkBackground} />
+        <StatusBar barStyle="light-content" />
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <MaterialIcons name="chevron-left" size={28} color={colors.white} />
+            <Text style={styles.backText}>Back</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.headerTitle}>{name || `${type.charAt(0).toUpperCase() + type.slice(1)}s`}</Text>
         {renderLoadingState()}
       </SafeAreaView>
     );
@@ -253,7 +268,17 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   if (error && items.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor={colors.darkBackground} />
+        <StatusBar barStyle="light-content" />
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <MaterialIcons name="chevron-left" size={28} color={colors.white} />
+            <Text style={styles.backText}>Back</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.headerTitle}>{name || `${type.charAt(0).toUpperCase() + type.slice(1)}s`}</Text>
         {renderErrorState()}
       </SafeAreaView>
     );
@@ -261,7 +286,18 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.darkBackground} />
+      <StatusBar barStyle="light-content" />
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <MaterialIcons name="chevron-left" size={28} color={colors.white} />
+          <Text style={styles.backText}>Back</Text>
+        </TouchableOpacity>
+      </View>
+      <Text style={styles.headerTitle}>{name || `${type.charAt(0).toUpperCase() + type.slice(1)}s`}</Text>
+      
       {items.length > 0 ? (
         <FlatList
           data={items}
@@ -287,6 +323,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           }
           contentContainerStyle={styles.list}
           columnWrapperStyle={styles.columnWrapper}
+          showsVerticalScrollIndicator={false}
         />
       ) : renderEmptyState()}
     </SafeAreaView>
@@ -298,29 +335,60 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.darkBackground,
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 8 : 8,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+  },
+  backText: {
+    fontSize: 17,
+    fontWeight: '400',
+    color: colors.primary,
+  },
+  headerTitle: {
+    fontSize: 34,
+    fontWeight: '700',
+    color: colors.white,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    paddingTop: 8,
+  },
   list: {
-    padding: SPACING.md,
+    padding: SPACING.lg,
+    paddingTop: SPACING.sm,
   },
   columnWrapper: {
     justifyContent: 'space-between',
   },
   item: {
     width: ITEM_WIDTH,
-    marginBottom: SPACING.md,
-    borderRadius: 8,
+    marginBottom: SPACING.lg,
+    borderRadius: 12,
     overflow: 'hidden',
+    backgroundColor: colors.elevation2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   poster: {
     width: '100%',
     aspectRatio: 2/3,
-    borderRadius: 8,
-    backgroundColor: colors.transparentLight,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    backgroundColor: colors.elevation3,
   },
   itemContent: {
-    padding: SPACING.xs,
+    padding: SPACING.sm,
   },
   title: {
-    marginTop: SPACING.xs,
     fontSize: 14,
     fontWeight: '600',
     color: colors.white,
@@ -329,7 +397,7 @@ const styles = StyleSheet.create({
   releaseInfo: {
     fontSize: 12,
     marginTop: SPACING.xs,
-    color: colors.lightGray,
+    color: colors.mediumGray,
   },
   footer: {
     padding: SPACING.lg,
@@ -358,14 +426,21 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 16,
     textAlign: 'center',
-    marginBottom: SPACING.md,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.sm,
   },
   errorText: {
     color: colors.white,
     fontSize: 16,
     textAlign: 'center',
-    marginBottom: SPACING.md,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.sm,
   },
+  loadingText: {
+    color: colors.white,
+    fontSize: 16,
+    marginTop: SPACING.lg,
+  }
 });
 
 export default CatalogScreen; 

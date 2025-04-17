@@ -53,10 +53,10 @@ export const CastSection: React.FC<CastSectionProps> = ({
             onPress={() => onSelectCastMember(member)}
           >
             <View style={styles.castImageContainer}>
-              {member.profile_path && tmdbService.getImageUrl(member.profile_path, 'w185') ? (
+              {member.profile_path ? (
                 <Image
                   source={{ 
-                    uri: tmdbService.getImageUrl(member.profile_path, 'w185')!
+                    uri: `https://image.tmdb.org/t/p/w185${member.profile_path}`
                   }}
                   style={styles.castImage}
                   contentFit="cover"

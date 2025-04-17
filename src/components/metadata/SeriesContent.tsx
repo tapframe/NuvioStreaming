@@ -7,6 +7,7 @@ import { Episode } from '../../types/metadata';
 import { tmdbService } from '../../services/tmdbService';
 import { storageService } from '../../services/storageService';
 import { useFocusEffect } from '@react-navigation/native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 interface SeriesContentProps {
   episodes: Episode[];
@@ -246,27 +247,49 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
 
   return (
     <View style={styles.container}>
-      {renderSeasonSelector()}
-      
-      <Text style={styles.sectionTitle}>
-        {episodes.length} {episodes.length === 1 ? 'Episode' : 'Episodes'}
-      </Text>
-      
-      <ScrollView 
-        style={styles.episodeList}
-        contentContainerStyle={[
-          styles.episodeListContent,
-          isTablet && styles.episodeListContentTablet
-        ]}
+      <Animated.View 
+        entering={FadeIn.duration(500).delay(100)}
       >
-        {isTablet ? (
-          <View style={styles.episodeGrid}>
-            {episodes.map(episode => renderEpisodeCard(episode))}
-          </View>
-        ) : (
-          episodes.map(episode => renderEpisodeCard(episode))
-        )}
-      </ScrollView>
+        {renderSeasonSelector()}
+      </Animated.View>
+      
+      <Animated.View 
+        entering={FadeIn.duration(500).delay(200)}
+      >
+        <Text style={styles.sectionTitle}>
+          {episodes.length} {episodes.length === 1 ? 'Episode' : 'Episodes'}
+        </Text>
+        
+        <ScrollView 
+          style={styles.episodeList}
+          contentContainerStyle={[
+            styles.episodeListContent,
+            isTablet && styles.episodeListContentTablet
+          ]}
+        >
+          {isTablet ? (
+            <View style={styles.episodeGrid}>
+              {episodes.map((episode, index) => (
+                <Animated.View 
+                  key={episode.id}
+                  entering={FadeIn.duration(400).delay(300 + index * 50)}
+                >
+                  {renderEpisodeCard(episode)}
+                </Animated.View>
+              ))}
+            </View>
+          ) : (
+            episodes.map((episode, index) => (
+              <Animated.View 
+                key={episode.id}
+                entering={FadeIn.duration(400).delay(300 + index * 50)}
+              >
+                {renderEpisodeCard(episode)}
+              </Animated.View>
+            ))
+          )}
+        </ScrollView>
+      </Animated.View>
     </View>
   );
 };

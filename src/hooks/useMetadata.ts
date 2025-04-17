@@ -206,8 +206,34 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
   };
 
   const loadCast = async () => {
+    setLoadingCast(true);
     try {
-      setLoadingCast(true);
+      // Handle TMDB IDs
+      let metadataId = id;
+      let metadataType = type;
+      
+      if (id.startsWith('tmdb:')) {
+        const extractedTmdbId = id.split(':')[1];
+        logger.log('[loadCast] Using extracted TMDB ID:', extractedTmdbId);
+        
+        // For TMDB IDs, we'll use the TMDB API directly
+        const castData = await tmdbService.getCredits(parseInt(extractedTmdbId), type);
+        if (castData && castData.cast) {
+          const formattedCast = castData.cast.map((actor: any) => ({
+            id: actor.id,
+            name: actor.name,
+            character: actor.character,
+            profile_path: actor.profile_path
+          }));
+          setCast(formattedCast);
+          setLoadingCast(false);
+          return formattedCast;
+        }
+        setLoadingCast(false);
+        return [];
+      }
+      
+      // Continue with the existing logic for non-TMDB IDs
       const cachedCast = cacheService.getCast(id, type);
       if (cachedCast) {
         setCast(cachedCast);
@@ -277,12 +303,172 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
         return;
       }
 
+      // Handle TMDB-specific IDs
+      let actualId = id;
+      if (id.startsWith('tmdb:')) {
+        const tmdbId = id.split(':')[1];
+        // For TMDB IDs, we need to handle metadata differently
+        if (type === 'movie') {
+          logger.log('Fetching movie details from TMDB for:', tmdbId);
+          const movieDetails = await tmdbService.getMovieDetails(tmdbId);
+          if (movieDetails) {
+            const imdbId = movieDetails.imdb_id || movieDetails.external_ids?.imdb_id;
+            if (imdbId) {
+              // Use the imdbId for compatibility with the rest of the app
+              actualId = imdbId;
+              // Also store the TMDB ID for later use
+              setTmdbId(parseInt(tmdbId));
+            } else {
+              // If no IMDb ID, directly call loadTMDBMovie (create this function if needed)
+              const formattedMovie: StreamingContent = {
+                id: `tmdb:${tmdbId}`,
+                type: 'movie',
+                name: movieDetails.title,
+                poster: tmdbService.getImageUrl(movieDetails.poster_path) || '',
+                banner: tmdbService.getImageUrl(movieDetails.backdrop_path) || '',
+                description: movieDetails.overview || '',
+                year: movieDetails.release_date ? parseInt(movieDetails.release_date.substring(0, 4)) : undefined,
+                genres: movieDetails.genres?.map((g: { name: string }) => g.name) || [],
+                inLibrary: false,
+              };
+              
+              // Fetch credits to get director and crew information
+              try {
+                const credits = await tmdbService.getCredits(parseInt(tmdbId), 'movie');
+                if (credits && credits.crew) {
+                  // Extract directors
+                  const directors = credits.crew
+                    .filter((person: any) => person.job === 'Director')
+                    .map((person: any) => person.name);
+                    
+                  // Extract creators/writers
+                  const writers = credits.crew
+                    .filter((person: any) => ['Writer', 'Screenplay'].includes(person.job))
+                    .map((person: any) => person.name);
+                  
+                  // Add to formatted movie
+                  if (directors.length > 0) {
+                    (formattedMovie as any).directors = directors;
+                    (formattedMovie as StreamingContent & { director: string }).director = directors.join(', ');
+                  }
+                  
+                  if (writers.length > 0) {
+                    (formattedMovie as any).creators = writers;
+                    (formattedMovie as StreamingContent & { writer: string }).writer = writers.join(', ');
+                  }
+                }
+              } catch (error) {
+                logger.error('Failed to fetch credits for movie:', error);
+              }
+              
+              // Fetch movie logo from TMDB
+              try {
+                const logoUrl = await tmdbService.getMovieImages(tmdbId);
+                if (logoUrl) {
+                  formattedMovie.logo = logoUrl;
+                  logger.log(`Successfully fetched logo for movie ${tmdbId} from TMDB`);
+                }
+              } catch (error) {
+                logger.error('Failed to fetch logo from TMDB:', error);
+                // Continue with execution, logo is optional
+              }
+              
+              setMetadata(formattedMovie);
+              cacheService.setMetadata(id, type, formattedMovie);
+              const isInLib = catalogService.getLibraryItems().some(item => item.id === id);
+              setInLibrary(isInLib);
+              setLoading(false);
+              return; 
+            }
+          }
+        } else if (type === 'series') {
+          // Handle TV shows with TMDB IDs
+          logger.log('Fetching TV show details from TMDB for:', tmdbId);
+          try {
+            const showDetails = await tmdbService.getTVShowDetails(parseInt(tmdbId));
+            if (showDetails) {
+              // Get external IDs to check for IMDb ID
+              const externalIds = await tmdbService.getShowExternalIds(parseInt(tmdbId));
+              const imdbId = externalIds?.imdb_id;
+              
+              if (imdbId) {
+                // Use the imdbId for compatibility with the rest of the app
+                actualId = imdbId;
+                // Also store the TMDB ID for later use
+                setTmdbId(parseInt(tmdbId));
+              } else {
+                // If no IMDb ID, create formatted show from TMDB data
+                const formattedShow: StreamingContent = {
+                  id: `tmdb:${tmdbId}`,
+                  type: 'series',
+                  name: showDetails.name,
+                  poster: tmdbService.getImageUrl(showDetails.poster_path) || '',
+                  banner: tmdbService.getImageUrl(showDetails.backdrop_path) || '',
+                  description: showDetails.overview || '',
+                  year: showDetails.first_air_date ? parseInt(showDetails.first_air_date.substring(0, 4)) : undefined,
+                  genres: showDetails.genres?.map((g: { name: string }) => g.name) || [],
+                  inLibrary: false,
+                };
+                
+                // Fetch credits to get creators
+                try {
+                  const credits = await tmdbService.getCredits(parseInt(tmdbId), 'series');
+                  if (credits && credits.crew) {
+                    // Extract creators
+                    const creators = credits.crew
+                      .filter((person: any) => 
+                        person.job === 'Creator' || 
+                        person.job === 'Series Creator' ||
+                        person.department === 'Production' || 
+                        person.job === 'Executive Producer'
+                      )
+                      .map((person: any) => person.name);
+                    
+                    if (creators.length > 0) {
+                      (formattedShow as any).creators = creators.slice(0, 3);
+                    }
+                  }
+                } catch (error) {
+                  logger.error('Failed to fetch credits for TV show:', error);
+                }
+                
+                // Fetch TV show logo from TMDB
+                try {
+                  const logoUrl = await tmdbService.getTvShowImages(tmdbId);
+                  if (logoUrl) {
+                    formattedShow.logo = logoUrl;
+                    logger.log(`Successfully fetched logo for TV show ${tmdbId} from TMDB`);
+                  }
+                } catch (error) {
+                  logger.error('Failed to fetch logo from TMDB:', error);
+                  // Continue with execution, logo is optional
+                }
+                
+                setMetadata(formattedShow);
+                cacheService.setMetadata(id, type, formattedShow);
+                
+                // Load series data (episodes)
+                setTmdbId(parseInt(tmdbId));
+                loadSeriesData().catch(console.error);
+                
+                const isInLib = catalogService.getLibraryItems().some(item => item.id === id);
+                setInLibrary(isInLib);
+                setLoading(false);
+                return;
+              }
+            }
+          } catch (error) {
+            logger.error('Failed to fetch TV show details from TMDB:', error);
+          }
+        }
+      }
+
       // Load all data in parallel
       const [content, castData] = await Promise.allSettled([
         // Load content with timeout and retry
         withRetry(async () => {
           const result = await withTimeout(
-            catalogService.getContentDetails(type, id),
+            catalogService.getContentDetails(type, actualId),
             API_TIMEOUT
           );
           return result;
@@ -297,6 +483,41 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
         const isInLib = catalogService.getLibraryItems().some(item => item.id === id);
         setInLibrary(isInLib);
         cacheService.setMetadata(id, type, content.value);
+
+        // Fetch and add logo from TMDB
+        let finalMetadata = { ...content.value };
+        try {
+          // Get TMDB ID if not already set
+          const contentTmdbId = await tmdbService.extractTMDBIdFromStremioId(id);
+          if (contentTmdbId) {
+            // Determine content type for TMDB API (movie or tv)
+            const tmdbType = type === 'series' ? 'tv' : 'movie';
+            // Fetch logo from TMDB
+            const logoUrl = await tmdbService.getContentLogo(tmdbType, contentTmdbId);
+            if (logoUrl) {
+              // Update metadata with logo
+              finalMetadata.logo = logoUrl;
+              logger.log(`[useMetadata] Successfully fetched and set logo from TMDB for ${id}`);
+            } else {
+              // If TMDB has no logo, ensure logo property is null/undefined
+              finalMetadata.logo = undefined;
+              logger.log(`[useMetadata] No logo found on TMDB for ${id}. Setting logo to undefined.`);
+            }
+          } else {
+            // If we couldn't get a TMDB ID, ensure logo is null/undefined
+             finalMetadata.logo = undefined;
+             logger.log(`[useMetadata] Could not determine TMDB ID for ${id}. Setting logo to undefined.`);
+          }
+        } catch (error) {
+          logger.error(`[useMetadata] Error fetching logo from TMDB for ${id}:`, error);
+          // Ensure logo is null/undefined on error
+           finalMetadata.logo = undefined;
+        }
+        
+        // Set the final metadata state
+        setMetadata(finalMetadata);
+        // Update cache with final metadata (including potentially nulled logo)
+        cacheService.setMetadata(id, type, finalMetadata);
 
         if (type === 'series') {
           // Load series data in parallel with other data

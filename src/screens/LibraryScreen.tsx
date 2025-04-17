@@ -19,6 +19,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { colors } from '../styles';
 import { Image } from 'expo-image';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { catalogService } from '../services/catalogService';
 import type { StreamingContent } from '../services/catalogService';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -81,7 +82,7 @@ const SkeletonLoader = () => {
   return (
     <View style={styles.skeletonContainer}>
       {[...Array(6)].map((_, index) => (
-        <View key={index} style={{ width: itemWidth }}>
+        <View key={index} style={{ width: itemWidth, margin: 8 }}>
           {renderSkeletonItem()}
         </View>
       ))}
@@ -135,13 +136,32 @@ const LibraryScreen = () => {
     <TouchableOpacity
       style={[styles.itemContainer, { width: itemWidth }]}
       onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type })}
+      activeOpacity={0.7}
     >
       <View style={styles.posterContainer}>
         <Image
           source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
           style={styles.poster}
           contentFit="cover"
+          transition={300}
         />
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.85)']}
+          style={styles.posterGradient}
+        >
+          <Text 
+            style={styles.itemTitle}
+            numberOfLines={2}
+          >
+            {item.name}
+          </Text>
+          {item.lastWatched && (
+            <Text style={styles.lastWatched}>
+              {item.lastWatched}
+            </Text>
+          )}
+        </LinearGradient>
+        
         {item.progress !== undefined && item.progress < 1 && (
           <View style={styles.progressBarContainer}>
             <View 
@@ -156,7 +176,7 @@ const LibraryScreen = () => {
           <View style={styles.badgeContainer}>
             <MaterialIcons
               name="live-tv"
-              size={12}
+              size={14}
               color={colors.white}
               style={{ marginRight: 4 }}
             />
@@ -164,17 +184,6 @@ const LibraryScreen = () => {
           </View>
         )}
       </View>
-      <Text 
-        style={[styles.itemTitle, { color: isDarkMode ? colors.white : colors.black }]}
-        numberOfLines={2}
-      >
-        {item.name}
-      </Text>
-      {item.lastWatched && (
-        <Text style={[styles.lastWatched, { color: isDarkMode ? colors.lightGray : colors.mediumGray }]}>
-          {item.lastWatched}
-        </Text>
-      )}
     </TouchableOpacity>
   );
 
@@ -185,25 +194,21 @@ const LibraryScreen = () => {
         style={[
           styles.filterButton,
           isActive && styles.filterButtonActive,
-          { 
-            borderColor: isDarkMode ? 'rgba(255,255,255,0.3)' : colors.border,
-            backgroundColor: isDarkMode && !isActive ? 'rgba(255,255,255,0.15)' : 'transparent'
-          }
         ]}
         onPress={() => setFilter(filterType)}
+        activeOpacity={0.7}
       >
         <MaterialIcons
           name={iconName}
-          size={20}
-          color={isActive ? colors.primary : (isDarkMode ? colors.white : colors.mediumGray)}
+          size={22}
+          color={isActive ? colors.white : colors.mediumGray}
           style={styles.filterIcon}
         />
         <Text
-          style={{
-            fontSize: 14,
-            fontWeight: isActive ? '600' : '500',
-            color: isActive ? colors.primary : colors.white
-          }}
+          style={[
+            styles.filterText,
+            isActive && styles.filterTextActive
+          ]}
         >
           {label}
         </Text>
@@ -212,10 +217,11 @@ const LibraryScreen = () => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.black }]}>
+    <SafeAreaView style={styles.container}>
       <StatusBar
         barStyle="light-content"
-        backgroundColor={colors.black}
+        backgroundColor="transparent"
+        translucent
       />
       
       <View style={styles.header}>
@@ -236,21 +242,21 @@ const LibraryScreen = () => {
         <View style={styles.emptyContainer}>
           <MaterialIcons 
             name="video-library" 
-            size={64} 
-            color={isDarkMode ? colors.lightGray : colors.mediumGray}
+            size={80} 
+            color={colors.mediumGray}
+            style={{ opacity: 0.7 }}
           />
-          <Text style={[
-            styles.emptyText,
-            { color: isDarkMode ? colors.white : colors.black }
-          ]}>
-            Your library is empty
+          <Text style={styles.emptyText}>Your library is empty</Text>
+          <Text style={styles.emptySubtext}>
+            Add content to your library to keep track of what you're watching
           </Text>
-          <Text style={[
-            styles.emptySubtext,
-            { color: isDarkMode ? colors.lightGray : colors.mediumGray }
-          ]}>
-            Add items to your library by marking them as favorites
-          </Text>
+          <TouchableOpacity 
+            style={styles.exploreButton}
+            onPress={() => navigation.navigate('Discover')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.exploreButtonText}>Explore Content</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
@@ -258,8 +264,13 @@ const LibraryScreen = () => {
           renderItem={renderItem}
           keyExtractor={item => item.id}
           numColumns={2}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
+          columnWrapperStyle={styles.columnWrapper}
+          initialNumToRender={6}
+          maxToRenderPerBatch={6}
+          windowSize={5}
+          removeClippedSubviews={Platform.OS === 'android'}
         />
       )}
     </SafeAreaView>
@@ -269,14 +280,12 @@ const LibraryScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.darkBackground,
   },
   header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 12 : 4,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: colors.darkBackground,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 16 : 16,
   },
   headerContent: {
     flexDirection: 'row',
@@ -287,90 +296,94 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '800',
     color: colors.white,
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
   filtersContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 12,
-    backgroundColor: colors.black,
+    paddingBottom: 16,
+    paddingTop: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+    zIndex: 10,
   },
   filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 10,
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.darkGray,
-    backgroundColor: 'transparent',
-    gap: 6,
-    minWidth: 100,
-    justifyContent: 'center',
+    marginHorizontal: 4,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   filterButtonActive: {
-    backgroundColor: colors.primary + '20',
-    borderColor: colors.primary,
+    backgroundColor: colors.primary,
   },
   filterIcon: {
-    marginRight: 2,
+    marginRight: 8,
   },
   filterText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '500',
+    color: colors.mediumGray,
   },
   filterTextActive: {
-    color: colors.primary,
     fontWeight: '600',
+    color: colors.white,
   },
-  listContent: {
-    paddingHorizontal: 8,
+  listContainer: {
+    paddingHorizontal: 12,
+    paddingVertical: 16,
+  },
+  columnWrapper: {
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  skeletonContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 12,
     paddingTop: 16,
-    paddingBottom: 32,
-    alignItems: 'flex-start',
+    justifyContent: 'space-between',
   },
   itemContainer: {
-    marginHorizontal: 8,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   posterContainer: {
-    position: 'relative',
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.03)',
     aspectRatio: 2/3,
-    marginBottom: 8,
-    backgroundColor: colors.darkBackground,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    elevation: 5,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
   },
   poster: {
     width: '100%',
     height: '100%',
   },
-  itemTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 4,
-    lineHeight: 20,
-  },
-  lastWatched: {
-    fontSize: 12,
-    lineHeight: 16,
-    opacity: 0.7,
+  posterGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 16,
+    justifyContent: 'flex-end',
+    height: '45%',
   },
   progressBarContainer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 3,
+    height: 4,
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   progressBar: {
@@ -379,9 +392,9 @@ const styles = StyleSheet.create({
   },
   badgeContainer: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(0,0,0,0.75)',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.7)',
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -390,8 +403,30 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     color: colors.white,
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '600',
+  },
+  itemTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.white,
+    marginBottom: 4,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+    letterSpacing: 0.3,
+  },
+  lastWatched: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.7)',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  skeletonTitle: {
+    height: 14,
+    marginTop: 8,
+    borderRadius: 4,
   },
   emptyContainer: {
     flex: 1,
@@ -400,30 +435,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.white,
     marginTop: 16,
     marginBottom: 8,
-    textAlign: 'center',
   },
   emptySubtext: {
-    fontSize: 14,
+    fontSize: 15,
+    color: colors.mediumGray,
     textAlign: 'center',
-    lineHeight: 20,
-    opacity: 0.7,
+    marginBottom: 24,
   },
-  skeletonContainer: {
-    padding: 16,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+  exploreButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 24,
+    elevation: 3,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
-  skeletonTitle: {
-    height: 20,
-    borderRadius: 4,
-    marginTop: 8,
-    width: '80%',
-  },
+  exploreButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '600',
+  }
 });
 
 export default LibraryScreen; 

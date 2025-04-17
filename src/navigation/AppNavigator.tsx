@@ -8,6 +8,7 @@ import type { MD3Theme } from 'react-native-paper';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { colors } from '../styles/colors';
 import { NuvioHeader } from '../components/NuvioHeader';
 import { Stream } from '../types/streams';
@@ -27,6 +28,10 @@ import CatalogSettingsScreen from '../screens/CatalogSettingsScreen';
 import StreamsScreen from '../screens/StreamsScreen';
 import CalendarScreen from '../screens/CalendarScreen';
 import NotificationSettingsScreen from '../screens/NotificationSettingsScreen';
+import MDBListSettingsScreen from '../screens/MDBListSettingsScreen';
+import TMDBSettingsScreen from '../screens/TMDBSettingsScreen';
+import HomeScreenSettings from '../screens/HomeScreenSettings';
+import HeroCatalogsScreen from '../screens/HeroCatalogsScreen';
 
 // Stack navigator types
 export type RootStackParamList = {
@@ -76,6 +81,10 @@ export type RootStackParamList = {
   Addons: undefined;
   CatalogSettings: undefined;
   NotificationSettings: undefined;
+  MDBListSettings: undefined;
+  TMDBSettings: undefined;
+  HomeScreenSettings: undefined;
+  HeroCatalogs: undefined;
 };
 
 export type RootStackNavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -85,7 +94,6 @@ export type MainTabParamList = {
   Home: undefined;
   Discover: undefined;
   Library: undefined;
-  Addons: undefined;
   Settings: undefined;
 };
 
@@ -320,27 +328,46 @@ const MainTabs = () => {
         bottom: 0, 
         left: 0, 
         right: 0,
-        height: 75,
+        height: 85,
         backgroundColor: 'transparent',
+        overflow: 'hidden',
       }}>
-        <LinearGradient
-          colors={[
-            'rgba(0, 0, 0, 0)',
-            'rgba(0, 0, 0, 0.65)',
-            'rgba(0, 0, 0, 0.85)',
-            'rgba(0, 0, 0, 0.98)',
-          ]}
-          locations={[0, 0.2, 0.4, 0.8]}
-          style={{
-            position: 'absolute',
-            height: '100%',
-            width: '100%',
-          }}
-        />
+        {Platform.OS === 'ios' ? (
+          <BlurView
+            tint="dark"
+            intensity={75}
+            style={{
+              position: 'absolute',
+              height: '100%',
+              width: '100%',
+              borderTopColor: 'rgba(255,255,255,0.2)',
+              borderTopWidth: 0.5,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: -2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 3,
+            }}
+          />
+        ) : (
+          <LinearGradient
+            colors={[
+              'rgba(0, 0, 0, 0)',
+              'rgba(0, 0, 0, 0.65)',
+              'rgba(0, 0, 0, 0.85)',
+              'rgba(0, 0, 0, 0.98)',
+            ]}
+            locations={[0, 0.2, 0.4, 0.8]}
+            style={{
+              position: 'absolute',
+              height: '100%',
+              width: '100%',
+            }}
+          />
+        )}
         <View
           style={{
             height: '100%',
-            paddingBottom: 10,
+            paddingBottom: 20,
             paddingTop: 12,
             backgroundColor: 'transparent',
           }}
@@ -379,9 +406,6 @@ const MainTabs = () => {
                   break;
                 case 'Library':
                   iconName = 'play-box-multiple';
-                  break;
-                case 'Addons':
-                  iconName = 'puzzle';
                   break;
                 case 'Settings':
                   iconName = 'cog';
@@ -442,9 +466,6 @@ const MainTabs = () => {
             case 'Library':
               iconName = 'play-box-multiple';
               break;
-            case 'Addons':
-              iconName = 'puzzle';
-              break;
             case 'Settings':
               iconName = 'cog';
               break;
@@ -459,8 +480,8 @@ const MainTabs = () => {
           backgroundColor: 'transparent',
           borderTopWidth: 0,
           elevation: 0,
-          height: 75,
-          paddingBottom: 10,
+          height: 85,
+          paddingBottom: 20,
           paddingTop: 12,
         },
         tabBarLabelStyle: {
@@ -469,20 +490,38 @@ const MainTabs = () => {
           marginTop: 0,
         },
         tabBarBackground: () => (
-          <LinearGradient
-            colors={[
-              'rgba(0, 0, 0, 0)',
-              'rgba(0, 0, 0, 0.65)',
-              'rgba(0, 0, 0, 0.85)',
-              'rgba(0, 0, 0, 0.98)',
-            ]}
-            locations={[0, 0.2, 0.4, 0.8]}
-            style={{
-              position: 'absolute',
-              height: '100%',
-              width: '100%',
-            }}
-          />
+          Platform.OS === 'ios' ? (
+            <BlurView
+              tint="dark"
+              intensity={75}
+              style={{
+                position: 'absolute',
+                height: '100%',
+                width: '100%',
+                borderTopColor: 'rgba(255,255,255,0.2)',
+                borderTopWidth: 0.5,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: -2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 3,
+              }}
+            />
+          ) : (
+            <LinearGradient
+              colors={[
+                'rgba(0, 0, 0, 0)',
+                'rgba(0, 0, 0, 0.65)',
+                'rgba(0, 0, 0, 0.85)',
+                'rgba(0, 0, 0, 0.98)',
+              ]}
+              locations={[0, 0.2, 0.4, 0.8]}
+              style={{
+                position: 'absolute',
+                height: '100%',
+                width: '100%',
+              }}
+            />
+          )
         ),
         header: () => route.name === 'Home' ? <NuvioHeader /> : null,
         headerShown: route.name === 'Home',
@@ -507,13 +546,6 @@ const MainTabs = () => {
         component={LibraryScreen as any}
         options={{ 
           tabBarLabel: 'Library'
-        }}
-      />
-      <Tab.Screen 
-        name="Addons" 
-        component={AddonsScreen as any}
-        options={{ 
-          tabBarLabel: 'Addons'
         }}
       />
       <Tab.Screen 
@@ -584,6 +616,36 @@ const AppNavigator = () => {
             component={CatalogSettingsScreen as any} 
           />
           <Stack.Screen 
+            name="HomeScreenSettings" 
+            component={HomeScreenSettings}
+            options={{
+              animation: 'fade',
+              animationDuration: 200,
+              presentation: 'card',
+              gestureEnabled: true,
+              gestureDirection: 'horizontal',
+              headerShown: false,
+              contentStyle: {
+                backgroundColor: colors.darkBackground,
+              },
+            }}
+          />
+          <Stack.Screen 
+            name="HeroCatalogs" 
+            component={HeroCatalogsScreen}
+            options={{
+              animation: 'fade',
+              animationDuration: 200,
+              presentation: 'card',
+              gestureEnabled: true,
+              gestureDirection: 'horizontal',
+              headerShown: false,
+              contentStyle: {
+                backgroundColor: colors.darkBackground,
+              },
+            }}
+          />
+          <Stack.Screen 
             name="ShowRatings" 
             component={ShowRatingsScreen}
             options={{
@@ -605,6 +667,36 @@ const AppNavigator = () => {
           <Stack.Screen 
             name="NotificationSettings" 
             component={NotificationSettingsScreen as any} 
+          />
+          <Stack.Screen 
+            name="MDBListSettings" 
+            component={MDBListSettingsScreen}
+            options={{
+              animation: 'fade',
+              animationDuration: 200,
+              presentation: 'card',
+              gestureEnabled: true,
+              gestureDirection: 'horizontal',
+              headerShown: false,
+              contentStyle: {
+                backgroundColor: colors.darkBackground,
+              },
+            }}
+          />
+          <Stack.Screen 
+            name="TMDBSettings" 
+            component={TMDBSettingsScreen}
+            options={{
+              animation: 'fade',
+              animationDuration: 200,
+              presentation: 'card',
+              gestureEnabled: true,
+              gestureDirection: 'horizontal',
+              headerShown: false,
+              contentStyle: {
+                backgroundColor: colors.darkBackground,
+              },
+            }}
           />
         </Stack.Navigator>
       </PaperProvider>

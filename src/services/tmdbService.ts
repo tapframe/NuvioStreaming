@@ -1,9 +1,12 @@
 import axios from 'axios';
 import { logger } from '../utils/logger';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // TMDB API configuration
-const API_KEY = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0MzljNDc4YTc3MWYzNWMwNTAyMmY5ZmVhYmNjYTAxYyIsIm5iZiI6MTcwOTkxMTEzNS4xNCwic3ViIjoiNjVlYjJjNWYzODlkYTEwMTYyZDgyOWU0Iiwic2NvcGVzIjpbImFwaV9yZWFkIl0sInZlcnNpb24iOjF9.gosBVl1wYUbePOeB9WieHn8bY9x938-GSGmlXZK_UVM';
+const DEFAULT_API_KEY = '439c478a771f35c05022f9feabcca01c';
 const BASE_URL = 'https://api.themoviedb.org/3';
+const TMDB_API_KEY_STORAGE_KEY = 'tmdb_api_key';
+const USE_CUSTOM_TMDB_API_KEY = 'use_custom_tmdb_api_key';
 
 // Types for TMDB responses
 export interface TMDBEpisode {
@@ -40,6 +43,7 @@ export interface TMDBShow {
   last_air_date: string;
   number_of_seasons: number;
   number_of_episodes: number;
+  genres?: { id: number; name: string }[];
   seasons: {
     id: number;
     name: string;
@@ -69,8 +73,13 @@ export interface TMDBTrendingResult {
 export class TMDBService {
   private static instance: TMDBService;
   private static ratingCache: Map<string, number | null> = new Map();
+  private apiKey: string = DEFAULT_API_KEY;
+  private useCustomKey: boolean = false;
+  private apiKeyLoaded: boolean = false;
 
-  private constructor() {}
+  private constructor() {
+    this.loadApiKey();
+  }
 
   static getInstance(): TMDBService {
     if (!TMDBService.instance) {
@@ -79,10 +88,51 @@ export class TMDBService {
     return TMDBService.instance;
   }
 
-  private getHeaders() {
+  private async loadApiKey() {
+    try {
+      const [savedKey, savedUseCustomKey] = await Promise.all([
+        AsyncStorage.getItem(TMDB_API_KEY_STORAGE_KEY),
+        AsyncStorage.getItem(USE_CUSTOM_TMDB_API_KEY)
+      ]);
+      
+      this.useCustomKey = savedUseCustomKey === 'true';
+      
+      if (this.useCustomKey && savedKey) {
+        this.apiKey = savedKey;
+        logger.log('Using custom TMDb API key');
+      } else {
+        this.apiKey = DEFAULT_API_KEY;
+        logger.log('Using default TMDb API key');
+      }
+      
+      this.apiKeyLoaded = true;
+    } catch (error) {
+      logger.error('Failed to load TMDb API key from storage, using default:', error);
+      this.apiKey = DEFAULT_API_KEY;
+      this.apiKeyLoaded = true;
+    }
+  }
+
+  private async getHeaders() {
+    // Ensure API key is loaded before returning headers
+    if (!this.apiKeyLoaded) {
+      await this.loadApiKey();
+    }
+    
     return {
-      Authorization: `Bearer ${API_KEY}`,
       'Content-Type': 'application/json',
+    };
+  }
+
+  private async getParams(additionalParams = {}) {
+    // Ensure API key is loaded before returning params
+    if (!this.apiKeyLoaded) {
+      await this.loadApiKey();
+    }
+    
+    return {
+      api_key: this.apiKey,
+      ...additionalParams
     };
   }
 
@@ -96,13 +146,13 @@ export class TMDBService {
   async searchTVShow(query: string): Promise<TMDBShow[]> {
     try {
       const response = await axios.get(`${BASE_URL}/search/tv`, {
-        headers: this.getHeaders(),
-        params: {
+        headers: await this.getHeaders(),
+        params: await this.getParams({
           query,
           include_adult: false,
           language: 'en-US',
           page: 1,
-        },
+        }),
       });
       return response.data.results;
     } catch (error) {
@@ -117,10 +167,10 @@ export class TMDBService {
   async getTVShowDetails(tmdbId: number): Promise<TMDBShow | null> {
     try {
       const response = await axios.get(`${BASE_URL}/tv/${tmdbId}`, {
-        headers: this.getHeaders(),
-        params: {
+        headers: await this.getHeaders(),
+        params: await this.getParams({
           language: 'en-US',
-        },
+        }),
       });
       return response.data;
     } catch (error) {
@@ -141,7 +191,8 @@ export class TMDBService {
       const response = await axios.get(
         `${BASE_URL}/tv/${tmdbId}/season/${seasonNumber}/episode/${episodeNumber}/external_ids`,
         {
-          headers: this.getHeaders(),
+          headers: await this.getHeaders(),
+          params: await this.getParams(),
         }
       );
       return response.data;
@@ -195,10 +246,10 @@ export class TMDBService {
   async getSeasonDetails(tmdbId: number, seasonNumber: number, showName?: string): Promise<TMDBSeason | null> {
     try {
       const response = await axios.get(`${BASE_URL}/tv/${tmdbId}/season/${seasonNumber}`, {
-        headers: this.getHeaders(),
-        params: {
+        headers: await this.getHeaders(),
+        params: await this.getParams({
           language: 'en-US',
-        },
+        }),
       });
 
       const season = response.data;
@@ -254,10 +305,10 @@ export class TMDBService {
       const response = await axios.get(
         `${BASE_URL}/tv/${tmdbId}/season/${seasonNumber}/episode/${episodeNumber}`,
         {
-          headers: this.getHeaders(),
-          params: {
+          headers: await this.getHeaders(),
+          params: await this.getParams({
             language: 'en-US',
-          },
+          }),
         }
       );
       return response.data;
@@ -295,11 +346,11 @@ export class TMDBService {
       const baseImdbId = imdbId.split(':')[0];
       
       const response = await axios.get(`${BASE_URL}/find/${baseImdbId}`, {
-        headers: this.getHeaders(),
-        params: {
+        headers: await this.getHeaders(),
+        params: await this.getParams({
           external_source: 'imdb_id',
           language: 'en-US',
-        },
+        }),
       });
       
       // Check TV results first
@@ -402,10 +453,10 @@ export class TMDBService {
   async getCredits(tmdbId: number, type: string) {
     try {
       const response = await axios.get(`${BASE_URL}/${type === 'series' ? 'tv' : 'movie'}/${tmdbId}/credits`, {
-        headers: this.getHeaders(),
-        params: {
+        headers: await this.getHeaders(),
+        params: await this.getParams({
           language: 'en-US',
-        },
+        }),
       });
       return {
         cast: response.data.cast || [],
@@ -420,10 +471,10 @@ export class TMDBService {
   async getPersonDetails(personId: number) {
     try {
       const response = await axios.get(`${BASE_URL}/person/${personId}`, {
-        headers: this.getHeaders(),
-        params: {
+        headers: await this.getHeaders(),
+        params: await this.getParams({
           language: 'en-US',
-        },
+        }),
       });
       return response.data;
     } catch (error) {
@@ -440,7 +491,8 @@ export class TMDBService {
       const response = await axios.get(
         `${BASE_URL}/tv/${tmdbId}/external_ids`,
         {
-          headers: this.getHeaders(),
+          headers: await this.getHeaders(),
+          params: await this.getParams(),
         }
       );
       return response.data;
@@ -451,14 +503,14 @@ export class TMDBService {
   }
 
   async getRecommendations(type: 'movie' | 'tv', tmdbId: string): Promise<any[]> {
-    if (!API_KEY) {
+    if (!this.apiKey) {
       logger.error('TMDB API key not set');
       return [];
     }
     try {
       const response = await axios.get(`${BASE_URL}/${type}/${tmdbId}/recommendations`, {
-        headers: this.getHeaders(),
-        params: { language: 'en-US' }
+        headers: await this.getHeaders(),
+        params: await this.getParams({ language: 'en-US' })
       });
       return response.data.results || [];
     } catch (error) {
@@ -470,13 +522,13 @@ export class TMDBService {
   async searchMulti(query: string): Promise<any[]> {
     try {
       const response = await axios.get(`${BASE_URL}/search/multi`, {
-        headers: this.getHeaders(),
-        params: {
+        headers: await this.getHeaders(),
+        params: await this.getParams({
           query,
           include_adult: false,
           language: 'en-US',
           page: 1,
-        },
+        }),
       });
       return response.data.results;
     } catch (error) {
@@ -485,25 +537,189 @@ export class TMDBService {
     }
   }
 
+  /**
+   * Get movie details by TMDB ID
+   */
   async getMovieDetails(movieId: string): Promise<any> {
     try {
       const response = await axios.get(`${BASE_URL}/movie/${movieId}`, {
-        headers: this.getHeaders(),
-        params: { language: 'en-US' }
+        headers: await this.getHeaders(),
+        params: await this.getParams({
+          language: 'en-US',
+          append_to_response: 'external_ids' // Append external IDs
+        }),
       });
       return response.data;
     } catch (error) {
-      logger.error('Error fetching movie details:', error);
+      logger.error('Failed to get movie details:', error);
       return null;
     }
   }
 
+  /**
+   * Get movie images (logos, posters, backdrops) by TMDB ID
+   */
+  async getMovieImages(movieId: number | string): Promise<string | null> {
+    try {
+      const response = await axios.get(`${BASE_URL}/movie/${movieId}/images`, {
+        headers: await this.getHeaders(),
+        params: await this.getParams({
+          include_image_language: 'en,null'
+        }),
+      });
+
+      const images = response.data;
+      if (images && images.logos && images.logos.length > 0) {
+        // First prioritize English SVG logos
+        const enSvgLogo = images.logos.find((logo: any) => 
+          logo.file_path && 
+          logo.file_path.endsWith('.svg') && 
+          logo.iso_639_1 === 'en'
+        );
+        if (enSvgLogo) {
+          return this.getImageUrl(enSvgLogo.file_path);
+        }
+
+        // Then English PNG logos
+        const enPngLogo = images.logos.find((logo: any) => 
+          logo.file_path && 
+          logo.file_path.endsWith('.png') && 
+          logo.iso_639_1 === 'en'
+        );
+        if (enPngLogo) {
+          return this.getImageUrl(enPngLogo.file_path);
+        }
+        
+        // Then any English logo
+        const enLogo = images.logos.find((logo: any) => 
+          logo.iso_639_1 === 'en'
+        );
+        if (enLogo) {
+          return this.getImageUrl(enLogo.file_path);
+        }
+
+        // Fallback to any SVG logo
+        const svgLogo = images.logos.find((logo: any) => 
+          logo.file_path && logo.file_path.endsWith('.svg')
+        );
+        if (svgLogo) {
+          return this.getImageUrl(svgLogo.file_path);
+        }
+
+        // Then any PNG logo
+        const pngLogo = images.logos.find((logo: any) => 
+          logo.file_path && logo.file_path.endsWith('.png')
+        );
+        if (pngLogo) {
+          return this.getImageUrl(pngLogo.file_path);
+        }
+         
+        // Last resort: any logo
+        return this.getImageUrl(images.logos[0].file_path);
+      }
+
+      return null; // No logos found
+    } catch (error) {
+      // Log error but don't throw, just return null if fetching images fails
+      logger.error(`Failed to get movie images for ID ${movieId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Get TV show images (logos, posters, backdrops) by TMDB ID
+   */
+  async getTvShowImages(showId: number | string): Promise<string | null> {
+    try {
+      const response = await axios.get(`${BASE_URL}/tv/${showId}/images`, {
+        headers: await this.getHeaders(),
+        params: await this.getParams({
+          include_image_language: 'en,null'
+        }),
+      });
+
+      const images = response.data;
+      if (images && images.logos && images.logos.length > 0) {
+        // First prioritize English SVG logos
+        const enSvgLogo = images.logos.find((logo: any) => 
+          logo.file_path && 
+          logo.file_path.endsWith('.svg') && 
+          logo.iso_639_1 === 'en'
+        );
+        if (enSvgLogo) {
+          return this.getImageUrl(enSvgLogo.file_path);
+        }
+
+        // Then English PNG logos
+        const enPngLogo = images.logos.find((logo: any) => 
+          logo.file_path && 
+          logo.file_path.endsWith('.png') && 
+          logo.iso_639_1 === 'en'
+        );
+        if (enPngLogo) {
+          return this.getImageUrl(enPngLogo.file_path);
+        }
+        
+        // Then any English logo
+        const enLogo = images.logos.find((logo: any) => 
+          logo.iso_639_1 === 'en'
+        );
+        if (enLogo) {
+          return this.getImageUrl(enLogo.file_path);
+        }
+
+        // Fallback to any SVG logo
+        const svgLogo = images.logos.find((logo: any) => 
+          logo.file_path && logo.file_path.endsWith('.svg')
+        );
+        if (svgLogo) {
+          return this.getImageUrl(svgLogo.file_path);
+        }
+
+        // Then any PNG logo
+        const pngLogo = images.logos.find((logo: any) => 
+          logo.file_path && logo.file_path.endsWith('.png')
+        );
+        if (pngLogo) {
+          return this.getImageUrl(pngLogo.file_path);
+        }
+         
+        // Last resort: any logo
+        return this.getImageUrl(images.logos[0].file_path);
+      }
+
+      return null; // No logos found
+    } catch (error) {
+      // Log error but don't throw, just return null if fetching images fails
+      logger.error(`Failed to get TV show images for ID ${showId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Get content logo based on type (movie or TV show)
+   */
+  async getContentLogo(type: 'movie' | 'tv', id: number | string): Promise<string | null> {
+    try {
+      return type === 'movie' 
+        ? await this.getMovieImages(id)
+        : await this.getTvShowImages(id);
+    } catch (error) {
+      logger.error(`Failed to get content logo for ${type} ID ${id}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Get content certification rating
+   */
   async getCertification(type: string, id: number): Promise<string | null> {
     try {
       // Different endpoints for movies and TV shows
       const endpoint = type === 'movie' ? 'movie' : 'tv';
       const response = await axios.get(`${BASE_URL}/${endpoint}/${id}/release_dates`, {
-        headers: this.getHeaders()
+        headers: await this.getHeaders(),
+        params: await this.getParams()
       });
 
       if (response.data && response.data.results) {
@@ -537,10 +753,10 @@ export class TMDBService {
   async getTrending(type: 'movie' | 'tv', timeWindow: 'day' | 'week'): Promise<TMDBTrendingResult[]> {
     try {
       const response = await axios.get(`${BASE_URL}/trending/${type}/${timeWindow}`, {
-        headers: this.getHeaders(),
-        params: {
+        headers: await this.getHeaders(),
+        params: await this.getParams({
           language: 'en-US',
-        },
+        }),
       });
 
       // Get external IDs for each trending item
@@ -551,7 +767,8 @@ export class TMDBService {
             const externalIdsResponse = await axios.get(
               `${BASE_URL}/${type}/${item.id}/external_ids`,
               {
-                headers: this.getHeaders(),
+                headers: await this.getHeaders(),
+                params: await this.getParams(),
               }
             );
             return {
@@ -568,6 +785,42 @@ export class TMDBService {
       return resultsWithExternalIds;
     } catch (error) {
       logger.error(`Failed to get trending ${type} content:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Get the list of official movie genres from TMDB
+   */
+  async getMovieGenres(): Promise<{ id: number; name: string }[]> {
+    try {
+      const response = await axios.get(`${BASE_URL}/genre/movie/list`, {
+        headers: await this.getHeaders(),
+        params: await this.getParams({
+          language: 'en-US',
+        }),
+      });
+      return response.data.genres || [];
+    } catch (error) {
+      logger.error('Failed to fetch movie genres:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get the list of official TV genres from TMDB
+   */
+  async getTvGenres(): Promise<{ id: number; name: string }[]> {
+    try {
+      const response = await axios.get(`${BASE_URL}/genre/tv/list`, {
+        headers: await this.getHeaders(),
+        params: await this.getParams({
+          language: 'en-US',
+        }),
+      });
+      return response.data.genres || [];
+    } catch (error) {
+      logger.error('Failed to fetch TV genres:', error);
       return [];
     }
   }
