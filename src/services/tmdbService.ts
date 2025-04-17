@@ -21,6 +21,7 @@ export interface TMDBEpisode {
   imdb_id?: string;
   imdb_rating?: number;
   season_poster_path?: string | null;
+  runtime?: number;
 }
 
 export interface TMDBSeason {

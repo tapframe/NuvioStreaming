@@ -171,6 +171,16 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
       });
     };
 
+    const formatRuntime = (runtime: number) => {
+      if (!runtime) return null;
+      const hours = Math.floor(runtime / 60);
+      const minutes = runtime % 60;
+      if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+      }
+      return `${minutes}m`;
+    };
+
     // Get episode progress
     const episodeId = episode.stremioId || `${metadata?.id}:${episode.season_number}:${episode.episode_number}`;
     const progress = episodeProgress[episodeId];
@@ -227,6 +237,14 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                   />
                   <Text style={styles.ratingText}>
                     {episode.vote_average.toFixed(1)}
+                  </Text>
+                </View>
+              )}
+              {episode.runtime && (
+                <View style={styles.runtimeContainer}>
+                  <MaterialIcons name="schedule" size={14} color={colors.textMuted} />
+                  <Text style={styles.runtimeText}>
+                    {formatRuntime(episode.runtime)}
                   </Text>
                 </View>
               )}
@@ -518,5 +536,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.3)',
+  },
+  runtimeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  runtimeText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 4,
   },
 }); 

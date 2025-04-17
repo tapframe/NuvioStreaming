@@ -1016,6 +1016,16 @@ export const StreamsScreen = () => {
                             </Text>
                           </View>
                         )}
+                        {currentEpisode.runtime && (
+                          <View style={styles.streamsHeroRuntime}>
+                            <MaterialIcons name="schedule" size={16} color={colors.mediumEmphasis} />
+                            <Text style={styles.streamsHeroRuntimeText}>
+                              {currentEpisode.runtime >= 60
+                                ? `${Math.floor(currentEpisode.runtime / 60)}h ${currentEpisode.runtime % 60}m`
+                                : `${currentEpisode.runtime}m`}
+                            </Text>
+                          </View>
+                        )}
                       </View>
                     </View>
                   </View>
@@ -1468,6 +1478,20 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
     letterSpacing: -0.5,
+  },
+  streamsHeroRuntime: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  streamsHeroRuntimeText: {
+    color: colors.mediumEmphasis,
+    fontSize: 13,
+    fontWeight: '600',
   },
 });
 
