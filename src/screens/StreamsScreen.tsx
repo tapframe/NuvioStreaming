@@ -247,24 +247,8 @@ export const StreamsScreen = () => {
       setLoadStartTime(now);
       setProviderLoadTimes({});
       
-      // Reset provider status
+      // Reset provider status - only for stremio addons
       setProviderStatus({
-        'source_1': {
-          loading: true,
-          success: false,
-          error: false,
-          message: 'Loading...',
-          timeStarted: now,
-          timeCompleted: 0
-        },
-        'source_2': {
-          loading: true,
-          success: false,
-          error: false,
-          message: 'Loading...',
-          timeStarted: now,
-          timeCompleted: 0
-        },
         'stremio': {
           loading: true,
           success: false,
@@ -275,10 +259,8 @@ export const StreamsScreen = () => {
         }
       });
       
-      // Also update the simpler loading state
+      // Also update the simpler loading state - only for stremio
       setLoadingProviders({
-        'source_1': true, 
-        'source_2': true,
         'stremio': true
       });
     }
@@ -288,8 +270,6 @@ export const StreamsScreen = () => {
     if (type === 'series' && episodeId) {
       logger.log(`🎬 Loading episode streams for: ${episodeId}`);
       setLoadingProviders({
-        'source_1': true, 
-        'source_2': true,
         'stremio': true
       });
       setSelectedEpisode(episodeId);
@@ -297,8 +277,6 @@ export const StreamsScreen = () => {
     } else if (type === 'movie') {
       logger.log(`🎬 Loading movie streams for: ${id}`);
       setLoadingProviders({
-        'source_1': true, 
-        'source_2': true,
         'stremio': true
       });
       loadStreams();
@@ -446,14 +424,13 @@ export const StreamsScreen = () => {
           if (indexB !== -1) return 1;
           return 0;
         })
+        .filter(provider => provider !== 'source_1' && provider !== 'source_2') // Filter out source_1 and source_2
         .map(provider => {
           const addonInfo = streams[provider];
           const installedAddon = installedAddons.find(addon => addon.id === provider);
           
           let displayName = provider;
-          if (provider === 'source_1') displayName = 'Source 1';
-          else if (provider === 'source_2') displayName = 'Source 2';
-          else if (provider === 'external_sources') displayName = 'External Sources';
+          if (provider === 'external_sources') displayName = 'External Sources';
           else if (installedAddon) displayName = installedAddon.name;
           else if (addonInfo?.addonName) displayName = addonInfo.addonName;
           
@@ -466,12 +443,10 @@ export const StreamsScreen = () => {
     const streams = type === 'series' ? episodeStreams : groupedStreams;
     const installedAddons = stremioService.getInstalledAddons();
 
-    // Remove test addon section
     return Object.entries(streams)
       .filter(([addonId]) => {
-        // Filter out test_addon and source_1
-        if (addonId === 'test_addon' || addonId === 'source_1') return false;
-        return selectedProvider === 'all' || selectedProvider === addonId;
+        // Filter out source_1 and source_2
+        return addonId !== 'source_1' && addonId !== 'source_2';
       })
       .sort(([addonIdA], [addonIdB]) => {
         const indexA = installedAddons.findIndex(addon => addon.id === addonIdA);
