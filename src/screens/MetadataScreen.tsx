@@ -60,11 +60,21 @@ const MovieContent = React.memo(OriginalMovieContent);
 const MoreLikeThisSection = React.memo(OriginalMoreLikeThisSection);
 const RatingsSection = React.memo(OriginalRatingsSection);
 
-// Animation configs
+// Animation constants
 const springConfig = {
   damping: 20,
   mass: 1,
   stiffness: 100
+};
+
+// Animation timing constants for staggered appearance
+const ANIMATION_DELAY_CONSTANTS = {
+  HERO: 100,
+  LOGO: 250,
+  PROGRESS: 350,
+  GENRES: 400,
+  BUTTONS: 450,
+  CONTENT: 500
 };
 
 // Add debug log for storageService
@@ -78,7 +88,8 @@ const ActionButtons = React.memo(({
   type, 
   id, 
   navigation, 
-  playButtonText 
+  playButtonText,
+  animatedStyle
 }: {
   handleShowStreams: () => void;
   toggleLibrary: () => void;
@@ -87,8 +98,9 @@ const ActionButtons = React.memo(({
   id: string;
   navigation: NavigationProp<RootStackParamList>;
   playButtonText: string;
+  animatedStyle: any;
 }) => (
-  <View style={styles.actionButtons}>
+  <Animated.View style={[styles.actionButtons, animatedStyle]}>
     <TouchableOpacity
       style={[styles.actionButton, styles.playButton]}
       onPress={handleShowStreams}
@@ -133,7 +145,7 @@ const ActionButtons = React.memo(({
         <MaterialIcons name="star-rate" size={24} color="#fff" />
       </TouchableOpacity>
     )}
-  </View>
+  </Animated.View>
 ));
 
 // Memoized WatchProgress Component
@@ -212,10 +224,18 @@ const MetadataScreen = () => {
   const [isFullDescriptionOpen, setIsFullDescriptionOpen] = useState(false);
 
   // Animation values
-  const screenScale = useSharedValue(0.8);
+  const screenScale = useSharedValue(0.92);
   const screenOpacity = useSharedValue(0);
   const heroHeight = useSharedValue(height * 0.5);
-  const contentTranslateY = useSharedValue(50);
+  const contentTranslateY = useSharedValue(60);
+  
+  // Additional animation values for staggered entrance
+  const heroScale = useSharedValue(1.05);
+  const heroOpacity = useSharedValue(0);
+  const genresOpacity = useSharedValue(0);
+  const genresTranslateY = useSharedValue(20);
+  const buttonsOpacity = useSharedValue(0);
+  const buttonsTranslateY = useSharedValue(30);
 
   // Add state for watch progress
   const [watchProgress, setWatchProgress] = useState<{
@@ -231,6 +251,7 @@ const MetadataScreen = () => {
 
   // Add animated value for logo
   const logoOpacity = useSharedValue(0);
+  const logoScale = useSharedValue(0.9);
 
   // Debug log for route params
   // logger.log('[MetadataScreen] Component mounted with route params:', { id, type, episodeId });
@@ -498,12 +519,7 @@ const MetadataScreen = () => {
   const logoAnimatedStyle = useAnimatedStyle(() => {
     return {
       opacity: logoOpacity.value,
-      transform: [{ scale: interpolate(
-        logoOpacity.value,
-        [0, 1],
-        [0.95, 1],
-        Extrapolate.CLAMP
-      ) }],
+      transform: [{ scale: logoScale.value }]
     };
   });
 
@@ -580,18 +596,36 @@ const MetadataScreen = () => {
   const heroAnimatedStyle = useAnimatedStyle(() => ({
     width: '100%',
     height: heroHeight.value,
-    backgroundColor: colors.black
+    backgroundColor: colors.black,
+    transform: [{ scale: heroScale.value }],
+    opacity: heroOpacity.value
   }));
 
   const contentAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: contentTranslateY.value }],
     opacity: interpolate(
       contentTranslateY.value,
-      [50, 0],
+      [60, 0],
       [0, 1],
       Extrapolate.CLAMP
     )
   }));
+
+  // Add animated style for genres
+  const genresAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: genresOpacity.value,
+      transform: [{ translateY: genresTranslateY.value }]
+    };
+  });
+
+  // Add animated style for buttons
+  const buttonsAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: buttonsOpacity.value,
+      transform: [{ translateY: buttonsTranslateY.value }]
+    };
+  });
 
   // Debug logs for director/creator data
   React.useEffect(() => {
@@ -653,13 +687,85 @@ const MetadataScreen = () => {
 
   // Start entrance animation
   React.useEffect(() => {
-    screenScale.value = withSpring(1, springConfig);
-    screenOpacity.value = withSpring(1, springConfig);
-    contentTranslateY.value = withSpring(0, {
-      damping: 25,
-      mass: 1,
-      stiffness: 100
-    });
+    // Use a timeout to ensure the animations starts after the component is mounted
+    const animationTimeout = setTimeout(() => {
+      // 1. First animate the container
+      screenScale.value = withSpring(1, springConfig);
+      screenOpacity.value = withSpring(1, springConfig);
+      
+      // 2. Then animate the hero section with a slight delay
+      setTimeout(() => {
+        heroOpacity.value = withSpring(1, {
+          damping: 14,
+          stiffness: 80
+        });
+        heroScale.value = withSpring(1, {
+          damping: 18,
+          stiffness: 100
+        });
+      }, ANIMATION_DELAY_CONSTANTS.HERO);
+      
+      // 3. Then animate the logo
+      setTimeout(() => {
+        logoOpacity.value = withSpring(1, {
+          damping: 12,
+          stiffness: 100
+        });
+        logoScale.value = withSpring(1, {
+          damping: 14,
+          stiffness: 90
+        });
+      }, ANIMATION_DELAY_CONSTANTS.LOGO);
+      
+      // 4. Then animate the watch progress if applicable
+      setTimeout(() => {
+        if (watchProgress && watchProgress.duration > 0) {
+          watchProgressOpacity.value = withSpring(1, {
+            damping: 14,
+            stiffness: 100
+          });
+          watchProgressScaleY.value = withSpring(1, {
+            damping: 18,
+            stiffness: 120
+          });
+        }
+      }, ANIMATION_DELAY_CONSTANTS.PROGRESS);
+      
+      // 5. Then animate the genres
+      setTimeout(() => {
+        genresOpacity.value = withSpring(1, {
+          damping: 14,
+          stiffness: 100
+        });
+        genresTranslateY.value = withSpring(0, {
+          damping: 18,
+          stiffness: 120
+        });
+      }, ANIMATION_DELAY_CONSTANTS.GENRES);
+      
+      // 6. Then animate the buttons
+      setTimeout(() => {
+        buttonsOpacity.value = withSpring(1, {
+          damping: 14,
+          stiffness: 100
+        });
+        buttonsTranslateY.value = withSpring(0, {
+          damping: 18,
+          stiffness: 120
+        });
+      }, ANIMATION_DELAY_CONSTANTS.BUTTONS);
+      
+      // 7. Finally animate the content section
+      setTimeout(() => {
+        contentTranslateY.value = withSpring(0, {
+          damping: 25,
+          mass: 1,
+          stiffness: 100
+        });
+      }, ANIMATION_DELAY_CONSTANTS.CONTENT);
+    }, 50); // Small timeout to ensure component is fully mounted
+    
+    return () => clearTimeout(animationTimeout);
   }, []);
 
   const handleBack = useCallback(() => {
@@ -679,20 +785,16 @@ const MetadataScreen = () => {
     // Since metadata.genres is string[], we display them directly
     const genresToDisplay: string[] = metadata.genres as string[];
 
-    return (
-      <View style={styles.genreContainer}>
-        {genresToDisplay.slice(0, 4).map((genreName, index, array) => (
-          // Use React.Fragment to avoid extra View wrappers
-          <React.Fragment key={index}>
-            <Text style={styles.genreText}>{genreName}</Text>
-            {/* Add dot separator */}
-            {index < array.length - 1 && (
-              <Text style={styles.genreDot}>•</Text>
-            )}
-          </React.Fragment>
-        ))}
-      </View>
-    );
+    return genresToDisplay.slice(0, 4).map((genreName, index, array) => (
+      // Use React.Fragment to avoid extra View wrappers
+      <React.Fragment key={index}>
+        <Text style={styles.genreText}>{genreName}</Text>
+        {/* Add dot separator */}
+        {index < array.length - 1 && (
+          <Text style={styles.genreDot}>•</Text>
+        )}
+      </React.Fragment>
+    ));
   }, [metadata?.genres]); // Dependency on metadata.genres
 
   if (loading) {
@@ -834,7 +936,11 @@ const MetadataScreen = () => {
                   />
 
                   {/* Genre Tags */}
-                  {renderGenres}
+                  <Animated.View style={genresAnimatedStyle}>
+                    <View style={styles.genreContainer}>
+                      {renderGenres}
+                    </View>
+                  </Animated.View>
 
                   {/* Action Buttons */}
                   <ActionButtons 
@@ -845,6 +951,7 @@ const MetadataScreen = () => {
                     id={id}
                     navigation={navigation}
                     playButtonText={getPlayButtonText()}
+                    animatedStyle={buttonsAnimatedStyle}
                   />
                 </View>
               </LinearGradient>
