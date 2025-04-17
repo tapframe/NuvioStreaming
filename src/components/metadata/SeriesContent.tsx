@@ -382,14 +382,15 @@ const styles = StyleSheet.create({
   },
   episodeNumberBadge: {
     position: 'absolute',
-    top: 8,
-    left: 8,
+    bottom: 8,
+    right: 4,
     backgroundColor: 'rgba(0,0,0,0.85)',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
+    zIndex: 1,
   },
   episodeNumberText: {
     color: '#fff',
@@ -415,14 +416,14 @@ const styles = StyleSheet.create({
   episodeMetadata: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 4,
   },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
     borderRadius: 4,
   },
   tmdbLogo: {
@@ -541,8 +542,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
     borderRadius: 4,
   },
   runtimeText: {
