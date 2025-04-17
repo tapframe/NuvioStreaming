@@ -43,8 +43,6 @@ import Animated, {
   cancelAnimation,
   SharedValue
 } from 'react-native-reanimated';
-import { torrentService } from '../services/torrentService';
-import { TorrentProgress } from '../services/torrentService';
 import { logger } from '../utils/logger';
 
 const TMDB_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tmdb.new.logo.svg/512px-Tmdb.new.logo.svg.png?20200406190906';
@@ -54,11 +52,10 @@ const DOLBY_ICON = 'https://upload.wikimedia.org/wikipedia/en/thumb/3/3f/Dolby_V
 const { width, height } = Dimensions.get('window');
 
 // Extracted Components
-const StreamCard = ({ stream, onPress, index, torrentProgress, isLoading, statusMessage }: { 
+const StreamCard = ({ stream, onPress, index, isLoading, statusMessage }: { 
   stream: Stream; 
   onPress: () => void; 
   index: number;
-  torrentProgress?: TorrentProgress;
   isLoading?: boolean;
   statusMessage?: string;
 }) => {
@@ -66,27 +63,19 @@ const StreamCard = ({ stream, onPress, index, torrentProgress, isLoading, status
   const isHDR = stream.title?.toLowerCase().includes('hdr');
   const isDolby = stream.title?.toLowerCase().includes('dolby') || stream.title?.includes('DV');
   const size = stream.title?.match(/💾\s*([\d.]+\s*[GM]B)/)?.[1];
-  const isTorrent = stream.url?.startsWith('magnet:') || stream.behaviorHints?.isMagnetStream;
   const isDebrid = stream.behaviorHints?.cached;
 
   const displayTitle = stream.name || stream.title || 'Unnamed Stream';
   const displayAddonName = stream.title || '';
 
-  // Only disable if it's a torrent that's not debrid and not currently downloading
-  const isDisabled = isTorrent && !isDebrid && !torrentProgress && !stream.behaviorHints?.notWebReady;
-
-  // Keep track of downloading status
-  const isDownloading = !!torrentProgress && isTorrent;
-
   return (
     <TouchableOpacity 
       style={[
         styles.streamCard, 
-        isDisabled && styles.streamCardDisabled,
         isLoading && styles.streamCardLoading
       ]} 
       onPress={onPress}
-      disabled={isDisabled || isLoading}
+      disabled={isLoading}
       activeOpacity={0.7}
     >
       <View style={styles.streamDetails}>
@@ -111,14 +100,6 @@ const StreamCard = ({ stream, onPress, index, torrentProgress, isLoading, status
               </Text>
             </View>
           )}
-          
-          {/* Show download indicator for active downloads */}
-          {isDownloading && (
-            <View style={styles.downloadingIndicator}>
-              <ActivityIndicator size="small" color={colors.primary} />
-              <Text style={styles.downloadingText}>Downloading...</Text>
-            </View>
-          )}
         </View>
         
         <View style={styles.streamMetaRow}>
@@ -136,40 +117,19 @@ const StreamCard = ({ stream, onPress, index, torrentProgress, isLoading, status
             </View>
           )}
           
-          {isTorrent && !isDebrid && (
-            <View style={[styles.chip, { backgroundColor: colors.error }]}>
-              <Text style={styles.chipText}>TORRENT</Text>
-            </View>
-          )}
-          
           {isDebrid && (
             <View style={[styles.chip, { backgroundColor: colors.success }]}>
               <Text style={styles.chipText}>DEBRID</Text>
             </View>
           )}
         </View>
-
-        {/* Render progress bar if there's progress */}
-        {torrentProgress && (
-          <View style={styles.progressContainer}>
-            <View 
-              style={[
-                styles.progressBar, 
-                { width: `${torrentProgress.bufferProgress}%` }
-              ]} 
-            />
-            <Text style={styles.progressText}>
-              {`${Math.round(torrentProgress.bufferProgress)}% • ${Math.round(torrentProgress.downloadSpeed / 1024)} KB/s • ${torrentProgress.seeds} seeds`}
-            </Text>
-          </View>
-        )}
       </View>
       
       <View style={styles.streamAction}>
         <MaterialIcons 
           name="play-arrow" 
           size={24} 
-          color={isDisabled ? colors.textMuted : colors.primary} 
+          color={colors.primary} 
         />
       </View>
     </TouchableOpacity>
@@ -238,26 +198,6 @@ export const StreamsScreen = () => {
   const { id, type, episodeId } = route.params;
   const { settings } = useSettings();
 
-  // Log the stream details and installed addons for debugging
-  useEffect(() => {
-    // Log installed addons
-    const installedAddons = stremioService.getInstalledAddons();
-    console.log('📦 [StreamsScreen] INSTALLED ADDONS:', installedAddons.map(addon => ({
-      id: addon.id,
-      name: addon.name,
-      version: addon.version,
-      resources: addon.resources,
-      types: addon.types
-    })));
-
-    // Log request details
-    console.log('🎬 [StreamsScreen] REQUEST DETAILS:', {
-      id,
-      type,
-      episodeId: episodeId || 'none'
-    });
-  }, [id, type, episodeId]);
-
   // Add timing logs
   const [loadStartTime, setLoadStartTime] = useState(0);
   const [providerLoadTimes, setProviderLoadTimes] = useState<{[key: string]: number}>({});
@@ -276,20 +216,6 @@ export const StreamsScreen = () => {
     groupedEpisodes,
   } = useMetadata({ id, type });
 
-  // Log stream results when they arrive
-  useEffect(() => {
-    const streams = type === 'series' ? episodeStreams : groupedStreams;
-    console.log('🔍 [StreamsScreen] STREAM RESULTS:', {
-      totalProviders: Object.keys(streams).length,
-      providers: Object.keys(streams),
-      streamCounts: Object.entries(streams).map(([provider, data]) => ({
-        provider,
-        addonName: data.addonName,
-        streams: data.streams.length
-      }))
-    });
-  }, [episodeStreams, groupedStreams, type]);
-
   const [selectedProvider, setSelectedProvider] = React.useState('all');
   const [availableProviders, setAvailableProviders] = React.useState<Set<string>>(new Set());
 
@@ -298,13 +224,6 @@ export const StreamsScreen = () => {
   const heroScale = useSharedValue(0.95);
   const filterOpacity = useSharedValue(0);
 
-  // Add new state for torrent progress
-  const [torrentProgress, setTorrentProgress] = React.useState<{[key: string]: TorrentProgress}>({});
-  const [activeTorrent, setActiveTorrent] = React.useState<string | null>(null);
-
-  // Add new state to track video player status
-  const [isVideoPlaying, setIsVideoPlaying] = React.useState(false);
-  
   // Add state for provider loading status
   const [loadingProviders, setLoadingProviders] = useState<{[key: string]: boolean}>({});
   
@@ -361,75 +280,6 @@ export const StreamsScreen = () => {
         'source_1': true, 
         'source_2': true,
         'stremio': true
-      });
-    }
-  }, [loadingStreams, loadingEpisodeStreams]);
-  
-  // Monitor new provider results as they appear
-  useEffect(() => {
-    const streams = type === 'series' ? episodeStreams : groupedStreams;
-    const now = Date.now();
-    
-    // Check for new providers
-    Object.keys(streams).forEach(provider => {
-      // Identify the parent provider (source_1, source_2, stremio addon)
-      let parentProvider = provider;
-      if (provider !== 'source_1' && provider !== 'source_2') {
-        parentProvider = 'stremio';
-      }
-      
-      // Update provider status when new streams appear
-      setProviderStatus(prev => {
-        const loadTime = now - loadStartTime;
-        logger.log(`✅ Provider "${parentProvider}" loaded successfully after ${loadTime}ms with ${streams[provider].streams.length} streams`);
-        
-        // Only update if it was previously loading
-        if (prev[parentProvider]?.loading) {
-          return {
-            ...prev,
-            [parentProvider]: {
-              ...prev[parentProvider],
-              loading: false,
-              success: true,
-              message: `Loaded ${streams[provider].streams.length} streams`,
-              timeCompleted: now
-            }
-          };
-        }
-        return prev;
-      });
-      
-      // Update the simpler loading state
-      setLoadingProviders((prev: {[key: string]: boolean}) => ({...prev, [parentProvider]: false}));
-    });
-  }, [episodeStreams, groupedStreams, type, loadStartTime]);
-  
-  // Mark loading as complete when all loading is done
-  useEffect(() => {
-    if (!loadingStreams && !loadingEpisodeStreams) {
-      // Check for any providers that are still marked as loading but didn't complete
-      setProviderStatus(prev => {
-        const updatedStatus = {...prev};
-        let updated = false;
-        
-        Object.keys(updatedStatus).forEach(provider => {
-          if (updatedStatus[provider]?.loading) {
-            updatedStatus[provider] = {
-              ...updatedStatus[provider],
-              loading: false,
-              error: true,
-              message: 'Failed to load',
-              timeCompleted: Date.now()
-            };
-            updated = true;
-            logger.log(`⚠️ Provider "${provider}" timed out or failed`);
-            
-            // Update the simpler loading state
-            setLoadingProviders((prevLoading: {[key: string]: boolean}) => ({...prevLoading, [provider]: false}));
-          }
-        });
-        
-        return updated ? updatedStatus : prev;
       });
     }
   }, [loadingStreams, loadingEpisodeStreams]);
@@ -522,78 +372,24 @@ export const StreamsScreen = () => {
         logger.log('handleStreamPress called with stream:', {
           url: stream.url,
           behaviorHints: stream.behaviorHints,
-          isMagnet: stream.url.startsWith('magnet:'),
-          isMagnetStream: stream.behaviorHints?.isMagnetStream,
           useExternalPlayer: settings.useExternalPlayer
         });
         
-        // Check if it's a magnet link either directly or through behaviorHints
-        const isMagnet = stream.url.startsWith('magnet:') || stream.behaviorHints?.isMagnetStream;
-        
-        if (isMagnet) {
-          logger.log('Handling magnet link...');
-          // Check if there's already an active torrent
-          if (activeTorrent && activeTorrent !== stream.url) {
-            Alert.alert(
-              'Active Download',
-              'There is already an active download. Do you want to stop it and start this one?',
-              [
-                {
-                  text: 'Cancel',
-                  style: 'cancel'
-                },
-                {
-                  text: 'Stop and Switch',
-                  style: 'destructive',
-                  onPress: async () => {
-                    logger.log('Stopping current torrent and starting new one');
-                    await torrentService.stopStreamAndWait();
-                    setActiveTorrent(null);
-                    setTorrentProgress({});
-                    startTorrentStream(stream);
-                  }
-                }
-              ]
-            );
-            return;
-          }
+        // Check if external player is enabled in settings
+        if (settings.useExternalPlayer) {
+          logger.log('Using external player for URL:', stream.url);
+          // Use VideoPlayerService to launch external player
+          const videoPlayerService = VideoPlayerService;
+          const launched = await videoPlayerService.playVideo(stream.url, {
+            useExternalPlayer: true,
+            title: metadata?.name || '',
+            episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
+            episodeNumber: type === 'series' ? `S${currentEpisode?.season_number}E${currentEpisode?.episode_number}` : undefined,
+            releaseDate: metadata?.year?.toString(),
+          });
 
-          logger.log('Starting torrent stream...');
-          startTorrentStream(stream);
-        } else {
-          logger.log('Playing regular stream...');
-          
-          // Check if external player is enabled in settings
-          if (settings.useExternalPlayer) {
-            logger.log('Using external player for URL:', stream.url);
-            // Use VideoPlayerService to launch external player
-            const videoPlayerService = VideoPlayerService;
-            const launched = await videoPlayerService.playVideo(stream.url, {
-              useExternalPlayer: true,
-              title: metadata?.name || '',
-              episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
-              episodeNumber: type === 'series' ? `S${currentEpisode?.season_number}E${currentEpisode?.episode_number}` : undefined,
-              releaseDate: metadata?.year?.toString(),
-            });
-
-            if (!launched) {
-              logger.log('External player launch failed, falling back to built-in player');
-              navigation.navigate('Player', {
-                uri: stream.url,
-                title: metadata?.name || '',
-                episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
-                season: type === 'series' ? currentEpisode?.season_number : undefined,
-                episode: type === 'series' ? currentEpisode?.episode_number : undefined,
-                quality: stream.title?.match(/(\d+)p/)?.[1] || undefined,
-                year: metadata?.year,
-                streamProvider: stream.name,
-                id,
-                type,
-                episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined
-              });
-            }
-          } else {
-            // Use built-in player
+          if (!launched) {
+            logger.log('External player launch failed, falling back to built-in player');
             navigation.navigate('Player', {
               uri: stream.url,
               title: metadata?.name || '',
@@ -608,6 +404,21 @@ export const StreamsScreen = () => {
               episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined
             });
           }
+        } else {
+          // Use built-in player
+          navigation.navigate('Player', {
+            uri: stream.url,
+            title: metadata?.name || '',
+            episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
+            season: type === 'series' ? currentEpisode?.season_number : undefined,
+            episode: type === 'series' ? currentEpisode?.episode_number : undefined,
+            quality: stream.title?.match(/(\d+)p/)?.[1] || undefined,
+            year: metadata?.year,
+            streamProvider: stream.name,
+            id,
+            type,
+            episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined
+          });
         }
       }
     } catch (error) {
@@ -617,171 +428,7 @@ export const StreamsScreen = () => {
         error instanceof Error ? error.message : 'An error occurred while playing the video'
       );
     }
-  }, [metadata, type, currentEpisode, activeTorrent, navigation, settings.useExternalPlayer]);
-
-  // Clean up torrent when component unmounts or when returning from player
-  React.useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      // This runs when returning from the player screen
-      logger.log('[StreamsScreen] Screen focused, checking if cleanup needed');
-      if (isVideoPlaying) {
-        logger.log('[StreamsScreen] Playback ended, cleaning up torrent');
-        setIsVideoPlaying(false);
-        
-        // Clean up the torrent when returning from video player
-        if (activeTorrent) {
-          logger.log('[StreamsScreen] Stopping torrent after playback');
-          torrentService.stopStreamAndWait().catch(error => {
-            logger.error('[StreamsScreen] Error during cleanup:', error);
-          });
-          setActiveTorrent(null);
-          setTorrentProgress({});
-        }
-      }
-    });
-
-    return () => {
-      unsubscribe();
-      logger.log('[StreamsScreen] Component unmounting, cleaning up torrent');
-      if (activeTorrent) {
-        logger.log('[StreamsScreen] Stopping torrent on unmount');
-        torrentService.stopStreamAndWait().catch(error => {
-          logger.error('[StreamsScreen] Error during cleanup:', error);
-        });
-      }
-    };
-  }, [navigation, activeTorrent, isVideoPlaying]);
-
-  const startTorrentStream = useCallback(async (stream: Stream) => {
-    if (!stream.url) return;
-
-    try {
-      logger.log('[StreamsScreen] Starting torrent stream with URL:', stream.url);
-      
-      // Make sure any existing stream is fully stopped
-      if (activeTorrent && activeTorrent !== stream.url) {
-        await torrentService.stopStreamAndWait();
-        setActiveTorrent(null);
-        setTorrentProgress({});
-      }
-      
-      setActiveTorrent(stream.url);
-      setIsVideoPlaying(false);
-      
-      const videoPath = await torrentService.startStream(stream.url, {
-        onProgress: (progress) => {
-          // Check if progress object is valid and has data
-          if (!progress || Object.keys(progress).length === 0) {
-            logger.log('[StreamsScreen] Received empty progress object, ignoring');
-            return;
-          }
-          
-          logger.log('[StreamsScreen] Torrent progress update:', {
-            url: stream.url,
-            progress,
-            currentTorrentProgress: torrentProgress[stream.url!]
-          });
-          
-          // Validate progress values before updating state
-          if (typeof progress.bufferProgress === 'number' || 
-              typeof progress.downloadSpeed === 'number' ||
-              typeof progress.progress === 'number' ||
-              typeof progress.seeds === 'number') {
-            
-            setTorrentProgress(prev => ({
-              ...prev,
-              [stream.url!]: progress
-            }));
-          }
-        }
-      });
-      
-      logger.log('[StreamsScreen] Got video path:', videoPath);
-      
-      // Once we have the video file path, play it using VideoPlayer screen
-      if (videoPath) {
-        setIsVideoPlaying(true);
-        
-        try {
-          if (settings.useExternalPlayer) {
-            logger.log('[StreamsScreen] Using external player for torrent video path:', videoPath);
-            // Use VideoPlayerService to launch external player
-            const videoPlayerService = VideoPlayerService;
-            const launched = await videoPlayerService.playVideo(`file://${videoPath}`, {
-              useExternalPlayer: true,
-              title: metadata?.name || '',
-              episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
-              episodeNumber: type === 'series' ? `S${currentEpisode?.season_number}E${currentEpisode?.episode_number}` : undefined,
-              releaseDate: metadata?.year?.toString(),
-            });
-
-            if (!launched) {
-              logger.log('[StreamsScreen] External player launch failed, falling back to built-in player');
-              navigation.navigate('Player', {
-                uri: `file://${videoPath}`,
-                title: metadata?.name || '',
-                episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
-                season: type === 'series' ? currentEpisode?.season_number : undefined,
-                episode: type === 'series' ? currentEpisode?.episode_number : undefined,
-                year: metadata?.year,
-                id,
-                type,
-                episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined
-              });
-            }
-          } else {
-            // Use built-in player
-            navigation.navigate('Player', {
-              uri: `file://${videoPath}`,
-              title: metadata?.name || '',
-              episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
-              season: type === 'series' ? currentEpisode?.season_number : undefined,
-              episode: type === 'series' ? currentEpisode?.episode_number : undefined,
-              year: metadata?.year,
-              id,
-              type,
-              episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined
-            });
-          }
-          
-          // Note: Cleanup happens in the focus effect when returning from the player
-        } catch (playerError) {
-          logger.error('[StreamsScreen] Video player navigation error:', playerError);
-          setIsVideoPlaying(false);
-          
-          // Also stop the torrent on player error
-          logger.log('[StreamsScreen] Stopping torrent after player error');
-          await torrentService.stopStreamAndWait();
-          setActiveTorrent(null);
-          setTorrentProgress({});
-          
-          throw playerError;
-        }
-      } else {
-        // If we didn't get a video path, there's a problem
-        logger.error('[StreamsScreen] No video path returned from torrent service');
-        Alert.alert(
-          'Playback Error',
-          'No video file found in torrent'
-        );
-        await torrentService.stopStreamAndWait();
-        setActiveTorrent(null);
-        setTorrentProgress({});
-      }
-      
-    } catch (error) {
-      logger.error('[StreamsScreen] Torrent error:', error);
-      // Clean up on error
-      setIsVideoPlaying(false);
-      await torrentService.stopStreamAndWait();
-      setActiveTorrent(null);
-      setTorrentProgress({});
-      Alert.alert(
-        'Download Error',
-        error instanceof Error ? error.message : 'An error occurred while playing the video'
-      );
-    }
-  }, [metadata, type, currentEpisode, torrentProgress, activeTorrent, navigation, settings.useExternalPlayer]);
+  }, [metadata, type, currentEpisode, navigation, settings.useExternalPlayer]);
 
   const filterItems = useMemo(() => {
     const installedAddons = stremioService.getInstalledAddons();
@@ -874,7 +521,6 @@ export const StreamsScreen = () => {
 
   const renderItem = useCallback(({ item, index, section }: { item: Stream; index: number; section: any }) => {
     const stream = item;
-    const progress = torrentProgress[stream.url!];
     const isLoading = loadingProviders[section.addonId];
     
     return (
@@ -883,12 +529,11 @@ export const StreamsScreen = () => {
         stream={stream} 
         onPress={() => handleStreamPress(stream)} 
         index={index}
-        torrentProgress={progress}
         isLoading={isLoading}
         statusMessage={providerStatus[section.addonId]?.message}
       />
     );
-  }, [handleStreamPress, torrentProgress, loadingProviders, providerStatus]);
+  }, [handleStreamPress, loadingProviders, providerStatus]);
 
   const renderSectionHeader = useCallback(({ section }: { section: { title: string } }) => (
     <Animated.View
@@ -1195,9 +840,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.05)',
     width: '100%',
     zIndex: 1,
-  },
-  streamCardDisabled: {
-    backgroundColor: colors.elevation2,
   },
   streamCardLoading: {
     opacity: 0.7,
