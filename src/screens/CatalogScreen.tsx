@@ -20,6 +20,7 @@ import { colors } from '../styles';
 import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { logger } from '../utils/logger';
+import { useCustomCatalogNames } from '../hooks/useCustomCatalogNames';
 
 type CatalogScreenProps = {
   route: RouteProp<RootStackParamList, 'Catalog'>;
@@ -44,15 +45,17 @@ const ITEM_MARGIN = SPACING.sm;
 const ITEM_WIDTH = (width - (SPACING.lg * 2) - (ITEM_MARGIN * 2 * NUM_COLUMNS)) / NUM_COLUMNS;
 
 const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
-  const { addonId, type, id, name, genreFilter } = route.params;
+  const { addonId, type, id, name: originalName, genreFilter } = route.params;
   const [items, setItems] = useState<Meta[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Force dark mode
   const isDarkMode = true;
+
+  const { getCustomName, isLoadingCustomNames } = useCustomCatalogNames();
+  const displayName = getCustomName(addonId || '', type || '', id || '', originalName || '');
 
   const loadItems = useCallback(async (pageNum: number, shouldRefresh: boolean = false) => {
     try {
@@ -246,7 +249,9 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
     </View>
   );
 
-  if (loading && items.length === 0) {
+  const isScreenLoading = loading || isLoadingCustomNames;
+
+  if (isScreenLoading && items.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" />
@@ -259,7 +264,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
             <Text style={styles.backText}>Back</Text>
           </TouchableOpacity>
         </View>
-        <Text style={styles.headerTitle}>{name || `${type.charAt(0).toUpperCase() + type.slice(1)}s`}</Text>
+        <Text style={styles.headerTitle}>{displayName || originalName || `${type.charAt(0).toUpperCase() + type.slice(1)}s`}</Text>
         {renderLoadingState()}
       </SafeAreaView>
     );
@@ -278,7 +283,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
             <Text style={styles.backText}>Back</Text>
           </TouchableOpacity>
         </View>
-        <Text style={styles.headerTitle}>{name || `${type.charAt(0).toUpperCase() + type.slice(1)}s`}</Text>
+        <Text style={styles.headerTitle}>{displayName || `${type.charAt(0).toUpperCase() + type.slice(1)}s`}</Text>
         {renderErrorState()}
       </SafeAreaView>
     );
@@ -296,7 +301,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
       </View>
-      <Text style={styles.headerTitle}>{name || `${type.charAt(0).toUpperCase() + type.slice(1)}s`}</Text>
+      <Text style={styles.headerTitle}>{displayName || `${type.charAt(0).toUpperCase() + type.slice(1)}s`}</Text>
       
       {items.length > 0 ? (
         <FlatList

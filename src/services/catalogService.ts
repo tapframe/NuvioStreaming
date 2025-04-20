@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { TMDBService } from './tmdbService';
 import { logger } from '../utils/logger';
+import { getCatalogDisplayName } from '../utils/catalogNameUtils';
 
 export interface StreamingAddon {
   id: string;
@@ -54,6 +55,8 @@ export interface CatalogContent {
   genre?: string;
   items: StreamingContent[];
 }
+
+const CATALOG_SETTINGS_KEY = 'catalog_settings';
 
 class CatalogService {
   private static instance: CatalogService;
@@ -137,43 +140,37 @@ class CatalogService {
     const addons = await this.getAllAddons();
     const catalogs: CatalogContent[] = [];
 
-    // Get saved catalog settings
-    const savedSettings = await AsyncStorage.getItem('catalog_settings');
-    const catalogSettings: { [key: string]: boolean } = savedSettings ? JSON.parse(savedSettings) : {};
+    // Load enabled/disabled settings
+    const catalogSettingsJson = await AsyncStorage.getItem(CATALOG_SETTINGS_KEY);
+    const catalogSettings = catalogSettingsJson ? JSON.parse(catalogSettingsJson) : {};
 
-    // Get featured catalogs
     for (const addon of addons) {
-      if (addon.catalogs && addon.catalogs.length > 0) {
-        // For each catalog, check if it's enabled in settings
+      if (addon.catalogs) {
         for (const catalog of addon.catalogs) {
           const settingKey = `${addon.id}:${catalog.type}:${catalog.id}`;
-          // If setting doesn't exist, default to true for backward compatibility
           const isEnabled = catalogSettings[settingKey] ?? true;
 
           if (isEnabled) {
             try {
-              // Get the items for this catalog
               const addonManifest = await stremioService.getInstalledAddonsAsync();
               const manifest = addonManifest.find(a => a.id === addon.id);
               if (!manifest) continue;
 
               const metas = await stremioService.getCatalog(manifest, catalog.type, catalog.id, 1);
               if (metas && metas.length > 0) {
-                // Convert Meta to StreamingContent
                 const items = metas.map(meta => this.convertMetaToStreamingContent(meta));
                 
-                // Format the catalog name
-                let displayName = catalog.name;
+                // Get potentially custom display name
+                let displayName = await getCatalogDisplayName(addon.id, catalog.type, catalog.id, catalog.name);
                 
                 // Remove duplicate words and clean up the name (case-insensitive)
                 const words = displayName.split(' ');
                 const uniqueWords = [];
                 const seenWords = new Set();
-                
                 for (const word of words) {
                   const lowerWord = word.toLowerCase();
                   if (!seenWords.has(lowerWord)) {
-                    uniqueWords.push(word); // Keep original case
+                    uniqueWords.push(word); 
                     seenWords.add(lowerWord);
                   }
                 }
@@ -208,7 +205,6 @@ class CatalogService {
     const addons = await this.getAllAddons();
     const catalogs: CatalogContent[] = [];
 
-    // Filter addons with catalogs of the specified type
     const typeAddons = addons.filter(addon => 
       addon.catalogs && addon.catalogs.some(catalog => catalog.type === type)
     );
@@ -222,18 +218,20 @@ class CatalogService {
           const manifest = addonManifest.find(a => a.id === addon.id);
           if (!manifest) continue;
 
-          // Apply genre filter if provided
           const filters = genreFilter ? [{ title: 'genre', value: genreFilter }] : [];
           const metas = await stremioService.getCatalog(manifest, type, catalog.id, 1, filters);
           
           if (metas && metas.length > 0) {
             const items = metas.map(meta => this.convertMetaToStreamingContent(meta));
             
+            // Get potentially custom display name
+            const displayName = await getCatalogDisplayName(addon.id, catalog.type, catalog.id, catalog.name);
+            
             catalogs.push({
               addon: addon.id,
               type,
               id: catalog.id,
-              name: catalog.name,
+              name: displayName,
               genre: genreFilter,
               items
             });

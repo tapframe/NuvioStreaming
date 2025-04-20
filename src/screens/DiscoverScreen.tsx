@@ -189,7 +189,6 @@ const CatalogSection = React.memo(({
   const { width } = Dimensions.get('window');
   const itemWidth = (width - 48) / 2.2; // 2 items per row with spacing
   
-  // Only display the first 3 items in the row
   const displayItems = useMemo(() => 
     catalog.items.slice(0, 3), 
     [catalog.items]
@@ -207,13 +206,34 @@ const CatalogSection = React.memo(({
   ), [handleContentPress]);
   
   const handleSeeMorePress = useCallback(() => {
+    // Get addon/catalog info from the first item (assuming homogeneity)
+    const firstItem = catalog.items[0];
+    if (!firstItem) return; // Should not happen if section exists
+
+    // We need addonId and catalogId. These aren't directly on StreamingContent.
+    // We might need to fetch this or adjust the GenreCatalog structure.
+    // FOR NOW: Assuming CatalogScreen can handle potentially missing addonId/catalogId
+    // OR: We could pass the *genre* as the name and let CatalogScreen figure it out?
+    // Let's pass the necessary info if available, assuming StreamingContent might have it
+    // (Requires checking StreamingContent interface or how it's populated)
+
+    // --- TEMPORARY/PLACEHOLDER --- 
+    // Ideally, GenreCatalog should contain addonId/catalogId for the group.
+    // If not, CatalogScreen needs modification or we fetch IDs here.
+    // Let's stick to passing genre and type for now, CatalogScreen logic might suffice?
     navigation.navigate('Catalog', {
-      id: 'discover',
+      // We don't have a single catalog ID or Addon ID for a genre section.
+      // Pass the genre as the 'id' and 'name' for CatalogScreen to potentially filter.
+      // This might require CatalogScreen to be adapted to handle genre-based views.
+      addonId: 'genre-based', // Placeholder or identifier
+      id: catalog.genre, 
       type: selectedCategory.type,
-      name: `${catalog.genre} ${selectedCategory.name}`,
-      genreFilter: catalog.genre
+      name: `${catalog.genre} ${selectedCategory.name}`, // Pass constructed name for now
+      genreFilter: catalog.genre // Keep the genre filter
     });
-  }, [navigation, selectedCategory, catalog.genre]);
+    // --- END TEMPORARY --- 
+
+  }, [navigation, selectedCategory, catalog.genre, catalog.items]);
   
   const keyExtractor = useCallback((item: StreamingContent) => item.id, []);
   const ItemSeparator = useCallback(() => <View style={{ width: 16 }} />, []);

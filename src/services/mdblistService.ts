@@ -20,6 +20,9 @@ export class MDBListService {
   private static instance: MDBListService;
   private apiKey: string | null = null;
   private enabled: boolean = true;
+  private apiKeyErrorCount: number = 0;  // Add counter for API key errors
+  private lastApiKeyErrorTime: number = 0; // To track when last error occurred
+  private ratingsCache: Map<string, MDBListRatings | null> = new Map(); // Cache for ratings - null values represent known "not found" results
 
   private constructor() {
     logger.log('[MDBListService] Service initialized');
@@ -36,8 +39,15 @@ export class MDBListService {
     try {
       // First check if MDBList is enabled
       const enabledSetting = await AsyncStorage.getItem(MDBLIST_ENABLED_STORAGE_KEY);
+      const wasEnabled = this.enabled;
       this.enabled = enabledSetting === null || enabledSetting === 'true';
       logger.log('[MDBListService] MDBList enabled:', this.enabled);
+      
+      // Clear cache if enabled state changed
+      if (wasEnabled !== this.enabled) {
+        this.clearCache();
+        logger.log('[MDBListService] Cache cleared due to enabled state change');
+      }
       
       if (!this.enabled) {
         logger.log('[MDBListService] MDBList is disabled, skipping API key loading');
@@ -45,7 +55,16 @@ export class MDBListService {
         return;
       }
 
-      this.apiKey = await AsyncStorage.getItem(MDBLIST_API_KEY_STORAGE_KEY);
+      const newApiKey = await AsyncStorage.getItem(MDBLIST_API_KEY_STORAGE_KEY);
+      // Reset error counter when API key changes
+      if (newApiKey !== this.apiKey) {
+        this.apiKeyErrorCount = 0;
+        this.lastApiKeyErrorTime = 0;
+        // Clear the cache when API key changes
+        this.clearCache();
+        logger.log('[MDBListService] Cache cleared due to API key change');
+      }
+      this.apiKey = newApiKey;
       logger.log('[MDBListService] Initialized with API key:', this.apiKey ? 'Present' : 'Not found');
     } catch (error) {
       logger.error('[MDBListService] Failed to load settings:', error);
@@ -56,6 +75,17 @@ export class MDBListService {
 
   async getRatings(imdbId: string, mediaType: 'movie' | 'show'): Promise<MDBListRatings | null> {
     logger.log(`[MDBListService] Fetching ratings for ${mediaType} with IMDB ID:`, imdbId);
+    
+    // Create cache key
+    const cacheKey = `${mediaType}:${imdbId}`;
+    
+    // Check cache first - including null values which mean "no ratings available"
+    if (this.ratingsCache.has(cacheKey)) {
+      const cachedRatings = this.ratingsCache.get(cacheKey);
+      logger.log(`[MDBListService] Retrieved ${cachedRatings ? 'ratings' : 'negative result'} from cache for ${mediaType}:`, imdbId);
+      // TypeScript knows cachedRatings can't be undefined here since we checked with .has()
+      return cachedRatings as MDBListRatings | null;
+    }
     
     // Check if MDBList is enabled before doing anything else
     if (!this.enabled) {
@@ -139,7 +169,13 @@ export class MDBListService {
                try {
                  const errorJson = JSON.parse(errorText);
                  if (errorJson.error === "Invalid API key") {
-                    logger.error('[MDBListService] API Key rejected by server:', this.apiKey);
+                    // Only log the error every 5 requests or if more than 10 minutes have passed
+                    const now = Date.now();
+                    this.apiKeyErrorCount++;
+                    if (this.apiKeyErrorCount === 1 || this.apiKeyErrorCount % 5 === 0 || now - this.lastApiKeyErrorTime > 600000) {
+                      logger.error('[MDBListService] API Key rejected by server:', this.apiKey);
+                      this.lastApiKeyErrorTime = now;
+                    }
                  } else {
                    logger.warn(`[MDBListService] 403 Forbidden, but not invalid key error:`, errorJson);
                  }
@@ -171,11 +207,36 @@ export class MDBListService {
 
       const ratingCount = Object.keys(ratings).length;
       logger.log(`[MDBListService] Fetched ${ratingCount} ratings successfully:`, ratings);
-      return ratingCount > 0 ? ratings : null;
+      
+      // Store in cache even if we got no ratings - this prevents repeated API calls for content with no ratings
+      const result = ratingCount > 0 ? ratings : null;
+      this.ratingsCache.set(cacheKey, result);
+      logger.log(`[MDBListService] Stored ${result ? 'ratings' : 'negative result'} in cache for ${mediaType}:`, imdbId);
+      
+      return result;
     } catch (error) {
       logger.error('[MDBListService] Error fetching MDBList ratings:', error);
       return null;
     }
+  }
+
+  // Method to clear the cache
+  clearCache(): void {
+    this.ratingsCache.clear();
+    logger.log('[MDBListService] Cache cleared');
+  }
+
+  // Method to invalidate a specific cache entry
+  invalidateCache(imdbId: string, mediaType: 'movie' | 'show'): void {
+    const cacheKey = `${mediaType}:${imdbId}`;
+    const hadEntry = this.ratingsCache.delete(cacheKey);
+    logger.log(`[MDBListService] Cache entry ${hadEntry ? 'invalidated' : 'not found'} for ${mediaType}:`, imdbId);
+  }
+
+  // Method to check if a rating is in cache
+  isCached(imdbId: string, mediaType: 'movie' | 'show'): boolean {
+    const cacheKey = `${mediaType}:${imdbId}`;
+    return this.ratingsCache.has(cacheKey);
   }
 }
 

@@ -258,7 +258,7 @@ const MetadataScreen = () => {
 
   // Fetch logo immediately for TMDB content
   useEffect(() => {
-    if (metadata && id.startsWith('tmdb:')) {
+    if (metadata && id.startsWith('tmdb:') && !metadata.logo) {
       const fetchLogo = async () => {
         try {
           const tmdbId = id.split(':')[1];

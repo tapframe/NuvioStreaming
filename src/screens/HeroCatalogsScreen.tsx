@@ -18,6 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors } from '../styles/colors';
 import { catalogService, StreamingAddon } from '../services/catalogService';
+import { useCustomCatalogNames } from '../hooks/useCustomCatalogNames';
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
@@ -36,6 +37,7 @@ const HeroCatalogsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [catalogs, setCatalogs] = useState<CatalogItem[]>([]);
   const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>(settings.selectedHeroCatalogs || []);
+  const { getCustomName, isLoadingCustomNames } = useCustomCatalogNames();
 
   const handleBack = useCallback(() => {
     navigation.goBack();
@@ -125,7 +127,7 @@ const HeroCatalogsScreen: React.FC = () => {
         </Text>
       </View>
 
-      {loading ? (
+      {loading || isLoadingCustomNames ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>
@@ -175,30 +177,35 @@ const HeroCatalogsScreen: React.FC = () => {
                   styles.catalogsContainer, 
                   { backgroundColor: isDarkMode ? colors.elevation1 : colors.white }
                 ]}>
-                  {addonCatalogs.map(catalog => (
-                    <TouchableOpacity
-                      key={catalog.id}
-                      style={[
-                        styles.catalogItem,
-                        { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }
-                      ]}
-                      onPress={() => toggleCatalog(catalog.id)}
-                    >
-                      <View style={styles.catalogInfo}>
-                        <Text style={[styles.catalogName, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
-                          {catalog.name}
-                        </Text>
-                        <Text style={[styles.catalogType, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>
-                          {catalog.type === 'movie' ? 'Movies' : 'TV Shows'}
-                        </Text>
-                      </View>
-                      <MaterialIcons
-                        name={selectedCatalogs.includes(catalog.id) ? "check-box" : "check-box-outline-blank"}
-                        size={24}
-                        color={selectedCatalogs.includes(catalog.id) ? colors.primary : isDarkMode ? colors.mediumEmphasis : colors.textMutedDark}
-                      />
-                    </TouchableOpacity>
-                  ))}
+                  {addonCatalogs.map(catalog => {
+                    const [addonId, type, catalogId] = catalog.id.split(':');
+                    const displayName = getCustomName(addonId, type, catalogId, catalog.name);
+                    
+                    return (
+                      <TouchableOpacity
+                        key={catalog.id}
+                        style={[
+                          styles.catalogItem,
+                          { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }
+                        ]}
+                        onPress={() => toggleCatalog(catalog.id)}
+                      >
+                        <View style={styles.catalogInfo}>
+                          <Text style={[styles.catalogName, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
+                            {displayName}
+                          </Text>
+                          <Text style={[styles.catalogType, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>
+                            {catalog.type === 'movie' ? 'Movies' : 'TV Shows'}
+                          </Text>
+                        </View>
+                        <MaterialIcons
+                          name={selectedCatalogs.includes(catalog.id) ? "check-box" : "check-box-outline-blank"}
+                          size={24}
+                          color={selectedCatalogs.includes(catalog.id) ? colors.primary : isDarkMode ? colors.mediumEmphasis : colors.textMutedDark}
+                        />
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
             ))}
