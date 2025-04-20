@@ -7,6 +7,7 @@ import { cacheService } from '../services/cacheService';
 import { Cast, Episode, GroupedEpisodes, GroupedStreams } from '../types/metadata';
 import { TMDBService } from '../services/tmdbService';
 import { logger } from '../utils/logger';
+import { usePersistentSeasons } from './usePersistentSeasons';
 
 // Constants for timeouts and retries
 const API_TIMEOUT = 10000; // 10 seconds
@@ -112,6 +113,9 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
   const [recommendations, setRecommendations] = useState<StreamingContent[]>([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
   const [imdbId, setImdbId] = useState<string | null>(null);
+
+  // Add hook for persistent seasons
+  const { getSeason, saveSeason } = usePersistentSeasons();
 
   const processStremioSource = async (type: string, id: string, isEpisode = false) => {
     const sourceStartTime = Date.now();
@@ -575,10 +579,17 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
         
         setGroupedEpisodes(transformedEpisodes);
         
+        // Get the first available season as fallback
         const firstSeason = Math.min(...Object.keys(allEpisodes).map(Number));
-        const initialEpisodes = transformedEpisodes[firstSeason] || [];
-        setSelectedSeason(firstSeason);
-        setEpisodes(initialEpisodes);
+        
+        // Get saved season from persistence, fallback to first season if not found
+        const persistedSeason = getSeason(id, firstSeason);
+        
+        // Set the selected season from persistence
+        setSelectedSeason(persistedSeason);
+        
+        // Set episodes for the selected season
+        setEpisodes(transformedEpisodes[persistedSeason] || []);
       }
     } catch (error) {
       console.error('Failed to load episodes:', error);
@@ -958,9 +969,14 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
 
   const handleSeasonChange = useCallback((seasonNumber: number) => {
     if (selectedSeason === seasonNumber) return;
+    
+    // Update local state
     setSelectedSeason(seasonNumber);
     setEpisodes(groupedEpisodes[seasonNumber] || []);
-  }, [selectedSeason, groupedEpisodes]);
+    
+    // Persist the selection
+    saveSeason(id, seasonNumber);
+  }, [selectedSeason, groupedEpisodes, saveSeason, id]);
 
   const toggleLibrary = useCallback(() => {
     if (!metadata) return;

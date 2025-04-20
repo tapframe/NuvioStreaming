@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, useWindowDimensions, useColorScheme } from 'react-native';
 import { Image } from 'expo-image';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
@@ -37,6 +37,9 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   const isTablet = width > 768;
   const isDarkMode = useColorScheme() === 'dark';
   const [episodeProgress, setEpisodeProgress] = useState<{ [key: string]: { currentTime: number; duration: number } }>({});
+  
+  // Add ref for the season selector ScrollView
+  const seasonScrollViewRef = useRef<ScrollView | null>(null);
 
   const loadEpisodesProgress = async () => {
     if (!metadata?.id) return;
@@ -70,6 +73,25 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
     }, [episodes, metadata?.id])
   );
 
+  // Add effect to scroll to selected season
+  useEffect(() => {
+    if (selectedSeason && seasonScrollViewRef.current && Object.keys(groupedEpisodes).length > 0) {
+      // Find the index of the selected season
+      const seasons = Object.keys(groupedEpisodes).map(Number).sort((a, b) => a - b);
+      const selectedIndex = seasons.findIndex(season => season === selectedSeason);
+      
+      if (selectedIndex !== -1) {
+        // Wait a small amount of time for layout to be ready
+        setTimeout(() => {
+          seasonScrollViewRef.current?.scrollTo({
+            x: selectedIndex * 116, // 100px width + 16px margin
+            animated: true
+          });
+        }, 300);
+      }
+    }
+  }, [selectedSeason, groupedEpisodes]);
+
   if (loadingSeasons) {
     return (
       <View style={styles.centeredContainer}>
@@ -99,6 +121,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
       <View style={styles.seasonSelectorWrapper}>
         <Text style={styles.seasonSelectorTitle}>Seasons</Text>
         <ScrollView 
+          ref={seasonScrollViewRef}
           horizontal 
           showsHorizontalScrollIndicator={false}
           style={styles.seasonSelectorContainer}

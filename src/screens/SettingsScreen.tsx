@@ -23,6 +23,7 @@ import { useSettings, DEFAULT_SETTINGS } from '../hooks/useSettings';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { stremioService } from '../services/stremioService';
 import { useCatalogContext } from '../contexts/CatalogContext';
+import { useTraktContext } from '../contexts/TraktContext';
 
 const { width } = Dimensions.get('window');
 
@@ -111,6 +112,7 @@ const SettingsScreen: React.FC = () => {
   const isDarkMode = systemColorScheme === 'dark' || settings.enableDarkMode;
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { lastUpdate } = useCatalogContext();
+  const { isAuthenticated, userProfile } = useTraktContext();
   
   // States for dynamic content
   const [addonCount, setAddonCount] = useState<number>(0);
@@ -225,11 +227,11 @@ const SettingsScreen: React.FC = () => {
         <SettingsCard isDarkMode={isDarkMode}>
           <SettingItem
             title="Trakt"
-            description="Not Connected"
+            description={isAuthenticated ? `Connected as ${userProfile?.username || 'User'}` : "Not Connected"}
             icon="person"
             isDarkMode={isDarkMode}
             renderControl={ChevronRight}
-            onPress={() => Alert.alert('Trakt', 'Trakt integration coming soon')}
+            onPress={() => navigation.navigate('TraktSettings')}
           />
           <SettingItem
             title="iCloud Sync"
