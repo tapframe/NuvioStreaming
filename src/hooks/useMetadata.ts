@@ -86,6 +86,7 @@ interface UseMetadataReturn {
   recommendations: StreamingContent[];
   loadingRecommendations: boolean;
   setMetadata: React.Dispatch<React.SetStateAction<StreamingContent | null>>;
+  imdbId: string | null;
 }
 
 export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn => {
@@ -110,6 +111,7 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
   const [loadAttempts, setLoadAttempts] = useState(0);
   const [recommendations, setRecommendations] = useState<StreamingContent[]>([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
+  const [imdbId, setImdbId] = useState<string | null>(null);
 
   const processStremioSource = async (type: string, id: string, isEpisode = false) => {
     const sourceStartTime = Date.now();
@@ -316,6 +318,7 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
             if (imdbId) {
               // Use the imdbId for compatibility with the rest of the app
               actualId = imdbId;
+              setImdbId(imdbId);
               // Also store the TMDB ID for later use
               setTmdbId(parseInt(tmdbId));
             } else {
@@ -394,6 +397,7 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
               if (imdbId) {
                 // Use the imdbId for compatibility with the rest of the app
                 actualId = imdbId;
+                setImdbId(imdbId);
                 // Also store the TMDB ID for later use
                 setTmdbId(parseInt(tmdbId));
               } else {
@@ -471,6 +475,10 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
             catalogService.getContentDetails(type, actualId),
             API_TIMEOUT
           );
+          // Store the actual ID used (could be IMDB)
+          if (actualId.startsWith('tt')) {
+            setImdbId(actualId);
+          }
           return result;
         }),
         // Start loading cast immediately in parallel
@@ -1096,5 +1104,6 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
     recommendations,
     loadingRecommendations,
     setMetadata,
+    imdbId,
   };
 }; 

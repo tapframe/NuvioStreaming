@@ -214,6 +214,7 @@ const MetadataScreen = () => {
     recommendations,
     loadingRecommendations,
     setMetadata,
+    imdbId,
   } = useMetadata({ id, type });
 
   // Get genres from context
@@ -984,9 +985,9 @@ const MetadataScreen = () => {
             </View>
 
             {/* Add RatingsSection right under the main metadata */}
-            {id && (
+            {imdbId && (
               <RatingsSection 
-                imdbId={id}
+                imdbId={imdbId}
                 type={type === 'series' ? 'show' : 'movie'} 
               />
             )}
