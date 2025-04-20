@@ -651,12 +651,12 @@ const AppNavigator = () => {
             options={{
               animation: 'fade',
               animationDuration: 200,
-              presentation: 'card',
+              ...(Platform.OS === 'ios' && { presentation: 'modal' }),
               gestureEnabled: true,
               gestureDirection: 'horizontal',
               headerShown: false,
               contentStyle: {
-                backgroundColor: colors.darkBackground,
+                backgroundColor: 'transparent',
               },
             }}
           />
