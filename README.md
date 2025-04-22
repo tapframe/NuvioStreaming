@@ -68,24 +68,24 @@ Nuvio is an Open-Source cross-platform streaming application built with React Na
 
     *   **For Expo Go (Development):**
         ```bash
-        npm start 
+        npx expo start
         # or
-        yarn start
+        yarn dlx expo start
         ```
         Scan the QR code with the Expo Go app on your iOS or Android device.
 
     *   **For Native Android Build/Emulator:**
         ```bash
-        npm run android
+        npx expo run:android
         # or
-        yarn android
+        yarn dlx expo run:android
         ```
 
     *   **For Native iOS Build/Simulator:**
         ```bash
-        npm run ios
+        npx expo run:ios
         # or
-        yarn ios
+        yarn dlx expo run:ios
         ```
 
 ## 🤝 Contributing
