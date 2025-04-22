@@ -25,6 +25,14 @@ Nuvio is an Open-Source cross-platform streaming application built with React Na
 *   **Optimized & Interactive UI:** Smooth browsing with skeleton loaders, pull-to-refresh, performant lists, haptic feedback, and action menus.
 *   **Cross-Platform:** Runs on iOS and Android (highly optimized for iOS; Android performance is generally good).
 
+## 📸 Screenshots
+
+| Home                                       | Discover                                   | Search                                   |
+| :----------------------------------------- | :----------------------------------------- | :--------------------------------------- |
+| ![Home](src/assets/home.jpg)               | ![Discover](src/assets/discover.jpg)       | ![Search](src/assets/search.jpg)         |
+| **Metadata**                               | **Seasons & Episodes**                     | **Rating**                               |
+| ![Metadata](src/assets/metadascreen.jpg)   | ![Seasons](src/assets/seasonandepisode.jpg)| ![Rating](src/assets/ratingscreen.jpg)   |
+
 ## 🚀 Tech Stack
 
 *   **Framework:** React Native (v0.76.9) with Expo (SDK 52)
