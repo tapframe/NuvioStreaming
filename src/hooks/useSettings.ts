@@ -28,6 +28,7 @@ export interface AppSettings {
   enableBackgroundPlayback: boolean;
   cacheLimit: number;
   useExternalPlayer: boolean;
+  preferredPlayer: 'internal' | 'vlc' | 'infuse' | 'outplayer' | 'vidhub' | 'external';
   showHeroSection: boolean;
   featuredContentSource: 'tmdb' | 'catalogs';
   selectedHeroCatalogs: string[]; // Array of catalog IDs to display in hero section
@@ -41,6 +42,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   enableBackgroundPlayback: false,
   cacheLimit: 1024,
   useExternalPlayer: false,
+  preferredPlayer: 'internal',
   showHeroSection: true,
   featuredContentSource: 'tmdb',
   selectedHeroCatalogs: [], // Empty array means all catalogs are selected
@@ -75,14 +77,17 @@ export const useSettings = () => {
 
   const updateSetting = useCallback(async <K extends keyof AppSettings>(
     key: K,
-    value: AppSettings[K]
+    value: AppSettings[K],
+    emitEvent: boolean = true
   ) => {
     const newSettings = { ...settings, [key]: value };
     try {
       await AsyncStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings));
       setSettings(newSettings);
-      // Notify all subscribers that settings have changed
-      settingsEmitter.emit();
+      // Notify all subscribers that settings have changed (if requested)
+      if (emitEvent) {
+        settingsEmitter.emit();
+      }
     } catch (error) {
       console.error('Failed to save settings:', error);
     }

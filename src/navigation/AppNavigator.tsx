@@ -33,6 +33,7 @@ import TMDBSettingsScreen from '../screens/TMDBSettingsScreen';
 import HomeScreenSettings from '../screens/HomeScreenSettings';
 import HeroCatalogsScreen from '../screens/HeroCatalogsScreen';
 import TraktSettingsScreen from '../screens/TraktSettingsScreen';
+import PlayerSettingsScreen from '../screens/PlayerSettingsScreen';
 
 // Stack navigator types
 export type RootStackParamList = {
@@ -87,6 +88,7 @@ export type RootStackParamList = {
   HomeScreenSettings: undefined;
   HeroCatalogs: undefined;
   TraktSettings: undefined;
+  PlayerSettings: undefined;
 };
 
 export type RootStackNavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -703,6 +705,21 @@ const AppNavigator = () => {
           <Stack.Screen 
             name="TraktSettings" 
             component={TraktSettingsScreen}
+            options={{
+              animation: 'fade',
+              animationDuration: 200,
+              presentation: 'card',
+              gestureEnabled: true,
+              gestureDirection: 'horizontal',
+              headerShown: false,
+              contentStyle: {
+                backgroundColor: colors.darkBackground,
+              },
+            }}
+          />
+          <Stack.Screen 
+            name="PlayerSettings" 
+            component={PlayerSettingsScreen}
             options={{
               animation: 'fade',
               animationDuration: 200,
