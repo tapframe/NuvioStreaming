@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { CatalogContent, catalogService } from '../services/catalogService';
 import { logger } from '../utils/logger';
 import { useCatalogContext } from '../contexts/CatalogContext';
+import { addonEmitter, ADDON_EVENTS } from '../services/stremioService';
 
 export function useHomeCatalogs() {
   const [catalogs, setCatalogs] = useState<CatalogContent[]>([]);
@@ -71,6 +72,33 @@ export function useHomeCatalogs() {
   useEffect(() => {
     loadCatalogs();
   }, [loadCatalogs, lastUpdate]);
+
+  // Subscribe to addon events to refresh catalogs when addons change
+  useEffect(() => {
+    // Handler for addon order changes
+    const handleAddonOrderChange = () => {
+      logger.info('Addon order changed, refreshing catalogs');
+      loadCatalogs();
+    };
+
+    // Handler for addon added/removed
+    const handleAddonChange = () => {
+      logger.info('Addon added or removed, refreshing catalogs');
+      loadCatalogs();
+    };
+
+    // Subscribe to addon events
+    addonEmitter.on(ADDON_EVENTS.ORDER_CHANGED, handleAddonOrderChange);
+    addonEmitter.on(ADDON_EVENTS.ADDON_ADDED, handleAddonChange);
+    addonEmitter.on(ADDON_EVENTS.ADDON_REMOVED, handleAddonChange);
+
+    // Cleanup on unmount
+    return () => {
+      addonEmitter.off(ADDON_EVENTS.ORDER_CHANGED, handleAddonOrderChange);
+      addonEmitter.off(ADDON_EVENTS.ADDON_ADDED, handleAddonChange);
+      addonEmitter.off(ADDON_EVENTS.ADDON_REMOVED, handleAddonChange);
+    };
+  }, [loadCatalogs]);
 
   // Cleanup on unmount
   useEffect(() => {

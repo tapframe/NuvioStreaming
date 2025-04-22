@@ -153,6 +153,7 @@ class CatalogService {
     const catalogSettingsJson = await AsyncStorage.getItem(CATALOG_SETTINGS_KEY);
     const catalogSettings = catalogSettingsJson ? JSON.parse(catalogSettingsJson) : {};
 
+    // Process addons in order (they're already returned in order from getAllAddons)
     for (const addon of addons) {
       if (addon.catalogs) {
         for (const catalog of addon.catalogs) {
@@ -200,7 +201,7 @@ class CatalogService {
                 });
               }
             } catch (error) {
-              logger.error(`Failed to get catalog ${catalog.id} for addon ${addon.id}:`, error);
+              logger.error(`Failed to load ${catalog.name} from ${addon.name}:`, error);
             }
           }
         }

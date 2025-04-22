@@ -1,6 +1,15 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logger } from '../utils/logger';
+import EventEmitter from 'eventemitter3';
+
+// Create an event emitter for addon changes
+export const addonEmitter = new EventEmitter();
+export const ADDON_EVENTS = {
+  ORDER_CHANGED: 'order_changed',
+  ADDON_ADDED: 'addon_added',
+  ADDON_REMOVED: 'addon_removed'
+};
 
 // Basic types for Stremio
 export interface Meta {
@@ -137,7 +146,9 @@ export interface AddonCapabilities {
 class StremioService {
   private static instance: StremioService;
   private installedAddons: Map<string, Manifest> = new Map();
+  private addonOrder: string[] = [];
   private readonly STORAGE_KEY = 'stremio-addons';
+  private readonly ADDON_ORDER_KEY = 'stremio-addon-order';
   private readonly DEFAULT_ADDONS = [
     'https://v3-cinemeta.strem.io/manifest.json',
     'https://opensubtitles-v3.strem.io/manifest.json'
@@ -177,10 +188,26 @@ class StremioService {
         }
       }
       
+      // Load addon order if exists
+      const storedOrder = await AsyncStorage.getItem(this.ADDON_ORDER_KEY);
+      if (storedOrder) {
+        this.addonOrder = JSON.parse(storedOrder);
+        // Filter out any ids that aren't in installedAddons
+        this.addonOrder = this.addonOrder.filter(id => this.installedAddons.has(id));
+      }
+      
+      // Add any missing addons to the order
+      const installedIds = Array.from(this.installedAddons.keys());
+      const missingIds = installedIds.filter(id => !this.addonOrder.includes(id));
+      this.addonOrder = [...this.addonOrder, ...missingIds];
+      
       // If no addons, install defaults
       if (this.installedAddons.size === 0) {
         await this.installDefaultAddons();
       }
+      
+      // Ensure order is saved
+      await this.saveAddonOrder();
       
       this.initialized = true;
     } catch (error) {
@@ -245,6 +272,14 @@ class StremioService {
     }
   }
 
+  private async saveAddonOrder(): Promise<void> {
+    try {
+      await AsyncStorage.setItem(this.ADDON_ORDER_KEY, JSON.stringify(this.addonOrder));
+    } catch (error) {
+      logger.error('Failed to save addon order:', error);
+    }
+  }
+
   async getManifest(url: string): Promise<Manifest> {
     try {
       // Clean up URL - ensure it ends with manifest.json
@@ -278,7 +313,16 @@ class StremioService {
     const manifest = await this.getManifest(url);
     if (manifest && manifest.id) {
       this.installedAddons.set(manifest.id, manifest);
+      
+      // Add to order if not already present (new addons go to the end)
+      if (!this.addonOrder.includes(manifest.id)) {
+        this.addonOrder.push(manifest.id);
+      }
+      
       await this.saveInstalledAddons();
+      await this.saveAddonOrder();
+      // Emit an event that an addon was added
+      addonEmitter.emit(ADDON_EVENTS.ADDON_ADDED, manifest.id);
     } else {
       throw new Error('Invalid addon manifest');
     }
@@ -287,12 +331,20 @@ class StremioService {
   removeAddon(id: string): void {
     if (this.installedAddons.has(id)) {
       this.installedAddons.delete(id);
+      // Remove from order
+      this.addonOrder = this.addonOrder.filter(addonId => addonId !== id);
       this.saveInstalledAddons();
+      this.saveAddonOrder();
+      // Emit an event that an addon was removed
+      addonEmitter.emit(ADDON_EVENTS.ADDON_REMOVED, id);
     }
   }
 
   getInstalledAddons(): Manifest[] {
-    return Array.from(this.installedAddons.values());
+    // Return addons in the specified order
+    return this.addonOrder
+      .filter(id => this.installedAddons.has(id))
+      .map(id => this.installedAddons.get(id)!);
   }
 
   async getInstalledAddonsAsync(): Promise<Manifest[]> {
@@ -476,7 +528,7 @@ class StremioService {
     }
   }
 
-  // Modify getStreams to use the new callback signature and rely on callbacks for results
+  // Modify getStreams to use this.getInstalledAddons() instead of getEnabledAddons
   async getStreams(type: string, id: string, callback?: StreamCallback): Promise<void> {
     await this.ensureInitialized();
     
@@ -792,6 +844,35 @@ class StremioService {
     }
     
     return [];
+  }
+
+  // Add methods to move addons in the order
+  moveAddonUp(id: string): boolean {
+    const index = this.addonOrder.indexOf(id);
+    if (index > 0) {
+      // Swap with the previous item
+      [this.addonOrder[index - 1], this.addonOrder[index]] = 
+        [this.addonOrder[index], this.addonOrder[index - 1]];
+      this.saveAddonOrder();
+      // Emit an event that the order has changed
+      addonEmitter.emit(ADDON_EVENTS.ORDER_CHANGED);
+      return true;
+    }
+    return false;
+  }
+
+  moveAddonDown(id: string): boolean {
+    const index = this.addonOrder.indexOf(id);
+    if (index >= 0 && index < this.addonOrder.length - 1) {
+      // Swap with the next item
+      [this.addonOrder[index], this.addonOrder[index + 1]] = 
+        [this.addonOrder[index + 1], this.addonOrder[index]];
+      this.saveAddonOrder();
+      // Emit an event that the order has changed
+      addonEmitter.emit(ADDON_EVENTS.ORDER_CHANGED);
+      return true;
+    }
+    return false;
   }
 }
 

@@ -31,7 +31,7 @@ import { logger } from '../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlurView } from 'expo-blur';
 
-// Extend Manifest type to include logo
+// Extend Manifest type to include logo only (remove disabled status)
 interface ExtendedManifest extends Manifest {
   logo?: string;
 }
@@ -49,7 +49,8 @@ const AddonsScreen = () => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [catalogCount, setCatalogCount] = useState(0);
-  const [activeAddons, setActiveAddons] = useState(0);
+  // Add state for reorder mode
+  const [reorderMode, setReorderMode] = useState(false);
   // Force dark mode
   const isDarkMode = true;
 
@@ -60,9 +61,9 @@ const AddonsScreen = () => {
   const loadAddons = async () => {
     try {
       setLoading(true);
+      // Use the regular method without disabled state
       const installedAddons = await stremioService.getInstalledAddonsAsync();
-      setAddons(installedAddons);
-      setActiveAddons(installedAddons.length);
+      setAddons(installedAddons as ExtendedManifest[]);
       
       // Count catalogs
       let totalCatalogs = 0;
@@ -130,28 +131,27 @@ const AddonsScreen = () => {
     }
   };
 
-  const handleToggleAddon = (addon: ExtendedManifest, enabled: boolean) => {
-    // Logic to enable/disable an addon
-    Alert.alert(
-      enabled ? 'Disable Addon' : 'Enable Addon',
-      `Are you sure you want to ${enabled ? 'disable' : 'enable'} ${addon.name}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: enabled ? 'Disable' : 'Enable',
-          style: enabled ? 'destructive' : 'default',
-          onPress: () => {
-            // TODO: Implement actual toggle functionality
-            Alert.alert('Success', `${addon.name} ${enabled ? 'disabled' : 'enabled'}`);
-          },
-        },
-      ]
-    );
+  const refreshAddons = async () => {
+    loadAddons();
+  };
+
+  const moveAddonUp = (addon: ExtendedManifest) => {
+    if (stremioService.moveAddonUp(addon.id)) {
+      // Refresh the list to reflect the new order
+      loadAddons();
+    }
+  };
+
+  const moveAddonDown = (addon: ExtendedManifest) => {
+    if (stremioService.moveAddonDown(addon.id)) {
+      // Refresh the list to reflect the new order
+      loadAddons();
+    }
   };
 
   const handleRemoveAddon = (addon: ExtendedManifest) => {
     Alert.alert(
-      'Uninstall',
+      'Uninstall Addon',
       `Are you sure you want to uninstall ${addon.name}?`,
       [
         { text: 'Cancel', style: 'cancel' },
@@ -160,14 +160,20 @@ const AddonsScreen = () => {
           style: 'destructive',
           onPress: () => {
             stremioService.removeAddon(addon.id);
-            loadAddons();
+            
+            // Remove from addons list
+            setAddons(prev => prev.filter(a => a.id !== addon.id));
           },
         },
       ]
     );
   };
 
-  const renderAddonItem = ({ item }: { item: ExtendedManifest }) => {
+  const toggleReorderMode = () => {
+    setReorderMode(!reorderMode);
+  };
+
+  const renderAddonItem = ({ item, index }: { item: ExtendedManifest, index: number }) => {
     const types = item.types || [];
     const description = item.description || '';
     // @ts-ignore - some addons might have logo property even though it's not in the type
@@ -177,9 +183,39 @@ const AddonsScreen = () => {
     const categoryText = types.length > 0 
       ? types.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(' • ') 
       : 'No categories';
+      
+    const isFirstItem = index === 0;
+    const isLastItem = index === addons.length - 1;
 
     return (
-      <View>
+      <View style={styles.addonItem}>
+        {reorderMode && (
+          <View style={styles.reorderButtons}>
+            <TouchableOpacity 
+              style={[styles.reorderButton, isFirstItem && styles.disabledButton]}
+              onPress={() => moveAddonUp(item)}
+              disabled={isFirstItem}
+            >
+              <MaterialIcons 
+                name="arrow-upward" 
+                size={20} 
+                color={isFirstItem ? colors.mediumGray : colors.white} 
+              />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.reorderButton, isLastItem && styles.disabledButton]}
+              onPress={() => moveAddonDown(item)}
+              disabled={isLastItem}
+            >
+              <MaterialIcons 
+                name="arrow-downward" 
+                size={20} 
+                color={isLastItem ? colors.mediumGray : colors.white}
+              />
+            </TouchableOpacity>
+          </View>
+        )}
+        
         <View style={styles.addonHeader}>
           {logo ? (
             <ExpoImage 
@@ -200,13 +236,20 @@ const AddonsScreen = () => {
               <Text style={styles.addonCategory}>{categoryText}</Text>
             </View>
           </View>
-          <Switch
-            value={true} // Default to enabled
-            onValueChange={(value) => handleToggleAddon(item, !value)}
-            trackColor={{ false: colors.elevation1, true: colors.primary }}
-            thumbColor={colors.white}
-            ios_backgroundColor={colors.elevation1}
-          />
+          <View style={styles.addonActions}>
+            {!reorderMode ? (
+              <TouchableOpacity 
+                style={styles.deleteButton}
+                onPress={() => handleRemoveAddon(item)}
+              >
+                <MaterialIcons name="delete" size={20} color={colors.error} />
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.priorityBadge}>
+                <Text style={styles.priorityText}>#{index + 1}</Text>
+              </View>
+            )}
+          </View>
         </View>
         
         <Text style={styles.addonDescription}>
@@ -236,9 +279,48 @@ const AddonsScreen = () => {
           <MaterialIcons name="chevron-left" size={28} color={colors.white} />
           <Text style={styles.backText}>Settings</Text>
         </TouchableOpacity>
+        
+        <View style={styles.headerActions}>
+          {/* Reorder Mode Toggle Button */}
+          <TouchableOpacity 
+            style={[styles.headerButton, reorderMode && styles.activeHeaderButton]}
+            onPress={toggleReorderMode}
+          >
+            <MaterialIcons 
+              name="swap-vert" 
+              size={24} 
+              color={reorderMode ? colors.primary : colors.white} 
+            />
+          </TouchableOpacity>
+          
+          {/* Refresh Button */}
+          <TouchableOpacity 
+            style={styles.headerButton}
+            onPress={refreshAddons}
+            disabled={loading}
+          >
+            <MaterialIcons 
+              name="refresh" 
+              size={24} 
+              color={loading ? colors.mediumGray : colors.white} 
+            />
+          </TouchableOpacity>
+        </View>
       </View>
       
-      <Text style={styles.headerTitle}>Addons</Text>
+      <Text style={styles.headerTitle}>
+        Addons
+        {reorderMode && <Text style={styles.reorderModeText}> (Reorder Mode)</Text>}
+      </Text>
+      
+      {reorderMode && (
+        <View style={styles.reorderInfoBanner}>
+          <MaterialIcons name="info-outline" size={18} color={colors.primary} />
+          <Text style={styles.reorderInfoText}>
+            Addons at the top have higher priority when loading content
+          </Text>
+        </View>
+      )}
       
       {loading ? (
         <View style={styles.loadingContainer}>
@@ -256,40 +338,44 @@ const AddonsScreen = () => {
             <View style={styles.statsContainer}>
               <StatsCard value={addons.length} label="Addons" />
               <View style={styles.statsDivider} />
-              <StatsCard value={activeAddons} label="Active" />
+              <StatsCard value={addons.length} label="Active" />
               <View style={styles.statsDivider} />
               <StatsCard value={catalogCount} label="Catalogs" />
             </View>
           </View>
           
-          {/* Add Addon Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>ADD NEW ADDON</Text>
-            <View style={styles.addAddonContainer}>
-              <TextInput
-                style={styles.addonInput}
-                placeholder="Addon URL"
-                placeholderTextColor={colors.mediumGray}
-                value={addonUrl}
-                onChangeText={setAddonUrl}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <TouchableOpacity 
-                style={[styles.addButton, {opacity: installing || !addonUrl ? 0.6 : 1}]}
-                onPress={handleAddAddon}
-                disabled={installing || !addonUrl}
-              >
-                <Text style={styles.addButtonText}>
-                  {installing ? 'Loading...' : 'Add Addon'}
-                </Text>
-              </TouchableOpacity>
+          {/* Hide Add Addon Section in reorder mode */}
+          {!reorderMode && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>ADD NEW ADDON</Text>
+              <View style={styles.addAddonContainer}>
+                <TextInput
+                  style={styles.addonInput}
+                  placeholder="Addon URL"
+                  placeholderTextColor={colors.mediumGray}
+                  value={addonUrl}
+                  onChangeText={setAddonUrl}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity 
+                  style={[styles.addButton, {opacity: installing || !addonUrl ? 0.6 : 1}]}
+                  onPress={handleAddAddon}
+                  disabled={installing || !addonUrl}
+                >
+                  <Text style={styles.addButtonText}>
+                    {installing ? 'Loading...' : 'Add Addon'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          )}
           
           {/* Installed Addons Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>INSTALLED ADDONS</Text>
+            <Text style={styles.sectionTitle}>
+              {reorderMode ? "DRAG ADDONS TO REORDER" : "INSTALLED ADDONS"}
+            </Text>
             <View style={styles.addonList}>
               {addons.length === 0 ? (
                 <View style={styles.emptyContainer}>
@@ -297,20 +383,14 @@ const AddonsScreen = () => {
                   <Text style={styles.emptyText}>No addons installed</Text>
                 </View>
               ) : (
-                addons.map((addon, index) => {
-                  const isLast = index === addons.length - 1;
-                  return (
-                    <View 
-                      key={addon.id} 
-                      style={[
-                        styles.addonItem, 
-                        { marginBottom: isLast ? 32 : 16 }
-                      ]}
-                    >
-                      {renderAddonItem({ item: addon })}
-                    </View>
-                  );
-                })
+                addons.map((addon, index) => (
+                  <View 
+                    key={addon.id} 
+                    style={{ marginBottom: index === addons.length - 1 ? 32 : 0 }}
+                  >
+                    {renderAddonItem({ item: addon, index })}
+                  </View>
+                ))
               )}
             </View>
           </View>
@@ -440,8 +520,75 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 8 : 8,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerButton: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  activeHeaderButton: {
+    backgroundColor: 'rgba(45, 156, 219, 0.2)',
+    borderRadius: 6,
+  },
+  reorderModeText: {
+    color: colors.primary,
+    fontSize: 18,
+    fontWeight: '400',
+  },
+  reorderInfoBanner: {
+    backgroundColor: 'rgba(45, 156, 219, 0.15)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginHorizontal: 16,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  reorderInfoText: {
+    color: colors.white,
+    fontSize: 14,
+    marginLeft: 8,
+  },
+  reorderButtons: {
+    position: 'absolute',
+    left: -12,
+    top: '50%',
+    marginTop: -40,
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  reorderButton: {
+    backgroundColor: colors.elevation3,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 4,
+  },
+  disabledButton: {
+    opacity: 0.5,
+    backgroundColor: colors.elevation2,
+  },
+  priorityBadge: {
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  priorityText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   backButton: {
     flexDirection: 'row',
@@ -569,6 +716,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
+    marginBottom: 16,
   },
   addonHeader: {
     flexDirection: 'row',
@@ -753,6 +901,16 @@ const styles = StyleSheet.create({
   modalButtonText: {
     color: colors.white,
     fontWeight: '600',
+  },
+  addonActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  deleteButton: {
+    padding: 6,
+  },
+  refreshButton: {
+    padding: 8,
   },
 });
 
