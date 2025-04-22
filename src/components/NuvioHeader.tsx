@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Platform, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, Platform, StyleSheet, Image } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '../styles/colors';
 import { useNavigation } from '@react-navigation/native';
@@ -38,9 +38,12 @@ export const NuvioHeader = () => {
           )
         )}
         <View style={styles.contentContainer}>
-          <View style={styles.titleContainer}>
-            <Text style={styles.title}>NUVIO</Text>
-            <View style={styles.titleAccent} />
+          <View style={styles.logoContainer}>
+            <Image
+              source={require('../assets/IMG_0762.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
           </View>
           <TouchableOpacity
             style={styles.searchButton}
@@ -70,7 +73,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   headerContainer: {
-    height: Platform.OS === 'ios' ? 85 : 75,
+    height: Platform.OS === 'ios' ? 100 : 90,
     paddingTop: Platform.OS === 'ios' ? 35 : 20,
     backgroundColor: 'rgba(0,0,0,0.3)',
   },
@@ -97,35 +100,23 @@ const styles = StyleSheet.create({
   contentContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 24,
     justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    height: '100%',
   },
-  titleContainer: {
-    position: 'relative',
+  logoContainer: {
+    height: 70,
+    width: 70,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
   },
-  title: {
-    fontSize: 32,
-    fontWeight: '900',
-    color: colors.white,
-    letterSpacing: 2,
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif-black',
-    textTransform: 'uppercase',
-    marginLeft: Platform.OS === 'ios' ? -4 : -8,
-    textShadowColor: 'rgba(255, 255, 255, 0.2)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-  titleAccent: {
-    position: 'absolute',
-    bottom: -3,
-    left: Platform.OS === 'ios' ? -2 : -6,
-    width: 24,
-    height: 2,
-    backgroundColor: colors.primary || '#3D85C6',
-    borderRadius: 1,
+  logo: {
+    height: '100%',
+    width: '100%',
   },
   searchButton: {
     padding: 8,
+    marginLeft: 'auto',
   },
   iconWrapper: {
     width: 40,

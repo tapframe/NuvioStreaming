@@ -368,18 +368,6 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
                 logger.error('Failed to fetch credits for movie:', error);
               }
               
-              // Fetch movie logo from TMDB
-              try {
-                const logoUrl = await tmdbService.getMovieImages(tmdbId);
-                if (logoUrl) {
-                  formattedMovie.logo = logoUrl;
-                  logger.log(`Successfully fetched logo for movie ${tmdbId} from TMDB`);
-                }
-              } catch (error) {
-                logger.error('Failed to fetch logo from TMDB:', error);
-                // Continue with execution, logo is optional
-              }
-              
               setMetadata(formattedMovie);
               cacheService.setMetadata(id, type, formattedMovie);
               const isInLib = catalogService.getLibraryItems().some(item => item.id === id);
@@ -496,40 +484,10 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
         setInLibrary(isInLib);
         cacheService.setMetadata(id, type, content.value);
 
-        // Fetch and add logo from TMDB
-        let finalMetadata = { ...content.value };
-        try {
-          // Get TMDB ID if not already set
-          const contentTmdbId = await tmdbService.extractTMDBIdFromStremioId(id);
-          if (contentTmdbId) {
-            // Determine content type for TMDB API (movie or tv)
-            const tmdbType = type === 'series' ? 'tv' : 'movie';
-            // Fetch logo from TMDB
-            const logoUrl = await tmdbService.getContentLogo(tmdbType, contentTmdbId);
-            if (logoUrl) {
-              // Update metadata with logo
-              finalMetadata.logo = logoUrl;
-              logger.log(`[useMetadata] Successfully fetched and set logo from TMDB for ${id}`);
-            } else {
-              // If TMDB has no logo, ensure logo property is null/undefined
-              finalMetadata.logo = undefined;
-              logger.log(`[useMetadata] No logo found on TMDB for ${id}. Setting logo to undefined.`);
-            }
-          } else {
-            // If we couldn't get a TMDB ID, ensure logo is null/undefined
-             finalMetadata.logo = undefined;
-             logger.log(`[useMetadata] Could not determine TMDB ID for ${id}. Setting logo to undefined.`);
-          }
-        } catch (error) {
-          logger.error(`[useMetadata] Error fetching logo from TMDB for ${id}:`, error);
-          // Ensure logo is null/undefined on error
-           finalMetadata.logo = undefined;
-        }
-        
-        // Set the final metadata state
-        setMetadata(finalMetadata);
-        // Update cache with final metadata (including potentially nulled logo)
-        cacheService.setMetadata(id, type, finalMetadata);
+        // Set the final metadata state without fetching logo (this will be handled by MetadataScreen)
+        setMetadata(content.value);
+        // Update cache
+        cacheService.setMetadata(id, type, content.value);
 
         if (type === 'series') {
           // Load series data in parallel with other data
