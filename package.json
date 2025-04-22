@@ -58,7 +58,8 @@
     "react-native-tab-view": "^4.0.10",
     "react-native-video": "^6.12.0",
     "react-native-web": "~0.19.13",
-    "subsrt": "^1.1.1"
+    "subsrt": "^1.1.1",
+    "expo-dev-client": "~5.0.20"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
