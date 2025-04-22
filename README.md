@@ -13,7 +13,7 @@ Nuvio is an Open-Source cross-platform streaming application built with React Na
 *   **Search Functionality:** Search for specific movies, TV shows, or other content.
 *   **Personal Library:** Manage a collection of favorite movies and shows.
 *   **Trakt.tv Integration:** Sync watch history, collection, and watch progress with your Trakt account.
-*   **Addon Management:** Configure and manage Stremio-like addons to source content streams and catalogs.
+*   **Addon Management:** Install, manage, and reorder addons compatible with the Stremio addon protocol to source content streams and catalogs.
 *   **Release Calendar:** View upcoming movie releases or TV show episode air dates.
 *   **Extensive Settings:**
     *   Player customization (e.g., subtitle preferences).
@@ -109,6 +109,10 @@ If you encounter any bugs or have suggestions, please open an issue on the GitHu
 *   Actual behavior.
 *   Screenshots or logs, if helpful.
 *   Your environment (OS, device, app version).
+
+## 🙏 Acknowledgements
+
+Huge thanks to the Stremio team for their pioneering work in the streaming space and for creating their addon protocol/system. As an indie developer, their approach has been a major source of inspiration. This project utilizes compatibility with the Stremio addon ecosystem to source content.
 
 ## 📄 License
 
