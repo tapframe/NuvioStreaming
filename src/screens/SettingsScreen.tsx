@@ -262,6 +262,26 @@ const SettingsScreen: React.FC = () => {
           />
         </SettingsCard>
 
+        <SettingsCard isDarkMode={isDarkMode} title="Features">
+          <SettingItem
+            title="Calendar"
+            description="Manage your show calendar settings"
+            icon="calendar-today"
+            renderControl={ChevronRight}
+            onPress={() => navigation.navigate('Calendar')}
+            isDarkMode={isDarkMode}
+          />
+          <SettingItem
+            title="Notifications"
+            description="Configure episode notifications and reminders"
+            icon="notifications"
+            renderControl={ChevronRight}
+            onPress={() => navigation.navigate('NotificationSettings')}
+            isDarkMode={isDarkMode}
+            isLast={true}
+          />
+        </SettingsCard>
+
         <SettingsCard isDarkMode={isDarkMode} title="Content">
           <SettingItem
             title="Addons"
