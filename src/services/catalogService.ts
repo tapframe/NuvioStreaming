@@ -3,6 +3,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { TMDBService } from './tmdbService';
 import { logger } from '../utils/logger';
+import { getCatalogDisplayName } from '../utils/catalogNameUtils';
+
+// Add a constant for storing the data source preference
+const DATA_SOURCE_KEY = 'discover_data_source';
+
+// Define data source types
+export enum DataSource {
+  STREMIO_ADDONS = 'stremio_addons',
+  TMDB = 'tmdb',
+}
 
 export interface StreamingAddon {
   id: string;
@@ -54,6 +64,8 @@ export interface CatalogContent {
   genre?: string;
   items: StreamingContent[];
 }
+
+const CATALOG_SETTINGS_KEY = 'catalog_settings';
 
 class CatalogService {
   private static instance: CatalogService;
@@ -137,43 +149,38 @@ class CatalogService {
     const addons = await this.getAllAddons();
     const catalogs: CatalogContent[] = [];
 
-    // Get saved catalog settings
-    const savedSettings = await AsyncStorage.getItem('catalog_settings');
-    const catalogSettings: { [key: string]: boolean } = savedSettings ? JSON.parse(savedSettings) : {};
+    // Load enabled/disabled settings
+    const catalogSettingsJson = await AsyncStorage.getItem(CATALOG_SETTINGS_KEY);
+    const catalogSettings = catalogSettingsJson ? JSON.parse(catalogSettingsJson) : {};
 
-    // Get featured catalogs
+    // Process addons in order (they're already returned in order from getAllAddons)
     for (const addon of addons) {
-      if (addon.catalogs && addon.catalogs.length > 0) {
-        // For each catalog, check if it's enabled in settings
+      if (addon.catalogs) {
         for (const catalog of addon.catalogs) {
           const settingKey = `${addon.id}:${catalog.type}:${catalog.id}`;
-          // If setting doesn't exist, default to true for backward compatibility
           const isEnabled = catalogSettings[settingKey] ?? true;
 
           if (isEnabled) {
             try {
-              // Get the items for this catalog
               const addonManifest = await stremioService.getInstalledAddonsAsync();
               const manifest = addonManifest.find(a => a.id === addon.id);
               if (!manifest) continue;
 
               const metas = await stremioService.getCatalog(manifest, catalog.type, catalog.id, 1);
               if (metas && metas.length > 0) {
-                // Convert Meta to StreamingContent
                 const items = metas.map(meta => this.convertMetaToStreamingContent(meta));
                 
-                // Format the catalog name
-                let displayName = catalog.name;
+                // Get potentially custom display name
+                let displayName = await getCatalogDisplayName(addon.id, catalog.type, catalog.id, catalog.name);
                 
                 // Remove duplicate words and clean up the name (case-insensitive)
                 const words = displayName.split(' ');
                 const uniqueWords = [];
                 const seenWords = new Set();
-                
                 for (const word of words) {
                   const lowerWord = word.toLowerCase();
                   if (!seenWords.has(lowerWord)) {
-                    uniqueWords.push(word); // Keep original case
+                    uniqueWords.push(word); 
                     seenWords.add(lowerWord);
                   }
                 }
@@ -194,7 +201,7 @@ class CatalogService {
                 });
               }
             } catch (error) {
-              logger.error(`Failed to get catalog ${catalog.id} for addon ${addon.id}:`, error);
+              logger.error(`Failed to load ${catalog.name} from ${addon.name}:`, error);
             }
           }
         }
@@ -205,10 +212,18 @@ class CatalogService {
   }
 
   async getCatalogByType(type: string, genreFilter?: string): Promise<CatalogContent[]> {
+    // Get the data source preference (default to Stremio addons)
+    const dataSourcePreference = await this.getDataSourcePreference();
+    
+    // If TMDB is selected as the data source, use TMDB API
+    if (dataSourcePreference === DataSource.TMDB) {
+      return this.getCatalogByTypeFromTMDB(type, genreFilter);
+    }
+    
+    // Otherwise use the original Stremio addons method
     const addons = await this.getAllAddons();
     const catalogs: CatalogContent[] = [];
 
-    // Filter addons with catalogs of the specified type
     const typeAddons = addons.filter(addon => 
       addon.catalogs && addon.catalogs.some(catalog => catalog.type === type)
     );
@@ -222,18 +237,20 @@ class CatalogService {
           const manifest = addonManifest.find(a => a.id === addon.id);
           if (!manifest) continue;
 
-          // Apply genre filter if provided
           const filters = genreFilter ? [{ title: 'genre', value: genreFilter }] : [];
           const metas = await stremioService.getCatalog(manifest, type, catalog.id, 1, filters);
           
           if (metas && metas.length > 0) {
             const items = metas.map(meta => this.convertMetaToStreamingContent(meta));
             
+            // Get potentially custom display name
+            const displayName = await getCatalogDisplayName(addon.id, catalog.type, catalog.id, catalog.name);
+            
             catalogs.push({
               addon: addon.id,
               type,
               id: catalog.id,
-              name: catalog.name,
+              name: displayName,
               genre: genreFilter,
               items
             });
@@ -245,6 +262,148 @@ class CatalogService {
     }
 
     return catalogs;
+  }
+
+  /**
+   * Get catalog content from TMDB by type and genre
+   */
+  private async getCatalogByTypeFromTMDB(type: string, genreFilter?: string): Promise<CatalogContent[]> {
+    const tmdbService = TMDBService.getInstance();
+    const catalogs: CatalogContent[] = [];
+    
+    try {
+      // Map Stremio content type to TMDB content type
+      const tmdbType = type === 'movie' ? 'movie' : 'tv';
+      
+      // If no genre filter or All is selected, get multiple catalogs
+      if (!genreFilter || genreFilter === 'All') {
+        // Get trending
+        const trendingItems = await tmdbService.getTrending(tmdbType, 'week');
+        const trendingItemsPromises = trendingItems.map(item => this.convertTMDBToStreamingContent(item, tmdbType));
+        const trendingStreamingItems = await Promise.all(trendingItemsPromises);
+        
+        catalogs.push({
+          addon: 'tmdb',
+          type,
+          id: 'trending',
+          name: `Trending ${type === 'movie' ? 'Movies' : 'TV Shows'}`,
+          items: trendingStreamingItems
+        });
+        
+        // Get popular
+        const popularItems = await tmdbService.getPopular(tmdbType, 1);
+        const popularItemsPromises = popularItems.map(item => this.convertTMDBToStreamingContent(item, tmdbType));
+        const popularStreamingItems = await Promise.all(popularItemsPromises);
+        
+        catalogs.push({
+          addon: 'tmdb',
+          type,
+          id: 'popular',
+          name: `Popular ${type === 'movie' ? 'Movies' : 'TV Shows'}`,
+          items: popularStreamingItems
+        });
+        
+        // Get upcoming/on air
+        const upcomingItems = await tmdbService.getUpcoming(tmdbType, 1);
+        const upcomingItemsPromises = upcomingItems.map(item => this.convertTMDBToStreamingContent(item, tmdbType));
+        const upcomingStreamingItems = await Promise.all(upcomingItemsPromises);
+        
+        catalogs.push({
+          addon: 'tmdb',
+          type,
+          id: 'upcoming',
+          name: type === 'movie' ? 'Upcoming Movies' : 'On Air TV Shows',
+          items: upcomingStreamingItems
+        });
+      } else {
+        // Get content by genre
+        const genreItems = await tmdbService.discoverByGenre(tmdbType, genreFilter);
+        const streamingItemsPromises = genreItems.map(item => this.convertTMDBToStreamingContent(item, tmdbType));
+        const streamingItems = await Promise.all(streamingItemsPromises);
+        
+        catalogs.push({
+          addon: 'tmdb',
+          type,
+          id: 'discover',
+          name: `${genreFilter} ${type === 'movie' ? 'Movies' : 'TV Shows'}`,
+          genre: genreFilter,
+          items: streamingItems
+        });
+      }
+    } catch (error) {
+      logger.error(`Failed to get catalog from TMDB for type ${type}, genre ${genreFilter}:`, error);
+    }
+    
+    return catalogs;
+  }
+
+  /**
+   * Convert TMDB trending/discover result to StreamingContent format
+   */
+  private async convertTMDBToStreamingContent(item: any, type: 'movie' | 'tv'): Promise<StreamingContent> {
+    const id = item.external_ids?.imdb_id || `tmdb:${item.id}`;
+    const name = type === 'movie' ? item.title : item.name;
+    const posterPath = item.poster_path;
+    
+    // Get genres from genre_ids
+    let genres: string[] = [];
+    if (item.genre_ids && item.genre_ids.length > 0) {
+      try {
+        const tmdbService = TMDBService.getInstance();
+        const genreLists = type === 'movie' 
+          ? await tmdbService.getMovieGenres() 
+          : await tmdbService.getTvGenres();
+        
+        const genreIds: number[] = item.genre_ids;
+        genres = genreIds
+          .map(genreId => {
+            const genre = genreLists.find(g => g.id === genreId);
+            return genre ? genre.name : null;
+          })
+          .filter(Boolean) as string[];
+      } catch (error) {
+        logger.error('Failed to get genres for TMDB content:', error);
+      }
+    }
+    
+    return {
+      id,
+      type: type === 'movie' ? 'movie' : 'series',
+      name: name || 'Unknown',
+      poster: posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : 'https://via.placeholder.com/300x450/cccccc/666666?text=No+Image',
+      posterShape: 'poster',
+      banner: item.backdrop_path ? `https://image.tmdb.org/t/p/original${item.backdrop_path}` : undefined,
+      year: type === 'movie' 
+        ? (item.release_date ? new Date(item.release_date).getFullYear() : undefined)
+        : (item.first_air_date ? new Date(item.first_air_date).getFullYear() : undefined),
+      description: item.overview,
+      genres,
+      inLibrary: this.library[`${type === 'movie' ? 'movie' : 'series'}:${id}`] !== undefined,
+    };
+  }
+
+  /**
+   * Get the current data source preference
+   */
+  async getDataSourcePreference(): Promise<DataSource> {
+    try {
+      const dataSource = await AsyncStorage.getItem(DATA_SOURCE_KEY);
+      return dataSource as DataSource || DataSource.STREMIO_ADDONS;
+    } catch (error) {
+      logger.error('Failed to get data source preference:', error);
+      return DataSource.STREMIO_ADDONS;
+    }
+  }
+
+  /**
+   * Set the data source preference
+   */
+  async setDataSourcePreference(dataSource: DataSource): Promise<void> {
+    try {
+      await AsyncStorage.setItem(DATA_SOURCE_KEY, dataSource);
+    } catch (error) {
+      logger.error('Failed to set data source preference:', error);
+    }
   }
 
   async getContentDetails(type: string, id: string): Promise<StreamingContent | null> {

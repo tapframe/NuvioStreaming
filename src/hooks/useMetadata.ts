@@ -7,6 +7,7 @@ import { cacheService } from '../services/cacheService';
 import { Cast, Episode, GroupedEpisodes, GroupedStreams } from '../types/metadata';
 import { TMDBService } from '../services/tmdbService';
 import { logger } from '../utils/logger';
+import { usePersistentSeasons } from './usePersistentSeasons';
 
 // Constants for timeouts and retries
 const API_TIMEOUT = 10000; // 10 seconds
@@ -86,6 +87,7 @@ interface UseMetadataReturn {
   recommendations: StreamingContent[];
   loadingRecommendations: boolean;
   setMetadata: React.Dispatch<React.SetStateAction<StreamingContent | null>>;
+  imdbId: string | null;
 }
 
 export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn => {
@@ -110,6 +112,10 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
   const [loadAttempts, setLoadAttempts] = useState(0);
   const [recommendations, setRecommendations] = useState<StreamingContent[]>([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
+  const [imdbId, setImdbId] = useState<string | null>(null);
+
+  // Add hook for persistent seasons
+  const { getSeason, saveSeason } = usePersistentSeasons();
 
   const processStremioSource = async (type: string, id: string, isEpisode = false) => {
     const sourceStartTime = Date.now();
@@ -316,6 +322,7 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
             if (imdbId) {
               // Use the imdbId for compatibility with the rest of the app
               actualId = imdbId;
+              setImdbId(imdbId);
               // Also store the TMDB ID for later use
               setTmdbId(parseInt(tmdbId));
             } else {
@@ -394,6 +401,7 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
               if (imdbId) {
                 // Use the imdbId for compatibility with the rest of the app
                 actualId = imdbId;
+                setImdbId(imdbId);
                 // Also store the TMDB ID for later use
                 setTmdbId(parseInt(tmdbId));
               } else {
@@ -471,6 +479,10 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
             catalogService.getContentDetails(type, actualId),
             API_TIMEOUT
           );
+          // Store the actual ID used (could be IMDB)
+          if (actualId.startsWith('tt')) {
+            setImdbId(actualId);
+          }
           return result;
         }),
         // Start loading cast immediately in parallel
@@ -567,10 +579,17 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
         
         setGroupedEpisodes(transformedEpisodes);
         
+        // Get the first available season as fallback
         const firstSeason = Math.min(...Object.keys(allEpisodes).map(Number));
-        const initialEpisodes = transformedEpisodes[firstSeason] || [];
-        setSelectedSeason(firstSeason);
-        setEpisodes(initialEpisodes);
+        
+        // Get saved season from persistence, fallback to first season if not found
+        const persistedSeason = getSeason(id, firstSeason);
+        
+        // Set the selected season from persistence
+        setSelectedSeason(persistedSeason);
+        
+        // Set episodes for the selected season
+        setEpisodes(transformedEpisodes[persistedSeason] || []);
       }
     } catch (error) {
       console.error('Failed to load episodes:', error);
@@ -950,9 +969,14 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
 
   const handleSeasonChange = useCallback((seasonNumber: number) => {
     if (selectedSeason === seasonNumber) return;
+    
+    // Update local state
     setSelectedSeason(seasonNumber);
     setEpisodes(groupedEpisodes[seasonNumber] || []);
-  }, [selectedSeason, groupedEpisodes]);
+    
+    // Persist the selection
+    saveSeason(id, seasonNumber);
+  }, [selectedSeason, groupedEpisodes, saveSeason, id]);
 
   const toggleLibrary = useCallback(() => {
     if (!metadata) return;
@@ -1096,5 +1120,6 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
     recommendations,
     loadingRecommendations,
     setMetadata,
+    imdbId,
   };
 }; 

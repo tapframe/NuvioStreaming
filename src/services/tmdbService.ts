@@ -791,6 +791,99 @@ export class TMDBService {
   }
 
   /**
+   * Get popular movies or TV shows
+   * @param type 'movie' or 'tv'
+   * @param page Page number for pagination
+   */
+  async getPopular(type: 'movie' | 'tv', page: number = 1): Promise<TMDBTrendingResult[]> {
+    try {
+      const response = await axios.get(`${BASE_URL}/${type}/popular`, {
+        headers: await this.getHeaders(),
+        params: await this.getParams({
+          language: 'en-US',
+          page,
+        }),
+      });
+
+      // Get external IDs for each popular item
+      const results = response.data.results || [];
+      const resultsWithExternalIds = await Promise.all(
+        results.map(async (item: TMDBTrendingResult) => {
+          try {
+            const externalIdsResponse = await axios.get(
+              `${BASE_URL}/${type}/${item.id}/external_ids`,
+              {
+                headers: await this.getHeaders(),
+                params: await this.getParams(),
+              }
+            );
+            return {
+              ...item,
+              external_ids: externalIdsResponse.data
+            };
+          } catch (error) {
+            logger.error(`Failed to get external IDs for ${type} ${item.id}:`, error);
+            return item;
+          }
+        })
+      );
+
+      return resultsWithExternalIds;
+    } catch (error) {
+      logger.error(`Failed to get popular ${type} content:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Get upcoming/now playing content
+   * @param type 'movie' or 'tv'
+   * @param page Page number for pagination
+   */
+  async getUpcoming(type: 'movie' | 'tv', page: number = 1): Promise<TMDBTrendingResult[]> {
+    try {
+      // For movies use upcoming, for TV use on_the_air
+      const endpoint = type === 'movie' ? 'upcoming' : 'on_the_air';
+      
+      const response = await axios.get(`${BASE_URL}/${type}/${endpoint}`, {
+        headers: await this.getHeaders(),
+        params: await this.getParams({
+          language: 'en-US',
+          page,
+        }),
+      });
+
+      // Get external IDs for each upcoming item
+      const results = response.data.results || [];
+      const resultsWithExternalIds = await Promise.all(
+        results.map(async (item: TMDBTrendingResult) => {
+          try {
+            const externalIdsResponse = await axios.get(
+              `${BASE_URL}/${type}/${item.id}/external_ids`,
+              {
+                headers: await this.getHeaders(),
+                params: await this.getParams(),
+              }
+            );
+            return {
+              ...item,
+              external_ids: externalIdsResponse.data
+            };
+          } catch (error) {
+            logger.error(`Failed to get external IDs for ${type} ${item.id}:`, error);
+            return item;
+          }
+        })
+      );
+
+      return resultsWithExternalIds;
+    } catch (error) {
+      logger.error(`Failed to get upcoming ${type} content:`, error);
+      return [];
+    }
+  }
+
+  /**
    * Get the list of official movie genres from TMDB
    */
   async getMovieGenres(): Promise<{ id: number; name: string }[]> {
@@ -822,6 +915,69 @@ export class TMDBService {
       return response.data.genres || [];
     } catch (error) {
       logger.error('Failed to fetch TV genres:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Discover movies or TV shows by genre
+   * @param type 'movie' or 'tv'
+   * @param genreName The genre name to filter by
+   * @param page Page number for pagination
+   */
+  async discoverByGenre(type: 'movie' | 'tv', genreName: string, page: number = 1): Promise<TMDBTrendingResult[]> {
+    try {
+      // First get the genre ID from the name
+      const genreList = type === 'movie' 
+        ? await this.getMovieGenres() 
+        : await this.getTvGenres();
+      
+      const genre = genreList.find(g => g.name.toLowerCase() === genreName.toLowerCase());
+      
+      if (!genre) {
+        logger.error(`Genre ${genreName} not found`);
+        return [];
+      }
+      
+      const response = await axios.get(`${BASE_URL}/discover/${type}`, {
+        headers: await this.getHeaders(),
+        params: await this.getParams({
+          language: 'en-US',
+          sort_by: 'popularity.desc',
+          include_adult: false,
+          include_video: false,
+          page,
+          with_genres: genre.id.toString(),
+          with_original_language: 'en',
+        }),
+      });
+
+      // Get external IDs for each item
+      const results = response.data.results || [];
+      const resultsWithExternalIds = await Promise.all(
+        results.map(async (item: TMDBTrendingResult) => {
+          try {
+            const externalIdsResponse = await axios.get(
+              `${BASE_URL}/${type}/${item.id}/external_ids`,
+              {
+                headers: await this.getHeaders(),
+                params: await this.getParams(),
+              }
+            );
+            return {
+              ...item,
+              external_ids: externalIdsResponse.data
+            };
+          } catch (error) {
+            logger.error(`Failed to get external IDs for ${type} ${item.id}:`, error);
+            return item;
+          }
+        })
+      );
+
+      return resultsWithExternalIds;
+    } catch (error) {
+      logger.error(`Failed to discover ${type} by genre ${genreName}:`, error);
       return [];
     }
   }

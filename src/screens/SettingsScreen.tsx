@@ -12,34 +12,48 @@ import {
   Alert,
   Platform,
   Dimensions,
-  Pressable
+  Image
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import { Picker } from '@react-native-picker/picker';
 import { colors } from '../styles/colors';
 import { useSettings, DEFAULT_SETTINGS } from '../hooks/useSettings';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { stremioService } from '../services/stremioService';
 import { useCatalogContext } from '../contexts/CatalogContext';
+import { useTraktContext } from '../contexts/TraktContext';
+import { catalogService, DataSource } from '../services/catalogService';
 
 const { width } = Dimensions.get('window');
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
-// Card component for iOS Fluent design style
+// Card component with modern style
 interface SettingsCardProps {
   children: React.ReactNode;
   isDarkMode: boolean;
+  title?: string;
 }
 
-const SettingsCard: React.FC<SettingsCardProps> = ({ children, isDarkMode }) => (
-  <View style={[
-    styles.card,
-    { backgroundColor: isDarkMode ? colors.elevation2 : colors.white }
-  ]}>
-    {children}
+const SettingsCard: React.FC<SettingsCardProps> = ({ children, isDarkMode, title }) => (
+  <View style={[styles.cardContainer]}>
+    {title && (
+      <Text style={[
+        styles.cardTitle,
+        { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }
+      ]}>
+        {title.toUpperCase()}
+      </Text>
+    )}
+    <View style={[
+      styles.card,
+      { backgroundColor: isDarkMode ? colors.elevation2 : colors.white }
+    ]}>
+      {children}
+    </View>
   </View>
 );
 
@@ -51,6 +65,7 @@ interface SettingItemProps {
   isLast?: boolean;
   onPress?: () => void;
   isDarkMode: boolean;
+  badge?: string | number;
 }
 
 const SettingItem: React.FC<SettingItemProps> = ({
@@ -60,7 +75,8 @@ const SettingItem: React.FC<SettingItemProps> = ({
   renderControl,
   isLast = false,
   onPress,
-  isDarkMode
+  isDarkMode,
+  badge
 }) => {
   return (
     <TouchableOpacity 
@@ -72,11 +88,14 @@ const SettingItem: React.FC<SettingItemProps> = ({
         { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }
       ]}
     >
-      <View style={styles.settingIconContainer}>
-        <MaterialIcons name={icon} size={22} color={colors.primary} />
+      <View style={[
+        styles.settingIconContainer,
+        { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+      ]}>
+        <MaterialIcons name={icon} size={20} color={colors.primary} />
       </View>
       <View style={styles.settingContent}>
-        <View style={styles.settingTitleRow}>
+        <View style={styles.settingTextContainer}>
           <Text style={[styles.settingTitle, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
             {title}
           </Text>
@@ -86,6 +105,11 @@ const SettingItem: React.FC<SettingItemProps> = ({
             </Text>
           )}
         </View>
+        {badge && (
+          <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+            <Text style={styles.badgeText}>{badge}</Text>
+          </View>
+        )}
       </View>
       <View style={styles.settingControl}>
         {renderControl()}
@@ -94,28 +118,19 @@ const SettingItem: React.FC<SettingItemProps> = ({
   );
 };
 
-const SectionHeader: React.FC<{ title: string; isDarkMode: boolean }> = ({ title, isDarkMode }) => (
-  <View style={styles.sectionHeader}>
-    <Text style={[
-      styles.sectionHeaderText,
-      { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }
-    ]}>
-      {title}
-    </Text>
-  </View>
-);
-
 const SettingsScreen: React.FC = () => {
   const { settings, updateSetting } = useSettings();
   const systemColorScheme = useColorScheme();
   const isDarkMode = systemColorScheme === 'dark' || settings.enableDarkMode;
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { lastUpdate } = useCatalogContext();
+  const { isAuthenticated, userProfile } = useTraktContext();
   
   // States for dynamic content
   const [addonCount, setAddonCount] = useState<number>(0);
   const [catalogCount, setCatalogCount] = useState<number>(0);
   const [mdblistKeySet, setMdblistKeySet] = useState<boolean>(false);
+  const [discoverDataSource, setDiscoverDataSource] = useState<DataSource>(DataSource.STREMIO_ADDONS);
 
   const loadData = useCallback(async () => {
     try {
@@ -149,6 +164,10 @@ const SettingsScreen: React.FC = () => {
       // Check MDBList API key status
       const mdblistKey = await AsyncStorage.getItem('mdblist_api_key');
       setMdblistKeySet(!!mdblistKey);
+      
+      // Get discover data source preference
+      const dataSource = await catalogService.getDataSourcePreference();
+      setDiscoverDataSource(dataSource);
     } catch (error) {
       console.error('Error loading settings data:', error);
     }
@@ -200,10 +219,17 @@ const SettingsScreen: React.FC = () => {
   const ChevronRight = () => (
     <MaterialIcons 
       name="chevron-right" 
-      size={24} 
+      size={22} 
       color={isDarkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
     />
   );
+
+  // Handle data source change
+  const handleDiscoverDataSourceChange = useCallback(async (value: string) => {
+    const dataSource = value as DataSource;
+    setDiscoverDataSource(dataSource);
+    await catalogService.setDataSourcePreference(dataSource);
+  }, []);
 
   return (
     <SafeAreaView style={[
@@ -215,68 +241,77 @@ const SettingsScreen: React.FC = () => {
         <Text style={[styles.headerTitle, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
           Settings
         </Text>
+        <TouchableOpacity onPress={handleResetSettings} style={styles.resetButton}>
+          <Text style={[styles.resetButtonText, {color: colors.primary}]}>Reset</Text>
+        </TouchableOpacity>
       </View>
       <ScrollView 
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        <SectionHeader title="USER & ACCOUNT" isDarkMode={isDarkMode} />
-        <SettingsCard isDarkMode={isDarkMode}>
+        <SettingsCard isDarkMode={isDarkMode} title="User & Account">
           <SettingItem
             title="Trakt"
-            description="Not Connected"
+            description={isAuthenticated ? `Connected as ${userProfile?.username || 'User'}` : "Not Connected"}
             icon="person"
             isDarkMode={isDarkMode}
             renderControl={ChevronRight}
-            onPress={() => Alert.alert('Trakt', 'Trakt integration coming soon')}
-          />
-          <SettingItem
-            title="iCloud Sync"
-            description="Enabled"
-            icon="cloud"
-            isDarkMode={isDarkMode}
-            renderControl={ChevronRight}
+            onPress={() => navigation.navigate('TraktSettings')}
             isLast={true}
           />
         </SettingsCard>
 
-        <SectionHeader title="CONTENT" isDarkMode={isDarkMode} />
-        <SettingsCard isDarkMode={isDarkMode}>
+        <SettingsCard isDarkMode={isDarkMode} title="Features">
+          <SettingItem
+            title="Calendar"
+            description="Manage your show calendar settings"
+            icon="calendar-today"
+            renderControl={ChevronRight}
+            onPress={() => navigation.navigate('Calendar')}
+            isDarkMode={isDarkMode}
+          />
+          <SettingItem
+            title="Notifications"
+            description="Configure episode notifications and reminders"
+            icon="notifications"
+            renderControl={ChevronRight}
+            onPress={() => navigation.navigate('NotificationSettings')}
+            isDarkMode={isDarkMode}
+            isLast={true}
+          />
+        </SettingsCard>
+
+        <SettingsCard isDarkMode={isDarkMode} title="Content">
           <SettingItem
             title="Addons"
-            description={addonCount + " installed"}
+            description="Manage your installed addons"
             icon="extension"
             isDarkMode={isDarkMode}
             renderControl={ChevronRight}
             onPress={() => navigation.navigate('Addons')}
+            badge={addonCount}
           />
           <SettingItem
             title="Catalogs"
-            description={`${catalogCount} ${catalogCount === 1 ? 'catalog' : 'catalogs'} enabled`}
+            description="Configure content sources"
             icon="view-list"
             isDarkMode={isDarkMode}
             renderControl={ChevronRight}
             onPress={() => navigation.navigate('CatalogSettings')}
+            badge={catalogCount}
           />
           <SettingItem
             title="Home Screen"
-            description="Customize home layout and content"
+            description="Customize layout and content"
             icon="home"
             isDarkMode={isDarkMode}
             renderControl={ChevronRight}
             onPress={() => navigation.navigate('HomeScreenSettings')}
           />
           <SettingItem
-            title="Folders"
-            description="0 created"
-            icon="folder"
-            isDarkMode={isDarkMode}
-            renderControl={ChevronRight}
-          />
-          <SettingItem
             title="Ratings Source"
-            description={mdblistKeySet ? "MDBList API Configured" : "MDBList API Not Set"}
+            description={mdblistKeySet ? "MDBList API Configured" : "Configure MDBList API"}
             icon="info-outline"
             isDarkMode={isDarkMode}
             renderControl={ChevronRight}
@@ -289,41 +324,71 @@ const SettingsScreen: React.FC = () => {
             isDarkMode={isDarkMode}
             renderControl={ChevronRight}
             onPress={() => navigation.navigate('TMDBSettings')}
-          />
-          <SettingItem
-            title="Resource Filters"
-            icon="tune"
-            isDarkMode={isDarkMode}
-            renderControl={ChevronRight}
-          />
-          <SettingItem
-            title="AI Features"
-            description="Not Connected"
-            icon="auto-awesome"
-            isDarkMode={isDarkMode}
-            renderControl={ChevronRight}
             isLast={true}
           />
         </SettingsCard>
 
-        <SectionHeader title="PLAYBACK" isDarkMode={isDarkMode} />
-        <SettingsCard isDarkMode={isDarkMode}>
+        <SettingsCard isDarkMode={isDarkMode} title="Playback">
           <SettingItem
             title="Video Player"
-            description="Infuse"
+            description={Platform.OS === 'ios' 
+              ? (settings.preferredPlayer === 'internal' 
+                ? 'Built-in Player' 
+                : settings.preferredPlayer 
+                  ? settings.preferredPlayer.toUpperCase()
+                  : 'Built-in Player')
+              : (settings.useExternalPlayer ? 'External Player' : 'Built-in Player')
+            }
             icon="play-arrow"
             isDarkMode={isDarkMode}
             renderControl={ChevronRight}
-          />
-          <SettingItem
-            title="Auto-Filtering"
-            description="Disabled"
-            icon="tune"
-            isDarkMode={isDarkMode}
-            renderControl={ChevronRight}
+            onPress={() => navigation.navigate('PlayerSettings')}
             isLast={true}
           />
         </SettingsCard>
+
+        <SettingsCard isDarkMode={isDarkMode} title="Discover">
+          <SettingItem
+            title="Content Source"
+            description="Choose where to get content for the Discover screen"
+            icon="explore"
+            isDarkMode={isDarkMode}
+            renderControl={() => (
+              <View style={styles.selectorContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.selectorButton,
+                    discoverDataSource === DataSource.STREMIO_ADDONS && styles.selectorButtonActive
+                  ]}
+                  onPress={() => handleDiscoverDataSourceChange(DataSource.STREMIO_ADDONS)}
+                >
+                  <Text style={[
+                    styles.selectorText,
+                    discoverDataSource === DataSource.STREMIO_ADDONS && styles.selectorTextActive
+                  ]}>Addons</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.selectorButton,
+                    discoverDataSource === DataSource.TMDB && styles.selectorButtonActive
+                  ]}
+                  onPress={() => handleDiscoverDataSourceChange(DataSource.TMDB)}
+                >
+                  <Text style={[
+                    styles.selectorText,
+                    discoverDataSource === DataSource.TMDB && styles.selectorTextActive
+                  ]}>TMDB</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          />
+        </SettingsCard>
+
+        <View style={styles.versionContainer}>
+          <Text style={[styles.versionText, {color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark}]}>
+            Version 1.0.0
+          </Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -337,11 +402,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 12 : 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 34,
+    fontSize: 32,
     fontWeight: '700',
     letterSpacing: 0.5,
+  },
+  resetButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  resetButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
   scrollView: {
     flex: 1,
@@ -349,70 +425,127 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 32,
   },
-  sectionHeader: {
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    paddingBottom: 8,
+  cardContainer: {
+    marginBottom: 20,
   },
-  sectionHeaderText: {
-    fontSize: 12,
+  cardTitle: {
+    fontSize: 13,
     fontWeight: '600',
     letterSpacing: 0.8,
+    marginLeft: 16,
+    marginBottom: 8,
   },
   card: {
     marginHorizontal: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
   },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 0.5,
-    minHeight: 44,
+    minHeight: 58,
   },
   settingItemBorder: {
     // Border styling handled directly in the component with borderBottomWidth
   },
   settingIconContainer: {
-    marginRight: 12,
-    width: 24,
-    height: 24,
+    marginRight: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   settingContent: {
     flex: 1,
-    marginRight: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  settingTextContainer: {
+    flex: 1,
   },
   settingTitleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 8,
   },
   settingTitle: {
-    fontSize: 15,
-    fontWeight: '400',
-    flex: 1,
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 3,
   },
   settingDescription: {
     fontSize: 14,
-    opacity: 0.7,
-    textAlign: 'right',
-    flexShrink: 1,
-    maxWidth: '60%',
+    opacity: 0.8,
   },
   settingControl: {
     justifyContent: 'center',
     alignItems: 'center',
-    paddingLeft: 8,
+    paddingLeft: 12,
+  },
+  badge: {
+    height: 22,
+    minWidth: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    marginRight: 8,
+  },
+  badgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  versionContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    marginBottom: 20,
+  },
+  versionText: {
+    fontSize: 14,
+  },
+  pickerContainer: {
+    flex: 1,
+  },
+  picker: {
+    flex: 1,
+  },
+  selectorContainer: {
+    flexDirection: 'row',
+    borderRadius: 8,
+    overflow: 'hidden',
+    height: 36,
+    width: 160,
+    marginRight: 8,
+  },
+  selectorButton: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  selectorButtonActive: {
+    backgroundColor: colors.primary,
+  },
+  selectorText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.mediumEmphasis,
+  },
+  selectorTextActive: {
+    color: colors.white,
+    fontWeight: '600',
   },
 });
 

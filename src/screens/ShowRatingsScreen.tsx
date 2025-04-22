@@ -11,6 +11,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { BlurView } from 'expo-blur';
 import { colors } from '../styles';
 import { TMDBService, TMDBShow as Show, TMDBSeason, TMDBEpisode } from '../services/tmdbService';
 import { RouteProp } from '@react-navigation/native';
@@ -367,7 +368,14 @@ const ShowRatingsScreen = ({ route }: Props) => {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.black }]}>
+    <View style={[styles.container, { backgroundColor: Platform.OS === 'ios' ? 'transparent' : colors.black }]}>
+      {Platform.OS === 'ios' && (
+        <BlurView
+          style={StyleSheet.absoluteFill}
+          tint="dark"
+          intensity={60}
+        />
+      )}
       <StatusBar
         translucent
         backgroundColor="transparent"
@@ -528,7 +536,6 @@ const ShowRatingsScreen = ({ route }: Props) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.black,
   },
   scrollView: {
     flex: 1,
@@ -548,7 +555,7 @@ const styles = StyleSheet.create({
   showInfo: {
     flexDirection: 'row',
     marginBottom: 12,
-    backgroundColor: colors.darkBackground,
+    backgroundColor: Platform.OS === 'ios' ? 'transparent' : colors.darkBackground,
     borderRadius: 8,
     padding: 8,
   },
@@ -641,7 +648,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   legend: {
-    backgroundColor: colors.darkBackground,
+    backgroundColor: Platform.OS === 'ios' ? 'transparent' : colors.darkBackground,
     borderRadius: 8,
     padding: 8,
     marginBottom: 12,
@@ -693,7 +700,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   ratingsGrid: {
-    backgroundColor: colors.darkBackground,
+    backgroundColor: Platform.OS === 'ios' ? 'transparent' : colors.darkBackground,
     borderRadius: 8,
     padding: 8,
   },

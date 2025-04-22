@@ -32,6 +32,8 @@ import MDBListSettingsScreen from '../screens/MDBListSettingsScreen';
 import TMDBSettingsScreen from '../screens/TMDBSettingsScreen';
 import HomeScreenSettings from '../screens/HomeScreenSettings';
 import HeroCatalogsScreen from '../screens/HeroCatalogsScreen';
+import TraktSettingsScreen from '../screens/TraktSettingsScreen';
+import PlayerSettingsScreen from '../screens/PlayerSettingsScreen';
 
 // Stack navigator types
 export type RootStackParamList = {
@@ -85,6 +87,8 @@ export type RootStackParamList = {
   TMDBSettings: undefined;
   HomeScreenSettings: undefined;
   HeroCatalogs: undefined;
+  TraktSettings: undefined;
+  PlayerSettings: undefined;
 };
 
 export type RootStackNavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -651,12 +655,12 @@ const AppNavigator = () => {
             options={{
               animation: 'fade',
               animationDuration: 200,
-              presentation: 'card',
+              ...(Platform.OS === 'ios' && { presentation: 'modal' }),
               gestureEnabled: true,
               gestureDirection: 'horizontal',
               headerShown: false,
               contentStyle: {
-                backgroundColor: colors.darkBackground,
+                backgroundColor: 'transparent',
               },
             }}
           />
@@ -686,6 +690,36 @@ const AppNavigator = () => {
           <Stack.Screen 
             name="TMDBSettings" 
             component={TMDBSettingsScreen}
+            options={{
+              animation: 'fade',
+              animationDuration: 200,
+              presentation: 'card',
+              gestureEnabled: true,
+              gestureDirection: 'horizontal',
+              headerShown: false,
+              contentStyle: {
+                backgroundColor: colors.darkBackground,
+              },
+            }}
+          />
+          <Stack.Screen 
+            name="TraktSettings" 
+            component={TraktSettingsScreen}
+            options={{
+              animation: 'fade',
+              animationDuration: 200,
+              presentation: 'card',
+              gestureEnabled: true,
+              gestureDirection: 'horizontal',
+              headerShown: false,
+              contentStyle: {
+                backgroundColor: colors.darkBackground,
+              },
+            }}
+          />
+          <Stack.Screen 
+            name="PlayerSettings" 
+            component={PlayerSettingsScreen}
             options={{
               animation: 'fade',
               animationDuration: 200,

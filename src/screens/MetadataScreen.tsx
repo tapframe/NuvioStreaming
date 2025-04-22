@@ -142,7 +142,7 @@ const ActionButtons = React.memo(({
           }
         }}
       >
-        <MaterialIcons name="star-rate" size={24} color="#fff" />
+        <MaterialIcons name="assessment" size={24} color="#fff" />
       </TouchableOpacity>
     )}
   </Animated.View>
@@ -214,6 +214,7 @@ const MetadataScreen = () => {
     recommendations,
     loadingRecommendations,
     setMetadata,
+    imdbId,
   } = useMetadata({ id, type });
 
   // Get genres from context
@@ -258,7 +259,7 @@ const MetadataScreen = () => {
 
   // Fetch logo immediately for TMDB content
   useEffect(() => {
-    if (metadata && id.startsWith('tmdb:')) {
+    if (metadata && id.startsWith('tmdb:') && !metadata.logo) {
       const fetchLogo = async () => {
         try {
           const tmdbId = id.split(':')[1];
@@ -984,9 +985,9 @@ const MetadataScreen = () => {
             </View>
 
             {/* Add RatingsSection right under the main metadata */}
-            {id && (
+            {imdbId && (
               <RatingsSection 
-                imdbId={id}
+                imdbId={imdbId}
                 type={type === 'series' ? 'show' : 'movie'} 
               />
             )}

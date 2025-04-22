@@ -21,6 +21,7 @@ import AppNavigator, {
 import 'react-native-reanimated';
 import { CatalogProvider } from './src/contexts/CatalogContext';
 import { GenreProvider } from './src/contexts/GenreContext';
+import { TraktProvider } from './src/contexts/TraktContext';
 
 function App(): React.JSX.Element {
   // Always use dark mode
@@ -30,16 +31,18 @@ function App(): React.JSX.Element {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <GenreProvider>
         <CatalogProvider>
-          <PaperProvider theme={CustomDarkTheme}>
-            <NavigationContainer theme={CustomNavigationDarkTheme}>
-              <View style={[styles.container, { backgroundColor: '#000000' }]}>
-                <StatusBar
-                  style="light"
-                />
-                <AppNavigator />
-              </View>
-            </NavigationContainer>
-          </PaperProvider>
+          <TraktProvider>
+            <PaperProvider theme={CustomDarkTheme}>
+              <NavigationContainer theme={CustomNavigationDarkTheme}>
+                <View style={[styles.container, { backgroundColor: '#000000' }]}>
+                  <StatusBar
+                    style="light"
+                  />
+                  <AppNavigator />
+                </View>
+              </NavigationContainer>
+            </PaperProvider>
+          </TraktProvider>
         </CatalogProvider>
       </GenreProvider>
     </GestureHandlerRootView>

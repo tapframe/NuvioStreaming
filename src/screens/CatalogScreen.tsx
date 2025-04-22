@@ -20,6 +20,8 @@ import { colors } from '../styles';
 import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { logger } from '../utils/logger';
+import { useCustomCatalogNames } from '../hooks/useCustomCatalogNames';
+import { catalogService, DataSource, StreamingContent } from '../services/catalogService';
 
 type CatalogScreenProps = {
   route: RouteProp<RootStackParamList, 'Catalog'>;
@@ -44,15 +46,28 @@ const ITEM_MARGIN = SPACING.sm;
 const ITEM_WIDTH = (width - (SPACING.lg * 2) - (ITEM_MARGIN * 2 * NUM_COLUMNS)) / NUM_COLUMNS;
 
 const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
-  const { addonId, type, id, name, genreFilter } = route.params;
+  const { addonId, type, id, name: originalName, genreFilter } = route.params;
   const [items, setItems] = useState<Meta[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Force dark mode
+  const [dataSource, setDataSource] = useState<DataSource>(DataSource.STREMIO_ADDONS);
   const isDarkMode = true;
+
+  const { getCustomName, isLoadingCustomNames } = useCustomCatalogNames();
+  const displayName = getCustomName(addonId || '', type || '', id || '', originalName || '');
+
+  // Add effect to get data source preference when component mounts
+  useEffect(() => {
+    const getDataSourcePreference = async () => {
+      const preference = await catalogService.getDataSourcePreference();
+      setDataSource(preference);
+    };
+    
+    getDataSourcePreference();
+  }, []);
 
   const loadItems = useCallback(async (pageNum: number, shouldRefresh: boolean = false) => {
     try {
@@ -63,6 +78,73 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
       }
 
       setError(null);
+      
+      // Process the genre filter - ignore "All" and clean up the value
+      let effectiveGenreFilter = genreFilter;
+      if (effectiveGenreFilter === 'All') {
+        effectiveGenreFilter = undefined;
+        logger.log('Genre "All" detected, removing genre filter');
+      } else if (effectiveGenreFilter) {
+        // Clean up the genre filter
+        effectiveGenreFilter = effectiveGenreFilter.trim();
+        logger.log(`Using cleaned genre filter: "${effectiveGenreFilter}"`);
+      }
+      
+      // Check if using TMDB as data source and not requesting a specific addon
+      if (dataSource === DataSource.TMDB && !addonId) {
+        logger.log('Using TMDB data source for CatalogScreen');
+        try {
+          const catalogs = await catalogService.getCatalogByType(type, effectiveGenreFilter);
+          if (catalogs && catalogs.length > 0) {
+            // Flatten all items from all catalogs
+            const allItems: StreamingContent[] = [];
+            catalogs.forEach(catalog => {
+              allItems.push(...catalog.items);
+            });
+            
+            // Convert StreamingContent to Meta format
+            const metaItems: Meta[] = allItems.map(item => ({
+              id: item.id,
+              type: item.type,
+              name: item.name,
+              poster: item.poster,
+              background: item.banner,
+              logo: item.logo,
+              description: item.description,
+              releaseInfo: item.year?.toString() || '',
+              imdbRating: item.imdbRating,
+              year: item.year,
+              genres: item.genres || [],
+              runtime: item.runtime,
+              certification: item.certification,
+            }));
+            
+            // Remove duplicates
+            const uniqueItems = metaItems.filter((item, index, self) =>
+              index === self.findIndex((t) => t.id === item.id)
+            );
+            
+            setItems(uniqueItems);
+            setHasMore(false); // TMDB already returns a full set
+            setLoading(false);
+            setRefreshing(false);
+            return;
+          } else {
+            setError("No content found for the selected filters");
+            setItems([]);
+            setLoading(false);
+            setRefreshing(false);
+            return;
+          }
+        } catch (error) {
+          logger.error('Failed to get TMDB catalog:', error);
+          setError('Failed to load content from TMDB');
+          setItems([]);
+          setLoading(false);
+          setRefreshing(false);
+          return;
+        }
+      }
       
       // Use this flag to track if we found and processed any items
       let foundItems = false;
@@ -80,7 +162,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
         }
         
         // Create filters array for genre filtering if provided
-        const filters = genreFilter ? [{ title: 'genre', value: genreFilter }] : [];
+        const filters = effectiveGenreFilter ? [{ title: 'genre', value: effectiveGenreFilter }] : [];
         
         // Load items from the catalog
         const newItems = await stremioService.getCatalog(addon, type, id, pageNum, filters);
@@ -96,11 +178,14 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
         } else {
           setItems(prev => [...prev, ...newItems]);
         }
-      } else if (genreFilter) {
+      } else if (effectiveGenreFilter) {
         // Get all addons that have catalogs of the specified type
         const typeManifests = manifests.filter(manifest => 
           manifest.catalogs && manifest.catalogs.some(catalog => catalog.type === type)
         );
+        
+        // Add debug logging for genre filter
+        logger.log(`Using genre filter: "${effectiveGenreFilter}" for type: ${type}`);
         
         // For each addon, try to get content with the genre filter
         for (const manifest of typeManifests) {
@@ -111,12 +196,46 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
             // For each catalog, try to get content
             for (const catalog of typeCatalogs) {
               try {
-                const filters = [{ title: 'genre', value: genreFilter }];
+                const filters = [{ title: 'genre', value: effectiveGenreFilter }];
+                
+                // Debug logging for each catalog request
+                logger.log(`Requesting from ${manifest.name}, catalog ${catalog.id} with genre "${effectiveGenreFilter}"`);
+                
                 const catalogItems = await stremioService.getCatalog(manifest, type, catalog.id, pageNum, filters);
                 
                 if (catalogItems && catalogItems.length > 0) {
-                  allItems = [...allItems, ...catalogItems];
-                  foundItems = true;
+                  // Log first few items' genres to debug
+                  const sampleItems = catalogItems.slice(0, 3);
+                  sampleItems.forEach(item => {
+                    logger.log(`Item "${item.name}" has genres: ${JSON.stringify(item.genres)}`);
+                  });
+                  
+                  // Filter items client-side to ensure they contain the requested genre
+                  // Some addons might not properly filter by genre on the server
+                  let filteredItems = catalogItems;
+                  if (effectiveGenreFilter) {
+                    const normalizedGenreFilter = effectiveGenreFilter.toLowerCase().trim();
+                    
+                    filteredItems = catalogItems.filter(item => {
+                      // Skip items without genres
+                      if (!item.genres || !Array.isArray(item.genres)) {
+                        return false;
+                      }
+                      
+                      // Check for genre match (exact or substring)
+                      return item.genres.some(genre => {
+                        const normalizedGenre = genre.toLowerCase().trim();
+                        return normalizedGenre === normalizedGenreFilter || 
+                               normalizedGenre.includes(normalizedGenreFilter) ||
+                               normalizedGenreFilter.includes(normalizedGenre);
+                      });
+                    });
+                    
+                    logger.log(`Filtered ${catalogItems.length} items to ${filteredItems.length} matching genre "${effectiveGenreFilter}"`);
+                  }
+                  
+                  allItems = [...allItems, ...filteredItems];
+                  foundItems = filteredItems.length > 0;
                 }
               } catch (error) {
                 logger.log(`Failed to load items from ${manifest.name} catalog ${catalog.id}:`, error);
@@ -160,7 +279,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [addonId, type, id, genreFilter]);
+  }, [addonId, type, id, genreFilter, dataSource]);
 
   useEffect(() => {
     loadItems(1);
@@ -246,7 +365,9 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
     </View>
   );
 
-  if (loading && items.length === 0) {
+  const isScreenLoading = loading || isLoadingCustomNames;
+
+  if (isScreenLoading && items.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" />
@@ -259,7 +380,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
             <Text style={styles.backText}>Back</Text>
           </TouchableOpacity>
         </View>
-        <Text style={styles.headerTitle}>{name || `${type.charAt(0).toUpperCase() + type.slice(1)}s`}</Text>
+        <Text style={styles.headerTitle}>{displayName || originalName || `${type.charAt(0).toUpperCase() + type.slice(1)}s`}</Text>
         {renderLoadingState()}
       </SafeAreaView>
     );
@@ -278,7 +399,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
             <Text style={styles.backText}>Back</Text>
           </TouchableOpacity>
         </View>
-        <Text style={styles.headerTitle}>{name || `${type.charAt(0).toUpperCase() + type.slice(1)}s`}</Text>
+        <Text style={styles.headerTitle}>{displayName || `${type.charAt(0).toUpperCase() + type.slice(1)}s`}</Text>
         {renderErrorState()}
       </SafeAreaView>
     );
@@ -296,7 +417,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
       </View>
-      <Text style={styles.headerTitle}>{name || `${type.charAt(0).toUpperCase() + type.slice(1)}s`}</Text>
+      <Text style={styles.headerTitle}>{displayName || `${type.charAt(0).toUpperCase() + type.slice(1)}s`}</Text>
       
       {items.length > 0 ? (
         <FlatList
