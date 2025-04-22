@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/titlelogo.png" alt="Nuvio Logo" width="400"/>
+</p>
+
 # Nuvio - Streaming App
 
 Nuvio is an Open-Source cross-platform streaming application built with React Native and Expo, allowing users to browse, discover, and watch video content.
