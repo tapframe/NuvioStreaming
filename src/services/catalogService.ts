@@ -5,6 +5,15 @@ import { TMDBService } from './tmdbService';
 import { logger } from '../utils/logger';
 import { getCatalogDisplayName } from '../utils/catalogNameUtils';
 
+// Add a constant for storing the data source preference
+const DATA_SOURCE_KEY = 'discover_data_source';
+
+// Define data source types
+export enum DataSource {
+  STREMIO_ADDONS = 'stremio_addons',
+  TMDB = 'tmdb',
+}
+
 export interface StreamingAddon {
   id: string;
   name: string;
@@ -202,6 +211,15 @@ class CatalogService {
   }
 
   async getCatalogByType(type: string, genreFilter?: string): Promise<CatalogContent[]> {
+    // Get the data source preference (default to Stremio addons)
+    const dataSourcePreference = await this.getDataSourcePreference();
+    
+    // If TMDB is selected as the data source, use TMDB API
+    if (dataSourcePreference === DataSource.TMDB) {
+      return this.getCatalogByTypeFromTMDB(type, genreFilter);
+    }
+    
+    // Otherwise use the original Stremio addons method
     const addons = await this.getAllAddons();
     const catalogs: CatalogContent[] = [];
 
@@ -243,6 +261,148 @@ class CatalogService {
     }
 
     return catalogs;
+  }
+
+  /**
+   * Get catalog content from TMDB by type and genre
+   */
+  private async getCatalogByTypeFromTMDB(type: string, genreFilter?: string): Promise<CatalogContent[]> {
+    const tmdbService = TMDBService.getInstance();
+    const catalogs: CatalogContent[] = [];
+    
+    try {
+      // Map Stremio content type to TMDB content type
+      const tmdbType = type === 'movie' ? 'movie' : 'tv';
+      
+      // If no genre filter or All is selected, get multiple catalogs
+      if (!genreFilter || genreFilter === 'All') {
+        // Get trending
+        const trendingItems = await tmdbService.getTrending(tmdbType, 'week');
+        const trendingItemsPromises = trendingItems.map(item => this.convertTMDBToStreamingContent(item, tmdbType));
+        const trendingStreamingItems = await Promise.all(trendingItemsPromises);
+        
+        catalogs.push({
+          addon: 'tmdb',
+          type,
+          id: 'trending',
+          name: `Trending ${type === 'movie' ? 'Movies' : 'TV Shows'}`,
+          items: trendingStreamingItems
+        });
+        
+        // Get popular
+        const popularItems = await tmdbService.getPopular(tmdbType, 1);
+        const popularItemsPromises = popularItems.map(item => this.convertTMDBToStreamingContent(item, tmdbType));
+        const popularStreamingItems = await Promise.all(popularItemsPromises);
+        
+        catalogs.push({
+          addon: 'tmdb',
+          type,
+          id: 'popular',
+          name: `Popular ${type === 'movie' ? 'Movies' : 'TV Shows'}`,
+          items: popularStreamingItems
+        });
+        
+        // Get upcoming/on air
+        const upcomingItems = await tmdbService.getUpcoming(tmdbType, 1);
+        const upcomingItemsPromises = upcomingItems.map(item => this.convertTMDBToStreamingContent(item, tmdbType));
+        const upcomingStreamingItems = await Promise.all(upcomingItemsPromises);
+        
+        catalogs.push({
+          addon: 'tmdb',
+          type,
+          id: 'upcoming',
+          name: type === 'movie' ? 'Upcoming Movies' : 'On Air TV Shows',
+          items: upcomingStreamingItems
+        });
+      } else {
+        // Get content by genre
+        const genreItems = await tmdbService.discoverByGenre(tmdbType, genreFilter);
+        const streamingItemsPromises = genreItems.map(item => this.convertTMDBToStreamingContent(item, tmdbType));
+        const streamingItems = await Promise.all(streamingItemsPromises);
+        
+        catalogs.push({
+          addon: 'tmdb',
+          type,
+          id: 'discover',
+          name: `${genreFilter} ${type === 'movie' ? 'Movies' : 'TV Shows'}`,
+          genre: genreFilter,
+          items: streamingItems
+        });
+      }
+    } catch (error) {
+      logger.error(`Failed to get catalog from TMDB for type ${type}, genre ${genreFilter}:`, error);
+    }
+    
+    return catalogs;
+  }
+
+  /**
+   * Convert TMDB trending/discover result to StreamingContent format
+   */
+  private async convertTMDBToStreamingContent(item: any, type: 'movie' | 'tv'): Promise<StreamingContent> {
+    const id = item.external_ids?.imdb_id || `tmdb:${item.id}`;
+    const name = type === 'movie' ? item.title : item.name;
+    const posterPath = item.poster_path;
+    
+    // Get genres from genre_ids
+    let genres: string[] = [];
+    if (item.genre_ids && item.genre_ids.length > 0) {
+      try {
+        const tmdbService = TMDBService.getInstance();
+        const genreLists = type === 'movie' 
+          ? await tmdbService.getMovieGenres() 
+          : await tmdbService.getTvGenres();
+        
+        const genreIds: number[] = item.genre_ids;
+        genres = genreIds
+          .map(genreId => {
+            const genre = genreLists.find(g => g.id === genreId);
+            return genre ? genre.name : null;
+          })
+          .filter(Boolean) as string[];
+      } catch (error) {
+        logger.error('Failed to get genres for TMDB content:', error);
+      }
+    }
+    
+    return {
+      id,
+      type: type === 'movie' ? 'movie' : 'series',
+      name: name || 'Unknown',
+      poster: posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : 'https://via.placeholder.com/300x450/cccccc/666666?text=No+Image',
+      posterShape: 'poster',
+      banner: item.backdrop_path ? `https://image.tmdb.org/t/p/original${item.backdrop_path}` : undefined,
+      year: type === 'movie' 
+        ? (item.release_date ? new Date(item.release_date).getFullYear() : undefined)
+        : (item.first_air_date ? new Date(item.first_air_date).getFullYear() : undefined),
+      description: item.overview,
+      genres,
+      inLibrary: this.library[`${type === 'movie' ? 'movie' : 'series'}:${id}`] !== undefined,
+    };
+  }
+
+  /**
+   * Get the current data source preference
+   */
+  async getDataSourcePreference(): Promise<DataSource> {
+    try {
+      const dataSource = await AsyncStorage.getItem(DATA_SOURCE_KEY);
+      return dataSource as DataSource || DataSource.STREMIO_ADDONS;
+    } catch (error) {
+      logger.error('Failed to get data source preference:', error);
+      return DataSource.STREMIO_ADDONS;
+    }
+  }
+
+  /**
+   * Set the data source preference
+   */
+  async setDataSourcePreference(dataSource: DataSource): Promise<void> {
+    try {
+      await AsyncStorage.setItem(DATA_SOURCE_KEY, dataSource);
+    } catch (error) {
+      logger.error('Failed to set data source preference:', error);
+    }
   }
 
   async getContentDetails(type: string, id: string): Promise<StreamingContent | null> {

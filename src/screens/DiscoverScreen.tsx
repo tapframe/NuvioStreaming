@@ -222,14 +222,11 @@ const CatalogSection = React.memo(({
     // If not, CatalogScreen needs modification or we fetch IDs here.
     // Let's stick to passing genre and type for now, CatalogScreen logic might suffice?
     navigation.navigate('Catalog', {
-      // We don't have a single catalog ID or Addon ID for a genre section.
-      // Pass the genre as the 'id' and 'name' for CatalogScreen to potentially filter.
-      // This might require CatalogScreen to be adapted to handle genre-based views.
-      addonId: 'genre-based', // Placeholder or identifier
+      // Don't pass an addonId since we want to filter by genre across all addons
       id: catalog.genre, 
       type: selectedCategory.type,
-      name: `${catalog.genre} ${selectedCategory.name}`, // Pass constructed name for now
-      genreFilter: catalog.genre // Keep the genre filter
+      name: `${catalog.genre} ${selectedCategory.name}`,
+      genreFilter: catalog.genre // This will trigger the genre-based filtering logic in CatalogScreen
     });
     // --- END TEMPORARY --- 
 

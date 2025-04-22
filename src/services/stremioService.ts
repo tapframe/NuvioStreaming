@@ -351,18 +351,23 @@ class StremioService {
       
       // Add filters
       if (filters.length > 0) {
+        logger.log(`Adding ${filters.length} filters to Cinemeta request`);
         filters.forEach(filter => {
           if (filter.value) {
+            logger.log(`Adding filter ${filter.title}=${filter.value}`);
             url += `&${encodeURIComponent(filter.title)}=${encodeURIComponent(filter.value)}`;
           }
         });
       }
+      
+      logger.log(`Cinemeta catalog request URL: ${url}`);
       
       const response = await this.retryRequest(async () => {
         return await axios.get(url);
       });
       
       if (response.data && response.data.metas && Array.isArray(response.data.metas)) {
+        logger.log(`Cinemeta returned ${response.data.metas.length} items`);
         return response.data.metas;
       }
       return [];
@@ -384,18 +389,23 @@ class StremioService {
       
       // Add filters
       if (filters.length > 0) {
+        logger.log(`Adding ${filters.length} filters to ${manifest.name} request`);
         filters.forEach(filter => {
           if (filter.value) {
+            logger.log(`Adding filter ${filter.title}=${filter.value}`);
             url += `&${encodeURIComponent(filter.title)}=${encodeURIComponent(filter.value)}`;
           }
         });
       }
+      
+      logger.log(`${manifest.name} catalog request URL: ${url}`);
       
       const response = await this.retryRequest(async () => {
         return await axios.get(url);
       });
       
       if (response.data && response.data.metas && Array.isArray(response.data.metas)) {
+        logger.log(`${manifest.name} returned ${response.data.metas.length} items`);
         return response.data.metas;
       }
       return [];

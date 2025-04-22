@@ -18,12 +18,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import { Picker } from '@react-native-picker/picker';
 import { colors } from '../styles/colors';
 import { useSettings, DEFAULT_SETTINGS } from '../hooks/useSettings';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { stremioService } from '../services/stremioService';
 import { useCatalogContext } from '../contexts/CatalogContext';
 import { useTraktContext } from '../contexts/TraktContext';
+import { catalogService, DataSource } from '../services/catalogService';
 
 const { width } = Dimensions.get('window');
 
@@ -128,6 +130,7 @@ const SettingsScreen: React.FC = () => {
   const [addonCount, setAddonCount] = useState<number>(0);
   const [catalogCount, setCatalogCount] = useState<number>(0);
   const [mdblistKeySet, setMdblistKeySet] = useState<boolean>(false);
+  const [discoverDataSource, setDiscoverDataSource] = useState<DataSource>(DataSource.STREMIO_ADDONS);
 
   const loadData = useCallback(async () => {
     try {
@@ -161,6 +164,10 @@ const SettingsScreen: React.FC = () => {
       // Check MDBList API key status
       const mdblistKey = await AsyncStorage.getItem('mdblist_api_key');
       setMdblistKeySet(!!mdblistKey);
+      
+      // Get discover data source preference
+      const dataSource = await catalogService.getDataSourcePreference();
+      setDiscoverDataSource(dataSource);
     } catch (error) {
       console.error('Error loading settings data:', error);
     }
@@ -216,6 +223,13 @@ const SettingsScreen: React.FC = () => {
       color={isDarkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
     />
   );
+
+  // Handle data source change
+  const handleDiscoverDataSourceChange = useCallback(async (value: string) => {
+    const dataSource = value as DataSource;
+    setDiscoverDataSource(dataSource);
+    await catalogService.setDataSourcePreference(dataSource);
+  }, []);
 
   return (
     <SafeAreaView style={[
@@ -317,6 +331,43 @@ const SettingsScreen: React.FC = () => {
             isDarkMode={isDarkMode}
             renderControl={ChevronRight}
             isLast={true}
+          />
+        </SettingsCard>
+
+        <SettingsCard isDarkMode={isDarkMode} title="Discover">
+          <SettingItem
+            title="Content Source"
+            description="Choose where to get content for the Discover screen"
+            icon="explore"
+            isDarkMode={isDarkMode}
+            renderControl={() => (
+              <View style={styles.selectorContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.selectorButton,
+                    discoverDataSource === DataSource.STREMIO_ADDONS && styles.selectorButtonActive
+                  ]}
+                  onPress={() => handleDiscoverDataSourceChange(DataSource.STREMIO_ADDONS)}
+                >
+                  <Text style={[
+                    styles.selectorText,
+                    discoverDataSource === DataSource.STREMIO_ADDONS && styles.selectorTextActive
+                  ]}>Addons</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.selectorButton,
+                    discoverDataSource === DataSource.TMDB && styles.selectorButtonActive
+                  ]}
+                  onPress={() => handleDiscoverDataSourceChange(DataSource.TMDB)}
+                >
+                  <Text style={[
+                    styles.selectorText,
+                    discoverDataSource === DataSource.TMDB && styles.selectorTextActive
+                  ]}>TMDB</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           />
         </SettingsCard>
 
@@ -449,6 +500,39 @@ const styles = StyleSheet.create({
   },
   versionText: {
     fontSize: 14,
+  },
+  pickerContainer: {
+    flex: 1,
+  },
+  picker: {
+    flex: 1,
+  },
+  selectorContainer: {
+    flexDirection: 'row',
+    borderRadius: 8,
+    overflow: 'hidden',
+    height: 36,
+    width: 160,
+    marginRight: 8,
+  },
+  selectorButton: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  selectorButtonActive: {
+    backgroundColor: colors.primary,
+  },
+  selectorText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.mediumEmphasis,
+  },
+  selectorTextActive: {
+    color: colors.white,
+    fontWeight: '600',
   },
 });
 

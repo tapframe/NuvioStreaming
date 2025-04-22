@@ -142,7 +142,7 @@ const ActionButtons = React.memo(({
           }
         }}
       >
-        <MaterialIcons name="star-rate" size={24} color="#fff" />
+        <MaterialIcons name="assessment" size={24} color="#fff" />
       </TouchableOpacity>
     )}
   </Animated.View>
