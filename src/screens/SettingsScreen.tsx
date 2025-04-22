@@ -323,13 +323,6 @@ const SettingsScreen: React.FC = () => {
             isDarkMode={isDarkMode}
             renderControl={ChevronRight}
             onPress={() => navigation.navigate('PlayerSettings')}
-          />
-          <SettingItem
-            title="Auto-Filtering"
-            description="Disabled"
-            icon="tune"
-            isDarkMode={isDarkMode}
-            renderControl={ChevronRight}
             isLast={true}
           />
         </SettingsCard>
