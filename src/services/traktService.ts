@@ -125,7 +125,7 @@ export class TraktService {
   /**
    * Exchange the authorization code for an access token
    */
-  public async exchangeCodeForToken(code: string): Promise<boolean> {
+  public async exchangeCodeForToken(code: string, codeVerifier: string): Promise<boolean> {
     await this.ensureInitialized();
 
     try {
@@ -139,11 +139,14 @@ export class TraktService {
           client_id: TRAKT_CLIENT_ID,
           client_secret: TRAKT_CLIENT_SECRET,
           redirect_uri: TRAKT_REDIRECT_URI,
-          grant_type: 'authorization_code'
+          grant_type: 'authorization_code',
+          code_verifier: codeVerifier
         })
       });
 
       if (!response.ok) {
+        const errorBody = await response.text();
+        logger.error('[TraktService] Token exchange error response:', errorBody);
         throw new Error(`Failed to exchange code: ${response.status}`);
       }
 

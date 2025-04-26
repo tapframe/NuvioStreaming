@@ -13,7 +13,7 @@ import {
   Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { makeRedirectUri, useAuthRequest, ResponseType } from 'expo-auth-session';
+import { makeRedirectUri, useAuthRequest, ResponseType, Prompt, CodeChallengeMethod } from 'expo-auth-session';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { traktService, TraktUser } from '../services/traktService';
 import { colors } from '../styles/colors';
@@ -23,12 +23,11 @@ import TraktIcon from '../../assets/rating-icons/trakt.svg';
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
-// Trakt configuration (replace with your actual Client ID if different)
+// Trakt configuration
 const TRAKT_CLIENT_ID = 'd7271f7dd57d8aeff63e99408610091a6b1ceac3b3a541d1031a48f429b7942c';
 const discovery = {
   authorizationEndpoint: 'https://trakt.tv/oauth/authorize',
-  // Note: Trakt doesn't use a standard token endpoint for the auth code flow
-  // We'll handle the code exchange manually in `traktService`
+  tokenEndpoint: 'https://api.trakt.tv/oauth/token',
 };
 
 // For use with deep linking
@@ -55,7 +54,7 @@ const TraktSettingsScreen: React.FC = () => {
         const profile = await traktService.getUserProfile();
         setUserProfile(profile);
       } else {
-        setUserProfile(null); // Ensure profile is cleared if not authenticated
+        setUserProfile(null);
       }
     } catch (error) {
       logger.error('[TraktSettingsScreen] Error checking auth status:', error);
@@ -68,13 +67,15 @@ const TraktSettingsScreen: React.FC = () => {
     checkAuthStatus();
   }, [checkAuthStatus]);
 
-  // Setup expo-auth-session hook
+  // Setup expo-auth-session hook with PKCE
   const [request, response, promptAsync] = useAuthRequest(
     {
       clientId: TRAKT_CLIENT_ID,
-      scopes: [], // Trakt doesn't use scopes for standard auth code flow
+      scopes: [],
       redirectUri: redirectUri,
-      responseType: ResponseType.Code, // Ask for the authorization code
+      responseType: ResponseType.Code,
+      usePKCE: true,
+      codeChallengeMethod: CodeChallengeMethod.S256,
     },
     discovery
   );
@@ -84,15 +85,15 @@ const TraktSettingsScreen: React.FC = () => {
   // Handle the response from the auth request
   useEffect(() => {
     if (response) {
-      setIsExchangingCode(true); // Indicate we're processing the response
-      if (response.type === 'success') {
+      setIsExchangingCode(true);
+      if (response.type === 'success' && request?.codeVerifier) {
         const { code } = response.params;
         logger.log('[TraktSettingsScreen] Auth code received:', code);
-        traktService.exchangeCodeForToken(code)
+        traktService.exchangeCodeForToken(code, request.codeVerifier)
           .then(success => {
             if (success) {
               logger.log('[TraktSettingsScreen] Token exchange successful');
-              checkAuthStatus(); // Re-check auth status and fetch profile
+              checkAuthStatus();
             } else {
               logger.error('[TraktSettingsScreen] Token exchange failed');
               Alert.alert('Authentication Error', 'Failed to complete authentication with Trakt.');
@@ -110,12 +111,11 @@ const TraktSettingsScreen: React.FC = () => {
         Alert.alert('Authentication Error', response.error?.message || 'An error occurred during authentication.');
         setIsExchangingCode(false);
       } else {
-        // Handle other response types like 'cancel', 'dismiss' if needed
         logger.log('[TraktSettingsScreen] Auth response type:', response.type);
         setIsExchangingCode(false);
       }
     }
-  }, [response, checkAuthStatus]);
+  }, [response, checkAuthStatus, request?.codeVerifier]);
 
   const handleSignIn = () => {
     promptAsync(); // Trigger the authentication flow
