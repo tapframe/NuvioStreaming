@@ -24,6 +24,7 @@ import { catalogService } from '../services/catalogService';
 import type { StreamingContent } from '../services/catalogService';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { logger } from '../utils/logger';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Types
 interface LibraryItem extends StreamingContent {
@@ -97,6 +98,24 @@ const LibraryScreen = () => {
   const [loading, setLoading] = useState(true);
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
   const [filter, setFilter] = useState<'all' | 'movies' | 'series'>('all');
+  const insets = useSafeAreaInsets();
+
+  // Force consistent status bar settings
+  useEffect(() => {
+    const applyStatusBarConfig = () => {
+      StatusBar.setBarStyle('light-content');
+      if (Platform.OS === 'android') {
+        StatusBar.setTranslucent(true);
+        StatusBar.setBackgroundColor('transparent');
+      }
+    };
+    
+    applyStatusBarConfig();
+    
+    // Re-apply on focus
+    const unsubscribe = navigation.addListener('focus', applyStatusBarConfig);
+    return unsubscribe;
+  }, [navigation]);
 
   useEffect(() => {
     const loadLibrary = async () => {
@@ -216,64 +235,71 @@ const LibraryScreen = () => {
     );
   };
 
+  const headerBaseHeight = Platform.OS === 'android' ? 80 : 60;
+  const topSpacing = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top;
+  const headerHeight = headerBaseHeight + topSpacing;
+
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor="transparent"
-        translucent
-      />
+    <View style={styles.container}>
+      {/* Fixed position header background to prevent shifts */}
+      <View style={[styles.headerBackground, { height: headerHeight }]} />
       
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Library</Text>
+      <View style={{ flex: 1 }}>
+        {/* Header Section with proper top spacing */}
+        <View style={[styles.header, { height: headerHeight, paddingTop: topSpacing }]}>
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>Library</Text>
+          </View>
+        </View>
+
+        {/* Content Container */}
+        <View style={styles.contentContainer}>
+          <View style={styles.filtersContainer}>
+            {renderFilter('all', 'All', 'apps')}
+            {renderFilter('movies', 'Movies', 'movie')}
+            {renderFilter('series', 'TV Shows', 'live-tv')}
+          </View>
+
+          {loading ? (
+            <SkeletonLoader />
+          ) : filteredItems.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <MaterialIcons 
+                name="video-library" 
+                size={80} 
+                color={colors.mediumGray}
+                style={{ opacity: 0.7 }}
+              />
+              <Text style={styles.emptyText}>Your library is empty</Text>
+              <Text style={styles.emptySubtext}>
+                Add content to your library to keep track of what you're watching
+              </Text>
+              <TouchableOpacity 
+                style={styles.exploreButton}
+                onPress={() => navigation.navigate('Discover')}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.exploreButtonText}>Explore Content</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <FlatList
+              data={filteredItems}
+              renderItem={renderItem}
+              keyExtractor={item => item.id}
+              numColumns={2}
+              contentContainerStyle={styles.listContainer}
+              showsVerticalScrollIndicator={false}
+              columnWrapperStyle={styles.columnWrapper}
+              initialNumToRender={6}
+              maxToRenderPerBatch={6}
+              windowSize={5}
+              removeClippedSubviews={Platform.OS === 'android'}
+            />
+          )}
         </View>
       </View>
-
-      <View style={styles.filtersContainer}>
-        {renderFilter('all', 'All', 'apps')}
-        {renderFilter('movies', 'Movies', 'movie')}
-        {renderFilter('series', 'TV Shows', 'live-tv')}
-      </View>
-
-      {loading ? (
-        <SkeletonLoader />
-      ) : filteredItems.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <MaterialIcons 
-            name="video-library" 
-            size={80} 
-            color={colors.mediumGray}
-            style={{ opacity: 0.7 }}
-          />
-          <Text style={styles.emptyText}>Your library is empty</Text>
-          <Text style={styles.emptySubtext}>
-            Add content to your library to keep track of what you're watching
-          </Text>
-          <TouchableOpacity 
-            style={styles.exploreButton}
-            onPress={() => navigation.navigate('Discover')}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.exploreButtonText}>Explore Content</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <FlatList
-          data={filteredItems}
-          renderItem={renderItem}
-          keyExtractor={item => item.id}
-          numColumns={2}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-          columnWrapperStyle={styles.columnWrapper}
-          initialNumToRender={6}
-          maxToRenderPerBatch={6}
-          windowSize={5}
-          removeClippedSubviews={Platform.OS === 'android'}
-        />
-      )}
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -282,10 +308,24 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.darkBackground,
   },
+  headerBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.darkBackground,
+    zIndex: 1,
+  },
+  contentContainer: {
+    flex: 1,
+    backgroundColor: colors.darkBackground,
+  },
   header: {
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 16 : 16,
+    justifyContent: 'flex-end',
+    paddingBottom: 8,
+    backgroundColor: 'transparent',
+    zIndex: 2,
   },
   headerContent: {
     flexDirection: 'row',

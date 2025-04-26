@@ -417,8 +417,8 @@ const HomeScreen = () => {
     useCallback(() => {
       const statusBarConfig = () => {
         StatusBar.setBarStyle("light-content");
-        StatusBar.setTranslucent(true);
-        StatusBar.setBackgroundColor('transparent');
+    StatusBar.setTranslucent(true);
+    StatusBar.setBackgroundColor('transparent');
       };
       
       statusBarConfig();
@@ -745,9 +745,9 @@ const HomeScreen = () => {
         </Animated.View>
 
         {hasContinueWatching && (
-          <Animated.View entering={FadeIn.duration(400).delay(250)}>
-            <ContinueWatchingSection ref={continueWatchingRef} />
-          </Animated.View>
+        <Animated.View entering={FadeIn.duration(400).delay(250)}>
+          <ContinueWatchingSection ref={continueWatchingRef} />
+        </Animated.View>
         )}
 
         {catalogs.length > 0 ? (

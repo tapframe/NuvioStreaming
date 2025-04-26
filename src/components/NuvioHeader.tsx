@@ -2,7 +2,7 @@ import React from 'react';
 import { View, TouchableOpacity, Platform, StyleSheet, Image } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '../styles/colors';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { BlurView as ExpoBlurView } from 'expo-blur';
@@ -13,6 +13,12 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export const NuvioHeader = () => {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute();
+
+  // Only render the header if the current route is 'Home'
+  if (route.name !== 'Home') {
+    return null;
+  }
   
   // Determine if running in Expo Go
   const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
