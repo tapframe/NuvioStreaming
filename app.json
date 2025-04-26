@@ -6,6 +6,7 @@
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "scheme": "stremioexpo",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",

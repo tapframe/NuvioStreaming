@@ -28,11 +28,16 @@ interface ContinueWatchingItem extends StreamingContent {
   episodeTitle?: string;
 }
 
+// Define the ref interface
+interface ContinueWatchingRef {
+  refresh: () => Promise<boolean>;
+}
+
 const { width } = Dimensions.get('window');
 const POSTER_WIDTH = (width - 40) / 2.7;
 
-// Create a proper imperative handle with React.forwardRef
-const ContinueWatchingSection = React.forwardRef<{ refresh: () => Promise<void> }>((props, ref) => {
+// Create a proper imperative handle with React.forwardRef and updated type
+const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, ref) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const [continueWatchingItems, setContinueWatchingItems] = useState<ContinueWatchingItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -188,7 +193,11 @@ const ContinueWatchingSection = React.forwardRef<{ refresh: () => Promise<void> 
 
   // Properly expose the refresh method
   React.useImperativeHandle(ref, () => ({
-    refresh: loadContinueWatching
+    refresh: async () => {
+      await loadContinueWatching();
+      // Return whether there are items to help parent determine visibility
+      return continueWatchingItems.length > 0;
+    }
   }));
 
   const handleContentPress = useCallback((id: string, type: string) => {
@@ -361,6 +370,15 @@ const styles = StyleSheet.create({
   progressBar: {
     height: '100%',
     backgroundColor: colors.primary,
+  },
+  emptyContainer: {
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyText: {
+    color: colors.textMuted,
+    fontSize: 14,
   },
 });
 
