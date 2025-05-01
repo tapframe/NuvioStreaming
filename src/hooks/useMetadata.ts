@@ -135,15 +135,10 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
           } else if (streams && addonId && addonName) {
             logger.log(`✅ [${logPrefix}:${sourceName}] Received ${streams.length} streams from ${addonName} (${addonId}) after ${processTime}ms`);
             
-            // Log the raw streams received for this addon
-            logger.log(`📦 [${logPrefix}:${sourceName}] Raw streams for ${addonName} (${addonId}):`, JSON.stringify(streams.slice(0, 2), null, 2)); // Log first 2 raw streams
-            
             if (streams.length > 0) {
               // Use the streams directly as they are already processed by stremioService
               const updateState = (prevState: GroupedStreams): GroupedStreams => {
                  logger.log(`🔄 [${logPrefix}:${sourceName}] Updating state for addon ${addonName} (${addonId})`);
-                 // Log the streams being added to state
-                 logger.log(`💾 [${logPrefix}:${sourceName}] Adding processed streams for ${addonName} (${addonId}) to state:`, JSON.stringify(streams.slice(0, 2), null, 2)); // Log first 2 processed streams
                  return {
                    ...prevState,
                    [addonId]: {
