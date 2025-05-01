@@ -559,7 +559,16 @@ export const StreamsScreen = () => {
     const streams = type === 'series' ? episodeStreams : groupedStreams;
     const installedAddons = stremioService.getInstalledAddons();
 
-    return Object.entries(streams)
+    // Filter streams by selected provider - only if not "all"
+    const filteredEntries = Object.entries(streams)
+      .filter(([addonId]) => {
+        // If "all" is selected, show all providers
+        if (selectedProvider === 'all') {
+          return true;
+        }
+        // Otherwise only show the selected provider
+        return addonId === selectedProvider;
+      })
       .sort(([addonIdA], [addonIdB]) => {
         const indexA = installedAddons.findIndex(addon => addon.id === addonIdA);
         const indexB = installedAddons.findIndex(addon => addon.id === addonIdB);
@@ -574,6 +583,8 @@ export const StreamsScreen = () => {
         addonId,
         data: streams
       }));
+      
+    return filteredEntries;
   }, [selectedProvider, type, episodeStreams, groupedStreams]);
 
   const episodeImage = useMemo(() => {
