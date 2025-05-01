@@ -749,39 +749,81 @@ class StremioService {
   private processStreams(streams: any[], addon: Manifest): Stream[] {
     return streams
       .filter(stream => {
-        const isTorrentioStream = stream.infoHash && stream.fileIdx !== undefined;
-        return stream && (stream.url || isTorrentioStream) && (stream.title || stream.name);
+        // Basic filtering - ensure there's a way to play (URL or infoHash) and identify (title/name)
+        const hasPlayableLink = !!(stream.url || stream.infoHash);
+        const hasIdentifier = !!(stream.title || stream.name);
+        return stream && hasPlayableLink && hasIdentifier;
       })
       .map(stream => {
-        const isDirectStreamingUrl = this.isDirectStreamingUrl(stream.url);
         const streamUrl = this.getStreamUrl(stream);
+        const isDirectStreamingUrl = this.isDirectStreamingUrl(streamUrl);
         const isMagnetStream = streamUrl?.startsWith('magnet:');
 
-        // Keep original stream data exactly as provided by the addon
-        return {
-          ...stream,
-          url: streamUrl,
+        // Determine the best title: Prioritize description if it seems detailed,
+        // otherwise fall back to title or name.
+        let displayTitle = stream.title || stream.name || 'Unnamed Stream';
+        if (stream.description && stream.description.includes('\n') && stream.description.length > (stream.title?.length || 0)) {
+          // If description exists, contains newlines (likely formatted metadata), 
+          // and is longer than the title, prefer it.
+          displayTitle = stream.description;
+        }
+        
+        // Use the original name field for the primary identifier if available
+        const name = stream.name || stream.title || 'Unnamed Stream';
+
+        // Extract size: Prefer behaviorHints.videoSize, fallback to top-level size
+        const sizeInBytes = stream.behaviorHints?.videoSize || stream.size || undefined;
+
+        // Consolidate behavior hints, prioritizing specific data extraction
+        let behaviorHints: Stream['behaviorHints'] = {
+          ...(stream.behaviorHints || {}), // Start with existing hints
+          notWebReady: !isDirectStreamingUrl,
+          isMagnetStream,
+          // Addon Info
           addonName: addon.name,
           addonId: addon.id,
-          // Preserve original stream metadata
-          name: stream.name,
-          title: stream.title,
-          behaviorHints: {
-            ...stream.behaviorHints,
-            notWebReady: !isDirectStreamingUrl,
-            isMagnetStream,
-            ...(isMagnetStream && {
-              infoHash: stream.infoHash || streamUrl?.match(/btih:([a-zA-Z0-9]+)/)?.[1],
-              fileIdx: stream.fileIdx,
-              magnetUrl: streamUrl,
-              type: 'torrent',
-              sources: stream.sources || [],
-              seeders: stream.seeders,
-              size: stream.size,
-              title: stream.title,
-            })
-          }
+          // Extracted data (provide defaults or undefined)
+          cached: stream.behaviorHints?.cached || undefined, // For RD/AD detection
+          filename: stream.behaviorHints?.filename || undefined, // Filename if available
+          bingeGroup: stream.behaviorHints?.bingeGroup || undefined,
+          // Add size here if extracted
+          size: sizeInBytes, 
         };
+
+        // Specific handling for magnet/torrent streams to extract more details
+        if (isMagnetStream) {
+          behaviorHints = {
+            ...behaviorHints,
+            infoHash: stream.infoHash || streamUrl?.match(/btih:([a-zA-Z0-9]+)/)?.[1],
+            fileIdx: stream.fileIdx,
+            magnetUrl: streamUrl,
+            type: 'torrent',
+            sources: stream.sources || [],
+            seeders: stream.seeders, // Explicitly map seeders if present
+            size: sizeInBytes || stream.seeders, // Use extracted size, fallback for torrents
+            title: stream.title, // Torrent title might be different
+          };
+        }
+
+        // Explicitly construct the final Stream object
+        const processedStream: Stream = {
+          url: streamUrl,
+          name: name, // Use the original name/title for primary ID
+          title: displayTitle, // Use the potentially more detailed title from description
+          addonName: addon.name,
+          addonId: addon.id,
+          // Map other potential top-level fields if they exist
+          description: stream.description || undefined, // Keep original description too
+          infoHash: stream.infoHash || undefined,
+          fileIdx: stream.fileIdx,
+          size: sizeInBytes, // Assign the extracted size
+          isFree: stream.isFree,
+          isDebrid: !!(stream.behaviorHints?.cached), // Map debrid status more reliably
+          // Assign the consolidated behaviorHints
+          behaviorHints: behaviorHints,
+        };
+
+        return processedStream;
       });
   }
 
