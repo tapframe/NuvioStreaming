@@ -542,14 +542,12 @@ export const StreamsScreen = () => {
           if (indexB !== -1) return 1;
           return 0;
         })
-        .filter(provider => provider !== 'source_1' && provider !== 'source_2') // Filter out source_1 and source_2
         .map(provider => {
           const addonInfo = streams[provider];
           const installedAddon = installedAddons.find(addon => addon.id === provider);
           
           let displayName = provider;
-          if (provider === 'external_sources') displayName = 'External Sources';
-          else if (installedAddon) displayName = installedAddon.name;
+          if (installedAddon) displayName = installedAddon.name;
           else if (addonInfo?.addonName) displayName = addonInfo.addonName;
           
           return { id: provider, name: displayName };
@@ -562,10 +560,6 @@ export const StreamsScreen = () => {
     const installedAddons = stremioService.getInstalledAddons();
 
     return Object.entries(streams)
-      .filter(([addonId]) => {
-        // Filter out source_1 and source_2
-        return addonId !== 'source_1' && addonId !== 'source_2';
-      })
       .sort(([addonIdA], [addonIdB]) => {
         const indexA = installedAddons.findIndex(addon => addon.id === addonIdA);
         const indexB = installedAddons.findIndex(addon => addon.id === addonIdB);

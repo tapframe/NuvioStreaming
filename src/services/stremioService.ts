@@ -558,21 +558,42 @@ class StremioService {
         }
         
         // Log the detailed resources structure for debugging
-        // logger.log(`📋 [getStreams] Checking addon ${addon.id} resources:`, JSON.stringify(addon.resources)); // Verbose, uncomment if needed
+        logger.log(`📋 [getStreams] Checking addon ${addon.id} resources:`, JSON.stringify(addon.resources));
         
-        // Check if the addon has a stream resource for this type
-        const hasStreamResource = addon.resources.some(
-          resource => {
-            const result = resource.name === 'stream' && resource.types && resource.types.includes(type);
-            // logger.log(`🔎 [getStreams] Addon ${addon.id} resource ${resource.name}: supports ${type}? ${result}`); // Verbose
-            return result;
-          }
-        );
+        let hasStreamResource = false;
+        
+        // Handle both resource formats:
+        // 1. Standard format: array of ResourceObjects with name and types properties
+        // 2. Simple format: string array ["stream"] with separate types array in the addon
+        
+        // Check for standard format (array of objects)
+        if (addon.resources.length > 0 && typeof addon.resources[0] === 'object') {
+          // Type-safe check for standard format (objects with name/types)
+          hasStreamResource = addon.resources.some(
+            resource => {
+              if (typeof resource === 'object' && resource !== null) {
+                const typedResource = resource as ResourceObject;
+                return typedResource.name === 'stream' && 
+                      Array.isArray(typedResource.types) && 
+                      typedResource.types.includes(type);
+              }
+              return false;
+            }
+          );
+        } 
+        // Check for simple format (string array)
+        else if (Array.isArray(addon.resources) && addon.types) {
+          // Check if resources array contains 'stream' and types array includes the desired type
+          hasStreamResource = 
+            (addon.resources as unknown as string[]).includes('stream') && 
+            Array.isArray(addon.types) && 
+            addon.types.includes(type);
+        }
         
         if (!hasStreamResource) {
-          // logger.log(`❌ [getStreams] Addon ${addon.id} does not support streaming ${type}`); // Verbose
+          logger.log(`❌ [getStreams] Addon ${addon.id} does not support streaming ${type}`);
         } else {
-          // logger.log(`✅ [getStreams] Addon ${addon.id} supports streaming ${type}`); // Verbose
+          logger.log(`✅ [getStreams] Addon ${addon.id} supports streaming ${type}`);
         }
         
         return hasStreamResource;

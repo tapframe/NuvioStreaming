@@ -577,8 +577,11 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
   const loadStreams = async () => {
     const startTime = Date.now();
     try {
-      console.log('🚀 [loadStreams] START - Loading movie streams for:', id);
+      console.log('🚀 [loadStreams] START - Loading streams for:', id);
       updateLoadingState();
+
+      // Always clear streams first to ensure we don't show stale data
+      setGroupedStreams({});
 
       // Get TMDB ID for external sources first before starting parallel requests
       console.log('🔍 [loadStreams] Getting TMDB ID for:', id);
@@ -598,70 +601,18 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
 
       console.log('🔄 [loadStreams] Starting stream requests');
       
-      const fetchPromises = [];
-
-      // Start Stremio request using the new callback method
-      // We don't push this promise anymore, as results are handled by callback
+      // Start Stremio request using the callback method
       processStremioSource(type, id, false);
 
-      // Start Source 1 request if we have a TMDB ID
-      if (tmdbId) {
-        const source1Promise = processExternalSource('source1', (async () => {
-          try {
-            const streams = await fetchExternalStreams(
-              `https://nice-month-production.up.railway.app/embedsu/${tmdbId}`,
-              'Source 1'
-            );
-            
-            if (streams.length > 0) {
-              return {
-                'source_1': {
-                  addonName: 'Source 1',
-                  streams
-                }
-              };
-            }
-            return {};
-          } catch (error) {
-            console.error('❌ [loadStreams:source1] Error fetching Source 1 streams:', error);
-            return {};
-          }
-        })(), false);
-        fetchPromises.push(source1Promise);
-      }
+      // No external sources are used anymore
+      const fetchPromises: Promise<any>[] = [];
 
-      // Start Source 2 request if we have a TMDB ID
-      if (tmdbId) {
-        const source2Promise = processExternalSource('source2', (async () => {
-          try {
-            const streams = await fetchExternalStreams(
-              `https://vidsrc-api-js-phz6.onrender.com/embedsu/${tmdbId}`,
-              'Source 2'
-            );
-            
-            if (streams.length > 0) {
-              return {
-                'source_2': {
-                  addonName: 'Source 2',
-                  streams
-                }
-              };
-            }
-            return {};
-          } catch (error) {
-            console.error('❌ [loadStreams:source2] Error fetching Source 2 streams:', error);
-            return {};
-          }
-        })(), false);
-        fetchPromises.push(source2Promise);
-      }
-
-      // Wait only for external promises now
+      // Wait only for external promises now (none in this case)
       const results = await Promise.allSettled(fetchPromises);
       const totalTime = Date.now() - startTime;
       console.log(`✅ [loadStreams] External source requests completed in ${totalTime}ms (Stremio continues in background)`);
       
-      const sourceTypes = ['source1', 'source2']; // Removed 'stremio'
+      const sourceTypes: string[] = []; // No external sources
       results.forEach((result, index) => {
         const source = sourceTypes[Math.min(index, sourceTypes.length - 1)];
         console.log(`📊 [loadStreams:${source}] Status: ${result.status}`);
@@ -729,72 +680,19 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
 
       console.log('🔄 [loadEpisodeStreams] Starting stream requests');
       
-      const fetchPromises = [];
+      const fetchPromises: Promise<any>[] = [];
       
-      // Start Stremio request using the new callback method
-      // We don't push this promise anymore
+      // Start Stremio request using the callback method
       processStremioSource('series', episodeId, true);
 
-      // Start Source 1 request if we have a TMDB ID
-      if (tmdbId) {
-        const source1Promise = processExternalSource('source1', (async () => {
-          try {
-            const streams = await fetchExternalStreams(
-              `https://nice-month-production.up.railway.app/embedsu/${tmdbId}${episodeQuery}`,
-              'Source 1',
-              true
-            );
-            
-            if (streams.length > 0) {
-              return {
-                'source_1': {
-                  addonName: 'Source 1',
-                  streams
-                }
-              };
-            }
-            return {};
-          } catch (error) {
-            console.error('❌ [loadEpisodeStreams:source1] Error fetching Source 1 streams:', error);
-            return {};
-          }
-        })(), true);
-        fetchPromises.push(source1Promise);
-      }
+      // No external sources are used anymore
 
-      // Start Source 2 request if we have a TMDB ID
-      if (tmdbId) {
-        const source2Promise = processExternalSource('source2', (async () => {
-          try {
-            const streams = await fetchExternalStreams(
-              `https://vidsrc-api-js-phz6.onrender.com/embedsu/${tmdbId}${episodeQuery}`,
-              'Source 2',
-              true
-            );
-            
-            if (streams.length > 0) {
-              return {
-                'source_2': {
-                  addonName: 'Source 2',
-                  streams
-                }
-              };
-            }
-            return {};
-          } catch (error) {
-            console.error('❌ [loadEpisodeStreams:source2] Error fetching Source 2 streams:', error);
-            return {};
-          }
-        })(), true);
-        fetchPromises.push(source2Promise);
-      }
-
-      // Wait only for external promises now
+      // Wait only for external promises now (none in this case)
       const results = await Promise.allSettled(fetchPromises);
       const totalTime = Date.now() - startTime;
       console.log(`✅ [loadEpisodeStreams] External source requests completed in ${totalTime}ms (Stremio continues in background)`);
       
-      const sourceTypes = ['source1', 'source2']; // Removed 'stremio'
+      const sourceTypes: string[] = []; // No external sources
       results.forEach((result, index) => {
         const source = sourceTypes[Math.min(index, sourceTypes.length - 1)];
         console.log(`📊 [loadEpisodeStreams:${source}] Status: ${result.status}`);
@@ -831,97 +729,6 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
       const endTime = Date.now() - startTime;
       console.log(`🏁 [loadEpisodeStreams] External sources FINISHED in ${endTime}ms`);
       setLoadingEpisodeStreams(false); // Mark loading=false, but Stremio might still be working
-    }
-  };
-
-  const fetchExternalStreams = async (url: string, sourceName: string, isEpisode = false) => {
-    try {
-      console.log(`\n🌐 [${sourceName}] Starting fetch request...`);
-      console.log(`📍 URL: ${url}`);
-      
-      // Add proper headers to ensure we get JSON response
-      const headers = {
-        'Accept': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      };
-      console.log('📋 Request Headers:', headers);
-
-      // Make the fetch request
-      console.log(`⏳ [${sourceName}] Making fetch request...`);
-      const response = await fetch(url, { headers });
-      console.log(`✅ [${sourceName}] Response received`);
-      console.log(`📊 Status: ${response.status} ${response.statusText}`);
-      console.log(`🔤 Content-Type:`, response.headers.get('content-type'));
-
-      // Check if response is ok
-      if (!response.ok) {
-        console.error(`❌ [${sourceName}] HTTP error: ${response.status}`);
-        console.error(`📝 Status Text: ${response.statusText}`);
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      // Try to parse JSON
-      console.log(`📑 [${sourceName}] Reading response body...`);
-      const text = await response.text();
-      console.log(`📄 [${sourceName}] Response body (first 300 chars):`, text.substring(0, 300));
-      
-      let data;
-      try {
-        console.log(`🔄 [${sourceName}] Parsing JSON...`);
-        data = JSON.parse(text);
-        console.log(`✅ [${sourceName}] JSON parsed successfully`);
-      } catch (e) {
-        console.error(`❌ [${sourceName}] JSON parse error:`, e);
-        console.error(`📝 [${sourceName}] Raw response:`, text.substring(0, 200));
-        throw new Error('Invalid JSON response');
-      }
-      
-      // Transform the response
-      console.log(`🔄 [${sourceName}] Processing sources...`);
-      if (data && data.sources && Array.isArray(data.sources)) {
-        console.log(`📦 [${sourceName}] Found ${data.sources.length} source(s)`);
-        
-        const transformedStreams = [];
-        for (const source of data.sources) {
-          console.log(`\n📂 [${sourceName}] Processing source:`, source);
-          
-          if (source.files && Array.isArray(source.files)) {
-            console.log(`📁 [${sourceName}] Found ${source.files.length} file(s) in source`);
-            
-            for (const file of source.files) {
-              console.log(`🎥 [${sourceName}] Processing file:`, file);
-              const stream = {
-                url: file.file,
-                title: `${sourceName} - ${file.quality || 'Unknown'}`,
-                name: `${sourceName} - ${file.quality || 'Unknown'}`,
-                behaviorHints: {
-                  notWebReady: false,
-                  headers: source.headers || {}
-                }
-              };
-              console.log(`✨ [${sourceName}] Created stream:`, stream);
-              transformedStreams.push(stream);
-            }
-          } else {
-            console.log(`⚠️ [${sourceName}] No files array found in source or invalid format`);
-          }
-        }
-        
-        console.log(`\n🎉 [${sourceName}] Successfully processed ${transformedStreams.length} stream(s)`);
-        return transformedStreams;
-      }
-      
-      console.log(`⚠️ [${sourceName}] No valid sources found in response`);
-      return [];
-    } catch (error) {
-      console.error(`\n❌ [${sourceName}] Error fetching streams:`, error);
-      console.error(`📍 URL: ${url}`);
-      if (error instanceof Error) {
-        console.error(`💥 Error name: ${error.name}`);
-        console.error(`💥 Error message: ${error.message}`);
-        console.error(`💥 Stack trace: ${error.stack}`);
-      }
-      return [];
     }
   };
 

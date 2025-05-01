@@ -633,6 +633,12 @@ const VideoPlayer: React.FC = () => {
     `);
   };
 
+  // Add onError handler
+  const handleError = (error: any) => {
+    logger.error('[VideoPlayer] Playback Error:', error);
+    // Optionally, you could show an error message to the user here
+  };
+
   return (
     <View style={styles.container}> 
       <TouchableOpacity
@@ -659,6 +665,7 @@ const VideoPlayer: React.FC = () => {
           onTextTracks={onTextTracks}
           onBuffer={onBuffer}
           onLoadStart={onLoadStart}
+          onError={handleError}
         />
 
         {/* Slider Container with buffer indicator */}

@@ -1,0 +1,44 @@
+diff --git a/node_modules/react-native-video/ios/Video/RCTVideo.m b/node_modules/react-native-video/ios/Video/RCTVideo.m
+index 79d88de..a28a21e 100644
+--- a/node_modules/react-native-video/ios/Video/RCTVideo.m
++++ b/node_modules/react-native-video/ios/Video/RCTVideo.m
+@@ -1023,7 +1023,9 @@ static NSString *const statusKeyPath = @"status";
+     
+     /* The player used to render the video */
+     AVPlayer *_player;
+-    AVPlayerLayer *_playerLayer;
++    // Use strong reference instead of weak to prevent deallocation issues
++    __strong AVPlayerLayer *_playerLayer;
++    
+     NSURL *_videoURL;
+     
+     /* IOS < 10 seek optimization */
+@@ -1084,7 +1086,16 @@ - (void)removeFromSuperview
+     
+     _player = nil;
+     _playerItem = nil;
+-    _playerLayer = nil;
++    
++    // Properly clean up the player layer
++    if (_playerLayer) {
++        [_playerLayer removeFromSuperlayer];
++        // Set animation keys to nil before releasing to avoid crashes
++        [_playerLayer removeAllAnimations];
++        _playerLayer = nil;
++    }
++    
++    [[NSNotificationCenter defaultCenter] removeObserver:self];
+ }
+ 
+ #pragma mark - App lifecycle handlers
+@@ -1116,7 +1127,8 @@ - (void)applicationDidEnterBackground:(NSNotification *)notification
+ 
+ - (void)applicationWillEnterForeground:(NSNotification *)notification
+ {
+-    if (_playInBackground || _playWhenInactive || _paused) return;
++    // Resume playback even if originally playing in background
++    if (_paused) return;
+     
+     [_player play];
+     [_player setRate:_rate];
+ } 
