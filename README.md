@@ -28,7 +28,7 @@ Built for iOS and Android.
 | **Metadata**                               | **Seasons & Episodes**                     | **Rating**                               |
 | ![Metadata](src/assets/metadascreen.jpg)   | ![Seasons](src/assets/seasonandepisode.jpg)| ![Rating](src/assets/ratingscreen.jpg)   |
 
-## Wanna run it? 🚀
+## Development
 
 1.  You'll need Node.js, npm/yarn, and the Expo Go app (or native build tools like Android Studio/Xcode).
 2.  `git clone https://github.com/nayifleo1/NuvioExpo.git`
@@ -37,11 +37,11 @@ Built for iOS and Android.
 5.  `npx expo start` (Easiest way: Scan QR code with Expo Go app)
     *   Or `npx expo run:android` / `npx expo run:ios` for native builds.
 
-## Found a bug or have an idea? 🐛
+## Found a bug or have an idea? 
 
 Great! Please open an [Issue on GitHub](https://github.com/nayifleo1/NuvioExpo/issues). Describe the problem or your suggestion.
 
-## Want to contribute? 🤝
+## Contribution
 
 Contributions are welcome! Fork the repository, make your changes, and submit a Pull Request.
 
