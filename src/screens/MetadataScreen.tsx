@@ -15,11 +15,12 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
+import { BlurView } from 'expo-blur';
 import { colors } from '../styles/colors';
 import { useMetadata } from '../hooks/useMetadata';
 import { CastSection as OriginalCastSection } from '../components/metadata/CastSection';
@@ -228,6 +229,9 @@ const MetadataScreen = () => {
   const [lastScrollTop, setLastScrollTop] = useState(0);
   const [isFullDescriptionOpen, setIsFullDescriptionOpen] = useState(false);
 
+  // Get safe area insets
+  const { top: safeAreaTop } = useSafeAreaInsets();
+
   // Animation values
   const screenScale = useSharedValue(0.92);
   const screenOpacity = useSharedValue(0);
@@ -263,6 +267,13 @@ const MetadataScreen = () => {
 
   // Create a dampened scroll value for smoother parallax
   const dampedScrollY = useSharedValue(0);
+
+  // Add shared value for floating header opacity
+  const headerOpacity = useSharedValue(0);
+  
+  // Add values for animated header elements
+  const headerElementsY = useSharedValue(-10);
+  const headerElementsOpacity = useSharedValue(0);
 
   // Debug log for route params
   // logger.log('[MetadataScreen] Component mounted with route params:', { id, type, episodeId });
@@ -869,6 +880,18 @@ const MetadataScreen = () => {
         duration: 300,
         easing: Easing.bezier(0.16, 1, 0.3, 1), // Custom spring-like curve
       });
+
+      // Update header opacity based on scroll position
+      const headerThreshold = height * 0.5 - safeAreaTop - 70; // Hero height - inset - buffer
+      if (rawScrollY > headerThreshold) {
+        headerOpacity.value = withTiming(1, { duration: 200 });
+        headerElementsY.value = withTiming(0, { duration: 300 });
+        headerElementsOpacity.value = withTiming(1, { duration: 450 });
+      } else {
+        headerOpacity.value = withTiming(0, { duration: 150 });
+        headerElementsY.value = withTiming(-10, { duration: 200 });
+        headerElementsOpacity.value = withTiming(0, { duration: 200 });
+      }
     },
   });
 
@@ -899,6 +922,20 @@ const MetadataScreen = () => {
       ],
     };
   });
+
+  // Add animated style for floating header
+  const headerAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: headerOpacity.value,
+    transform: [
+      { translateY: interpolate(headerOpacity.value, [0, 1], [-20, 0], Extrapolate.CLAMP) }
+    ]
+  }));
+  
+  // Add animated style for header elements
+  const headerElementsStyle = useAnimatedStyle(() => ({
+    opacity: headerElementsOpacity.value,
+    transform: [{ translateY: headerElementsY.value }]
+  }));
 
   if (loading) {
     return (
@@ -984,6 +1021,51 @@ const MetadataScreen = () => {
         animated={true}
       />
       <Animated.View style={containerAnimatedStyle}>
+        {/* Floating Header */}
+        <Animated.View style={[styles.floatingHeader, headerAnimatedStyle]}>
+          <BlurView
+            intensity={Platform.OS === 'ios' ? 50 : 80}
+            tint="dark"
+            style={[styles.blurContainer, { paddingTop: Math.max(safeAreaTop * 0.8, safeAreaTop - 6) }]}
+          >
+            <Animated.View style={[styles.floatingHeaderContent, headerElementsStyle]}>
+              <TouchableOpacity 
+                style={styles.backButton} 
+                onPress={handleBack}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <MaterialIcons name="arrow-back" size={24} color={colors.highEmphasis} />
+              </TouchableOpacity>
+              
+              <View style={styles.headerTitleContainer}>
+                {metadata.logo ? (
+                  <Image
+                    source={{ uri: metadata.logo }}
+                    style={styles.floatingHeaderLogo}
+                    contentFit="contain"
+                    transition={150}
+                  />
+                ) : (
+                  <Text style={styles.floatingHeaderTitle} numberOfLines={1}>{metadata.name}</Text>
+                )}
+              </View>
+              
+              <TouchableOpacity 
+                style={styles.headerActionButton}
+                onPress={toggleLibrary}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <MaterialIcons 
+                  name={inLibrary ? 'bookmark' : 'bookmark-border'} 
+                  size={22} 
+                  color={colors.highEmphasis} 
+                />
+              </TouchableOpacity>
+            </Animated.View>
+          </BlurView>
+          {Platform.OS === 'ios' && <View style={styles.headerBottomBorder} />}
+        </Animated.View>
+
         <Animated.ScrollView
           ref={contentRef}
           style={styles.scrollView}
@@ -1223,13 +1305,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   backButton: {
-    flexDirection: 'row',
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 24,
-    borderWidth: 1,
+    borderRadius: 20,
   },
   backButtonText: {
     fontSize: 16,
@@ -1461,6 +1541,64 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.9,
     letterSpacing: 0.2
+  },
+  floatingHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    overflow: 'hidden',
+    elevation: 4, // for Android shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  blurContainer: {
+    width: '100%',
+  },
+  floatingHeaderContent: {
+    height: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+  },
+  headerBottomBorder: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 0.5,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  headerTitleContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+  },
+  headerRightPlaceholder: {
+    width: 40, // same width as back button for symmetry
+  },
+  headerActionButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
+  },
+  floatingHeaderLogo: {
+    height: 42,
+    width: width * 0.6,
+    maxWidth: 240,
+  },
+  floatingHeaderTitle: {
+    color: colors.highEmphasis,
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
   },
 });
 
