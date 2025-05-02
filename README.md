@@ -13,10 +13,10 @@ Built for iOS and Android.
 *   **Home Screen:** Highlights new content, your watch history, and content categories.
 *   **Discover:** Browse trending and popular movies & TV shows.
 *   **Details:** Displays detailed info (descriptions, cast, ratings).
-*   **Video Player:** Integrated player that remembers playback progress.
+*   **Video Player:** Integrated player(still broken on IOS,supports External PLayer for now).
 *   **Stream Finding:** Finds available streams using Stremio addons.
 *   **Search:** Quickly find specific movies or shows.
-*   **Trakt Sync:** Option to connect your Trakt.tv account.
+*   **Trakt Sync:** Planned integration (coming soon).
 *   **Addon Management:** Add and manage your Stremio addons.
 *   **UI:** Focuses on a clean, interactive user experience.
 
