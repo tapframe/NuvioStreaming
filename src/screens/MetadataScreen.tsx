@@ -12,6 +12,8 @@ import {
   Dimensions,
   Platform,
   TouchableWithoutFeedback,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -42,6 +44,7 @@ import Animated, {
   FadeIn,
   runOnJS,
   Layout,
+  useAnimatedScrollHandler,
 } from 'react-native-reanimated';
 import { RouteProp } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -220,7 +223,8 @@ const MetadataScreen = () => {
   // Get genres from context
   const { genreMap, loadingGenres } = useGenres();
 
-  const contentRef = useRef<ScrollView>(null);
+  // Update the ref type to be compatible with Animated.ScrollView
+  const contentRef = useRef<Animated.ScrollView>(null);
   const [lastScrollTop, setLastScrollTop] = useState(0);
   const [isFullDescriptionOpen, setIsFullDescriptionOpen] = useState(false);
 
@@ -253,6 +257,12 @@ const MetadataScreen = () => {
   // Add animated value for logo
   const logoOpacity = useSharedValue(0);
   const logoScale = useSharedValue(0.9);
+
+  // Add shared value for parallax effect
+  const scrollY = useSharedValue(0);
+
+  // Create a dampened scroll value for smoother parallax
+  const dampedScrollY = useSharedValue(0);
 
   // Debug log for route params
   // logger.log('[MetadataScreen] Component mounted with route params:', { id, type, episodeId });
@@ -643,14 +653,6 @@ const MetadataScreen = () => {
     opacity: screenOpacity.value
   }));
 
-  const heroAnimatedStyle = useAnimatedStyle(() => ({
-    width: '100%',
-    height: heroHeight.value,
-    backgroundColor: colors.black,
-    transform: [{ scale: heroScale.value }],
-    opacity: heroOpacity.value
-  }));
-
   const contentAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: contentTranslateY.value }],
     opacity: interpolate(
@@ -847,6 +849,57 @@ const MetadataScreen = () => {
     ));
   }, [metadata?.genres]); // Dependency on metadata.genres
 
+  // Update the heroAnimatedStyle for parallax effect
+  const heroAnimatedStyle = useAnimatedStyle(() => ({
+    width: '100%',
+    height: heroHeight.value,
+    backgroundColor: colors.black,
+    transform: [{ scale: heroScale.value }],
+    opacity: heroOpacity.value,
+  }));
+  
+  // Replace direct onScroll with useAnimatedScrollHandler
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      const rawScrollY = event.contentOffset.y;
+      scrollY.value = rawScrollY;
+      
+      // Apply spring-like damping for smoother transitions
+      dampedScrollY.value = withTiming(rawScrollY, {
+        duration: 300,
+        easing: Easing.bezier(0.16, 1, 0.3, 1), // Custom spring-like curve
+      });
+    },
+  });
+
+  // Add a new animated style for the parallax image
+  const parallaxImageStyle = useAnimatedStyle(() => {
+    // Use dampedScrollY instead of direct scrollY for smoother effect
+    return {
+      width: '100%',
+      height: '120%', // Increase height for more movement range
+      top: '-10%', // Start image slightly higher to allow more upward movement
+      transform: [
+        { 
+          translateY: interpolate(
+            dampedScrollY.value,
+            [0, 100, 300],
+            [20, -20, -60],  // Start with a lower position, then move up
+            Extrapolate.CLAMP
+          )
+        },
+        { 
+          scale: interpolate(
+            dampedScrollY.value,
+            [0, 150, 300],
+            [1.1, 1.02, 0.95],  // More dramatic scale changes
+            Extrapolate.CLAMP
+          )
+        }
+      ],
+    };
+  });
+
   if (loading) {
     return (
       <SafeAreaView 
@@ -931,23 +984,22 @@ const MetadataScreen = () => {
         animated={true}
       />
       <Animated.View style={containerAnimatedStyle}>
-        <ScrollView
+        <Animated.ScrollView
           ref={contentRef}
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
-          onScroll={(e) => {
-            // setLastScrollTop(e.nativeEvent.contentOffset.y); // Remove unused onScroll handler logic
-          }}
-          scrollEventThrottle={16}
+          onScroll={scrollHandler}
+          scrollEventThrottle={16} // Back to standard value
         >
           {/* Hero Section */}
           <Animated.View style={heroAnimatedStyle}>
-            <ImageBackground
-              source={{ uri: metadata.banner || metadata.poster }}
-              style={styles.heroSection}
-              imageStyle={styles.heroImage}
-              resizeMode="cover"
-            >
+            <View style={styles.heroSection}>
+              {/* Use Animated.Image directly instead of ImageBackground with imageStyle */}
+              <Animated.Image 
+                source={{ uri: metadata.banner || metadata.poster }}
+                style={[styles.absoluteFill, parallaxImageStyle]}
+                resizeMode="cover"
+              />
               <LinearGradient
                 colors={[
                   `${colors.darkBackground}00`,
@@ -1005,7 +1057,7 @@ const MetadataScreen = () => {
                   />
                 </View>
               </LinearGradient>
-            </ImageBackground>
+            </View>
           </Animated.View>
 
           {/* Main Content */}
@@ -1117,7 +1169,7 @@ const MetadataScreen = () => {
               <MovieContent metadata={metadata} />
             )}
           </Animated.View>
-        </ScrollView>
+        </Animated.ScrollView>
       </Animated.View>
     </SafeAreaView>
   );
@@ -1189,11 +1241,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.black,
     overflow: 'hidden',
   },
-  heroImage: {
-    width: '100%',
-    height: '100%',
-    top: '0%',
-    transform: [{ scale: 1 }],
+  absoluteFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   heroGradient: {
     flex: 1,
