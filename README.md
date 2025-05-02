@@ -8,7 +8,7 @@ An app I built with React Native/Expo for browsing and watching movies & shows. 
 
 Built for iOS and Android.
 
-## Key Features ✨
+## Key Features 
 
 *   **Home Screen:** Highlights new content, your watch history, and content categories.
 *   **Discover:** Browse trending and popular movies & TV shows.
