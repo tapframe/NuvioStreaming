@@ -20,7 +20,9 @@ import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/nativ
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
-import { BlurView } from 'expo-blur';
+import { BlurView as ExpoBlurView } from 'expo-blur';
+import { BlurView as CommunityBlurView } from '@react-native-community/blur';
+import * as Haptics from 'expo-haptics';
 import { colors } from '../styles/colors';
 import { useMetadata } from '../hooks/useMetadata';
 import { CastSection as OriginalCastSection } from '../components/metadata/CastSection';
@@ -103,54 +105,62 @@ const ActionButtons = React.memo(({
   navigation: NavigationProp<RootStackParamList>;
   playButtonText: string;
   animatedStyle: any;
-}) => (
-  <Animated.View style={[styles.actionButtons, animatedStyle]}>
-    <TouchableOpacity
-      style={[styles.actionButton, styles.playButton]}
-      onPress={handleShowStreams}
-    >
-      <MaterialIcons 
-        name={playButtonText === 'Resume' ? "play-circle-outline" : "play-arrow"} 
-        size={24} 
-        color="#000" 
-      />
-      <Text style={styles.playButtonText}>
-        {playButtonText}
-      </Text>
-    </TouchableOpacity>
+}) => {
+  // Add wrapper for play button with haptic feedback
+  const handlePlay = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    handleShowStreams();
+  };
 
-    <TouchableOpacity
-      style={[styles.actionButton, styles.infoButton]}
-      onPress={toggleLibrary}
-    >
-      <MaterialIcons
-        name={inLibrary ? 'bookmark' : 'bookmark-border'}
-        size={24}
-        color="#fff"
-      />
-      <Text style={styles.infoButtonText}>
-        {inLibrary ? 'Saved' : 'Save'}
-      </Text>
-    </TouchableOpacity>
-
-    {type === 'series' && (
+  return (
+    <Animated.View style={[styles.actionButtons, animatedStyle]}>
       <TouchableOpacity
-        style={[styles.iconButton]}
-        onPress={async () => {
-          const tmdb = TMDBService.getInstance();
-          const tmdbId = await tmdb.extractTMDBIdFromStremioId(id);
-          if (tmdbId) {
-            navigation.navigate('ShowRatings', { showId: tmdbId });
-          } else {
-            logger.error('Could not find TMDB ID for show');
-          }
-        }}
+        style={[styles.actionButton, styles.playButton]}
+        onPress={handlePlay}
       >
-        <MaterialIcons name="assessment" size={24} color="#fff" />
+        <MaterialIcons 
+          name={playButtonText === 'Resume' ? "play-circle-outline" : "play-arrow"} 
+          size={24} 
+          color="#000" 
+        />
+        <Text style={styles.playButtonText}>
+          {playButtonText}
+        </Text>
       </TouchableOpacity>
-    )}
-  </Animated.View>
-));
+
+      <TouchableOpacity
+        style={[styles.actionButton, styles.infoButton]}
+        onPress={toggleLibrary}
+      >
+        <MaterialIcons
+          name={inLibrary ? 'bookmark' : 'bookmark-border'}
+          size={24}
+          color="#fff"
+        />
+        <Text style={styles.infoButtonText}>
+          {inLibrary ? 'Saved' : 'Save'}
+        </Text>
+      </TouchableOpacity>
+
+      {type === 'series' && (
+        <TouchableOpacity
+          style={[styles.iconButton]}
+          onPress={async () => {
+            const tmdb = TMDBService.getInstance();
+            const tmdbId = await tmdb.extractTMDBIdFromStremioId(id);
+            if (tmdbId) {
+              navigation.navigate('ShowRatings', { showId: tmdbId });
+            } else {
+              logger.error('Could not find TMDB ID for show');
+            }
+          }}
+        >
+          <MaterialIcons name="assessment" size={24} color="#fff" />
+        </TouchableOpacity>
+      )}
+    </Animated.View>
+  );
+});
 
 // Memoized WatchProgress Component
 const WatchProgressDisplay = React.memo(({ 
@@ -253,6 +263,21 @@ const MetadataScreen = () => {
     lastUpdated: number;
     episodeId?: string;
   } | null>(null);
+
+  // Add wrapper for toggleLibrary that includes haptic feedback
+  const handleToggleLibrary = useCallback(() => {
+    // Trigger appropriate haptic feedback based on action
+    if (inLibrary) {
+      // Removed from library - light impact
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } else {
+      // Added to library - success feedback
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    
+    // Call the original toggleLibrary function
+    toggleLibrary();
+  }, [inLibrary, toggleLibrary]);
 
   // Add new animated value for watch progress
   const watchProgressOpacity = useSharedValue(0);
@@ -1023,46 +1048,91 @@ const MetadataScreen = () => {
       <Animated.View style={containerAnimatedStyle}>
         {/* Floating Header */}
         <Animated.View style={[styles.floatingHeader, headerAnimatedStyle]}>
-          <BlurView
-            intensity={Platform.OS === 'ios' ? 50 : 80}
-            tint="dark"
-            style={[styles.blurContainer, { paddingTop: Math.max(safeAreaTop * 0.8, safeAreaTop - 6) }]}
-          >
-            <Animated.View style={[styles.floatingHeaderContent, headerElementsStyle]}>
-              <TouchableOpacity 
-                style={styles.backButton} 
-                onPress={handleBack}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <MaterialIcons name="arrow-back" size={24} color={colors.highEmphasis} />
-              </TouchableOpacity>
-              
-              <View style={styles.headerTitleContainer}>
-                {metadata.logo ? (
-                  <Image
-                    source={{ uri: metadata.logo }}
-                    style={styles.floatingHeaderLogo}
-                    contentFit="contain"
-                    transition={150}
+          {Platform.OS === 'ios' ? (
+            <ExpoBlurView
+              intensity={50}
+              tint="dark"
+              style={[styles.blurContainer, { paddingTop: Math.max(safeAreaTop * 0.8, safeAreaTop - 6) }]}
+            >
+              <Animated.View style={[styles.floatingHeaderContent, headerElementsStyle]}>
+                <TouchableOpacity 
+                  style={styles.backButton} 
+                  onPress={handleBack}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <MaterialIcons name="arrow-back" size={24} color={colors.highEmphasis} />
+                </TouchableOpacity>
+                
+                <View style={styles.headerTitleContainer}>
+                  {metadata.logo ? (
+                    <Image
+                      source={{ uri: metadata.logo }}
+                      style={styles.floatingHeaderLogo}
+                      contentFit="contain"
+                      transition={150}
+                    />
+                  ) : (
+                    <Text style={styles.floatingHeaderTitle} numberOfLines={1}>{metadata.name}</Text>
+                  )}
+                </View>
+                
+                <TouchableOpacity 
+                  style={styles.headerActionButton}
+                  onPress={handleToggleLibrary}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <MaterialIcons 
+                    name={inLibrary ? 'bookmark' : 'bookmark-border'} 
+                    size={22} 
+                    color={colors.highEmphasis} 
                   />
-                ) : (
-                  <Text style={styles.floatingHeaderTitle} numberOfLines={1}>{metadata.name}</Text>
-                )}
-              </View>
-              
-              <TouchableOpacity 
-                style={styles.headerActionButton}
-                onPress={toggleLibrary}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <MaterialIcons 
-                  name={inLibrary ? 'bookmark' : 'bookmark-border'} 
-                  size={22} 
-                  color={colors.highEmphasis} 
-                />
-              </TouchableOpacity>
-            </Animated.View>
-          </BlurView>
+                </TouchableOpacity>
+              </Animated.View>
+            </ExpoBlurView>
+          ) : (
+            <View style={[styles.blurContainer, { paddingTop: Math.max(safeAreaTop * 0.8, safeAreaTop - 6) }]}>
+              <CommunityBlurView
+                style={styles.absoluteFill}
+                blurType="dark"
+                blurAmount={15}
+                reducedTransparencyFallbackColor="rgba(20, 20, 20, 0.9)"
+              />
+              <Animated.View style={[styles.floatingHeaderContent, headerElementsStyle]}>
+                <TouchableOpacity 
+                  style={styles.backButton} 
+                  onPress={handleBack}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <MaterialIcons name="arrow-back" size={24} color={colors.highEmphasis} />
+                </TouchableOpacity>
+                
+                <View style={styles.headerTitleContainer}>
+                  {metadata.logo ? (
+                    <Image
+                      source={{ uri: metadata.logo }}
+                      style={styles.floatingHeaderLogo}
+                      contentFit="contain"
+                      transition={150}
+                    />
+                  ) : (
+                    <Text style={styles.floatingHeaderTitle} numberOfLines={1}>{metadata.name}</Text>
+                  )}
+                </View>
+                
+                <TouchableOpacity 
+                  style={styles.headerActionButton}
+                  onPress={handleToggleLibrary}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <MaterialIcons 
+                    name={inLibrary ? 'bookmark' : 'bookmark-border'} 
+                    size={22} 
+                    color={colors.highEmphasis} 
+                  />
+                </TouchableOpacity>
+              </Animated.View>
+            </View>
+          )}
           {Platform.OS === 'ios' && <View style={styles.headerBottomBorder} />}
         </Animated.View>
 
@@ -1129,7 +1199,7 @@ const MetadataScreen = () => {
                   {/* Action Buttons */}
                   <ActionButtons 
                     handleShowStreams={handleShowStreams}
-                    toggleLibrary={toggleLibrary}
+                    toggleLibrary={handleToggleLibrary}
                     inLibrary={inLibrary}
                     type={type as 'movie' | 'series'}
                     id={id}
