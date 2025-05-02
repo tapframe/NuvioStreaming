@@ -11,11 +11,9 @@ import {
   ScrollView,
   StatusBar,
   Platform,
-  Linking
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import * as WebBrowser from 'expo-web-browser';
-import { makeRedirectUri } from 'expo-auth-session';
+import { makeRedirectUri, useAuthRequest, ResponseType, Prompt, CodeChallengeMethod } from 'expo-auth-session';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { traktService, TraktUser } from '../services/traktService';
 import { colors } from '../styles/colors';
@@ -24,6 +22,13 @@ import { logger } from '../utils/logger';
 import TraktIcon from '../../assets/rating-icons/trakt.svg';
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
+
+// Trakt configuration
+const TRAKT_CLIENT_ID = 'd7271f7dd57d8aeff63e99408610091a6b1ceac3b3a541d1031a48f429b7942c';
+const discovery = {
+  authorizationEndpoint: 'https://trakt.tv/oauth/authorize',
+  tokenEndpoint: 'https://api.trakt.tv/oauth/token',
+};
 
 // For use with deep linking
 const redirectUri = makeRedirectUri({
@@ -36,7 +41,6 @@ const TraktSettingsScreen: React.FC = () => {
   const isDarkMode = settings.enableDarkMode;
   const navigation = useNavigation();
   const [isLoading, setIsLoading] = useState(true);
-  const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userProfile, setUserProfile] = useState<TraktUser | null>(null);
 
@@ -49,6 +53,8 @@ const TraktSettingsScreen: React.FC = () => {
       if (authenticated) {
         const profile = await traktService.getUserProfile();
         setUserProfile(profile);
+      } else {
+        setUserProfile(null);
       }
     } catch (error) {
       logger.error('[TraktSettingsScreen] Error checking auth status:', error);
@@ -61,45 +67,58 @@ const TraktSettingsScreen: React.FC = () => {
     checkAuthStatus();
   }, [checkAuthStatus]);
 
-  // Handle deep linking when returning from Trakt authorization
+  // Setup expo-auth-session hook with PKCE
+  const [request, response, promptAsync] = useAuthRequest(
+    {
+      clientId: TRAKT_CLIENT_ID,
+      scopes: [],
+      redirectUri: redirectUri,
+      responseType: ResponseType.Code,
+      usePKCE: true,
+      codeChallengeMethod: CodeChallengeMethod.S256,
+    },
+    discovery
+  );
+
+  const [isExchangingCode, setIsExchangingCode] = useState(false);
+
+  // Handle the response from the auth request
   useEffect(() => {
-    const handleRedirect = async (event: { url: string }) => {
-      const { url } = event;
-      if (url.includes('auth/trakt')) {
-        setIsAuthenticating(true);
-        try {
-          const code = url.split('code=')[1].split('&')[0];
-          const success = await traktService.exchangeCodeForToken(code);
-          if (success) {
-            checkAuthStatus();
-          } else {
-            Alert.alert('Authentication Error', 'Failed to complete authentication with Trakt.');
-          }
-        } catch (error) {
-          logger.error('[TraktSettingsScreen] Authentication error:', error);
-          Alert.alert('Authentication Error', 'An error occurred during authentication.');
-        } finally {
-          setIsAuthenticating(false);
-        }
+    if (response) {
+      setIsExchangingCode(true);
+      if (response.type === 'success' && request?.codeVerifier) {
+        const { code } = response.params;
+        logger.log('[TraktSettingsScreen] Auth code received:', code);
+        traktService.exchangeCodeForToken(code, request.codeVerifier)
+          .then(success => {
+            if (success) {
+              logger.log('[TraktSettingsScreen] Token exchange successful');
+              checkAuthStatus();
+            } else {
+              logger.error('[TraktSettingsScreen] Token exchange failed');
+              Alert.alert('Authentication Error', 'Failed to complete authentication with Trakt.');
+            }
+          })
+          .catch(error => {
+            logger.error('[TraktSettingsScreen] Token exchange error:', error);
+            Alert.alert('Authentication Error', 'An error occurred during authentication.');
+          })
+          .finally(() => {
+            setIsExchangingCode(false);
+          });
+      } else if (response.type === 'error') {
+        logger.error('[TraktSettingsScreen] Authentication error:', response.error);
+        Alert.alert('Authentication Error', response.error?.message || 'An error occurred during authentication.');
+        setIsExchangingCode(false);
+      } else {
+        logger.log('[TraktSettingsScreen] Auth response type:', response.type);
+        setIsExchangingCode(false);
       }
-    };
-
-    // Add event listener for deep linking
-    const subscription = Linking.addEventListener('url', handleRedirect);
-
-    return () => {
-      subscription.remove();
-    };
-  }, [checkAuthStatus]);
-
-  const handleSignIn = async () => {
-    try {
-      const authUrl = traktService.getAuthUrl();
-      await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
-    } catch (error) {
-      logger.error('[TraktSettingsScreen] Error opening auth session:', error);
-      Alert.alert('Authentication Error', 'Could not open Trakt authentication page.');
     }
+  }, [response, checkAuthStatus, request?.codeVerifier]);
+
+  const handleSignIn = () => {
+    promptAsync(); // Trigger the authentication flow
   };
 
   const handleSignOut = async () => {
@@ -249,9 +268,9 @@ const TraktSettingsScreen: React.FC = () => {
                   { backgroundColor: isDarkMode ? colors.primary : colors.primary }
                 ]}
                 onPress={handleSignIn}
-                disabled={isAuthenticating}
+                disabled={!request || isExchangingCode} // Disable while waiting for response or exchanging code
               >
-                {isAuthenticating ? (
+                {isExchangingCode ? (
                   <ActivityIndicator size="small" color="white" />
                 ) : (
                   <Text style={styles.buttonText}>

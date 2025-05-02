@@ -18,7 +18,7 @@ import {
   Modal,
   Pressable
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { StreamingContent, CatalogContent, catalogService } from '../services/catalogService';
@@ -72,6 +72,10 @@ interface DropUpMenuProps {
   onClose: () => void;
   item: StreamingContent;
   onOptionSelect: (option: string) => void;
+}
+
+interface ContinueWatchingRef {
+  refresh: () => Promise<boolean>;
 }
 
 const DropUpMenu = ({ visible, onClose, item, onOptionSelect }: DropUpMenuProps) => {
@@ -354,11 +358,12 @@ const SkeletonFeatured = () => (
 const HomeScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const isDarkMode = useColorScheme() === 'dark';
-  const continueWatchingRef = useRef<{ refresh: () => Promise<void> }>(null);
+  const continueWatchingRef = useRef<ContinueWatchingRef>(null);
   const { settings } = useSettings();
   const [showHeroSection, setShowHeroSection] = useState(settings.showHeroSection);
   const [featuredContentSource, setFeaturedContentSource] = useState(settings.featuredContentSource);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [hasContinueWatching, setHasContinueWatching] = useState(false);
 
   const { 
     catalogs, 
@@ -408,9 +413,25 @@ const HomeScreen = () => {
     };
   }, [featuredContentSource, showHeroSection, refreshFeatured]);
 
-  useEffect(() => {
+  useFocusEffect(
+    useCallback(() => {
+      const statusBarConfig = () => {
+        StatusBar.setBarStyle("light-content");
     StatusBar.setTranslucent(true);
     StatusBar.setBackgroundColor('transparent');
+      };
+      
+      statusBarConfig();
+      
+      return () => {
+        // Don't change StatusBar settings when unfocusing to prevent layout shifts
+        // Only set these when component unmounts completely
+      };
+    }, [])
+  );
+
+  useEffect(() => {
+    // Only run cleanup when component unmounts completely, not on unfocus
     return () => {
       StatusBar.setTranslucent(false);
       StatusBar.setBackgroundColor(colors.darkBackground);
@@ -484,9 +505,10 @@ const HomeScreen = () => {
     });
   }, [featuredContent, navigation]);
 
-  const refreshContinueWatching = useCallback(() => {
+  const refreshContinueWatching = useCallback(async () => {
     if (continueWatchingRef.current) {
-      continueWatchingRef.current.refresh();
+      const hasContent = await continueWatchingRef.current.refresh();
+      setHasContinueWatching(hasContent);
     }
   }, []);
 
@@ -695,7 +717,7 @@ const HomeScreen = () => {
   }
 
   return (
-    <View style={[styles.container]}>
+    <SafeAreaView style={[styles.container]}>
       <StatusBar
         barStyle="light-content"
         backgroundColor="transparent"
@@ -710,7 +732,10 @@ const HomeScreen = () => {
             colors={[colors.primary, colors.secondary]}
           />
         }
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: Platform.OS === 'ios' ? 0 : 0 }
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {showHeroSection && renderFeaturedContent()}
@@ -719,9 +744,11 @@ const HomeScreen = () => {
           <ThisWeekSection />
         </Animated.View>
 
+        {hasContinueWatching && (
         <Animated.View entering={FadeIn.duration(400).delay(250)}>
           <ContinueWatchingSection ref={continueWatchingRef} />
         </Animated.View>
+        )}
 
         {catalogs.length > 0 ? (
           catalogs.map((catalog, index) => (
@@ -747,7 +774,7 @@ const HomeScreen = () => {
           )
         )}
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -770,7 +797,7 @@ const styles = StyleSheet.create<any>({
   featuredContainer: {
     width: '100%',
     height: height * 0.6,
-    marginTop: Platform.OS === 'ios' ? 85 : 75,
+    marginTop: Platform.OS === 'ios' ? 0 : 0,
     marginBottom: 8,
     position: 'relative',
   },

@@ -6,6 +6,7 @@
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "scheme": "stremioexpo",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -17,9 +18,26 @@
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
-        }
+        },
+        "NSBonjourServices": [
+          "_http._tcp"
+        ],
+        "NSLocalNetworkUsageDescription": "App uses the local network to discover and connect to devices.",
+        "NSMicrophoneUsageDescription": "This app does not require microphone access.",
+        "UIBackgroundModes": ["audio"],
+        "LSSupportsOpeningDocumentsInPlace": true,
+        "UIFileSharingEnabled": true
       },
-      "bundleIdentifier": "com.nuvio.app"
+      "bundleIdentifier": "com.nuvio.app",
+      "associatedDomains": [],
+      "documentTypes": [
+        {
+          "name": "Matroska Video",
+          "role": "viewer",
+          "utis": ["org.matroska.mkv"],
+          "extensions": ["mkv"]
+        }
+      ]
     },
     "android": {
       "adaptiveIcon": {

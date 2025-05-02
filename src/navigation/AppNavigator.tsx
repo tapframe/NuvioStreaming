@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { NavigationContainer, DefaultTheme as NavigationDefaultTheme, DarkTheme as NavigationDarkTheme, Theme, NavigationProp } from '@react-navigation/native';
 import { createNativeStackNavigator, NativeStackNavigationOptions, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createBottomTabNavigator, BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { useColorScheme, Platform, Animated, StatusBar, TouchableOpacity, View, Text } from 'react-native';
+import { useColorScheme, Platform, Animated, StatusBar, TouchableOpacity, View, Text, AppState } from 'react-native';
 import { PaperProvider, MD3DarkTheme, MD3LightTheme, adaptNavigationTheme } from 'react-native-paper';
 import type { MD3Theme } from 'react-native-paper';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
@@ -12,6 +12,7 @@ import { BlurView } from 'expo-blur';
 import { colors } from '../styles/colors';
 import { NuvioHeader } from '../components/NuvioHeader';
 import { Stream } from '../types/streams';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Import screens with their proper types
 import HomeScreen from '../screens/HomeScreen';
@@ -320,6 +321,65 @@ const TabIcon = React.memo(({ focused, color, iconName }: {
   );
 });
 
+// Update the TabScreenWrapper component with fixed layout dimensions
+const TabScreenWrapper: React.FC<{children: React.ReactNode}> = ({ children }) => {
+  // Force consistent status bar settings
+  useEffect(() => {
+    const applyStatusBarConfig = () => {
+      StatusBar.setBarStyle('light-content');
+      StatusBar.setTranslucent(true);
+      StatusBar.setBackgroundColor('transparent');
+    };
+    
+    applyStatusBarConfig();
+    
+    // Apply status bar config on every focus
+    const subscription = Platform.OS === 'android' 
+      ? AppState.addEventListener('change', (state) => {
+          if (state === 'active') {
+            applyStatusBarConfig();
+          }
+        })
+      : { remove: () => {} };
+      
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  return (
+    <View style={{ 
+      flex: 1, 
+      backgroundColor: colors.darkBackground,
+      // Lock the layout to prevent shifts
+      position: 'relative',
+      overflow: 'hidden'
+    }}>
+      {/* Reserve consistent space for the header area on all screens */}
+      <View style={{ 
+        height: Platform.OS === 'android' ? 80 : 60, 
+        width: '100%', 
+        backgroundColor: colors.darkBackground,
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: -1
+      }} />
+      {children}
+    </View>
+  );
+};
+
+// Add this component to wrap each screen in the tab navigator
+const WrappedScreen: React.FC<{Screen: React.ComponentType<any>}> = ({ Screen }) => {
+  return (
+    <TabScreenWrapper>
+      <Screen />
+    </TabScreenWrapper>
+  );
+};
+
 // Tab Navigator
 const MainTabs = () => {
   // Always use dark mode
@@ -454,112 +514,138 @@ const MainTabs = () => {
   };
   
   return (
-    <Tab.Navigator
-      tabBar={renderTabBar}
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName: IconNameType = 'home';
-          
-          switch (route.name) {
-            case 'Home':
-              iconName = 'home';
-              break;
-            case 'Discover':
-              iconName = 'compass';
-              break;
-            case 'Library':
-              iconName = 'play-box-multiple';
-              break;
-            case 'Settings':
-              iconName = 'cog';
-              break;
-          }
-          
-          return <TabIcon focused={focused} color={color} iconName={iconName} />;
-        },
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: '#FFFFFF',
-        tabBarStyle: {
-          position: 'absolute',
-          backgroundColor: 'transparent',
-          borderTopWidth: 0,
-          elevation: 0,
-          height: 85,
-          paddingBottom: 20,
-          paddingTop: 12,
-        },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
-          marginTop: 0,
-        },
-        tabBarBackground: () => (
-          Platform.OS === 'ios' ? (
-            <BlurView
-              tint="dark"
-              intensity={75}
-              style={{
-                position: 'absolute',
-                height: '100%',
-                width: '100%',
-                borderTopColor: 'rgba(255,255,255,0.2)',
-                borderTopWidth: 0.5,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: -2 },
-                shadowOpacity: 0.1,
-                shadowRadius: 3,
-              }}
-            />
-          ) : (
-            <LinearGradient
-              colors={[
-                'rgba(0, 0, 0, 0)',
-                'rgba(0, 0, 0, 0.65)',
-                'rgba(0, 0, 0, 0.85)',
-                'rgba(0, 0, 0, 0.98)',
-              ]}
-              locations={[0, 0.2, 0.4, 0.8]}
-              style={{
-                position: 'absolute',
-                height: '100%',
-                width: '100%',
-              }}
-            />
-          )
-        ),
-        header: () => route.name === 'Home' ? <NuvioHeader /> : null,
-        headerShown: route.name === 'Home',
-      })}
-    >
-      <Tab.Screen 
-        name="Home" 
-        component={HomeScreen as any}
-        options={{ 
-          tabBarLabel: 'Home',
-        }}
+    <View style={{ flex: 1, backgroundColor: colors.darkBackground }}>
+      {/* Common StatusBar for all tabs */}
+      <StatusBar
+        translucent
+        barStyle="light-content"
+        backgroundColor="transparent"
       />
-      <Tab.Screen 
-        name="Discover" 
-        component={DiscoverScreen as any}
-        options={{ 
-          tabBarLabel: 'Discover'
-        }}
-      />
-      <Tab.Screen 
-        name="Library" 
-        component={LibraryScreen as any}
-        options={{ 
-          tabBarLabel: 'Library'
-        }}
-      />
-      <Tab.Screen 
-        name="Settings" 
-        component={SettingsScreen as any}
-        options={{ 
-          tabBarLabel: 'Settings'
-        }}
-      />
-    </Tab.Navigator>
+      
+      <Tab.Navigator
+        tabBar={renderTabBar}
+        screenOptions={({ route }) => ({
+          tabBarIcon: ({ focused, color, size }) => {
+            let iconName: IconNameType = 'home';
+            
+            switch (route.name) {
+              case 'Home':
+                iconName = 'home';
+                break;
+              case 'Discover':
+                iconName = 'compass';
+                break;
+              case 'Library':
+                iconName = 'play-box-multiple';
+                break;
+              case 'Settings':
+                iconName = 'cog';
+                break;
+            }
+            
+            return <TabIcon focused={focused} color={color} iconName={iconName} />;
+          },
+          tabBarActiveTintColor: colors.primary,
+          tabBarInactiveTintColor: '#FFFFFF',
+          tabBarStyle: {
+            position: 'absolute',
+            backgroundColor: 'transparent',
+            borderTopWidth: 0,
+            elevation: 0,
+            height: 85,
+            paddingBottom: 20,
+            paddingTop: 12,
+          },
+          tabBarLabelStyle: {
+            fontSize: 12,
+            fontWeight: '600',
+            marginTop: 0,
+          },
+          // Completely disable animations between tabs for better performance
+          animationEnabled: false,
+          // Keep all screens mounted and active
+          lazy: false,
+          freezeOnBlur: false,
+          detachPreviousScreen: false,
+          // Configure how the screen renders
+          detachInactiveScreens: false,
+          tabBarBackground: () => (
+            Platform.OS === 'ios' ? (
+              <BlurView
+                tint="dark"
+                intensity={75}
+                style={{
+                  position: 'absolute',
+                  height: '100%',
+                  width: '100%',
+                  borderTopColor: 'rgba(255,255,255,0.2)',
+                  borderTopWidth: 0.5,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: -2 },
+                  shadowOpacity: 0.1,
+                  shadowRadius: 3,
+                }}
+              />
+            ) : (
+              <LinearGradient
+                colors={[
+                  'rgba(0, 0, 0, 0)',
+                  'rgba(0, 0, 0, 0.65)',
+                  'rgba(0, 0, 0, 0.85)',
+                  'rgba(0, 0, 0, 0.98)',
+                ]}
+                locations={[0, 0.2, 0.4, 0.8]}
+                style={{
+                  position: 'absolute',
+                  height: '100%',
+                  width: '100%',
+                }}
+              />
+            )
+          ),
+          header: () => route.name === 'Home' ? <NuvioHeader /> : null,
+          headerShown: route.name === 'Home',
+          // Add fixed screen styling to help with consistency
+          contentStyle: {
+            backgroundColor: colors.darkBackground,
+          },
+        })}
+        // Global configuration for the tab navigator
+        detachInactiveScreens={false}
+      >
+        <Tab.Screen 
+          name="Home" 
+          component={HomeScreen}
+          options={{ 
+            tabBarLabel: 'Home',
+          }}
+        />
+        <Tab.Screen 
+          name="Discover"
+          component={DiscoverScreen}
+          options={{ 
+            tabBarLabel: 'Discover',
+            headerShown: false
+          }}
+        />
+        <Tab.Screen 
+          name="Library" 
+          component={LibraryScreen}
+          options={{ 
+            tabBarLabel: 'Library',
+            headerShown: false
+          }}
+        />
+        <Tab.Screen 
+          name="Settings" 
+          component={SettingsScreen}
+          options={{ 
+            tabBarLabel: 'Settings',
+            headerShown: false
+          }}
+        />
+      </Tab.Navigator>
+    </View>
   );
 };
 
@@ -569,7 +655,7 @@ const AppNavigator = () => {
   const isDarkMode = true;
   
   return (
-    <>
+    <SafeAreaProvider>
       <StatusBar
         translucent
         backgroundColor="transparent"
@@ -579,7 +665,12 @@ const AppNavigator = () => {
         <Stack.Navigator
           screenOptions={{
             headerShown: false,
-            animation: Platform.OS === 'android' ? 'fade_from_bottom' : 'default',
+            // Disable animations for smoother transitions
+            animation: 'none',
+            // Ensure content is not popping in and out
+            contentStyle: {
+              backgroundColor: colors.darkBackground,
+            }
           }}
         >
           <Stack.Screen 
@@ -734,7 +825,7 @@ const AppNavigator = () => {
           />
         </Stack.Navigator>
       </PaperProvider>
-    </>
+    </SafeAreaProvider>
   );
 };
 

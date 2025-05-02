@@ -12,12 +12,17 @@ import {
   Dimensions,
   Platform,
   TouchableWithoutFeedback,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
+import { BlurView as ExpoBlurView } from 'expo-blur';
+import { BlurView as CommunityBlurView } from '@react-native-community/blur';
+import * as Haptics from 'expo-haptics';
 import { colors } from '../styles/colors';
 import { useMetadata } from '../hooks/useMetadata';
 import { CastSection as OriginalCastSection } from '../components/metadata/CastSection';
@@ -42,6 +47,7 @@ import Animated, {
   FadeIn,
   runOnJS,
   Layout,
+  useAnimatedScrollHandler,
 } from 'react-native-reanimated';
 import { RouteProp } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -99,54 +105,62 @@ const ActionButtons = React.memo(({
   navigation: NavigationProp<RootStackParamList>;
   playButtonText: string;
   animatedStyle: any;
-}) => (
-  <Animated.View style={[styles.actionButtons, animatedStyle]}>
-    <TouchableOpacity
-      style={[styles.actionButton, styles.playButton]}
-      onPress={handleShowStreams}
-    >
-      <MaterialIcons 
-        name={playButtonText === 'Resume' ? "play-circle-outline" : "play-arrow"} 
-        size={24} 
-        color="#000" 
-      />
-      <Text style={styles.playButtonText}>
-        {playButtonText}
-      </Text>
-    </TouchableOpacity>
+}) => {
+  // Add wrapper for play button with haptic feedback
+  const handlePlay = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    handleShowStreams();
+  };
 
-    <TouchableOpacity
-      style={[styles.actionButton, styles.infoButton]}
-      onPress={toggleLibrary}
-    >
-      <MaterialIcons
-        name={inLibrary ? 'bookmark' : 'bookmark-border'}
-        size={24}
-        color="#fff"
-      />
-      <Text style={styles.infoButtonText}>
-        {inLibrary ? 'Saved' : 'Save'}
-      </Text>
-    </TouchableOpacity>
-
-    {type === 'series' && (
+  return (
+    <Animated.View style={[styles.actionButtons, animatedStyle]}>
       <TouchableOpacity
-        style={[styles.iconButton]}
-        onPress={async () => {
-          const tmdb = TMDBService.getInstance();
-          const tmdbId = await tmdb.extractTMDBIdFromStremioId(id);
-          if (tmdbId) {
-            navigation.navigate('ShowRatings', { showId: tmdbId });
-          } else {
-            logger.error('Could not find TMDB ID for show');
-          }
-        }}
+        style={[styles.actionButton, styles.playButton]}
+        onPress={handlePlay}
       >
-        <MaterialIcons name="assessment" size={24} color="#fff" />
+        <MaterialIcons 
+          name={playButtonText === 'Resume' ? "play-circle-outline" : "play-arrow"} 
+          size={24} 
+          color="#000" 
+        />
+        <Text style={styles.playButtonText}>
+          {playButtonText}
+        </Text>
       </TouchableOpacity>
-    )}
-  </Animated.View>
-));
+
+      <TouchableOpacity
+        style={[styles.actionButton, styles.infoButton]}
+        onPress={toggleLibrary}
+      >
+        <MaterialIcons
+          name={inLibrary ? 'bookmark' : 'bookmark-border'}
+          size={24}
+          color="#fff"
+        />
+        <Text style={styles.infoButtonText}>
+          {inLibrary ? 'Saved' : 'Save'}
+        </Text>
+      </TouchableOpacity>
+
+      {type === 'series' && (
+        <TouchableOpacity
+          style={[styles.iconButton]}
+          onPress={async () => {
+            const tmdb = TMDBService.getInstance();
+            const tmdbId = await tmdb.extractTMDBIdFromStremioId(id);
+            if (tmdbId) {
+              navigation.navigate('ShowRatings', { showId: tmdbId });
+            } else {
+              logger.error('Could not find TMDB ID for show');
+            }
+          }}
+        >
+          <MaterialIcons name="assessment" size={24} color="#fff" />
+        </TouchableOpacity>
+      )}
+    </Animated.View>
+  );
+});
 
 // Memoized WatchProgress Component
 const WatchProgressDisplay = React.memo(({ 
@@ -220,9 +234,13 @@ const MetadataScreen = () => {
   // Get genres from context
   const { genreMap, loadingGenres } = useGenres();
 
-  const contentRef = useRef<ScrollView>(null);
+  // Update the ref type to be compatible with Animated.ScrollView
+  const contentRef = useRef<Animated.ScrollView>(null);
   const [lastScrollTop, setLastScrollTop] = useState(0);
   const [isFullDescriptionOpen, setIsFullDescriptionOpen] = useState(false);
+
+  // Get safe area insets
+  const { top: safeAreaTop } = useSafeAreaInsets();
 
   // Animation values
   const screenScale = useSharedValue(0.92);
@@ -246,6 +264,32 @@ const MetadataScreen = () => {
     episodeId?: string;
   } | null>(null);
 
+  // Add wrapper for toggleLibrary that includes haptic feedback
+  const handleToggleLibrary = useCallback(() => {
+    // Trigger appropriate haptic feedback based on action
+    if (inLibrary) {
+      // Removed from library - light impact
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } else {
+      // Added to library - success feedback
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    
+    // Call the original toggleLibrary function
+    toggleLibrary();
+  }, [inLibrary, toggleLibrary]);
+
+  // Add wrapper for season change with distinctive haptic feedback
+  const handleSeasonChangeWithHaptics = useCallback((seasonNumber: number) => {
+    // Change to Light impact for a more subtle feedback
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    // Wait a tiny bit before changing season, making the feedback more noticeable
+    setTimeout(() => {
+      handleSeasonChange(seasonNumber);
+    }, 10);
+  }, [handleSeasonChange]);
+
   // Add new animated value for watch progress
   const watchProgressOpacity = useSharedValue(0);
   const watchProgressScaleY = useSharedValue(0);
@@ -253,6 +297,19 @@ const MetadataScreen = () => {
   // Add animated value for logo
   const logoOpacity = useSharedValue(0);
   const logoScale = useSharedValue(0.9);
+
+  // Add shared value for parallax effect
+  const scrollY = useSharedValue(0);
+
+  // Create a dampened scroll value for smoother parallax
+  const dampedScrollY = useSharedValue(0);
+
+  // Add shared value for floating header opacity
+  const headerOpacity = useSharedValue(0);
+  
+  // Add values for animated header elements
+  const headerElementsY = useSharedValue(-10);
+  const headerElementsOpacity = useSharedValue(0);
 
   // Debug log for route params
   // logger.log('[MetadataScreen] Component mounted with route params:', { id, type, episodeId });
@@ -628,27 +685,21 @@ const MetadataScreen = () => {
   }, []); // Empty dependency array as it doesn't depend on component state/props currently
 
   const handleEpisodeSelect = useCallback((episode: Episode) => {
+    // Removed haptic feedback
+    
     const episodeId = episode.stremioId || `${id}:${episode.season_number}:${episode.episode_number}`;
     navigation.navigate('Streams', {
       id,
       type,
       episodeId
     });
-  }, [navigation, id, type]); // Added dependencies
+  }, [navigation, id, type]);
 
   // Animated styles
   const containerAnimatedStyle = useAnimatedStyle(() => ({
     flex: 1,
     transform: [{ scale: screenScale.value }],
     opacity: screenOpacity.value
-  }));
-
-  const heroAnimatedStyle = useAnimatedStyle(() => ({
-    width: '100%',
-    height: heroHeight.value,
-    backgroundColor: colors.black,
-    transform: [{ scale: heroScale.value }],
-    opacity: heroOpacity.value
   }));
 
   const contentAnimatedStyle = useAnimatedStyle(() => ({
@@ -847,6 +898,83 @@ const MetadataScreen = () => {
     ));
   }, [metadata?.genres]); // Dependency on metadata.genres
 
+  // Update the heroAnimatedStyle for parallax effect
+  const heroAnimatedStyle = useAnimatedStyle(() => ({
+    width: '100%',
+    height: heroHeight.value,
+    backgroundColor: colors.black,
+    transform: [{ scale: heroScale.value }],
+    opacity: heroOpacity.value,
+  }));
+  
+  // Replace direct onScroll with useAnimatedScrollHandler
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      const rawScrollY = event.contentOffset.y;
+      scrollY.value = rawScrollY;
+      
+      // Apply spring-like damping for smoother transitions
+      dampedScrollY.value = withTiming(rawScrollY, {
+        duration: 300,
+        easing: Easing.bezier(0.16, 1, 0.3, 1), // Custom spring-like curve
+      });
+
+      // Update header opacity based on scroll position
+      const headerThreshold = height * 0.5 - safeAreaTop - 70; // Hero height - inset - buffer
+      if (rawScrollY > headerThreshold) {
+        headerOpacity.value = withTiming(1, { duration: 200 });
+        headerElementsY.value = withTiming(0, { duration: 300 });
+        headerElementsOpacity.value = withTiming(1, { duration: 450 });
+      } else {
+        headerOpacity.value = withTiming(0, { duration: 150 });
+        headerElementsY.value = withTiming(-10, { duration: 200 });
+        headerElementsOpacity.value = withTiming(0, { duration: 200 });
+      }
+    },
+  });
+
+  // Add a new animated style for the parallax image
+  const parallaxImageStyle = useAnimatedStyle(() => {
+    // Use dampedScrollY instead of direct scrollY for smoother effect
+    return {
+      width: '100%',
+      height: '120%', // Increase height for more movement range
+      top: '-10%', // Start image slightly higher to allow more upward movement
+      transform: [
+        { 
+          translateY: interpolate(
+            dampedScrollY.value,
+            [0, 100, 300],
+            [20, -20, -60],  // Start with a lower position, then move up
+            Extrapolate.CLAMP
+          )
+        },
+        { 
+          scale: interpolate(
+            dampedScrollY.value,
+            [0, 150, 300],
+            [1.1, 1.02, 0.95],  // More dramatic scale changes
+            Extrapolate.CLAMP
+          )
+        }
+      ],
+    };
+  });
+
+  // Add animated style for floating header
+  const headerAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: headerOpacity.value,
+    transform: [
+      { translateY: interpolate(headerOpacity.value, [0, 1], [-20, 0], Extrapolate.CLAMP) }
+    ]
+  }));
+  
+  // Add animated style for header elements
+  const headerElementsStyle = useAnimatedStyle(() => ({
+    opacity: headerElementsOpacity.value,
+    transform: [{ translateY: headerElementsY.value }]
+  }));
+
   if (loading) {
     return (
       <SafeAreaView 
@@ -931,23 +1059,112 @@ const MetadataScreen = () => {
         animated={true}
       />
       <Animated.View style={containerAnimatedStyle}>
-        <ScrollView
+        {/* Floating Header */}
+        <Animated.View style={[styles.floatingHeader, headerAnimatedStyle]}>
+          {Platform.OS === 'ios' ? (
+            <ExpoBlurView
+              intensity={50}
+              tint="dark"
+              style={[styles.blurContainer, { paddingTop: Math.max(safeAreaTop * 0.8, safeAreaTop - 6) }]}
+            >
+              <Animated.View style={[styles.floatingHeaderContent, headerElementsStyle]}>
+                <TouchableOpacity 
+                  style={styles.backButton} 
+                  onPress={handleBack}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <MaterialIcons name="arrow-back" size={24} color={colors.highEmphasis} />
+                </TouchableOpacity>
+                
+                <View style={styles.headerTitleContainer}>
+                  {metadata.logo ? (
+                    <Image
+                      source={{ uri: metadata.logo }}
+                      style={styles.floatingHeaderLogo}
+                      contentFit="contain"
+                      transition={150}
+                    />
+                  ) : (
+                    <Text style={styles.floatingHeaderTitle} numberOfLines={1}>{metadata.name}</Text>
+                  )}
+                </View>
+                
+                <TouchableOpacity 
+                  style={styles.headerActionButton}
+                  onPress={handleToggleLibrary}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <MaterialIcons 
+                    name={inLibrary ? 'bookmark' : 'bookmark-border'} 
+                    size={22} 
+                    color={colors.highEmphasis} 
+                  />
+                </TouchableOpacity>
+              </Animated.View>
+            </ExpoBlurView>
+          ) : (
+            <View style={[styles.blurContainer, { paddingTop: Math.max(safeAreaTop * 0.8, safeAreaTop - 6) }]}>
+              <CommunityBlurView
+                style={styles.absoluteFill}
+                blurType="dark"
+                blurAmount={15}
+                reducedTransparencyFallbackColor="rgba(20, 20, 20, 0.9)"
+              />
+              <Animated.View style={[styles.floatingHeaderContent, headerElementsStyle]}>
+                <TouchableOpacity 
+                  style={styles.backButton} 
+                  onPress={handleBack}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <MaterialIcons name="arrow-back" size={24} color={colors.highEmphasis} />
+                </TouchableOpacity>
+                
+                <View style={styles.headerTitleContainer}>
+                  {metadata.logo ? (
+                    <Image
+                      source={{ uri: metadata.logo }}
+                      style={styles.floatingHeaderLogo}
+                      contentFit="contain"
+                      transition={150}
+                    />
+                  ) : (
+                    <Text style={styles.floatingHeaderTitle} numberOfLines={1}>{metadata.name}</Text>
+                  )}
+                </View>
+                
+                <TouchableOpacity 
+                  style={styles.headerActionButton}
+                  onPress={handleToggleLibrary}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <MaterialIcons 
+                    name={inLibrary ? 'bookmark' : 'bookmark-border'} 
+                    size={22} 
+                    color={colors.highEmphasis} 
+                  />
+                </TouchableOpacity>
+              </Animated.View>
+            </View>
+          )}
+          {Platform.OS === 'ios' && <View style={styles.headerBottomBorder} />}
+        </Animated.View>
+
+        <Animated.ScrollView
           ref={contentRef}
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
-          onScroll={(e) => {
-            // setLastScrollTop(e.nativeEvent.contentOffset.y); // Remove unused onScroll handler logic
-          }}
-          scrollEventThrottle={16}
+          onScroll={scrollHandler}
+          scrollEventThrottle={16} // Back to standard value
         >
           {/* Hero Section */}
           <Animated.View style={heroAnimatedStyle}>
-            <ImageBackground
-              source={{ uri: metadata.banner || metadata.poster }}
-              style={styles.heroSection}
-              imageStyle={styles.heroImage}
-              resizeMode="cover"
-            >
+            <View style={styles.heroSection}>
+              {/* Use Animated.Image directly instead of ImageBackground with imageStyle */}
+              <Animated.Image 
+                source={{ uri: metadata.banner || metadata.poster }}
+                style={[styles.absoluteFill, parallaxImageStyle]}
+                resizeMode="cover"
+              />
               <LinearGradient
                 colors={[
                   `${colors.darkBackground}00`,
@@ -995,7 +1212,7 @@ const MetadataScreen = () => {
                   {/* Action Buttons */}
                   <ActionButtons 
                     handleShowStreams={handleShowStreams}
-                    toggleLibrary={toggleLibrary}
+                    toggleLibrary={handleToggleLibrary}
                     inLibrary={inLibrary}
                     type={type as 'movie' | 'series'}
                     id={id}
@@ -1005,7 +1222,7 @@ const MetadataScreen = () => {
                   />
                 </View>
               </LinearGradient>
-            </ImageBackground>
+            </View>
           </Animated.View>
 
           {/* Main Content */}
@@ -1108,7 +1325,7 @@ const MetadataScreen = () => {
                 episodes={episodes}
                 selectedSeason={selectedSeason}
                 loadingSeasons={loadingSeasons}
-                onSeasonChange={handleSeasonChange}
+                onSeasonChange={handleSeasonChangeWithHaptics}
                 onSelectEpisode={handleEpisodeSelect}
                 groupedEpisodes={groupedEpisodes}
                 metadata={metadata}
@@ -1117,7 +1334,7 @@ const MetadataScreen = () => {
               <MovieContent metadata={metadata} />
             )}
           </Animated.View>
-        </ScrollView>
+        </Animated.ScrollView>
       </Animated.View>
     </SafeAreaView>
   );
@@ -1171,13 +1388,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   backButton: {
-    flexDirection: 'row',
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 24,
-    borderWidth: 1,
+    borderRadius: 20,
   },
   backButtonText: {
     fontSize: 16,
@@ -1189,11 +1404,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.black,
     overflow: 'hidden',
   },
-  heroImage: {
-    width: '100%',
-    height: '100%',
-    top: '0%',
-    transform: [{ scale: 1 }],
+  absoluteFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   heroGradient: {
     flex: 1,
@@ -1408,6 +1624,64 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.9,
     letterSpacing: 0.2
+  },
+  floatingHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    overflow: 'hidden',
+    elevation: 4, // for Android shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  blurContainer: {
+    width: '100%',
+  },
+  floatingHeaderContent: {
+    height: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+  },
+  headerBottomBorder: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 0.5,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  headerTitleContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+  },
+  headerRightPlaceholder: {
+    width: 40, // same width as back button for symmetry
+  },
+  headerActionButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
+  },
+  floatingHeaderLogo: {
+    height: 42,
+    width: width * 0.6,
+    maxWidth: 240,
+  },
+  floatingHeaderTitle: {
+    color: colors.highEmphasis,
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
   },
 });
 

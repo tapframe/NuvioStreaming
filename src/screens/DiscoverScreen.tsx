@@ -24,6 +24,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { logger } from '../utils/logger';
 import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface Category {
   id: string;
@@ -281,10 +282,24 @@ const useStyles = () => {
       flex: 1,
       backgroundColor: colors.darkBackground,
     },
+    headerBackground: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: colors.darkBackground,
+      zIndex: 1,
+    },
+    contentContainer: {
+      flex: 1,
+      backgroundColor: colors.darkBackground,
+    },
     header: {
       paddingHorizontal: 20,
-      paddingVertical: 16,
-      paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 16 : 16,
+      justifyContent: 'flex-end',
+      paddingBottom: 8,
+      backgroundColor: 'transparent',
+      zIndex: 2,
     },
     headerContent: {
       flexDirection: 'row',
@@ -487,6 +502,24 @@ const DiscoverScreen = () => {
   const [allContent, setAllContent] = useState<StreamingContent[]>([]);
   const [loading, setLoading] = useState(true);
   const styles = useStyles();
+  const insets = useSafeAreaInsets();
+
+  // Force consistent status bar settings
+  useEffect(() => {
+    const applyStatusBarConfig = () => {
+      StatusBar.setBarStyle('light-content');
+      if (Platform.OS === 'android') {
+        StatusBar.setTranslucent(true);
+        StatusBar.setBackgroundColor('transparent');
+      }
+    };
+    
+    applyStatusBarConfig();
+    
+    // Re-apply on focus
+    const unsubscribe = navigation.addListener('focus', applyStatusBarConfig);
+    return unsubscribe;
+  }, [navigation]);
 
   // Load content when category or genre changes
   useEffect(() => {
@@ -580,17 +613,18 @@ const DiscoverScreen = () => {
   // Memoize list key extractor
   const catalogKeyExtractor = useCallback((item: GenreCatalog) => item.genre, []);
 
+  const headerBaseHeight = Platform.OS === 'android' ? 80 : 60;
+  const topSpacing = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top;
+  const headerHeight = headerBaseHeight + topSpacing;
+
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor="transparent"
-        translucent
-      />
+    <View style={styles.container}>
+      {/* Fixed position header background to prevent shifts */}
+      <View style={[styles.headerBackground, { height: headerHeight }]} />
       
       <View style={{ flex: 1 }}>
-        {/* Header Section */}
-        <View style={styles.header}>
+        {/* Header Section with proper top spacing */}
+        <View style={[styles.header, { height: headerHeight, paddingTop: topSpacing }]}>
           <View style={styles.headerContent}>
             <Text style={styles.headerTitle}>Discover</Text>
             <TouchableOpacity 
@@ -607,66 +641,69 @@ const DiscoverScreen = () => {
           </View>
         </View>
         
-        {/* Categories Section */}
-        <View style={styles.categoryContainer}>
-          <View style={styles.categoriesContent}>
-            {CATEGORIES.map((category) => (
-              <CategoryButton
-                key={category.id}
-                category={category}
-                isSelected={selectedCategory.id === category.id}
-                onPress={() => handleCategoryPress(category)}
-              />
-            ))}
+        {/* Rest of the content */}
+        <View style={styles.contentContainer}>
+          {/* Categories Section */}
+          <View style={styles.categoryContainer}>
+            <View style={styles.categoriesContent}>
+              {CATEGORIES.map((category) => (
+                <CategoryButton
+                  key={category.id}
+                  category={category}
+                  isSelected={selectedCategory.id === category.id}
+                  onPress={() => handleCategoryPress(category)}
+                />
+              ))}
+            </View>
           </View>
+          
+          {/* Genres Section */}
+          <View style={styles.genreContainer}>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.genresScrollView}
+              decelerationRate="fast"
+              snapToInterval={10}
+            >
+              {COMMON_GENRES.map(genre => (
+                <GenreButton
+                  key={genre}
+                  genre={genre}
+                  isSelected={selectedGenre === genre}
+                  onPress={() => handleGenrePress(genre)}
+                />
+              ))}
+            </ScrollView>
+          </View>
+          
+          {/* Content Section */}
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : catalogs.length > 0 ? (
+            <FlatList
+              data={catalogs}
+              renderItem={renderCatalogItem}
+              keyExtractor={catalogKeyExtractor}
+              contentContainerStyle={styles.catalogsContainer}
+              showsVerticalScrollIndicator={false}
+              initialNumToRender={3}
+              maxToRenderPerBatch={3}
+              windowSize={5}
+              removeClippedSubviews={Platform.OS === 'android'}
+            />
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>
+                No content found for {selectedGenre !== 'All' ? selectedGenre : 'these filters'}
+              </Text>
+            </View>
+          )}
         </View>
-        
-        {/* Genres Section */}
-        <View style={styles.genreContainer}>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.genresScrollView}
-            decelerationRate="fast"
-            snapToInterval={10}
-          >
-            {COMMON_GENRES.map(genre => (
-              <GenreButton
-                key={genre}
-                genre={genre}
-                isSelected={selectedGenre === genre}
-                onPress={() => handleGenrePress(genre)}
-              />
-            ))}
-          </ScrollView>
-        </View>
-        
-        {/* Content Section */}
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        ) : catalogs.length > 0 ? (
-          <FlatList
-            data={catalogs}
-            renderItem={renderCatalogItem}
-            keyExtractor={catalogKeyExtractor}
-            contentContainerStyle={styles.catalogsContainer}
-            showsVerticalScrollIndicator={false}
-            initialNumToRender={3}
-            maxToRenderPerBatch={3}
-            windowSize={5}
-            removeClippedSubviews={Platform.OS === 'android'}
-          />
-        ) : (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>
-              No content found for {selectedGenre !== 'All' ? selectedGenre : 'these filters'}
-            </Text>
-          </View>
-        )}
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 

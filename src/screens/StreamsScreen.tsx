@@ -542,14 +542,12 @@ export const StreamsScreen = () => {
           if (indexB !== -1) return 1;
           return 0;
         })
-        .filter(provider => provider !== 'source_1' && provider !== 'source_2') // Filter out source_1 and source_2
         .map(provider => {
           const addonInfo = streams[provider];
           const installedAddon = installedAddons.find(addon => addon.id === provider);
           
           let displayName = provider;
-          if (provider === 'external_sources') displayName = 'External Sources';
-          else if (installedAddon) displayName = installedAddon.name;
+          if (installedAddon) displayName = installedAddon.name;
           else if (addonInfo?.addonName) displayName = addonInfo.addonName;
           
           return { id: provider, name: displayName };
@@ -561,10 +559,15 @@ export const StreamsScreen = () => {
     const streams = type === 'series' ? episodeStreams : groupedStreams;
     const installedAddons = stremioService.getInstalledAddons();
 
-    return Object.entries(streams)
+    // Filter streams by selected provider - only if not "all"
+    const filteredEntries = Object.entries(streams)
       .filter(([addonId]) => {
-        // Filter out source_1 and source_2
-        return addonId !== 'source_1' && addonId !== 'source_2';
+        // If "all" is selected, show all providers
+        if (selectedProvider === 'all') {
+          return true;
+        }
+        // Otherwise only show the selected provider
+        return addonId === selectedProvider;
       })
       .sort(([addonIdA], [addonIdB]) => {
         const indexA = installedAddons.findIndex(addon => addon.id === addonIdA);
@@ -580,6 +583,8 @@ export const StreamsScreen = () => {
         addonId,
         data: streams
       }));
+      
+    return filteredEntries;
   }, [selectedProvider, type, episodeStreams, groupedStreams]);
 
   const episodeImage = useMemo(() => {

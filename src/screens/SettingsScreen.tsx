@@ -26,6 +26,7 @@ import { stremioService } from '../services/stremioService';
 import { useCatalogContext } from '../contexts/CatalogContext';
 import { useTraktContext } from '../contexts/TraktContext';
 import { catalogService, DataSource } from '../services/catalogService';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
@@ -125,12 +126,30 @@ const SettingsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { lastUpdate } = useCatalogContext();
   const { isAuthenticated, userProfile } = useTraktContext();
+  const insets = useSafeAreaInsets();
   
   // States for dynamic content
   const [addonCount, setAddonCount] = useState<number>(0);
   const [catalogCount, setCatalogCount] = useState<number>(0);
   const [mdblistKeySet, setMdblistKeySet] = useState<boolean>(false);
   const [discoverDataSource, setDiscoverDataSource] = useState<DataSource>(DataSource.STREMIO_ADDONS);
+
+  // Force consistent status bar settings
+  useEffect(() => {
+    const applyStatusBarConfig = () => {
+      StatusBar.setBarStyle('light-content');
+      if (Platform.OS === 'android') {
+        StatusBar.setTranslucent(true);
+        StatusBar.setBackgroundColor('transparent');
+      }
+    };
+    
+    applyStatusBarConfig();
+    
+    // Re-apply on focus
+    const unsubscribe = navigation.addListener('focus', applyStatusBarConfig);
+    return unsubscribe;
+  }, [navigation]);
 
   const loadData = useCallback(async () => {
     try {
@@ -231,166 +250,182 @@ const SettingsScreen: React.FC = () => {
     await catalogService.setDataSourcePreference(dataSource);
   }, []);
 
+  const headerBaseHeight = Platform.OS === 'android' ? 80 : 60;
+  const topSpacing = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top;
+  const headerHeight = headerBaseHeight + topSpacing;
+
   return (
-    <SafeAreaView style={[
+    <View style={[
       styles.container,
       { backgroundColor: isDarkMode ? colors.darkBackground : '#F2F2F7' }
     ]}>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
-          Settings
-        </Text>
-        <TouchableOpacity onPress={handleResetSettings} style={styles.resetButton}>
-          <Text style={[styles.resetButtonText, {color: colors.primary}]}>Reset</Text>
-        </TouchableOpacity>
-      </View>
-      <ScrollView 
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <SettingsCard isDarkMode={isDarkMode} title="User & Account">
-          <SettingItem
-            title="Trakt"
-            description={isAuthenticated ? `Connected as ${userProfile?.username || 'User'}` : "Not Connected"}
-            icon="person"
-            isDarkMode={isDarkMode}
-            renderControl={ChevronRight}
-            onPress={() => navigation.navigate('TraktSettings')}
-            isLast={true}
-          />
-        </SettingsCard>
-
-        <SettingsCard isDarkMode={isDarkMode} title="Features">
-          <SettingItem
-            title="Calendar"
-            description="Manage your show calendar settings"
-            icon="calendar-today"
-            renderControl={ChevronRight}
-            onPress={() => navigation.navigate('Calendar')}
-            isDarkMode={isDarkMode}
-          />
-          <SettingItem
-            title="Notifications"
-            description="Configure episode notifications and reminders"
-            icon="notifications"
-            renderControl={ChevronRight}
-            onPress={() => navigation.navigate('NotificationSettings')}
-            isDarkMode={isDarkMode}
-            isLast={true}
-          />
-        </SettingsCard>
-
-        <SettingsCard isDarkMode={isDarkMode} title="Content">
-          <SettingItem
-            title="Addons"
-            description="Manage your installed addons"
-            icon="extension"
-            isDarkMode={isDarkMode}
-            renderControl={ChevronRight}
-            onPress={() => navigation.navigate('Addons')}
-            badge={addonCount}
-          />
-          <SettingItem
-            title="Catalogs"
-            description="Configure content sources"
-            icon="view-list"
-            isDarkMode={isDarkMode}
-            renderControl={ChevronRight}
-            onPress={() => navigation.navigate('CatalogSettings')}
-            badge={catalogCount}
-          />
-          <SettingItem
-            title="Home Screen"
-            description="Customize layout and content"
-            icon="home"
-            isDarkMode={isDarkMode}
-            renderControl={ChevronRight}
-            onPress={() => navigation.navigate('HomeScreenSettings')}
-          />
-          <SettingItem
-            title="Ratings Source"
-            description={mdblistKeySet ? "MDBList API Configured" : "Configure MDBList API"}
-            icon="info-outline"
-            isDarkMode={isDarkMode}
-            renderControl={ChevronRight}
-            onPress={() => navigation.navigate('MDBListSettings')}
-          />
-          <SettingItem
-            title="TMDB"
-            description="API & Metadata Settings"
-            icon="movie-filter"
-            isDarkMode={isDarkMode}
-            renderControl={ChevronRight}
-            onPress={() => navigation.navigate('TMDBSettings')}
-            isLast={true}
-          />
-        </SettingsCard>
-
-        <SettingsCard isDarkMode={isDarkMode} title="Playback">
-          <SettingItem
-            title="Video Player"
-            description={Platform.OS === 'ios' 
-              ? (settings.preferredPlayer === 'internal' 
-                ? 'Built-in Player' 
-                : settings.preferredPlayer 
-                  ? settings.preferredPlayer.toUpperCase()
-                  : 'Built-in Player')
-              : (settings.useExternalPlayer ? 'External Player' : 'Built-in Player')
-            }
-            icon="play-arrow"
-            isDarkMode={isDarkMode}
-            renderControl={ChevronRight}
-            onPress={() => navigation.navigate('PlayerSettings')}
-            isLast={true}
-          />
-        </SettingsCard>
-
-        <SettingsCard isDarkMode={isDarkMode} title="Discover">
-          <SettingItem
-            title="Content Source"
-            description="Choose where to get content for the Discover screen"
-            icon="explore"
-            isDarkMode={isDarkMode}
-            renderControl={() => (
-              <View style={styles.selectorContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.selectorButton,
-                    discoverDataSource === DataSource.STREMIO_ADDONS && styles.selectorButtonActive
-                  ]}
-                  onPress={() => handleDiscoverDataSourceChange(DataSource.STREMIO_ADDONS)}
-                >
-                  <Text style={[
-                    styles.selectorText,
-                    discoverDataSource === DataSource.STREMIO_ADDONS && styles.selectorTextActive
-                  ]}>Addons</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.selectorButton,
-                    discoverDataSource === DataSource.TMDB && styles.selectorButtonActive
-                  ]}
-                  onPress={() => handleDiscoverDataSourceChange(DataSource.TMDB)}
-                >
-                  <Text style={[
-                    styles.selectorText,
-                    discoverDataSource === DataSource.TMDB && styles.selectorTextActive
-                  ]}>TMDB</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          />
-        </SettingsCard>
-
-        <View style={styles.versionContainer}>
-          <Text style={[styles.versionText, {color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark}]}>
-            Version 1.0.0
+      {/* Fixed position header background to prevent shifts */}
+      <View style={[
+        styles.headerBackground,
+        { height: headerHeight, backgroundColor: isDarkMode ? colors.darkBackground : '#F2F2F7' }
+      ]} />
+      
+      <View style={{ flex: 1 }}>
+        {/* Header Section with proper top spacing */}
+        <View style={[styles.header, { height: headerHeight, paddingTop: topSpacing }]}>
+          <Text style={[styles.headerTitle, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
+            Settings
           </Text>
+          <TouchableOpacity onPress={handleResetSettings} style={styles.resetButton}>
+            <Text style={[styles.resetButtonText, {color: colors.primary}]}>Reset</Text>
+          </TouchableOpacity>
         </View>
-      </ScrollView>
-    </SafeAreaView>
+
+        {/* Content Container */}
+        <View style={styles.contentContainer}>
+          <ScrollView 
+            style={styles.scrollView}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+          >
+            <SettingsCard isDarkMode={isDarkMode} title="User & Account">
+              <SettingItem
+                title="Trakt"
+                description={isAuthenticated ? `Connected as ${userProfile?.username || 'User'}` : "Not Connected"}
+                icon="person"
+                isDarkMode={isDarkMode}
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('TraktSettings')}
+                isLast={true}
+              />
+            </SettingsCard>
+
+            <SettingsCard isDarkMode={isDarkMode} title="Features">
+              <SettingItem
+                title="Calendar"
+                description="Manage your show calendar settings"
+                icon="calendar-today"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('Calendar')}
+                isDarkMode={isDarkMode}
+              />
+              <SettingItem
+                title="Notifications"
+                description="Configure episode notifications and reminders"
+                icon="notifications"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('NotificationSettings')}
+                isDarkMode={isDarkMode}
+                isLast={true}
+              />
+            </SettingsCard>
+
+            <SettingsCard isDarkMode={isDarkMode} title="Content">
+              <SettingItem
+                title="Addons"
+                description="Manage your installed addons"
+                icon="extension"
+                isDarkMode={isDarkMode}
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('Addons')}
+                badge={addonCount}
+              />
+              <SettingItem
+                title="Catalogs"
+                description="Configure content sources"
+                icon="view-list"
+                isDarkMode={isDarkMode}
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('CatalogSettings')}
+                badge={catalogCount}
+              />
+              <SettingItem
+                title="Home Screen"
+                description="Customize layout and content"
+                icon="home"
+                isDarkMode={isDarkMode}
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('HomeScreenSettings')}
+              />
+              <SettingItem
+                title="Ratings Source"
+                description={mdblistKeySet ? "MDBList API Configured" : "Configure MDBList API"}
+                icon="info-outline"
+                isDarkMode={isDarkMode}
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('MDBListSettings')}
+              />
+              <SettingItem
+                title="TMDB"
+                description="API & Metadata Settings"
+                icon="movie-filter"
+                isDarkMode={isDarkMode}
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('TMDBSettings')}
+                isLast={true}
+              />
+            </SettingsCard>
+
+            <SettingsCard isDarkMode={isDarkMode} title="Playback">
+              <SettingItem
+                title="Video Player"
+                description={Platform.OS === 'ios' 
+                  ? (settings.preferredPlayer === 'internal' 
+                    ? 'Built-in Player' 
+                    : settings.preferredPlayer 
+                      ? settings.preferredPlayer.toUpperCase()
+                      : 'Built-in Player')
+                  : (settings.useExternalPlayer ? 'External Player' : 'Built-in Player')
+                }
+                icon="play-arrow"
+                isDarkMode={isDarkMode}
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('PlayerSettings')}
+                isLast={true}
+              />
+            </SettingsCard>
+
+            <SettingsCard isDarkMode={isDarkMode} title="Discover">
+              <SettingItem
+                title="Content Source"
+                description="Choose where to get content for the Discover screen"
+                icon="explore"
+                isDarkMode={isDarkMode}
+                renderControl={() => (
+                  <View style={styles.selectorContainer}>
+                    <TouchableOpacity
+                      style={[
+                        styles.selectorButton,
+                        discoverDataSource === DataSource.STREMIO_ADDONS && styles.selectorButtonActive
+                      ]}
+                      onPress={() => handleDiscoverDataSourceChange(DataSource.STREMIO_ADDONS)}
+                    >
+                      <Text style={[
+                        styles.selectorText,
+                        discoverDataSource === DataSource.STREMIO_ADDONS && styles.selectorTextActive
+                      ]}>Addons</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.selectorButton,
+                        discoverDataSource === DataSource.TMDB && styles.selectorButtonActive
+                      ]}
+                      onPress={() => handleDiscoverDataSourceChange(DataSource.TMDB)}
+                    >
+                      <Text style={[
+                        styles.selectorText,
+                        discoverDataSource === DataSource.TMDB && styles.selectorTextActive
+                      ]}>TMDB</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              />
+            </SettingsCard>
+
+            <View style={styles.versionContainer}>
+              <Text style={[styles.versionText, {color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark}]}>
+                Version 1.0.0
+              </Text>
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </View>
   );
 };
 
@@ -398,34 +433,51 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  headerBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1,
+  },
+  contentContainer: {
+    flex: 1,
+    zIndex: 1,
+    width: '100%',
+  },
   header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 12 : 8,
+    paddingHorizontal: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-end',
+    paddingBottom: 8,
+    backgroundColor: 'transparent',
+    zIndex: 2,
   },
   headerTitle: {
     fontSize: 32,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
   resetButton: {
-    paddingVertical: 6,
+    paddingVertical: 8,
     paddingHorizontal: 12,
   },
   resetButtonText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
   },
   scrollView: {
     flex: 1,
+    width: '100%',
   },
   scrollContent: {
+    flexGrow: 1,
+    width: '100%',
     paddingBottom: 32,
   },
   cardContainer: {
+    width: '100%',
     marginBottom: 20,
   },
   cardTitle: {
@@ -444,6 +496,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    width: undefined, // Let it fill the container width
   },
   settingItem: {
     flexDirection: 'row',
@@ -452,6 +505,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderBottomWidth: 0.5,
     minHeight: 58,
+    width: '100%',
   },
   settingItemBorder: {
     // Border styling handled directly in the component with borderBottomWidth

@@ -552,27 +552,41 @@ class StremioService {
     // Find addons that provide streams and sort them by installation order
     const streamAddons = addons
       .filter(addon => {
-        if (!addon.resources) {
-          logger.log(`⚠️ [getStreams] Addon ${addon.id} has no resources`);
+        if (!addon.resources || !Array.isArray(addon.resources)) {
+          logger.log(`⚠️ [getStreams] Addon ${addon.id} has no valid resources array`);
           return false;
         }
         
         // Log the detailed resources structure for debugging
-        // logger.log(`📋 [getStreams] Checking addon ${addon.id} resources:`, JSON.stringify(addon.resources)); // Verbose, uncomment if needed
+        logger.log(`📋 [getStreams] Checking addon ${addon.id} resources:`, JSON.stringify(addon.resources));
         
-        // Check if the addon has a stream resource for this type
-        const hasStreamResource = addon.resources.some(
-          resource => {
-            const result = resource.name === 'stream' && resource.types && resource.types.includes(type);
-            // logger.log(`🔎 [getStreams] Addon ${addon.id} resource ${resource.name}: supports ${type}? ${result}`); // Verbose
-            return result;
+        let hasStreamResource = false;
+        
+        // Iterate through the resources array, checking each element
+        for (const resource of addon.resources) {
+          // Check if the current element is a ResourceObject
+          if (typeof resource === 'object' && resource !== null && 'name' in resource) {
+            const typedResource = resource as ResourceObject;
+            if (typedResource.name === 'stream' && 
+                Array.isArray(typedResource.types) && 
+                typedResource.types.includes(type)) {
+              hasStreamResource = true;
+              break; // Found the stream resource object, no need to check further
+            }
+          } 
+          // Check if the element is the simple string "stream" AND the addon has a top-level types array
+          else if (typeof resource === 'string' && resource === 'stream' && addon.types) {
+            if (Array.isArray(addon.types) && addon.types.includes(type)) {
+              hasStreamResource = true;
+              break; // Found the simple stream resource string and type support
+            }
           }
-        );
+        }
         
         if (!hasStreamResource) {
-          // logger.log(`❌ [getStreams] Addon ${addon.id} does not support streaming ${type}`); // Verbose
+          logger.log(`❌ [getStreams] Addon ${addon.id} does not support streaming ${type}`);
         } else {
-          // logger.log(`✅ [getStreams] Addon ${addon.id} supports streaming ${type}`); // Verbose
+          logger.log(`✅ [getStreams] Addon ${addon.id} supports streaming ${type}`);
         }
         
         return hasStreamResource;
@@ -728,39 +742,81 @@ class StremioService {
   private processStreams(streams: any[], addon: Manifest): Stream[] {
     return streams
       .filter(stream => {
-        const isTorrentioStream = stream.infoHash && stream.fileIdx !== undefined;
-        return stream && (stream.url || isTorrentioStream) && (stream.title || stream.name);
+        // Basic filtering - ensure there's a way to play (URL or infoHash) and identify (title/name)
+        const hasPlayableLink = !!(stream.url || stream.infoHash);
+        const hasIdentifier = !!(stream.title || stream.name);
+        return stream && hasPlayableLink && hasIdentifier;
       })
       .map(stream => {
-        const isDirectStreamingUrl = this.isDirectStreamingUrl(stream.url);
         const streamUrl = this.getStreamUrl(stream);
+        const isDirectStreamingUrl = this.isDirectStreamingUrl(streamUrl);
         const isMagnetStream = streamUrl?.startsWith('magnet:');
 
-        // Keep original stream data exactly as provided by the addon
-        return {
-          ...stream,
-          url: streamUrl,
+        // Determine the best title: Prioritize description if it seems detailed,
+        // otherwise fall back to title or name.
+        let displayTitle = stream.title || stream.name || 'Unnamed Stream';
+        if (stream.description && stream.description.includes('\n') && stream.description.length > (stream.title?.length || 0)) {
+          // If description exists, contains newlines (likely formatted metadata), 
+          // and is longer than the title, prefer it.
+          displayTitle = stream.description;
+        }
+        
+        // Use the original name field for the primary identifier if available
+        const name = stream.name || stream.title || 'Unnamed Stream';
+
+        // Extract size: Prefer behaviorHints.videoSize, fallback to top-level size
+        const sizeInBytes = stream.behaviorHints?.videoSize || stream.size || undefined;
+
+        // Consolidate behavior hints, prioritizing specific data extraction
+        let behaviorHints: Stream['behaviorHints'] = {
+          ...(stream.behaviorHints || {}), // Start with existing hints
+          notWebReady: !isDirectStreamingUrl,
+          isMagnetStream,
+          // Addon Info
           addonName: addon.name,
           addonId: addon.id,
-          // Preserve original stream metadata
-          name: stream.name,
-          title: stream.title,
-          behaviorHints: {
-            ...stream.behaviorHints,
-            notWebReady: !isDirectStreamingUrl,
-            isMagnetStream,
-            ...(isMagnetStream && {
-              infoHash: stream.infoHash || streamUrl?.match(/btih:([a-zA-Z0-9]+)/)?.[1],
-              fileIdx: stream.fileIdx,
-              magnetUrl: streamUrl,
-              type: 'torrent',
-              sources: stream.sources || [],
-              seeders: stream.seeders,
-              size: stream.size,
-              title: stream.title,
-            })
-          }
+          // Extracted data (provide defaults or undefined)
+          cached: stream.behaviorHints?.cached || undefined, // For RD/AD detection
+          filename: stream.behaviorHints?.filename || undefined, // Filename if available
+          bingeGroup: stream.behaviorHints?.bingeGroup || undefined,
+          // Add size here if extracted
+          size: sizeInBytes, 
         };
+
+        // Specific handling for magnet/torrent streams to extract more details
+        if (isMagnetStream) {
+          behaviorHints = {
+            ...behaviorHints,
+            infoHash: stream.infoHash || streamUrl?.match(/btih:([a-zA-Z0-9]+)/)?.[1],
+            fileIdx: stream.fileIdx,
+            magnetUrl: streamUrl,
+            type: 'torrent',
+            sources: stream.sources || [],
+            seeders: stream.seeders, // Explicitly map seeders if present
+            size: sizeInBytes || stream.seeders, // Use extracted size, fallback for torrents
+            title: stream.title, // Torrent title might be different
+          };
+        }
+
+        // Explicitly construct the final Stream object
+        const processedStream: Stream = {
+          url: streamUrl,
+          name: name, // Use the original name/title for primary ID
+          title: displayTitle, // Use the potentially more detailed title from description
+          addonName: addon.name,
+          addonId: addon.id,
+          // Map other potential top-level fields if they exist
+          description: stream.description || undefined, // Keep original description too
+          infoHash: stream.infoHash || undefined,
+          fileIdx: stream.fileIdx,
+          size: sizeInBytes, // Assign the extracted size
+          isFree: stream.isFree,
+          isDebrid: !!(stream.behaviorHints?.cached), // Map debrid status more reliably
+          // Assign the consolidated behaviorHints
+          behaviorHints: behaviorHints,
+        };
+
+        return processedStream;
       });
   }
 
