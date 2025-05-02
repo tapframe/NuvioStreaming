@@ -279,6 +279,17 @@ const MetadataScreen = () => {
     toggleLibrary();
   }, [inLibrary, toggleLibrary]);
 
+  // Add wrapper for season change with distinctive haptic feedback
+  const handleSeasonChangeWithHaptics = useCallback((seasonNumber: number) => {
+    // Change to Light impact for a more subtle feedback
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    // Wait a tiny bit before changing season, making the feedback more noticeable
+    setTimeout(() => {
+      handleSeasonChange(seasonNumber);
+    }, 10);
+  }, [handleSeasonChange]);
+
   // Add new animated value for watch progress
   const watchProgressOpacity = useSharedValue(0);
   const watchProgressScaleY = useSharedValue(0);
@@ -674,13 +685,15 @@ const MetadataScreen = () => {
   }, []); // Empty dependency array as it doesn't depend on component state/props currently
 
   const handleEpisodeSelect = useCallback((episode: Episode) => {
+    // Removed haptic feedback
+    
     const episodeId = episode.stremioId || `${id}:${episode.season_number}:${episode.episode_number}`;
     navigation.navigate('Streams', {
       id,
       type,
       episodeId
     });
-  }, [navigation, id, type]); // Added dependencies
+  }, [navigation, id, type]);
 
   // Animated styles
   const containerAnimatedStyle = useAnimatedStyle(() => ({
@@ -1312,7 +1325,7 @@ const MetadataScreen = () => {
                 episodes={episodes}
                 selectedSeason={selectedSeason}
                 loadingSeasons={loadingSeasons}
-                onSeasonChange={handleSeasonChange}
+                onSeasonChange={handleSeasonChangeWithHaptics}
                 onSelectEpisode={handleEpisodeSelect}
                 groupedEpisodes={groupedEpisodes}
                 metadata={metadata}
