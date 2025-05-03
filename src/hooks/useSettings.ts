@@ -32,6 +32,7 @@ export interface AppSettings {
   showHeroSection: boolean;
   featuredContentSource: 'tmdb' | 'catalogs';
   selectedHeroCatalogs: string[]; // Array of catalog IDs to display in hero section
+  logoSourcePreference: 'metahub' | 'tmdb'; // Preferred source for title logos
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -46,6 +47,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showHeroSection: true,
   featuredContentSource: 'tmdb',
   selectedHeroCatalogs: [], // Empty array means all catalogs are selected
+  logoSourcePreference: 'metahub', // Default to Metahub as first source
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';

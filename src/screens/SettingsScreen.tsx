@@ -351,6 +351,78 @@ const SettingsScreen: React.FC = () => {
                 onPress={() => navigation.navigate('MDBListSettings')}
               />
               <SettingItem
+                title="Logo Source Preference"
+                description="Choose primary source for title logos"
+                icon="image"
+                isDarkMode={isDarkMode}
+                renderControl={() => (
+                  <View style={styles.selectorContainer}>
+                    <TouchableOpacity
+                      style={[
+                        styles.selectorButton,
+                        settings.logoSourcePreference === 'metahub' && styles.selectorButtonActive
+                      ]}
+                      onPress={() => {
+                        console.log('Setting logo source preference to Metahub');
+                        updateSetting('logoSourcePreference', 'metahub');
+                        console.log('New logo source preference:', 'metahub');
+                        
+                        // Clear any cached logo data in storage
+                        try {
+                          // This is just to help clear any cached state - the exact implementation may vary
+                          AsyncStorage.removeItem('_last_logos_');
+                        } catch (e) {
+                          console.error('Error clearing logo cache:', e);
+                        }
+                        
+                        // Show alert that settings have been updated
+                        Alert.alert(
+                          'Settings Updated',
+                          'Logo source preference set to Metahub. Changes will apply when you navigate to content.',
+                          [{ text: 'OK' }]
+                        );
+                      }}
+                    >
+                      <Text style={[
+                        styles.selectorText,
+                        settings.logoSourcePreference === 'metahub' && styles.selectorTextActive
+                      ]}>Metahub</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.selectorButton,
+                        settings.logoSourcePreference === 'tmdb' && styles.selectorButtonActive
+                      ]}
+                      onPress={() => {
+                        console.log('Setting logo source preference to TMDB');
+                        updateSetting('logoSourcePreference', 'tmdb');
+                        console.log('New logo source preference:', 'tmdb');
+                        
+                        // Clear any cached logo data in storage
+                        try {
+                          // This is just to help clear any cached state - the exact implementation may vary
+                          AsyncStorage.removeItem('_last_logos_');
+                        } catch (e) {
+                          console.error('Error clearing logo cache:', e);
+                        }
+                        
+                        // Show alert that settings have been updated
+                        Alert.alert(
+                          'Settings Updated',
+                          'Logo source preference set to TMDB. Changes will apply when you navigate to content.',
+                          [{ text: 'OK' }]
+                        );
+                      }}
+                    >
+                      <Text style={[
+                        styles.selectorText,
+                        settings.logoSourcePreference === 'tmdb' && styles.selectorTextActive
+                      ]}>TMDB</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              />
+              <SettingItem
                 title="TMDB"
                 description="API & Metadata Settings"
                 icon="movie-filter"

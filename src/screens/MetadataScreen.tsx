@@ -57,6 +57,7 @@ import { storageService } from '../services/storageService';
 import { logger } from '../utils/logger';
 import { useGenres } from '../contexts/GenreContext';
 import { isValidMetahubLogo, isMetahubUrl, isTmdbUrl } from '../utils/logoUtils';
+import { useSettings } from '../hooks/useSettings';
 
 const { width, height } = Dimensions.get('window');
 
@@ -211,6 +212,17 @@ const MetadataScreen = () => {
   const route = useRoute<RouteProp<Record<string, RouteParams & { episodeId?: string }>, string>>();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { id, type, episodeId } = route.params;
+  
+  // Add settings hook
+  const { settings } = useSettings();
+
+  // Add a flag to track if we need to do a forced initial logo refresh
+  const forcedLogoRefreshDone = useRef<boolean>(false);
+
+  // Add debug log for settings when component mounts
+  useEffect(() => {
+    logger.log(`[MetadataScreen] Component mounted with logo preference setting: ${settings.logoSourcePreference}`);
+  }, [settings.logoSourcePreference]);
 
   const {
     metadata,
@@ -231,6 +243,30 @@ const MetadataScreen = () => {
     setMetadata,
     imdbId,
   } = useMetadata({ id, type });
+
+  // Force an initial logo refresh when component mounts and logo doesn't match preference
+  useEffect(() => {
+    if (metadata?.logo && !forcedLogoRefreshDone.current) {
+      const currentLogoIsMetahub = isMetahubUrl(metadata.logo);
+      const currentLogoIsTmdb = isTmdbUrl(metadata.logo);
+      const preferenceIsMetahub = settings.logoSourcePreference === 'metahub';
+
+      // Check if logo source doesn't match preference
+      if ((preferenceIsMetahub && !currentLogoIsMetahub) || 
+          (!preferenceIsMetahub && !currentLogoIsTmdb)) {
+        logger.log(`[MetadataScreen] Initial load: Logo source doesn't match preference. Forcing refresh.`);
+        
+        // Clear logo to force a new fetch according to preference
+        setMetadata(prevMetadata => ({
+          ...prevMetadata!,
+          logo: undefined
+        }));
+      }
+      
+      // Mark that we've checked this so we don't endlessly loop
+      forcedLogoRefreshDone.current = true;
+    }
+  }, [metadata?.logo, settings.logoSourcePreference, setMetadata]);
 
   // Get genres from context
   const { genreMap, loadingGenres } = useGenres();
@@ -272,6 +308,76 @@ const MetadataScreen = () => {
   useEffect(() => {
     setLogoLoadError(false);
   }, [metadata?.logo]);
+
+  // Add a ref to track logo fetch in progress
+  const logoFetchInProgress = useRef<boolean>(false);
+
+  // Add a ref to track logo preference changes to prevent infinite loops
+  const logoRefreshCounter = useRef<number>(0);
+  const MAX_LOGO_REFRESHES = 2;
+
+  // Force refresh logo when logo preference changes - only when preference actually changes
+  useEffect(() => {
+    // Reset the counter when preference actually changes
+    if (logoRefreshCounter.current === 0) {
+      logoRefreshCounter.current = 1; // Mark that we've started a refresh cycle
+      
+      // Only clear logo if we already have metadata with a logo
+      if (metadata?.logo) {
+        // Check if the current logo source doesn't match the preference
+        const currentLogoIsMetahub = isMetahubUrl(metadata.logo);
+        const currentLogoIsTmdb = isTmdbUrl(metadata.logo);
+        const preferenceIsMetahub = settings.logoSourcePreference === 'metahub';
+        
+        // Only refresh if the current logo doesn't match the preference
+        if ((preferenceIsMetahub && !currentLogoIsMetahub) || 
+            (!preferenceIsMetahub && !currentLogoIsTmdb)) {
+          logger.log(`[MetadataScreen] Logo preference (${settings.logoSourcePreference}) doesn't match current logo source, refreshing`);
+          
+          // Prevent endless refreshes
+          if (logoRefreshCounter.current < MAX_LOGO_REFRESHES) {
+            logoRefreshCounter.current++;
+            setMetadata(prevMetadata => ({
+              ...prevMetadata!,
+              logo: undefined
+            }));
+          } else {
+            logger.warn(`[MetadataScreen] Maximum logo refreshes (${MAX_LOGO_REFRESHES}) reached, stopping to prevent loop`);
+          }
+        } else {
+          logger.log(`[MetadataScreen] Logo source already matches preference, no refresh needed`);
+          logoRefreshCounter.current = 0; // Reset for future changes
+        }
+      }
+    } else {
+      logoRefreshCounter.current++; 
+      logger.log(`[MetadataScreen] Logo refresh already in progress (${logoRefreshCounter.current}/${MAX_LOGO_REFRESHES})`);
+      
+      // Reset counter after max refreshes to allow future preference changes to work
+      if (logoRefreshCounter.current >= MAX_LOGO_REFRESHES) {
+        logger.warn(`[MetadataScreen] Maximum refreshes reached, resetting counter`);
+        // After a timeout to avoid immediate re-triggering
+        setTimeout(() => {
+          logoRefreshCounter.current = 0;
+        }, 1000);
+      }
+    }
+  }, [settings.logoSourcePreference, metadata?.logo, setMetadata]);
+
+  // Add effect to track when logo source matches preference
+  useEffect(() => {
+    if (metadata?.logo) {
+      const currentLogoIsMetahub = isMetahubUrl(metadata.logo);
+      const currentLogoIsTmdb = isTmdbUrl(metadata.logo);
+      const preferenceIsMetahub = settings.logoSourcePreference === 'metahub';
+      
+      if ((preferenceIsMetahub && currentLogoIsMetahub) || 
+          (!preferenceIsMetahub && currentLogoIsTmdb)) {
+        logger.log('[MetadataScreen] Logo source now matches preference, refresh complete');
+        logoRefreshCounter.current = 0; // Reset counter since we've achieved our goal
+      }
+    }
+  }, [metadata?.logo, settings.logoSourcePreference]);
 
   // Add wrapper for toggleLibrary that includes haptic feedback
   const handleToggleLibrary = useCallback(() => {
@@ -323,71 +429,171 @@ const MetadataScreen = () => {
   // Debug log for route params
   // logger.log('[MetadataScreen] Component mounted with route params:', { id, type, episodeId });
 
-  // Fetch logo immediately for TMDB content
+  // Fetch logo immediately for TMDB content - with guard against recursive updates
   useEffect(() => {
-    if (metadata && !metadata.logo) {
+    // Guard against infinite loops by checking if we're already fetching
+    if (metadata && !metadata.logo && !logoFetchInProgress.current) {
+      console.log('[MetadataScreen] Current settings:', JSON.stringify(settings));
+      console.log('[MetadataScreen] Current metadata:', JSON.stringify(metadata, null, 2));
+      
       const fetchLogo = async () => {
+        // Set fetch in progress flag
+        logoFetchInProgress.current = true;
+        
         try {
-          // First try to get logo from Metahub
-          const metahubUrl = `https://images.metahub.space/logo/medium/${imdbId}/img`;
+          // Get logo source preference from settings
+          const logoPreference = settings.logoSourcePreference || 'metahub'; // Default to metahub if not set
           
-          logger.log(`[MetadataScreen] Attempting to fetch logo from Metahub for ${imdbId}`);
+          console.log(`[MetadataScreen] Using logo preference: ${logoPreference}, TMDB first: ${logoPreference === 'tmdb'}`);
+          logger.log(`[MetadataScreen] Logo source preference: ${logoPreference}`);
           
-          // For now, skip detailed validation and just check if URL is accessible
-          try {
-            const response = await fetch(metahubUrl, { method: 'HEAD' });
-            if (response.ok) {
-              logger.log(`[MetadataScreen] Successfully fetched logo from Metahub:
-                - Content ID: ${id}
-                - Content Type: ${type}
-                - Logo URL: ${metahubUrl}
-              `);
-              
-              // Update metadata with Metahub logo
-              setMetadata(prevMetadata => ({
-                ...prevMetadata!,
-                logo: metahubUrl
-              }));
-              return; // Exit if Metahub logo was found
-            } else {
-              logger.warn(`[MetadataScreen] Metahub logo request failed with status ${response.status}`);
+          // First source based on preference
+          if (logoPreference === 'metahub') {
+            // Try to get logo from Metahub first
+            const metahubUrl = `https://images.metahub.space/logo/medium/${imdbId}/img`;
+            
+            logger.log(`[MetadataScreen] Attempting to fetch logo from Metahub for ${imdbId}`);
+            
+            try {
+              const response = await fetch(metahubUrl, { method: 'HEAD' });
+              if (response.ok) {
+                logger.log(`[MetadataScreen] Successfully fetched logo from Metahub:
+                  - Content ID: ${id}
+                  - Content Type: ${type}
+                  - Logo URL: ${metahubUrl}
+                `);
+                
+                // Update metadata with Metahub logo
+                setMetadata(prevMetadata => ({
+                  ...prevMetadata!,
+                  logo: metahubUrl
+                }));
+                return; // Exit if Metahub logo was found
+              } else {
+                logger.warn(`[MetadataScreen] Metahub logo request failed with status ${response.status}`);
+              }
+            } catch (metahubError) {
+              logger.warn(`[MetadataScreen] Failed to fetch logo from Metahub:`, metahubError);
             }
-          } catch (metahubError) {
-            logger.warn(`[MetadataScreen] Failed to fetch logo from Metahub:`, metahubError);
-          }
-
-          // If Metahub fails, try TMDB as fallback
-          if (id.startsWith('tmdb:')) {
-            const tmdbId = id.split(':')[1];
+            
+            // If Metahub fails, try TMDB as fallback
+            if (id.startsWith('tmdb:')) {
+              const tmdbId = id.split(':')[1];
+              const tmdbType = type === 'series' ? 'tv' : 'movie';
+              
+              logger.log(`[MetadataScreen] Attempting to fetch logo from TMDB as fallback for ${tmdbType} (ID: ${tmdbId})`);
+              
+              const logoUrl = await TMDBService.getInstance().getContentLogo(tmdbType, tmdbId);
+              
+              if (logoUrl) {
+                logger.log(`[MetadataScreen] Successfully fetched fallback logo from TMDB:
+                  - Content Type: ${tmdbType}
+                  - TMDB ID: ${tmdbId}
+                  - Logo URL: ${logoUrl}
+                `);
+                
+                // Update metadata with TMDB logo
+                setMetadata(prevMetadata => ({
+                  ...prevMetadata!,
+                  logo: logoUrl
+                }));
+              } else {
+                // If both Metahub and TMDB fail, use the title as text instead of a logo
+                logger.warn(`[MetadataScreen] No logo found from either Metahub or TMDB for ${type} (ID: ${id}), using title text instead`);
+                
+                // Leave logo as null/undefined to trigger fallback to text
+              }
+            }
+          } else { // TMDB first
+            // Try to get logo from TMDB first
+            let tmdbId = null;
             const tmdbType = type === 'series' ? 'tv' : 'movie';
             
-            logger.log(`[MetadataScreen] Attempting to fetch logo from TMDB as fallback for ${tmdbType} (ID: ${tmdbId})`);
+            if (id.startsWith('tmdb:')) {
+              // Direct TMDB ID
+              tmdbId = id.split(':')[1];
+              logger.log(`[MetadataScreen] Content has direct TMDB ID: ${tmdbId}`);
+            } else if (id.startsWith('tt')) {
+              // IMDB ID - need to find the corresponding TMDB ID
+              logger.log(`[MetadataScreen] Content has IMDB ID (${id}), looking up TMDB ID`);
+              try {
+                // Use the passed imdbId if available, otherwise use id directly
+                const imdbIdToUse = imdbId || id;
+                logger.log(`[MetadataScreen] Using IMDB ID for lookup: ${imdbIdToUse}`);
+                
+                tmdbId = await TMDBService.getInstance().findTMDBIdByIMDB(imdbIdToUse);
+                if (tmdbId) {
+                  logger.log(`[MetadataScreen] Found TMDB ID ${tmdbId} for IMDB ID ${imdbIdToUse}`);
+                } else {
+                  logger.warn(`[MetadataScreen] Could not find TMDB ID for IMDB ID ${imdbIdToUse}`);
+                }
+              } catch (error) {
+                logger.error(`[MetadataScreen] Error finding TMDB ID for IMDB ID ${id}:`, error);
+              }
+            }
             
-            const logoUrl = await TMDBService.getInstance().getContentLogo(tmdbType, tmdbId);
-            
-            if (logoUrl) {
-              logger.log(`[MetadataScreen] Successfully fetched fallback logo from TMDB:
-                - Content Type: ${tmdbType}
-                - TMDB ID: ${tmdbId}
-                - Logo URL: ${logoUrl}
-              `);
+            if (tmdbId) {
+              logger.log(`[MetadataScreen] Attempting to fetch logo from TMDB for ${tmdbType} (ID: ${tmdbId})`);
               
-              // Update metadata with TMDB logo
-              setMetadata(prevMetadata => ({
-                ...prevMetadata!,
-                logo: logoUrl
-              }));
+              try {
+                const tmdbService = TMDBService.getInstance();
+                logger.log(`[MetadataScreen] Calling getContentLogo with type=${tmdbType}, id=${tmdbId}`);
+                
+                const logoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId);
+                
+                if (logoUrl) {
+                  logger.log(`[MetadataScreen] Successfully fetched logo from TMDB:
+                    - Content Type: ${tmdbType}
+                    - TMDB ID: ${tmdbId}
+                    - Logo URL: ${logoUrl}
+                  `);
+                  
+                  // Update metadata with TMDB logo
+                  setMetadata(prevMetadata => ({
+                    ...prevMetadata!,
+                    logo: logoUrl
+                  }));
+                  return; // Exit if TMDB logo was found
+                } else {
+                  logger.warn(`[MetadataScreen] No logo found from TMDB for ${type} (ID: ${tmdbId}), trying Metahub`);
+                }
+              } catch (error) {
+                logger.error(`[MetadataScreen] Error fetching TMDB logo for ID ${tmdbId}:`, error);
+              }
             } else {
-              // If both Metahub and TMDB fail, use the title as text instead of a logo
-              logger.warn(`[MetadataScreen] No logo found from either Metahub or TMDB for ${type} (ID: ${id}), using title text instead`);
+              logger.warn(`[MetadataScreen] No TMDB ID available, falling back to Metahub`);
+            }
+            
+            // If TMDB fails or isn't a TMDB ID, try Metahub as fallback
+            const metahubUrl = `https://images.metahub.space/logo/medium/${imdbId}/img`;
+            
+            logger.log(`[MetadataScreen] Attempting to fetch logo from Metahub as fallback for ${imdbId}`);
+            
+            try {
+              const response = await fetch(metahubUrl, { method: 'HEAD' });
+              if (response.ok) {
+                logger.log(`[MetadataScreen] Successfully fetched fallback logo from Metahub:
+                  - Content ID: ${id}
+                  - Content Type: ${type}
+                  - Logo URL: ${metahubUrl}
+                `);
+                
+                // Update metadata with Metahub logo
+                setMetadata(prevMetadata => ({
+                  ...prevMetadata!,
+                  logo: metahubUrl
+                }));
+              } else {
+                // If both TMDB and Metahub fail, use the title as text instead of a logo
+                logger.warn(`[MetadataScreen] No logo found from either source for ${type} (ID: ${id}), using title text instead`);
+                
+                // Leave logo as null/undefined to trigger fallback to text
+              }
+            } catch (metahubError) {
+              logger.warn(`[MetadataScreen] Failed to fetch logo from Metahub:`, metahubError);
               
               // Leave logo as null/undefined to trigger fallback to text
             }
-          } else {
-            // If no TMDB ID and Metahub failed, use the title as text instead of a logo
-            logger.warn(`[MetadataScreen] No logo found for ${type} (ID: ${id}), using title text instead`);
-            
-            // Leave logo as null/undefined to trigger fallback to text
           }
         } catch (error) {
           logger.error('[MetadataScreen] Failed to fetch logo from all sources:', {
@@ -395,10 +601,15 @@ const MetadataScreen = () => {
             contentId: id,
             contentType: type
           });
+        } finally {
+          // Clear fetch in progress flag when done
+          logoFetchInProgress.current = false;
         }
       };
       
       fetchLogo();
+    } else if (logoFetchInProgress.current) {
+      console.log('[MetadataScreen] Logo fetch already in progress, skipping');
     } else if (metadata?.logo) {
       logger.log(`[MetadataScreen] Using existing logo from metadata:
         - Content ID: ${id}
@@ -407,7 +618,7 @@ const MetadataScreen = () => {
         - Source: ${isMetahubUrl(metadata.logo) ? 'Metahub' : (isTmdbUrl(metadata.logo) ? 'TMDB' : 'Other')}
       `);
     }
-  }, [id, type, metadata, setMetadata, imdbId]);
+  }, [id, type, metadata, setMetadata, imdbId, settings.logoSourcePreference]);
 
   // Function to get episode details from episodeId
   const getEpisodeDetails = useCallback((episodeId: string): { seasonNumber: string; episodeNumber: string; episodeName: string } | null => {
