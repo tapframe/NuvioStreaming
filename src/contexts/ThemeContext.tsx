@@ -51,6 +51,94 @@ export const DEFAULT_THEMES: Theme[] = [
     },
     isEditable: false,
   },
+  {
+    id: 'emerald',
+    name: 'Emerald',
+    colors: {
+      ...defaultColors,
+      primary: '#2ecc71',
+      secondary: '#3498db',
+      darkBackground: '#0e1e13',
+    },
+    isEditable: false,
+  },
+  {
+    id: 'ruby',
+    name: 'Ruby',
+    colors: {
+      ...defaultColors,
+      primary: '#e74c3c',
+      secondary: '#9b59b6',
+      darkBackground: '#1a0a0a',
+    },
+    isEditable: false,
+  },
+  {
+    id: 'amethyst',
+    name: 'Amethyst',
+    colors: {
+      ...defaultColors,
+      primary: '#9b59b6',
+      secondary: '#3498db',
+      darkBackground: '#140a1c',
+    },
+    isEditable: false,
+  },
+  {
+    id: 'amber',
+    name: 'Amber',
+    colors: {
+      ...defaultColors,
+      primary: '#f39c12',
+      secondary: '#d35400',
+      darkBackground: '#1a140a',
+    },
+    isEditable: false,
+  },
+  {
+    id: 'mint',
+    name: 'Mint',
+    colors: {
+      ...defaultColors,
+      primary: '#1abc9c',
+      secondary: '#16a085',
+      darkBackground: '#0a1a17',
+    },
+    isEditable: false,
+  },
+  {
+    id: 'slate',
+    name: 'Slate',
+    colors: {
+      ...defaultColors,
+      primary: '#7f8c8d',
+      secondary: '#95a5a6',
+      darkBackground: '#10191a',
+    },
+    isEditable: false,
+  },
+  {
+    id: 'neon',
+    name: 'Neon',
+    colors: {
+      ...defaultColors,
+      primary: '#00ff00',
+      secondary: '#ff00ff',
+      darkBackground: '#0a0a0a',
+    },
+    isEditable: false,
+  },
+  {
+    id: 'retro',
+    name: 'Retro Wave',
+    colors: {
+      ...defaultColors,
+      primary: '#ff00ff',
+      secondary: '#00ffff',
+      darkBackground: '#150036',
+    },
+    isEditable: false,
+  },
 ];
 
 // Theme context props
