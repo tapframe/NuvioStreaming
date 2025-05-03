@@ -6,14 +6,13 @@ import {
   ScrollView,
   SafeAreaView,
   Platform,
-  useColorScheme,
   TouchableOpacity,
   StatusBar,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSettings, AppSettings } from '../hooks/useSettings';
-import { colors } from '../styles/colors';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import { useTheme } from '../contexts/ThemeContext';
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
@@ -21,7 +20,6 @@ interface SettingItemProps {
   title: string;
   description?: string;
   icon: string;
-  isDarkMode: boolean;
   isSelected: boolean;
   onPress: () => void;
   isLast?: boolean;
@@ -31,67 +29,69 @@ const SettingItem: React.FC<SettingItemProps> = ({
   title,
   description,
   icon,
-  isDarkMode,
   isSelected,
   onPress,
   isLast,
-}) => (
-  <TouchableOpacity
-    onPress={onPress}
-    activeOpacity={0.7}
-    style={[
-      styles.settingItem,
-      !isLast && styles.settingItemBorder,
-      { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' },
-    ]}
-  >
-    <View style={styles.settingContent}>
-      <View style={[
-        styles.settingIconContainer,
-        { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
-      ]}>
-        <MaterialIcons
-          name={icon}
-          size={20}
-          color={colors.primary}
-        />
-      </View>
-      <View style={styles.settingText}>
-        <Text
-          style={[
-            styles.settingTitle,
-            { color: isDarkMode ? colors.highEmphasis : colors.textDark },
-          ]}
-        >
-          {title}
-        </Text>
-        {description && (
+}) => {
+  const { currentTheme } = useTheme();
+  
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.7}
+      style={[
+        styles.settingItem,
+        !isLast && styles.settingItemBorder,
+        { borderBottomColor: 'rgba(255,255,255,0.08)' },
+      ]}
+    >
+      <View style={styles.settingContent}>
+        <View style={[
+          styles.settingIconContainer,
+          { backgroundColor: 'rgba(255,255,255,0.1)' }
+        ]}>
+          <MaterialIcons
+            name={icon}
+            size={20}
+            color={currentTheme.colors.primary}
+          />
+        </View>
+        <View style={styles.settingText}>
           <Text
             style={[
-              styles.settingDescription,
-              { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark },
+              styles.settingTitle,
+              { color: currentTheme.colors.text },
             ]}
           >
-            {description}
+            {title}
           </Text>
+          {description && (
+            <Text
+              style={[
+                styles.settingDescription,
+                { color: currentTheme.colors.textMuted },
+              ]}
+            >
+              {description}
+            </Text>
+          )}
+        </View>
+        {isSelected && (
+          <MaterialIcons
+            name="check"
+            size={24}
+            color={currentTheme.colors.primary}
+            style={styles.checkIcon}
+          />
         )}
       </View>
-      {isSelected && (
-        <MaterialIcons
-          name="check"
-          size={24}
-          color={colors.primary}
-          style={styles.checkIcon}
-        />
-      )}
-    </View>
-  </TouchableOpacity>
-);
+    </TouchableOpacity>
+  );
+};
 
 const PlayerSettingsScreen: React.FC = () => {
   const { settings, updateSetting } = useSettings();
-  const systemColorScheme = useColorScheme();
-  const isDarkMode = systemColorScheme === 'dark' || settings.enableDarkMode;
+  const { currentTheme } = useTheme();
   const navigation = useNavigation();
 
   const playerOptions = [
@@ -144,13 +144,13 @@ const PlayerSettingsScreen: React.FC = () => {
     <SafeAreaView
       style={[
         styles.container,
-        { backgroundColor: isDarkMode ? colors.darkBackground : '#F2F2F7' },
+        { backgroundColor: currentTheme.colors.darkBackground },
       ]}
     >
       <StatusBar
         translucent
         backgroundColor="transparent"
-        barStyle={isDarkMode ? "light-content" : "dark-content"}
+        barStyle="light-content"
       />
 
       <View style={styles.header}>
@@ -162,13 +162,13 @@ const PlayerSettingsScreen: React.FC = () => {
           <MaterialIcons
             name="arrow-back"
             size={24}
-            color={isDarkMode ? colors.highEmphasis : colors.textDark}
+            color={currentTheme.colors.text}
           />
         </TouchableOpacity>
         <Text
           style={[
             styles.headerTitle,
-            { color: isDarkMode ? colors.highEmphasis : colors.textDark },
+            { color: currentTheme.colors.text },
           ]}
         >
           Video Player
@@ -183,7 +183,7 @@ const PlayerSettingsScreen: React.FC = () => {
           <Text
             style={[
               styles.sectionTitle,
-              { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark },
+              { color: currentTheme.colors.textMuted },
             ]}
           >
             PLAYER SELECTION
@@ -192,9 +192,7 @@ const PlayerSettingsScreen: React.FC = () => {
             style={[
               styles.card,
               {
-                backgroundColor: isDarkMode
-                  ? colors.elevation2
-                  : colors.white,
+                backgroundColor: currentTheme.colors.elevation2,
               },
             ]}
           >
@@ -204,7 +202,6 @@ const PlayerSettingsScreen: React.FC = () => {
                 title={option.title}
                 description={option.description}
                 icon={option.icon}
-                isDarkMode={isDarkMode}
                 isSelected={
                   Platform.OS === 'ios'
                     ? settings.preferredPlayer === option.id
