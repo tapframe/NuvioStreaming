@@ -147,11 +147,13 @@ class CatalogService {
 
   async getHomeCatalogs(): Promise<CatalogContent[]> {
     const addons = await this.getAllAddons();
-    const catalogs: CatalogContent[] = [];
-
+    
     // Load enabled/disabled settings
     const catalogSettingsJson = await AsyncStorage.getItem(CATALOG_SETTINGS_KEY);
     const catalogSettings = catalogSettingsJson ? JSON.parse(catalogSettingsJson) : {};
+
+    // Create an array of promises for all catalog fetches
+    const catalogPromises: Promise<CatalogContent | null>[] = [];
 
     // Process addons in order (they're already returned in order from getAllAddons)
     for (const addon of addons) {
@@ -161,54 +163,65 @@ class CatalogService {
           const isEnabled = catalogSettings[settingKey] ?? true;
 
           if (isEnabled) {
-            try {
-              const addonManifest = await stremioService.getInstalledAddonsAsync();
-              const manifest = addonManifest.find(a => a.id === addon.id);
-              if (!manifest) continue;
+            // Create a promise for each catalog fetch
+            const catalogPromise = (async () => {
+              try {
+                const addonManifest = await stremioService.getInstalledAddonsAsync();
+                const manifest = addonManifest.find(a => a.id === addon.id);
+                if (!manifest) return null;
 
-              const metas = await stremioService.getCatalog(manifest, catalog.type, catalog.id, 1);
-              if (metas && metas.length > 0) {
-                const items = metas.map(meta => this.convertMetaToStreamingContent(meta));
-                
-                // Get potentially custom display name
-                let displayName = await getCatalogDisplayName(addon.id, catalog.type, catalog.id, catalog.name);
-                
-                // Remove duplicate words and clean up the name (case-insensitive)
-                const words = displayName.split(' ');
-                const uniqueWords = [];
-                const seenWords = new Set();
-                for (const word of words) {
-                  const lowerWord = word.toLowerCase();
-                  if (!seenWords.has(lowerWord)) {
-                    uniqueWords.push(word); 
-                    seenWords.add(lowerWord);
+                const metas = await stremioService.getCatalog(manifest, catalog.type, catalog.id, 1);
+                if (metas && metas.length > 0) {
+                  const items = metas.map(meta => this.convertMetaToStreamingContent(meta));
+                  
+                  // Get potentially custom display name
+                  let displayName = await getCatalogDisplayName(addon.id, catalog.type, catalog.id, catalog.name);
+                  
+                  // Remove duplicate words and clean up the name (case-insensitive)
+                  const words = displayName.split(' ');
+                  const uniqueWords = [];
+                  const seenWords = new Set();
+                  for (const word of words) {
+                    const lowerWord = word.toLowerCase();
+                    if (!seenWords.has(lowerWord)) {
+                      uniqueWords.push(word); 
+                      seenWords.add(lowerWord);
+                    }
                   }
+                  displayName = uniqueWords.join(' ');
+                  
+                  // Add content type if not present
+                  const contentType = catalog.type === 'movie' ? 'Movies' : 'TV Shows';
+                  if (!displayName.toLowerCase().includes(contentType.toLowerCase())) {
+                    displayName = `${displayName} ${contentType}`;
+                  }
+                  
+                  return {
+                    addon: addon.id,
+                    type: catalog.type,
+                    id: catalog.id,
+                    name: displayName,
+                    items
+                  };
                 }
-                displayName = uniqueWords.join(' ');
-                
-                // Add content type if not present
-                const contentType = catalog.type === 'movie' ? 'Movies' : 'TV Shows';
-                if (!displayName.toLowerCase().includes(contentType.toLowerCase())) {
-                  displayName = `${displayName} ${contentType}`;
-                }
-                
-                catalogs.push({
-                  addon: addon.id,
-                  type: catalog.type,
-                  id: catalog.id,
-                  name: displayName,
-                  items
-                });
+                return null;
+              } catch (error) {
+                logger.error(`Failed to load ${catalog.name} from ${addon.name}:`, error);
+                return null;
               }
-            } catch (error) {
-              logger.error(`Failed to load ${catalog.name} from ${addon.name}:`, error);
-            }
+            })();
+            
+            catalogPromises.push(catalogPromise);
           }
         }
       }
     }
 
-    return catalogs;
+    // Wait for all catalog fetch promises to resolve in parallel
+    const catalogResults = await Promise.all(catalogPromises);
+    
+    // Filter out null results
+    return catalogResults.filter(catalog => catalog !== null) as CatalogContent[];
   }
 
   async getCatalogByType(type: string, genreFilter?: string): Promise<CatalogContent[]> {
@@ -222,46 +235,58 @@ class CatalogService {
     
     // Otherwise use the original Stremio addons method
     const addons = await this.getAllAddons();
-    const catalogs: CatalogContent[] = [];
-
+    
     const typeAddons = addons.filter(addon => 
       addon.catalogs && addon.catalogs.some(catalog => catalog.type === type)
     );
+
+    // Create an array of promises for all catalog fetches
+    const catalogPromises: Promise<CatalogContent | null>[] = [];
 
     for (const addon of typeAddons) {
       const typeCatalogs = addon.catalogs.filter(catalog => catalog.type === type);
 
       for (const catalog of typeCatalogs) {
-        try {
-          const addonManifest = await stremioService.getInstalledAddonsAsync();
-          const manifest = addonManifest.find(a => a.id === addon.id);
-          if (!manifest) continue;
+        const catalogPromise = (async () => {
+          try {
+            const addonManifest = await stremioService.getInstalledAddonsAsync();
+            const manifest = addonManifest.find(a => a.id === addon.id);
+            if (!manifest) return null;
 
-          const filters = genreFilter ? [{ title: 'genre', value: genreFilter }] : [];
-          const metas = await stremioService.getCatalog(manifest, type, catalog.id, 1, filters);
-          
-          if (metas && metas.length > 0) {
-            const items = metas.map(meta => this.convertMetaToStreamingContent(meta));
+            const filters = genreFilter ? [{ title: 'genre', value: genreFilter }] : [];
+            const metas = await stremioService.getCatalog(manifest, type, catalog.id, 1, filters);
             
-            // Get potentially custom display name
-            const displayName = await getCatalogDisplayName(addon.id, catalog.type, catalog.id, catalog.name);
-            
-            catalogs.push({
-              addon: addon.id,
-              type,
-              id: catalog.id,
-              name: displayName,
-              genre: genreFilter,
-              items
-            });
+            if (metas && metas.length > 0) {
+              const items = metas.map(meta => this.convertMetaToStreamingContent(meta));
+              
+              // Get potentially custom display name
+              const displayName = await getCatalogDisplayName(addon.id, catalog.type, catalog.id, catalog.name);
+              
+              return {
+                addon: addon.id,
+                type,
+                id: catalog.id,
+                name: displayName,
+                genre: genreFilter,
+                items
+              };
+            }
+            return null;
+          } catch (error) {
+            logger.error(`Failed to get catalog ${catalog.id} for addon ${addon.id}:`, error);
+            return null;
           }
-        } catch (error) {
-          logger.error(`Failed to get catalog ${catalog.id} for addon ${addon.id}:`, error);
-        }
+        })();
+        
+        catalogPromises.push(catalogPromise);
       }
     }
 
-    return catalogs;
+    // Wait for all catalog fetch promises to resolve in parallel
+    const catalogResults = await Promise.all(catalogPromises);
+    
+    // Filter out null results
+    return catalogResults.filter(catalog => catalog !== null) as CatalogContent[];
   }
 
   /**
@@ -277,64 +302,75 @@ class CatalogService {
       
       // If no genre filter or All is selected, get multiple catalogs
       if (!genreFilter || genreFilter === 'All') {
-        // Get trending
-        const trendingItems = await tmdbService.getTrending(tmdbType, 'week');
-        const trendingItemsPromises = trendingItems.map(item => this.convertTMDBToStreamingContent(item, tmdbType));
-        const trendingStreamingItems = await Promise.all(trendingItemsPromises);
+        // Create an array of promises for all catalog fetches
+        const catalogFetchPromises = [
+          // Trending catalog
+          (async () => {
+            const trendingItems = await tmdbService.getTrending(tmdbType, 'week');
+            const trendingItemsPromises = trendingItems.map(item => this.convertTMDBToStreamingContent(item, tmdbType));
+            const trendingStreamingItems = await Promise.all(trendingItemsPromises);
+            
+            return {
+              addon: 'tmdb',
+              type,
+              id: 'trending',
+              name: `Trending ${type === 'movie' ? 'Movies' : 'TV Shows'}`,
+              items: trendingStreamingItems
+            };
+          })(),
+          
+          // Popular catalog
+          (async () => {
+            const popularItems = await tmdbService.getPopular(tmdbType, 1);
+            const popularItemsPromises = popularItems.map(item => this.convertTMDBToStreamingContent(item, tmdbType));
+            const popularStreamingItems = await Promise.all(popularItemsPromises);
+            
+            return {
+              addon: 'tmdb',
+              type,
+              id: 'popular',
+              name: `Popular ${type === 'movie' ? 'Movies' : 'TV Shows'}`,
+              items: popularStreamingItems
+            };
+          })(),
+          
+          // Upcoming/on air catalog
+          (async () => {
+            const upcomingItems = await tmdbService.getUpcoming(tmdbType, 1);
+            const upcomingItemsPromises = upcomingItems.map(item => this.convertTMDBToStreamingContent(item, tmdbType));
+            const upcomingStreamingItems = await Promise.all(upcomingItemsPromises);
+            
+            return {
+              addon: 'tmdb',
+              type,
+              id: 'upcoming',
+              name: type === 'movie' ? 'Upcoming Movies' : 'On Air TV Shows',
+              items: upcomingStreamingItems
+            };
+          })()
+        ];
         
-        catalogs.push({
-          addon: 'tmdb',
-          type,
-          id: 'trending',
-          name: `Trending ${type === 'movie' ? 'Movies' : 'TV Shows'}`,
-          items: trendingStreamingItems
-        });
-        
-        // Get popular
-        const popularItems = await tmdbService.getPopular(tmdbType, 1);
-        const popularItemsPromises = popularItems.map(item => this.convertTMDBToStreamingContent(item, tmdbType));
-        const popularStreamingItems = await Promise.all(popularItemsPromises);
-        
-        catalogs.push({
-          addon: 'tmdb',
-          type,
-          id: 'popular',
-          name: `Popular ${type === 'movie' ? 'Movies' : 'TV Shows'}`,
-          items: popularStreamingItems
-        });
-        
-        // Get upcoming/on air
-        const upcomingItems = await tmdbService.getUpcoming(tmdbType, 1);
-        const upcomingItemsPromises = upcomingItems.map(item => this.convertTMDBToStreamingContent(item, tmdbType));
-        const upcomingStreamingItems = await Promise.all(upcomingItemsPromises);
-        
-        catalogs.push({
-          addon: 'tmdb',
-          type,
-          id: 'upcoming',
-          name: type === 'movie' ? 'Upcoming Movies' : 'On Air TV Shows',
-          items: upcomingStreamingItems
-        });
+        // Wait for all catalog fetches to complete in parallel
+        return await Promise.all(catalogFetchPromises);
       } else {
         // Get content by genre
         const genreItems = await tmdbService.discoverByGenre(tmdbType, genreFilter);
         const streamingItemsPromises = genreItems.map(item => this.convertTMDBToStreamingContent(item, tmdbType));
         const streamingItems = await Promise.all(streamingItemsPromises);
         
-        catalogs.push({
+        return [{
           addon: 'tmdb',
           type,
           id: 'discover',
           name: `${genreFilter} ${type === 'movie' ? 'Movies' : 'TV Shows'}`,
           genre: genreFilter,
           items: streamingItems
-        });
+        }];
       }
     } catch (error) {
       logger.error(`Failed to get catalog from TMDB for type ${type}, genre ${genreFilter}:`, error);
+      return [];
     }
-    
-    return catalogs;
   }
 
   /**

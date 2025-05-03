@@ -55,6 +55,10 @@ import { storageService } from '../services/storageService';
 import { useHomeCatalogs } from '../hooks/useHomeCatalogs';
 import { useFeaturedContent } from '../hooks/useFeaturedContent';
 import { useSettings, settingsEmitter } from '../hooks/useSettings';
+import FeaturedContent from '../components/home/FeaturedContent';
+import CatalogSection from '../components/home/CatalogSection';
+import { SkeletonFeatured } from '../components/home/SkeletonLoaders';
+import homeStyles from '../styles/homeStyles';
 
 // Define interfaces for our data
 interface Category {
@@ -348,13 +352,6 @@ const SkeletonCatalog = () => (
   </View>
 );
 
-const SkeletonFeatured = () => (
-  <View style={styles.featuredLoadingContainer}>
-    <ActivityIndicator size="large" color={colors.primary} />
-    <Text style={styles.loadingText}>Loading featured content...</Text>
-  </View>
-);
-
 const HomeScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const isDarkMode = useColorScheme() === 'dark';
@@ -390,35 +387,40 @@ const HomeScreen = () => {
     setFeaturedContentSource(settings.featuredContentSource);
   }, [settings]);
 
-  // If featured content source changes, refresh featured content with debouncing
+  // Subscribe directly to settings emitter for immediate updates
   useEffect(() => {
-    if (showHeroSection) {
-      // Clear any existing timeout
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current);
-      }
+    const handleSettingsChange = () => {
+      setShowHeroSection(settings.showHeroSection);
+      setFeaturedContentSource(settings.featuredContentSource);
       
-      // Set a new timeout to debounce the refresh
-      refreshTimeoutRef.current = setTimeout(() => {
-        refreshFeatured();
-        refreshTimeoutRef.current = null;
-      }, 300);
+      // The featured content refresh is now handled by the useFeaturedContent hook
+      // No need to call refreshFeatured() here to avoid duplicate refreshes
+    };
+    
+    // Subscribe to settings changes
+    const unsubscribe = settingsEmitter.addListener(handleSettingsChange);
+    
+    return unsubscribe;
+  }, [settings]);
+
+  // Update the featured content refresh logic to handle persistence
+  useEffect(() => {
+    // This effect was causing duplicate refreshes - it's now handled in useFeaturedContent
+    // We'll keep it just to sync the local state with settings
+    if (showHeroSection && featuredContentSource !== settings.featuredContentSource) {
+      // Just update the local state
+      setFeaturedContentSource(settings.featuredContentSource);
     }
     
-    // Cleanup the timeout on unmount
-    return () => {
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current);
-      }
-    };
-  }, [featuredContentSource, showHeroSection, refreshFeatured]);
+    // No timeout needed since we're not refreshing here
+  }, [settings.featuredContentSource, showHeroSection]);
 
   useFocusEffect(
     useCallback(() => {
       const statusBarConfig = () => {
         StatusBar.setBarStyle("light-content");
-    StatusBar.setTranslucent(true);
-    StatusBar.setBackgroundColor('transparent');
+        StatusBar.setTranslucent(true);
+        StatusBar.setBackgroundColor('transparent');
       };
       
       statusBarConfig();
@@ -476,7 +478,8 @@ const HomeScreen = () => {
         continueWatchingRef.current?.refresh(),
       ];
       
-      // Only refresh featured content if hero section is enabled
+      // Only refresh featured content if hero section is enabled,
+      // and force refresh to bypass the cache
       if (showHeroSection) {
         refreshTasks.push(refreshFeatured());
       }
@@ -526,198 +529,24 @@ const HomeScreen = () => {
     };
   }, [navigation, refreshContinueWatching]);
 
-  const renderFeaturedContent = () => {
-    if (!featuredContent) {
-      return <SkeletonFeatured />;
-    }
-
-    return (
-      <TouchableOpacity 
-        activeOpacity={0.9} 
-        onPress={() => {
-          if (featuredContent) {
-            navigation.navigate('Metadata', {
-              id: featuredContent.id,
-              type: featuredContent.type
-            });
-          }
-        }}
-        style={styles.featuredContainer}
-      >
-        <ImageBackground
-          source={{ uri: featuredContent.banner || featuredContent.poster }}
-          style={styles.featuredImage}
-          resizeMode="cover"
-        >
-          <LinearGradient
-            colors={[
-              'transparent',
-              'rgba(0,0,0,0.1)',
-              'rgba(0,0,0,0.7)',
-              colors.darkBackground,
-            ]}
-            locations={[0, 0.3, 0.7, 1]}
-            style={styles.featuredGradient}
-          >
-            <Animated.View style={styles.featuredContentContainer} entering={FadeIn.duration(600)}>
-              {featuredContent.logo ? (
-                <ExpoImage 
-                  source={{ uri: featuredContent.logo }} 
-                  style={styles.featuredLogo}
-                  contentFit="contain"
-                />
-              ) : (
-                <Text style={styles.featuredTitleText}>{featuredContent.name}</Text>
-              )}
-              <View style={styles.genreContainer}>
-                {featuredContent.genres?.slice(0, 3).map((genre, index, array) => (
-                  <React.Fragment key={index}>
-                    <Text style={styles.genreText}>{genre}</Text>
-                    {index < array.length - 1 && (
-                      <Text style={styles.genreDot}>•</Text>
-                    )}
-                  </React.Fragment>
-                ))}
-              </View>
-              <View style={styles.featuredButtons}>
-                <TouchableOpacity 
-                  style={styles.myListButton}
-                  onPress={handleSaveToLibrary}
-                >
-                  <MaterialIcons 
-                    name={isSaved ? "bookmark" : "bookmark-border"} 
-                    size={24} 
-                    color={colors.white} 
-                  />
-                  <Text style={styles.myListButtonText}>
-                    {isSaved ? "Saved" : "Save"}
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={styles.playButton}
-                  onPress={() => {
-                    if (featuredContent) {
-                      navigation.navigate('Streams', { 
-                        id: featuredContent.id, 
-                        type: featuredContent.type
-                      });
-                    }
-                  }}
-                >
-                  <MaterialIcons name="play-arrow" size={24} color={colors.black} />
-                  <Text style={styles.playButtonText}>Play</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={styles.infoButton}
-                  onPress={async () => {
-                    if (featuredContent) {
-                      navigation.navigate('Metadata', {
-                        id: featuredContent.id,
-                        type: featuredContent.type
-                      });
-                    }
-                  }}
-                >
-                  <MaterialIcons name="info-outline" size={24} color={colors.white} />
-                  <Text style={styles.infoButtonText}>Info</Text>
-                </TouchableOpacity>
-              </View>
-            </Animated.View>
-          </LinearGradient>
-        </ImageBackground>
-      </TouchableOpacity>
-    );
-  };
-
-  const renderContentItem = useCallback(({ item, index }: { item: StreamingContent, index: number }) => {
-    return (
-      <Animated.View
-        entering={FadeIn.duration(300).delay(100 + (index * 40))}
-      >
-        <ContentItem 
-          item={item} 
-          onPress={handleContentPress}
-        />
-      </Animated.View>
-    );
-  }, [handleContentPress]);
-
-  const renderCatalog = ({ item }: { item: CatalogContent }) => {
-    return (
-      <Animated.View 
-        style={styles.catalogContainer}
-        entering={FadeIn.duration(400).delay(50)}
-      >
-        <View style={styles.catalogHeader}>
-          <View style={styles.titleContainer}>
-            <Text style={styles.catalogTitle}>{item.name}</Text>
-            <LinearGradient
-              colors={[colors.primary, colors.secondary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.titleUnderline}
-            />
-          </View>
-          <TouchableOpacity
-            onPress={() => 
-              navigation.navigate('Catalog', {
-                id: item.id,
-                type: item.type,
-                addonId: item.addon
-              })
-            }
-            style={styles.seeAllButton}
-          >
-            <Text style={styles.seeAllText}>See More</Text>
-            <MaterialIcons name="arrow-forward" color={colors.primary} size={16} />
-          </TouchableOpacity>
-        </View>
-        
-        <FlatList
-          data={item.items}
-          renderItem={({ item, index }) => renderContentItem({ item, index })}
-          keyExtractor={(item) => `${item.id}-${item.type}`}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.catalogList}
-          snapToInterval={POSTER_WIDTH + 12}
-          decelerationRate="fast"
-          snapToAlignment="start"
-          ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
-          initialNumToRender={4}
-          maxToRenderPerBatch={4}
-          windowSize={5}
-          removeClippedSubviews={Platform.OS === 'android'}
-          getItemLayout={(data, index) => ({
-            length: POSTER_WIDTH + 12,
-            offset: (POSTER_WIDTH + 12) * index,
-            index,
-          })}
-        />
-      </Animated.View>
-    );
-  };
-
   if (isLoading && !isRefreshing) {
     return (
-      <View style={[styles.container]}>
+      <View style={homeStyles.container}>
         <StatusBar
           barStyle="light-content"
           backgroundColor="transparent"
           translucent
         />
-        <View style={styles.loadingMainContainer}>
+        <View style={homeStyles.loadingMainContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading your content...</Text>
+          <Text style={homeStyles.loadingText}>Loading your content...</Text>
         </View>
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container]}>
+    <SafeAreaView style={homeStyles.container}>
       <StatusBar
         barStyle="light-content"
         backgroundColor="transparent"
@@ -733,12 +562,19 @@ const HomeScreen = () => {
           />
         }
         contentContainerStyle={[
-          styles.scrollContent,
-          { paddingTop: Platform.OS === 'ios' ? 0 : 0 }
+          homeStyles.scrollContent,
+          { paddingTop: Platform.OS === 'ios' ? 39 : 90 }
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {showHeroSection && renderFeaturedContent()}
+        {showHeroSection && (
+          <FeaturedContent 
+            key={`featured-${showHeroSection}`}
+            featuredContent={featuredContent}
+            isSaved={isSaved}
+            handleSaveToLibrary={handleSaveToLibrary}
+          />
+        )}
 
         <Animated.View entering={FadeIn.duration(400).delay(150)}>
           <ThisWeekSection />
@@ -753,22 +589,22 @@ const HomeScreen = () => {
         {catalogs.length > 0 ? (
           catalogs.map((catalog, index) => (
             <View key={`${catalog.addon}-${catalog.id}-${index}`}>
-              {renderCatalog({ item: catalog })}
+              <CatalogSection catalog={catalog} />
             </View>
           ))
         ) : (
           !catalogsLoading && (
-            <View style={styles.emptyCatalog}>
+            <View style={homeStyles.emptyCatalog}>
               <MaterialIcons name="movie-filter" size={40} color={colors.textDark} />
               <Text style={{ color: colors.textDark, marginTop: 8, fontSize: 16, textAlign: 'center' }}>
                 No content available
               </Text>
               <TouchableOpacity
-                style={styles.addCatalogButton}
+                style={homeStyles.addCatalogButton}
                 onPress={() => navigation.navigate('Settings')}
               >
                 <MaterialIcons name="add-circle" size={20} color={colors.white} />
-                <Text style={styles.addCatalogButtonText}>Add Catalogs</Text>
+                <Text style={homeStyles.addCatalogButtonText}>Add Catalogs</Text>
               </TouchableOpacity>
             </View>
           )

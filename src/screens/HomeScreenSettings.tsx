@@ -249,8 +249,9 @@ const HomeScreenSettings: React.FC = () => {
             icon="settings-input-component"
             isDarkMode={isDarkMode}
             renderControl={() => <View />}
+            isLast={!settings.showHeroSection || settings.featuredContentSource !== 'catalogs'}
           />
-          {settings.featuredContentSource === 'catalogs' && (
+          {settings.showHeroSection && settings.featuredContentSource === 'catalogs' && (
             <SettingItem
               title="Select Catalogs"
               description={getSelectedCatalogsText()}
@@ -261,9 +262,6 @@ const HomeScreenSettings: React.FC = () => {
               isLast={true}
             />
           )}
-          {settings.featuredContentSource !== 'catalogs' && (
-            <View style={{ height: 0 }} /> // Placeholder to maintain layout
-          )}
         </SettingsCard>
 
         {settings.showHeroSection && (
@@ -271,7 +269,10 @@ const HomeScreenSettings: React.FC = () => {
             <View style={styles.radioCardContainer}>
               <RadioOption 
                 selected={settings.featuredContentSource === 'tmdb'}
-                onPress={() => handleUpdateSetting('featuredContentSource', 'tmdb')}
+                onPress={() => {
+                  console.log('Selected TMDB source');
+                  handleUpdateSetting('featuredContentSource', 'tmdb');
+                }}
                 label="TMDB Trending Movies"
               />
               <View style={styles.radioDescription}>
@@ -284,7 +285,10 @@ const HomeScreenSettings: React.FC = () => {
             <View style={styles.radioCardContainer}>
               <RadioOption 
                 selected={settings.featuredContentSource === 'catalogs'}
-                onPress={() => handleUpdateSetting('featuredContentSource', 'catalogs')}
+                onPress={() => {
+                  console.log('Selected Catalogs source');
+                  handleUpdateSetting('featuredContentSource', 'catalogs');
+                }}
                 label="Installed Catalogs"
               />
               <View style={styles.radioDescription}>

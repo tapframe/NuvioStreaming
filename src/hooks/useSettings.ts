@@ -84,8 +84,11 @@ export const useSettings = () => {
     try {
       await AsyncStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings));
       setSettings(newSettings);
+      console.log(`Setting updated: ${key}`, value);
+      
       // Notify all subscribers that settings have changed (if requested)
       if (emitEvent) {
+        console.log('Emitting settings change event');
         settingsEmitter.emit();
       }
     } catch (error) {
