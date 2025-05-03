@@ -96,6 +96,33 @@ const LogoSourceSettings = () => {
     setSelectedTmdbLanguage(settings.tmdbLanguagePreference || 'en');
   }, [settings.tmdbLanguagePreference]);
   
+  // Force reload settings from AsyncStorage when component mounts
+  useEffect(() => {
+    const loadSettingsFromStorage = async () => {
+      try {
+        const settingsJson = await AsyncStorage.getItem('app_settings');
+        if (settingsJson) {
+          const storedSettings = JSON.parse(settingsJson);
+          
+          // Update local state to match stored settings
+          if (storedSettings.logoSourcePreference) {
+            setLogoSource(storedSettings.logoSourcePreference);
+          }
+          
+          if (storedSettings.tmdbLanguagePreference) {
+            setSelectedTmdbLanguage(storedSettings.tmdbLanguagePreference);
+          }
+          
+          logger.log('[LogoSourceSettings] Successfully loaded settings from AsyncStorage');
+        }
+      } catch (error) {
+        logger.error('[LogoSourceSettings] Error loading settings from AsyncStorage:', error);
+      }
+    };
+    
+    loadSettingsFromStorage();
+  }, []);
+  
   // Selected example show
   const [selectedShow, setSelectedShow] = useState(EXAMPLE_SHOWS[0]);
   
@@ -248,14 +275,40 @@ const LogoSourceSettings = () => {
 
     // Apply logo source setting and show confirmation
     const applyLogoSourceSetting = (source: 'metahub' | 'tmdb') => {
+      // Update local state first
       setLogoSource(source);
+      
+      // Update using the settings hook
       updateSetting('logoSourcePreference', source);
       
-      // Clear any cached logo data in storage
+      // Also save directly to AsyncStorage for extra assurance
       try {
+        // Get current settings
+        AsyncStorage.getItem('app_settings').then((settingsJson) => {
+          if (settingsJson) {
+            const currentSettings = JSON.parse(settingsJson);
+            // Update the logo source preference
+            const updatedSettings = {
+              ...currentSettings,
+              logoSourcePreference: source
+            };
+            // Save back to AsyncStorage
+            AsyncStorage.setItem('app_settings', JSON.stringify(updatedSettings))
+              .then(() => {
+                logger.log(`[LogoSourceSettings] Successfully saved logo source preference '${source}' to AsyncStorage`);
+              })
+              .catch((error) => {
+                logger.error(`[LogoSourceSettings] Error saving logo source preference to AsyncStorage:`, error);
+              });
+          }
+        }).catch((error) => {
+          logger.error(`[LogoSourceSettings] Error getting current settings:`, error);
+        });
+        
+        // Clear any cached logo data
         AsyncStorage.removeItem('_last_logos_');
       } catch (e) {
-        console.error('Error clearing logo cache:', e);
+        logger.error(`[LogoSourceSettings] Error in applyLogoSourceSetting:`, e);
       }
       
       // Show confirmation alert
@@ -266,16 +319,59 @@ const LogoSourceSettings = () => {
       );
     };
     
-    // Apply TMDB language setting
-    const applyTmdbLanguageSetting = (languageCode: string) => {
+    // Handle TMDB language selection
+    const handleTmdbLanguageSelect = (languageCode: string) => {
+      // First set local state for immediate UI updates
       setSelectedTmdbLanguage(languageCode);
+      
+      // Update the preview logo if possible
+      if (tmdbLogosData) {
+        const selectedLogoData = tmdbLogosData.find(logo => logo.iso_639_1 === languageCode);
+        if (selectedLogoData) {
+          setTmdbLogo(`https://image.tmdb.org/t/p/original${selectedLogoData.file_path}`);
+          logger.log(`[LogoSourceSettings] Switched TMDB logo preview to language: ${languageCode}`);
+        } else {
+          logger.warn(`[LogoSourceSettings] Could not find logo data for selected language: ${languageCode}`);
+        }
+      }
+      
+      // Then persist the setting globally
+      saveLanguagePreference(languageCode);
+    };
+    
+    // Save language preference with proper persistence
+    const saveLanguagePreference = (languageCode: string) => {
+      // First use the settings hook to update the setting
       updateSetting('tmdbLanguagePreference', languageCode);
       
-      // Clear any cached logo data in storage
+      // For extra assurance, also save directly to AsyncStorage
       try {
+        // Get current settings
+        AsyncStorage.getItem('app_settings').then((settingsJson) => {
+          if (settingsJson) {
+            const currentSettings = JSON.parse(settingsJson);
+            // Update the language preference
+            const updatedSettings = {
+              ...currentSettings,
+              tmdbLanguagePreference: languageCode
+            };
+            // Save back to AsyncStorage
+            AsyncStorage.setItem('app_settings', JSON.stringify(updatedSettings))
+              .then(() => {
+                logger.log(`[LogoSourceSettings] Successfully saved TMDB language preference '${languageCode}' to AsyncStorage`);
+              })
+              .catch((error) => {
+                logger.error(`[LogoSourceSettings] Error saving TMDB language preference to AsyncStorage:`, error);
+              });
+          }
+        }).catch((error) => {
+          logger.error(`[LogoSourceSettings] Error getting current settings:`, error);
+        });
+        
+        // Clear any cached logo data
         AsyncStorage.removeItem('_last_logos_');
       } catch (e) {
-        console.error('Error clearing logo cache:', e);
+        logger.error(`[LogoSourceSettings] Error in saveLanguagePreference:`, e);
       }
       
       // Show confirmation toast or feedback
@@ -357,25 +453,6 @@ const LogoSourceSettings = () => {
           )}
         </View>
       );
-    };
-
-    // Handle TMDB language selection
-    const handleTmdbLanguageSelect = (languageCode: string) => {
-      // Update local state for the example
-      setSelectedTmdbLanguage(languageCode);
-      
-      if (tmdbLogosData) {
-        const selectedLogoData = tmdbLogosData.find(logo => logo.iso_639_1 === languageCode);
-        if (selectedLogoData) {
-          setTmdbLogo(`https://image.tmdb.org/t/p/original${selectedLogoData.file_path}`);
-          logger.log(`[LogoSourceSettings] Switched TMDB logo to language: ${languageCode}`);
-        } else {
-          logger.warn(`[LogoSourceSettings] Could not find logo data for selected language: ${languageCode}`);
-        }
-      }
-      
-      // Also update the app-wide setting
-      applyTmdbLanguageSetting(languageCode);
     };
 
     return (

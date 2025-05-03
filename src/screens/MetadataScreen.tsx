@@ -287,6 +287,7 @@ const MetadataScreen = () => {
         
         let finalBanner: string | null = metadata.banner || metadata.poster; // Default fallback
         const preference = settings.logoSourcePreference || 'metahub';
+        const preferredLanguage = settings.tmdbLanguagePreference || 'en';
         const apiKey = '439c478a771f35c05022f9feabcca01c'; // Re-using API key
 
         // Extract IDs
@@ -302,7 +303,7 @@ const MetadataScreen = () => {
         const currentImdbId = imdbId;
         const contentType = type === 'series' ? 'tv' : 'movie';
         
-        logger.log(`[MetadataScreen] Fetching banner with preference: ${preference}, TMDB ID: ${currentTmdbId}, IMDB ID: ${currentImdbId}`);
+        logger.log(`[MetadataScreen] Fetching banner with preference: ${preference}, language: ${preferredLanguage}, TMDB ID: ${currentTmdbId}, IMDB ID: ${currentImdbId}`);
         
         try {
           if (preference === 'tmdb') {
@@ -312,11 +313,34 @@ const MetadataScreen = () => {
               logger.log(`[MetadataScreen] Attempting TMDB banner fetch with ID: ${currentTmdbId}`);
               try {
                 const endpoint = contentType === 'tv' ? 'tv' : 'movie';
-                const response = await fetch(`https://api.themoviedb.org/3/${endpoint}/${currentTmdbId}/images?api_key=${apiKey}`);
+                const response = await fetch(`https://api.themoviedb.org/3/${endpoint}/${currentTmdbId}/images?api_key=${apiKey}&include_image_language=${preferredLanguage},en,null`);
                 const imagesData = await response.json();
                 
                 if (imagesData.backdrops && imagesData.backdrops.length > 0) {
-                  const backdropPath = imagesData.backdrops[0].file_path;
+                  // Try to find backdrop in preferred language first
+                  let backdropPath = null;
+                  
+                  if (preferredLanguage !== 'en') {
+                    const preferredBackdrop = imagesData.backdrops.find((backdrop: any) => backdrop.iso_639_1 === preferredLanguage);
+                    if (preferredBackdrop) {
+                      backdropPath = preferredBackdrop.file_path;
+                      logger.log(`[MetadataScreen] Found ${preferredLanguage} backdrop for ID: ${currentTmdbId}`);
+                    }
+                  }
+                  
+                  // Fall back to English backdrop
+                  if (!backdropPath) {
+                    const englishBackdrop = imagesData.backdrops.find((backdrop: any) => backdrop.iso_639_1 === 'en');
+                    if (englishBackdrop) {
+                      backdropPath = englishBackdrop.file_path;
+                      logger.log(`[MetadataScreen] Found English backdrop for ID: ${currentTmdbId}`);
+                    } else {
+                      // Last resort: use the first backdrop
+                      backdropPath = imagesData.backdrops[0].file_path;
+                      logger.log(`[MetadataScreen] Using first available backdrop for ID: ${currentTmdbId}`);
+                    }
+                  }
+                  
                   tmdbBannerUrl = `https://image.tmdb.org/t/p/original${backdropPath}`;
                   logger.log(`[MetadataScreen] Found TMDB banner via images endpoint: ${tmdbBannerUrl}`);
                 } else {
