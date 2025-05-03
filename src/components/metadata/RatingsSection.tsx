@@ -2,9 +2,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Image, Animated } from 'react-native';
 import { colors } from '../../styles/colors';
 import { useMDBListRatings } from '../../hooks/useMDBListRatings';
-import { logger } from '../../utils/logger';
-import { MaterialIcons } from '@expo/vector-icons';
-import { FontAwesome } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isMDBListEnabled, RATING_PROVIDERS_STORAGE_KEY } from '../../screens/MDBListSettingsScreen';
 
@@ -67,9 +64,7 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
     try {
       const enabled = await isMDBListEnabled();
       setIsMDBEnabled(enabled);
-      logger.log('[RatingsSection] MDBList enabled:', enabled);
     } catch (error) {
-      logger.error('[RatingsSection] Failed to check if MDBList is enabled:', error);
       setIsMDBEnabled(true); // Default to enabled
     }
   };
@@ -88,26 +83,21 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
         setEnabledProviders(defaultSettings);
       }
     } catch (error) {
-      logger.error('[RatingsSection] Failed to load provider settings:', error);
     }
   };
 
   useEffect(() => {
-    logger.log(`[RatingsSection] Mounted for ${type}:`, imdbId);
     return () => {
-      logger.log(`[RatingsSection] Unmounted for ${type}:`, imdbId);
     };
   }, [imdbId, type]);
 
   useEffect(() => {
     if (error) {
-      logger.error('[RatingsSection] Error state:', error);
     }
   }, [error]);
 
   useEffect(() => {
     if (ratings) {
-      logger.log('[RatingsSection] Received ratings:', ratings);
     }
   }, [ratings]);
 
@@ -124,12 +114,10 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
 
   // If MDBList is disabled, don't show anything
   if (!isMDBEnabled) {
-    logger.log('[RatingsSection] MDBList is disabled, not showing ratings');
     return null;
   }
 
   if (loading) {
-    logger.log('[RatingsSection] Loading state');
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="small" color={colors.primary} />
@@ -138,11 +126,8 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
   }
 
   if (error || !ratings || Object.keys(ratings).length === 0) {
-    logger.log('[RatingsSection] No ratings to display');
     return null;
   }
-
-  logger.log('[RatingsSection] Rendering ratings:', Object.keys(ratings).length);
 
   // Define the order and icons/colors for the ratings
   const ratingConfig = {

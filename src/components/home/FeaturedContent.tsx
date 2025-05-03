@@ -91,22 +91,18 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
         try {
           const isValid = await isValidMetahubLogo(url);
           if (!isValid) {
-            console.warn(`[FeaturedContent] Metahub logo validation failed: ${url}`);
             return false;
           }
         } catch (validationError) {
           // If validation fails, still try to load the image
-          console.warn(`[FeaturedContent] Logo validation error, will try to load anyway: ${url}`, validationError);
         }
       }
       
       // Always attempt to prefetch the image regardless of format validation
       await ExpoImage.prefetch(url);
       imageCache[url] = true;
-      console.log(`[FeaturedContent] Successfully preloaded image: ${url}`);
       return true;
     } catch (error) {
-      console.error('[FeaturedContent] Error preloading image:', error);
       return false;
     }
   };
@@ -146,8 +142,6 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
           }
         }
         
-        logger.log(`[FeaturedContent] Fetching logo with preference: ${logoPreference}, language: ${preferredLanguage}, ID: ${contentId}`);
-        
         // Extract IMDB ID if available
         let imdbId = null;
         if (featuredContent.id.startsWith('tt')) {
@@ -172,13 +166,12 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
           try {
             const response = await fetch(metahubUrl, { method: 'HEAD' });
             if (response.ok) {
-              logger.log(`[FeaturedContent] Using Metahub logo: ${metahubUrl}`);
               setLogoUrl(metahubUrl);
               logoFetchInProgress.current = false;
               return; // Exit if Metahub logo was found
             }
           } catch (error) {
-            logger.warn(`[FeaturedContent] Failed to fetch Metahub logo:`, error);
+            // Removed logger.warn
           }
           
           // Fall back to TMDB if Metahub fails and we have a TMDB ID
@@ -189,14 +182,13 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
               const logoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId, preferredLanguage);
               
               if (logoUrl) {
-                logger.log(`[FeaturedContent] Using fallback TMDB logo (${preferredLanguage}): ${logoUrl}`);
                 setLogoUrl(logoUrl);
               } else if (currentLogo) {
                 // If TMDB fails too, use existing logo if any
                 setLogoUrl(currentLogo);
               }
             } catch (error) {
-              logger.error('[FeaturedContent] Error fetching TMDB logo:', error);
+              // Removed logger.error
               if (currentLogo) setLogoUrl(currentLogo);
             }
           } else if (currentLogo) {
@@ -212,13 +204,12 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
               const logoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId, preferredLanguage);
               
               if (logoUrl) {
-                logger.log(`[FeaturedContent] Using TMDB logo (${preferredLanguage}): ${logoUrl}`);
                 setLogoUrl(logoUrl);
                 logoFetchInProgress.current = false;
                 return; // Exit if TMDB logo was found
               }
             } catch (error) {
-              logger.error('[FeaturedContent] Error fetching TMDB logo:', error);
+              // Removed logger.error
             }
           } else if (imdbId) {
             // If we have IMDB ID but no TMDB ID, try to find TMDB ID
@@ -231,14 +222,13 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
                 const logoUrl = await tmdbService.getContentLogo(tmdbType, foundTmdbId.toString(), preferredLanguage);
                 
                 if (logoUrl) {
-                  logger.log(`[FeaturedContent] Using TMDB logo (${preferredLanguage}) via IMDB lookup: ${logoUrl}`);
                   setLogoUrl(logoUrl);
                   logoFetchInProgress.current = false;
                   return; // Exit if TMDB logo was found
                 }
               }
             } catch (error) {
-              logger.error('[FeaturedContent] Error finding TMDB ID from IMDB:', error);
+              // Removed logger.error
             }
           }
           
@@ -249,14 +239,13 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
             try {
               const response = await fetch(metahubUrl, { method: 'HEAD' });
               if (response.ok) {
-                logger.log(`[FeaturedContent] Using fallback Metahub logo: ${metahubUrl}`);
                 setLogoUrl(metahubUrl);
               } else if (currentLogo) {
                 // If Metahub fails too, use existing logo if any
                 setLogoUrl(currentLogo);
               }
             } catch (error) {
-              logger.warn(`[FeaturedContent] Failed to fetch fallback Metahub logo:`, error);
+              // Removed logger.warn
               if (currentLogo) setLogoUrl(currentLogo);
             }
           } else if (currentLogo) {
@@ -265,10 +254,10 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
           }
         }
       } catch (error) {
-        logger.error('[FeaturedContent] Error fetching logo:', error);
-        if (featuredContent?.logo) setLogoUrl(featuredContent.logo);
+        // Removed logger.error
+        // Optionally set a fallback logo or handle the error state
+        setLogoUrl(featuredContent.logo ?? null); // Fallback to initial logo or null
       } finally {
-        // Clear fetch in progress flag
         logoFetchInProgress.current = false;
       }
     };
