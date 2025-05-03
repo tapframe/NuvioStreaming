@@ -481,8 +481,7 @@ const LogoSourceSettings = () => {
           {/* Description */}
           <View style={styles.descriptionContainer}>
             <Text style={styles.description}>
-              Choose the primary source for content logos and background images. This affects the appearance
-              of titles in the metadata screen.
+              Choose the primary source for content logos and backgrounds.
             </Text>
           </View>
           
@@ -539,8 +538,7 @@ const LogoSourceSettings = () => {
               </View>
               
               <Text style={styles.optionDescription}>
-                Prioritizes high-quality title logos from the Metahub image repository.
-                Offers good coverage for popular titles.
+                High-quality logos from Metahub. Best for popular titles.
               </Text>
               
               <View style={styles.exampleContainer}>
@@ -567,8 +565,7 @@ const LogoSourceSettings = () => {
               </View>
               
               <Text style={styles.optionDescription}>
-                Uses logos from The Movie Database. Often includes more localized and newer logos,
-                with better coverage for recent content.
+                Logos from TMDB. Offers localized options and better coverage for recent content.
               </Text>
               
               <View style={styles.exampleContainer}>
@@ -582,7 +579,7 @@ const LogoSourceSettings = () => {
                 <View style={styles.languageSelectorContainer}>
                   <Text style={styles.languageSelectorTitle}>Logo Language</Text>
                   <Text style={styles.languageSelectorDescription}>
-                    Select your preferred language for TMDB logos. This affects all content when TMDB is used as the logo source.
+                    Select your preferred language for TMDB logos.
                   </Text>
                   <ScrollView 
                     horizontal 
@@ -615,7 +612,7 @@ const LogoSourceSettings = () => {
                     ))}
                   </ScrollView>
                   <Text style={styles.noteText}>
-                    Note: Not all titles have logos in all languages. If a logo isn't available in your preferred language, English will be used as a fallback.
+                    If unavailable in preferred language, English will be used as fallback.
                   </Text>
                 </View>
               )}
@@ -625,8 +622,7 @@ const LogoSourceSettings = () => {
           {/* Additional Info */}
           <View style={styles.infoBox}>
             <Text style={styles.infoText}>
-              If a logo is not available from your preferred source, the app will automatically fall back to the other source.
-              If no logo is found, the title text will be shown instead.
+              Unavailable logos will fall back to the alternate source, or display text if none found.
             </Text>
           </View>
         </ScrollView>
@@ -643,70 +639,70 @@ const LogoSourceSettings = () => {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingHorizontal: 16,
-      height: 56,
+      paddingHorizontal: 12,
+      height: 48,
       backgroundColor: colors.elevation2,
     },
     backButton: {
-      width: 40,
-      height: 40,
+      width: 36,
+      height: 36,
       alignItems: 'center',
       justifyContent: 'center',
     },
     headerTitle: {
       color: colors.white,
-      fontSize: 20,
+      fontSize: 18,
       fontWeight: '600',
     },
     headerRight: {
-      width: 40,
+      width: 36,
     },
     scrollView: {
       flex: 1,
     },
     descriptionContainer: {
-      padding: 16,
+      padding: 12,
       borderBottomWidth: 1,
       borderBottomColor: 'rgba(255,255,255,0.1)',
     },
     description: {
       color: colors.text,
-      fontSize: 16,
-      lineHeight: 24,
+      fontSize: 14,
+      lineHeight: 20,
     },
     showSelectorContainer: {
-      padding: 16,
-      paddingBottom: 8,
+      padding: 12,
+      paddingBottom: 6,
     },
     selectorLabel: {
       color: colors.text,
-      fontSize: 16,
-      marginBottom: 12,
+      fontSize: 14,
+      marginBottom: 8,
     },
     showsScrollContent: {
       paddingRight: 16,
     },
     showItem: {
-      paddingHorizontal: 16,
-      paddingVertical: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
       backgroundColor: colors.elevation2,
-      borderRadius: 20,
-      marginRight: 8,
+      borderRadius: 16,
+      marginRight: 6,
       borderWidth: 1,
       borderColor: 'transparent',
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 1 },
       shadowOpacity: 0.1,
-      shadowRadius: 2,
+      shadowRadius: 1,
       elevation: 1,
     },
     selectedShowItem: {
       borderColor: colors.primary,
       backgroundColor: colors.elevation3,
       shadowColor: colors.primary,
-      shadowOffset: { width: 0, height: 2 },
+      shadowOffset: { width: 0, height: 1 },
       shadowOpacity: 0.2,
-      shadowRadius: 3,
+      shadowRadius: 2,
       elevation: 2,
     },
     showItemText: {
@@ -718,16 +714,16 @@ const LogoSourceSettings = () => {
       fontWeight: '600',
     },
     optionsContainer: {
-      padding: 16,
-      gap: 16,
+      padding: 10,
+      gap: 10,
     },
     optionCard: {
       backgroundColor: colors.elevation2,
-      borderRadius: 12,
-      padding: 16,
+      borderRadius: 8,
+      padding: 12,
       borderWidth: 2,
       borderColor: 'transparent',
-      marginBottom: 12,
+      marginBottom: 8,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.2,
@@ -744,26 +740,26 @@ const LogoSourceSettings = () => {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 8,
+      marginBottom: 6,
     },
     optionTitle: {
       color: colors.white,
-      fontSize: 18,
+      fontSize: 16,
       fontWeight: '600',
     },
     optionDescription: {
       color: colors.mediumEmphasis,
-      fontSize: 14,
-      lineHeight: 20,
-      marginBottom: 16,
+      fontSize: 13,
+      lineHeight: 18,
+      marginBottom: 10,
     },
     exampleContainer: {
-      marginTop: 8,
+      marginTop: 4,
     },
     exampleLabel: {
       color: colors.mediumEmphasis,
-      fontSize: 14,
-      marginBottom: 8,
+      fontSize: 13,
+      marginBottom: 4,
     },
     exampleImage: {
       height: 60,
@@ -776,58 +772,58 @@ const LogoSourceSettings = () => {
       alignItems: 'center',
     },
     infoBox: {
-      margin: 16,
-      padding: 16,
+      margin: 10,
+      padding: 10,
       backgroundColor: 'rgba(255,255,255,0.05)',
-      borderRadius: 8,
-      borderLeftWidth: 4,
+      borderRadius: 6,
+      borderLeftWidth: 3,
       borderLeftColor: colors.primary,
     },
     infoText: {
       color: colors.mediumEmphasis,
-      fontSize: 14,
-      lineHeight: 20,
+      fontSize: 12,
+      lineHeight: 18,
     },
     logoSourceLabel: {
       color: colors.mediumEmphasis,
-      fontSize: 12,
-      marginTop: 4,
+      fontSize: 11,
+      marginTop: 2,
     },
     languageSelectorContainer: {
-      marginTop: 16,
-      padding: 12,
+      marginTop: 10,
+      padding: 10,
       backgroundColor: 'rgba(255,255,255,0.05)',
-      borderRadius: 8,
+      borderRadius: 6,
     },
     languageSelectorTitle: {
       color: colors.white,
-      fontSize: 16,
+      fontSize: 14,
       fontWeight: '600',
-      marginBottom: 8,
+      marginBottom: 4,
     },
     languageSelectorDescription: {
       color: colors.mediumEmphasis,
-      fontSize: 14,
-      lineHeight: 20,
-      marginBottom: 12,
+      fontSize: 12,
+      lineHeight: 18,
+      marginBottom: 8,
     },
     languageSelectorLabel: {
       color: colors.mediumEmphasis,
-      fontSize: 13,
-      marginBottom: 8,
+      fontSize: 12,
+      marginBottom: 6,
     },
     languageScrollContent: {
-      paddingVertical: 4,
+      paddingVertical: 2,
     },
     languageItem: {
-      paddingHorizontal: 12,
-      paddingVertical: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
       backgroundColor: colors.elevation1,
-      borderRadius: 16,
-      marginRight: 8,
+      borderRadius: 12,
+      marginRight: 6,
       borderWidth: 1,
       borderColor: colors.elevation3,
-      marginVertical: 2,
+      marginVertical: 1,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 1 },
       shadowOpacity: 0.1,
@@ -838,14 +834,14 @@ const LogoSourceSettings = () => {
       backgroundColor: colors.primary,
       borderColor: colors.primary,
       shadowColor: colors.primary,
-      shadowOffset: { width: 0, height: 2 },
+      shadowOffset: { width: 0, height: 1 },
       shadowOpacity: 0.2,
-      shadowRadius: 2,
+      shadowRadius: 1,
       elevation: 2,
     },
     languageItemText: {
       color: colors.mediumEmphasis,
-      fontSize: 13,
+      fontSize: 12,
       fontWeight: '600',
     },
     selectedLanguageItemText: {
@@ -853,14 +849,14 @@ const LogoSourceSettings = () => {
     },
     noteText: {
       color: colors.mediumEmphasis,
-      fontSize: 12,
-      marginTop: 12,
+      fontSize: 11,
+      marginTop: 8,
       fontStyle: 'italic',
     },
     bannerContainer: {
-      height: 120,
+      height: 90,
       width: '100%',
-      borderRadius: 8,
+      borderRadius: 6,
       overflow: 'hidden',
       position: 'relative',
     },
@@ -874,9 +870,9 @@ const LogoSourceSettings = () => {
     logoOverBanner: {
       position: 'absolute',
       width: '80%',
-      height: '80%',
+      height: '75%',
       alignSelf: 'center',
-      top: '10%',
+      top: '12.5%',
     },
     noLogoContainer: {
       position: 'absolute',
