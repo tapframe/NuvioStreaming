@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -8,24 +8,14 @@ import {
   Dimensions 
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { colors } from '../../styles/colors';
-import { 
-  format, 
-  addMonths, 
-  subMonths, 
-  startOfMonth, 
-  endOfMonth, 
-  isSameMonth, 
-  isSameDay,
-  getDay, 
-  isToday, 
-  parseISO
-} from 'date-fns';
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isSameDay } from 'date-fns';
 import Animated, { FadeIn } from 'react-native-reanimated';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const { width } = Dimensions.get('window');
 const COLUMN_COUNT = 7; // 7 days in a week
-const DAY_ITEM_SIZE = width / 9; // Slightly smaller than 1/7 to fit all days
+const DAY_ITEM_SIZE = (width - 32 - 56) / 7; // Slightly smaller than 1/7 to fit all days
+const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 interface CalendarEpisode {
   id: string;
@@ -54,37 +44,40 @@ const DayItem = ({
   isSelected,
   hasEvents, 
   onPress 
-}: DayItemProps) => (
-  <TouchableOpacity 
-    style={[
-      styles.dayItem, 
-      today && styles.todayItem,
-      isSelected && styles.selectedItem,
-      hasEvents && styles.dayWithEvents
-    ]} 
-    onPress={() => onPress(date)}
-  >
-    <Text style={[
-      styles.dayText, 
-      !isCurrentMonth && styles.otherMonthDay,
-      today && styles.todayText,
-      isSelected && styles.selectedDayText
-    ]}>
-      {date.getDate()}
-    </Text>
-    {hasEvents && (
-      <View style={styles.eventIndicator} />
-    )}
-  </TouchableOpacity>
-);
+}: DayItemProps) => {
+  const { currentTheme } = useTheme();
+  return (
+    <TouchableOpacity 
+      style={[
+        styles.dayButton, 
+        today && styles.todayItem,
+        isSelected && styles.selectedItem,
+        hasEvents && styles.dayWithEvents
+      ]} 
+      onPress={() => onPress(date)}
+    >
+      <Text style={[
+        styles.dayText, 
+        !isCurrentMonth && { color: currentTheme.colors.lightGray + '80' },
+        today && styles.todayText,
+        isSelected && styles.selectedDayText
+      ]}>
+        {date.getDate()}
+      </Text>
+      {hasEvents && (
+        <View style={[styles.eventIndicator, { backgroundColor: currentTheme.colors.primary }]} />
+      )}
+    </TouchableOpacity>
+  );
+};
 
 export const CalendarSection: React.FC<CalendarSectionProps> = ({ 
   episodes = [], 
   onSelectDate 
 }) => {
-  console.log(`[CalendarSection] Rendering with ${episodes.length} episodes`);
+  const { currentTheme } = useTheme();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
 
   // Map of dates with episodes
@@ -97,7 +90,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     
     episodes.forEach(episode => {
       if (episode.releaseDate) {
-        const releaseDate = parseISO(episode.releaseDate);
+        const releaseDate = new Date(episode.releaseDate);
         const dateKey = format(releaseDate, 'yyyy-MM-dd');
         dateMap[dateKey] = true;
       }
@@ -107,201 +100,194 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     setDatesWithEpisodes(dateMap);
   }, [episodes]);
 
-  const goToPreviousMonth = () => {
-    setCurrentDate(prevDate => subMonths(prevDate, 1));
-  };
+  const goToPreviousMonth = useCallback(() => {
+    setCurrentDate(prev => subMonths(prev, 1));
+  }, []);
 
-  const goToNextMonth = () => {
-    setCurrentDate(prevDate => addMonths(prevDate, 1));
-  };
+  const goToNextMonth = useCallback(() => {
+    setCurrentDate(prev => addMonths(prev, 1));
+  }, []);
 
-  const handleDayPress = (date: Date) => {
+  const handleDateSelect = useCallback((date: Date) => {
     setSelectedDate(date);
-    if (onSelectDate) {
-      onSelectDate(date);
+    onSelectDate?.(date);
+  }, [onSelectDate]);
+
+  const renderDays = () => {
+    const start = startOfMonth(currentDate);
+    const end = endOfMonth(currentDate);
+    const days = eachDayOfInterval({ start, end });
+
+    // Get the day of the week for the first day (0-6)
+    const firstDayOfWeek = start.getDay();
+
+    // Add empty days at the start
+    const emptyDays = Array(firstDayOfWeek).fill(null);
+
+    // Calculate remaining days to fill the last row
+    const totalDays = emptyDays.length + days.length;
+    const remainingDays = 7 - (totalDays % 7);
+    const endEmptyDays = remainingDays === 7 ? [] : Array(remainingDays).fill(null);
+
+    const allDays = [...emptyDays, ...days, ...endEmptyDays];
+    const weeks = [];
+
+    for (let i = 0; i < allDays.length; i += 7) {
+      weeks.push(allDays.slice(i, i + 7));
     }
+
+    return weeks.map((week, weekIndex) => (
+      <View key={weekIndex} style={styles.weekRow}>
+        {week.map((day, dayIndex) => {
+          if (!day) {
+            return <View key={`empty-${dayIndex}`} style={styles.emptyDay} />;
+          }
+
+          const isCurrentMonth = isSameMonth(day, currentDate);
+          const isCurrentDay = isToday(day);
+          const isSelected = selectedDate && isSameDay(day, selectedDate);
+          const hasEvents = datesWithEpisodes[format(day, 'yyyy-MM-dd')] || false;
+
+          return (
+            <TouchableOpacity
+              key={day.toISOString()}
+              style={[
+                styles.dayButton,
+                isCurrentDay && [styles.todayItem, { backgroundColor: currentTheme.colors.primary + '30', borderColor: currentTheme.colors.primary }],
+                isSelected && [styles.selectedItem, { backgroundColor: currentTheme.colors.primary + '60', borderColor: currentTheme.colors.primary }],
+                hasEvents && styles.dayWithEvents
+              ]}
+              onPress={() => handleDateSelect(day)}
+            >
+              <Text
+                style={[
+                  styles.dayText,
+                  { color: currentTheme.colors.text },
+                  !isCurrentMonth && { color: currentTheme.colors.lightGray + '80' },
+                  isCurrentDay && [styles.todayText, { color: currentTheme.colors.primary }],
+                  isSelected && [styles.selectedDayText, { color: currentTheme.colors.text }]
+                ]}
+              >
+                {format(day, 'd')}
+              </Text>
+              {hasEvents && (
+                <View style={[styles.eventDot, { backgroundColor: currentTheme.colors.primary }]} />
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    ));
   };
-
-  // Generate days for the current month view
-  const generateDaysForMonth = () => {
-    const monthStart = startOfMonth(currentDate);
-    const monthEnd = endOfMonth(currentDate);
-    const startDate = new Date(monthStart);
-    
-    // Adjust the start date to the beginning of the week
-    const dayOfWeek = getDay(startDate);
-    startDate.setDate(startDate.getDate() - dayOfWeek);
-    
-    // Ensure we have 6 complete weeks in our view
-    const endDate = new Date(monthEnd);
-    const lastDayOfWeek = getDay(endDate);
-    if (lastDayOfWeek < 6) {
-      endDate.setDate(endDate.getDate() + (6 - lastDayOfWeek));
-    }
-    
-    // Get dates for a complete 6-week calendar
-    const totalDaysNeeded = 42; // 6 weeks × 7 days
-    const daysInView = [];
-    
-    let currentDateInView = new Date(startDate);
-    for (let i = 0; i < totalDaysNeeded; i++) {
-      daysInView.push(new Date(currentDateInView));
-      currentDateInView.setDate(currentDateInView.getDate() + 1);
-    }
-    
-    return daysInView;
-  };
-
-  const dayItems = generateDaysForMonth();
-  
-  // Break days into rows (6 rows of 7 days each)
-  const rows = [];
-  for (let i = 0; i < dayItems.length; i += COLUMN_COUNT) {
-    rows.push(dayItems.slice(i, i + COLUMN_COUNT));
-  }
-
-  // Get weekday names for header
-  const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   return (
-    <Animated.View entering={FadeIn.duration(300)} style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={goToPreviousMonth} style={styles.headerButton}>
-          <MaterialIcons name="chevron-left" size={24} color={colors.text} />
+    <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
+      <View style={[styles.header, { borderBottomColor: currentTheme.colors.border }]}>
+        <TouchableOpacity 
+          onPress={goToPreviousMonth}
+          style={styles.headerButton}
+        >
+          <MaterialIcons name="chevron-left" size={24} color={currentTheme.colors.text} />
         </TouchableOpacity>
         
-        <Text style={styles.monthTitle}>
+        <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
           {format(currentDate, 'MMMM yyyy')}
         </Text>
         
-        <TouchableOpacity onPress={goToNextMonth} style={styles.headerButton}>
-          <MaterialIcons name="chevron-right" size={24} color={colors.text} />
+        <TouchableOpacity 
+          onPress={goToNextMonth}
+          style={styles.headerButton}
+        >
+          <MaterialIcons name="chevron-right" size={24} color={currentTheme.colors.text} />
         </TouchableOpacity>
       </View>
-      
-      <View style={styles.weekHeader}>
+
+      <View style={styles.weekDaysContainer}>
         {weekDays.map((day, index) => (
-          <View key={index} style={styles.weekHeaderItem}>
-            <Text style={styles.weekDayText}>{day}</Text>
-          </View>
+          <Text 
+            key={index} 
+            style={[styles.weekDayText, { color: currentTheme.colors.lightGray }]}
+          >
+            {day}
+          </Text>
         ))}
       </View>
-      
-      <View style={styles.calendarGrid}>
-        {rows.map((row, rowIndex) => (
-          <View key={rowIndex} style={styles.row}>
-            {row.map((date, cellIndex) => {
-              const isCurrentMonthDay = isSameMonth(date, currentDate);
-              const isSelectedToday = isToday(date);
-              const isDateSelected = isSameDay(date, selectedDate);
-              
-              // Check if this date has episodes
-              const dateKey = format(date, 'yyyy-MM-dd');
-              const hasEvents = datesWithEpisodes[dateKey] || false;
-              
-              // Log every 7 days to avoid console spam
-              if (cellIndex === 0 && rowIndex === 0) {
-                console.log(`[CalendarSection] Sample date check - ${dateKey}: hasEvents=${hasEvents}`);
-              }
-              
-              return (
-                <DayItem
-                  key={cellIndex}
-                  date={date}
-                  isCurrentMonth={isCurrentMonthDay}
-                  isToday={isSelectedToday}
-                  isSelected={isDateSelected}
-                  hasEvents={hasEvents}
-                  onPress={handleDayPress}
-                />
-              );
-            })}
-          </View>
-        ))}
+
+      <View style={styles.daysContainer}>
+        {renderDays()}
       </View>
-    </Animated.View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.darkBackground,
-    marginBottom: 12,
-    borderRadius: 8,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.border,
+    width: '100%',
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    alignItems: 'center',
+    padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
   headerButton: {
     padding: 8,
   },
-  monthTitle: {
+  headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: colors.text,
   },
-  weekHeader: {
+  weekDaysContainer: {
     flexDirection: 'row',
+    justifyContent: 'space-around',
     padding: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  weekHeaderItem: {
-    width: DAY_ITEM_SIZE,
-    alignItems: 'center',
   },
   weekDayText: {
     fontSize: 12,
-    color: colors.lightGray,
   },
-  calendarGrid: {
+  daysContainer: {
     padding: 8,
   },
-  row: {
+  weekRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginBottom: 8,
   },
-  dayItem: {
-    width: DAY_ITEM_SIZE,
-    height: DAY_ITEM_SIZE,
+  dayButton: {
+    width: 36,
+    height: 36,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: DAY_ITEM_SIZE / 2,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   dayText: {
     fontSize: 14,
-    color: colors.text,
   },
-  otherMonthDay: {
-    color: colors.lightGray + '80', // 50% opacity
+  emptyDay: {
+    width: 36,
+    height: 36,
+  },
+  eventDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    position: 'absolute',
+    bottom: 6,
   },
   todayItem: {
-    backgroundColor: colors.primary + '30', // 30% opacity
     borderWidth: 1,
-    borderColor: colors.primary,
   },
   selectedItem: {
-    backgroundColor: colors.primary + '60', // 60% opacity
     borderWidth: 1,
-    borderColor: colors.primary,
   },
   todayText: {
     fontWeight: 'bold',
-    color: colors.primary,
   },
   selectedDayText: {
     fontWeight: 'bold',
-    color: colors.text,
   },
   dayWithEvents: {
     position: 'relative',
@@ -312,6 +298,5 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: colors.primary,
   },
 }); 
