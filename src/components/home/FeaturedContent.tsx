@@ -32,7 +32,6 @@ import { useSettings } from '../../hooks/useSettings';
 import { TMDBService } from '../../services/tmdbService';
 import { logger } from '../../utils/logger';
 import { useTheme } from '../../contexts/ThemeContext';
-import type { Theme } from '../../contexts/ThemeContext';
 
 interface FeaturedContentProps {
   featuredContent: StreamingContent | null;
@@ -47,10 +46,18 @@ const { width, height } = Dimensions.get('window');
 
 const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: FeaturedContentProps) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
-  const { settings } = useSettings();
   const { currentTheme } = useTheme();
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoLoaded, setLogoLoaded] = useState(false);
+  const [bannerLoaded, setBannerLoaded] = useState(false);
+  const [showSkeleton, setShowSkeleton] = useState(true);
+  const [logoError, setLogoError] = useState(false);
+  const [bannerError, setBannerError] = useState(false);
+  const { settings } = useSettings();
+  const logoOpacity = useSharedValue(0);
+  const bannerOpacity = useSharedValue(0);
+  const posterOpacity = useSharedValue(0);
   const prevContentIdRef = useRef<string | null>(null);
   // Add state for tracking logo load errors
   const [logoLoadError, setLogoLoadError] = useState(false);
@@ -58,11 +65,6 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
   const logoFetchInProgress = useRef<boolean>(false);
   
   // Animation values
-  const posterOpacity = useSharedValue(0);
-  const logoOpacity = useSharedValue(0);
-  const contentOpacity = useSharedValue(1); // Start visible
-  const buttonsOpacity = useSharedValue(1);
-  
   const posterAnimatedStyle = useAnimatedStyle(() => ({
     opacity: posterOpacity.value,
   }));
@@ -70,6 +72,9 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
   const logoAnimatedStyle = useAnimatedStyle(() => ({
     opacity: logoOpacity.value,
   }));
+  
+  const contentOpacity = useSharedValue(1); // Start visible
+  const buttonsOpacity = useSharedValue(1);
   
   const contentAnimatedStyle = useAnimatedStyle(() => ({
     opacity: contentOpacity.value,

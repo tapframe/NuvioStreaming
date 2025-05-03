@@ -15,7 +15,7 @@ import { RootStackParamList } from '../../navigation/AppNavigator';
 import { StreamingContent, catalogService } from '../../services/catalogService';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image as ExpoImage } from 'expo-image';
-import { colors } from '../../styles/colors';
+import { useTheme } from '../../contexts/ThemeContext';
 import { storageService } from '../../services/storageService';
 import { logger } from '../../utils/logger';
 
@@ -39,6 +39,7 @@ const POSTER_WIDTH = (width - 40) / 2.7;
 // Create a proper imperative handle with React.forwardRef and updated type
 const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, ref) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const { currentTheme } = useTheme();
   const [continueWatchingItems, setContinueWatchingItems] = useState<ContinueWatchingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const appState = useRef(AppState.currentState);
@@ -213,9 +214,9 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>Continue Watching</Text>
+          <Text style={[styles.title, { color: currentTheme.colors.highEmphasis }]}>Continue Watching</Text>
           <LinearGradient
-            colors={[colors.primary, colors.secondary]}
+            colors={[currentTheme.colors.primary, currentTheme.colors.secondary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.titleUnderline}
@@ -227,7 +228,10 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         data={continueWatchingItems}
         renderItem={({ item }) => (
           <TouchableOpacity
-            style={styles.contentItem}
+            style={[styles.contentItem, {
+              borderColor: currentTheme.colors.border,
+              shadowColor: currentTheme.colors.black
+            }]}
             activeOpacity={0.7}
             onPress={() => handleContentPress(item.id, item.type)}
           >
@@ -240,12 +244,12 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                 cachePolicy="memory-disk"
               />
               {item.type === 'series' && item.season && item.episode && (
-                <View style={styles.episodeInfoContainer}>
-                  <Text style={styles.episodeInfo}>
+                <View style={[styles.episodeInfoContainer, { backgroundColor: 'rgba(0, 0, 0, 0.7)' }]}>
+                  <Text style={[styles.episodeInfo, { color: currentTheme.colors.white }]}>
                     S{item.season.toString().padStart(2, '0')}E{item.episode.toString().padStart(2, '0')}
                   </Text>
                   {item.episodeTitle && (
-                    <Text style={styles.episodeTitle} numberOfLines={1}>
+                    <Text style={[styles.episodeTitle, { color: currentTheme.colors.white, opacity: 0.9 }]} numberOfLines={1}>
                       {item.episodeTitle}
                     </Text>
                   )}
@@ -256,7 +260,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                 <View 
                   style={[
                     styles.progressBar, 
-                    { width: `${item.progress}%` }
+                    { width: `${item.progress}%`, backgroundColor: currentTheme.colors.primary }
                   ]} 
                 />
               </View>
@@ -295,7 +299,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '800',
-    color: colors.highEmphasis,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 6,
@@ -321,12 +324,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
     elevation: 8,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
   },
   contentItemContainer: {
     width: '100%',
@@ -347,17 +348,13 @@ const styles = StyleSheet.create({
     right: 0,
     padding: 4,
     paddingHorizontal: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
   episodeInfo: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: colors.white,
   },
   episodeTitle: {
     fontSize: 10,
-    color: colors.white,
-    opacity: 0.9,
   },
   progressBarContainer: {
     position: 'absolute',
@@ -365,20 +362,10 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 3,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   progressBar: {
     height: '100%',
-    backgroundColor: colors.primary,
-  },
-  emptyContainer: {
-    paddingHorizontal: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyText: {
-    color: colors.textMuted,
-    fontSize: 14,
   },
 });
 
