@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,12 +15,17 @@ import {
   Keyboard,
   Clipboard,
   Switch,
+  Image,
+  KeyboardAvoidingView,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { colors } from '../styles/colors';
+import { tmdbService } from '../services/tmdbService';
+import { useSettings } from '../hooks/useSettings';
 import { logger } from '../utils/logger';
+import { useTheme } from '../contexts/ThemeContext';
 
 const TMDB_API_KEY_STORAGE_KEY = 'tmdb_api_key';
 const USE_CUSTOM_TMDB_API_KEY = 'use_custom_tmdb_api_key';
@@ -35,6 +40,7 @@ const TMDBSettingsScreen = () => {
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const apiKeyInputRef = useRef<TextInput>(null);
+  const { currentTheme } = useTheme();
 
   useEffect(() => {
     logger.log('[TMDBSettingsScreen] Component mounted');
@@ -217,12 +223,231 @@ const TMDBSettingsScreen = () => {
     });
   };
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: currentTheme.colors.darkBackground,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    loadingText: {
+      marginTop: 12,
+      fontSize: 16,
+      color: currentTheme.colors.white,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 8 : 8,
+      paddingHorizontal: 16,
+      paddingBottom: 16,
+    },
+    backButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    backText: {
+      color: currentTheme.colors.primary,
+      fontSize: 16,
+      fontWeight: '500',
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingBottom: 40,
+    },
+    titleContainer: {
+      paddingTop: 8,
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: 'bold',
+      color: currentTheme.colors.white,
+      marginHorizontal: 16,
+      marginBottom: 16,
+    },
+    switchCard: {
+      backgroundColor: currentTheme.colors.elevation2,
+      borderRadius: 12,
+      marginHorizontal: 16,
+      marginBottom: 16,
+      padding: 16,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    switchTextContainer: {
+      flex: 1,
+      marginRight: 12,
+    },
+    switchTitle: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: currentTheme.colors.white,
+    },
+    switchDescription: {
+      fontSize: 14,
+      color: currentTheme.colors.mediumEmphasis,
+      lineHeight: 20,
+    },
+    statusCard: {
+      flexDirection: 'row',
+      backgroundColor: currentTheme.colors.elevation2,
+      borderRadius: 12,
+      marginHorizontal: 16,
+      marginBottom: 16,
+      padding: 16,
+    },
+    statusIconContainer: {
+      marginRight: 12,
+    },
+    statusTextContainer: {
+      flex: 1,
+    },
+    statusTitle: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: currentTheme.colors.white,
+      marginBottom: 4,
+    },
+    statusDescription: {
+      fontSize: 14,
+      color: currentTheme.colors.mediumEmphasis,
+    },
+    card: {
+      backgroundColor: currentTheme.colors.elevation2,
+      borderRadius: 12,
+      marginHorizontal: 16,
+      marginBottom: 16,
+      padding: 16,
+    },
+    cardTitle: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: currentTheme.colors.white,
+      marginBottom: 16,
+    },
+    inputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    input: {
+      flex: 1,
+      backgroundColor: currentTheme.colors.elevation1,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      color: currentTheme.colors.white,
+      fontSize: 15,
+      borderWidth: 1,
+      borderColor: 'transparent',
+    },
+    inputFocused: {
+      borderColor: currentTheme.colors.primary,
+    },
+    pasteButton: {
+      position: 'absolute',
+      right: 8,
+      padding: 4,
+    },
+    buttonRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    button: {
+      backgroundColor: currentTheme.colors.primary,
+      borderRadius: 8,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      alignItems: 'center',
+      flex: 1,
+      marginRight: 8,
+    },
+    clearButton: {
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: currentTheme.colors.error,
+      marginRight: 0,
+      marginLeft: 8,
+      flex: 0,
+    },
+    buttonText: {
+      color: currentTheme.colors.white,
+      fontWeight: '500',
+      fontSize: 15,
+    },
+    clearButtonText: {
+      color: currentTheme.colors.error,
+    },
+    resultMessage: {
+      borderRadius: 8,
+      padding: 12,
+      marginTop: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    successMessage: {
+      backgroundColor: currentTheme.colors.success + '1A', // 10% opacity
+    },
+    errorMessage: {
+      backgroundColor: currentTheme.colors.error + '1A', // 10% opacity
+    },
+    resultIcon: {
+      marginRight: 8,
+    },
+    resultText: {
+      flex: 1,
+    },
+    successText: {
+      color: currentTheme.colors.success,
+    },
+    errorText: {
+      color: currentTheme.colors.error,
+    },
+    helpLink: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    helpIcon: {
+      marginRight: 4,
+    },
+    helpText: {
+      color: currentTheme.colors.primary,
+      fontSize: 14,
+    },
+    infoCard: {
+      backgroundColor: currentTheme.colors.elevation1,
+      borderRadius: 12,
+      marginHorizontal: 16,
+      marginBottom: 16,
+      padding: 16,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+    },
+    infoIcon: {
+      marginRight: 8,
+      marginTop: 2,
+    },
+    infoText: {
+      color: currentTheme.colors.mediumEmphasis,
+      fontSize: 14,
+      flex: 1,
+      lineHeight: 20,
+    },
+  });
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={currentTheme.colors.primary} />
           <Text style={styles.loadingText}>Loading Settings...</Text>
         </View>
       </SafeAreaView>
@@ -237,33 +462,34 @@ const TMDBSettingsScreen = () => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <MaterialIcons name="chevron-left" size={28} color={colors.primary} /> 
+          <MaterialIcons name="chevron-left" size={28} color={currentTheme.colors.primary} /> 
           <Text style={styles.backText}>Settings</Text>
         </TouchableOpacity>
       </View>
-      <Text style={styles.headerTitle}>TMDb Settings</Text>
+      <Text style={styles.title}>TMDb Settings</Text>
 
       <ScrollView 
-        style={styles.content}
+        style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.switchCard}>
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>Use Custom TMDb API Key</Text>
-            <Switch
-              value={useCustomKey}
-              onValueChange={toggleUseCustomKey}
-              trackColor={{ false: colors.lightGray, true: colors.accentLight }}
-              thumbColor={Platform.OS === 'android' ? colors.primary : ''}
-              ios_backgroundColor={colors.lightGray}
-            />
+          <View style={styles.switchTextContainer}>
+            <Text style={styles.switchTitle}>Use Custom TMDb API Key</Text>
           </View>
-          <Text style={styles.switchDescription}>
-            Enable to use your own TMDb API key instead of the built-in one.
-            Using your own API key may provide better performance and higher rate limits.
-          </Text>
+          <Switch
+            value={useCustomKey}
+            onValueChange={toggleUseCustomKey}
+            trackColor={{ false: currentTheme.colors.lightGray, true: currentTheme.colors.accentLight }}
+            thumbColor={Platform.OS === 'android' ? currentTheme.colors.primary : ''}
+            ios_backgroundColor={currentTheme.colors.lightGray}
+          />
         </View>
+
+        <Text style={styles.switchDescription}>
+          Enable to use your own TMDb API key instead of the built-in one.
+          Using your own API key may provide better performance and higher rate limits.
+        </Text>
 
         {useCustomKey && (
           <>
@@ -271,8 +497,8 @@ const TMDBSettingsScreen = () => {
               <MaterialIcons 
                 name={isKeySet ? "check-circle" : "error-outline"} 
                 size={28}
-                color={isKeySet ? colors.success : colors.warning} 
-                style={styles.statusIcon}
+                color={isKeySet ? currentTheme.colors.success : currentTheme.colors.warning} 
+                style={styles.statusIconContainer}
               />
               <View style={styles.statusTextContainer}>
                 <Text style={styles.statusTitle}>
@@ -287,8 +513,8 @@ const TMDBSettingsScreen = () => {
             </View>
 
             <View style={styles.card}>
-              <Text style={styles.sectionTitle}>API Key</Text>
-              <View style={styles.inputWrapper}>
+              <Text style={styles.cardTitle}>API Key</Text>
+              <View style={styles.inputContainer}>
                 <TextInput
                   ref={apiKeyInputRef}
                   style={[styles.input, isInputFocused && styles.inputFocused]}
@@ -298,7 +524,7 @@ const TMDBSettingsScreen = () => {
                     if (testResult) setTestResult(null);
                   }}
                   placeholder="Paste your TMDb API key (v4 auth)"
-                  placeholderTextColor={colors.mediumGray}
+                  placeholderTextColor={currentTheme.colors.mediumGray}
                   autoCapitalize="none"
                   autoCorrect={false}
                   spellCheck={false}
@@ -309,7 +535,7 @@ const TMDBSettingsScreen = () => {
                   style={styles.pasteButton}
                   onPress={pasteFromClipboard}
                 >
-                  <MaterialIcons name="content-paste" size={20} color={colors.primary} />
+                  <MaterialIcons name="content-paste" size={20} color={currentTheme.colors.primary} />
                 </TouchableOpacity>
               </View>
 
@@ -339,7 +565,7 @@ const TMDBSettingsScreen = () => {
                   <MaterialIcons 
                     name={testResult.success ? "check-circle" : "error"} 
                     size={18} 
-                    color={testResult.success ? colors.success : colors.error}
+                    color={testResult.success ? currentTheme.colors.success : currentTheme.colors.error}
                     style={styles.resultIcon}
                   />
                   <Text style={[
@@ -355,7 +581,7 @@ const TMDBSettingsScreen = () => {
                 style={styles.helpLink}
                 onPress={openTMDBWebsite}
               >
-                <MaterialIcons name="help" size={16} color={colors.primary} style={styles.helpIcon} />
+                <MaterialIcons name="help" size={16} color={currentTheme.colors.primary} style={styles.helpIcon} />
                 <Text style={styles.helpText}>
                   How to get a TMDb API key?
                 </Text>
@@ -363,7 +589,7 @@ const TMDBSettingsScreen = () => {
             </View>
 
             <View style={styles.infoCard}>
-              <MaterialIcons name="info-outline" size={22} color={colors.primary} style={styles.infoIcon} />
+              <MaterialIcons name="info-outline" size={22} color={currentTheme.colors.primary} style={styles.infoIcon} />
               <Text style={styles.infoText}>
                 To get your own TMDb API key (v4 auth token), you need to create a TMDb account and request an API key from their website.
                 Using your own API key gives you dedicated quota and may improve app performance.
@@ -374,7 +600,7 @@ const TMDBSettingsScreen = () => {
 
         {!useCustomKey && (
           <View style={styles.infoCard}>
-            <MaterialIcons name="info-outline" size={22} color={colors.primary} style={styles.infoIcon} />
+            <MaterialIcons name="info-outline" size={22} color={currentTheme.colors.primary} style={styles.infoIcon} />
             <Text style={styles.infoText}>
               Currently using the built-in TMDb API key. This key is shared among all users.
               For better performance and reliability, consider using your own API key.
@@ -385,237 +611,5 @@ const TMDBSettingsScreen = () => {
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.darkBackground,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: colors.white,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 16 : 16,
-    paddingBottom: 8,
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  backText: {
-    color: colors.primary,
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: colors.white,
-    marginHorizontal: 16,
-    marginBottom: 16,
-  },
-  content: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 40,
-  },
-  switchCard: {
-    backgroundColor: colors.elevation2,
-    borderRadius: 12,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  switchLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.white,
-  },
-  switchDescription: {
-    fontSize: 14,
-    color: colors.mediumEmphasis,
-    lineHeight: 20,
-  },
-  statusCard: {
-    flexDirection: 'row',
-    backgroundColor: colors.elevation2,
-    borderRadius: 12,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  statusIcon: {
-    marginRight: 12,
-  },
-  statusTextContainer: {
-    flex: 1,
-  },
-  statusTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.white,
-    marginBottom: 4,
-  },
-  statusDescription: {
-    fontSize: 14,
-    color: colors.mediumEmphasis,
-  },
-  card: {
-    backgroundColor: colors.elevation2,
-    borderRadius: 12,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.white,
-    marginBottom: 16,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: colors.elevation1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: colors.white,
-    fontSize: 15,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  inputFocused: {
-    borderColor: colors.primary,
-  },
-  pasteButton: {
-    position: 'absolute',
-    right: 8,
-    padding: 8,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
-  button: {
-    backgroundColor: colors.primary,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 8,
-  },
-  clearButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: colors.error,
-    marginRight: 0,
-    marginLeft: 8,
-    flex: 0,
-  },
-  buttonText: {
-    color: colors.white,
-    fontWeight: '500',
-    fontSize: 15,
-  },
-  clearButtonText: {
-    color: colors.error,
-  },
-  resultMessage: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-  },
-  successMessage: {
-    backgroundColor: colors.success + '1A', // 10% opacity
-  },
-  errorMessage: {
-    backgroundColor: colors.error + '1A', // 10% opacity
-  },
-  resultIcon: {
-    marginRight: 8,
-  },
-  resultText: {
-    fontSize: 14,
-    flex: 1,
-  },
-  successText: {
-    color: colors.success,
-  },
-  errorText: {
-    color: colors.error,
-  },
-  helpLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 8,
-  },
-  helpIcon: {
-    marginRight: 6,
-  },
-  helpText: {
-    color: colors.primary,
-    fontSize: 14,
-  },
-  infoCard: {
-    backgroundColor: colors.elevation1,
-    borderRadius: 12,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  infoIcon: {
-    marginRight: 12,
-    marginTop: 2,
-  },
-  infoText: {
-    color: colors.mediumEmphasis,
-    fontSize: 14,
-    flex: 1,
-    lineHeight: 20,
-  },
-});
 
 export default TMDBSettingsScreen; 

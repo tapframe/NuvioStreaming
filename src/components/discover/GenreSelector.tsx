@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
-import { colors } from '../../styles';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface GenreSelectorProps {
   genres: string[];
@@ -13,6 +13,7 @@ const GenreSelector = ({
   selectedGenre, 
   onSelectGenre 
 }: GenreSelectorProps) => {
+  const { currentTheme } = useTheme();
   
   const renderGenreButton = useCallback((genre: string) => {
     const isSelected = selectedGenre === genre;
@@ -22,7 +23,7 @@ const GenreSelector = ({
         key={genre}
         style={[
           styles.genreButton,
-          isSelected && styles.selectedGenreButton
+          isSelected && { backgroundColor: currentTheme.colors.primary }
         ]}
         onPress={() => onSelectGenre(genre)}
         activeOpacity={0.7}
@@ -30,14 +31,14 @@ const GenreSelector = ({
         <Text
           style={[
             styles.genreText,
-            isSelected && styles.selectedGenreText
+            isSelected && { color: currentTheme.colors.white, fontWeight: '600' }
           ]}
         >
           {genre}
         </Text>
       </TouchableOpacity>
     );
-  }, [selectedGenre, onSelectGenre]);
+  }, [selectedGenre, onSelectGenre, currentTheme]);
 
   return (
     <View style={styles.container}>
@@ -70,24 +71,17 @@ const styles = StyleSheet.create({
     marginRight: 12,
     borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.05)',
-    shadowColor: colors.black,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
     overflow: 'hidden',
   },
-  selectedGenreButton: {
-    backgroundColor: colors.primary,
-  },
   genreText: {
-    color: colors.mediumGray,
+    color: '#9e9e9e', // Default medium gray
     fontWeight: '500',
     fontSize: 14,
-  },
-  selectedGenreText: {
-    color: colors.white,
-    fontWeight: '600',
   },
 });
 

@@ -1,19 +1,20 @@
 import React from 'react';
 import { View, TouchableOpacity, Platform, StyleSheet, Image } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { colors } from '../styles/colors';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { BlurView as ExpoBlurView } from 'expo-blur';
 import { BlurView as CommunityBlurView } from '@react-native-community/blur';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
+import { useTheme } from '../contexts/ThemeContext';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export const NuvioHeader = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute();
+  const { currentTheme } = useTheme();
 
   // Only render the header if the current route is 'Home'
   if (route.name !== 'Home') {
@@ -59,7 +60,7 @@ export const NuvioHeader = () => {
               <MaterialCommunityIcons 
                 name="magnify" 
                 size={24} 
-                color={colors.white} 
+                color={currentTheme.colors.white} 
               />
             </View>
           </TouchableOpacity>

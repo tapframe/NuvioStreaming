@@ -19,12 +19,12 @@ import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { Picker } from '@react-native-picker/picker';
-import { colors } from '../styles/colors';
 import { useSettings, DEFAULT_SETTINGS } from '../hooks/useSettings';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { stremioService } from '../services/stremioService';
 import { useCatalogContext } from '../contexts/CatalogContext';
 import { useTraktContext } from '../contexts/TraktContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { catalogService, DataSource } from '../services/catalogService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -39,24 +39,28 @@ interface SettingsCardProps {
   title?: string;
 }
 
-const SettingsCard: React.FC<SettingsCardProps> = ({ children, isDarkMode, title }) => (
-  <View style={[styles.cardContainer]}>
-    {title && (
-      <Text style={[
-        styles.cardTitle,
-        { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }
+const SettingsCard: React.FC<SettingsCardProps> = ({ children, isDarkMode, title }) => {
+  const { currentTheme } = useTheme();
+  
+  return (
+    <View style={[styles.cardContainer]}>
+      {title && (
+        <Text style={[
+          styles.cardTitle,
+          { color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark }
+        ]}>
+          {title.toUpperCase()}
+        </Text>
+      )}
+      <View style={[
+        styles.card,
+        { backgroundColor: isDarkMode ? currentTheme.colors.elevation2 : currentTheme.colors.white }
       ]}>
-        {title.toUpperCase()}
-      </Text>
-    )}
-    <View style={[
-      styles.card,
-      { backgroundColor: isDarkMode ? colors.elevation2 : colors.white }
-    ]}>
-      {children}
+        {children}
+      </View>
     </View>
-  </View>
-);
+  );
+};
 
 interface SettingItemProps {
   title: string;
@@ -79,6 +83,8 @@ const SettingItem: React.FC<SettingItemProps> = ({
   isDarkMode,
   badge
 }) => {
+  const { currentTheme } = useTheme();
+  
   return (
     <TouchableOpacity 
       activeOpacity={0.7}
@@ -93,21 +99,21 @@ const SettingItem: React.FC<SettingItemProps> = ({
         styles.settingIconContainer,
         { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
       ]}>
-        <MaterialIcons name={icon} size={20} color={colors.primary} />
+        <MaterialIcons name={icon} size={20} color={currentTheme.colors.primary} />
       </View>
       <View style={styles.settingContent}>
         <View style={styles.settingTextContainer}>
-          <Text style={[styles.settingTitle, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
+          <Text style={[styles.settingTitle, { color: isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark }]}>
             {title}
           </Text>
           {description && (
-            <Text style={[styles.settingDescription, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>
+            <Text style={[styles.settingDescription, { color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark }]}>
               {description}
             </Text>
           )}
         </View>
         {badge && (
-          <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+          <View style={[styles.badge, { backgroundColor: currentTheme.colors.primary }]}>
             <Text style={styles.badgeText}>{badge}</Text>
           </View>
         )}
@@ -126,6 +132,7 @@ const SettingsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { lastUpdate } = useCatalogContext();
   const { isAuthenticated, userProfile } = useTraktContext();
+  const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
   
   // States for dynamic content
@@ -229,8 +236,8 @@ const SettingsScreen: React.FC = () => {
     <Switch
       value={value}
       onValueChange={onValueChange}
-      trackColor={{ false: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)', true: colors.primary }}
-      thumbColor={Platform.OS === 'android' ? (value ? colors.white : colors.white) : ''}
+      trackColor={{ false: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)', true: currentTheme.colors.primary }}
+      thumbColor={Platform.OS === 'android' ? (value ? currentTheme.colors.white : currentTheme.colors.white) : ''}
       ios_backgroundColor={isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}
     />
   );
@@ -257,22 +264,22 @@ const SettingsScreen: React.FC = () => {
   return (
     <View style={[
       styles.container,
-      { backgroundColor: isDarkMode ? colors.darkBackground : '#F2F2F7' }
+      { backgroundColor: isDarkMode ? currentTheme.colors.darkBackground : '#F2F2F7' }
     ]}>
       {/* Fixed position header background to prevent shifts */}
       <View style={[
         styles.headerBackground,
-        { height: headerHeight, backgroundColor: isDarkMode ? colors.darkBackground : '#F2F2F7' }
+        { height: headerHeight, backgroundColor: isDarkMode ? currentTheme.colors.darkBackground : '#F2F2F7' }
       ]} />
       
       <View style={{ flex: 1 }}>
         {/* Header Section with proper top spacing */}
         <View style={[styles.header, { height: headerHeight, paddingTop: topSpacing }]}>
-          <Text style={[styles.headerTitle, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
+          <Text style={[styles.headerTitle, { color: isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark }]}>
             Settings
           </Text>
           <TouchableOpacity onPress={handleResetSettings} style={styles.resetButton}>
-            <Text style={[styles.resetButtonText, {color: colors.primary}]}>Reset</Text>
+            <Text style={[styles.resetButtonText, {color: currentTheme.colors.primary}]}>Reset</Text>
           </TouchableOpacity>
         </View>
 
@@ -399,25 +406,37 @@ const SettingsScreen: React.FC = () => {
                     <TouchableOpacity
                       style={[
                         styles.selectorButton,
-                        discoverDataSource === DataSource.STREMIO_ADDONS && styles.selectorButtonActive
+                        discoverDataSource === DataSource.STREMIO_ADDONS && {
+                          backgroundColor: currentTheme.colors.primary
+                        }
                       ]}
                       onPress={() => handleDiscoverDataSourceChange(DataSource.STREMIO_ADDONS)}
                     >
                       <Text style={[
                         styles.selectorText,
-                        discoverDataSource === DataSource.STREMIO_ADDONS && styles.selectorTextActive
+                        { color: currentTheme.colors.mediumEmphasis },
+                        discoverDataSource === DataSource.STREMIO_ADDONS && {
+                          color: currentTheme.colors.white,
+                          fontWeight: '600'
+                        }
                       ]}>Addons</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[
                         styles.selectorButton,
-                        discoverDataSource === DataSource.TMDB && styles.selectorButtonActive
+                        discoverDataSource === DataSource.TMDB && {
+                          backgroundColor: currentTheme.colors.primary
+                        }
                       ]}
                       onPress={() => handleDiscoverDataSourceChange(DataSource.TMDB)}
                     >
                       <Text style={[
                         styles.selectorText,
-                        discoverDataSource === DataSource.TMDB && styles.selectorTextActive
+                        { color: currentTheme.colors.mediumEmphasis },
+                        discoverDataSource === DataSource.TMDB && {
+                          color: currentTheme.colors.white,
+                          fontWeight: '600'
+                        }
                       ]}>TMDB</Text>
                     </TouchableOpacity>
                   </View>
@@ -425,8 +444,32 @@ const SettingsScreen: React.FC = () => {
               />
             </SettingsCard>
 
+            <SettingsCard isDarkMode={isDarkMode} title="Appearance">
+              <SettingItem
+                title="Dark Mode"
+                description="Enable dark mode for the app"
+                icon="brightness-6"
+                renderControl={() => (
+                  <CustomSwitch
+                    value={settings.enableDarkMode}
+                    onValueChange={(value) => updateSetting('enableDarkMode', value)}
+                  />
+                )}
+                isDarkMode={isDarkMode}
+              />
+              <SettingItem
+                title="Themes"
+                description="Customize app colors and themes"
+                icon="palette"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('ThemeSettings')}
+                isDarkMode={isDarkMode}
+                isLast
+              />
+            </SettingsCard>
+
             <View style={styles.versionContainer}>
-              <Text style={[styles.versionText, {color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark}]}>
+              <Text style={[styles.versionText, {color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark}]}>
                 Version 1.0.0
               </Text>
             </View>
@@ -597,17 +640,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
-  selectorButtonActive: {
-    backgroundColor: colors.primary,
-  },
   selectorText: {
     fontSize: 14,
     fontWeight: '500',
-    color: colors.mediumEmphasis,
-  },
-  selectorTextActive: {
-    color: colors.white,
-    fontWeight: '600',
   },
 });
 

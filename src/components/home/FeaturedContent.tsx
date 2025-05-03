@@ -17,7 +17,6 @@ import { RootStackParamList } from '../../navigation/AppNavigator';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image as ExpoImage } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
-import { colors } from '../../styles/colors';
 import Animated, { 
   FadeIn, 
   useAnimatedStyle, 
@@ -32,6 +31,8 @@ import { isValidMetahubLogo, hasValidLogoFormat, isMetahubUrl, isTmdbUrl } from 
 import { useSettings } from '../../hooks/useSettings';
 import { TMDBService } from '../../services/tmdbService';
 import { logger } from '../../utils/logger';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { Theme } from '../../contexts/ThemeContext';
 
 interface FeaturedContentProps {
   featuredContent: StreamingContent | null;
@@ -47,6 +48,7 @@ const { width, height } = Dimensions.get('window');
 const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: FeaturedContentProps) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { settings } = useSettings();
+  const { currentTheme } = useTheme();
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const prevContentIdRef = useRef<string | null>(null);
@@ -350,7 +352,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
               'transparent',
               'rgba(0,0,0,0.1)',
               'rgba(0,0,0,0.7)',
-              colors.darkBackground,
+              currentTheme.colors.darkBackground,
             ]}
             locations={[0, 0.3, 0.7, 1]}
             style={styles.featuredGradient as ViewStyle}
@@ -373,14 +375,18 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
                   />
                 </Animated.View>
               ) : (
-                <Text style={styles.featuredTitleText as TextStyle}>{featuredContent.name}</Text>
+                <Text style={[styles.featuredTitleText as TextStyle, { color: currentTheme.colors.highEmphasis }]}>
+                  {featuredContent.name}
+                </Text>
               )}
               <View style={styles.genreContainer as ViewStyle}>
                 {featuredContent.genres?.slice(0, 3).map((genre, index, array) => (
                   <React.Fragment key={index}>
-                    <Text style={styles.genreText as TextStyle}>{genre}</Text>
+                    <Text style={[styles.genreText as TextStyle, { color: currentTheme.colors.white }]}>
+                      {genre}
+                    </Text>
                     {index < array.length - 1 && (
-                      <Text style={styles.genreDot as TextStyle}>•</Text>
+                      <Text style={[styles.genreDot as TextStyle, { color: currentTheme.colors.white }]}>•</Text>
                     )}
                   </React.Fragment>
                 ))}
@@ -395,15 +401,15 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
                 <MaterialIcons 
                   name={isSaved ? "bookmark" : "bookmark-border"} 
                   size={24} 
-                  color={colors.white} 
+                  color={currentTheme.colors.white} 
                 />
-                <Text style={styles.myListButtonText as TextStyle}>
+                <Text style={[styles.myListButtonText as TextStyle, { color: currentTheme.colors.white }]}>
                   {isSaved ? "Saved" : "Save"}
                 </Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
-                style={styles.playButton as ViewStyle}
+                style={[styles.playButton as ViewStyle, { backgroundColor: currentTheme.colors.white }]}
                 onPress={() => {
                   if (featuredContent) {
                     navigation.navigate('Streams', { 
@@ -413,8 +419,10 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
                   }
                 }}
               >
-                <MaterialIcons name="play-arrow" size={24} color={colors.black} />
-                <Text style={styles.playButtonText as TextStyle}>Play</Text>
+                <MaterialIcons name="play-arrow" size={24} color={currentTheme.colors.black} />
+                <Text style={[styles.playButtonText as TextStyle, { color: currentTheme.colors.black }]}>
+                  Play
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
@@ -428,8 +436,10 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
                   }
                 }}
               >
-                <MaterialIcons name="info-outline" size={24} color={colors.white} />
-                <Text style={styles.infoButtonText as TextStyle}>Info</Text>
+                <MaterialIcons name="info-outline" size={24} color={currentTheme.colors.white} />
+                <Text style={[styles.infoButtonText as TextStyle, { color: currentTheme.colors.white }]}>
+                  Info
+                </Text>
               </TouchableOpacity>
             </Animated.View>
           </LinearGradient>
@@ -446,7 +456,6 @@ const styles = StyleSheet.create({
     marginTop: 0,
     marginBottom: 8,
     position: 'relative',
-    backgroundColor: colors.elevation1,
   },
   imageContainer: {
     width: '100%',
@@ -468,7 +477,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: colors.elevation1,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1,
@@ -491,7 +499,6 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   featuredTitleText: {
-    color: colors.highEmphasis,
     fontSize: 28,
     fontWeight: '900',
     marginBottom: 8,
@@ -510,13 +517,11 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   genreText: {
-    color: colors.white,
     fontSize: 14,
     fontWeight: '500',
     opacity: 0.9,
   },
   genreDot: {
-    color: colors.white,
     fontSize: 14,
     fontWeight: '500',
     opacity: 0.6,
@@ -538,7 +543,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 32,
     borderRadius: 30,
-    backgroundColor: colors.white,
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -568,18 +572,15 @@ const styles = StyleSheet.create({
     flex: undefined,
   },
   playButtonText: {
-    color: colors.black,
     fontWeight: '600',
     marginLeft: 8,
     fontSize: 16,
   },
   myListButtonText: {
-    color: colors.white,
     fontSize: 12,
     fontWeight: '500',
   },
   infoButtonText: {
-    color: colors.white,
     fontSize: 12,
     fontWeight: '500',
   },

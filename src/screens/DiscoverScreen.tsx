@@ -12,11 +12,11 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { colors } from '../styles';
 import { catalogService, StreamingContent } from '../services/catalogService';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { logger } from '../utils/logger';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../contexts/ThemeContext';
 
 // Components
 import CategorySelector from '../components/discover/CategorySelector';
@@ -37,6 +37,7 @@ const DiscoverScreen = () => {
   const [loading, setLoading] = useState(true);
   const styles = useDiscoverStyles();
   const insets = useSafeAreaInsets();
+  const { currentTheme } = useTheme();
 
   // Force consistent status bar settings
   useEffect(() => {
@@ -162,7 +163,7 @@ const DiscoverScreen = () => {
               <MaterialIcons 
                 name="search" 
                 size={24} 
-                color={colors.white}
+                color={currentTheme.colors.white}
               />
             </TouchableOpacity>
           </View>
@@ -187,7 +188,7 @@ const DiscoverScreen = () => {
           {/* Content Section */}
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
+              <ActivityIndicator size="large" color={currentTheme.colors.primary} />
             </View>
           ) : catalogs.length > 0 ? (
             <CatalogsList 

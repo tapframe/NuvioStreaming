@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, FlatList, Dimensions } from '
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
-import { colors } from '../../styles';
+import { useTheme } from '../../contexts/ThemeContext';
 import { GenreCatalog, Category } from '../../constants/discover';
 import { StreamingContent } from '../../services/catalogService';
 import { RootStackParamList } from '../../navigation/AppNavigator';
@@ -16,6 +16,7 @@ interface CatalogSectionProps {
 
 const CatalogSection = ({ catalog, selectedCategory }: CatalogSectionProps) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const { currentTheme } = useTheme();
   const { width } = Dimensions.get('window');
   const itemWidth = (width - 48) / 2.2; // 2 items per row with spacing
   
@@ -56,16 +57,18 @@ const CatalogSection = ({ catalog, selectedCategory }: CatalogSectionProps) => {
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>{catalog.genre}</Text>
-          <View style={styles.titleBar} />
+          <Text style={[styles.title, { color: currentTheme.colors.white }]}>
+            {catalog.genre}
+          </Text>
+          <View style={[styles.titleBar, { backgroundColor: currentTheme.colors.primary }]} />
         </View>
         <TouchableOpacity
           onPress={handleSeeMorePress}
           style={styles.seeAllButton}
           activeOpacity={0.6}
         >
-          <Text style={styles.seeAllText}>See All</Text>
-          <MaterialIcons name="arrow-forward-ios" color={colors.primary} size={14} />
+          <Text style={[styles.seeAllText, { color: currentTheme.colors.primary }]}>See All</Text>
+          <MaterialIcons name="arrow-forward-ios" color={currentTheme.colors.primary} size={14} />
         </TouchableOpacity>
       </View>
       
@@ -106,14 +109,12 @@ const styles = StyleSheet.create({
   titleBar: {
     width: 32,
     height: 3,
-    backgroundColor: colors.primary,
     marginTop: 6,
     borderRadius: 2,
   },
   title: {
     fontSize: 20,
     fontWeight: '700',
-    color: colors.white,
   },
   seeAllButton: {
     flexDirection: 'row',
@@ -123,7 +124,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   seeAllText: {
-    color: colors.primary,
     fontWeight: '600',
     fontSize: 14,
   },

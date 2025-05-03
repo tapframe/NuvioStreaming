@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { colors } from '../../styles';
+import { useTheme } from '../../contexts/ThemeContext';
 import { Category } from '../../constants/discover';
 
 interface CategorySelectorProps {
@@ -15,6 +15,7 @@ const CategorySelector = ({
   selectedCategory, 
   onSelectCategory 
 }: CategorySelectorProps) => {
+  const { currentTheme } = useTheme();
   
   const renderCategoryButton = useCallback((category: Category) => {
     const isSelected = selectedCategory.id === category.id;
@@ -24,7 +25,7 @@ const CategorySelector = ({
         key={category.id}
         style={[
           styles.categoryButton,
-          isSelected && styles.selectedCategoryButton
+          isSelected && { backgroundColor: currentTheme.colors.primary }
         ]}
         onPress={() => onSelectCategory(category)}
         activeOpacity={0.7}
@@ -32,19 +33,19 @@ const CategorySelector = ({
         <MaterialIcons 
           name={category.icon} 
           size={24} 
-          color={isSelected ? colors.white : colors.mediumGray} 
+          color={isSelected ? currentTheme.colors.white : currentTheme.colors.mediumGray} 
         />
         <Text
           style={[
             styles.categoryText,
-            isSelected && styles.selectedCategoryText
+            isSelected && { color: currentTheme.colors.white, fontWeight: '700' }
           ]}
         >
           {category.name}
         </Text>
       </TouchableOpacity>
     );
-  }, [selectedCategory, onSelectCategory]);
+  }, [selectedCategory, onSelectCategory, currentTheme]);
 
   return (
     <View style={styles.container}>
@@ -78,23 +79,16 @@ const styles = StyleSheet.create({
     flex: 1,
     maxWidth: 160,
     justifyContent: 'center',
-    shadowColor: colors.black,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
   },
-  selectedCategoryButton: {
-    backgroundColor: colors.primary,
-  },
   categoryText: {
-    color: colors.mediumGray,
+    color: '#9e9e9e', // Default medium gray
     fontWeight: '600',
     fontSize: 16,
-  },
-  selectedCategoryText: {
-    color: colors.white,
-    fontWeight: '700',
   },
 });
 

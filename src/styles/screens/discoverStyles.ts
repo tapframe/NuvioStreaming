@@ -1,25 +1,26 @@
 import { StyleSheet, Dimensions } from 'react-native';
-import { colors } from '../index';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const useDiscoverStyles = () => {
   const { width } = Dimensions.get('window');
+  const { currentTheme } = useTheme();
   
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.darkBackground,
+      backgroundColor: currentTheme.colors.darkBackground,
     },
     headerBackground: {
       position: 'absolute',
       top: 0,
       left: 0,
       right: 0,
-      backgroundColor: colors.darkBackground,
+      backgroundColor: currentTheme.colors.darkBackground,
       zIndex: 1,
     },
     contentContainer: {
       flex: 1,
-      backgroundColor: colors.darkBackground,
+      backgroundColor: currentTheme.colors.darkBackground,
     },
     header: {
       paddingHorizontal: 20,
@@ -36,7 +37,7 @@ const useDiscoverStyles = () => {
     headerTitle: {
       fontSize: 32,
       fontWeight: '800',
-      color: colors.white,
+      color: currentTheme.colors.white,
       letterSpacing: 0.3,
     },
     searchButton: {
@@ -56,7 +57,7 @@ const useDiscoverStyles = () => {
       paddingTop: 80,
     },
     emptyText: {
-      color: colors.mediumGray,
+      color: currentTheme.colors.mediumGray,
       fontSize: 16,
       textAlign: 'center',
       paddingHorizontal: 32,

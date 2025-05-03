@@ -13,6 +13,8 @@ import { colors } from '../styles/colors';
 import { NuvioHeader } from '../components/NuvioHeader';
 import { Stream } from '../types/streams';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AnimationFade, AnimationSlideHorizontal } from '../utils/animations';
+import { useTheme } from '../contexts/ThemeContext';
 
 // Import screens with their proper types
 import HomeScreen from '../screens/HomeScreen';
@@ -36,6 +38,7 @@ import HeroCatalogsScreen from '../screens/HeroCatalogsScreen';
 import TraktSettingsScreen from '../screens/TraktSettingsScreen';
 import PlayerSettingsScreen from '../screens/PlayerSettingsScreen';
 import LogoSourceSettings from '../screens/LogoSourceSettings';
+import ThemeScreen from '../screens/ThemeScreen';
 
 // Stack navigator types
 export type RootStackParamList = {
@@ -92,6 +95,7 @@ export type RootStackParamList = {
   TraktSettings: undefined;
   PlayerSettings: undefined;
   LogoSourceSettings: undefined;
+  ThemeSettings: undefined;
 };
 
 export type RootStackNavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -653,8 +657,7 @@ const MainTabs = () => {
 
 // Stack Navigator
 const AppNavigator = () => {
-  // Always use dark mode
-  const isDarkMode = true;
+  const { currentTheme } = useTheme();
   
   return (
     <SafeAreaProvider>
@@ -671,7 +674,7 @@ const AppNavigator = () => {
             animation: 'none',
             // Ensure content is not popping in and out
             contentStyle: {
-              backgroundColor: colors.darkBackground,
+              backgroundColor: currentTheme.colors.darkBackground,
             }
           }}
         >
@@ -723,7 +726,7 @@ const AppNavigator = () => {
               gestureDirection: 'horizontal',
               headerShown: false,
               contentStyle: {
-                backgroundColor: colors.darkBackground,
+                backgroundColor: currentTheme.colors.darkBackground,
               },
             }}
           />
@@ -738,7 +741,7 @@ const AppNavigator = () => {
               gestureDirection: 'horizontal',
               headerShown: false,
               contentStyle: {
-                backgroundColor: colors.darkBackground,
+                backgroundColor: currentTheme.colors.darkBackground,
               },
             }}
           />
@@ -776,7 +779,7 @@ const AppNavigator = () => {
               gestureDirection: 'horizontal',
               headerShown: false,
               contentStyle: {
-                backgroundColor: colors.darkBackground,
+                backgroundColor: currentTheme.colors.darkBackground,
               },
             }}
           />
@@ -791,7 +794,7 @@ const AppNavigator = () => {
               gestureDirection: 'horizontal',
               headerShown: false,
               contentStyle: {
-                backgroundColor: colors.darkBackground,
+                backgroundColor: currentTheme.colors.darkBackground,
               },
             }}
           />
@@ -806,7 +809,7 @@ const AppNavigator = () => {
               gestureDirection: 'horizontal',
               headerShown: false,
               contentStyle: {
-                backgroundColor: colors.darkBackground,
+                backgroundColor: currentTheme.colors.darkBackground,
               },
             }}
           />
@@ -821,7 +824,7 @@ const AppNavigator = () => {
               gestureDirection: 'horizontal',
               headerShown: false,
               contentStyle: {
-                backgroundColor: colors.darkBackground,
+                backgroundColor: currentTheme.colors.darkBackground,
               },
             }}
           />
@@ -836,7 +839,22 @@ const AppNavigator = () => {
               gestureDirection: 'horizontal',
               headerShown: false,
               contentStyle: {
-                backgroundColor: colors.darkBackground,
+                backgroundColor: currentTheme.colors.darkBackground,
+              },
+            }}
+          />
+          <Stack.Screen 
+            name="ThemeSettings" 
+            component={ThemeScreen}
+            options={{
+              animation: 'fade',
+              animationDuration: 200,
+              presentation: 'card',
+              gestureEnabled: true,
+              gestureDirection: 'horizontal',
+              headerShown: false,
+              contentStyle: {
+                backgroundColor: currentTheme.colors.darkBackground,
               },
             }}
           />

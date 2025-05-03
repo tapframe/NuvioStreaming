@@ -21,7 +21,6 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { colors } from '../styles';
 import { catalogService, StreamingContent } from '../services/catalogService';
 import { Image } from 'expo-image';
 import debounce from 'lodash/debounce';
@@ -42,6 +41,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { logger } from '../utils/logger';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../contexts/ThemeContext';
 
 const { width } = Dimensions.get('window');
 const HORIZONTAL_ITEM_WIDTH = width * 0.3;
@@ -57,6 +57,7 @@ const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 const SkeletonLoader = () => {
   const pulseAnim = React.useRef(new RNAnimated.Value(0)).current;
+  const { currentTheme } = useTheme();
 
   React.useEffect(() => {
     const pulse = RNAnimated.loop(
@@ -84,12 +85,24 @@ const SkeletonLoader = () => {
 
   const renderSkeletonItem = () => (
     <View style={styles.skeletonVerticalItem}>
-      <RNAnimated.View style={[styles.skeletonPoster, { opacity }]} />
+      <RNAnimated.View style={[
+        styles.skeletonPoster, 
+        { opacity, backgroundColor: currentTheme.colors.darkBackground }
+      ]} />
       <View style={styles.skeletonItemDetails}>
-        <RNAnimated.View style={[styles.skeletonTitle, { opacity }]} />
+        <RNAnimated.View style={[
+          styles.skeletonTitle, 
+          { opacity, backgroundColor: currentTheme.colors.darkBackground }
+        ]} />
         <View style={styles.skeletonMetaRow}>
-          <RNAnimated.View style={[styles.skeletonMeta, { opacity }]} />
-          <RNAnimated.View style={[styles.skeletonMeta, { opacity }]} />
+          <RNAnimated.View style={[
+            styles.skeletonMeta, 
+            { opacity, backgroundColor: currentTheme.colors.darkBackground }
+          ]} />
+          <RNAnimated.View style={[
+            styles.skeletonMeta, 
+            { opacity, backgroundColor: currentTheme.colors.darkBackground }
+          ]} />
         </View>
       </View>
     </View>
@@ -100,7 +113,10 @@ const SkeletonLoader = () => {
       {[...Array(5)].map((_, index) => (
         <View key={index}>
           {index === 0 && (
-            <RNAnimated.View style={[styles.skeletonSectionHeader, { opacity }]} />
+            <RNAnimated.View style={[
+              styles.skeletonSectionHeader, 
+              { opacity, backgroundColor: currentTheme.colors.darkBackground }
+            ]} />
           )}
           {renderSkeletonItem()}
         </View>
@@ -116,6 +132,7 @@ const SimpleSearchAnimation = () => {
   // Simple animation values that work reliably
   const spinAnim = React.useRef(new RNAnimated.Value(0)).current;
   const fadeAnim = React.useRef(new RNAnimated.Value(0)).current;
+  const { currentTheme } = useTheme();
   
   React.useEffect(() => {
     // Rotation animation
@@ -161,15 +178,15 @@ const SimpleSearchAnimation = () => {
       <View style={styles.simpleAnimationContent}>
         <RNAnimated.View style={[
           styles.spinnerContainer,
-          { transform: [{ rotate: spin }] }
+          { transform: [{ rotate: spin }], backgroundColor: currentTheme.colors.primary }
         ]}>
           <MaterialIcons 
             name="search" 
             size={32} 
-            color={colors.white} 
+            color={currentTheme.colors.white} 
           />
         </RNAnimated.View>
-        <Text style={styles.simpleAnimationText}>Searching</Text>
+        <Text style={[styles.simpleAnimationText, { color: currentTheme.colors.white }]}>Searching</Text>
       </View>
     </RNAnimated.View>
   );
@@ -186,6 +203,7 @@ const SearchScreen = () => {
   const [showRecent, setShowRecent] = useState(true);
   const inputRef = useRef<TextInput>(null);
   const insets = useSafeAreaInsets();
+  const { currentTheme } = useTheme();
   
   // Animation values
   const searchBarWidth = useSharedValue(width - 32);
@@ -348,7 +366,7 @@ const SearchScreen = () => {
         style={styles.recentSearchesContainer}
         entering={FadeIn.duration(300)}
       >
-        <Text style={styles.carouselTitle}>
+        <Text style={[styles.carouselTitle, { color: currentTheme.colors.white }]}>
           Recent Searches
         </Text>
         {recentSearches.map((search, index) => (
@@ -364,10 +382,10 @@ const SearchScreen = () => {
             <MaterialIcons
               name="history"
               size={20}
-              color={colors.lightGray}
+              color={currentTheme.colors.lightGray}
               style={styles.recentSearchIcon}
             />
-            <Text style={styles.recentSearchText}>
+            <Text style={[styles.recentSearchText, { color: currentTheme.colors.white }]}>
               {search}
             </Text>
             <TouchableOpacity
@@ -380,7 +398,7 @@ const SearchScreen = () => {
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               style={styles.recentSearchDeleteButton}
             >
-              <MaterialIcons name="close" size={16} color={colors.lightGray} />
+              <MaterialIcons name="close" size={16} color={currentTheme.colors.lightGray} />
             </TouchableOpacity>
           </AnimatedTouchable>
         ))}
@@ -398,7 +416,10 @@ const SearchScreen = () => {
         entering={FadeIn.duration(500).delay(index * 100)}
         activeOpacity={0.7}
       >
-        <View style={styles.horizontalItemPosterContainer}>
+        <View style={[styles.horizontalItemPosterContainer, { 
+          backgroundColor: currentTheme.colors.darkBackground,
+          borderColor: 'rgba(255,255,255,0.05)'
+        }]}>
           <Image
             source={{ uri: item.poster || PLACEHOLDER_POSTER }}
             style={styles.horizontalItemPoster}
@@ -406,23 +427,29 @@ const SearchScreen = () => {
             transition={300}
           />
           <View style={styles.itemTypeContainer}>
-            <Text style={styles.itemTypeText}>{item.type === 'movie' ? 'MOVIE' : 'SERIES'}</Text>
+            <Text style={[styles.itemTypeText, { color: currentTheme.colors.white }]}>
+              {item.type === 'movie' ? 'MOVIE' : 'SERIES'}
+            </Text>
           </View>
           {item.imdbRating && (
             <View style={styles.ratingContainer}>
               <MaterialIcons name="star" size={12} color="#FFC107" />
-              <Text style={styles.ratingText}>{item.imdbRating}</Text>
+              <Text style={[styles.ratingText, { color: currentTheme.colors.white }]}>
+                {item.imdbRating}
+              </Text>
             </View>
           )}
         </View>
         <Text 
-          style={styles.horizontalItemTitle}
+          style={[styles.horizontalItemTitle, { color: currentTheme.colors.white }]}
           numberOfLines={2}
         >
           {item.name}
         </Text>
         {item.year && (
-          <Text style={styles.yearText}>{item.year}</Text>
+          <Text style={[styles.yearText, { color: currentTheme.colors.mediumGray }]}>
+            {item.year}
+          </Text>
         )}
       </AnimatedTouchable>
     );
@@ -445,7 +472,7 @@ const SearchScreen = () => {
   const headerHeight = headerBaseHeight + topSpacing + 60;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
       <StatusBar
         barStyle="light-content"
         backgroundColor="transparent"
@@ -453,56 +480,68 @@ const SearchScreen = () => {
       />
       
       {/* Fixed position header background to prevent shifts */}
-      <View style={[styles.headerBackground, { height: headerHeight }]} />
+      <View style={[styles.headerBackground, { 
+        height: headerHeight,
+        backgroundColor: currentTheme.colors.darkBackground 
+      }]} />
       
       <View style={{ flex: 1 }}>
         {/* Header Section with proper top spacing */}
         <View style={[styles.header, { height: headerHeight, paddingTop: topSpacing }]}>
-          <Text style={styles.headerTitle}>Search</Text>
-          <View style={[
-            styles.searchBar, 
-            { 
-              backgroundColor: colors.darkGray,
-              borderColor: 'transparent',
-            }
-          ]}>
-            <MaterialIcons 
-              name="search" 
-              size={24} 
-              color={colors.lightGray}
-              style={styles.searchIcon}
-            />
-            <TextInput
-              style={[
-                styles.searchInput,
-                { color: colors.white }
-              ]}
-              placeholder="Search movies, shows..."
-              placeholderTextColor={colors.lightGray}
-              value={query}
-              onChangeText={setQuery}
-              returnKeyType="search"
-              keyboardAppearance="dark"
-              autoFocus
-            />
-            {query.length > 0 && (
-              <TouchableOpacity 
-                onPress={handleClearSearch} 
-                style={styles.clearButton}
-                hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-              >
+          <Text style={[styles.headerTitle, { color: currentTheme.colors.white }]}>Search</Text>
+          <View style={styles.searchBarContainer}>
+            <View style={[
+              styles.searchBarWrapper,
+              { width: '100%' }
+            ]}>
+              <View style={[
+                styles.searchBar, 
+                { 
+                  backgroundColor: currentTheme.colors.elevation2,
+                  borderColor: 'rgba(255,255,255,0.1)',
+                  borderWidth: 1,
+                }
+              ]}>
                 <MaterialIcons 
-                  name="close" 
-                  size={20} 
-                  color={colors.lightGray}
+                  name="search" 
+                  size={24} 
+                  color={currentTheme.colors.lightGray}
+                  style={styles.searchIcon}
                 />
-              </TouchableOpacity>
-            )}
+                <TextInput
+                  style={[
+                    styles.searchInput,
+                    { color: currentTheme.colors.white }
+                  ]}
+                  placeholder="Search movies, shows..."
+                  placeholderTextColor={currentTheme.colors.lightGray}
+                  value={query}
+                  onChangeText={setQuery}
+                  returnKeyType="search"
+                  keyboardAppearance="dark"
+                  autoFocus
+                  ref={inputRef}
+                />
+                {query.length > 0 && (
+                  <TouchableOpacity 
+                    onPress={handleClearSearch} 
+                    style={styles.clearButton}
+                    hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                  >
+                    <MaterialIcons 
+                      name="close" 
+                      size={20} 
+                      color={currentTheme.colors.lightGray}
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
           </View>
         </View>
 
         {/* Content Container */}
-        <View style={styles.contentContainer}>
+        <View style={[styles.contentContainer, { backgroundColor: currentTheme.colors.darkBackground }]}>
           {searching ? (
             <SimpleSearchAnimation />
           ) : searched && !hasResultsToShow ? (
@@ -513,12 +552,12 @@ const SearchScreen = () => {
               <MaterialIcons 
                 name="search-off" 
                 size={64} 
-                color={colors.lightGray}
+                color={currentTheme.colors.lightGray}
               />
-              <Text style={styles.emptyText}>
+              <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>
                 No results found
               </Text>
-              <Text style={styles.emptySubtext}>
+              <Text style={[styles.emptySubtext, { color: currentTheme.colors.lightGray }]}>
                 Try different keywords or check your spelling
               </Text>
             </Animated.View>
@@ -538,7 +577,9 @@ const SearchScreen = () => {
                   style={styles.carouselContainer}
                   entering={FadeIn.duration(300)}
                 >
-                  <Text style={styles.carouselTitle}>Movies ({movieResults.length})</Text>
+                  <Text style={[styles.carouselTitle, { color: currentTheme.colors.white }]}>
+                    Movies ({movieResults.length})
+                  </Text>
                   <FlatList
                     data={movieResults}
                     renderItem={renderHorizontalItem}
@@ -555,7 +596,9 @@ const SearchScreen = () => {
                   style={styles.carouselContainer}
                   entering={FadeIn.duration(300).delay(100)}
                 >
-                  <Text style={styles.carouselTitle}>TV Shows ({seriesResults.length})</Text>
+                  <Text style={[styles.carouselTitle, { color: currentTheme.colors.white }]}>
+                    TV Shows ({seriesResults.length})
+                  </Text>
                   <FlatList
                     data={seriesResults}
                     renderItem={renderHorizontalItem}
@@ -578,19 +621,16 @@ const SearchScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.black,
   },
   headerBackground: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    backgroundColor: colors.black,
     zIndex: 1,
   },
   contentContainer: {
     flex: 1,
-    backgroundColor: colors.black,
     paddingTop: 0,
   },
   header: {
@@ -603,26 +643,26 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 32,
     fontWeight: '800',
-    color: colors.white,
     letterSpacing: 0.5,
     marginBottom: 12,
   },
   searchBarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     marginBottom: 8,
+    height: 48,
   },
   searchBarWrapper: {
     flex: 1,
+    height: 48,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 12,
     paddingHorizontal: 16,
-    height: 48,
-    backgroundColor: colors.darkGray,
+    height: '100%',
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -632,13 +672,6 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  backButton: {
-    marginRight: 10,
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   searchIcon: {
     marginRight: 12,
   },
@@ -646,7 +679,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     height: '100%',
-    color: colors.white,
   },
   clearButton: {
     padding: 4,
@@ -664,7 +696,6 @@ const styles = StyleSheet.create({
   carouselTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: colors.white,
     marginBottom: 12,
     paddingHorizontal: 16,
   },
@@ -681,10 +712,8 @@ const styles = StyleSheet.create({
     height: HORIZONTAL_POSTER_HEIGHT,
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: colors.darkBackground,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
   },
   horizontalItemPoster: {
     width: '100%',
@@ -695,11 +724,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     lineHeight: 18,
     textAlign: 'left',
-    color: colors.white,
   },
   yearText: {
     fontSize: 12,
-    color: colors.mediumGray,
     marginTop: 2,
   },
   recentSearchesContainer: {
@@ -723,7 +750,6 @@ const styles = StyleSheet.create({
   recentSearchText: {
     fontSize: 16,
     flex: 1,
-    color: colors.white,
   },
   recentSearchDeleteButton: {
     padding: 4,
@@ -736,7 +762,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: colors.white,
   },
   emptyContainer: {
     flex: 1,
@@ -749,13 +774,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginTop: 16,
     marginBottom: 8,
-    color: colors.white,
   },
   emptySubtext: {
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
-    color: colors.lightGray,
   },
   skeletonContainer: {
     flexDirection: 'row',
@@ -772,7 +795,6 @@ const styles = StyleSheet.create({
     width: POSTER_WIDTH,
     height: POSTER_HEIGHT,
     borderRadius: 8,
-    backgroundColor: colors.darkBackground,
   },
   skeletonItemDetails: {
     flex: 1,
@@ -788,19 +810,16 @@ const styles = StyleSheet.create({
     height: 20,
     width: '80%',
     marginBottom: 8,
-    backgroundColor: colors.darkBackground,
     borderRadius: 4,
   },
   skeletonMeta: {
     height: 14,
     width: '30%',
-    backgroundColor: colors.darkBackground,
     borderRadius: 4,
   },
   skeletonSectionHeader: {
     height: 24,
     width: '40%',
-    backgroundColor: colors.darkBackground,
     marginBottom: 16,
     borderRadius: 4,
   },
@@ -814,7 +833,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   itemTypeText: {
-    color: colors.white,
     fontSize: 8,
     fontWeight: '700',
   },
@@ -830,7 +848,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   ratingText: {
-    color: colors.white,
     fontSize: 10,
     fontWeight: '700',
     marginLeft: 2,
@@ -847,7 +864,6 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -861,7 +877,6 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   simpleAnimationText: {
-    color: colors.white,
     fontSize: 16,
     fontWeight: '600',
   },

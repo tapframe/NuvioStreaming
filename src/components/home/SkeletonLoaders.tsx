@@ -1,23 +1,30 @@
 import React from 'react';
 import { View, Text, ActivityIndicator, StyleSheet, Dimensions } from 'react-native';
-import { colors } from '../../styles/colors';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { Theme } from '../../contexts/ThemeContext';
 
 const { height } = Dimensions.get('window');
 
-export const SkeletonCatalog = () => (
-  <View style={styles.catalogContainer}>
-    <View style={styles.loadingPlaceholder}>
-      <ActivityIndicator size="small" color={colors.primary} />
+export const SkeletonCatalog = () => {
+  const { currentTheme } = useTheme();
+  return (
+    <View style={styles.catalogContainer}>
+      <View style={[styles.loadingPlaceholder, { backgroundColor: currentTheme.colors.elevation1 }]}>
+        <ActivityIndicator size="small" color={currentTheme.colors.primary} />
+      </View>
     </View>
-  </View>
-);
+  );
+};
 
-export const SkeletonFeatured = () => (
-  <View style={styles.featuredLoadingContainer}>
-    <ActivityIndicator size="large" color={colors.primary} />
-    <Text style={styles.loadingText}>Loading featured content...</Text>
-  </View>
-);
+export const SkeletonFeatured = () => {
+  const { currentTheme } = useTheme();
+  return (
+    <View style={[styles.featuredLoadingContainer, { backgroundColor: currentTheme.colors.elevation1 }]}>
+      <ActivityIndicator size="large" color={currentTheme.colors.primary} />
+      <Text style={[styles.loadingText, { color: currentTheme.colors.textMuted }]}>Loading featured content...</Text>
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   catalogContainer: {
@@ -29,7 +36,6 @@ const styles = StyleSheet.create({
     height: 200,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.elevation1,
     borderRadius: 12,
     marginHorizontal: 16,
   },
@@ -37,28 +43,23 @@ const styles = StyleSheet.create({
     height: height * 0.4,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.elevation1,
   },
   loadingText: {
-    color: colors.textMuted,
     marginTop: 12,
     fontSize: 14,
   },
   skeletonBox: {
-    backgroundColor: colors.elevation2,
     borderRadius: 16,
     overflow: 'hidden',
   },
   skeletonFeatured: {
     width: '100%',
     height: height * 0.6,
-    backgroundColor: colors.elevation2,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
     marginBottom: 0,
   },
   skeletonPoster: {
-    backgroundColor: colors.elevation1,
     marginHorizontal: 4,
     borderRadius: 16,
   },
