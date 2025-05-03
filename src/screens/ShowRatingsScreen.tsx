@@ -114,16 +114,16 @@ const RatingCell = memo(({ episode, ratingSource, getTVMazeRating, isCurrentSeas
   }
 
   return (
-    <View style={styles.ratingCellContainer}>
-      <View style={[
+    <Animated.View style={styles.ratingCellContainer}>
+      <Animated.View style={[
         styles.ratingCell, 
         { 
           backgroundColor: getRatingColor(rating),
-          opacity: isCurrent ? 0.7 : 1 
+          opacity: isCurrent ? 0.7 : 1,
         }
       ]}>
         <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
-      </View>
+      </Animated.View>
       {(isInaccurate || isCurrent) && (
         <MaterialIcons 
           name={isCurrent ? "schedule" : "warning"}
@@ -132,7 +132,7 @@ const RatingCell = memo(({ episode, ratingSource, getTVMazeRating, isCurrentSeas
           style={styles.warningIcon}
         />
       )}
-    </View>
+    </Animated.View>
   );
 });
 
@@ -141,44 +141,23 @@ const RatingSourceToggle = memo(({ ratingSource, setRatingSource }: {
   setRatingSource: (source: RatingSource) => void;
 }) => (
   <View style={styles.ratingSourceContainer}>
-    <Text style={styles.ratingSourceTitle}>Rating Source:</Text>
+    <Text style={styles.sectionTitle}>Rating Source:</Text>
     <View style={styles.ratingSourceButtons}>
-      <TouchableOpacity
-        style={[
-          styles.sourceButton,
-          ratingSource === 'imdb' && styles.sourceButtonActive
-        ]}
-        onPress={() => setRatingSource('imdb')}
-      >
-        <Text style={[
-          styles.sourceButtonText,
-          ratingSource === 'imdb' && styles.sourceButtonTextActive
-        ]}>IMDb</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[
-          styles.sourceButton,
-          ratingSource === 'tmdb' && styles.sourceButtonActive
-        ]}
-        onPress={() => setRatingSource('tmdb')}
-      >
-        <Text style={[
-          styles.sourceButtonText,
-          ratingSource === 'tmdb' && styles.sourceButtonTextActive
-        ]}>TMDB</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[
-          styles.sourceButton,
-          ratingSource === 'tvmaze' && styles.sourceButtonActive
-        ]}
-        onPress={() => setRatingSource('tvmaze')}
-      >
-        <Text style={[
-          styles.sourceButtonText,
-          ratingSource === 'tvmaze' && styles.sourceButtonTextActive
-        ]}>TVMaze</Text>
-      </TouchableOpacity>
+      {['imdb', 'tmdb', 'tvmaze'].map((source) => (
+        <TouchableOpacity
+          key={source}
+          style={[
+            styles.sourceButton,
+            ratingSource === source && styles.sourceButtonActive
+          ]}
+          onPress={() => setRatingSource(source as RatingSource)}
+        >
+          <Text style={[
+            styles.sourceButtonText,
+            ratingSource === source && styles.sourceButtonTextActive
+          ]}>{source.toUpperCase()}</Text>
+        </TouchableOpacity>
+      ))}
     </View>
   </View>
 ));
@@ -189,6 +168,7 @@ const ShowInfo = memo(({ show }: { show: Show | null }) => (
       source={{ uri: `https://image.tmdb.org/t/p/w500${show?.poster_path}` }}
       style={styles.poster}
       contentFit="cover"
+      transition={200}
     />
     <View style={styles.showDetails}>
       <Text style={styles.showTitle}>{show?.name}</Text>
@@ -365,6 +345,7 @@ const ShowRatingsScreen = ({ route }: Props) => {
         <SafeAreaView style={{ flex: 1 }}>
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Loading show data...</Text>
           </View>
         </SafeAreaView>
       </View>
@@ -389,68 +370,59 @@ const ShowRatingsScreen = ({ route }: Props) => {
         <Suspense fallback={
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Loading content...</Text>
           </View>
         }>
           <ScrollView 
             style={styles.scrollView}
             showsVerticalScrollIndicator={false}
             removeClippedSubviews={true}
+            contentContainerStyle={styles.scrollViewContent}
           >
             <View style={styles.content}>
               <Animated.View 
-                entering={FadeIn.duration(150)}
+                entering={FadeIn.duration(300)}
                 style={styles.showInfoContainer}
               >
                 <ShowInfo show={show} />
               </Animated.View>
               
               <Animated.View 
-                entering={FadeIn.delay(50).duration(150)}
-                style={styles.ratingSourceContainer}
+                entering={FadeIn.delay(100).duration(300)}
+                style={styles.section}
               >
                 <RatingSourceToggle ratingSource={ratingSource} setRatingSource={setRatingSource} />
               </Animated.View>
 
               <Animated.View 
-                entering={FadeIn.delay(100).duration(150)}
-                style={styles.legend}
+                entering={FadeIn.delay(200).duration(300)}
+                style={styles.section}
               >
                 {/* Legend */}
                 <View style={styles.legend}>
-                  <Text style={styles.legendTitle}>Rating Scale</Text>
+                  <Text style={styles.sectionTitle}>Rating Scale</Text>
                   <View style={styles.legendItems}>
-                    <View style={styles.legendItem}>
-                      <View style={[styles.legendColor, { backgroundColor: '#186A3B' }]} />
-                      <Text style={styles.legendText}>Awesome (9.0+)</Text>
-                    </View>
-                    <View style={styles.legendItem}>
-                      <View style={[styles.legendColor, { backgroundColor: '#28B463' }]} />
-                      <Text style={styles.legendText}>Great (8.0-8.9)</Text>
-                    </View>
-                    <View style={styles.legendItem}>
-                      <View style={[styles.legendColor, { backgroundColor: '#F4D03F' }]} />
-                      <Text style={styles.legendText}>Good (7.5-7.9)</Text>
-                    </View>
-                    <View style={styles.legendItem}>
-                      <View style={[styles.legendColor, { backgroundColor: '#F39C12' }]} />
-                      <Text style={styles.legendText}>Regular (7.0-7.4)</Text>
-                    </View>
-                    <View style={styles.legendItem}>
-                      <View style={[styles.legendColor, { backgroundColor: '#E74C3C' }]} />
-                      <Text style={styles.legendText}>Bad (6.0-6.9)</Text>
-                    </View>
-                    <View style={styles.legendItem}>
-                      <View style={[styles.legendColor, { backgroundColor: '#633974' }]} />
-                      <Text style={styles.legendText}>Garbage ({'<'}6.0)</Text>
-                    </View>
+                    {[
+                      { color: '#186A3B', text: 'Awesome (9.0+)' },
+                      { color: '#28B463', text: 'Great (8.0-8.9)' },
+                      { color: '#F4D03F', text: 'Good (7.5-7.9)' },
+                      { color: '#F39C12', text: 'Regular (7.0-7.4)' },
+                      { color: '#E74C3C', text: 'Bad (6.0-6.9)' },
+                      { color: '#633974', text: 'Garbage (<6.0)' }
+                    ].map((item, index) => (
+                      <View key={index} style={styles.legendItem}>
+                        <View style={[styles.legendColor, { backgroundColor: item.color }]} />
+                        <Text style={styles.legendText}>{item.text}</Text>
+                      </View>
+                    ))}
                   </View>
                   <View style={styles.warningLegends}>
                     <View style={styles.warningLegend}>
-                      <MaterialIcons name="warning" size={16} color={colors.warning} />
+                      <MaterialIcons name="warning" size={14} color={colors.warning} />
                       <Text style={styles.warningText}>Rating differs significantly from IMDb</Text>
                     </View>
                     <View style={styles.warningLegend}>
-                      <MaterialIcons name="schedule" size={16} color={colors.primary} />
+                      <MaterialIcons name="schedule" size={14} color={colors.primary} />
                       <Text style={styles.warningText}>Current season (ratings may change)</Text>
                     </View>
                   </View>
@@ -458,10 +430,11 @@ const ShowRatingsScreen = ({ route }: Props) => {
               </Animated.View>
 
               <Animated.View 
-                entering={FadeIn.delay(150).duration(150)}
-                style={styles.ratingsGrid}
+                entering={FadeIn.delay(300).duration(300)}
+                style={styles.section}
               >
                 {/* Ratings Grid */}
+                <Text style={styles.sectionTitle}>Episode Ratings</Text>
                 <View style={styles.ratingsGrid}>
                   <View style={styles.gridContainer}>
                     {/* Fixed Episode Column */}
@@ -488,9 +461,13 @@ const ShowRatingsScreen = ({ route }: Props) => {
                         {/* Seasons Header */}
                         <View style={styles.gridHeader}>
                           {seasons.map((season) => (
-                            <View key={`s${season.season_number}`} style={styles.ratingColumn}>
+                            <Animated.View 
+                              key={`s${season.season_number}`} 
+                              style={styles.ratingColumn}
+                              entering={SlideInRight.delay(season.season_number * 50).duration(200)}
+                            >
                               <Text style={styles.headerText}>S{season.season_number}</Text>
-                            </View>
+                            </Animated.View>
                           ))}
                           {loadingSeasons && (
                             <View style={[styles.ratingColumn, styles.loadingColumn]}>
@@ -510,7 +487,11 @@ const ShowRatingsScreen = ({ route }: Props) => {
                         {Array.from({ length: Math.max(...seasons.map(s => s.episodes.length)) }).map((_, episodeIndex) => (
                           <View key={`e${episodeIndex + 1}`} style={styles.gridRow}>
                             {seasons.map((season) => (
-                              <View key={`s${season.season_number}e${episodeIndex + 1}`} style={styles.ratingColumn}>
+                              <Animated.View 
+                                key={`s${season.season_number}e${episodeIndex + 1}`} 
+                                style={styles.ratingColumn}
+                                entering={SlideInRight.delay((season.season_number + episodeIndex) * 10).duration(200)}
+                              >
                                 {season.episodes[episodeIndex] && 
                                   <RatingCell
                                     episode={season.episodes[episodeIndex]}
@@ -519,7 +500,7 @@ const ShowRatingsScreen = ({ route }: Props) => {
                                     isCurrentSeason={isCurrentSeason}
                                   />
                                 }
-                              </View>
+                              </Animated.View>
                             ))}
                             {loadingSeasons && <View style={[styles.ratingColumn, styles.loadingColumn]} />}
                           </View>
@@ -544,24 +525,40 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  scrollViewContent: {
+    flexGrow: 1,
+  },
   content: {
-    padding: 8,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 8 : 8,
+    padding: 12,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 12 : 12,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 12,
+  },
+  loadingText: {
+    color: colors.lightGray,
+    fontSize: 14,
+    fontWeight: '500',
   },
   showInfoContainer: {
     marginBottom: 12,
   },
+  section: {
+    marginBottom: 12,
+  },
   showInfo: {
     flexDirection: 'row',
-    marginBottom: 12,
     backgroundColor: Platform.OS === 'ios' ? 'transparent' : colors.darkBackground,
     borderRadius: 8,
-    padding: 8,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   poster: {
     width: 80,
@@ -570,44 +567,39 @@ const styles = StyleSheet.create({
   },
   showDetails: {
     flex: 1,
-    marginLeft: 8,
+    marginLeft: 12,
     justifyContent: 'center',
   },
   showTitle: {
     fontSize: 18,
     fontWeight: '800',
     color: colors.white,
-    marginBottom: 2,
+    marginBottom: 4,
     letterSpacing: 0.5,
   },
   showYear: {
     fontSize: 13,
     color: colors.lightGray,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   episodeCountContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    marginTop: 4,
   },
   episodeCount: {
-    fontSize: 12,
+    fontSize: 13,
     color: colors.lightGray,
   },
-  ratingSection: {
-    backgroundColor: colors.darkBackground,
-    borderRadius: 8,
-    padding: 8,
+  ratingSourceContainer: {
     marginBottom: 12,
   },
-  ratingSourceContainer: {
-    marginBottom: 8,
-  },
-  ratingSourceTitle: {
-    fontSize: 14,
+  sectionTitle: {
+    fontSize: 15,
     fontWeight: '700',
     color: colors.white,
-    marginBottom: 6,
+    marginBottom: 8,
     letterSpacing: 0.5,
   },
   ratingSourceButtons: {
@@ -629,56 +621,38 @@ const styles = StyleSheet.create({
   },
   sourceButtonText: {
     color: colors.lightGray,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   sourceButtonTextActive: {
     color: colors.white,
     fontWeight: '700',
   },
-  tmdbDisclaimer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.black + '40',
-    padding: 6,
-    borderRadius: 6,
-    marginTop: 8,
-    gap: 6,
-  },
-  tmdbDisclaimerText: {
-    color: colors.lightGray,
-    fontSize: 12,
-    flex: 1,
-    lineHeight: 16,
-  },
   legend: {
     backgroundColor: Platform.OS === 'ios' ? 'transparent' : colors.darkBackground,
     borderRadius: 8,
-    padding: 8,
-    marginBottom: 12,
-  },
-  legendTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.white,
-    marginBottom: 8,
-    letterSpacing: 0.5,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   legendItems: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    justifyContent: 'space-between',
     marginBottom: 12,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    minWidth: '45%',
-    marginBottom: 2,
+    width: '48%',
+    marginBottom: 8,
   },
   legendColor: {
-    width: 14,
-    height: 14,
+    width: 12,
+    height: 12,
     borderRadius: 3,
     marginRight: 6,
   },
@@ -688,7 +662,7 @@ const styles = StyleSheet.create({
   },
   warningLegends: {
     marginTop: 8,
-    gap: 6,
+    gap: 4,
     borderTopWidth: 1,
     borderTopColor: colors.black + '40',
     paddingTop: 8,
@@ -700,13 +674,18 @@ const styles = StyleSheet.create({
   },
   warningText: {
     color: colors.lightGray,
-    fontSize: 11,
+    fontSize: 12,
     flex: 1,
   },
   ratingsGrid: {
     backgroundColor: Platform.OS === 'ios' ? 'transparent' : colors.darkBackground,
     borderRadius: 8,
-    padding: 8,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   gridContainer: {
     flexDirection: 'row',
@@ -715,6 +694,7 @@ const styles = StyleSheet.create({
     width: 40,
     borderRightWidth: 1,
     borderRightColor: colors.black + '40',
+    paddingRight: 6,
   },
   seasonsScrollView: {
     flex: 1,
@@ -733,12 +713,12 @@ const styles = StyleSheet.create({
     paddingLeft: 6,
   },
   episodeCell: {
-    height: 28,
+    height: 26,
     justifyContent: 'center',
     paddingRight: 6,
   },
   episodeColumn: {
-    height: 28,
+    height: 26,
     justifyContent: 'center',
     marginBottom: 8,
     paddingRight: 6,
@@ -750,18 +730,18 @@ const styles = StyleSheet.create({
   headerText: {
     color: colors.white,
     fontWeight: '700',
-    fontSize: 12,
+    fontSize: 13,
     letterSpacing: 0.5,
   },
   episodeText: {
     color: colors.lightGray,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '500',
   },
   ratingCell: {
     width: 32,
-    height: 24,
-    borderRadius: 3,
+    height: 26,
+    borderRadius: 4,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -773,7 +753,7 @@ const styles = StyleSheet.create({
   ratingCellContainer: {
     position: 'relative',
     width: 32,
-    height: 24,
+    height: 26,
   },
   warningIcon: {
     position: 'absolute',
