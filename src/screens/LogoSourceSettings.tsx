@@ -16,11 +16,11 @@ import {
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { colors } from '../styles/colors';
 import { useSettings, DEFAULT_SETTINGS } from '../hooks/useSettings';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TMDBService } from '../services/tmdbService';
 import { logger } from '../utils/logger';
+import { useTheme } from '../contexts/ThemeContext';
 
 // TMDB API key - since the default key might be private in the service, we'll use our own
 const TMDB_API_KEY = '439c478a771f35c05022f9feabcca01c';
@@ -71,10 +71,277 @@ const EXAMPLE_SHOWS = [
   }
 ];
 
+// Create a styles creator function that accepts the theme colors
+const createStyles = (colors: any) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.darkBackground,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 16 : 16,
+    backgroundColor: colors.darkBackground,
+  },
+  backButton: {
+    padding: 4,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: '600',
+    marginLeft: 16,
+    color: colors.white,
+  },
+  headerRight: {
+    width: 24,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+  },
+  descriptionContainer: {
+    marginBottom: 16,
+  },
+  description: {
+    color: colors.mediumEmphasis,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  showSelectorContainer: {
+    marginBottom: 16,
+  },
+  selectorLabel: {
+    color: colors.highEmphasis,
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 12,
+  },
+  showsScrollContent: {
+    paddingRight: 16,
+  },
+  showItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: colors.elevation2,
+    borderRadius: 16,
+    marginRight: 6,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  selectedShowItem: {
+    borderColor: colors.primary,
+    backgroundColor: colors.elevation3,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  showItemText: {
+    color: colors.mediumEmphasis,
+    fontSize: 14,
+  },
+  selectedShowItemText: {
+    color: colors.white,
+    fontWeight: '600',
+  },
+  optionsContainer: {
+    marginBottom: 16,
+    gap: 12,
+  },
+  optionCard: {
+    backgroundColor: colors.elevation2,
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  selectedCard: {
+    borderColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.3,
+    elevation: 3,
+  },
+  optionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  optionTitle: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  optionDescription: {
+    color: colors.mediumEmphasis,
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  exampleContainer: {
+    marginTop: 4,
+  },
+  exampleLabel: {
+    color: colors.mediumEmphasis,
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  exampleImage: {
+    height: 60,
+    width: '100%',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 8,
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  infoBox: {
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary,
+  },
+  infoText: {
+    color: colors.mediumEmphasis,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  logoSourceLabel: {
+    color: colors.mediumEmphasis,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  languageSelectorContainer: {
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 6,
+  },
+  languageSelectorTitle: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  languageSelectorDescription: {
+    color: colors.mediumEmphasis,
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  languageSelectorLabel: {
+    color: colors.mediumEmphasis,
+    fontSize: 12,
+    marginBottom: 6,
+  },
+  languageScrollContent: {
+    paddingVertical: 2,
+  },
+  languageItem: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: colors.elevation1,
+    borderRadius: 12,
+    marginRight: 6,
+    borderWidth: 1,
+    borderColor: colors.elevation3,
+    marginVertical: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  selectedLanguageItem: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
+    elevation: 2,
+  },
+  languageItemText: {
+    color: colors.mediumEmphasis,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  selectedLanguageItemText: {
+    color: colors.white,
+  },
+  noteText: {
+    color: colors.mediumEmphasis,
+    fontSize: 11,
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
+  bannerContainer: {
+    height: 90,
+    width: '100%',
+    borderRadius: 6,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  bannerImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  bannerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  logoOverBanner: {
+    position: 'absolute',
+    width: '80%',
+    height: '75%',
+    alignSelf: 'center',
+    top: '12.5%',
+  },
+  noLogoContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  noLogoText: {
+    color: colors.white,
+    fontSize: 14,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+  },
+});
+
 const LogoSourceSettings = () => {
   const { settings, updateSetting } = useSettings();
   const navigation = useNavigation<NavigationProp<any>>();
   const insets = useSafeAreaInsets();
+  const { currentTheme } = useTheme();
+  const colors = currentTheme.colors;
+  const styles = createStyles(colors);
   
   // Get current preference
   const [logoSource, setLogoSource] = useState<'metahub' | 'tmdb'>(
@@ -643,268 +910,5 @@ const LogoSourceSettings = () => {
       </SafeAreaView>
     );
   };
-
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.darkBackground,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 16,
-      paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 16 : 16,
-      backgroundColor: colors.darkBackground,
-    },
-    backButton: {
-      padding: 4,
-    },
-    headerTitle: {
-      fontSize: 22,
-      fontWeight: '600',
-      marginLeft: 16,
-      color: colors.white,
-    },
-    headerRight: {
-      width: 24,
-    },
-    scrollView: {
-      flex: 1,
-    },
-    scrollContent: {
-      paddingHorizontal: 16,
-      paddingBottom: 24,
-    },
-    descriptionContainer: {
-      marginBottom: 16,
-    },
-    description: {
-      color: colors.mediumEmphasis,
-      fontSize: 15,
-      lineHeight: 22,
-    },
-    showSelectorContainer: {
-      marginBottom: 16,
-    },
-    selectorLabel: {
-      color: colors.highEmphasis,
-      fontSize: 16,
-      fontWeight: '500',
-      marginBottom: 12,
-    },
-    showsScrollContent: {
-      paddingRight: 16,
-    },
-    showItem: {
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      backgroundColor: colors.elevation2,
-      borderRadius: 16,
-      marginRight: 6,
-      borderWidth: 1,
-      borderColor: 'transparent',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.1,
-      shadowRadius: 1,
-      elevation: 1,
-    },
-    selectedShowItem: {
-      borderColor: colors.primary,
-      backgroundColor: colors.elevation3,
-      shadowColor: colors.primary,
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.2,
-      shadowRadius: 2,
-      elevation: 2,
-    },
-    showItemText: {
-      color: colors.mediumEmphasis,
-      fontSize: 14,
-    },
-    selectedShowItemText: {
-      color: colors.white,
-      fontWeight: '600',
-    },
-    optionsContainer: {
-      marginBottom: 16,
-      gap: 12,
-    },
-    optionCard: {
-      backgroundColor: colors.elevation2,
-      borderRadius: 8,
-      padding: 12,
-      borderWidth: 2,
-      borderColor: 'transparent',
-      marginBottom: 8,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.2,
-      shadowRadius: 3,
-      elevation: 2,
-    },
-    selectedCard: {
-      borderColor: colors.primary,
-      shadowColor: colors.primary,
-      shadowOpacity: 0.3,
-      elevation: 3,
-    },
-    optionHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 6,
-    },
-    optionTitle: {
-      color: colors.white,
-      fontSize: 16,
-      fontWeight: '600',
-    },
-    optionDescription: {
-      color: colors.mediumEmphasis,
-      fontSize: 13,
-      lineHeight: 18,
-      marginBottom: 10,
-    },
-    exampleContainer: {
-      marginTop: 4,
-    },
-    exampleLabel: {
-      color: colors.mediumEmphasis,
-      fontSize: 13,
-      marginBottom: 4,
-    },
-    exampleImage: {
-      height: 60,
-      width: '100%',
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      borderRadius: 8,
-    },
-    loadingContainer: {
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    infoBox: {
-      marginBottom: 16,
-      padding: 12,
-      backgroundColor: 'rgba(255,255,255,0.05)',
-      borderRadius: 8,
-      borderLeftWidth: 3,
-      borderLeftColor: colors.primary,
-    },
-    infoText: {
-      color: colors.mediumEmphasis,
-      fontSize: 12,
-      lineHeight: 18,
-    },
-    logoSourceLabel: {
-      color: colors.mediumEmphasis,
-      fontSize: 11,
-      marginTop: 2,
-    },
-    languageSelectorContainer: {
-      marginTop: 10,
-      padding: 10,
-      backgroundColor: 'rgba(255,255,255,0.05)',
-      borderRadius: 6,
-    },
-    languageSelectorTitle: {
-      color: colors.white,
-      fontSize: 14,
-      fontWeight: '600',
-      marginBottom: 4,
-    },
-    languageSelectorDescription: {
-      color: colors.mediumEmphasis,
-      fontSize: 12,
-      lineHeight: 18,
-      marginBottom: 8,
-    },
-    languageSelectorLabel: {
-      color: colors.mediumEmphasis,
-      fontSize: 12,
-      marginBottom: 6,
-    },
-    languageScrollContent: {
-      paddingVertical: 2,
-    },
-    languageItem: {
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-      backgroundColor: colors.elevation1,
-      borderRadius: 12,
-      marginRight: 6,
-      borderWidth: 1,
-      borderColor: colors.elevation3,
-      marginVertical: 1,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.1,
-      shadowRadius: 1,
-      elevation: 1,
-    },
-    selectedLanguageItem: {
-      backgroundColor: colors.primary,
-      borderColor: colors.primary,
-      shadowColor: colors.primary,
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.2,
-      shadowRadius: 1,
-      elevation: 2,
-    },
-    languageItemText: {
-      color: colors.mediumEmphasis,
-      fontSize: 12,
-      fontWeight: '600',
-    },
-    selectedLanguageItemText: {
-      color: colors.white,
-    },
-    noteText: {
-      color: colors.mediumEmphasis,
-      fontSize: 11,
-      marginTop: 8,
-      fontStyle: 'italic',
-    },
-    bannerContainer: {
-      height: 90,
-      width: '100%',
-      borderRadius: 6,
-      overflow: 'hidden',
-      position: 'relative',
-    },
-    bannerImage: {
-      ...StyleSheet.absoluteFillObject,
-    },
-    bannerOverlay: {
-      ...StyleSheet.absoluteFillObject,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-    },
-    logoOverBanner: {
-      position: 'absolute',
-      width: '80%',
-      height: '75%',
-      alignSelf: 'center',
-      top: '12.5%',
-    },
-    noLogoContainer: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    noLogoText: {
-      color: colors.white,
-      fontSize: 14,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 4,
-    },
-  });
 
   export default LogoSourceSettings; 
