@@ -425,25 +425,32 @@ const HomeScreen = () => {
   useFocusEffect(
     useCallback(() => {
       const statusBarConfig = () => {
+        // Ensure status bar is fully transparent and doesn't take up space
         StatusBar.setBarStyle("light-content");
         StatusBar.setTranslucent(true);
         StatusBar.setBackgroundColor('transparent');
+        
+        // For iOS specifically
+        if (Platform.OS === 'ios') {
+          StatusBar.setHidden(false);
+        }
       };
       
       statusBarConfig();
       
       return () => {
-        // Don't change StatusBar settings when unfocusing to prevent layout shifts
-        // Only set these when component unmounts completely
+        // Keep translucent when unfocusing to prevent layout shifts
       };
     }, [])
   );
 
   useEffect(() => {
-    // Only run cleanup when component unmounts completely, not on unfocus
+    // Only run cleanup when component unmounts completely
     return () => {
-      StatusBar.setTranslucent(false);
-      StatusBar.setBackgroundColor(currentTheme.colors.darkBackground);
+      if (Platform.OS === 'android') {
+        StatusBar.setTranslucent(false);
+        StatusBar.setBackgroundColor(currentTheme.colors.darkBackground);
+      }
     };
   }, [currentTheme.colors.darkBackground]);
 
@@ -553,7 +560,7 @@ const HomeScreen = () => {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
+    <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
       <StatusBar
         barStyle="light-content"
         backgroundColor="transparent"
@@ -570,7 +577,7 @@ const HomeScreen = () => {
         }
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: Platform.OS === 'ios' ? 39 : 90 }
+          { paddingTop: Platform.OS === 'ios' ? 100 : 90 }
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -617,7 +624,7 @@ const HomeScreen = () => {
           )
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
