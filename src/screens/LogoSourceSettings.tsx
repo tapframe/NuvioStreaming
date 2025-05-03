@@ -472,7 +472,12 @@ const LogoSourceSettings = () => {
           <View style={styles.headerRight} />
         </View>
         
-        <ScrollView style={styles.scrollView}>
+        <ScrollView 
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={true}
+          scrollEventThrottle={32}
+          decelerationRate="normal"
+        >
           {/* Description */}
           <View style={styles.descriptionContainer}>
             <Text style={styles.description}>
@@ -488,6 +493,8 @@ const LogoSourceSettings = () => {
               horizontal 
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.showsScrollContent}
+              scrollEventThrottle={32}
+              decelerationRate="normal"
             >
               {EXAMPLE_SHOWS.map((show) => (
                 <TouchableOpacity
@@ -497,6 +504,8 @@ const LogoSourceSettings = () => {
                     selectedShow.imdbId === show.imdbId && styles.selectedShowItem
                   ]}
                   onPress={() => handleShowSelect(show)}
+                  activeOpacity={0.7}
+                  delayPressIn={100}
                 >
                   <Text 
                     style={[
@@ -519,6 +528,8 @@ const LogoSourceSettings = () => {
                 logoSource === 'metahub' && styles.selectedCard
               ]}
               onPress={() => applyLogoSourceSetting('metahub')}
+              activeOpacity={0.7}
+              delayPressIn={100}
             >
               <View style={styles.optionHeader}>
                 <Text style={styles.optionTitle}>Metahub</Text>
@@ -545,6 +556,8 @@ const LogoSourceSettings = () => {
                 logoSource === 'tmdb' && styles.selectedCard
               ]}
               onPress={() => applyLogoSourceSetting('tmdb')}
+              activeOpacity={0.7}
+              delayPressIn={100}
             >
               <View style={styles.optionHeader}>
                 <Text style={styles.optionTitle}>TMDB</Text>
@@ -575,6 +588,8 @@ const LogoSourceSettings = () => {
                     horizontal 
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.languageScrollContent}
+                    scrollEventThrottle={32}
+                    decelerationRate="normal"
                   >
                     {/* Iterate over unique language codes */}
                     {uniqueTmdbLanguages.map((langCode) => (
@@ -585,6 +600,8 @@ const LogoSourceSettings = () => {
                           selectedTmdbLanguage === langCode && styles.selectedLanguageItem
                         ]}
                         onPress={() => handleTmdbLanguageSelect(langCode)}
+                        activeOpacity={0.7}
+                        delayPressIn={150}
                       >
                         <Text 
                           style={[
@@ -677,10 +694,20 @@ const LogoSourceSettings = () => {
       marginRight: 8,
       borderWidth: 1,
       borderColor: 'transparent',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      elevation: 1,
     },
     selectedShowItem: {
       borderColor: colors.primary,
       backgroundColor: colors.elevation3,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 3,
+      elevation: 2,
     },
     showItemText: {
       color: colors.mediumEmphasis,
@@ -700,9 +727,18 @@ const LogoSourceSettings = () => {
       padding: 16,
       borderWidth: 2,
       borderColor: 'transparent',
+      marginBottom: 12,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 3,
+      elevation: 2,
     },
     selectedCard: {
       borderColor: colors.primary,
+      shadowColor: colors.primary,
+      shadowOpacity: 0.3,
+      elevation: 3,
     },
     optionHeader: {
       flexDirection: 'row',
@@ -785,16 +821,27 @@ const LogoSourceSettings = () => {
     },
     languageItem: {
       paddingHorizontal: 12,
-      paddingVertical: 6,
+      paddingVertical: 8,
       backgroundColor: colors.elevation1,
       borderRadius: 16,
       marginRight: 8,
       borderWidth: 1,
       borderColor: colors.elevation3,
+      marginVertical: 2,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 1,
+      elevation: 1,
     },
     selectedLanguageItem: {
       backgroundColor: colors.primary,
       borderColor: colors.primary,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 2,
+      elevation: 2,
     },
     languageItemText: {
       color: colors.mediumEmphasis,
