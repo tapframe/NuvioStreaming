@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, useWindowDimensions, useColorScheme } from 'react-native';
 import { Image } from 'expo-image';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import { colors } from '../../styles/colors';
+import { useTheme } from '../../contexts/ThemeContext';
 import { Episode } from '../../types/metadata';
 import { tmdbService } from '../../services/tmdbService';
 import { storageService } from '../../services/storageService';
@@ -33,6 +33,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   groupedEpisodes = {},
   metadata
 }) => {
+  const { currentTheme } = useTheme();
   const { width } = useWindowDimensions();
   const isTablet = width > 768;
   const isDarkMode = useColorScheme() === 'dark';
@@ -95,8 +96,8 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   if (loadingSeasons) {
     return (
       <View style={styles.centeredContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.centeredText}>Loading episodes...</Text>
+        <ActivityIndicator size="large" color={currentTheme.colors.primary} />
+        <Text style={[styles.centeredText, { color: currentTheme.colors.text }]}>Loading episodes...</Text>
       </View>
     );
   }
@@ -104,8 +105,8 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   if (episodes.length === 0) {
     return (
       <View style={styles.centeredContainer}>
-        <MaterialIcons name="error-outline" size={48} color="#666" />
-        <Text style={styles.centeredText}>No episodes available</Text>
+        <MaterialIcons name="error-outline" size={48} color={currentTheme.colors.textMuted} />
+        <Text style={[styles.centeredText, { color: currentTheme.colors.text }]}>No episodes available</Text>
       </View>
     );
   }
@@ -119,7 +120,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
     
     return (
       <View style={styles.seasonSelectorWrapper}>
-        <Text style={styles.seasonSelectorTitle}>Seasons</Text>
+        <Text style={[styles.seasonSelectorTitle, { color: currentTheme.colors.highEmphasis }]}>Seasons</Text>
         <ScrollView 
           ref={seasonScrollViewRef}
           horizontal 
@@ -142,7 +143,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                 key={season}
                 style={[
                   styles.seasonButton,
-                  selectedSeason === season && styles.selectedSeasonButton
+                  selectedSeason === season && [styles.selectedSeasonButton, { borderColor: currentTheme.colors.primary }]
                 ]}
                 onPress={() => onSeasonChange(season)}
               >
@@ -153,13 +154,13 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                     contentFit="cover"
                   />
                   {selectedSeason === season && (
-                    <View style={styles.selectedSeasonIndicator} />
+                    <View style={[styles.selectedSeasonIndicator, { backgroundColor: currentTheme.colors.primary }]} />
                   )}
                 </View>
                 <Text 
                   style={[
-                    styles.seasonButtonText,
-                    selectedSeason === season && styles.selectedSeasonButtonText
+                    { color: currentTheme.colors.mediumEmphasis },
+                    selectedSeason === season && [styles.selectedSeasonButtonText, { color: currentTheme.colors.primary }]
                   ]}
                 >
                   Season {season}
@@ -215,7 +216,11 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
     return (
       <TouchableOpacity
         key={episode.id}
-        style={[styles.episodeCard, isTablet && styles.episodeCardTablet]}
+        style={[
+          styles.episodeCard, 
+          isTablet && styles.episodeCardTablet, 
+          { backgroundColor: currentTheme.colors.elevation2 }
+        ]}
         onPress={() => onSelectEpisode(episode)}
         activeOpacity={0.7}
       >
@@ -233,21 +238,21 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               <View 
                 style={[
                   styles.progressBar,
-                  { width: `${progressPercent}%` }
+                  { width: `${progressPercent}%`, backgroundColor: currentTheme.colors.primary }
                 ]} 
               />
             </View>
           )}
           {progressPercent >= 95 && (
-            <View style={styles.completedBadge}>
-              <MaterialIcons name="check" size={12} color={colors.white} />
+            <View style={[styles.completedBadge, { backgroundColor: currentTheme.colors.primary }]}>
+              <MaterialIcons name="check" size={12} color={currentTheme.colors.white} />
             </View>
           )}
         </View>
 
         <View style={styles.episodeInfo}>
           <View style={styles.episodeHeader}>
-            <Text style={styles.episodeTitle} numberOfLines={2}>
+            <Text style={[styles.episodeTitle, { color: currentTheme.colors.text }]} numberOfLines={2}>
               {episode.name}
             </Text>
             <View style={styles.episodeMetadata}>
@@ -258,33 +263,35 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                     style={styles.tmdbLogo}
                     contentFit="contain"
                   />
-                  <Text style={styles.ratingText}>
+                  <Text style={[styles.ratingText, { color: currentTheme.colors.textMuted }]}>
                     {episode.vote_average.toFixed(1)}
                   </Text>
                 </View>
               )}
               {episode.runtime && (
                 <View style={styles.runtimeContainer}>
-                  <MaterialIcons name="schedule" size={14} color={colors.textMuted} />
-                  <Text style={styles.runtimeText}>
+                  <MaterialIcons name="schedule" size={14} color={currentTheme.colors.textMuted} />
+                  <Text style={[styles.runtimeText, { color: currentTheme.colors.textMuted }]}>
                     {formatRuntime(episode.runtime)}
                   </Text>
                 </View>
               )}
               {episode.air_date && (
-                <Text style={styles.airDateText}>
+                <Text style={[styles.airDateText, { color: currentTheme.colors.textMuted }]}>
                   {formatDate(episode.air_date)}
                 </Text>
               )}
             </View>
           </View>
-          <Text style={styles.episodeOverview} numberOfLines={2}>
+          <Text style={[styles.episodeOverview, { color: currentTheme.colors.mediumEmphasis }]} numberOfLines={2}>
             {episode.overview || 'No description available'}
           </Text>
         </View>
       </TouchableOpacity>
     );
   };
+
+  const currentSeasonEpisodes = groupedEpisodes[selectedSeason] || [];
 
   return (
     <View style={styles.container}>
@@ -297,7 +304,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
       <Animated.View 
         entering={FadeIn.duration(500).delay(200)}
       >
-        <Text style={styles.sectionTitle}>
+        <Text style={[styles.sectionTitle, { color: currentTheme.colors.highEmphasis }]}>
           {episodes.length} {episodes.length === 1 ? 'Episode' : 'Episodes'}
         </Text>
         
@@ -310,7 +317,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
         >
           {isTablet ? (
             <View style={styles.episodeGrid}>
-              {episodes.map((episode, index) => (
+              {currentSeasonEpisodes.map((episode, index) => (
                 <Animated.View 
                   key={episode.id}
                   entering={FadeIn.duration(400).delay(300 + index * 50)}
@@ -320,7 +327,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               ))}
             </View>
           ) : (
-            episodes.map((episode, index) => (
+            currentSeasonEpisodes.map((episode, index) => (
               <Animated.View 
                 key={episode.id}
                 entering={FadeIn.duration(400).delay(300 + index * 50)}
@@ -349,14 +356,12 @@ const styles = StyleSheet.create({
   centeredText: {
     marginTop: 12,
     fontSize: 16,
-    color: colors.textMuted,
     textAlign: 'center',
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700',
     marginBottom: 16,
-    color: colors.text,
   },
   episodeList: {
     flex: 1,
@@ -374,7 +379,6 @@ const styles = StyleSheet.create({
   },
   episodeCard: {
     flexDirection: 'row',
-    backgroundColor: colors.darkBackground,
     borderRadius: 16,
     marginBottom: 16,
     overflow: 'hidden',
@@ -396,7 +400,6 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: 120,
     height: 120,
-    backgroundColor: colors.darkBackground,
   },
   episodeImage: {
     width: '100%',
@@ -432,7 +435,6 @@ const styles = StyleSheet.create({
   episodeTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: colors.text,
     letterSpacing: 0.3,
     marginBottom: 2,
   },
@@ -461,13 +463,11 @@ const styles = StyleSheet.create({
   },
   airDateText: {
     fontSize: 12,
-    color: colors.textMuted,
     opacity: 0.8,
   },
   episodeOverview: {
     fontSize: 13,
     lineHeight: 18,
-    color: colors.textMuted,
   },
   seasonSelectorWrapper: {
     marginBottom: 20,
@@ -476,7 +476,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 12,
-    color: colors.text,
   },
   seasonSelectorContainer: {
     flexGrow: 0,
@@ -510,15 +509,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 4,
-    backgroundColor: colors.primary,
   },
   seasonButtonText: {
     fontSize: 14,
     fontWeight: '500',
-    color: colors.textMuted,
   },
   selectedSeasonButtonText: {
-    color: colors.text,
     fontWeight: '700',
   },
   progressBarContainer: {
@@ -531,7 +527,6 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: '100%',
-    backgroundColor: colors.primary,
   },
   progressTextContainer: {
     flexDirection: 'row',
@@ -543,7 +538,6 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   progressText: {
-    color: colors.primary,
     fontSize: 12,
     fontWeight: '600',
     marginLeft: 4,
@@ -552,7 +546,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 8,
     right: 8,
-    backgroundColor: colors.success,
     width: 20,
     height: 20,
     borderRadius: 10,
@@ -570,7 +563,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   runtimeText: {
-    color: colors.textMuted,
     fontSize: 13,
     fontWeight: '600',
     marginLeft: 4,
