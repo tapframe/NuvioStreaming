@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,8 @@ import {
   Image,
   Alert,
   StatusBar,
-  Platform
+  Platform,
+  ActivityIndicator
 } from 'react-native';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -18,6 +19,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../styles/colors';
 import { useSettings } from '../hooks/useSettings';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TMDBService } from '../services/tmdbService';
+import { logger } from '../utils/logger';
+
+// TMDB API key - since the default key might be private in the service, we'll use our own
+const TMDB_API_KEY = '439c478a771f35c05022f9feabcca01c';
 
 const LogoSourceSettings = () => {
   const { settings, updateSetting } = useSettings();
@@ -28,6 +34,118 @@ const LogoSourceSettings = () => {
   const [logoSource, setLogoSource] = useState<'metahub' | 'tmdb'>(
     settings.logoSourcePreference || 'metahub'
   );
+  
+  // Add state for example logos
+  const [tmdbLogo, setTmdbLogo] = useState<string | null>(null);
+  const [metahubLogo, setMetahubLogo] = useState<string | null>(null);
+  const [loadingLogos, setLoadingLogos] = useState(true);
+
+  // Load example logos on mount
+  useEffect(() => {
+    const fetchExampleLogos = async () => {
+      setLoadingLogos(true);
+      
+      try {
+        const tmdbService = TMDBService.getInstance();
+        
+        // Specifically search for Breaking Bad
+        const searchResults = await tmdbService.searchTVShow("Breaking Bad");
+        
+        if (searchResults && searchResults.length > 0) {
+          // Get Breaking Bad (should be the first result)
+          const breakingBad = searchResults[0];
+          const breakingBadId = breakingBad.id;
+          
+          logger.log(`[LogoSourceSettings] Found Breaking Bad with TMDB ID: ${breakingBadId}`);
+          
+          // Get the external IDs to get IMDB ID
+          const externalIds = await tmdbService.getShowExternalIds(breakingBadId);
+          
+          if (externalIds?.imdb_id) {
+            const imdbId = externalIds.imdb_id;
+            logger.log(`[LogoSourceSettings] Breaking Bad IMDB ID: ${imdbId}`);
+            
+            // Get TMDB logo using the images endpoint
+            try {
+              // Manually fetch images from TMDB API
+              const apiKey = TMDB_API_KEY; // Use the TMDB API key
+              const response = await fetch(`https://api.themoviedb.org/3/tv/${breakingBadId}/images?api_key=${apiKey}`);
+              const imagesData = await response.json();
+              
+              if (imagesData.logos && imagesData.logos.length > 0) {
+                // Look for English logo first
+                let logoPath = null;
+                
+                // First try to find an English logo
+                const englishLogo = imagesData.logos.find((logo: { iso_639_1: string; file_path: string }) => 
+                  logo.iso_639_1 === 'en'
+                );
+                if (englishLogo) {
+                  logoPath = englishLogo.file_path;
+                } else if (imagesData.logos[0]) {
+                  // Fallback to the first logo
+                  logoPath = imagesData.logos[0].file_path;
+                }
+                
+                if (logoPath) {
+                  const tmdbLogoUrl = `https://image.tmdb.org/t/p/original${logoPath}`;
+                  setTmdbLogo(tmdbLogoUrl);
+                  logger.log(`[LogoSourceSettings] Got Breaking Bad TMDB logo: ${tmdbLogoUrl}`);
+                } else {
+                  // Fallback to hardcoded Breaking Bad TMDB logo
+                  setTmdbLogo('https://image.tmdb.org/t/p/original/ggFHVNu6YYI5L9pCfOacjizRGt.png');
+                  logger.log(`[LogoSourceSettings] Using fallback Breaking Bad TMDB logo`);
+                }
+              } else {
+                // No logos found in the response
+                setTmdbLogo('https://image.tmdb.org/t/p/original/ggFHVNu6YYI5L9pCfOacjizRGt.png');
+                logger.log(`[LogoSourceSettings] No logos found in TMDB response, using fallback`);
+              }
+            } catch (tmdbError) {
+              logger.error(`[LogoSourceSettings] Error fetching TMDB images:`, tmdbError);
+              // Fallback to hardcoded Breaking Bad TMDB logo
+              setTmdbLogo('https://image.tmdb.org/t/p/original/ggFHVNu6YYI5L9pCfOacjizRGt.png');
+            }
+            
+            // Get Metahub logo
+            const metahubLogoUrl = `https://images.metahub.space/logo/medium/${imdbId}/img`;
+            
+            // Check if Metahub logo exists
+            try {
+              const metahubResponse = await fetch(metahubLogoUrl, { method: 'HEAD' });
+              if (metahubResponse.ok) {
+                setMetahubLogo(metahubLogoUrl);
+                logger.log(`[LogoSourceSettings] Got Breaking Bad Metahub logo: ${metahubLogoUrl}`);
+              } else {
+                // Fallback to hardcoded Breaking Bad Metahub logo
+                setMetahubLogo('https://images.metahub.space/logo/medium/tt0903747/img');
+                logger.log(`[LogoSourceSettings] Using fallback Breaking Bad Metahub logo`);
+              }
+            } catch (metahubErr) {
+              logger.error(`[LogoSourceSettings] Error checking Metahub logo:`, metahubErr);
+              // Fallback to hardcoded Breaking Bad Metahub logo
+              setMetahubLogo('https://images.metahub.space/logo/medium/tt0903747/img');
+            }
+          }
+        } else {
+          logger.warn(`[LogoSourceSettings] Breaking Bad not found in search results`);
+          // Use hardcoded Breaking Bad logos
+          setTmdbLogo('https://image.tmdb.org/t/p/original/ggFHVNu6YYI5L9pCfOacjizRGt.png');
+          setMetahubLogo('https://images.metahub.space/logo/medium/tt0903747/img');
+        }
+      } catch (err) {
+        logger.error('[LogoSourceSettings] Error fetching Breaking Bad logos:', err);
+        
+        // Use hardcoded Breaking Bad logos
+        setTmdbLogo('https://image.tmdb.org/t/p/original/ggFHVNu6YYI5L9pCfOacjizRGt.png');
+        setMetahubLogo('https://images.metahub.space/logo/medium/tt0903747/img');
+      } finally {
+        setLoadingLogos(false);
+      }
+    };
+    
+    fetchExampleLogos();
+  }, []);
 
   // Apply setting and show confirmation
   const applyLogoSourceSetting = (source: 'metahub' | 'tmdb') => {
@@ -52,6 +170,25 @@ const LogoSourceSettings = () => {
   // Handle back navigation
   const handleBack = () => {
     navigation.goBack();
+  };
+
+  // Render logo example with loading state
+  const renderLogoExample = (url: string | null, isLoading: boolean) => {
+    if (isLoading) {
+      return (
+        <View style={[styles.exampleImage, styles.loadingContainer]}>
+          <ActivityIndicator size="small" color={colors.primary} />
+        </View>
+      );
+    }
+    
+    return (
+      <Image 
+        source={{ uri: url || undefined }}
+        style={styles.exampleImage}
+        resizeMode="contain"
+      />
+    );
   };
 
   return (
@@ -103,11 +240,8 @@ const LogoSourceSettings = () => {
             
             <View style={styles.exampleContainer}>
               <Text style={styles.exampleLabel}>Example:</Text>
-              <Image 
-                source={{ uri: 'https://images.metahub.space/logo/medium/tt1475582/img' }}
-                style={styles.exampleImage}
-                resizeMode="contain"
-              />
+              {renderLogoExample(metahubLogo, loadingLogos)}
+              <Text style={styles.logoSourceLabel}>Breaking Bad logo from Metahub</Text>
             </View>
           </TouchableOpacity>
           
@@ -132,11 +266,8 @@ const LogoSourceSettings = () => {
             
             <View style={styles.exampleContainer}>
               <Text style={styles.exampleLabel}>Example:</Text>
-              <Image 
-                source={{ uri: 'https://image.tmdb.org/t/p/original/wwemzKWzjKYJFfCeiB57q3r4Bcm.svg' }}
-                style={styles.exampleImage}
-                resizeMode="contain"
-              />
+              {renderLogoExample(tmdbLogo, loadingLogos)}
+              <Text style={styles.logoSourceLabel}>Breaking Bad logo from TMDB</Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -235,8 +366,12 @@ const styles = StyleSheet.create({
   exampleImage: {
     height: 60,
     width: '100%',
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     borderRadius: 8,
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   infoBox: {
     margin: 16,
@@ -250,6 +385,11 @@ const styles = StyleSheet.create({
     color: colors.mediumEmphasis,
     fontSize: 14,
     lineHeight: 20,
+  },
+  logoSourceLabel: {
+    color: colors.mediumEmphasis,
+    fontSize: 12,
+    marginTop: 4,
   },
 });
 
