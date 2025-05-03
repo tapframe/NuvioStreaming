@@ -127,6 +127,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
         
         // Get logo source preference from settings
         const logoPreference = settings.logoSourcePreference || 'metahub'; // Default to metahub if not set
+        const preferredLanguage = settings.tmdbLanguagePreference || 'en'; // Get preferred language
         
         // Check if current logo matches preferences
         const currentLogo = featuredContent.logo;
@@ -143,7 +144,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
           }
         }
         
-        logger.log(`[FeaturedContent] Fetching logo with preference: ${logoPreference}, ID: ${contentId}`);
+        logger.log(`[FeaturedContent] Fetching logo with preference: ${logoPreference}, language: ${preferredLanguage}, ID: ${contentId}`);
         
         // Extract IMDB ID if available
         let imdbId = null;
@@ -183,10 +184,10 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
             const tmdbType = featuredContent.type === 'series' ? 'tv' : 'movie';
             try {
               const tmdbService = TMDBService.getInstance();
-              const logoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId);
+              const logoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId, preferredLanguage);
               
               if (logoUrl) {
-                logger.log(`[FeaturedContent] Using fallback TMDB logo: ${logoUrl}`);
+                logger.log(`[FeaturedContent] Using fallback TMDB logo (${preferredLanguage}): ${logoUrl}`);
                 setLogoUrl(logoUrl);
               } else if (currentLogo) {
                 // If TMDB fails too, use existing logo if any
@@ -206,10 +207,10 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
             const tmdbType = featuredContent.type === 'series' ? 'tv' : 'movie';
             try {
               const tmdbService = TMDBService.getInstance();
-              const logoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId);
+              const logoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId, preferredLanguage);
               
               if (logoUrl) {
-                logger.log(`[FeaturedContent] Using TMDB logo: ${logoUrl}`);
+                logger.log(`[FeaturedContent] Using TMDB logo (${preferredLanguage}): ${logoUrl}`);
                 setLogoUrl(logoUrl);
                 logoFetchInProgress.current = false;
                 return; // Exit if TMDB logo was found
@@ -225,10 +226,10 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
               
               if (foundTmdbId) {
                 const tmdbType = featuredContent.type === 'series' ? 'tv' : 'movie';
-                const logoUrl = await tmdbService.getContentLogo(tmdbType, foundTmdbId.toString());
+                const logoUrl = await tmdbService.getContentLogo(tmdbType, foundTmdbId.toString(), preferredLanguage);
                 
                 if (logoUrl) {
-                  logger.log(`[FeaturedContent] Using TMDB logo via IMDB lookup: ${logoUrl}`);
+                  logger.log(`[FeaturedContent] Using TMDB logo (${preferredLanguage}) via IMDB lookup: ${logoUrl}`);
                   setLogoUrl(logoUrl);
                   logoFetchInProgress.current = false;
                   return; // Exit if TMDB logo was found
@@ -271,7 +272,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
     };
     
     fetchLogo();
-  }, [featuredContent?.id, settings.logoSourcePreference]);
+  }, [featuredContent?.id, settings.logoSourcePreference, settings.tmdbLanguagePreference]);
 
   // Load poster and logo
   useEffect(() => {
