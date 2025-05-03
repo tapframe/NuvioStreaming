@@ -13,7 +13,6 @@ import { colors } from '../styles/colors';
 import { NuvioHeader } from '../components/NuvioHeader';
 import { Stream } from '../types/streams';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { AnimationFade, AnimationSlideHorizontal } from '../utils/animations';
 import { useTheme } from '../contexts/ThemeContext';
 
 // Import screens with their proper types
