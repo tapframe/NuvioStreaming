@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
-import { colors } from '../styles';
+import { useTheme } from '../contexts/ThemeContext';
 import { stremioService } from '../services/stremioService';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useCatalogContext } from '../contexts/CatalogContext';
@@ -52,12 +52,171 @@ const CATALOG_SETTINGS_KEY = 'catalog_settings';
 const CATALOG_CUSTOM_NAMES_KEY = 'catalog_custom_names';
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
+// Create a styles creator function that accepts the theme colors
+const createStyles = (colors: any) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.darkBackground,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 8 : 8,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+  },
+  backText: {
+    fontSize: 17,
+    fontWeight: '400',
+    color: colors.primary,
+  },
+  headerTitle: {
+    fontSize: 34,
+    fontWeight: '700',
+    color: colors.white,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    paddingTop: 8,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 32,
+  },
+  addonSection: {
+    marginBottom: 24,
+  },
+  addonTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.mediumGray,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    letterSpacing: 0.8,
+  },
+  card: {
+    marginHorizontal: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: colors.elevation2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  groupHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  groupTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: colors.white,
+  },
+  groupHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  enabledCount: {
+    fontSize: 15,
+    color: colors.mediumGray,
+    marginRight: 8,
+  },
+  catalogItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    // Ensure last item doesn't have border if needed (check logic)
+  },
+  catalogItemPressed: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)', // Subtle feedback for press
+  },
+  catalogInfo: {
+    flex: 1,
+    marginRight: 8, // Add space before switch
+  },
+  catalogName: {
+    fontSize: 15,
+    color: colors.white,
+    marginBottom: 2,
+  },
+  catalogType: {
+    fontSize: 13,
+    color: colors.mediumGray,
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  modalContent: {
+    backgroundColor: Platform.OS === 'ios' ? undefined : colors.elevation3,
+    borderRadius: 14,
+    padding: 20,
+    width: '85%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 10,
+    overflow: 'hidden',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.white,
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  modalInput: {
+    backgroundColor: colors.elevation1, // Darker input background
+    color: colors.white,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around', // Adjust as needed (e.g., 'flex-end')
+  },
+});
+
 const CatalogSettingsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState<CatalogSetting[]>([]);
   const [groupedSettings, setGroupedSettings] = useState<GroupedCatalogs>({});
   const navigation = useNavigation();
   const { refreshCatalogs } = useCatalogContext();
+  const { currentTheme } = useTheme();
+  const colors = currentTheme.colors;
+  const styles = createStyles(colors);
   const isDarkMode = true; // Force dark mode
 
   // Modal State
@@ -389,160 +548,5 @@ const CatalogSettingsScreen = () => {
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.darkBackground,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 8 : 8,
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-  },
-  backText: {
-    fontSize: 17,
-    fontWeight: '400',
-    color: colors.primary,
-  },
-  headerTitle: {
-    fontSize: 34,
-    fontWeight: '700',
-    color: colors.white,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    paddingTop: 8,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 32,
-  },
-  addonSection: {
-    marginBottom: 24,
-  },
-  addonTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.mediumGray,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    letterSpacing: 0.8,
-  },
-  card: {
-    marginHorizontal: 16,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: colors.elevation2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  groupHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 0.5,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  groupTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: colors.white,
-  },
-  groupHeaderRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  enabledCount: {
-    fontSize: 15,
-    color: colors.mediumGray,
-    marginRight: 8,
-  },
-  catalogItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 0.5,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-    // Ensure last item doesn't have border if needed (check logic)
-  },
-  catalogItemPressed: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)', // Subtle feedback for press
-  },
-  catalogInfo: {
-    flex: 1,
-    marginRight: 8, // Add space before switch
-  },
-  catalogName: {
-    fontSize: 15,
-    color: colors.white,
-    marginBottom: 2,
-  },
-  catalogType: {
-    fontSize: 13,
-    color: colors.mediumGray,
-  },
-
-  // Modal Styles
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-  },
-  modalContent: {
-    backgroundColor: Platform.OS === 'ios' ? undefined : colors.elevation3,
-    borderRadius: 14,
-    padding: 20,
-    width: '85%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 10,
-    overflow: 'hidden',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.white,
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  modalInput: {
-    backgroundColor: colors.elevation1, // Darker input background
-    color: colors.white,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-around', // Adjust as needed (e.g., 'flex-end')
-  },
-});
 
 export default CatalogSettingsScreen; 
