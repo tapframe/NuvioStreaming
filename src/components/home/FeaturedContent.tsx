@@ -245,7 +245,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
 const styles = StyleSheet.create({
   featuredContainer: {
     width: '100%',
-    height: height * 0.5,
+    height: height * 0.48,
     marginTop: 0,
     marginBottom: 8,
     position: 'relative',
@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingBottom: 4,
   },
   featuredLogo: {
     width: width * 0.7,
@@ -308,7 +308,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
     flexWrap: 'wrap',
     gap: 4,
   },
@@ -331,7 +331,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-evenly',
     width: '100%',
     flex: 1,
-    maxHeight: 60,
+    maxHeight: 55,
     paddingTop: 0,
   },
   playButton: {

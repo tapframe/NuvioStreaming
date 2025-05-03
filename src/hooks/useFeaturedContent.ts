@@ -11,7 +11,13 @@ const persistentStore = {
   featuredContent: null as StreamingContent | null,
   allFeaturedContent: [] as StreamingContent[],
   lastFetchTime: 0,
-  isFirstLoad: true
+  isFirstLoad: true,
+  // Track last used settings to detect changes on app restart
+  lastSettings: {
+    showHeroSection: true,
+    featuredContentSource: 'tmdb' as 'tmdb' | 'catalogs',
+    selectedHeroCatalogs: [] as string[]
+  }
 };
 
 // Cache timeout in milliseconds (e.g., 5 minutes)
@@ -30,7 +36,7 @@ export function useFeaturedContent() {
 
   const { genreMap, loadingGenres } = useGenres();
 
-  // Update local state when settings change
+  // Simple update for state variables
   useEffect(() => {
     setContentSource(settings.featuredContentSource);
     setSelectedCatalogs(settings.selectedHeroCatalogs || []);
@@ -44,6 +50,14 @@ export function useFeaturedContent() {
   }, []);
 
   const loadFeaturedContent = useCallback(async (forceRefresh = false) => {
+    // First, ensure contentSource matches current settings (could be outdated due to async updates)
+    if (contentSource !== settings.featuredContentSource) {
+      console.log(`Updating content source from ${contentSource} to ${settings.featuredContentSource}`);
+      setContentSource(settings.featuredContentSource);
+      // We return here and let the effect triggered by contentSource change handle the loading
+      return;
+    }
+    
     // Check if we should use cached data
     const now = Date.now();
     const cacheAge = now - persistentStore.lastFetchTime;
@@ -53,6 +67,7 @@ export function useFeaturedContent() {
         persistentStore.allFeaturedContent.length > 0 && 
         cacheAge < CACHE_TIMEOUT) {
       // Use cached data
+      console.log('Using cached featured content data');
       setFeaturedContent(persistentStore.featuredContent);
       setAllFeaturedContent(persistentStore.allFeaturedContent);
       setLoading(false);
@@ -60,6 +75,7 @@ export function useFeaturedContent() {
       return;
     }
 
+    console.log(`Loading featured content from ${contentSource}`);
     setLoading(true);
     cleanup();
     abortControllerRef.current = new AbortController();
@@ -176,32 +192,75 @@ export function useFeaturedContent() {
     }
   }, [cleanup, genreMap, loadingGenres, contentSource, selectedCatalogs]);
 
+  // Check for settings changes, including during app restart
+  useEffect(() => {
+    // Check if settings changed while app was closed
+    const settingsChanged = 
+      persistentStore.lastSettings.showHeroSection !== settings.showHeroSection ||
+      persistentStore.lastSettings.featuredContentSource !== settings.featuredContentSource ||
+      JSON.stringify(persistentStore.lastSettings.selectedHeroCatalogs) !== JSON.stringify(settings.selectedHeroCatalogs);
+    
+    // Update our tracking of last used settings
+    persistentStore.lastSettings = {
+      showHeroSection: settings.showHeroSection,
+      featuredContentSource: settings.featuredContentSource,
+      selectedHeroCatalogs: [...settings.selectedHeroCatalogs]
+    };
+    
+    // Force refresh if settings changed during app restart
+    if (settingsChanged) {
+      loadFeaturedContent(true);
+    }
+  }, [settings, loadFeaturedContent]);
+
   // Subscribe directly to settings emitter for immediate updates
   useEffect(() => {
     const handleSettingsChange = () => {
-      // Force refresh when settings change
-      loadFeaturedContent(true);
+      // Only refresh if current content source is different from settings
+      // This prevents duplicate refreshes when HomeScreen also handles this event
+      if (contentSource !== settings.featuredContentSource) {
+        console.log('Content source changed, refreshing featured content');
+        console.log('Current content source:', contentSource);
+        console.log('New settings source:', settings.featuredContentSource);
+        // Content source will be updated in the next render cycle due to state updates
+        // No need to call loadFeaturedContent here as it will be triggered by contentSource change
+      } else if (
+        contentSource === 'catalogs' && 
+        JSON.stringify(selectedCatalogs) !== JSON.stringify(settings.selectedHeroCatalogs)
+      ) {
+        // Only refresh if using catalogs and selected catalogs changed
+        console.log('Selected catalogs changed, refreshing featured content');
+        loadFeaturedContent(true);
+      }
     };
     
     // Subscribe to settings changes
     const unsubscribe = settingsEmitter.addListener(handleSettingsChange);
     
     return unsubscribe;
-  }, [loadFeaturedContent]);
+  }, [loadFeaturedContent, settings, contentSource, selectedCatalogs]);
 
   // Load featured content initially and when content source changes
   useEffect(() => {
-    const shouldForceRefresh = contentSource === 'tmdb' && 
-                               contentSource !== persistentStore.featuredContent?.type;
-    
-    if (shouldForceRefresh) {
+    // Force refresh when switching to catalogs or when catalog selection changes
+    if (contentSource === 'catalogs') {
+      // Clear cache when switching to catalogs mode
       setAllFeaturedContent([]);
       setFeaturedContent(null);
       persistentStore.allFeaturedContent = [];
       persistentStore.featuredContent = null;
+      loadFeaturedContent(true);
+    } else if (contentSource === 'tmdb' && contentSource !== persistentStore.featuredContent?.type) {
+      // Clear cache when switching to TMDB mode from catalogs
+      setAllFeaturedContent([]);
+      setFeaturedContent(null);
+      persistentStore.allFeaturedContent = [];
+      persistentStore.featuredContent = null;
+      loadFeaturedContent(true);
+    } else {
+      // Normal load (might use cache if available)
+      loadFeaturedContent(false);
     }
-    
-    loadFeaturedContent(shouldForceRefresh);
   }, [loadFeaturedContent, contentSource, selectedCatalogs]);
 
   useEffect(() => {

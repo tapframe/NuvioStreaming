@@ -393,40 +393,27 @@ const HomeScreen = () => {
       setShowHeroSection(settings.showHeroSection);
       setFeaturedContentSource(settings.featuredContentSource);
       
-      // If hero section is enabled, force a refresh of featured content
-      if (settings.showHeroSection) {
-        refreshFeatured();
-      }
+      // The featured content refresh is now handled by the useFeaturedContent hook
+      // No need to call refreshFeatured() here to avoid duplicate refreshes
     };
     
     // Subscribe to settings changes
     const unsubscribe = settingsEmitter.addListener(handleSettingsChange);
     
     return unsubscribe;
-  }, [refreshFeatured, settings]);
+  }, [settings]);
 
   // Update the featured content refresh logic to handle persistence
   useEffect(() => {
+    // This effect was causing duplicate refreshes - it's now handled in useFeaturedContent
+    // We'll keep it just to sync the local state with settings
     if (showHeroSection && featuredContentSource !== settings.featuredContentSource) {
-      // Clear any existing timeout
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current);
-      }
-      
-      // Set a new timeout to debounce the refresh - only when settings actually change
-      refreshTimeoutRef.current = setTimeout(() => {
-        refreshFeatured();
-        refreshTimeoutRef.current = null;
-      }, 300);
+      // Just update the local state
+      setFeaturedContentSource(settings.featuredContentSource);
     }
     
-    // Cleanup the timeout on unmount
-    return () => {
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current);
-      }
-    };
-  }, [featuredContentSource, settings.featuredContentSource, showHeroSection, refreshFeatured]);
+    // No timeout needed since we're not refreshing here
+  }, [settings.featuredContentSource, showHeroSection]);
 
   useFocusEffect(
     useCallback(() => {

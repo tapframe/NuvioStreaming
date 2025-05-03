@@ -269,7 +269,10 @@ const HomeScreenSettings: React.FC = () => {
             <View style={styles.radioCardContainer}>
               <RadioOption 
                 selected={settings.featuredContentSource === 'tmdb'}
-                onPress={() => handleUpdateSetting('featuredContentSource', 'tmdb')}
+                onPress={() => {
+                  console.log('Selected TMDB source');
+                  handleUpdateSetting('featuredContentSource', 'tmdb');
+                }}
                 label="TMDB Trending Movies"
               />
               <View style={styles.radioDescription}>
@@ -282,7 +285,10 @@ const HomeScreenSettings: React.FC = () => {
             <View style={styles.radioCardContainer}>
               <RadioOption 
                 selected={settings.featuredContentSource === 'catalogs'}
-                onPress={() => handleUpdateSetting('featuredContentSource', 'catalogs')}
+                onPress={() => {
+                  console.log('Selected Catalogs source');
+                  handleUpdateSetting('featuredContentSource', 'catalogs');
+                }}
                 label="Installed Catalogs"
               />
               <View style={styles.radioDescription}>
