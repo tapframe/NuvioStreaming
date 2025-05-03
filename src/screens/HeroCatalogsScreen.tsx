@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,9 +12,10 @@ import {
   useColorScheme,
   ActivityIndicator,
   Alert,
+  Animated
 } from 'react-native';
-import { useSettings } from '../hooks/useSettings';
-import { useNavigation } from '@react-navigation/native';
+import { useSettings, settingsEmitter } from '../hooks/useSettings';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors } from '../styles/colors';
 import { catalogService, StreamingAddon } from '../services/catalogService';
@@ -38,6 +39,58 @@ const HeroCatalogsScreen: React.FC = () => {
   const [catalogs, setCatalogs] = useState<CatalogItem[]>([]);
   const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>(settings.selectedHeroCatalogs || []);
   const { getCustomName, isLoadingCustomNames } = useCustomCatalogNames();
+  const [showSavedIndicator, setShowSavedIndicator] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // Ensure selected catalogs state is refreshed whenever the screen gains focus
+  useFocusEffect(
+    useCallback(() => {
+      setSelectedCatalogs(settings.selectedHeroCatalogs || []);
+    }, [settings.selectedHeroCatalogs])
+  );
+
+  // Subscribe to settings changes
+  useEffect(() => {
+    const unsubscribe = settingsEmitter.addListener(() => {
+      // Refresh selected catalogs when settings change
+      setSelectedCatalogs(settings.selectedHeroCatalogs || []);
+    });
+    
+    return unsubscribe;
+  }, [settings.selectedHeroCatalogs]);
+
+  // Fade in/out animation for the "Changes saved" indicator
+  useEffect(() => {
+    if (showSavedIndicator) {
+      Animated.sequence([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true
+        }),
+        Animated.delay(1500),
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true
+        })
+      ]).start(() => setShowSavedIndicator(false));
+    }
+  }, [showSavedIndicator, fadeAnim]);
+
+  const handleSave = useCallback(() => {
+    // First update the settings
+    updateSetting('selectedHeroCatalogs', selectedCatalogs);
+    
+    // Show the confirmation indicator
+    setShowSavedIndicator(true);
+    
+    // Short delay before navigating back to allow settings to save
+    // and the user to see the confirmation message
+    setTimeout(() => {
+      navigation.goBack();
+    }, 800);
+  }, [navigation, selectedCatalogs, updateSetting]);
 
   const handleBack = useCallback(() => {
     navigation.goBack();
@@ -84,11 +137,6 @@ const HeroCatalogsScreen: React.FC = () => {
     setSelectedCatalogs([]);
   }, []);
 
-  const handleSave = useCallback(() => {
-    updateSetting('selectedHeroCatalogs', selectedCatalogs);
-    navigation.goBack();
-  }, [navigation, selectedCatalogs, updateSetting]);
-
   const toggleCatalog = useCallback((catalogId: string) => {
     setSelectedCatalogs(prev => {
       if (prev.includes(catalogId)) {
@@ -127,6 +175,21 @@ const HeroCatalogsScreen: React.FC = () => {
         </Text>
       </View>
 
+      {/* Saved indicator */}
+      <Animated.View 
+        style={[
+          styles.savedIndicator, 
+          { 
+            opacity: fadeAnim,
+            backgroundColor: isDarkMode ? 'rgba(0, 180, 150, 0.9)' : 'rgba(0, 180, 150, 0.9)'
+          }
+        ]}
+        pointerEvents="none"
+      >
+        <MaterialIcons name="check-circle" size={20} color="#FFFFFF" />
+        <Text style={styles.savedIndicatorText}>Settings Saved</Text>
+      </Animated.View>
+
       {loading || isLoadingCustomNames ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -153,13 +216,14 @@ const HeroCatalogsScreen: React.FC = () => {
               style={[styles.saveButton, { backgroundColor: colors.primary }]} 
               onPress={handleSave}
             >
+              <MaterialIcons name="save" size={16} color={colors.white} style={styles.saveIcon} />
               <Text style={styles.saveButtonText}>Save</Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.infoCard}>
             <Text style={[styles.infoText, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>
-              Select which catalogs to display in the hero section. If none are selected, all catalogs will be used.
+              Select which catalogs to display in the hero section. If none are selected, all catalogs will be used. Don't forget to press Save when you're done.
             </Text>
           </View>
 
@@ -256,6 +320,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
   actionButton: {
     paddingHorizontal: 12,
@@ -271,11 +336,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
+    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 100,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
   },
   saveButtonText: {
     color: colors.white,
     fontSize: 14,
     fontWeight: '600',
+  },
+  saveIcon: {
+    marginRight: 6,
   },
   infoCard: {
     marginHorizontal: 16,
@@ -319,6 +397,28 @@ const styles = StyleSheet.create({
   catalogType: {
     fontSize: 14,
     marginTop: 2,
+  },
+  savedIndicator: {
+    position: 'absolute',
+    top: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 60 : 90,
+    alignSelf: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  savedIndicatorText: {
+    color: '#FFFFFF',
+    marginLeft: 6,
+    fontWeight: '600',
   },
 });
 

@@ -387,6 +387,24 @@ const HomeScreen = () => {
     setFeaturedContentSource(settings.featuredContentSource);
   }, [settings]);
 
+  // Subscribe directly to settings emitter for immediate updates
+  useEffect(() => {
+    const handleSettingsChange = () => {
+      setShowHeroSection(settings.showHeroSection);
+      setFeaturedContentSource(settings.featuredContentSource);
+      
+      // If hero section is enabled, force a refresh of featured content
+      if (settings.showHeroSection) {
+        refreshFeatured();
+      }
+    };
+    
+    // Subscribe to settings changes
+    const unsubscribe = settingsEmitter.addListener(handleSettingsChange);
+    
+    return unsubscribe;
+  }, [refreshFeatured, settings]);
+
   // Update the featured content refresh logic to handle persistence
   useEffect(() => {
     if (showHeroSection && featuredContentSource !== settings.featuredContentSource) {
@@ -558,12 +576,13 @@ const HomeScreen = () => {
         }
         contentContainerStyle={[
           homeStyles.scrollContent,
-          { paddingTop: Platform.OS === 'ios' ? 0 : 0 }
+          { paddingTop: Platform.OS === 'ios' ? 39 : 90 }
         ]}
         showsVerticalScrollIndicator={false}
       >
         {showHeroSection && (
           <FeaturedContent 
+            key={`featured-${showHeroSection}`}
             featuredContent={featuredContent}
             isSaved={isSaved}
             handleSaveToLibrary={handleSaveToLibrary}

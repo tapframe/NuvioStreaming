@@ -249,8 +249,9 @@ const HomeScreenSettings: React.FC = () => {
             icon="settings-input-component"
             isDarkMode={isDarkMode}
             renderControl={() => <View />}
+            isLast={!settings.showHeroSection || settings.featuredContentSource !== 'catalogs'}
           />
-          {settings.featuredContentSource === 'catalogs' && (
+          {settings.showHeroSection && settings.featuredContentSource === 'catalogs' && (
             <SettingItem
               title="Select Catalogs"
               description={getSelectedCatalogsText()}
@@ -260,9 +261,6 @@ const HomeScreenSettings: React.FC = () => {
               onPress={() => navigation.navigate('HeroCatalogs')}
               isLast={true}
             />
-          )}
-          {settings.featuredContentSource !== 'catalogs' && (
-            <View style={{ height: 0 }} /> // Placeholder to maintain layout
           )}
         </SettingsCard>
 

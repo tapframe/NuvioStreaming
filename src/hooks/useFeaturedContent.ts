@@ -176,6 +176,19 @@ export function useFeaturedContent() {
     }
   }, [cleanup, genreMap, loadingGenres, contentSource, selectedCatalogs]);
 
+  // Subscribe directly to settings emitter for immediate updates
+  useEffect(() => {
+    const handleSettingsChange = () => {
+      // Force refresh when settings change
+      loadFeaturedContent(true);
+    };
+    
+    // Subscribe to settings changes
+    const unsubscribe = settingsEmitter.addListener(handleSettingsChange);
+    
+    return unsubscribe;
+  }, [loadFeaturedContent]);
+
   // Load featured content initially and when content source changes
   useEffect(() => {
     const shouldForceRefresh = contentSource === 'tmdb' && 

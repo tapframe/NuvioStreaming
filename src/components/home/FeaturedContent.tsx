@@ -8,7 +8,9 @@ import {
   Dimensions,
   ViewStyle,
   TextStyle,
-  ImageStyle
+  ImageStyle,
+  ActivityIndicator,
+  Platform
 } from 'react-native';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
@@ -40,17 +42,15 @@ const { width, height } = Dimensions.get('window');
 
 const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: FeaturedContentProps) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
-  const [posterLoaded, setPosterLoaded] = useState(false);
-  const [logoLoaded, setLogoLoaded] = useState(false);
-  const [imageError, setImageError] = useState(false);
-  const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const prevContentIdRef = useRef<string | null>(null);
   
   // Animation values
   const posterOpacity = useSharedValue(0);
   const logoOpacity = useSharedValue(0);
-  const contentOpacity = useSharedValue(0);
+  const contentOpacity = useSharedValue(1); // Start visible
+  const buttonsOpacity = useSharedValue(1);
   
   const posterAnimatedStyle = useAnimatedStyle(() => ({
     opacity: posterOpacity.value,
@@ -64,11 +64,13 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
     opacity: contentOpacity.value,
   }));
 
+  const buttonsAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: buttonsOpacity.value,
+  }));
+
   // Preload the image
   const preloadImage = async (url: string): Promise<boolean> => {
     if (!url) return false;
-    
-    // If already cached, return true immediately
     if (imageCache[url]) return true;
     
     try {
@@ -81,7 +83,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
     }
   };
 
-  // Load poster first, then logo
+  // Load poster and logo
   useEffect(() => {
     if (!featuredContent) return;
     
@@ -91,49 +93,33 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
     
     // Reset states for new content
     if (contentId !== prevContentIdRef.current) {
-      setPosterLoaded(false);
-      setLogoLoaded(false);
-      setImageError(false);
       posterOpacity.value = 0;
       logoOpacity.value = 0;
-      contentOpacity.value = 0;
     }
     
     prevContentIdRef.current = contentId;
     
-    // Sequential loading: poster first, then logo
+    // Set URLs immediately for instant display
+    if (posterUrl) setBannerUrl(posterUrl);
+    if (titleLogo) setLogoUrl(titleLogo);
+    
+    // Load images in background
     const loadImages = async () => {
-      // Step 1: Load poster
+      // Load poster
       if (posterUrl) {
-        setBannerUrl(posterUrl);
         const posterSuccess = await preloadImage(posterUrl);
-        
         if (posterSuccess) {
-          setPosterLoaded(true);
-          // Fade in poster
           posterOpacity.value = withTiming(1, {
             duration: 600,
             easing: Easing.bezier(0.25, 0.1, 0.25, 1)
           });
-          
-          // After poster loads, start showing content with slight delay
-          contentOpacity.value = withDelay(150, withTiming(1, {
-            duration: 400,
-            easing: Easing.bezier(0.25, 0.1, 0.25, 1)
-          }));
-        } else {
-          setImageError(true);
         }
       }
       
-      // Step 2: Load logo if available
+      // Load logo if available
       if (titleLogo) {
-        setLogoUrl(titleLogo);
         const logoSuccess = await preloadImage(titleLogo);
-        
         if (logoSuccess) {
-          setLogoLoaded(true);
-          // Fade in logo with delay after poster
           logoOpacity.value = withDelay(300, withTiming(1, {
             duration: 500,
             easing: Easing.bezier(0.25, 0.1, 0.25, 1)
@@ -144,37 +130,6 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
     
     loadImages();
   }, [featuredContent?.id]);
-
-  // Preload next content
-  useEffect(() => {
-    if (!featuredContent || !posterLoaded) return;
-    
-    // After current poster loads, prefetch for potential next items
-    const preloadNextContent = async () => {
-      // Simulate preloading next item (in a real app, you'd get this from allFeaturedContent)
-      if (featuredContent.type === 'movie' && featuredContent.id) {
-        // Try to preload related content by ID pattern
-        const relatedIds = [
-          `tmdb:${parseInt(featuredContent.id.split(':')[1] || '0') + 1}`,
-          `tmdb:${parseInt(featuredContent.id.split(':')[1] || '0') + 2}`
-        ];
-        
-        for (const id of relatedIds) {
-          // This is just a simulation - in real app you'd have actual next content URLs
-          const potentialNextPoster = featuredContent.poster?.replace(
-            featuredContent.id, 
-            id
-          );
-          
-          if (potentialNextPoster) {
-            await preloadImage(potentialNextPoster);
-          }
-        }
-      }
-    };
-    
-    preloadNextContent();
-  }, [posterLoaded, featuredContent]);
 
   if (!featuredContent) {
     return <SkeletonFeatured />;
@@ -193,10 +148,9 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
     >
       <Animated.View style={[styles.imageContainer, posterAnimatedStyle]}>
         <ImageBackground
-          source={{ uri: bannerUrl || '' }}
+          source={{ uri: bannerUrl || featuredContent.poster }}
           style={styles.featuredImage as ViewStyle}
           resizeMode="cover"
-          imageStyle={{ opacity: imageError ? 0.5 : 1 }}
         >
           <LinearGradient
             colors={[
@@ -214,7 +168,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
               {featuredContent.logo ? (
                 <Animated.View style={logoAnimatedStyle}>
                   <ExpoImage 
-                    source={{ uri: logoUrl }} 
+                    source={{ uri: logoUrl || featuredContent.logo }} 
                     style={styles.featuredLogo as ImageStyle}
                     contentFit="contain"
                     cachePolicy="memory-disk"
@@ -234,51 +188,52 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
                   </React.Fragment>
                 ))}
               </View>
-              <View style={styles.featuredButtons as ViewStyle}>
-                <TouchableOpacity 
-                  style={styles.myListButton as ViewStyle}
-                  onPress={handleSaveToLibrary}
-                >
-                  <MaterialIcons 
-                    name={isSaved ? "bookmark" : "bookmark-border"} 
-                    size={24} 
-                    color={colors.white} 
-                  />
-                  <Text style={styles.myListButtonText as TextStyle}>
-                    {isSaved ? "Saved" : "Save"}
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={styles.playButton as ViewStyle}
-                  onPress={() => {
-                    if (featuredContent) {
-                      navigation.navigate('Streams', { 
-                        id: featuredContent.id, 
-                        type: featuredContent.type
-                      });
-                    }
-                  }}
-                >
-                  <MaterialIcons name="play-arrow" size={24} color={colors.black} />
-                  <Text style={styles.playButtonText as TextStyle}>Play</Text>
-                </TouchableOpacity>
+            </Animated.View>
 
-                <TouchableOpacity 
-                  style={styles.infoButton as ViewStyle}
-                  onPress={() => {
-                    if (featuredContent) {
-                      navigation.navigate('Metadata', {
-                        id: featuredContent.id,
-                        type: featuredContent.type
-                      });
-                    }
-                  }}
-                >
-                  <MaterialIcons name="info-outline" size={24} color={colors.white} />
-                  <Text style={styles.infoButtonText as TextStyle}>Info</Text>
-                </TouchableOpacity>
-              </View>
+            <Animated.View style={[styles.featuredButtons as ViewStyle, buttonsAnimatedStyle]}>
+              <TouchableOpacity 
+                style={styles.myListButton as ViewStyle}
+                onPress={handleSaveToLibrary}
+              >
+                <MaterialIcons 
+                  name={isSaved ? "bookmark" : "bookmark-border"} 
+                  size={24} 
+                  color={colors.white} 
+                />
+                <Text style={styles.myListButtonText as TextStyle}>
+                  {isSaved ? "Saved" : "Save"}
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.playButton as ViewStyle}
+                onPress={() => {
+                  if (featuredContent) {
+                    navigation.navigate('Streams', { 
+                      id: featuredContent.id, 
+                      type: featuredContent.type
+                    });
+                  }
+                }}
+              >
+                <MaterialIcons name="play-arrow" size={24} color={colors.black} />
+                <Text style={styles.playButtonText as TextStyle}>Play</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.infoButton as ViewStyle}
+                onPress={() => {
+                  if (featuredContent) {
+                    navigation.navigate('Metadata', {
+                      id: featuredContent.id,
+                      type: featuredContent.type
+                    });
+                  }
+                }}
+              >
+                <MaterialIcons name="info-outline" size={24} color={colors.white} />
+                <Text style={styles.infoButtonText as TextStyle}>Info</Text>
+              </TouchableOpacity>
             </Animated.View>
           </LinearGradient>
         </ImageBackground>
@@ -290,7 +245,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
 const styles = StyleSheet.create({
   featuredContainer: {
     width: '100%',
-    height: height * 0.6,
+    height: height * 0.5,
     marginTop: 0,
     marginBottom: 8,
     position: 'relative',
@@ -330,7 +285,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
     paddingHorizontal: 16,
-    paddingBottom: 20,
+    paddingBottom: 12,
   },
   featuredLogo: {
     width: width * 0.7,
@@ -353,7 +308,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
     flexWrap: 'wrap',
     gap: 4,
   },
@@ -376,8 +331,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-evenly',
     width: '100%',
     flex: 1,
-    maxHeight: 65,
-    paddingTop: 16,
+    maxHeight: 60,
+    paddingTop: 0,
   },
   playButton: {
     flexDirection: 'row',
