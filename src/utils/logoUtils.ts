@@ -1,4 +1,5 @@
 import { logger } from './logger';
+import { TMDBService } from '../services/tmdbService';
 
 /**
  * Checks if a URL is a valid Metahub logo by performing a HEAD request
@@ -80,4 +81,90 @@ export const isMetahubUrl = (url: string | null): boolean => {
 export const isTmdbUrl = (url: string | null): boolean => {
   if (!url) return false;
   return url.includes('themoviedb.org') || url.includes('tmdb.org') || url.includes('image.tmdb.org');
+};
+
+/**
+ * Fetches a banner image based on logo source preference
+ * @param imdbId The IMDB ID of the content
+ * @param tmdbId The TMDB ID of the content (if available)
+ * @param type The content type ('movie' or 'series')
+ * @param preference The logo source preference ('metahub' or 'tmdb')
+ * @returns The URL of the banner image, or null if none found
+ */
+export const fetchBannerWithPreference = async (
+  imdbId: string | null, 
+  tmdbId: number | string | null, 
+  type: 'movie' | 'series',
+  preference: 'metahub' | 'tmdb'
+): Promise<string | null> => {
+  logger.log(`[logoUtils] Fetching banner with preference ${preference} for ${type} (IMDB: ${imdbId}, TMDB: ${tmdbId})`);
+  
+  // Determine which source to try first based on preference
+  if (preference === 'tmdb') {
+    // Try TMDB first if it's the preferred source
+    if (tmdbId) {
+      try {
+        const tmdbService = TMDBService.getInstance();
+        
+        // Get backdrop from TMDB
+        const tmdbType = type === 'series' ? 'tv' : 'movie';
+        logger.log(`[logoUtils] Attempting to fetch banner from TMDB for ${tmdbType} (ID: ${tmdbId})`);
+        
+        let bannerUrl = null;
+        if (tmdbType === 'movie') {
+          const movieDetails = await tmdbService.getMovieDetails(tmdbId.toString());
+          if (movieDetails && movieDetails.backdrop_path) {
+            bannerUrl = tmdbService.getImageUrl(movieDetails.backdrop_path, 'original');
+            logger.log(`[logoUtils] Found backdrop_path: ${movieDetails.backdrop_path}`);
+          } else {
+            logger.warn(`[logoUtils] No backdrop_path found in movie details for ID ${tmdbId}`);
+          }
+        } else {
+          const showDetails = await tmdbService.getTVShowDetails(Number(tmdbId));
+          if (showDetails && showDetails.backdrop_path) {
+            bannerUrl = tmdbService.getImageUrl(showDetails.backdrop_path, 'original');
+            logger.log(`[logoUtils] Found backdrop_path: ${showDetails.backdrop_path}`);
+          } else {
+            logger.warn(`[logoUtils] No backdrop_path found in TV show details for ID ${tmdbId}`);
+          }
+        }
+        
+        if (bannerUrl) {
+          logger.log(`[logoUtils] Successfully fetched ${tmdbType} banner from TMDB: ${bannerUrl}`);
+          return bannerUrl;
+        }
+      } catch (error) {
+        logger.error(`[logoUtils] Error fetching banner from TMDB for ID ${tmdbId}:`, error);
+      }
+      
+      logger.warn(`[logoUtils] No banner found from TMDB for ${type} (ID: ${tmdbId}), falling back to Metahub`);
+    } else {
+      logger.warn(`[logoUtils] Cannot fetch from TMDB - no TMDB ID provided, falling back to Metahub`);
+    }
+  }
+  
+  // Try Metahub if it's preferred or TMDB failed
+  if (imdbId) {
+    const metahubUrl = `https://images.metahub.space/background/large/${imdbId}/img`;
+    
+    logger.log(`[logoUtils] Attempting to fetch banner from Metahub for ${imdbId}`);
+    
+    try {
+      const response = await fetch(metahubUrl, { method: 'HEAD' });
+      if (response.ok) {
+        logger.log(`[logoUtils] Successfully fetched banner from Metahub: ${metahubUrl}`);
+        return metahubUrl;
+      } else {
+        logger.warn(`[logoUtils] Metahub banner request failed with status ${response.status}`);
+      }
+    } catch (error) {
+      logger.warn(`[logoUtils] Failed to fetch banner from Metahub:`, error);
+    }
+  } else {
+    logger.warn(`[logoUtils] Cannot fetch from Metahub - no IMDB ID provided`);
+  }
+  
+  // If both sources fail or aren't available, return null
+  logger.warn(`[logoUtils] No banner found from any source for ${type} (IMDB: ${imdbId}, TMDB: ${tmdbId})`);
+  return null;
 }; 

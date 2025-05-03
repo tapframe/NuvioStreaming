@@ -35,6 +35,7 @@ import HomeScreenSettings from '../screens/HomeScreenSettings';
 import HeroCatalogsScreen from '../screens/HeroCatalogsScreen';
 import TraktSettingsScreen from '../screens/TraktSettingsScreen';
 import PlayerSettingsScreen from '../screens/PlayerSettingsScreen';
+import LogoSourceSettings from '../screens/LogoSourceSettings';
 
 // Stack navigator types
 export type RootStackParamList = {
@@ -90,6 +91,7 @@ export type RootStackParamList = {
   HeroCatalogs: undefined;
   TraktSettings: undefined;
   PlayerSettings: undefined;
+  LogoSourceSettings: undefined;
 };
 
 export type RootStackNavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -811,6 +813,21 @@ const AppNavigator = () => {
           <Stack.Screen 
             name="PlayerSettings" 
             component={PlayerSettingsScreen}
+            options={{
+              animation: 'fade',
+              animationDuration: 200,
+              presentation: 'card',
+              gestureEnabled: true,
+              gestureDirection: 'horizontal',
+              headerShown: false,
+              contentStyle: {
+                backgroundColor: colors.darkBackground,
+              },
+            }}
+          />
+          <Stack.Screen 
+            name="LogoSourceSettings" 
+            component={LogoSourceSettings}
             options={{
               animation: 'fade',
               animationDuration: 200,
