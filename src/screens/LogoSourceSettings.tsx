@@ -762,7 +762,7 @@ const LogoSourceSettings = () => {
           {/* Description */}
           <View style={styles.descriptionContainer}>
             <Text style={styles.description}>
-              Choose the primary source for content logos and backgrounds.
+              Choose the primary source for content logos and backgrounds. The selected source will be used exclusively.
             </Text>
           </View>
           
@@ -903,7 +903,7 @@ const LogoSourceSettings = () => {
           {/* Additional Info */}
           <View style={styles.infoBox}>
             <Text style={styles.infoText}>
-              Unavailable logos will fall back to the alternate source, or display text if none found.
+              The app will use only the selected source for logos and backgrounds. If no image is available from your chosen source, a text fallback will be used.
             </Text>
           </View>
         </ScrollView>

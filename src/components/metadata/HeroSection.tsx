@@ -16,6 +16,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { colors } from '../../styles/colors';
 import { logger } from '../../utils/logger';
+import { TMDBService } from '../../services/tmdbService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -110,7 +111,48 @@ const ActionButtons = React.memo(({
         <TouchableOpacity
           style={[styles.iconButton]}
           onPress={async () => {
-            navigation.navigate('ShowRatings', { showId: id.split(':')[1] });
+            let finalTmdbId: number | null = null;
+            
+            if (id && id.startsWith('tmdb:')) {
+              const numericPart = id.split(':')[1];
+              const parsedId = parseInt(numericPart, 10);
+              if (!isNaN(parsedId)) {
+                finalTmdbId = parsedId;
+              } else {
+                logger.error(`[HeroSection] Failed to parse TMDB ID from: ${id}`);
+              }
+            } else if (id && id.startsWith('tt')) {
+              // It's an IMDb ID, convert it
+              logger.log(`[HeroSection] Detected IMDb ID: ${id}, attempting conversion to TMDB ID.`);
+              try {
+                const tmdbService = TMDBService.getInstance();
+                const convertedId = await tmdbService.findTMDBIdByIMDB(id);
+                if (convertedId) {
+                  finalTmdbId = convertedId;
+                  logger.log(`[HeroSection] Successfully converted IMDb ID ${id} to TMDB ID: ${finalTmdbId}`);
+                } else {
+                  logger.error(`[HeroSection] Could not convert IMDb ID ${id} to TMDB ID.`);
+                }
+              } catch (error) {
+                logger.error(`[HeroSection] Error converting IMDb ID ${id}:`, error);
+              }
+            } else if (id) {
+              // Assume it might be a raw TMDB ID (numeric string)
+              const parsedId = parseInt(id, 10);
+              if (!isNaN(parsedId)) {
+                finalTmdbId = parsedId;
+              } else {
+                logger.error(`[HeroSection] Unrecognized ID format or invalid numeric ID: ${id}`);
+              }
+            }
+            
+            // Navigate if we have a valid TMDB ID
+            if (finalTmdbId !== null) {
+              navigation.navigate('ShowRatings', { showId: finalTmdbId });
+            } else {
+              logger.error(`[HeroSection] Could not navigate to ShowRatings, failed to obtain a valid TMDB ID from original id: ${id}`);
+              // Optionally show an error message to the user here
+            }
           }}
         >
           <MaterialIcons name="assessment" size={24} color="#fff" />

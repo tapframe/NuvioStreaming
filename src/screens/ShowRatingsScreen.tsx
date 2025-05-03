@@ -301,6 +301,10 @@ const ShowRatingsScreen = ({ route }: Props) => {
     const fetchShowData = async () => {
       try {
         const tmdb = TMDBService.getInstance();
+        
+        // Log the showId being used
+        logger.log(`[ShowRatingsScreen] Fetching show details for ID: ${showId}`);
+        
         const showData = await tmdb.getTVShowDetails(showId);
         if (showData) {
           setShow(showData);
