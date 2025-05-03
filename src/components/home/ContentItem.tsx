@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions } from 'react-native';
+import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Platform } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
-import { colors } from '../../styles/colors';
+import { useTheme } from '../../contexts/ThemeContext';
 import { catalogService, StreamingContent } from '../../services/catalogService';
 import DropUpMenu from './DropUpMenu';
 
@@ -20,6 +20,7 @@ const ContentItem = ({ item: initialItem, onPress }: ContentItemProps) => {
   const [isWatched, setIsWatched] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const { currentTheme } = useTheme();
 
   const handleLongPress = useCallback(() => {
     setMenuVisible(true);
@@ -95,22 +96,22 @@ const ContentItem = ({ item: initialItem, onPress }: ContentItemProps) => {
             }}
           />
           {(!imageLoaded || imageError) && (
-            <View style={[styles.loadingOverlay, { backgroundColor: colors.elevation2 }]}>
+            <View style={[styles.loadingOverlay, { backgroundColor: currentTheme.colors.elevation2 }]}>
               {!imageError ? (
-                <ActivityIndicator color={colors.primary} size="small" />
+                <ActivityIndicator color={currentTheme.colors.primary} size="small" />
               ) : (
-                <MaterialIcons name="broken-image" size={24} color={colors.lightGray} />
+                <MaterialIcons name="broken-image" size={24} color={currentTheme.colors.lightGray} />
               )}
             </View>
           )}
           {isWatched && (
             <View style={styles.watchedIndicator}>
-              <MaterialIcons name="check-circle" size={22} color={colors.success} />
+              <MaterialIcons name="check-circle" size={22} color={currentTheme.colors.success} />
             </View>
           )}
           {localItem.inLibrary && (
             <View style={styles.libraryBadge}>
-              <MaterialIcons name="bookmark" size={16} color={colors.white} />
+              <MaterialIcons name="bookmark" size={16} color={currentTheme.colors.white} />
             </View>
           )}
         </View>
@@ -160,7 +161,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 16,
@@ -169,7 +169,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     right: 8,
-    backgroundColor: colors.transparentDark,
     borderRadius: 12,
     padding: 2,
   },
@@ -177,7 +176,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     left: 8,
-    backgroundColor: colors.transparentDark,
     borderRadius: 8,
     padding: 4,
   },

@@ -3,20 +3,21 @@ import {
   View,
   Text,
   StyleSheet,
+  FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  ScrollView,
 } from 'react-native';
 import { Image } from 'expo-image';
-import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import { colors } from '../../styles/colors';
-import { Cast } from '../../types/metadata';
-import { tmdbService } from '../../services/tmdbService';
+import Animated, {
+  FadeIn,
+  Layout,
+} from 'react-native-reanimated';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface CastSectionProps {
-  cast: Cast[];
+  cast: any[];
   loadingCast: boolean;
-  onSelectCastMember: (member: Cast) => void;
+  onSelectCastMember: (castMember: any) => void;
 }
 
 export const CastSection: React.FC<CastSectionProps> = ({
@@ -24,123 +25,137 @@ export const CastSection: React.FC<CastSectionProps> = ({
   loadingCast,
   onSelectCastMember,
 }) => {
+  const { currentTheme } = useTheme();
+
   if (loadingCast) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="small" color={colors.primary} />
+        <ActivityIndicator size="small" color={currentTheme.colors.primary} />
       </View>
     );
   }
 
-  if (!cast.length) {
+  if (!cast || cast.length === 0) {
     return null;
   }
 
   return (
-    <View style={styles.castSection}>
-      <Text style={styles.sectionTitle}>Cast</Text>
-      <ScrollView 
-        horizontal 
+    <Animated.View 
+      style={styles.castSection}
+      entering={FadeIn.duration(500).delay(300)}
+      layout={Layout}
+    >
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: currentTheme.colors.highEmphasis }]}>Cast</Text>
+      </View>
+      <FlatList
+        horizontal
+        data={cast}
         showsHorizontalScrollIndicator={false}
-        style={styles.castScrollContainer}
-        contentContainerStyle={styles.castContainer}
-        snapToAlignment="start"
-      >
-        {cast.map((member) => (
-          <TouchableOpacity
-            key={member.id}
-            style={styles.castMember}
-            onPress={() => onSelectCastMember(member)}
+        contentContainerStyle={styles.castList}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={({ item, index }) => (
+          <Animated.View 
+            entering={FadeIn.duration(500).delay(100 + index * 50)} 
+            layout={Layout}
           >
-            <View style={styles.castImageContainer}>
-              {member.profile_path ? (
-                <Image
-                  source={{ 
-                    uri: `https://image.tmdb.org/t/p/w185${member.profile_path}`
-                  }}
-                  style={styles.castImage}
-                  contentFit="cover"
-                />
-              ) : (
-                <MaterialIcons 
-                  name="person" 
-                  size={32} 
-                  color={colors.textMuted} 
-                />
+            <TouchableOpacity 
+              style={styles.castCard}
+              onPress={() => onSelectCastMember(item)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.castImageContainer}>
+                {item.profile_path ? (
+                  <Image
+                    source={{
+                      uri: `https://image.tmdb.org/t/p/w185${item.profile_path}`,
+                    }}
+                    style={styles.castImage}
+                    contentFit="cover"
+                    transition={200}
+                  />
+                ) : (
+                  <View style={[styles.castImagePlaceholder, { backgroundColor: currentTheme.colors.cardBackground }]}>
+                    <Text style={[styles.placeholderText, { color: currentTheme.colors.textMuted }]}>
+                      {item.name.split(' ').reduce((prev: string, current: string) => prev + current[0], '').substring(0, 2)}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <Text style={[styles.castName, { color: currentTheme.colors.text }]} numberOfLines={1}>{item.name}</Text>
+              {item.character && (
+                <Text style={[styles.characterName, { color: currentTheme.colors.textMuted }]} numberOfLines={1}>{item.character}</Text>
               )}
-            </View>
-            <View style={styles.castTextContainer}>
-              <Text style={styles.castName} numberOfLines={1}>{member.name}</Text>
-              <Text style={styles.castCharacter} numberOfLines={1}>{member.character}</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    </View>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+      />
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
+  castSection: {
+    marginBottom: 24,
+    paddingHorizontal: 0,
+  },
   loadingContainer: {
+    paddingVertical: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 12,
   },
-  castSection: {
-    marginTop: 0,
-    paddingLeft: 0,
-  },
-  sectionTitle: {
-    color: colors.highEmphasis,
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 10,
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
     paddingHorizontal: 16,
   },
-  castScrollContainer: {
-    marginTop: 4,
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
   },
-  castContainer: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+  castList: {
+    paddingHorizontal: 16,
+    paddingBottom: 4,
   },
-  castMember: {
-    width: 80,
-    marginRight: 12,
+  castCard: {
+    marginRight: 16,
+    width: 90,
     alignItems: 'center',
   },
   castImageContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.elevation2,
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     overflow: 'hidden',
-    marginBottom: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    marginBottom: 8,
   },
   castImage: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-  },
-  castTextContainer: {
     width: '100%',
+    height: '100%',
+  },
+  castImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 40,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  placeholderText: {
+    fontSize: 24,
+    fontWeight: '600',
   },
   castName: {
-    color: colors.highEmphasis,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
+    width: 90,
   },
-  castCharacter: {
-    color: colors.mediumEmphasis,
+  characterName: {
     fontSize: 12,
     textAlign: 'center',
+    width: 90,
     marginTop: 2,
-    opacity: 0.8,
   },
 }); 

@@ -5,7 +5,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { CatalogContent, StreamingContent } from '../../services/catalogService';
-import { colors } from '../../styles/colors';
+import { useTheme } from '../../contexts/ThemeContext';
 import ContentItem from './ContentItem';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 
@@ -18,6 +18,7 @@ const POSTER_WIDTH = (width - 50) / 3;
 
 const CatalogSection = ({ catalog }: CatalogSectionProps) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const { currentTheme } = useTheme();
 
   const handleContentPress = (id: string, type: string) => {
     navigation.navigate('Metadata', { id, type });
@@ -43,9 +44,9 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
     >
       <View style={styles.catalogHeader}>
         <View style={styles.titleContainer}>
-          <Text style={styles.catalogTitle}>{catalog.name}</Text>
+          <Text style={[styles.catalogTitle, { color: currentTheme.colors.highEmphasis }]}>{catalog.name}</Text>
           <LinearGradient
-            colors={[colors.primary, colors.secondary]}
+            colors={[currentTheme.colors.primary, currentTheme.colors.secondary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.titleUnderline}
@@ -61,8 +62,8 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
           }
           style={styles.seeAllButton}
         >
-          <Text style={styles.seeAllText}>See More</Text>
-          <MaterialIcons name="arrow-forward" color={colors.primary} size={16} />
+          <Text style={[styles.seeAllText, { color: currentTheme.colors.primary }]}>See More</Text>
+          <MaterialIcons name="arrow-forward" color={currentTheme.colors.primary} size={16} />
         </TouchableOpacity>
       </View>
       
@@ -94,8 +95,6 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
 const styles = StyleSheet.create({
   catalogContainer: {
     marginBottom: 24,
-    paddingTop: 0,
-    marginTop: 16,
   },
   catalogHeader: {
     flexDirection: 'row',
@@ -110,7 +109,6 @@ const styles = StyleSheet.create({
   catalogTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: colors.highEmphasis,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 6,
@@ -126,21 +124,14 @@ const styles = StyleSheet.create({
   seeAllButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.elevation1,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    gap: 4,
   },
   seeAllText: {
-    color: colors.primary,
-    fontSize: 13,
-    fontWeight: '700',
-    marginRight: 4,
+    fontSize: 14,
+    fontWeight: '600',
   },
   catalogList: {
     paddingHorizontal: 16,
-    paddingBottom: 12,
-    paddingTop: 6,
   },
 });
 

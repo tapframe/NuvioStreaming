@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Switch,
   ScrollView,
-  useColorScheme,
   SafeAreaView,
   StatusBar,
   Alert,
@@ -19,12 +18,12 @@ import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { Picker } from '@react-native-picker/picker';
-import { colors } from '../styles/colors';
 import { useSettings, DEFAULT_SETTINGS } from '../hooks/useSettings';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { stremioService } from '../services/stremioService';
 import { useCatalogContext } from '../contexts/CatalogContext';
 import { useTraktContext } from '../contexts/TraktContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { catalogService, DataSource } from '../services/catalogService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -35,28 +34,31 @@ const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 // Card component with modern style
 interface SettingsCardProps {
   children: React.ReactNode;
-  isDarkMode: boolean;
   title?: string;
 }
 
-const SettingsCard: React.FC<SettingsCardProps> = ({ children, isDarkMode, title }) => (
-  <View style={[styles.cardContainer]}>
-    {title && (
-      <Text style={[
-        styles.cardTitle,
-        { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }
+const SettingsCard: React.FC<SettingsCardProps> = ({ children, title }) => {
+  const { currentTheme } = useTheme();
+  
+  return (
+    <View style={[styles.cardContainer]}>
+      {title && (
+        <Text style={[
+          styles.cardTitle,
+          { color: currentTheme.colors.mediumEmphasis }
+        ]}>
+          {title.toUpperCase()}
+        </Text>
+      )}
+      <View style={[
+        styles.card,
+        { backgroundColor: currentTheme.colors.elevation2 }
       ]}>
-        {title.toUpperCase()}
-      </Text>
-    )}
-    <View style={[
-      styles.card,
-      { backgroundColor: isDarkMode ? colors.elevation2 : colors.white }
-    ]}>
-      {children}
+        {children}
+      </View>
     </View>
-  </View>
-);
+  );
+};
 
 interface SettingItemProps {
   title: string;
@@ -65,7 +67,6 @@ interface SettingItemProps {
   renderControl: () => React.ReactNode;
   isLast?: boolean;
   onPress?: () => void;
-  isDarkMode: boolean;
   badge?: string | number;
 }
 
@@ -76,9 +77,10 @@ const SettingItem: React.FC<SettingItemProps> = ({
   renderControl,
   isLast = false,
   onPress,
-  isDarkMode,
   badge
 }) => {
+  const { currentTheme } = useTheme();
+  
   return (
     <TouchableOpacity 
       activeOpacity={0.7}
@@ -86,28 +88,28 @@ const SettingItem: React.FC<SettingItemProps> = ({
       style={[
         styles.settingItem, 
         !isLast && styles.settingItemBorder,
-        { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }
+        { borderBottomColor: 'rgba(255,255,255,0.08)' }
       ]}
     >
       <View style={[
         styles.settingIconContainer,
-        { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+        { backgroundColor: 'rgba(255,255,255,0.1)' }
       ]}>
-        <MaterialIcons name={icon} size={20} color={colors.primary} />
+        <MaterialIcons name={icon} size={20} color={currentTheme.colors.primary} />
       </View>
       <View style={styles.settingContent}>
         <View style={styles.settingTextContainer}>
-          <Text style={[styles.settingTitle, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
+          <Text style={[styles.settingTitle, { color: currentTheme.colors.highEmphasis }]}>
             {title}
           </Text>
           {description && (
-            <Text style={[styles.settingDescription, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>
+            <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
               {description}
             </Text>
           )}
         </View>
         {badge && (
-          <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+          <View style={[styles.badge, { backgroundColor: currentTheme.colors.primary }]}>
             <Text style={styles.badgeText}>{badge}</Text>
           </View>
         )}
@@ -121,35 +123,34 @@ const SettingItem: React.FC<SettingItemProps> = ({
 
 const SettingsScreen: React.FC = () => {
   const { settings, updateSetting } = useSettings();
-  const systemColorScheme = useColorScheme();
-  const isDarkMode = systemColorScheme === 'dark' || settings.enableDarkMode;
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { lastUpdate } = useCatalogContext();
-  const { isAuthenticated, userProfile } = useTraktContext();
+  const { isAuthenticated, userProfile, refreshAuthStatus } = useTraktContext();
+  const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
   
+  // Add a useEffect to check authentication status on focus
+  useEffect(() => {
+    // This will reload the Trakt auth status whenever the settings screen is focused
+    const unsubscribe = navigation.addListener('focus', () => {
+      // Force a re-render when returning to this screen
+      // This will reflect the updated isAuthenticated state from the TraktContext
+      // Refresh auth status
+      if (isAuthenticated || userProfile) {
+        // Just to be cautious, log the current state
+        console.log('SettingsScreen focused, refreshing auth status. Current state:', { isAuthenticated, userProfile: userProfile?.username });
+      }
+      refreshAuthStatus();
+    });
+    
+    return unsubscribe;
+  }, [navigation, isAuthenticated, userProfile, refreshAuthStatus]);
+
   // States for dynamic content
   const [addonCount, setAddonCount] = useState<number>(0);
   const [catalogCount, setCatalogCount] = useState<number>(0);
   const [mdblistKeySet, setMdblistKeySet] = useState<boolean>(false);
   const [discoverDataSource, setDiscoverDataSource] = useState<DataSource>(DataSource.STREMIO_ADDONS);
-
-  // Force consistent status bar settings
-  useEffect(() => {
-    const applyStatusBarConfig = () => {
-      StatusBar.setBarStyle('light-content');
-      if (Platform.OS === 'android') {
-        StatusBar.setTranslucent(true);
-        StatusBar.setBackgroundColor('transparent');
-      }
-    };
-    
-    applyStatusBarConfig();
-    
-    // Re-apply on focus
-    const unsubscribe = navigation.addListener('focus', applyStatusBarConfig);
-    return unsubscribe;
-  }, [navigation]);
 
   const loadData = useCallback(async () => {
     try {
@@ -229,9 +230,9 @@ const SettingsScreen: React.FC = () => {
     <Switch
       value={value}
       onValueChange={onValueChange}
-      trackColor={{ false: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)', true: colors.primary }}
-      thumbColor={Platform.OS === 'android' ? (value ? colors.white : colors.white) : ''}
-      ios_backgroundColor={isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}
+      trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
+      thumbColor={Platform.OS === 'android' ? (value ? currentTheme.colors.white : currentTheme.colors.white) : ''}
+      ios_backgroundColor={'rgba(255,255,255,0.1)'}
     />
   );
 
@@ -239,7 +240,7 @@ const SettingsScreen: React.FC = () => {
     <MaterialIcons 
       name="chevron-right" 
       size={22} 
-      color={isDarkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
+      color={'rgba(255,255,255,0.3)'}
     />
   );
 
@@ -257,52 +258,126 @@ const SettingsScreen: React.FC = () => {
   return (
     <View style={[
       styles.container,
-      { backgroundColor: isDarkMode ? colors.darkBackground : '#F2F2F7' }
+      { backgroundColor: currentTheme.colors.darkBackground }
     ]}>
-      {/* Fixed position header background to prevent shifts */}
-      <View style={[
-        styles.headerBackground,
-        { height: headerHeight, backgroundColor: isDarkMode ? colors.darkBackground : '#F2F2F7' }
-      ]} />
-      
+      <StatusBar barStyle={'light-content'} />
       <View style={{ flex: 1 }}>
-        {/* Header Section with proper top spacing */}
         <View style={[styles.header, { height: headerHeight, paddingTop: topSpacing }]}>
-          <Text style={[styles.headerTitle, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
+          <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
             Settings
           </Text>
-          <TouchableOpacity onPress={handleResetSettings} style={styles.resetButton}>
-            <Text style={[styles.resetButtonText, {color: colors.primary}]}>Reset</Text>
-          </TouchableOpacity>
         </View>
 
-        {/* Content Container */}
         <View style={styles.contentContainer}>
           <ScrollView 
             style={styles.scrollView}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
           >
-            <SettingsCard isDarkMode={isDarkMode} title="User & Account">
+            <SettingsCard title="User & Account">
               <SettingItem
                 title="Trakt"
                 description={isAuthenticated ? `Connected as ${userProfile?.username || 'User'}` : "Not Connected"}
                 icon="person"
-                isDarkMode={isDarkMode}
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('TraktSettings')}
+                isLast={false}
+              />
+            </SettingsCard>
+
+            <SettingsCard title="Profiles">
+              {isAuthenticated ? (
+                <SettingItem
+                  title="Manage Profiles"
+                  description="Create and switch between profiles"
+                  icon="people"
+                  renderControl={ChevronRight}
+                  onPress={() => navigation.navigate('ProfilesSettings')}
+                  isLast={true}
+                />
+              ) : (
+                <TouchableOpacity
+                  style={[
+                    styles.profileLockContainer,
+                    { 
+                      backgroundColor: `${currentTheme.colors.primary}10`,
+                      borderWidth: 1,
+                      borderColor: `${currentTheme.colors.primary}30`
+                    }
+                  ]}
+                  activeOpacity={1}
+                >
+                  <View style={styles.profileLockContent}>
+                    <MaterialIcons name="lock-outline" size={24} color={currentTheme.colors.primary} />
+                    <View style={styles.profileLockTextContainer}>
+                      <Text style={[styles.profileLockTitle, { color: currentTheme.colors.text }]}>
+                        Sign in to use Profiles
+                      </Text>
+                      <Text style={[styles.profileLockDescription, { color: currentTheme.colors.textMuted }]}>
+                        Create multiple profiles for different users and preferences
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.profileBenefits}>
+                    <View style={styles.benefitCol}>
+                      <View style={styles.benefitItem}>
+                        <MaterialIcons name="check-circle" size={16} color={currentTheme.colors.primary} />
+                        <Text style={[styles.benefitText, { color: currentTheme.colors.textMuted }]}>
+                          Separate watchlists
+                        </Text>
+                      </View>
+                      <View style={styles.benefitItem}>
+                        <MaterialIcons name="check-circle" size={16} color={currentTheme.colors.primary} />
+                        <Text style={[styles.benefitText, { color: currentTheme.colors.textMuted }]}>
+                          Content preferences
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.benefitCol}>
+                      <View style={styles.benefitItem}>
+                        <MaterialIcons name="check-circle" size={16} color={currentTheme.colors.primary} />
+                        <Text style={[styles.benefitText, { color: currentTheme.colors.textMuted }]}>
+                          Personalized recommendations
+                        </Text>
+                      </View>
+                      <View style={styles.benefitItem}>
+                        <MaterialIcons name="check-circle" size={16} color={currentTheme.colors.primary} />
+                        <Text style={[styles.benefitText, { color: currentTheme.colors.textMuted }]}>
+                          Individual viewing history
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.loginButton, { backgroundColor: currentTheme.colors.primary }]}
+                    activeOpacity={0.7}
+                    onPress={() => navigation.navigate('TraktSettings')}
+                  >
+                    <Text style={styles.loginButtonText}>Connect with Trakt</Text>
+                    <MaterialIcons name="arrow-forward" size={18} color="#FFFFFF" style={styles.loginButtonIcon} />
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              )}
+            </SettingsCard>
+
+            <SettingsCard title="Appearance">
+              <SettingItem
+                title="Theme"
+                description={currentTheme.name}
+                icon="palette"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('ThemeSettings')}
                 isLast={true}
               />
             </SettingsCard>
 
-            <SettingsCard isDarkMode={isDarkMode} title="Features">
+            <SettingsCard title="Features">
               <SettingItem
                 title="Calendar"
                 description="Manage your show calendar settings"
                 icon="calendar-today"
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('Calendar')}
-                isDarkMode={isDarkMode}
               />
               <SettingItem
                 title="Notifications"
@@ -310,17 +385,15 @@ const SettingsScreen: React.FC = () => {
                 icon="notifications"
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('NotificationSettings')}
-                isDarkMode={isDarkMode}
                 isLast={true}
               />
             </SettingsCard>
 
-            <SettingsCard isDarkMode={isDarkMode} title="Content">
+            <SettingsCard title="Content">
               <SettingItem
                 title="Addons"
                 description="Manage your installed addons"
                 icon="extension"
-                isDarkMode={isDarkMode}
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('Addons')}
                 badge={addonCount}
@@ -329,7 +402,6 @@ const SettingsScreen: React.FC = () => {
                 title="Catalogs"
                 description="Configure content sources"
                 icon="view-list"
-                isDarkMode={isDarkMode}
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('CatalogSettings')}
                 badge={catalogCount}
@@ -338,30 +410,34 @@ const SettingsScreen: React.FC = () => {
                 title="Home Screen"
                 description="Customize layout and content"
                 icon="home"
-                isDarkMode={isDarkMode}
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('HomeScreenSettings')}
               />
               <SettingItem
-                title="Ratings Source"
-                description={mdblistKeySet ? "MDBList API Configured" : "Configure MDBList API"}
+                title="MDBList Integration"
+                description={mdblistKeySet ? "Ratings and reviews provided by MDBList" : "Connect MDBList for ratings and reviews"}
                 icon="info-outline"
-                isDarkMode={isDarkMode}
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('MDBListSettings')}
+              />
+              <SettingItem
+                title="Image Sources"
+                description="Choose primary source for title logos and backgrounds"
+                icon="image"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('LogoSourceSettings')}
               />
               <SettingItem
                 title="TMDB"
                 description="API & Metadata Settings"
                 icon="movie-filter"
-                isDarkMode={isDarkMode}
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('TMDBSettings')}
                 isLast={true}
               />
             </SettingsCard>
 
-            <SettingsCard isDarkMode={isDarkMode} title="Playback">
+            <SettingsCard title="Playback">
               <SettingItem
                 title="Video Player"
                 description={Platform.OS === 'ios' 
@@ -373,43 +449,53 @@ const SettingsScreen: React.FC = () => {
                   : (settings.useExternalPlayer ? 'External Player' : 'Built-in Player')
                 }
                 icon="play-arrow"
-                isDarkMode={isDarkMode}
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('PlayerSettings')}
                 isLast={true}
               />
             </SettingsCard>
 
-            <SettingsCard isDarkMode={isDarkMode} title="Discover">
+            <SettingsCard title="Discover">
               <SettingItem
                 title="Content Source"
                 description="Choose where to get content for the Discover screen"
                 icon="explore"
-                isDarkMode={isDarkMode}
                 renderControl={() => (
                   <View style={styles.selectorContainer}>
                     <TouchableOpacity
                       style={[
                         styles.selectorButton,
-                        discoverDataSource === DataSource.STREMIO_ADDONS && styles.selectorButtonActive
+                        discoverDataSource === DataSource.STREMIO_ADDONS && {
+                          backgroundColor: currentTheme.colors.primary
+                        }
                       ]}
                       onPress={() => handleDiscoverDataSourceChange(DataSource.STREMIO_ADDONS)}
                     >
                       <Text style={[
                         styles.selectorText,
-                        discoverDataSource === DataSource.STREMIO_ADDONS && styles.selectorTextActive
+                        { color: currentTheme.colors.mediumEmphasis },
+                        discoverDataSource === DataSource.STREMIO_ADDONS && {
+                          color: currentTheme.colors.white,
+                          fontWeight: '600'
+                        }
                       ]}>Addons</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[
                         styles.selectorButton,
-                        discoverDataSource === DataSource.TMDB && styles.selectorButtonActive
+                        discoverDataSource === DataSource.TMDB && {
+                          backgroundColor: currentTheme.colors.primary
+                        }
                       ]}
                       onPress={() => handleDiscoverDataSourceChange(DataSource.TMDB)}
                     >
                       <Text style={[
                         styles.selectorText,
-                        discoverDataSource === DataSource.TMDB && styles.selectorTextActive
+                        { color: currentTheme.colors.mediumEmphasis },
+                        discoverDataSource === DataSource.TMDB && {
+                          color: currentTheme.colors.white,
+                          fontWeight: '600'
+                        }
                       ]}>TMDB</Text>
                     </TouchableOpacity>
                   </View>
@@ -418,7 +504,7 @@ const SettingsScreen: React.FC = () => {
             </SettingsCard>
 
             <View style={styles.versionContainer}>
-              <Text style={[styles.versionText, {color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark}]}>
+              <Text style={[styles.versionText, {color: currentTheme.colors.mediumEmphasis}]}>
                 Version 1.0.0
               </Text>
             </View>
@@ -432,18 +518,6 @@ const SettingsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  headerBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1,
-  },
-  contentContainer: {
-    flex: 1,
-    zIndex: 1,
-    width: '100%',
   },
   header: {
     paddingHorizontal: 20,
@@ -459,13 +533,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.3,
   },
-  resetButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  resetButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+  contentContainer: {
+    flex: 1,
+    zIndex: 1,
+    width: '100%',
   },
   scrollView: {
     flex: 1,
@@ -526,11 +597,6 @@ const styles = StyleSheet.create({
   settingTextContainer: {
     flex: 1,
   },
-  settingTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
   settingTitle: {
     fontSize: 16,
     fontWeight: '500',
@@ -589,17 +655,65 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
-  selectorButtonActive: {
-    backgroundColor: colors.primary,
-  },
   selectorText: {
     fontSize: 14,
     fontWeight: '500',
-    color: colors.mediumEmphasis,
   },
-  selectorTextActive: {
-    color: colors.white,
+  profileLockContainer: {
+    padding: 16,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginVertical: 8,
+  },
+  profileLockContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  profileLockTextContainer: {
+    flex: 1,
+    marginHorizontal: 12,
+  },
+  profileLockTitle: {
+    fontSize: 16,
     fontWeight: '600',
+    marginBottom: 4,
+  },
+  profileLockDescription: {
+    fontSize: 14,
+    opacity: 0.8,
+  },
+  profileBenefits: {
+    flexDirection: 'row',
+    marginTop: 16,
+    justifyContent: 'space-between',
+  },
+  benefitCol: {
+    flex: 1,
+  },
+  benefitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  benefitText: {
+    fontSize: 14,
+    marginLeft: 8,
+  },
+  loginButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    paddingVertical: 12,
+    marginTop: 16,
+  },
+  loginButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  loginButtonIcon: {
+    marginLeft: 8,
   },
 });
 

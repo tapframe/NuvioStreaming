@@ -1,10 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Image, Animated } from 'react-native';
-import { colors } from '../../styles/colors';
+import { useTheme } from '../../contexts/ThemeContext';
 import { useMDBListRatings } from '../../hooks/useMDBListRatings';
-import { logger } from '../../utils/logger';
-import { MaterialIcons } from '@expo/vector-icons';
-import { FontAwesome } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isMDBListEnabled, RATING_PROVIDERS_STORAGE_KEY } from '../../screens/MDBListSettingsScreen';
 
@@ -57,6 +54,7 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
   const [enabledProviders, setEnabledProviders] = useState<Record<string, boolean>>({});
   const [isMDBEnabled, setIsMDBEnabled] = useState(true);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const { currentTheme } = useTheme();
 
   useEffect(() => {
     loadProviderSettings();
@@ -67,9 +65,7 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
     try {
       const enabled = await isMDBListEnabled();
       setIsMDBEnabled(enabled);
-      logger.log('[RatingsSection] MDBList enabled:', enabled);
     } catch (error) {
-      logger.error('[RatingsSection] Failed to check if MDBList is enabled:', error);
       setIsMDBEnabled(true); // Default to enabled
     }
   };
@@ -88,28 +84,8 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
         setEnabledProviders(defaultSettings);
       }
     } catch (error) {
-      logger.error('[RatingsSection] Failed to load provider settings:', error);
     }
   };
-
-  useEffect(() => {
-    logger.log(`[RatingsSection] Mounted for ${type}:`, imdbId);
-    return () => {
-      logger.log(`[RatingsSection] Unmounted for ${type}:`, imdbId);
-    };
-  }, [imdbId, type]);
-
-  useEffect(() => {
-    if (error) {
-      logger.error('[RatingsSection] Error state:', error);
-    }
-  }, [error]);
-
-  useEffect(() => {
-    if (ratings) {
-      logger.log('[RatingsSection] Received ratings:', ratings);
-    }
-  }, [ratings]);
 
   useEffect(() => {
     if (ratings && Object.keys(ratings).length > 0) {
@@ -123,26 +99,9 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
   }, [ratings, fadeAnim]);
 
   // If MDBList is disabled, don't show anything
-  if (!isMDBEnabled) {
-    logger.log('[RatingsSection] MDBList is disabled, not showing ratings');
-    return null;
-  }
-
-  if (loading) {
-    logger.log('[RatingsSection] Loading state');
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="small" color={colors.primary} />
-      </View>
-    );
-  }
-
-  if (error || !ratings || Object.keys(ratings).length === 0) {
-    logger.log('[RatingsSection] No ratings to display');
-    return null;
-  }
-
-  logger.log('[RatingsSection] Rendering ratings:', Object.keys(ratings).length);
+  if (!isMDBEnabled) return null;
+  if (loading) return <View style={styles.loadingContainer}><ActivityIndicator size="small" color={currentTheme.colors.primary} /></View>;
+  if (error || !ratings || Object.keys(ratings).length === 0) return null;
 
   // Define the order and icons/colors for the ratings
   const ratingConfig = {
@@ -150,56 +109,42 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
       icon: require('../../../assets/rating-icons/imdb.png'),
       isImage: true,
       color: '#F5C518',
-      prefix: '',
-      suffix: '',
       transform: (value: number) => value.toFixed(1)
     },
     tmdb: {
       icon: TMDBIcon,
       isImage: false,
       color: '#01B4E4',
-      prefix: '',
-      suffix: '',
       transform: (value: number) => value.toFixed(0)
     },
     trakt: {
       icon: TraktIcon,
       isImage: false,
       color: '#ED1C24',
-      prefix: '',
-      suffix: '',
       transform: (value: number) => value.toFixed(0)
     },
     letterboxd: {
       icon: LetterboxdIcon,
       isImage: false,
       color: '#00E054',
-      prefix: '',
-      suffix: '',
       transform: (value: number) => value.toFixed(1)
     },
     tomatoes: {
       icon: RottenTomatoesIcon,
       isImage: false,
       color: '#FA320A',
-      prefix: '',
-      suffix: '%',
-      transform: (value: number) => Math.round(value).toString()
+      transform: (value: number) => Math.round(value).toString() + '%'
     },
     audience: {
       icon: AudienceScoreIcon,
       isImage: true,
       color: '#FA320A',
-      prefix: '',
-      suffix: '%',
-      transform: (value: number) => Math.round(value).toString()
+      transform: (value: number) => Math.round(value).toString() + '%'
     },
     metacritic: {
       icon: MetacriticIcon,
       isImage: true,
       color: '#FFCC33',
-      prefix: '',
-      suffix: '',
       transform: (value: number) => Math.round(value).toString()
     }
   };
@@ -229,86 +174,69 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
         },
       ]}
     >
-      {displayRatings.map(([source, value]) => {
-        const config = ratingConfig[source as keyof typeof ratingConfig];
-        const numericValue = typeof value === 'string' ? parseFloat(value) : value;
-        const displayValue = config.transform(numericValue);
-        
-        // Get a short display name for the rating source
-        const getSourceLabel = (src: string): string => {
-          switch(src) {
-            case 'imdb': return 'IMDb';
-            case 'tmdb': return 'TMDB';
-            case 'tomatoes': return 'RT';
-            case 'audience': return 'Aud';
-            case 'metacritic': return 'Meta';
-            case 'letterboxd': return 'LBXD';
-            case 'trakt': return 'Trakt';
-            default: return src;
-          }
-        };
-        
-        return (
-          <View key={source} style={styles.ratingItem}>
-            {config.isImage ? (
-              <Image 
-                source={config.icon} 
-                style={styles.ratingIcon} 
-                resizeMode="contain"
-              />
-            ) : (
-              <config.icon 
-                width={16} 
-                height={16} 
-                style={styles.ratingIcon}
-              />
-            )}
-            <Text style={[styles.ratingValue, {color: config.color}]}>
-              {displayValue}{config.suffix}
-            </Text>
-          </View>
-        );
-      })}
+      <View style={styles.compactRatingsContainer}>
+        {displayRatings.map(([source, value]) => {
+          const config = ratingConfig[source as keyof typeof ratingConfig];
+          const displayValue = config.transform(parseFloat(value as string));
+          
+          return (
+            <View key={source} style={styles.compactRatingItem}>
+              {config.isImage ? (
+                <Image 
+                  source={config.icon as any}
+                  style={styles.compactRatingIcon}
+                  resizeMode="contain"
+                />
+              ) : (
+                <View style={styles.compactSvgContainer}>
+                  {React.createElement(config.icon as any, {
+                    width: 16,
+                    height: 16,
+                  })}
+                </View>
+              )}
+              <Text style={[styles.compactRatingValue, { color: config.color }]}>
+                {displayValue}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
     </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-    marginBottom: 16,
-    paddingHorizontal: 12,
-    gap: 4,
+    marginTop: 2,
+    marginBottom: 8,
+    paddingHorizontal: 16,
   },
   loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
     height: 40,
-    marginVertical: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  ratingItem: {
+  compactRatingsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    paddingVertical: 3,
-    paddingHorizontal: 4,
-    borderRadius: 4,
+    flexWrap: 'nowrap',
   },
-  ratingIcon: {
+  compactRatingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  compactRatingIcon: {
     width: 16,
     height: 16,
-    marginRight: 3,
-    alignSelf: 'center',
+    marginRight: 4,
   },
-  ratingValue: {
-    fontSize: 13,
-    fontWeight: 'bold',
+  compactSvgContainer: {
+    marginRight: 4,
   },
-  ratingLabel: {
-    fontSize: 11,
-    opacity: 0.9,
+  compactRatingValue: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 }); 

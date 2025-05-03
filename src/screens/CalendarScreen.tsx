@@ -9,7 +9,6 @@ import {
   RefreshControl,
   SafeAreaView,
   StatusBar,
-  useColorScheme,
   Dimensions,
   SectionList
 } from 'react-native';
@@ -18,7 +17,7 @@ import { NavigationProp } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors } from '../styles/colors';
+import { useTheme } from '../contexts/ThemeContext';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { stremioService } from '../services/stremioService';
 import { useLibrary } from '../hooks/useLibrary';
@@ -53,6 +52,7 @@ interface CalendarSection {
 const CalendarScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { libraryItems, loading: libraryLoading } = useLibrary();
+  const { currentTheme } = useTheme();
   logger.log(`[Calendar] Initial load - Library has ${libraryItems?.length || 0} items, loading: ${libraryLoading}`);
   const [calendarData, setCalendarData] = useState<CalendarSection[]>([]);
   const [loading, setLoading] = useState(true);
@@ -270,7 +270,7 @@ const CalendarScreen = () => {
     return (
       <Animated.View entering={FadeIn.duration(300).delay(100)}>
         <TouchableOpacity 
-          style={styles.episodeItem}
+          style={[styles.episodeItem, { borderBottomColor: currentTheme.colors.border + '20' }]}
           onPress={() => handleEpisodePress(item)}
           activeOpacity={0.7}
         >
@@ -287,18 +287,18 @@ const CalendarScreen = () => {
           </TouchableOpacity>
           
           <View style={styles.episodeDetails}>
-            <Text style={styles.seriesName} numberOfLines={1}>
+            <Text style={[styles.seriesName, { color: currentTheme.colors.text }]} numberOfLines={1}>
               {item.seriesName}
             </Text>
             
             {hasReleaseDate ? (
               <>
-                <Text style={styles.episodeTitle} numberOfLines={2}>
+                <Text style={[styles.episodeTitle, { color: currentTheme.colors.lightGray }]} numberOfLines={2}>
                   S{item.season}:E{item.episode} - {item.title}
                 </Text>
                 
                 {item.overview ? (
-                  <Text style={styles.overview} numberOfLines={2}>
+                  <Text style={[styles.overview, { color: currentTheme.colors.lightGray }]} numberOfLines={2}>
                     {item.overview}
                   </Text>
                 ) : null}
@@ -308,9 +308,9 @@ const CalendarScreen = () => {
                     <MaterialIcons 
                       name={isFuture ? "event" : "event-available"} 
                       size={16} 
-                      color={colors.lightGray} 
+                      color={currentTheme.colors.lightGray} 
                     />
-                    <Text style={styles.date}>{formattedDate}</Text>
+                    <Text style={[styles.date, { color: currentTheme.colors.lightGray }]}>{formattedDate}</Text>
                   </View>
                   
                   {item.vote_average > 0 && (
@@ -318,9 +318,9 @@ const CalendarScreen = () => {
                       <MaterialIcons 
                         name="star" 
                         size={16} 
-                        color={colors.primary} 
+                        color={currentTheme.colors.primary} 
                       />
-                      <Text style={styles.rating}>
+                      <Text style={[styles.rating, { color: currentTheme.colors.primary }]}>
                         {item.vote_average.toFixed(1)}
                       </Text>
                     </View>
@@ -329,16 +329,16 @@ const CalendarScreen = () => {
               </>
             ) : (
               <>
-                <Text style={styles.noEpisodesText}>
+                <Text style={[styles.noEpisodesText, { color: currentTheme.colors.text }]}>
                   No scheduled episodes
                 </Text>
                 <View style={styles.dateContainer}>
                   <MaterialIcons 
                     name="event-busy" 
                     size={16} 
-                    color={colors.lightGray} 
+                    color={currentTheme.colors.lightGray} 
                   />
-                  <Text style={styles.date}>Check back later</Text>
+                  <Text style={[styles.date, { color: currentTheme.colors.lightGray }]}>Check back later</Text>
                 </View>
               </>
             )}
@@ -349,8 +349,13 @@ const CalendarScreen = () => {
   };
   
   const renderSectionHeader = ({ section }: { section: CalendarSection }) => (
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>{section.title}</Text>
+    <View style={[styles.sectionHeader, { 
+      backgroundColor: currentTheme.colors.darkBackground,
+      borderBottomColor: currentTheme.colors.border 
+    }]}>
+      <Text style={[styles.sectionTitle, { color: currentTheme.colors.text }]}>
+        {section.title}
+      </Text>
     </View>
   );
   
@@ -386,22 +391,22 @@ const CalendarScreen = () => {
   
   if (libraryItems.length === 0 && !libraryLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
         <StatusBar barStyle="light-content" />
         
-        <View style={styles.header}>
+        <View style={[styles.header, { borderBottomColor: currentTheme.colors.border }]}>
           <TouchableOpacity 
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-            <MaterialIcons name="arrow-back" size={24} color={colors.text} />
+            <MaterialIcons name="arrow-back" size={24} color={currentTheme.colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Calendar</Text>
+          <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>Calendar</Text>
           <View style={{ width: 40 }} />
         </View>
         
         <View style={styles.emptyLibraryContainer}>
-          <MaterialIcons name="video-library" size={64} color={colors.lightGray} />
+          <MaterialIcons name="video-library" size={64} color={currentTheme.colors.lightGray} />
           <Text style={styles.emptyText}>
             Your library is empty
           </Text>
@@ -423,10 +428,10 @@ const CalendarScreen = () => {
   
   if (loading && !refreshing) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
         <StatusBar barStyle="light-content" />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={currentTheme.colors.primary} />
           <Text style={styles.loadingText}>Loading calendar...</Text>
         </View>
       </SafeAreaView>
@@ -434,27 +439,27 @@ const CalendarScreen = () => {
   }
   
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
       <StatusBar barStyle="light-content" />
       
-      <View style={styles.header}>
+      <View style={[styles.header, { borderBottomColor: currentTheme.colors.border }]}>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <MaterialIcons name="arrow-back" size={24} color={colors.text} />
+          <MaterialIcons name="arrow-back" size={24} color={currentTheme.colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Calendar</Text>
+        <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>Calendar</Text>
         <View style={{ width: 40 }} />
       </View>
       
       {selectedDate && filteredEpisodes.length > 0 && (
-        <View style={styles.filterInfoContainer}>
-          <Text style={styles.filterInfoText}>
+        <View style={[styles.filterInfoContainer, { borderBottomColor: currentTheme.colors.border }]}>
+          <Text style={[styles.filterInfoText, { color: currentTheme.colors.text }]}>
             Showing episodes for {format(selectedDate, 'MMMM d, yyyy')}
           </Text>
           <TouchableOpacity onPress={clearDateFilter} style={styles.clearFilterButton}>
-            <MaterialIcons name="close" size={18} color={colors.text} />
+            <MaterialIcons name="close" size={18} color={currentTheme.colors.text} />
           </TouchableOpacity>
         </View>
       )}
@@ -474,22 +479,22 @@ const CalendarScreen = () => {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={colors.primary}
-              colors={[colors.primary]}
+              tintColor={currentTheme.colors.primary}
+              colors={[currentTheme.colors.primary]}
             />
           }
         />
       ) : selectedDate && filteredEpisodes.length === 0 ? (
         <View style={styles.emptyFilterContainer}>
-          <MaterialIcons name="event-busy" size={48} color={colors.lightGray} />
-          <Text style={styles.emptyFilterText}>
+          <MaterialIcons name="event-busy" size={48} color={currentTheme.colors.lightGray} />
+          <Text style={[styles.emptyFilterText, { color: currentTheme.colors.text }]}>
             No episodes for {format(selectedDate, 'MMMM d, yyyy')}
           </Text>
           <TouchableOpacity 
-            style={styles.clearFilterButtonLarge}
+            style={[styles.clearFilterButtonLarge, { backgroundColor: currentTheme.colors.primary }]}
             onPress={clearDateFilter}
           >
-            <Text style={styles.clearFilterButtonText}>
+            <Text style={[styles.clearFilterButtonText, { color: currentTheme.colors.text }]}>
               Show All Episodes
             </Text>
           </TouchableOpacity>
@@ -505,18 +510,18 @@ const CalendarScreen = () => {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={colors.primary}
-              colors={[colors.primary]}
+              tintColor={currentTheme.colors.primary}
+              colors={[currentTheme.colors.primary]}
             />
           }
         />
       ) : (
         <View style={styles.emptyContainer}>
-          <MaterialIcons name="calendar-today" size={64} color={colors.lightGray} />
-          <Text style={styles.emptyText}>
+          <MaterialIcons name="calendar-today" size={64} color={currentTheme.colors.lightGray} />
+          <Text style={[styles.emptyText, { color: currentTheme.colors.text }]}>
             No upcoming episodes found
           </Text>
-          <Text style={styles.emptySubtext}>
+          <Text style={[styles.emptySubtext, { color: currentTheme.colors.lightGray }]}>
             Add series to your library to see their upcoming episodes here
           </Text>
         </View>
@@ -528,7 +533,6 @@ const CalendarScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.darkBackground,
   },
   listContent: {
     paddingBottom: 20,
@@ -539,19 +543,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    color: colors.text,
     marginTop: 10,
     fontSize: 16,
   },
   sectionHeader: {
-    backgroundColor: colors.darkBackground,
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
   sectionTitle: {
-    color: colors.text,
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -559,7 +559,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border + '20',
   },
   poster: {
     width: 120,
@@ -572,18 +571,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   seriesName: {
-    color: colors.text,
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 4,
   },
   episodeTitle: {
-    color: colors.lightGray,
     fontSize: 14,
     lineHeight: 20,
   },
   overview: {
-    color: colors.lightGray,
     fontSize: 12,
     marginTop: 4,
     lineHeight: 16,
@@ -599,7 +595,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   date: {
-    color: colors.lightGray,
     fontSize: 14,
     marginLeft: 4,
   },
@@ -608,7 +603,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   rating: {
-    color: colors.primary,
     fontSize: 14,
     marginLeft: 4,
     fontWeight: 'bold',
@@ -620,14 +614,12 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   emptyText: {
-    color: colors.text,
     fontSize: 18,
     fontWeight: 'bold',
     marginTop: 16,
     textAlign: 'center',
   },
   emptySubtext: {
-    color: colors.lightGray,
     fontSize: 14,
     marginTop: 8,
     textAlign: 'center',
@@ -638,10 +630,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
   filterInfoText: {
-    color: colors.text,
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -655,7 +645,6 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   emptyFilterText: {
-    color: colors.text,
     fontSize: 18,
     fontWeight: 'bold',
     marginTop: 16,
@@ -664,11 +653,9 @@ const styles = StyleSheet.create({
   clearFilterButtonLarge: {
     marginTop: 20,
     padding: 16,
-    backgroundColor: colors.primary,
     borderRadius: 8,
   },
   clearFilterButtonText: {
-    color: colors.text,
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -681,7 +668,6 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   headerTitle: {
-    color: colors.text,
     fontSize: 18,
     fontWeight: 'bold',
     marginLeft: 12,
@@ -694,16 +680,13 @@ const styles = StyleSheet.create({
   },
   discoverButton: {
     padding: 16,
-    backgroundColor: colors.primary,
     borderRadius: 8,
   },
   discoverButtonText: {
-    color: colors.text,
     fontSize: 16,
     fontWeight: 'bold',
   },
   noEpisodesText: {
-    color: colors.text,
     fontSize: 14,
     marginBottom: 4,
   },

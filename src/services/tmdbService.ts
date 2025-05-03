@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { logger } from '../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // TMDB API configuration
@@ -100,15 +99,12 @@ export class TMDBService {
       
       if (this.useCustomKey && savedKey) {
         this.apiKey = savedKey;
-        logger.log('Using custom TMDb API key');
       } else {
         this.apiKey = DEFAULT_API_KEY;
-        logger.log('Using default TMDb API key');
       }
       
       this.apiKeyLoaded = true;
     } catch (error) {
-      logger.error('Failed to load TMDb API key from storage, using default:', error);
       this.apiKey = DEFAULT_API_KEY;
       this.apiKeyLoaded = true;
     }
@@ -157,7 +153,6 @@ export class TMDBService {
       });
       return response.data.results;
     } catch (error) {
-      logger.error('Failed to search TV show:', error);
       return [];
     }
   }
@@ -175,7 +170,6 @@ export class TMDBService {
       });
       return response.data;
     } catch (error) {
-      logger.error('Failed to get TV show details:', error);
       return null;
     }
   }
@@ -198,7 +192,6 @@ export class TMDBService {
       );
       return response.data;
     } catch (error) {
-      logger.error('Failed to get episode external IDs:', error);
       return null;
     }
   }
@@ -234,7 +227,6 @@ export class TMDBService {
       TMDBService.ratingCache.set(cacheKey, rating);
       return rating;
     } catch (error) {
-      logger.error('Failed to get IMDb rating:', error);
       // Cache the failed result too to prevent repeated failed requests
       TMDBService.ratingCache.set(cacheKey, null);
       return null;
@@ -289,7 +281,6 @@ export class TMDBService {
 
       return season;
     } catch (error) {
-      logger.error('Failed to get season details:', error);
       return null;
     }
   }
@@ -314,7 +305,6 @@ export class TMDBService {
       );
       return response.data;
     } catch (error) {
-      logger.error('Failed to get episode details:', error);
       return null;
     }
   }
@@ -333,7 +323,6 @@ export class TMDBService {
       const tmdbId = await this.findTMDBIdByIMDB(imdbId);
       return tmdbId;
     } catch (error) {
-      logger.error('Failed to extract TMDB ID from Stremio ID:', error);
       return null;
     }
   }
@@ -366,7 +355,6 @@ export class TMDBService {
       
       return null;
     } catch (error) {
-      logger.error('Failed to find TMDB ID by IMDB ID:', error);
       return null;
     }
   }
@@ -375,8 +363,14 @@ export class TMDBService {
    * Get image URL for TMDB images
    */
   getImageUrl(path: string | null, size: 'original' | 'w500' | 'w300' | 'w185' | 'profile' = 'original'): string | null {
-    if (!path) return null;
-    return `https://image.tmdb.org/t/p/${size}${path}`;
+    if (!path) {
+      return null;
+    }
+    
+    const baseImageUrl = 'https://image.tmdb.org/t/p/';
+    const fullUrl = `${baseImageUrl}${size}${path}`;
+    
+    return fullUrl;
   }
 
   /**
@@ -403,7 +397,6 @@ export class TMDBService {
       await Promise.all(seasonPromises);
       return allEpisodes;
     } catch (error) {
-      logger.error('Failed to get all episodes:', error);
       return {};
     }
   }
@@ -464,7 +457,6 @@ export class TMDBService {
         crew: response.data.crew || []
       };
     } catch (error) {
-      logger.error('Failed to fetch credits:', error);
       return { cast: [], crew: [] };
     }
   }
@@ -479,7 +471,6 @@ export class TMDBService {
       });
       return response.data;
     } catch (error) {
-      logger.error('Failed to fetch person details:', error);
       return null;
     }
   }
@@ -498,14 +489,12 @@ export class TMDBService {
       );
       return response.data;
     } catch (error) {
-      logger.error('Failed to get show external IDs:', error);
       return null;
     }
   }
 
   async getRecommendations(type: 'movie' | 'tv', tmdbId: string): Promise<any[]> {
     if (!this.apiKey) {
-      logger.error('TMDB API key not set');
       return [];
     }
     try {
@@ -515,7 +504,6 @@ export class TMDBService {
       });
       return response.data.results || [];
     } catch (error) {
-      logger.error(`Error fetching TMDB ${type} recommendations for ID ${tmdbId}:`, error);
       return [];
     }
   }
@@ -533,7 +521,6 @@ export class TMDBService {
       });
       return response.data.results;
     } catch (error) {
-      logger.error('Failed to search multi:', error);
       return [];
     }
   }
@@ -552,7 +539,6 @@ export class TMDBService {
       });
       return response.data;
     } catch (error) {
-      logger.error('Failed to get movie details:', error);
       return null;
     }
   }
@@ -560,18 +546,49 @@ export class TMDBService {
   /**
    * Get movie images (logos, posters, backdrops) by TMDB ID
    */
-  async getMovieImages(movieId: number | string): Promise<string | null> {
+  async getMovieImages(movieId: number | string, preferredLanguage: string = 'en'): Promise<string | null> {
     try {
       const response = await axios.get(`${BASE_URL}/movie/${movieId}/images`, {
         headers: await this.getHeaders(),
         params: await this.getParams({
-          include_image_language: 'en,null'
+          include_image_language: `${preferredLanguage},en,null`
         }),
       });
 
       const images = response.data;
+      
       if (images && images.logos && images.logos.length > 0) {
-        // First prioritize English SVG logos
+        // First prioritize preferred language SVG logos if not English
+        if (preferredLanguage !== 'en') {
+          const preferredSvgLogo = images.logos.find((logo: any) => 
+            logo.file_path && 
+            logo.file_path.endsWith('.svg') && 
+            logo.iso_639_1 === preferredLanguage
+          );
+          if (preferredSvgLogo) {
+            return this.getImageUrl(preferredSvgLogo.file_path);
+          }
+
+          // Then preferred language PNG logos
+          const preferredPngLogo = images.logos.find((logo: any) => 
+            logo.file_path && 
+            logo.file_path.endsWith('.png') && 
+            logo.iso_639_1 === preferredLanguage
+          );
+          if (preferredPngLogo) {
+            return this.getImageUrl(preferredPngLogo.file_path);
+          }
+          
+          // Then any preferred language logo
+          const preferredLogo = images.logos.find((logo: any) => 
+            logo.iso_639_1 === preferredLanguage
+          );
+          if (preferredLogo) {
+            return this.getImageUrl(preferredLogo.file_path);
+          }
+        }
+
+        // Then prioritize English SVG logos
         const enSvgLogo = images.logos.find((logo: any) => 
           logo.file_path && 
           logo.file_path.endsWith('.svg') && 
@@ -621,8 +638,6 @@ export class TMDBService {
 
       return null; // No logos found
     } catch (error) {
-      // Log error but don't throw, just return null if fetching images fails
-      logger.error(`Failed to get movie images for ID ${movieId}:`, error);
       return null;
     }
   }
@@ -630,17 +645,48 @@ export class TMDBService {
   /**
    * Get TV show images (logos, posters, backdrops) by TMDB ID
    */
-  async getTvShowImages(showId: number | string): Promise<string | null> {
+  async getTvShowImages(showId: number | string, preferredLanguage: string = 'en'): Promise<string | null> {
     try {
       const response = await axios.get(`${BASE_URL}/tv/${showId}/images`, {
         headers: await this.getHeaders(),
         params: await this.getParams({
-          include_image_language: 'en,null'
+          include_image_language: `${preferredLanguage},en,null`
         }),
       });
 
       const images = response.data;
+      
       if (images && images.logos && images.logos.length > 0) {
+        // First prioritize preferred language SVG logos if not English
+        if (preferredLanguage !== 'en') {
+          const preferredSvgLogo = images.logos.find((logo: any) => 
+            logo.file_path && 
+            logo.file_path.endsWith('.svg') && 
+            logo.iso_639_1 === preferredLanguage
+          );
+          if (preferredSvgLogo) {
+            return this.getImageUrl(preferredSvgLogo.file_path);
+          }
+
+          // Then preferred language PNG logos
+          const preferredPngLogo = images.logos.find((logo: any) => 
+            logo.file_path && 
+            logo.file_path.endsWith('.png') && 
+            logo.iso_639_1 === preferredLanguage
+          );
+          if (preferredPngLogo) {
+            return this.getImageUrl(preferredPngLogo.file_path);
+          }
+          
+          // Then any preferred language logo
+          const preferredLogo = images.logos.find((logo: any) => 
+            logo.iso_639_1 === preferredLanguage
+          );
+          if (preferredLogo) {
+            return this.getImageUrl(preferredLogo.file_path);
+          }
+        }
+
         // First prioritize English SVG logos
         const enSvgLogo = images.logos.find((logo: any) => 
           logo.file_path && 
@@ -691,8 +737,6 @@ export class TMDBService {
 
       return null; // No logos found
     } catch (error) {
-      // Log error but don't throw, just return null if fetching images fails
-      logger.error(`Failed to get TV show images for ID ${showId}:`, error);
       return null;
     }
   }
@@ -700,13 +744,18 @@ export class TMDBService {
   /**
    * Get content logo based on type (movie or TV show)
    */
-  async getContentLogo(type: 'movie' | 'tv', id: number | string): Promise<string | null> {
+  async getContentLogo(type: 'movie' | 'tv', id: number | string, preferredLanguage: string = 'en'): Promise<string | null> {
     try {
-      return type === 'movie' 
-        ? await this.getMovieImages(id)
-        : await this.getTvShowImages(id);
+      const result = type === 'movie' 
+        ? await this.getMovieImages(id, preferredLanguage)
+        : await this.getTvShowImages(id, preferredLanguage);
+        
+      if (result) {
+      } else {
+      }
+      
+      return result;
     } catch (error) {
-      logger.error(`Failed to get content logo for ${type} ID ${id}:`, error);
       return null;
     }
   }
@@ -741,7 +790,6 @@ export class TMDBService {
       }
       return null;
     } catch (error) {
-      logger.error('Error fetching certification:', error);
       return null;
     }
   }
@@ -777,7 +825,6 @@ export class TMDBService {
               external_ids: externalIdsResponse.data
             };
           } catch (error) {
-            logger.error(`Failed to get external IDs for ${type} ${item.id}:`, error);
             return item;
           }
         })
@@ -785,7 +832,6 @@ export class TMDBService {
 
       return resultsWithExternalIds;
     } catch (error) {
-      logger.error(`Failed to get trending ${type} content:`, error);
       return [];
     }
   }
@@ -822,7 +868,6 @@ export class TMDBService {
               external_ids: externalIdsResponse.data
             };
           } catch (error) {
-            logger.error(`Failed to get external IDs for ${type} ${item.id}:`, error);
             return item;
           }
         })
@@ -830,7 +875,6 @@ export class TMDBService {
 
       return resultsWithExternalIds;
     } catch (error) {
-      logger.error(`Failed to get popular ${type} content:`, error);
       return [];
     }
   }
@@ -870,7 +914,6 @@ export class TMDBService {
               external_ids: externalIdsResponse.data
             };
           } catch (error) {
-            logger.error(`Failed to get external IDs for ${type} ${item.id}:`, error);
             return item;
           }
         })
@@ -878,7 +921,6 @@ export class TMDBService {
 
       return resultsWithExternalIds;
     } catch (error) {
-      logger.error(`Failed to get upcoming ${type} content:`, error);
       return [];
     }
   }
@@ -896,7 +938,6 @@ export class TMDBService {
       });
       return response.data.genres || [];
     } catch (error) {
-      logger.error('Failed to fetch movie genres:', error);
       return [];
     }
   }
@@ -914,7 +955,6 @@ export class TMDBService {
       });
       return response.data.genres || [];
     } catch (error) {
-      logger.error('Failed to fetch TV genres:', error);
       return [];
     }
   }
@@ -935,7 +975,6 @@ export class TMDBService {
       const genre = genreList.find(g => g.name.toLowerCase() === genreName.toLowerCase());
       
       if (!genre) {
-        logger.error(`Genre ${genreName} not found`);
         return [];
       }
       
@@ -969,7 +1008,6 @@ export class TMDBService {
               external_ids: externalIdsResponse.data
             };
           } catch (error) {
-            logger.error(`Failed to get external IDs for ${type} ${item.id}:`, error);
             return item;
           }
         })
@@ -977,7 +1015,6 @@ export class TMDBService {
 
       return resultsWithExternalIds;
     } catch (error) {
-      logger.error(`Failed to discover ${type} by genre ${genreName}:`, error);
       return [];
     }
   }

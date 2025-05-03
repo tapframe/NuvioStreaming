@@ -13,6 +13,7 @@ import { colors } from '../styles/colors';
 import { NuvioHeader } from '../components/NuvioHeader';
 import { Stream } from '../types/streams';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useTheme } from '../contexts/ThemeContext';
 
 // Import screens with their proper types
 import HomeScreen from '../screens/HomeScreen';
@@ -35,6 +36,9 @@ import HomeScreenSettings from '../screens/HomeScreenSettings';
 import HeroCatalogsScreen from '../screens/HeroCatalogsScreen';
 import TraktSettingsScreen from '../screens/TraktSettingsScreen';
 import PlayerSettingsScreen from '../screens/PlayerSettingsScreen';
+import LogoSourceSettings from '../screens/LogoSourceSettings';
+import ThemeScreen from '../screens/ThemeScreen';
+import ProfilesScreen from '../screens/ProfilesScreen';
 
 // Stack navigator types
 export type RootStackParamList = {
@@ -90,6 +94,9 @@ export type RootStackParamList = {
   HeroCatalogs: undefined;
   TraktSettings: undefined;
   PlayerSettings: undefined;
+  LogoSourceSettings: undefined;
+  ThemeSettings: undefined;
+  ProfilesSettings: undefined;
 };
 
 export type RootStackNavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -384,6 +391,7 @@ const WrappedScreen: React.FC<{Screen: React.ComponentType<any>}> = ({ Screen })
 const MainTabs = () => {
   // Always use dark mode
   const isDarkMode = true;
+  const { currentTheme } = useTheme();
   
   const renderTabBar = (props: BottomTabBarProps) => {
     return (
@@ -404,9 +412,9 @@ const MainTabs = () => {
               position: 'absolute',
               height: '100%',
               width: '100%',
-              borderTopColor: 'rgba(255,255,255,0.2)',
+              borderTopColor: currentTheme.colors.border,
               borderTopWidth: 0.5,
-              shadowColor: '#000',
+              shadowColor: currentTheme.colors.black,
               shadowOffset: { width: 0, height: -2 },
               shadowOpacity: 0.1,
               shadowRadius: 3,
@@ -490,7 +498,7 @@ const MainTabs = () => {
                 >
                   <TabIcon 
                     focused={isFocused} 
-                    color={isFocused ? colors.primary : '#FFFFFF'} 
+                    color={isFocused ? currentTheme.colors.primary : currentTheme.colors.white} 
                     iconName={iconName}
                   />
                   <Text
@@ -498,7 +506,7 @@ const MainTabs = () => {
                       fontSize: 12,
                       fontWeight: '600',
                       marginTop: 4,
-                      color: isFocused ? colors.primary : '#FFFFFF',
+                      color: isFocused ? currentTheme.colors.primary : currentTheme.colors.white,
                       opacity: isFocused ? 1 : 0.7,
                     }}
                   >
@@ -514,7 +522,7 @@ const MainTabs = () => {
   };
   
   return (
-    <View style={{ flex: 1, backgroundColor: colors.darkBackground }}>
+    <View style={{ flex: 1, backgroundColor: currentTheme.colors.darkBackground }}>
       {/* Common StatusBar for all tabs */}
       <StatusBar
         translucent
@@ -545,8 +553,8 @@ const MainTabs = () => {
             
             return <TabIcon focused={focused} color={color} iconName={iconName} />;
           },
-          tabBarActiveTintColor: colors.primary,
-          tabBarInactiveTintColor: '#FFFFFF',
+          tabBarActiveTintColor: currentTheme.colors.primary,
+          tabBarInactiveTintColor: currentTheme.colors.white,
           tabBarStyle: {
             position: 'absolute',
             backgroundColor: 'transparent',
@@ -578,9 +586,9 @@ const MainTabs = () => {
                   position: 'absolute',
                   height: '100%',
                   width: '100%',
-                  borderTopColor: 'rgba(255,255,255,0.2)',
+                  borderTopColor: currentTheme.colors.border,
                   borderTopWidth: 0.5,
-                  shadowColor: '#000',
+                  shadowColor: currentTheme.colors.black,
                   shadowOffset: { width: 0, height: -2 },
                   shadowOpacity: 0.1,
                   shadowRadius: 3,
@@ -607,7 +615,7 @@ const MainTabs = () => {
           headerShown: route.name === 'Home',
           // Add fixed screen styling to help with consistency
           contentStyle: {
-            backgroundColor: colors.darkBackground,
+            backgroundColor: currentTheme.colors.darkBackground,
           },
         })}
         // Global configuration for the tab navigator
@@ -651,8 +659,7 @@ const MainTabs = () => {
 
 // Stack Navigator
 const AppNavigator = () => {
-  // Always use dark mode
-  const isDarkMode = true;
+  const { currentTheme } = useTheme();
   
   return (
     <SafeAreaProvider>
@@ -669,7 +676,7 @@ const AppNavigator = () => {
             animation: 'none',
             // Ensure content is not popping in and out
             contentStyle: {
-              backgroundColor: colors.darkBackground,
+              backgroundColor: currentTheme.colors.darkBackground,
             }
           }}
         >
@@ -721,7 +728,7 @@ const AppNavigator = () => {
               gestureDirection: 'horizontal',
               headerShown: false,
               contentStyle: {
-                backgroundColor: colors.darkBackground,
+                backgroundColor: currentTheme.colors.darkBackground,
               },
             }}
           />
@@ -736,7 +743,7 @@ const AppNavigator = () => {
               gestureDirection: 'horizontal',
               headerShown: false,
               contentStyle: {
-                backgroundColor: colors.darkBackground,
+                backgroundColor: currentTheme.colors.darkBackground,
               },
             }}
           />
@@ -774,7 +781,7 @@ const AppNavigator = () => {
               gestureDirection: 'horizontal',
               headerShown: false,
               contentStyle: {
-                backgroundColor: colors.darkBackground,
+                backgroundColor: currentTheme.colors.darkBackground,
               },
             }}
           />
@@ -789,7 +796,7 @@ const AppNavigator = () => {
               gestureDirection: 'horizontal',
               headerShown: false,
               contentStyle: {
-                backgroundColor: colors.darkBackground,
+                backgroundColor: currentTheme.colors.darkBackground,
               },
             }}
           />
@@ -804,7 +811,7 @@ const AppNavigator = () => {
               gestureDirection: 'horizontal',
               headerShown: false,
               contentStyle: {
-                backgroundColor: colors.darkBackground,
+                backgroundColor: currentTheme.colors.darkBackground,
               },
             }}
           />
@@ -819,7 +826,52 @@ const AppNavigator = () => {
               gestureDirection: 'horizontal',
               headerShown: false,
               contentStyle: {
-                backgroundColor: colors.darkBackground,
+                backgroundColor: currentTheme.colors.darkBackground,
+              },
+            }}
+          />
+          <Stack.Screen 
+            name="LogoSourceSettings" 
+            component={LogoSourceSettings}
+            options={{
+              animation: 'fade',
+              animationDuration: 200,
+              presentation: 'card',
+              gestureEnabled: true,
+              gestureDirection: 'horizontal',
+              headerShown: false,
+              contentStyle: {
+                backgroundColor: currentTheme.colors.darkBackground,
+              },
+            }}
+          />
+          <Stack.Screen 
+            name="ThemeSettings" 
+            component={ThemeScreen}
+            options={{
+              animation: 'fade',
+              animationDuration: 200,
+              presentation: 'card',
+              gestureEnabled: true,
+              gestureDirection: 'horizontal',
+              headerShown: false,
+              contentStyle: {
+                backgroundColor: currentTheme.colors.darkBackground,
+              },
+            }}
+          />
+          <Stack.Screen 
+            name="ProfilesSettings" 
+            component={ProfilesScreen}
+            options={{
+              animation: 'fade',
+              animationDuration: 200,
+              presentation: 'card',
+              gestureEnabled: true,
+              gestureDirection: 'horizontal',
+              headerShown: false,
+              contentStyle: {
+                backgroundColor: currentTheme.colors.darkBackground,
               },
             }}
           />

@@ -26,7 +26,6 @@ import { Stream } from '../types/metadata';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image as ExpoImage } from 'expo-image';
-import { colors } from '../styles/colors';
 import Animated, { 
   FadeIn, 
   FadeOut,
@@ -58,7 +57,9 @@ import { useSettings, settingsEmitter } from '../hooks/useSettings';
 import FeaturedContent from '../components/home/FeaturedContent';
 import CatalogSection from '../components/home/CatalogSection';
 import { SkeletonFeatured } from '../components/home/SkeletonLoaders';
-import homeStyles from '../styles/homeStyles';
+import homeStyles, { sharedStyles } from '../styles/homeStyles';
+import { useTheme } from '../contexts/ThemeContext';
+import type { Theme } from '../contexts/ThemeContext';
 
 // Define interfaces for our data
 interface Category {
@@ -86,6 +87,7 @@ const DropUpMenu = ({ visible, onClose, item, onOptionSelect }: DropUpMenuProps)
   const translateY = useSharedValue(300);
   const opacity = useSharedValue(0);
   const isDarkMode = useColorScheme() === 'dark';
+  const { currentTheme } = useTheme();
   const SNAP_THRESHOLD = 100;
 
   useEffect(() => {
@@ -126,12 +128,14 @@ const DropUpMenu = ({ visible, onClose, item, onOptionSelect }: DropUpMenuProps)
 
   const overlayStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
+    backgroundColor: currentTheme.colors.transparentDark,
   }));
 
   const menuStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
+    backgroundColor: isDarkMode ? currentTheme.colors.elevation2 : currentTheme.colors.white,
   }));
 
   const menuOptions = [
@@ -157,8 +161,6 @@ const DropUpMenu = ({ visible, onClose, item, onOptionSelect }: DropUpMenuProps)
     }
   ];
 
-  const backgroundColor = isDarkMode ? '#1A1A1A' : '#FFFFFF';
-
   return (
     <Modal
       visible={visible}
@@ -170,20 +172,20 @@ const DropUpMenu = ({ visible, onClose, item, onOptionSelect }: DropUpMenuProps)
         <Animated.View style={[styles.modalOverlay, overlayStyle]}>
           <Pressable style={styles.modalOverlayPressable} onPress={onClose} />
           <GestureDetector gesture={gesture}>
-            <Animated.View style={[styles.menuContainer, menuStyle, { backgroundColor }]}>
-              <View style={styles.dragHandle} />
-              <View style={styles.menuHeader}>
+            <Animated.View style={[styles.menuContainer, menuStyle]}>
+              <View style={[styles.dragHandle, { backgroundColor: currentTheme.colors.transparentLight }]} />
+              <View style={[styles.menuHeader, { borderBottomColor: currentTheme.colors.border }]}>
                 <ExpoImage
                   source={{ uri: item.poster }}
                   style={styles.menuPoster}
                   contentFit="cover"
                 />
                 <View style={styles.menuTitleContainer}>
-                  <Text style={[styles.menuTitle, { color: isDarkMode ? '#FFFFFF' : '#000000' }]}>
+                  <Text style={[styles.menuTitle, { color: isDarkMode ? currentTheme.colors.white : currentTheme.colors.black }]}>
                     {item.name}
                   </Text>
                   {item.year && (
-                    <Text style={[styles.menuYear, { color: isDarkMode ? '#999999' : '#666666' }]}>
+                    <Text style={[styles.menuYear, { color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark }]}>
                       {item.year}
                     </Text>
                   )}
@@ -206,11 +208,11 @@ const DropUpMenu = ({ visible, onClose, item, onOptionSelect }: DropUpMenuProps)
                     <MaterialIcons
                       name={option.icon as "bookmark" | "check-circle" | "playlist-add" | "share" | "bookmark-border"}
                       size={24}
-                      color={colors.primary}
+                      color={currentTheme.colors.primary}
                     />
                     <Text style={[
                       styles.menuOptionText,
-                      { color: isDarkMode ? '#FFFFFF' : '#000000' }
+                      { color: isDarkMode ? currentTheme.colors.white : currentTheme.colors.black }
                     ]}>
                       {option.label}
                     </Text>
@@ -231,6 +233,7 @@ const ContentItem = ({ item: initialItem, onPress }: ContentItemProps) => {
   const [isWatched, setIsWatched] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const { currentTheme } = useTheme();
 
   const handleLongPress = useCallback(() => {
     setMenuVisible(true);
@@ -306,22 +309,22 @@ const ContentItem = ({ item: initialItem, onPress }: ContentItemProps) => {
             }}
           />
           {(!imageLoaded || imageError) && (
-            <View style={[styles.loadingOverlay, { backgroundColor: colors.elevation2 }]}>
+            <View style={[styles.loadingOverlay, { backgroundColor: currentTheme.colors.elevation2 }]}>
               {!imageError ? (
-                <ActivityIndicator color={colors.primary} size="small" />
+                <ActivityIndicator color={currentTheme.colors.primary} size="small" />
               ) : (
-                <MaterialIcons name="broken-image" size={24} color={colors.lightGray} />
+                <MaterialIcons name="broken-image" size={24} color={currentTheme.colors.lightGray} />
               )}
             </View>
           )}
           {isWatched && (
             <View style={styles.watchedIndicator}>
-              <MaterialIcons name="check-circle" size={22} color={colors.success} />
+              <MaterialIcons name="check-circle" size={22} color={currentTheme.colors.success} />
             </View>
           )}
           {localItem.inLibrary && (
             <View style={styles.libraryBadge}>
-              <MaterialIcons name="bookmark" size={16} color={colors.white} />
+              <MaterialIcons name="bookmark" size={16} color={currentTheme.colors.white} />
             </View>
           )}
         </View>
@@ -344,17 +347,21 @@ const SAMPLE_CATEGORIES: Category[] = [
   { id: 'channel', name: 'Channels' },
 ];
 
-const SkeletonCatalog = () => (
-  <View style={styles.catalogContainer}>
-    <View style={styles.loadingPlaceholder}>
-      <ActivityIndicator size="small" color={colors.primary} />
+const SkeletonCatalog = () => {
+  const { currentTheme } = useTheme();
+  return (
+    <View style={styles.catalogContainer}>
+      <View style={styles.loadingPlaceholder}>
+        <ActivityIndicator size="small" color={currentTheme.colors.primary} />
+      </View>
     </View>
-  </View>
-);
+  );
+};
 
 const HomeScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const isDarkMode = useColorScheme() === 'dark';
+  const { currentTheme } = useTheme();
   const continueWatchingRef = useRef<ContinueWatchingRef>(null);
   const { settings } = useSettings();
   const [showHeroSection, setShowHeroSection] = useState(settings.showHeroSection);
@@ -418,27 +425,34 @@ const HomeScreen = () => {
   useFocusEffect(
     useCallback(() => {
       const statusBarConfig = () => {
+        // Ensure status bar is fully transparent and doesn't take up space
         StatusBar.setBarStyle("light-content");
         StatusBar.setTranslucent(true);
         StatusBar.setBackgroundColor('transparent');
+        
+        // For iOS specifically
+        if (Platform.OS === 'ios') {
+          StatusBar.setHidden(false);
+        }
       };
       
       statusBarConfig();
       
       return () => {
-        // Don't change StatusBar settings when unfocusing to prevent layout shifts
-        // Only set these when component unmounts completely
+        // Keep translucent when unfocusing to prevent layout shifts
       };
     }, [])
   );
 
   useEffect(() => {
-    // Only run cleanup when component unmounts completely, not on unfocus
+    // Only run cleanup when component unmounts completely
     return () => {
-      StatusBar.setTranslucent(false);
-      StatusBar.setBackgroundColor(colors.darkBackground);
+      if (Platform.OS === 'android') {
+        StatusBar.setTranslucent(false);
+        StatusBar.setBackgroundColor(currentTheme.colors.darkBackground);
+      }
     };
-  }, []);
+  }, [currentTheme.colors.darkBackground]);
 
   useEffect(() => {
     navigation.addListener('beforeRemove', () => {});
@@ -531,22 +545,22 @@ const HomeScreen = () => {
 
   if (isLoading && !isRefreshing) {
     return (
-      <View style={homeStyles.container}>
+      <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
         <StatusBar
           barStyle="light-content"
           backgroundColor="transparent"
           translucent
         />
-        <View style={homeStyles.loadingMainContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={homeStyles.loadingText}>Loading your content...</Text>
+        <View style={styles.loadingMainContainer}>
+          <ActivityIndicator size="large" color={currentTheme.colors.primary} />
+          <Text style={[styles.loadingText, { color: currentTheme.colors.textMuted }]}>Loading your content...</Text>
         </View>
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={homeStyles.container}>
+    <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
       <StatusBar
         barStyle="light-content"
         backgroundColor="transparent"
@@ -557,13 +571,13 @@ const HomeScreen = () => {
           <RefreshControl 
             refreshing={isRefreshing} 
             onRefresh={handleRefresh} 
-            tintColor={colors.primary} 
-            colors={[colors.primary, colors.secondary]}
+            tintColor={currentTheme.colors.primary} 
+            colors={[currentTheme.colors.primary, currentTheme.colors.secondary]}
           />
         }
         contentContainerStyle={[
-          homeStyles.scrollContent,
-          { paddingTop: Platform.OS === 'ios' ? 39 : 90 }
+          styles.scrollContent,
+          { paddingTop: Platform.OS === 'ios' ? 100 : 90 }
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -594,23 +608,23 @@ const HomeScreen = () => {
           ))
         ) : (
           !catalogsLoading && (
-            <View style={homeStyles.emptyCatalog}>
-              <MaterialIcons name="movie-filter" size={40} color={colors.textDark} />
-              <Text style={{ color: colors.textDark, marginTop: 8, fontSize: 16, textAlign: 'center' }}>
+            <View style={[styles.emptyCatalog, { backgroundColor: currentTheme.colors.elevation1 }]}>
+              <MaterialIcons name="movie-filter" size={40} color={currentTheme.colors.textDark} />
+              <Text style={{ color: currentTheme.colors.textDark, marginTop: 8, fontSize: 16, textAlign: 'center' }}>
                 No content available
               </Text>
               <TouchableOpacity
-                style={homeStyles.addCatalogButton}
+                style={[styles.addCatalogButton, { backgroundColor: currentTheme.colors.primary }]}
                 onPress={() => navigation.navigate('Settings')}
               >
-                <MaterialIcons name="add-circle" size={20} color={colors.white} />
-                <Text style={homeStyles.addCatalogButtonText}>Add Catalogs</Text>
+                <MaterialIcons name="add-circle" size={20} color={currentTheme.colors.white} />
+                <Text style={[styles.addCatalogButtonText, { color: currentTheme.colors.white }]}>Add Catalogs</Text>
               </TouchableOpacity>
             </View>
           )
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -620,10 +634,43 @@ const POSTER_WIDTH = (width - 50) / 3;
 const styles = StyleSheet.create<any>({
   container: {
     flex: 1,
-    backgroundColor: colors.darkBackground,
   },
   scrollContent: {
     paddingBottom: 40,
+  },
+  loadingMainContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: 40,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+  },
+  emptyCatalog: {
+    padding: 32,
+    alignItems: 'center',
+    margin: 16,
+    borderRadius: 16,
+  },
+  addCatalogButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 30,
+    marginTop: 16,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+  },
+  addCatalogButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   loadingContainer: {
     flex: 1,
@@ -661,7 +708,6 @@ const styles = StyleSheet.create<any>({
     alignSelf: 'center',
   },
   featuredTitle: {
-    color: colors.white,
     fontSize: 32,
     fontWeight: '900',
     marginBottom: 0,
@@ -679,13 +725,11 @@ const styles = StyleSheet.create<any>({
     gap: 4,
   },
   genreText: {
-    color: colors.white,
     fontSize: 14,
     fontWeight: '500',
     opacity: 0.9,
   },
   genreDot: {
-    color: colors.white,
     fontSize: 14,
     fontWeight: '500',
     opacity: 0.6,
@@ -707,7 +751,7 @@ const styles = StyleSheet.create<any>({
     paddingVertical: 14,
     paddingHorizontal: 32,
     borderRadius: 30,
-    backgroundColor: colors.white,
+    backgroundColor: '#FFFFFF',
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -737,18 +781,16 @@ const styles = StyleSheet.create<any>({
     flex: null,
   },
   playButtonText: {
-    color: colors.black,
+    color: '#000000',
     fontWeight: '600',
     marginLeft: 8,
     fontSize: 16,
   },
   myListButtonText: {
-    color: colors.white,
     fontSize: 12,
     fontWeight: '500',
   },
   infoButtonText: {
-    color: colors.white,
     fontSize: 12,
     fontWeight: '500',
   },
@@ -770,7 +812,6 @@ const styles = StyleSheet.create<any>({
   catalogTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: colors.highEmphasis,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 6,
@@ -786,13 +827,11 @@ const styles = StyleSheet.create<any>({
   seeAllButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.elevation1,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
   },
   seeAllText: {
-    color: colors.primary,
     fontSize: 13,
     fontWeight: '700',
     marginRight: 4,
@@ -841,28 +880,18 @@ const styles = StyleSheet.create<any>({
     fontWeight: 'bold',
     marginLeft: 3,
   },
-  emptyCatalog: {
-    padding: 32,
-    alignItems: 'center',
-    backgroundColor: colors.elevation1,
-    margin: 16,
-    borderRadius: 16,
-  },
   skeletonBox: {
-    backgroundColor: colors.elevation2,
     borderRadius: 16,
     overflow: 'hidden',
   },
   skeletonFeatured: {
     width: '100%',
     height: height * 0.6,
-    backgroundColor: colors.elevation2,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
     marginBottom: 0,
   },
   skeletonPoster: {
-    backgroundColor: colors.elevation1,
     marginHorizontal: 4,
     borderRadius: 16,
   },
@@ -888,7 +917,6 @@ const styles = StyleSheet.create<any>({
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: colors.transparentDark,
   },
   modalOverlayPressable: {
     flex: 1,
@@ -896,7 +924,6 @@ const styles = StyleSheet.create<any>({
   dragHandle: {
     width: 40,
     height: 4,
-    backgroundColor: colors.transparentLight,
     borderRadius: 2,
     alignSelf: 'center',
     marginTop: 12,
@@ -908,7 +935,7 @@ const styles = StyleSheet.create<any>({
     paddingBottom: Platform.select({ ios: 40, android: 24 }),
     ...Platform.select({
       ios: {
-        shadowColor: colors.black,
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: -3 },
         shadowOpacity: 0.1,
         shadowRadius: 5,
@@ -922,7 +949,6 @@ const styles = StyleSheet.create<any>({
     flexDirection: 'row',
     padding: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
   },
   menuPoster: {
     width: 60,
@@ -962,7 +988,7 @@ const styles = StyleSheet.create<any>({
     position: 'absolute',
     top: 8,
     right: 8,
-    backgroundColor: colors.transparentDark,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     borderRadius: 12,
     padding: 2,
   },
@@ -970,7 +996,7 @@ const styles = StyleSheet.create<any>({
     position: 'absolute',
     top: 8,
     left: 8,
-    backgroundColor: colors.transparentDark,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     borderRadius: 8,
     padding: 4,
   },
@@ -996,7 +1022,6 @@ const styles = StyleSheet.create<any>({
     paddingBottom: 20,
   },
   featuredTitleText: {
-    color: colors.highEmphasis,
     fontSize: 28,
     fontWeight: '900',
     marginBottom: 8,
@@ -1006,42 +1031,10 @@ const styles = StyleSheet.create<any>({
     textAlign: 'center',
     paddingHorizontal: 16,
   },
-  addCatalogButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 30,
-    marginTop: 16,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-  },
-  addCatalogButtonText: {
-    color: colors.white,
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  loadingMainContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingBottom: 40,
-  },
-  loadingText: {
-    color: colors.textMuted,
-    marginTop: 12,
-    fontSize: 14,
-  },
   loadingPlaceholder: {
     height: 200,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.elevation1,
     borderRadius: 12,
     marginHorizontal: 16,
   },
@@ -1049,7 +1042,6 @@ const styles = StyleSheet.create<any>({
     height: height * 0.4,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.elevation1,
   },
 });
 

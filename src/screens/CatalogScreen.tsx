@@ -16,7 +16,7 @@ import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { Meta, stremioService } from '../services/stremioService';
-import { colors } from '../styles';
+import { useTheme } from '../contexts/ThemeContext';
 import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { logger } from '../utils/logger';
@@ -45,6 +45,120 @@ const NUM_COLUMNS = 3;
 const ITEM_MARGIN = SPACING.sm;
 const ITEM_WIDTH = (width - (SPACING.lg * 2) - (ITEM_MARGIN * 2 * NUM_COLUMNS)) / NUM_COLUMNS;
 
+// Create a styles creator function that accepts the theme colors
+const createStyles = (colors: any) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.darkBackground,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 8 : 8,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+  },
+  backText: {
+    fontSize: 17,
+    fontWeight: '400',
+    color: colors.primary,
+  },
+  headerTitle: {
+    fontSize: 34,
+    fontWeight: '700',
+    color: colors.white,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    paddingTop: 8,
+  },
+  list: {
+    padding: SPACING.lg,
+    paddingTop: SPACING.sm,
+  },
+  columnWrapper: {
+    justifyContent: 'space-between',
+  },
+  item: {
+    width: ITEM_WIDTH,
+    marginBottom: SPACING.lg,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: colors.elevation2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  poster: {
+    width: '100%',
+    aspectRatio: 2/3,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    backgroundColor: colors.elevation3,
+  },
+  itemContent: {
+    padding: SPACING.sm,
+  },
+  title: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.white,
+    lineHeight: 18,
+  },
+  releaseInfo: {
+    fontSize: 12,
+    marginTop: SPACING.xs,
+    color: colors.mediumGray,
+  },
+  footer: {
+    padding: SPACING.lg,
+    alignItems: 'center',
+  },
+  button: {
+    marginTop: SPACING.md,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.xl,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    elevation: 2,
+  },
+  buttonText: {
+    color: colors.white,
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.xl,
+  },
+  emptyText: {
+    color: colors.white,
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  errorText: {
+    color: colors.white,
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  loadingText: {
+    color: colors.white,
+    fontSize: 16,
+    marginTop: SPACING.lg,
+  }
+});
+
 const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   const { addonId, type, id, name: originalName, genreFilter } = route.params;
   const [items, setItems] = useState<Meta[]>([]);
@@ -54,6 +168,9 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dataSource, setDataSource] = useState<DataSource>(DataSource.STREMIO_ADDONS);
+  const { currentTheme } = useTheme();
+  const colors = currentTheme.colors;
+  const styles = createStyles(colors);
   const isDarkMode = true;
 
   const { getCustomName, isLoadingCustomNames } = useCustomCatalogNames();
@@ -326,7 +443,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
         </View>
       </TouchableOpacity>
     );
-  }, [navigation]);
+  }, [navigation, styles]);
 
   const renderEmptyState = () => (
     <View style={styles.centered}>
@@ -450,118 +567,5 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.darkBackground,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 8 : 8,
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-  },
-  backText: {
-    fontSize: 17,
-    fontWeight: '400',
-    color: colors.primary,
-  },
-  headerTitle: {
-    fontSize: 34,
-    fontWeight: '700',
-    color: colors.white,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    paddingTop: 8,
-  },
-  list: {
-    padding: SPACING.lg,
-    paddingTop: SPACING.sm,
-  },
-  columnWrapper: {
-    justifyContent: 'space-between',
-  },
-  item: {
-    width: ITEM_WIDTH,
-    marginBottom: SPACING.lg,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: colors.elevation2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  poster: {
-    width: '100%',
-    aspectRatio: 2/3,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    backgroundColor: colors.elevation3,
-  },
-  itemContent: {
-    padding: SPACING.sm,
-  },
-  title: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.white,
-    lineHeight: 18,
-  },
-  releaseInfo: {
-    fontSize: 12,
-    marginTop: SPACING.xs,
-    color: colors.mediumGray,
-  },
-  footer: {
-    padding: SPACING.lg,
-    alignItems: 'center',
-  },
-  button: {
-    marginTop: SPACING.md,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.xl,
-    backgroundColor: colors.primary,
-    borderRadius: 8,
-    elevation: 2,
-  },
-  buttonText: {
-    color: colors.white,
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: SPACING.xl,
-  },
-  emptyText: {
-    color: colors.white,
-    fontSize: 16,
-    textAlign: 'center',
-    marginTop: SPACING.md,
-    marginBottom: SPACING.sm,
-  },
-  errorText: {
-    color: colors.white,
-    fontSize: 16,
-    textAlign: 'center',
-    marginTop: SPACING.md,
-    marginBottom: SPACING.sm,
-  },
-  loadingText: {
-    color: colors.white,
-    fontSize: 16,
-    marginTop: SPACING.lg,
-  }
-});
 
 export default CatalogScreen; 

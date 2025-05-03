@@ -8,6 +8,7 @@ export function useTraktIntegration() {
   const [userProfile, setUserProfile] = useState<TraktUser | null>(null);
   const [watchedMovies, setWatchedMovies] = useState<TraktWatchedItem[]>([]);
   const [watchedShows, setWatchedShows] = useState<TraktWatchedItem[]>([]);
+  const [lastAuthCheck, setLastAuthCheck] = useState<number>(Date.now());
 
   // Check authentication status
   const checkAuthStatus = useCallback(async () => {
@@ -22,12 +23,21 @@ export function useTraktIntegration() {
       } else {
         setUserProfile(null);
       }
+      
+      // Update the last auth check timestamp to trigger dependent components to update
+      setLastAuthCheck(Date.now());
     } catch (error) {
       logger.error('[useTraktIntegration] Error checking auth status:', error);
     } finally {
       setIsLoading(false);
     }
   }, []);
+
+  // Function to force refresh the auth status
+  const refreshAuthStatus = useCallback(async () => {
+    logger.log('[useTraktIntegration] Refreshing auth status');
+    await checkAuthStatus();
+  }, [checkAuthStatus]);
 
   // Load watched items
   const loadWatchedItems = useCallback(async () => {
@@ -141,6 +151,7 @@ export function useTraktIntegration() {
     isMovieWatched,
     isEpisodeWatched,
     markMovieAsWatched,
-    markEpisodeAsWatched
+    markEpisodeAsWatched,
+    refreshAuthStatus
   };
 } 

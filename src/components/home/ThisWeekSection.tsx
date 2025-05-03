@@ -13,7 +13,7 @@ import { NavigationProp } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
-import { colors } from '../../styles/colors';
+import { useTheme } from '../../contexts/ThemeContext';
 import { stremioService } from '../../services/stremioService';
 import { tmdbService } from '../../services/tmdbService';
 import { useLibrary } from '../../hooks/useLibrary';
@@ -47,6 +47,7 @@ export const ThisWeekSection = () => {
   const { libraryItems, loading: libraryLoading } = useLibrary();
   const [episodes, setEpisodes] = useState<ThisWeekEpisode[]>([]);
   const [loading, setLoading] = useState(true);
+  const { currentTheme } = useTheme();
 
   const fetchThisWeekEpisodes = useCallback(async () => {
     if (libraryItems.length === 0) {
@@ -172,7 +173,7 @@ export const ThisWeekSection = () => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="small" color={colors.primary} />
+        <ActivityIndicator size="small" color={currentTheme.colors.primary} />
       </View>
     );
   }
@@ -217,26 +218,27 @@ export const ThisWeekSection = () => {
             <View style={styles.badgeContainer}>
               <View style={[
                 styles.badge, 
-                isReleased ? styles.releasedBadge : styles.upcomingBadge
+                isReleased ? styles.releasedBadge : styles.upcomingBadge,
+                { backgroundColor: isReleased ? currentTheme.colors.success + 'CC' : currentTheme.colors.primary + 'CC' }
               ]}>
                 <MaterialIcons
                   name={isReleased ? "check-circle" : "event"}
                   size={12}
-                  color={isReleased ? "#ffffff" : "#ffffff"}
+                  color={currentTheme.colors.white}
                 />
-                <Text style={styles.badgeText}>
+                <Text style={[styles.badgeText, { color: currentTheme.colors.white }]}>
                   {isReleased ? 'Released' : 'Coming Soon'}
                 </Text>
               </View>
               
               {item.vote_average > 0 && (
-                <View style={styles.ratingBadge}>
+                <View style={[styles.ratingBadge, { backgroundColor: 'rgba(0,0,0,0.8)' }]}>
                   <MaterialIcons
                     name="star"
                     size={12}
-                    color={colors.primary}
+                    color={currentTheme.colors.primary}
                   />
-                  <Text style={styles.ratingText}>
+                  <Text style={[styles.ratingText, { color: currentTheme.colors.primary }]}>
                     {item.vote_average.toFixed(1)}
                   </Text>
                 </View>
@@ -244,18 +246,18 @@ export const ThisWeekSection = () => {
             </View>
             
             <View style={styles.content}>
-              <Text style={styles.seriesName} numberOfLines={1}>
+              <Text style={[styles.seriesName, { color: currentTheme.colors.text }]} numberOfLines={1}>
                 {item.seriesName}
               </Text>
-              <Text style={styles.episodeTitle} numberOfLines={2}>
+              <Text style={[styles.episodeTitle, { color: currentTheme.colors.lightGray }]} numberOfLines={2}>
                 S{item.season}:E{item.episode} - {item.title}
               </Text>
               {item.overview ? (
-                <Text style={styles.overview} numberOfLines={2}>
+                <Text style={[styles.overview, { color: currentTheme.colors.lightGray, opacity: 0.8 }]} numberOfLines={2}>
                   {item.overview}
                 </Text>
               ) : null}
-              <Text style={styles.releaseDate}>
+              <Text style={[styles.releaseDate, { color: currentTheme.colors.primary }]}>
                 {formattedDate}
               </Text>
             </View>
@@ -268,10 +270,10 @@ export const ThisWeekSection = () => {
   return (
     <Animated.View entering={FadeIn.duration(300)} style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>This Week</Text>
+        <Text style={[styles.title, { color: currentTheme.colors.text }]}>This Week</Text>
         <TouchableOpacity onPress={handleViewAll} style={styles.viewAllButton}>
-          <Text style={styles.viewAllText}>View All</Text>
-          <MaterialIcons name="chevron-right" size={18} color={colors.lightGray} />
+          <Text style={[styles.viewAllText, { color: currentTheme.colors.lightGray }]}>View All</Text>
+          <MaterialIcons name="chevron-right" size={18} color={currentTheme.colors.lightGray} />
         </TouchableOpacity>
       </View>
       
@@ -303,7 +305,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: colors.text,
   },
   viewAllButton: {
     flexDirection: 'row',
@@ -311,7 +312,6 @@ const styles = StyleSheet.create({
   },
   viewAllText: {
     fontSize: 14,
-    color: colors.lightGray,
     marginRight: 4,
   },
   listContent: {
@@ -358,14 +358,9 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 4,
   },
-  releasedBadge: {
-    backgroundColor: colors.success + 'CC', // 80% opacity
-  },
-  upcomingBadge: {
-    backgroundColor: colors.primary + 'CC', // 80% opacity
-  },
+  releasedBadge: {},
+  upcomingBadge: {},
   badgeText: {
-    color: '#ffffff',
     fontSize: 10,
     fontWeight: 'bold',
     marginLeft: 4,
@@ -373,13 +368,11 @@ const styles = StyleSheet.create({
   ratingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.8)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
   },
   ratingText: {
-    color: colors.primary,
     fontSize: 10,
     fontWeight: 'bold',
     marginLeft: 4,
@@ -388,24 +381,19 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   seriesName: {
-    color: colors.text,
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 4,
   },
   episodeTitle: {
-    color: colors.lightGray,
     fontSize: 14,
     marginBottom: 4,
   },
   overview: {
-    color: colors.lightGray,
     fontSize: 12,
     marginBottom: 4,
-    opacity: 0.8,
   },
   releaseDate: {
-    color: colors.primary,
     fontSize: 12,
     fontWeight: 'bold',
   },

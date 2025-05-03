@@ -9,6 +9,7 @@ interface TraktContextProps {
   watchedMovies: TraktWatchedItem[];
   watchedShows: TraktWatchedItem[];
   checkAuthStatus: () => Promise<void>;
+  refreshAuthStatus: () => Promise<void>;
   loadWatchedItems: () => Promise<void>;
   isMovieWatched: (imdbId: string) => Promise<boolean>;
   isEpisodeWatched: (imdbId: string, season: number, episode: number) => Promise<boolean>;

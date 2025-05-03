@@ -16,7 +16,6 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { colors } from '../styles';
 import { Image } from 'expo-image';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,6 +24,7 @@ import type { StreamingContent } from '../services/catalogService';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { logger } from '../utils/logger';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../contexts/ThemeContext';
 
 // Types
 interface LibraryItem extends StreamingContent {
@@ -38,6 +38,7 @@ const SkeletonLoader = () => {
   const pulseAnim = React.useRef(new RNAnimated.Value(0)).current;
   const { width } = useWindowDimensions();
   const itemWidth = (width - 48) / 2;
+  const { currentTheme } = useTheme();
 
   React.useEffect(() => {
     const pulse = RNAnimated.loop(
@@ -68,13 +69,13 @@ const SkeletonLoader = () => {
       <RNAnimated.View 
         style={[
           styles.posterContainer,
-          { opacity, backgroundColor: colors.darkBackground }
+          { opacity, backgroundColor: currentTheme.colors.darkBackground }
         ]} 
       />
       <RNAnimated.View 
         style={[
           styles.skeletonTitle,
-          { opacity, backgroundColor: colors.darkBackground }
+          { opacity, backgroundColor: currentTheme.colors.darkBackground }
         ]} 
       />
     </View>
@@ -99,6 +100,7 @@ const LibraryScreen = () => {
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
   const [filter, setFilter] = useState<'all' | 'movies' | 'series'>('all');
   const insets = useSafeAreaInsets();
+  const { currentTheme } = useTheme();
 
   // Force consistent status bar settings
   useEffect(() => {
@@ -157,7 +159,7 @@ const LibraryScreen = () => {
       onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type })}
       activeOpacity={0.7}
     >
-      <View style={styles.posterContainer}>
+      <View style={[styles.posterContainer, { shadowColor: currentTheme.colors.black }]}>
         <Image
           source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
           style={styles.poster}
@@ -169,7 +171,7 @@ const LibraryScreen = () => {
           style={styles.posterGradient}
         >
           <Text 
-            style={styles.itemTitle}
+            style={[styles.itemTitle, { color: currentTheme.colors.white }]}
             numberOfLines={2}
           >
             {item.name}
@@ -186,7 +188,7 @@ const LibraryScreen = () => {
             <View 
               style={[
                 styles.progressBar,
-                { width: `${item.progress * 100}%` }
+                { width: `${item.progress * 100}%`, backgroundColor: currentTheme.colors.primary }
               ]} 
             />
           </View>
@@ -196,10 +198,10 @@ const LibraryScreen = () => {
             <MaterialIcons
               name="live-tv"
               size={14}
-              color={colors.white}
+              color={currentTheme.colors.white}
               style={{ marginRight: 4 }}
             />
-            <Text style={styles.badgeText}>Series</Text>
+            <Text style={[styles.badgeText, { color: currentTheme.colors.white }]}>Series</Text>
           </View>
         )}
       </View>
@@ -212,7 +214,8 @@ const LibraryScreen = () => {
       <TouchableOpacity
         style={[
           styles.filterButton,
-          isActive && styles.filterButtonActive,
+          isActive && { backgroundColor: currentTheme.colors.primary },
+          { shadowColor: currentTheme.colors.black }
         ]}
         onPress={() => setFilter(filterType)}
         activeOpacity={0.7}
@@ -220,13 +223,14 @@ const LibraryScreen = () => {
         <MaterialIcons
           name={iconName}
           size={22}
-          color={isActive ? colors.white : colors.mediumGray}
+          color={isActive ? currentTheme.colors.white : currentTheme.colors.mediumGray}
           style={styles.filterIcon}
         />
         <Text
           style={[
             styles.filterText,
-            isActive && styles.filterTextActive
+            { color: currentTheme.colors.mediumGray },
+            isActive && { color: currentTheme.colors.white, fontWeight: '600' }
           ]}
         >
           {label}
@@ -240,20 +244,20 @@ const LibraryScreen = () => {
   const headerHeight = headerBaseHeight + topSpacing;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
       {/* Fixed position header background to prevent shifts */}
-      <View style={[styles.headerBackground, { height: headerHeight }]} />
+      <View style={[styles.headerBackground, { height: headerHeight, backgroundColor: currentTheme.colors.darkBackground }]} />
       
       <View style={{ flex: 1 }}>
         {/* Header Section with proper top spacing */}
         <View style={[styles.header, { height: headerHeight, paddingTop: topSpacing }]}>
           <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Library</Text>
+            <Text style={[styles.headerTitle, { color: currentTheme.colors.white }]}>Library</Text>
           </View>
         </View>
 
         {/* Content Container */}
-        <View style={styles.contentContainer}>
+        <View style={[styles.contentContainer, { backgroundColor: currentTheme.colors.darkBackground }]}>
           <View style={styles.filtersContainer}>
             {renderFilter('all', 'All', 'apps')}
             {renderFilter('movies', 'Movies', 'movie')}
@@ -267,19 +271,22 @@ const LibraryScreen = () => {
               <MaterialIcons 
                 name="video-library" 
                 size={80} 
-                color={colors.mediumGray}
+                color={currentTheme.colors.mediumGray}
                 style={{ opacity: 0.7 }}
               />
-              <Text style={styles.emptyText}>Your library is empty</Text>
-              <Text style={styles.emptySubtext}>
+              <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>Your library is empty</Text>
+              <Text style={[styles.emptySubtext, { color: currentTheme.colors.mediumGray }]}>
                 Add content to your library to keep track of what you're watching
               </Text>
               <TouchableOpacity 
-                style={styles.exploreButton}
+                style={[styles.exploreButton, { 
+                  backgroundColor: currentTheme.colors.primary,
+                  shadowColor: currentTheme.colors.black
+                }]}
                 onPress={() => navigation.navigate('Discover')}
                 activeOpacity={0.7}
               >
-                <Text style={styles.exploreButtonText}>Explore Content</Text>
+                <Text style={[styles.exploreButtonText, { color: currentTheme.colors.white }]}>Explore Content</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -306,19 +313,16 @@ const LibraryScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.darkBackground,
   },
   headerBackground: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    backgroundColor: colors.darkBackground,
     zIndex: 1,
   },
   contentContainer: {
     flex: 1,
-    backgroundColor: colors.darkBackground,
   },
   header: {
     paddingHorizontal: 20,
@@ -335,7 +339,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 32,
     fontWeight: '800',
-    color: colors.white,
     letterSpacing: 0.3,
   },
   filtersContainer: {
@@ -355,14 +358,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
     borderRadius: 24,
     backgroundColor: 'rgba(255,255,255,0.05)',
-    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
-  },
-  filterButtonActive: {
-    backgroundColor: colors.primary,
   },
   filterIcon: {
     marginRight: 8,
@@ -370,11 +369,6 @@ const styles = StyleSheet.create({
   filterText: {
     fontSize: 15,
     fontWeight: '500',
-    color: colors.mediumGray,
-  },
-  filterTextActive: {
-    fontWeight: '600',
-    color: colors.white,
   },
   listContainer: {
     paddingHorizontal: 12,
@@ -400,7 +394,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.03)',
     aspectRatio: 2/3,
     elevation: 5,
-    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -428,7 +421,6 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: '100%',
-    backgroundColor: colors.primary,
   },
   badgeContainer: {
     position: 'absolute',
@@ -442,14 +434,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   badgeText: {
-    color: colors.white,
     fontSize: 10,
     fontWeight: '600',
   },
   itemTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: colors.white,
     marginBottom: 4,
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 0, height: 1 },
@@ -477,29 +467,24 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 20,
     fontWeight: '700',
-    color: colors.white,
     marginTop: 16,
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 15,
-    color: colors.mediumGray,
     textAlign: 'center',
     marginBottom: 24,
   },
   exploreButton: {
-    backgroundColor: colors.primary,
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 24,
     elevation: 3,
-    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
   },
   exploreButtonText: {
-    color: colors.white,
     fontSize: 16,
     fontWeight: '600',
   }

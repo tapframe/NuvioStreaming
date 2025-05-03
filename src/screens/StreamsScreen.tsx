@@ -23,7 +23,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import { RootStackParamList, RootStackNavigationProp } from '../navigation/AppNavigator';
 import { useMetadata } from '../hooks/useMetadata';
-import { colors } from '../styles/colors';
+import { useTheme } from '../contexts/ThemeContext';
 import { Stream } from '../types/metadata';
 import { tmdbService } from '../services/tmdbService';
 import { stremioService } from '../services/stremioService';
@@ -53,13 +53,16 @@ const DOLBY_ICON = 'https://upload.wikimedia.org/wikipedia/en/thumb/3/3f/Dolby_V
 const { width, height } = Dimensions.get('window');
 
 // Extracted Components
-const StreamCard = ({ stream, onPress, index, isLoading, statusMessage }: { 
+const StreamCard = ({ stream, onPress, index, isLoading, statusMessage, theme }: { 
   stream: Stream; 
   onPress: () => void; 
   index: number;
   isLoading?: boolean;
   statusMessage?: string;
+  theme: any;
 }) => {
+  const styles = React.useMemo(() => createStyles(theme.colors), [theme.colors]);
+  
   const quality = stream.title?.match(/(\d+)p/)?.[1] || null;
   const isHDR = stream.title?.toLowerCase().includes('hdr');
   const isDolby = stream.title?.toLowerCase().includes('dolby') || stream.title?.includes('DV');
@@ -82,11 +85,11 @@ const StreamCard = ({ stream, onPress, index, isLoading, statusMessage }: {
       <View style={styles.streamDetails}>
         <View style={styles.streamNameRow}>
           <View style={styles.streamTitleContainer}>
-            <Text style={styles.streamName}>
+            <Text style={[styles.streamName, { color: theme.colors.highEmphasis }]}>
               {displayTitle}
             </Text>
             {displayAddonName && displayAddonName !== displayTitle && (
-              <Text style={styles.streamAddonName}>
+              <Text style={[styles.streamAddonName, { color: theme.colors.mediumEmphasis }]}>
                 {displayAddonName}
               </Text>
             )}
@@ -95,8 +98,8 @@ const StreamCard = ({ stream, onPress, index, isLoading, statusMessage }: {
           {/* Show loading indicator if stream is loading */}
           {isLoading && (
             <View style={styles.loadingIndicator}>
-              <ActivityIndicator size="small" color={colors.primary} />
-              <Text style={styles.loadingText}>
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+              <Text style={[styles.loadingText, { color: theme.colors.primary }]}>
                 {statusMessage || "Loading..."}
               </Text>
             </View>
@@ -113,14 +116,14 @@ const StreamCard = ({ stream, onPress, index, isLoading, statusMessage }: {
           )}
           
           {size && (
-            <View style={[styles.chip, { backgroundColor: colors.darkGray }]}>
-              <Text style={styles.chipText}>{size}</Text>
+            <View style={[styles.chip, { backgroundColor: theme.colors.darkGray }]}>
+              <Text style={[styles.chipText, { color: theme.colors.white }]}>{size}</Text>
             </View>
           )}
           
           {isDebrid && (
-            <View style={[styles.chip, { backgroundColor: colors.success }]}>
-              <Text style={styles.chipText}>DEBRID</Text>
+            <View style={[styles.chip, { backgroundColor: theme.colors.success }]}>
+              <Text style={[styles.chipText, { color: theme.colors.white }]}>DEBRID</Text>
             </View>
           )}
         </View>
@@ -130,28 +133,36 @@ const StreamCard = ({ stream, onPress, index, isLoading, statusMessage }: {
         <MaterialIcons 
           name="play-arrow" 
           size={24} 
-          color={colors.primary} 
+          color={theme.colors.primary} 
         />
       </View>
     </TouchableOpacity>
   );
 };
 
-const QualityTag = React.memo(({ text, color }: { text: string; color: string }) => (
-  <View style={[styles.chip, { backgroundColor: color }]}>
-    <Text style={styles.chipText}>{text}</Text>
-  </View>
-));
+const QualityTag = React.memo(({ text, color, theme }: { text: string; color: string; theme: any }) => {
+  const styles = React.useMemo(() => createStyles(theme.colors), [theme.colors]);
+  
+  return (
+    <View style={[styles.chip, { backgroundColor: color }]}>
+      <Text style={styles.chipText}>{text}</Text>
+    </View>
+  );
+});
 
 const ProviderFilter = memo(({ 
   selectedProvider, 
   providers, 
-  onSelect 
+  onSelect,
+  theme
 }: { 
   selectedProvider: string; 
   providers: Array<{ id: string; name: string; }>; 
   onSelect: (id: string) => void;
+  theme: any;
 }) => {
+  const styles = React.useMemo(() => createStyles(theme.colors), [theme.colors]);
+  
   const renderItem = useCallback(({ item }: { item: { id: string; name: string } }) => (
     <TouchableOpacity
       key={item.id}
@@ -168,7 +179,7 @@ const ProviderFilter = memo(({
         {item.name}
       </Text>
     </TouchableOpacity>
-  ), [selectedProvider, onSelect]);
+  ), [selectedProvider, onSelect, styles]);
 
   return (
     <FlatList
@@ -198,6 +209,8 @@ export const StreamsScreen = () => {
   const navigation = useNavigation<RootStackNavigationProp>();
   const { id, type, episodeId } = route.params;
   const { settings } = useSettings();
+  const { currentTheme } = useTheme();
+  const { colors } = currentTheme;
 
   // Add timing logs
   const [loadStartTime, setLoadStartTime] = useState(0);
@@ -216,6 +229,9 @@ export const StreamsScreen = () => {
     setSelectedEpisode,
     groupedEpisodes,
   } = useMetadata({ id, type });
+
+  // Create styles using current theme colors
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
 
   const [selectedProvider, setSelectedProvider] = React.useState('all');
   const [availableProviders, setAvailableProviders] = React.useState<Set<string>>(new Set());
@@ -629,9 +645,10 @@ export const StreamsScreen = () => {
         index={index}
         isLoading={isLoading}
         statusMessage={providerStatus[section.addonId]?.message}
+        theme={currentTheme}
       />
     );
-  }, [handleStreamPress, loadingProviders, providerStatus]);
+  }, [handleStreamPress, loadingProviders, providerStatus, currentTheme]);
 
   const renderSectionHeader = useCallback(({ section }: { section: { title: string } }) => (
     <Animated.View
@@ -658,7 +675,7 @@ export const StreamsScreen = () => {
           onPress={handleBack}
           activeOpacity={0.7}
         >
-          <MaterialIcons name="arrow-back" size={24} color="#fff" />
+          <MaterialIcons name="arrow-back" size={24} color={colors.white} />
           <Text style={styles.backButtonText}>
             {type === 'series' ? 'Back to Episodes' : 'Back to Info'}
           </Text>
@@ -722,12 +739,11 @@ export const StreamsScreen = () => {
                   colors={[
                     'rgba(0,0,0,0)',
                     'rgba(0,0,0,0.4)',
-                    'rgba(0,0,0,0.7)',
-                    'rgba(0,0,0,0.85)',
-                    'rgba(0,0,0,0.95)',
+                    'rgba(0,0,0,0.6)',
+                    'rgba(0,0,0,0.8)',
                     colors.darkBackground
                   ]}
-                  locations={[0, 0.3, 0.5, 0.7, 0.85, 1]}
+                  locations={[0, 0.3, 0.5, 0.7, 1]}
                   style={styles.streamsHeroGradient}
                 >
                   <View style={styles.streamsHeroContent}>
@@ -789,6 +805,7 @@ export const StreamsScreen = () => {
               selectedProvider={selectedProvider}
               providers={filterItems}
               onSelect={handleProviderChange}
+              theme={currentTheme}
             />
           )}
         </Animated.View>
@@ -842,7 +859,8 @@ export const StreamsScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+// Create a function to generate styles with the current theme colors
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.darkBackground,
@@ -1133,7 +1151,7 @@ const styles = StyleSheet.create({
     height: 14,
   },
   streamsHeroRatingText: {
-    color: '#01b4e4',
+    color: colors.accent,
     fontSize: 13,
     fontWeight: '700',
     marginLeft: 4,
