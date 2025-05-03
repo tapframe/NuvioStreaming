@@ -28,7 +28,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import { StreamingContent } from '../../services/catalogService';
 import { SkeletonFeatured } from './SkeletonLoaders';
-import { isValidMetahubLogo, hasValidLogoFormat } from '../../utils/logoUtils';
+import { isValidMetahubLogo, hasValidLogoFormat, isMetahubUrl, isTmdbUrl } from '../../utils/logoUtils';
+import { useSettings } from '../../hooks/useSettings';
+import { TMDBService } from '../../services/tmdbService';
+import { logger } from '../../utils/logger';
 
 interface FeaturedContentProps {
   featuredContent: StreamingContent | null;
@@ -43,11 +46,14 @@ const { width, height } = Dimensions.get('window');
 
 const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: FeaturedContentProps) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const { settings } = useSettings();
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const prevContentIdRef = useRef<string | null>(null);
   // Add state for tracking logo load errors
   const [logoLoadError, setLogoLoadError] = useState(false);
+  // Add a ref to track logo fetch in progress
+  const logoFetchInProgress = useRef<boolean>(false);
   
   // Animation values
   const posterOpacity = useSharedValue(0);
@@ -107,13 +113,171 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
   useEffect(() => {
     setLogoLoadError(false);
   }, [featuredContent?.id]);
+  
+  // Fetch logo based on preference
+  useEffect(() => {
+    if (!featuredContent || logoFetchInProgress.current) return;
+    
+    const fetchLogo = async () => {
+      // Set fetch in progress flag
+      logoFetchInProgress.current = true;
+      
+      try {
+        const contentId = featuredContent.id;
+        
+        // Get logo source preference from settings
+        const logoPreference = settings.logoSourcePreference || 'metahub'; // Default to metahub if not set
+        
+        // Check if current logo matches preferences
+        const currentLogo = featuredContent.logo;
+        if (currentLogo) {
+          const isCurrentMetahub = isMetahubUrl(currentLogo);
+          const isCurrentTmdb = isTmdbUrl(currentLogo);
+          
+          // If logo already matches preference, use it
+          if ((logoPreference === 'metahub' && isCurrentMetahub) || 
+              (logoPreference === 'tmdb' && isCurrentTmdb)) {
+            setLogoUrl(currentLogo);
+            logoFetchInProgress.current = false;
+            return;
+          }
+        }
+        
+        logger.log(`[FeaturedContent] Fetching logo with preference: ${logoPreference}, ID: ${contentId}`);
+        
+        // Extract IMDB ID if available
+        let imdbId = null;
+        if (featuredContent.id.startsWith('tt')) {
+          // If the ID itself is an IMDB ID
+          imdbId = featuredContent.id;
+        } else if ((featuredContent as any).imdbId) {
+          // Try to get IMDB ID from the content object if available
+          imdbId = (featuredContent as any).imdbId;
+        }
+        
+        // Extract TMDB ID if available
+        let tmdbId = null;
+        if (contentId.startsWith('tmdb:')) {
+          tmdbId = contentId.split(':')[1];
+        }
+        
+        // First source based on preference
+        if (logoPreference === 'metahub' && imdbId) {
+          // Try to get logo from Metahub first
+          const metahubUrl = `https://images.metahub.space/logo/medium/${imdbId}/img`;
+          
+          try {
+            const response = await fetch(metahubUrl, { method: 'HEAD' });
+            if (response.ok) {
+              logger.log(`[FeaturedContent] Using Metahub logo: ${metahubUrl}`);
+              setLogoUrl(metahubUrl);
+              logoFetchInProgress.current = false;
+              return; // Exit if Metahub logo was found
+            }
+          } catch (error) {
+            logger.warn(`[FeaturedContent] Failed to fetch Metahub logo:`, error);
+          }
+          
+          // Fall back to TMDB if Metahub fails and we have a TMDB ID
+          if (tmdbId) {
+            const tmdbType = featuredContent.type === 'series' ? 'tv' : 'movie';
+            try {
+              const tmdbService = TMDBService.getInstance();
+              const logoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId);
+              
+              if (logoUrl) {
+                logger.log(`[FeaturedContent] Using fallback TMDB logo: ${logoUrl}`);
+                setLogoUrl(logoUrl);
+              } else if (currentLogo) {
+                // If TMDB fails too, use existing logo if any
+                setLogoUrl(currentLogo);
+              }
+            } catch (error) {
+              logger.error('[FeaturedContent] Error fetching TMDB logo:', error);
+              if (currentLogo) setLogoUrl(currentLogo);
+            }
+          } else if (currentLogo) {
+            // Use existing logo if we don't have TMDB ID
+            setLogoUrl(currentLogo);
+          }
+        } else if (logoPreference === 'tmdb') {
+          // Try to get logo from TMDB first
+          if (tmdbId) {
+            const tmdbType = featuredContent.type === 'series' ? 'tv' : 'movie';
+            try {
+              const tmdbService = TMDBService.getInstance();
+              const logoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId);
+              
+              if (logoUrl) {
+                logger.log(`[FeaturedContent] Using TMDB logo: ${logoUrl}`);
+                setLogoUrl(logoUrl);
+                logoFetchInProgress.current = false;
+                return; // Exit if TMDB logo was found
+              }
+            } catch (error) {
+              logger.error('[FeaturedContent] Error fetching TMDB logo:', error);
+            }
+          } else if (imdbId) {
+            // If we have IMDB ID but no TMDB ID, try to find TMDB ID
+            try {
+              const tmdbService = TMDBService.getInstance();
+              const foundTmdbId = await tmdbService.findTMDBIdByIMDB(imdbId);
+              
+              if (foundTmdbId) {
+                const tmdbType = featuredContent.type === 'series' ? 'tv' : 'movie';
+                const logoUrl = await tmdbService.getContentLogo(tmdbType, foundTmdbId.toString());
+                
+                if (logoUrl) {
+                  logger.log(`[FeaturedContent] Using TMDB logo via IMDB lookup: ${logoUrl}`);
+                  setLogoUrl(logoUrl);
+                  logoFetchInProgress.current = false;
+                  return; // Exit if TMDB logo was found
+                }
+              }
+            } catch (error) {
+              logger.error('[FeaturedContent] Error finding TMDB ID from IMDB:', error);
+            }
+          }
+          
+          // Fall back to Metahub if TMDB fails and we have an IMDB ID
+          if (imdbId) {
+            const metahubUrl = `https://images.metahub.space/logo/medium/${imdbId}/img`;
+            
+            try {
+              const response = await fetch(metahubUrl, { method: 'HEAD' });
+              if (response.ok) {
+                logger.log(`[FeaturedContent] Using fallback Metahub logo: ${metahubUrl}`);
+                setLogoUrl(metahubUrl);
+              } else if (currentLogo) {
+                // If Metahub fails too, use existing logo if any
+                setLogoUrl(currentLogo);
+              }
+            } catch (error) {
+              logger.warn(`[FeaturedContent] Failed to fetch fallback Metahub logo:`, error);
+              if (currentLogo) setLogoUrl(currentLogo);
+            }
+          } else if (currentLogo) {
+            // Use existing logo if we don't have IMDB ID
+            setLogoUrl(currentLogo);
+          }
+        }
+      } catch (error) {
+        logger.error('[FeaturedContent] Error fetching logo:', error);
+        if (featuredContent?.logo) setLogoUrl(featuredContent.logo);
+      } finally {
+        // Clear fetch in progress flag
+        logoFetchInProgress.current = false;
+      }
+    };
+    
+    fetchLogo();
+  }, [featuredContent?.id, settings.logoSourcePreference]);
 
   // Load poster and logo
   useEffect(() => {
     if (!featuredContent) return;
     
     const posterUrl = featuredContent.banner || featuredContent.poster;
-    const titleLogo = featuredContent.logo;
     const contentId = featuredContent.id;
     
     // Reset states for new content
@@ -124,9 +288,8 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
     
     prevContentIdRef.current = contentId;
     
-    // Set URLs immediately for instant display
+    // Set poster URL immediately for instant display
     if (posterUrl) setBannerUrl(posterUrl);
-    if (titleLogo) setLogoUrl(titleLogo);
     
     // Load images in background
     const loadImages = async () => {
@@ -142,8 +305,8 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
       }
       
       // Load logo if available
-      if (titleLogo) {
-        const logoSuccess = await preloadImage(titleLogo);
+      if (logoUrl) {
+        const logoSuccess = await preloadImage(logoUrl);
         if (logoSuccess) {
           logoOpacity.value = withDelay(300, withTiming(1, {
             duration: 500,
@@ -152,13 +315,13 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
         } else {
           // If prefetch fails, mark as error to show title text instead
           setLogoLoadError(true);
-          console.warn(`[FeaturedContent] Logo prefetch failed, falling back to text: ${titleLogo}`);
+          console.warn(`[FeaturedContent] Logo prefetch failed, falling back to text: ${logoUrl}`);
         }
       }
     };
     
     loadImages();
-  }, [featuredContent?.id]);
+  }, [featuredContent?.id, logoUrl]);
 
   if (!featuredContent) {
     return <SkeletonFeatured />;
@@ -194,16 +357,16 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
             <Animated.View 
               style={[styles.featuredContentContainer as ViewStyle, contentAnimatedStyle]}
             >
-              {featuredContent.logo && !logoLoadError ? (
+              {logoUrl && !logoLoadError ? (
                 <Animated.View style={logoAnimatedStyle}>
                   <ExpoImage 
-                    source={{ uri: logoUrl || featuredContent.logo }} 
+                    source={{ uri: logoUrl }} 
                     style={styles.featuredLogo as ImageStyle}
                     contentFit="contain"
                     cachePolicy="memory-disk"
                     transition={400}
                     onError={() => {
-                      console.warn(`[FeaturedContent] Logo failed to load: ${featuredContent.logo}`);
+                      console.warn(`[FeaturedContent] Logo failed to load: ${logoUrl}`);
                       setLogoLoadError(true);
                     }}
                   />

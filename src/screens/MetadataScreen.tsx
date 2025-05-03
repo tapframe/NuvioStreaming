@@ -222,6 +222,7 @@ const MetadataScreen = () => {
   // Add state for custom banner
   const [bannerImage, setBannerImage] = useState<string | null>(null);
   const forcedBannerRefreshDone = useRef<boolean>(false);
+  const [loadingBanner, setLoadingBanner] = useState<boolean>(false);
 
   // Add debug log for settings when component mounts
   useEffect(() => {
@@ -278,46 +279,147 @@ const MetadataScreen = () => {
   // Fetch banner image based on logo source preference
   useEffect(() => {
     const fetchBanner = async () => {
-      if (metadata && (!forcedBannerRefreshDone.current || foundTmdbId)) {
-        // Extract any existing TMDB ID if available
-        let tmdbId = null;
+      if (metadata) {
+        setLoadingBanner(true);
+        
+        // Clear the banner initially when starting a preference-driven fetch
+        setBannerImage(null); 
+        
+        let finalBanner: string | null = metadata.banner || metadata.poster; // Default fallback
+        const preference = settings.logoSourcePreference || 'metahub';
+        const apiKey = '439c478a771f35c05022f9feabcca01c'; // Re-using API key
+
+        // Extract IDs
+        let currentTmdbId = null;
         if (id.startsWith('tmdb:')) {
-          tmdbId = id.split(':')[1];
+          currentTmdbId = id.split(':')[1];
+        } else if (foundTmdbId) {
+          currentTmdbId = foundTmdbId;
+        } else if ((metadata as any).tmdbId) {
+          currentTmdbId = (metadata as any).tmdbId;
         }
         
-        // Use our stored TMDB ID if we have one
-        const effectiveTmdbId = foundTmdbId || tmdbId || (metadata as any).tmdbId;
+        const currentImdbId = imdbId;
+        const contentType = type === 'series' ? 'tv' : 'movie';
         
-        logger.log(`[MetadataScreen] Fetching banner with preference: ${settings.logoSourcePreference}, TMDB ID: ${effectiveTmdbId}`);
+        logger.log(`[MetadataScreen] Fetching banner with preference: ${preference}, TMDB ID: ${currentTmdbId}, IMDB ID: ${currentImdbId}`);
         
         try {
-          // Use our utility function to get the banner based on preference
-          const newBanner = await fetchBannerWithPreference(
-            imdbId, 
-            effectiveTmdbId, 
-            type as 'movie' | 'series',
-            settings.logoSourcePreference
-          );
-          
-          if (newBanner) {
-            logger.log(`[MetadataScreen] Setting new banner: ${newBanner}`);
-            setBannerImage(newBanner);
-          } else {
-            // If no banner found from preferred source, use the existing one from metadata
-            logger.log(`[MetadataScreen] Using existing banner from metadata: ${metadata.banner}`);
-            setBannerImage(metadata.banner || metadata.poster);
+          if (preference === 'tmdb') {
+            // 1. Try TMDB first
+            let tmdbBannerUrl: string | null = null;
+            if (currentTmdbId) {
+              logger.log(`[MetadataScreen] Attempting TMDB banner fetch with ID: ${currentTmdbId}`);
+              try {
+                const endpoint = contentType === 'tv' ? 'tv' : 'movie';
+                const response = await fetch(`https://api.themoviedb.org/3/${endpoint}/${currentTmdbId}/images?api_key=${apiKey}`);
+                const imagesData = await response.json();
+                
+                if (imagesData.backdrops && imagesData.backdrops.length > 0) {
+                  const backdropPath = imagesData.backdrops[0].file_path;
+                  tmdbBannerUrl = `https://image.tmdb.org/t/p/original${backdropPath}`;
+                  logger.log(`[MetadataScreen] Found TMDB banner via images endpoint: ${tmdbBannerUrl}`);
+                } else {
+                  // Add log for when no backdrops are found
+                  logger.warn(`[MetadataScreen] TMDB API successful, but no backdrops found for ID: ${currentTmdbId}`);
+                }
+              } catch (err) {
+                logger.error(`[MetadataScreen] Error fetching TMDB banner via images endpoint:`, err);
+              }
+            } else {
+              // Add log for when no TMDB ID is available
+              logger.warn(`[MetadataScreen] No TMDB ID available to fetch TMDB banner.`);
+            }
+            
+            if (tmdbBannerUrl) {
+              // TMDB SUCCESS: Set banner and EXIT
+              finalBanner = tmdbBannerUrl;
+              logger.log(`[MetadataScreen] Setting final banner to TMDB source: ${finalBanner}`);
+              setBannerImage(finalBanner);
+              setLoadingBanner(false);
+              forcedBannerRefreshDone.current = true;
+              return; // <-- Exit here, don't attempt fallback
+            } else {
+              // TMDB FAILED: Proceed to Metahub fallback
+              logger.log(`[MetadataScreen] TMDB banner failed, trying Metahub fallback.`);
+              if (currentImdbId) {
+                const metahubBannerUrl = `https://images.metahub.space/background/medium/${currentImdbId}/img`;
+                try {
+                  const metahubResponse = await fetch(metahubBannerUrl, { method: 'HEAD' });
+                  if (metahubResponse.ok) {
+                    finalBanner = metahubBannerUrl;
+                    logger.log(`[MetadataScreen] Found Metahub banner as fallback: ${finalBanner}`);
+                  }
+                } catch (err) {
+                  logger.error(`[MetadataScreen] Error fetching Metahub fallback banner:`, err);
+                }
+              }
+            }
+          } else { // Preference is Metahub
+            // 1. Try Metahub first
+            let metahubBannerUrl: string | null = null;
+            if (currentImdbId) {
+              const url = `https://images.metahub.space/background/medium/${currentImdbId}/img`;
+              try {
+                const metahubResponse = await fetch(url, { method: 'HEAD' });
+                if (metahubResponse.ok) {
+                  metahubBannerUrl = url;
+                  logger.log(`[MetadataScreen] Found Metahub banner: ${metahubBannerUrl}`);
+                }
+              } catch (err) {
+                logger.error(`[MetadataScreen] Error fetching Metahub banner:`, err);
+              }
+            }
+            
+            if (metahubBannerUrl) {
+              // METAHUB SUCCESS: Set banner and EXIT
+              finalBanner = metahubBannerUrl;
+              logger.log(`[MetadataScreen] Setting final banner to Metahub source: ${finalBanner}`);
+              setBannerImage(finalBanner);
+              setLoadingBanner(false);
+              forcedBannerRefreshDone.current = true;
+              return; // <-- Exit here, don't attempt fallback
+            } else {
+              // METAHUB FAILED: Proceed to TMDB fallback
+              logger.log(`[MetadataScreen] Metahub banner failed, trying TMDB fallback.`);
+              if (currentTmdbId) {
+                try {
+                  const endpoint = contentType === 'tv' ? 'tv' : 'movie';
+                  const response = await fetch(`https://api.themoviedb.org/3/${endpoint}/${currentTmdbId}/images?api_key=${apiKey}`);
+                  const imagesData = await response.json();
+                  
+                  if (imagesData.backdrops && imagesData.backdrops.length > 0) {
+                    const backdropPath = imagesData.backdrops[0].file_path;
+                    finalBanner = `https://image.tmdb.org/t/p/original${backdropPath}`;
+                    logger.log(`[MetadataScreen] Found TMDB banner as fallback: ${finalBanner}`);
+                  }
+                } catch (err) {
+                  logger.error(`[MetadataScreen] Error fetching TMDB fallback banner:`, err);
+                }
+              }
+            }
           }
+          
+          // Set the final determined banner (could be fallback or initial default)
+          setBannerImage(finalBanner);
+          logger.log(`[MetadataScreen] Final banner set after fallbacks (if any): ${finalBanner}`);
+          
         } catch (error) {
-          logger.error(`[MetadataScreen] Error fetching banner:`, error);
-          // Use existing banner as fallback
+          logger.error(`[MetadataScreen] General error fetching banner:`, error);
+          // Fallback to initial banner on general error
           setBannerImage(metadata.banner || metadata.poster);
+        } finally {
+          // Only set loading to false here if we didn't exit early
+          setLoadingBanner(false);
+          forcedBannerRefreshDone.current = true; // Mark refresh as done
         }
-        
-        forcedBannerRefreshDone.current = true;
       }
     };
     
+    // Only run fetchBanner if metadata exists and preference/content might have changed
+    // The dependencies array handles triggering this effect
     fetchBanner();
+    
   }, [metadata, id, type, imdbId, settings.logoSourcePreference, foundTmdbId]);
 
   // Reset forced refresh when preference changes
@@ -325,7 +427,7 @@ const MetadataScreen = () => {
     if (forcedBannerRefreshDone.current) {
       logger.log(`[MetadataScreen] Logo preference changed, resetting banner refresh flag`);
       forcedBannerRefreshDone.current = false;
-      // Clear the banner image to force a new fetch
+      // Clear the banner image immediately to prevent showing the wrong source briefly
       setBannerImage(null);
       // This will trigger the banner fetch effect to run again
     }
@@ -582,102 +684,84 @@ const MetadataScreen = () => {
               }
             }
           } else { // TMDB first
-            // Try to get logo from TMDB first
-            let tmdbId = null;
-            const tmdbType = type === 'series' ? 'tv' : 'movie';
+            let tmdbLogoUrl: string | null = null;
             
+            // 1. Attempt to fetch TMDB logo
             if (id.startsWith('tmdb:')) {
-              // Direct TMDB ID
-              tmdbId = id.split(':')[1];
-              logger.log(`[MetadataScreen] Content has direct TMDB ID: ${tmdbId}`);
-            } else if (id.startsWith('tt')) {
-              // IMDB ID - need to find the corresponding TMDB ID
-              logger.log(`[MetadataScreen] Content has IMDB ID (${id}), looking up TMDB ID`);
-              try {
-                // Use the passed imdbId if available, otherwise use id directly
-                const imdbIdToUse = imdbId || id;
-                logger.log(`[MetadataScreen] Using IMDB ID for lookup: ${imdbIdToUse}`);
-                
-                tmdbId = await TMDBService.getInstance().findTMDBIdByIMDB(imdbIdToUse);
-                if (tmdbId) {
-                  logger.log(`[MetadataScreen] Found TMDB ID ${tmdbId} for IMDB ID ${imdbIdToUse}`);
-                  
-                  // Save the TMDB ID for banner fetching
-                  setFoundTmdbId(String(tmdbId));
-                } else {
-                  logger.warn(`[MetadataScreen] Could not find TMDB ID for IMDB ID ${imdbIdToUse}`);
-                }
-              } catch (error) {
-                logger.error(`[MetadataScreen] Error finding TMDB ID for IMDB ID ${id}:`, error);
-              }
-            }
-            
-            if (tmdbId) {
+              const tmdbId = id.split(':')[1];
+              const tmdbType = type === 'series' ? 'tv' : 'movie';
               logger.log(`[MetadataScreen] Attempting to fetch logo from TMDB for ${tmdbType} (ID: ${tmdbId})`);
-              
               try {
                 const tmdbService = TMDBService.getInstance();
-                logger.log(`[MetadataScreen] Calling getContentLogo with type=${tmdbType}, id=${tmdbId}`);
+                tmdbLogoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId);
                 
-                const logoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId);
-                
-                if (logoUrl) {
-                  logger.log(`[MetadataScreen] Successfully fetched logo from TMDB:
-                    - Content Type: ${tmdbType}
-                    - TMDB ID: ${tmdbId}
-                    - Logo URL: ${logoUrl}
-                  `);
-                  
-                  // Update metadata with TMDB logo
-                  setMetadata(prevMetadata => ({
-                    ...prevMetadata!,
-                    logo: logoUrl
-                  }));
-                  
-                  // Clear fetch in progress flag when done
-                  logoFetchInProgress.current = false;
-                  return; // Exit if TMDB logo was found
+                if (tmdbLogoUrl) {
+                  logger.log(`[MetadataScreen] Successfully fetched logo from TMDB: ${tmdbLogoUrl}`);
                 } else {
-                  logger.warn(`[MetadataScreen] No logo found from TMDB for ${type} (ID: ${tmdbId}), trying Metahub`);
+                  logger.warn(`[MetadataScreen] No logo found from TMDB for ${type} (ID: ${tmdbId})`);
                 }
               } catch (error) {
                 logger.error(`[MetadataScreen] Error fetching TMDB logo for ID ${tmdbId}:`, error);
               }
-            } else {
-              logger.warn(`[MetadataScreen] No TMDB ID available, falling back to Metahub`);
+            } else if (imdbId) {
+              // If we have IMDB ID but no direct TMDB ID, try to find TMDB ID
+              logger.log(`[MetadataScreen] Content has IMDB ID (${imdbId}), looking up TMDB ID for TMDB logo`);
+              try {
+                const tmdbService = TMDBService.getInstance();
+                const foundTmdbId = await tmdbService.findTMDBIdByIMDB(imdbId);
+                
+                if (foundTmdbId) {
+                  logger.log(`[MetadataScreen] Found TMDB ID ${foundTmdbId} for IMDB ID ${imdbId}`);
+                  setFoundTmdbId(String(foundTmdbId)); // Save for banner fetching
+                  
+                  tmdbLogoUrl = await tmdbService.getContentLogo(type === 'series' ? 'tv' : 'movie', foundTmdbId.toString());
+                  
+                  if (tmdbLogoUrl) {
+                    logger.log(`[MetadataScreen] Successfully fetched logo from TMDB via IMDB lookup: ${tmdbLogoUrl}`);
+                  } else {
+                    logger.warn(`[MetadataScreen] No logo found from TMDB via IMDB lookup for ${type} (IMDB: ${imdbId})`);
+                  }
+                } else {
+                  logger.warn(`[MetadataScreen] Could not find TMDB ID for IMDB ID ${imdbId}`);
+                }
+              } catch (error) {
+                logger.error(`[MetadataScreen] Error finding TMDB ID or fetching logo for IMDB ID ${imdbId}:`, error);
+              }
             }
             
-            // If TMDB fails or isn't a TMDB ID, try Metahub as fallback
+            // 2. If TMDB logo was fetched successfully, update and return
+            if (tmdbLogoUrl) {
+              setMetadata(prevMetadata => ({
+                ...prevMetadata!,
+                logo: tmdbLogoUrl
+              }));
+              logoFetchInProgress.current = false;
+              return;
+            }
+            
+            // 3. If TMDB failed, try Metahub as fallback
+            logger.log(`[MetadataScreen] TMDB logo fetch failed or not applicable. Attempting Metahub fallback.`);
             if (imdbId) {
               const metahubUrl = `https://images.metahub.space/logo/medium/${imdbId}/img`;
-              
               logger.log(`[MetadataScreen] Attempting to fetch logo from Metahub as fallback for ${imdbId}`);
               
               try {
                 const response = await fetch(metahubUrl, { method: 'HEAD' });
                 if (response.ok) {
-                  logger.log(`[MetadataScreen] Successfully fetched fallback logo from Metahub:
-                    - Content ID: ${id}
-                    - Content Type: ${type}
-                    - Logo URL: ${metahubUrl}
-                  `);
-                  
-                  // Update metadata with Metahub logo
-                  setMetadata(prevMetadata => ({
-                    ...prevMetadata!,
-                    logo: metahubUrl
-                  }));
+                  logger.log(`[MetadataScreen] Successfully fetched fallback logo from Metahub: ${metahubUrl}`);
+                  setMetadata(prevMetadata => ({ ...prevMetadata!, logo: metahubUrl }));
                 } else {
-                  // If both TMDB and Metahub fail, use the title as text instead of a logo
-                  logger.warn(`[MetadataScreen] No logo found from either source for ${type} (ID: ${id}), using title text instead`);
-                  
-                  // Leave logo as null/undefined to trigger fallback to text
+                  logger.warn(`[MetadataScreen] Metahub fallback failed. Using title text.`);
+                  setMetadata(prevMetadata => ({ ...prevMetadata!, logo: undefined }));
                 }
               } catch (metahubError) {
-                logger.warn(`[MetadataScreen] Failed to fetch logo from Metahub:`, metahubError);
-                
-                // Leave logo as null/undefined to trigger fallback to text
+                logger.warn(`[MetadataScreen] Failed to fetch fallback logo from Metahub:`, metahubError);
+                setMetadata(prevMetadata => ({ ...prevMetadata!, logo: undefined }));
               }
+            } else {
+              // No IMDB ID for Metahub fallback
+              logger.warn(`[MetadataScreen] No IMDB ID for Metahub fallback. Using title text.`);
+              setMetadata(prevMetadata => ({ ...prevMetadata!, logo: undefined }));
             }
           }
         } catch (error) {
@@ -686,6 +770,8 @@ const MetadataScreen = () => {
             contentId: id,
             contentType: type
           });
+          // Fallback to text on general error
+          setMetadata(prevMetadata => ({ ...prevMetadata!, logo: undefined }));
         } finally {
           // Clear fetch in progress flag when done
           logoFetchInProgress.current = false;
@@ -1484,18 +1570,22 @@ const MetadataScreen = () => {
           <Animated.View style={heroAnimatedStyle}>
             <View style={styles.heroSection}>
               {/* Use Animated.Image directly instead of ImageBackground with imageStyle */}
-              <Animated.Image 
-                source={{ uri: bannerImage || metadata.banner || metadata.poster }}
-                style={[styles.absoluteFill, parallaxImageStyle]}
-                resizeMode="cover"
-                onError={() => {
-                  logger.warn(`[MetadataScreen] Banner failed to load: ${bannerImage}`);
-                  // If custom banner fails, fall back to original metadata banner
-                  if (bannerImage !== metadata.banner) {
-                    setBannerImage(metadata.banner || metadata.poster);
-                  }
-                }}
-              />
+              {loadingBanner ? (
+                <View style={[styles.absoluteFill, { backgroundColor: colors.black }]} />
+              ) : (
+                <Animated.Image 
+                  source={{ uri: bannerImage || metadata.banner || metadata.poster }}
+                  style={[styles.absoluteFill, parallaxImageStyle]}
+                  resizeMode="cover"
+                  onError={() => {
+                    logger.warn(`[MetadataScreen] Banner failed to load: ${bannerImage}`);
+                    // If custom banner fails, fall back to original metadata banner
+                    if (bannerImage !== metadata.banner) {
+                      setBannerImage(metadata.banner || metadata.poster);
+                    }
+                  }}
+                />
+              )}
               <LinearGradient
                 colors={[
                   `${colors.darkBackground}00`,
