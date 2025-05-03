@@ -335,15 +335,13 @@ const MetadataScreen = () => {
               metadata={metadata}
               imdbId={imdbId}
               type={type as 'movie' | 'series'}
+              renderRatings={() => imdbId ? (
+                <RatingsSection 
+                  imdbId={imdbId}
+                  type={type === 'series' ? 'show' : 'movie'} 
+                />
+              ) : null}
             />
-
-            {/* Add RatingsSection right under the main metadata */}
-            {imdbId && (
-              <RatingsSection 
-                imdbId={imdbId}
-                type={type === 'series' ? 'show' : 'movie'} 
-              />
-            )}
 
             {/* Cast Section */}
             <CastSection

@@ -389,6 +389,7 @@ const WrappedScreen: React.FC<{Screen: React.ComponentType<any>}> = ({ Screen })
 const MainTabs = () => {
   // Always use dark mode
   const isDarkMode = true;
+  const { currentTheme } = useTheme();
   
   const renderTabBar = (props: BottomTabBarProps) => {
     return (
@@ -409,9 +410,9 @@ const MainTabs = () => {
               position: 'absolute',
               height: '100%',
               width: '100%',
-              borderTopColor: 'rgba(255,255,255,0.2)',
+              borderTopColor: currentTheme.colors.border,
               borderTopWidth: 0.5,
-              shadowColor: '#000',
+              shadowColor: currentTheme.colors.black,
               shadowOffset: { width: 0, height: -2 },
               shadowOpacity: 0.1,
               shadowRadius: 3,
@@ -495,7 +496,7 @@ const MainTabs = () => {
                 >
                   <TabIcon 
                     focused={isFocused} 
-                    color={isFocused ? colors.primary : '#FFFFFF'} 
+                    color={isFocused ? currentTheme.colors.primary : currentTheme.colors.white} 
                     iconName={iconName}
                   />
                   <Text
@@ -503,7 +504,7 @@ const MainTabs = () => {
                       fontSize: 12,
                       fontWeight: '600',
                       marginTop: 4,
-                      color: isFocused ? colors.primary : '#FFFFFF',
+                      color: isFocused ? currentTheme.colors.primary : currentTheme.colors.white,
                       opacity: isFocused ? 1 : 0.7,
                     }}
                   >
@@ -519,7 +520,7 @@ const MainTabs = () => {
   };
   
   return (
-    <View style={{ flex: 1, backgroundColor: colors.darkBackground }}>
+    <View style={{ flex: 1, backgroundColor: currentTheme.colors.darkBackground }}>
       {/* Common StatusBar for all tabs */}
       <StatusBar
         translucent
@@ -550,8 +551,8 @@ const MainTabs = () => {
             
             return <TabIcon focused={focused} color={color} iconName={iconName} />;
           },
-          tabBarActiveTintColor: colors.primary,
-          tabBarInactiveTintColor: '#FFFFFF',
+          tabBarActiveTintColor: currentTheme.colors.primary,
+          tabBarInactiveTintColor: currentTheme.colors.white,
           tabBarStyle: {
             position: 'absolute',
             backgroundColor: 'transparent',
@@ -583,9 +584,9 @@ const MainTabs = () => {
                   position: 'absolute',
                   height: '100%',
                   width: '100%',
-                  borderTopColor: 'rgba(255,255,255,0.2)',
+                  borderTopColor: currentTheme.colors.border,
                   borderTopWidth: 0.5,
-                  shadowColor: '#000',
+                  shadowColor: currentTheme.colors.black,
                   shadowOffset: { width: 0, height: -2 },
                   shadowOpacity: 0.1,
                   shadowRadius: 3,
@@ -612,7 +613,7 @@ const MainTabs = () => {
           headerShown: route.name === 'Home',
           // Add fixed screen styling to help with consistency
           contentStyle: {
-            backgroundColor: colors.darkBackground,
+            backgroundColor: currentTheme.colors.darkBackground,
           },
         })}
         // Global configuration for the tab navigator

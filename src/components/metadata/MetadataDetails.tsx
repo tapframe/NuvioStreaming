@@ -18,12 +18,14 @@ interface MetadataDetailsProps {
   metadata: any;
   imdbId: string | null;
   type: 'movie' | 'series';
+  renderRatings?: () => React.ReactNode;
 }
 
 const MetadataDetails: React.FC<MetadataDetailsProps> = ({
   metadata,
   imdbId,
   type,
+  renderRatings,
 }) => {
   const { currentTheme } = useTheme();
   const [isFullDescriptionOpen, setIsFullDescriptionOpen] = useState(false);
@@ -52,6 +54,9 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
           </View>
         )}
       </View>
+
+      {/* Ratings Section */}
+      {renderRatings && renderRatings()}
 
       {/* Creator/Director Info */}
       <Animated.View
