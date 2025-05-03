@@ -47,28 +47,28 @@ const DayItem = ({
 }: DayItemProps) => {
   const { currentTheme } = useTheme();
   return (
-    <TouchableOpacity 
-      style={[
+  <TouchableOpacity 
+    style={[
         styles.dayButton, 
-        today && styles.todayItem,
-        isSelected && styles.selectedItem,
-        hasEvents && styles.dayWithEvents
-      ]} 
-      onPress={() => onPress(date)}
-    >
-      <Text style={[
-        styles.dayText, 
+      today && styles.todayItem,
+      isSelected && styles.selectedItem,
+      hasEvents && styles.dayWithEvents
+    ]} 
+    onPress={() => onPress(date)}
+  >
+    <Text style={[
+      styles.dayText, 
         !isCurrentMonth && { color: currentTheme.colors.lightGray + '80' },
-        today && styles.todayText,
-        isSelected && styles.selectedDayText
-      ]}>
-        {date.getDate()}
-      </Text>
-      {hasEvents && (
+      today && styles.todayText,
+      isSelected && styles.selectedDayText
+    ]}>
+      {date.getDate()}
+    </Text>
+    {hasEvents && (
         <View style={[styles.eventIndicator, { backgroundColor: currentTheme.colors.primary }]} />
-      )}
-    </TouchableOpacity>
-  );
+    )}
+  </TouchableOpacity>
+);
 };
 
 export const CalendarSection: React.FC<CalendarSectionProps> = ({ 
@@ -117,13 +117,13 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     const start = startOfMonth(currentDate);
     const end = endOfMonth(currentDate);
     const days = eachDayOfInterval({ start, end });
-
+    
     // Get the day of the week for the first day (0-6)
     const firstDayOfWeek = start.getDay();
 
     // Add empty days at the start
     const emptyDays = Array(firstDayOfWeek).fill(null);
-
+    
     // Calculate remaining days to fill the last row
     const totalDays = emptyDays.length + days.length;
     const remainingDays = 7 - (totalDays % 7);
@@ -135,7 +135,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     for (let i = 0; i < allDays.length; i += 7) {
       weeks.push(allDays.slice(i, i + 7));
     }
-
+    
     return weeks.map((week, weekIndex) => (
       <View key={weekIndex} style={styles.weekRow}>
         {week.map((day, dayIndex) => {
@@ -201,7 +201,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
           <MaterialIcons name="chevron-right" size={24} color={currentTheme.colors.text} />
         </TouchableOpacity>
       </View>
-
+      
       <View style={styles.weekDaysContainer}>
         {weekDays.map((day, index) => (
           <Text 
@@ -212,7 +212,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
           </Text>
         ))}
       </View>
-
+      
       <View style={styles.daysContainer}>
         {renderDays()}
       </View>

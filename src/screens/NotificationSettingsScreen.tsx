@@ -314,7 +314,7 @@ const NotificationSettingsScreen = () => {
 
                 <TouchableOpacity 
                   style={[
-                    styles.resetButton,
+                    styles.resetButton, 
                     { 
                       marginTop: 12,
                       backgroundColor: currentTheme.colors.primary + '20',

@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Switch,
   ScrollView,
-  useColorScheme,
   SafeAreaView,
   StatusBar,
   Alert,
@@ -35,11 +34,10 @@ const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 // Card component with modern style
 interface SettingsCardProps {
   children: React.ReactNode;
-  isDarkMode: boolean;
   title?: string;
 }
 
-const SettingsCard: React.FC<SettingsCardProps> = ({ children, isDarkMode, title }) => {
+const SettingsCard: React.FC<SettingsCardProps> = ({ children, title }) => {
   const { currentTheme } = useTheme();
   
   return (
@@ -47,14 +45,14 @@ const SettingsCard: React.FC<SettingsCardProps> = ({ children, isDarkMode, title
       {title && (
         <Text style={[
           styles.cardTitle,
-          { color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark }
+          { color: currentTheme.colors.mediumEmphasis }
         ]}>
           {title.toUpperCase()}
         </Text>
       )}
       <View style={[
         styles.card,
-        { backgroundColor: isDarkMode ? currentTheme.colors.elevation2 : currentTheme.colors.white }
+        { backgroundColor: currentTheme.colors.elevation2 }
       ]}>
         {children}
       </View>
@@ -69,7 +67,6 @@ interface SettingItemProps {
   renderControl: () => React.ReactNode;
   isLast?: boolean;
   onPress?: () => void;
-  isDarkMode: boolean;
   badge?: string | number;
 }
 
@@ -80,7 +77,6 @@ const SettingItem: React.FC<SettingItemProps> = ({
   renderControl,
   isLast = false,
   onPress,
-  isDarkMode,
   badge
 }) => {
   const { currentTheme } = useTheme();
@@ -92,22 +88,22 @@ const SettingItem: React.FC<SettingItemProps> = ({
       style={[
         styles.settingItem, 
         !isLast && styles.settingItemBorder,
-        { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }
+        { borderBottomColor: 'rgba(255,255,255,0.08)' }
       ]}
     >
       <View style={[
         styles.settingIconContainer,
-        { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+        { backgroundColor: 'rgba(255,255,255,0.1)' }
       ]}>
         <MaterialIcons name={icon} size={20} color={currentTheme.colors.primary} />
       </View>
       <View style={styles.settingContent}>
         <View style={styles.settingTextContainer}>
-          <Text style={[styles.settingTitle, { color: isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark }]}>
+          <Text style={[styles.settingTitle, { color: currentTheme.colors.highEmphasis }]}>
             {title}
           </Text>
           {description && (
-            <Text style={[styles.settingDescription, { color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark }]}>
+            <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
               {description}
             </Text>
           )}
@@ -127,8 +123,6 @@ const SettingItem: React.FC<SettingItemProps> = ({
 
 const SettingsScreen: React.FC = () => {
   const { settings, updateSetting } = useSettings();
-  const systemColorScheme = useColorScheme();
-  const isDarkMode = systemColorScheme === 'dark' || settings.enableDarkMode;
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { lastUpdate } = useCatalogContext();
   const { isAuthenticated, userProfile } = useTraktContext();
@@ -140,23 +134,6 @@ const SettingsScreen: React.FC = () => {
   const [catalogCount, setCatalogCount] = useState<number>(0);
   const [mdblistKeySet, setMdblistKeySet] = useState<boolean>(false);
   const [discoverDataSource, setDiscoverDataSource] = useState<DataSource>(DataSource.STREMIO_ADDONS);
-
-  // Force consistent status bar settings
-  useEffect(() => {
-    const applyStatusBarConfig = () => {
-      StatusBar.setBarStyle('light-content');
-      if (Platform.OS === 'android') {
-        StatusBar.setTranslucent(true);
-        StatusBar.setBackgroundColor('transparent');
-      }
-    };
-    
-    applyStatusBarConfig();
-    
-    // Re-apply on focus
-    const unsubscribe = navigation.addListener('focus', applyStatusBarConfig);
-    return unsubscribe;
-  }, [navigation]);
 
   const loadData = useCallback(async () => {
     try {
@@ -236,9 +213,9 @@ const SettingsScreen: React.FC = () => {
     <Switch
       value={value}
       onValueChange={onValueChange}
-      trackColor={{ false: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)', true: currentTheme.colors.primary }}
+      trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
       thumbColor={Platform.OS === 'android' ? (value ? currentTheme.colors.white : currentTheme.colors.white) : ''}
-      ios_backgroundColor={isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}
+      ios_backgroundColor={'rgba(255,255,255,0.1)'}
     />
   );
 
@@ -246,7 +223,7 @@ const SettingsScreen: React.FC = () => {
     <MaterialIcons 
       name="chevron-right" 
       size={22} 
-      color={isDarkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
+      color={'rgba(255,255,255,0.3)'}
     />
   );
 
@@ -264,52 +241,51 @@ const SettingsScreen: React.FC = () => {
   return (
     <View style={[
       styles.container,
-      { backgroundColor: isDarkMode ? currentTheme.colors.darkBackground : '#F2F2F7' }
+      { backgroundColor: currentTheme.colors.darkBackground }
     ]}>
-      {/* Fixed position header background to prevent shifts */}
-      <View style={[
-        styles.headerBackground,
-        { height: headerHeight, backgroundColor: isDarkMode ? currentTheme.colors.darkBackground : '#F2F2F7' }
-      ]} />
-      
+      <StatusBar barStyle={'light-content'} />
       <View style={{ flex: 1 }}>
-        {/* Header Section with proper top spacing */}
         <View style={[styles.header, { height: headerHeight, paddingTop: topSpacing }]}>
-          <Text style={[styles.headerTitle, { color: isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark }]}>
+          <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
             Settings
           </Text>
-          <TouchableOpacity onPress={handleResetSettings} style={styles.resetButton}>
-            <Text style={[styles.resetButtonText, {color: currentTheme.colors.primary}]}>Reset</Text>
-          </TouchableOpacity>
         </View>
 
-        {/* Content Container */}
         <View style={styles.contentContainer}>
           <ScrollView 
             style={styles.scrollView}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
           >
-            <SettingsCard isDarkMode={isDarkMode} title="User & Account">
+            <SettingsCard title="User & Account">
               <SettingItem
                 title="Trakt"
                 description={isAuthenticated ? `Connected as ${userProfile?.username || 'User'}` : "Not Connected"}
                 icon="person"
-                isDarkMode={isDarkMode}
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('TraktSettings')}
+                isLast={false}
+              />
+            </SettingsCard>
+
+            <SettingsCard title="Appearance">
+              <SettingItem
+                title="Theme"
+                description={currentTheme.name}
+                icon="palette"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('ThemeSettings')}
                 isLast={true}
               />
             </SettingsCard>
 
-            <SettingsCard isDarkMode={isDarkMode} title="Features">
+            <SettingsCard title="Features">
               <SettingItem
                 title="Calendar"
                 description="Manage your show calendar settings"
                 icon="calendar-today"
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('Calendar')}
-                isDarkMode={isDarkMode}
               />
               <SettingItem
                 title="Notifications"
@@ -317,17 +293,15 @@ const SettingsScreen: React.FC = () => {
                 icon="notifications"
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('NotificationSettings')}
-                isDarkMode={isDarkMode}
                 isLast={true}
               />
             </SettingsCard>
 
-            <SettingsCard isDarkMode={isDarkMode} title="Content">
+            <SettingsCard title="Content">
               <SettingItem
                 title="Addons"
                 description="Manage your installed addons"
                 icon="extension"
-                isDarkMode={isDarkMode}
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('Addons')}
                 badge={addonCount}
@@ -336,7 +310,6 @@ const SettingsScreen: React.FC = () => {
                 title="Catalogs"
                 description="Configure content sources"
                 icon="view-list"
-                isDarkMode={isDarkMode}
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('CatalogSettings')}
                 badge={catalogCount}
@@ -345,23 +318,20 @@ const SettingsScreen: React.FC = () => {
                 title="Home Screen"
                 description="Customize layout and content"
                 icon="home"
-                isDarkMode={isDarkMode}
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('HomeScreenSettings')}
               />
               <SettingItem
-                title="Ratings Source"
-                description={mdblistKeySet ? "MDBList API Configured" : "Configure MDBList API"}
+                title="MDBList Integration"
+                description={mdblistKeySet ? "Ratings and reviews provided by MDBList" : "Connect MDBList for ratings and reviews"}
                 icon="info-outline"
-                isDarkMode={isDarkMode}
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('MDBListSettings')}
               />
               <SettingItem
-                title="Logo Source Preference"
+                title="Image Sources"
                 description="Choose primary source for title logos and backgrounds"
                 icon="image"
-                isDarkMode={isDarkMode}
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('LogoSourceSettings')}
               />
@@ -369,14 +339,13 @@ const SettingsScreen: React.FC = () => {
                 title="TMDB"
                 description="API & Metadata Settings"
                 icon="movie-filter"
-                isDarkMode={isDarkMode}
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('TMDBSettings')}
                 isLast={true}
               />
             </SettingsCard>
 
-            <SettingsCard isDarkMode={isDarkMode} title="Playback">
+            <SettingsCard title="Playback">
               <SettingItem
                 title="Video Player"
                 description={Platform.OS === 'ios' 
@@ -388,19 +357,17 @@ const SettingsScreen: React.FC = () => {
                   : (settings.useExternalPlayer ? 'External Player' : 'Built-in Player')
                 }
                 icon="play-arrow"
-                isDarkMode={isDarkMode}
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('PlayerSettings')}
                 isLast={true}
               />
             </SettingsCard>
 
-            <SettingsCard isDarkMode={isDarkMode} title="Discover">
+            <SettingsCard title="Discover">
               <SettingItem
                 title="Content Source"
                 description="Choose where to get content for the Discover screen"
                 icon="explore"
-                isDarkMode={isDarkMode}
                 renderControl={() => (
                   <View style={styles.selectorContainer}>
                     <TouchableOpacity
@@ -444,32 +411,8 @@ const SettingsScreen: React.FC = () => {
               />
             </SettingsCard>
 
-            <SettingsCard isDarkMode={isDarkMode} title="Appearance">
-              <SettingItem
-                title="Dark Mode"
-                description="Enable dark mode for the app"
-                icon="brightness-6"
-                renderControl={() => (
-                  <CustomSwitch
-                    value={settings.enableDarkMode}
-                    onValueChange={(value) => updateSetting('enableDarkMode', value)}
-                  />
-                )}
-                isDarkMode={isDarkMode}
-              />
-              <SettingItem
-                title="Themes"
-                description="Customize app colors and themes"
-                icon="palette"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('ThemeSettings')}
-                isDarkMode={isDarkMode}
-                isLast
-              />
-            </SettingsCard>
-
             <View style={styles.versionContainer}>
-              <Text style={[styles.versionText, {color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark}]}>
+              <Text style={[styles.versionText, {color: currentTheme.colors.mediumEmphasis}]}>
                 Version 1.0.0
               </Text>
             </View>
@@ -483,18 +426,6 @@ const SettingsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  headerBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1,
-  },
-  contentContainer: {
-    flex: 1,
-    zIndex: 1,
-    width: '100%',
   },
   header: {
     paddingHorizontal: 20,
@@ -510,13 +441,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.3,
   },
-  resetButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  resetButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+  contentContainer: {
+    flex: 1,
+    zIndex: 1,
+    width: '100%',
   },
   scrollView: {
     flex: 1,
@@ -576,11 +504,6 @@ const styles = StyleSheet.create({
   },
   settingTextContainer: {
     flex: 1,
-  },
-  settingTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
   settingTitle: {
     fontSize: 16,
