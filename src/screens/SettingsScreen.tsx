@@ -125,10 +125,27 @@ const SettingsScreen: React.FC = () => {
   const { settings, updateSetting } = useSettings();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { lastUpdate } = useCatalogContext();
-  const { isAuthenticated, userProfile } = useTraktContext();
+  const { isAuthenticated, userProfile, refreshAuthStatus } = useTraktContext();
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
   
+  // Add a useEffect to check authentication status on focus
+  useEffect(() => {
+    // This will reload the Trakt auth status whenever the settings screen is focused
+    const unsubscribe = navigation.addListener('focus', () => {
+      // Force a re-render when returning to this screen
+      // This will reflect the updated isAuthenticated state from the TraktContext
+      // Refresh auth status
+      if (isAuthenticated || userProfile) {
+        // Just to be cautious, log the current state
+        console.log('SettingsScreen focused, refreshing auth status. Current state:', { isAuthenticated, userProfile: userProfile?.username });
+      }
+      refreshAuthStatus();
+    });
+    
+    return unsubscribe;
+  }, [navigation, isAuthenticated, userProfile, refreshAuthStatus]);
+
   // States for dynamic content
   const [addonCount, setAddonCount] = useState<number>(0);
   const [catalogCount, setCatalogCount] = useState<number>(0);
@@ -266,6 +283,81 @@ const SettingsScreen: React.FC = () => {
                 onPress={() => navigation.navigate('TraktSettings')}
                 isLast={false}
               />
+            </SettingsCard>
+
+            <SettingsCard title="Profiles">
+              {isAuthenticated ? (
+                <SettingItem
+                  title="Manage Profiles"
+                  description="Create and switch between profiles"
+                  icon="people"
+                  renderControl={ChevronRight}
+                  onPress={() => navigation.navigate('ProfilesSettings')}
+                  isLast={true}
+                />
+              ) : (
+                <TouchableOpacity
+                  style={[
+                    styles.profileLockContainer,
+                    { 
+                      backgroundColor: `${currentTheme.colors.primary}10`,
+                      borderWidth: 1,
+                      borderColor: `${currentTheme.colors.primary}30`
+                    }
+                  ]}
+                  activeOpacity={1}
+                >
+                  <View style={styles.profileLockContent}>
+                    <MaterialIcons name="lock-outline" size={24} color={currentTheme.colors.primary} />
+                    <View style={styles.profileLockTextContainer}>
+                      <Text style={[styles.profileLockTitle, { color: currentTheme.colors.text }]}>
+                        Sign in to use Profiles
+                      </Text>
+                      <Text style={[styles.profileLockDescription, { color: currentTheme.colors.textMuted }]}>
+                        Create multiple profiles for different users and preferences
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.profileBenefits}>
+                    <View style={styles.benefitCol}>
+                      <View style={styles.benefitItem}>
+                        <MaterialIcons name="check-circle" size={16} color={currentTheme.colors.primary} />
+                        <Text style={[styles.benefitText, { color: currentTheme.colors.textMuted }]}>
+                          Separate watchlists
+                        </Text>
+                      </View>
+                      <View style={styles.benefitItem}>
+                        <MaterialIcons name="check-circle" size={16} color={currentTheme.colors.primary} />
+                        <Text style={[styles.benefitText, { color: currentTheme.colors.textMuted }]}>
+                          Content preferences
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.benefitCol}>
+                      <View style={styles.benefitItem}>
+                        <MaterialIcons name="check-circle" size={16} color={currentTheme.colors.primary} />
+                        <Text style={[styles.benefitText, { color: currentTheme.colors.textMuted }]}>
+                          Personalized recommendations
+                        </Text>
+                      </View>
+                      <View style={styles.benefitItem}>
+                        <MaterialIcons name="check-circle" size={16} color={currentTheme.colors.primary} />
+                        <Text style={[styles.benefitText, { color: currentTheme.colors.textMuted }]}>
+                          Individual viewing history
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.loginButton, { backgroundColor: currentTheme.colors.primary }]}
+                    activeOpacity={0.7}
+                    onPress={() => navigation.navigate('TraktSettings')}
+                  >
+                    <Text style={styles.loginButtonText}>Connect with Trakt</Text>
+                    <MaterialIcons name="arrow-forward" size={18} color="#FFFFFF" style={styles.loginButtonIcon} />
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              )}
             </SettingsCard>
 
             <SettingsCard title="Appearance">
@@ -566,6 +658,62 @@ const styles = StyleSheet.create({
   selectorText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  profileLockContainer: {
+    padding: 16,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginVertical: 8,
+  },
+  profileLockContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  profileLockTextContainer: {
+    flex: 1,
+    marginHorizontal: 12,
+  },
+  profileLockTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  profileLockDescription: {
+    fontSize: 14,
+    opacity: 0.8,
+  },
+  profileBenefits: {
+    flexDirection: 'row',
+    marginTop: 16,
+    justifyContent: 'space-between',
+  },
+  benefitCol: {
+    flex: 1,
+  },
+  benefitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  benefitText: {
+    fontSize: 14,
+    marginLeft: 8,
+  },
+  loginButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    paddingVertical: 12,
+    marginTop: 16,
+  },
+  loginButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  loginButtonIcon: {
+    marginLeft: 8,
   },
 });
 

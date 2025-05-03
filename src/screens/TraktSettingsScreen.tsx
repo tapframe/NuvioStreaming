@@ -94,7 +94,19 @@ const TraktSettingsScreen: React.FC = () => {
           .then(success => {
             if (success) {
               logger.log('[TraktSettingsScreen] Token exchange successful');
-              checkAuthStatus();
+              checkAuthStatus().then(() => {
+                // Show success message
+                Alert.alert(
+                  'Successfully Connected',
+                  'Your Trakt account has been connected successfully.',
+                  [
+                    { 
+                      text: 'OK', 
+                      onPress: () => navigation.goBack() 
+                    }
+                  ]
+                );
+              });
             } else {
               logger.error('[TraktSettingsScreen] Token exchange failed');
               Alert.alert('Authentication Error', 'Failed to complete authentication with Trakt.');
@@ -116,7 +128,7 @@ const TraktSettingsScreen: React.FC = () => {
         setIsExchangingCode(false);
       }
     }
-  }, [response, checkAuthStatus, request?.codeVerifier]);
+  }, [response, checkAuthStatus, request?.codeVerifier, navigation]);
 
   const handleSignIn = () => {
     promptAsync(); // Trigger the authentication flow

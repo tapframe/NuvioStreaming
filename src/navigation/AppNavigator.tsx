@@ -38,6 +38,7 @@ import TraktSettingsScreen from '../screens/TraktSettingsScreen';
 import PlayerSettingsScreen from '../screens/PlayerSettingsScreen';
 import LogoSourceSettings from '../screens/LogoSourceSettings';
 import ThemeScreen from '../screens/ThemeScreen';
+import ProfilesScreen from '../screens/ProfilesScreen';
 
 // Stack navigator types
 export type RootStackParamList = {
@@ -95,6 +96,7 @@ export type RootStackParamList = {
   PlayerSettings: undefined;
   LogoSourceSettings: undefined;
   ThemeSettings: undefined;
+  ProfilesSettings: undefined;
 };
 
 export type RootStackNavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -846,6 +848,21 @@ const AppNavigator = () => {
           <Stack.Screen 
             name="ThemeSettings" 
             component={ThemeScreen}
+            options={{
+              animation: 'fade',
+              animationDuration: 200,
+              presentation: 'card',
+              gestureEnabled: true,
+              gestureDirection: 'horizontal',
+              headerShown: false,
+              contentStyle: {
+                backgroundColor: currentTheme.colors.darkBackground,
+              },
+            }}
+          />
+          <Stack.Screen 
+            name="ProfilesSettings" 
+            component={ProfilesScreen}
             options={{
               animation: 'fade',
               animationDuration: 200,
