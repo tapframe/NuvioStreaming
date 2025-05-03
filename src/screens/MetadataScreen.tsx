@@ -25,11 +25,11 @@ import { BlurView as CommunityBlurView } from '@react-native-community/blur';
 import * as Haptics from 'expo-haptics';
 import { colors } from '../styles/colors';
 import { useMetadata } from '../hooks/useMetadata';
-import { CastSection } from '../components/metadata/CastSection';
-import { SeriesContent } from '../components/metadata/SeriesContent';
-import { MovieContent } from '../components/metadata/MovieContent';
-import { MoreLikeThisSection } from '../components/metadata/MoreLikeThisSection';
-import { RatingsSection } from '../components/metadata/RatingsSection';
+import { CastSection as OriginalCastSection } from '../components/metadata/CastSection';
+import { SeriesContent as OriginalSeriesContent } from '../components/metadata/SeriesContent';
+import { MovieContent as OriginalMovieContent } from '../components/metadata/MovieContent';
+import { MoreLikeThisSection as OriginalMoreLikeThisSection } from '../components/metadata/MoreLikeThisSection';
+import { RatingsSection as OriginalRatingsSection } from '../components/metadata/RatingsSection';
 import { StreamingContent } from '../services/catalogService';
 import { GroupedStreams } from '../types/streams';
 import { TMDBEpisode } from '../services/tmdbService';
@@ -57,18 +57,14 @@ import { storageService } from '../services/storageService';
 import { logger } from '../utils/logger';
 import { useGenres } from '../contexts/GenreContext';
 
-// Import our new components
-import ActionButtons from '../components/metadata/ActionButtons';
-import WatchProgressDisplay from '../components/metadata/WatchProgressDisplay';
-import FloatingHeader from '../components/metadata/FloatingHeader';
-import HeroSection from '../components/metadata/HeroSection';
-import HeroContent from '../components/metadata/HeroContent';
-import MetaInfo from '../components/metadata/MetaInfo';
-import Description from '../components/metadata/Description';
-import CreatorInfo from '../components/metadata/CreatorInfo';
-import GenreTags from '../components/metadata/GenreTags';
-
 const { width, height } = Dimensions.get('window');
+
+// Memoize child components
+const CastSection = React.memo(OriginalCastSection);
+const SeriesContent = React.memo(OriginalSeriesContent);
+const MovieContent = React.memo(OriginalMovieContent);
+const MoreLikeThisSection = React.memo(OriginalMoreLikeThisSection);
+const RatingsSection = React.memo(OriginalRatingsSection);
 
 // Animation constants
 const springConfig = {
@@ -89,6 +85,126 @@ const ANIMATION_DELAY_CONSTANTS = {
 
 // Add debug log for storageService
 logger.log('[MetadataScreen] StorageService instance:', storageService);
+
+// Memoized ActionButtons Component
+const ActionButtons = React.memo(({ 
+  handleShowStreams, 
+  toggleLibrary, 
+  inLibrary, 
+  type, 
+  id, 
+  navigation, 
+  playButtonText,
+  animatedStyle
+}: {
+  handleShowStreams: () => void;
+  toggleLibrary: () => void;
+  inLibrary: boolean;
+  type: 'movie' | 'series';
+  id: string;
+  navigation: NavigationProp<RootStackParamList>;
+  playButtonText: string;
+  animatedStyle: any;
+}) => {
+  // Add wrapper for play button with haptic feedback
+  const handlePlay = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    handleShowStreams();
+  };
+
+  return (
+    <Animated.View style={[styles.actionButtons, animatedStyle]}>
+      <TouchableOpacity
+        style={[styles.actionButton, styles.playButton]}
+        onPress={handlePlay}
+      >
+        <MaterialIcons 
+          name={playButtonText === 'Resume' ? "play-circle-outline" : "play-arrow"} 
+          size={24} 
+          color="#000" 
+        />
+        <Text style={styles.playButtonText}>
+          {playButtonText}
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.actionButton, styles.infoButton]}
+        onPress={toggleLibrary}
+      >
+        <MaterialIcons
+          name={inLibrary ? 'bookmark' : 'bookmark-border'}
+          size={24}
+          color="#fff"
+        />
+        <Text style={styles.infoButtonText}>
+          {inLibrary ? 'Saved' : 'Save'}
+        </Text>
+      </TouchableOpacity>
+
+      {type === 'series' && (
+        <TouchableOpacity
+          style={[styles.iconButton]}
+          onPress={async () => {
+            const tmdb = TMDBService.getInstance();
+            const tmdbId = await tmdb.extractTMDBIdFromStremioId(id);
+            if (tmdbId) {
+              navigation.navigate('ShowRatings', { showId: tmdbId });
+            } else {
+              logger.error('Could not find TMDB ID for show');
+            }
+          }}
+        >
+          <MaterialIcons name="assessment" size={24} color="#fff" />
+        </TouchableOpacity>
+      )}
+    </Animated.View>
+  );
+});
+
+// Memoized WatchProgress Component
+const WatchProgressDisplay = React.memo(({ 
+  watchProgress, 
+  type, 
+  getEpisodeDetails, 
+  animatedStyle 
+}: {
+  watchProgress: { currentTime: number; duration: number; lastUpdated: number; episodeId?: string } | null;
+  type: 'movie' | 'series';
+  getEpisodeDetails: (episodeId: string) => { seasonNumber: string; episodeNumber: string; episodeName: string } | null;
+  animatedStyle: any;
+}) => {
+  if (!watchProgress || watchProgress.duration === 0) {
+    return null;
+  }
+
+  const progressPercent = (watchProgress.currentTime / watchProgress.duration) * 100;
+  const formattedTime = new Date(watchProgress.lastUpdated).toLocaleDateString();
+  let episodeInfo = '';
+
+  if (type === 'series' && watchProgress.episodeId) {
+    const details = getEpisodeDetails(watchProgress.episodeId);
+    if (details) {
+      episodeInfo = ` • S${details.seasonNumber}:E${details.episodeNumber}${details.episodeName ? ` - ${details.episodeName}` : ''}`;
+    }
+  }
+
+  return (
+    <Animated.View style={[styles.watchProgressContainer, animatedStyle]}>
+      <View style={styles.watchProgressBar}>
+        <View 
+          style={[
+            styles.watchProgressFill, 
+            { width: `${progressPercent}%` }
+          ]} 
+        />
+      </View>
+      <Text style={styles.watchProgressText}>
+        {progressPercent >= 95 ? 'Watched' : `${Math.round(progressPercent)}% watched`}{episodeInfo} • Last watched on {formattedTime}
+      </Text>
+    </Animated.View>
+  );
+});
 
 const MetadataScreen = () => {
   const route = useRoute<RouteProp<Record<string, RouteParams & { episodeId?: string }>, string>>();
@@ -529,6 +645,9 @@ const MetadataScreen = () => {
     }
   }, [metadata?.logo, logoOpacity]);
 
+  // Update the watch progress render function - Now uses WatchProgressDisplay component
+  // const renderWatchProgress = () => { ... }; // Removed old inline function
+
   // Handler functions
   const handleShowStreams = useCallback(() => {
     if (type === 'series') {
@@ -619,6 +738,7 @@ const MetadataScreen = () => {
           
           if (tmdbId) {
             const credits = await tmdb.getCredits(tmdbId, type);
+            // logger.log("Credits data structure:", JSON.stringify(credits).substring(0, 300));
             
             // Extract directors for movies
             if (type === 'movie' && credits.crew) {
@@ -632,6 +752,7 @@ const MetadataScreen = () => {
                   ...metadata,
                   directors
                 });
+                // logger.log("Updated directors:", directors);
               }
             }
             
@@ -652,6 +773,7 @@ const MetadataScreen = () => {
                   ...metadata,
                   creators: creators.slice(0, 3) // Limit to first 3 creators
                 });
+                // logger.log("Updated creators:", creators.slice(0, 3));
               }
             }
           }
@@ -748,9 +870,43 @@ const MetadataScreen = () => {
   }, []);
 
   const handleBack = useCallback(() => {
+    // Use goBack() which will return to the previous screen in the navigation stack
+    // This will work for both cases:
+    // 1. Coming from Calendar/ThisWeek - goes back to them
+    // 2. Coming from StreamsScreen - goes back to Calendar/ThisWeek
     navigation.goBack();
   }, [navigation]);
 
+  // Function to render genres (updated to handle string array and use useMemo)
+  const renderGenres = useMemo(() => {
+    if (!metadata?.genres || !Array.isArray(metadata.genres) || metadata.genres.length === 0) {
+      return null;
+    }
+
+    // Since metadata.genres is string[], we display them directly
+    const genresToDisplay: string[] = metadata.genres as string[];
+
+    return genresToDisplay.slice(0, 4).map((genreName, index, array) => (
+      // Use React.Fragment to avoid extra View wrappers
+      <React.Fragment key={index}>
+        <Text style={styles.genreText}>{genreName}</Text>
+        {/* Add dot separator */}
+        {index < array.length - 1 && (
+          <Text style={styles.genreDot}>•</Text>
+        )}
+      </React.Fragment>
+    ));
+  }, [metadata?.genres]); // Dependency on metadata.genres
+
+  // Update the heroAnimatedStyle for parallax effect
+  const heroAnimatedStyle = useAnimatedStyle(() => ({
+    width: '100%',
+    height: heroHeight.value,
+    backgroundColor: colors.black,
+    transform: [{ scale: heroScale.value }],
+    opacity: heroOpacity.value,
+  }));
+  
   // Replace direct onScroll with useAnimatedScrollHandler
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
@@ -776,6 +932,48 @@ const MetadataScreen = () => {
       }
     },
   });
+
+  // Add a new animated style for the parallax image
+  const parallaxImageStyle = useAnimatedStyle(() => {
+    // Use dampedScrollY instead of direct scrollY for smoother effect
+    return {
+      width: '100%',
+      height: '120%', // Increase height for more movement range
+      top: '-10%', // Start image slightly higher to allow more upward movement
+      transform: [
+        { 
+          translateY: interpolate(
+            dampedScrollY.value,
+            [0, 100, 300],
+            [20, -20, -60],  // Start with a lower position, then move up
+            Extrapolate.CLAMP
+          )
+        },
+        { 
+          scale: interpolate(
+            dampedScrollY.value,
+            [0, 150, 300],
+            [1.1, 1.02, 0.95],  // More dramatic scale changes
+            Extrapolate.CLAMP
+          )
+        }
+      ],
+    };
+  });
+
+  // Add animated style for floating header
+  const headerAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: headerOpacity.value,
+    transform: [
+      { translateY: interpolate(headerOpacity.value, [0, 1], [-20, 0], Extrapolate.CLAMP) }
+    ]
+  }));
+  
+  // Add animated style for header elements
+  const headerElementsStyle = useAnimatedStyle(() => ({
+    opacity: headerElementsOpacity.value,
+    transform: [{ translateY: headerElementsY.value }]
+  }));
 
   if (loading) {
     return (
@@ -849,11 +1047,6 @@ const MetadataScreen = () => {
     );
   }
 
-  // Prepare genre tags for rendering
-  const genreTagsElement = metadata.genres && Array.isArray(metadata.genres) ? (
-    <GenreTags genres={metadata.genres} maxToShow={4} />
-  ) : null;
-
   return (
     <SafeAreaView 
       style={[styles.container, { backgroundColor: colors.darkBackground }]}
@@ -867,74 +1060,197 @@ const MetadataScreen = () => {
       />
       <Animated.View style={containerAnimatedStyle}>
         {/* Floating Header */}
-        <FloatingHeader 
-          headerOpacity={headerOpacity}
-          headerElementsOpacity={headerElementsOpacity}
-          headerElementsY={headerElementsY}
-          logo={metadata.logo}
-          title={metadata.name}
-          safeAreaTop={safeAreaTop}
-          onBack={handleBack}
-          onToggleLibrary={handleToggleLibrary}
-          inLibrary={inLibrary}
-        />
+        <Animated.View style={[styles.floatingHeader, headerAnimatedStyle]}>
+          {Platform.OS === 'ios' ? (
+            <ExpoBlurView
+              intensity={50}
+              tint="dark"
+              style={[styles.blurContainer, { paddingTop: Math.max(safeAreaTop * 0.8, safeAreaTop - 6) }]}
+            >
+              <Animated.View style={[styles.floatingHeaderContent, headerElementsStyle]}>
+                <TouchableOpacity 
+                  style={styles.backButton} 
+                  onPress={handleBack}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <MaterialIcons name="arrow-back" size={24} color={colors.highEmphasis} />
+                </TouchableOpacity>
+                
+                <View style={styles.headerTitleContainer}>
+                  {metadata.logo ? (
+                    <Image
+                      source={{ uri: metadata.logo }}
+                      style={styles.floatingHeaderLogo}
+                      contentFit="contain"
+                      transition={150}
+                    />
+                  ) : (
+                    <Text style={styles.floatingHeaderTitle} numberOfLines={1}>{metadata.name}</Text>
+                  )}
+                </View>
+                
+                <TouchableOpacity 
+                  style={styles.headerActionButton}
+                  onPress={handleToggleLibrary}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <MaterialIcons 
+                    name={inLibrary ? 'bookmark' : 'bookmark-border'} 
+                    size={22} 
+                    color={colors.highEmphasis} 
+                  />
+                </TouchableOpacity>
+              </Animated.View>
+            </ExpoBlurView>
+          ) : (
+            <View style={[styles.blurContainer, { paddingTop: Math.max(safeAreaTop * 0.8, safeAreaTop - 6) }]}>
+              <CommunityBlurView
+                style={styles.absoluteFill}
+                blurType="dark"
+                blurAmount={15}
+                reducedTransparencyFallbackColor="rgba(20, 20, 20, 0.9)"
+              />
+              <Animated.View style={[styles.floatingHeaderContent, headerElementsStyle]}>
+                <TouchableOpacity 
+                  style={styles.backButton} 
+                  onPress={handleBack}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <MaterialIcons name="arrow-back" size={24} color={colors.highEmphasis} />
+                </TouchableOpacity>
+                
+                <View style={styles.headerTitleContainer}>
+                  {metadata.logo ? (
+                    <Image
+                      source={{ uri: metadata.logo }}
+                      style={styles.floatingHeaderLogo}
+                      contentFit="contain"
+                      transition={150}
+                    />
+                  ) : (
+                    <Text style={styles.floatingHeaderTitle} numberOfLines={1}>{metadata.name}</Text>
+                  )}
+                </View>
+                
+                <TouchableOpacity 
+                  style={styles.headerActionButton}
+                  onPress={handleToggleLibrary}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <MaterialIcons 
+                    name={inLibrary ? 'bookmark' : 'bookmark-border'} 
+                    size={22} 
+                    color={colors.highEmphasis} 
+                  />
+                </TouchableOpacity>
+              </Animated.View>
+            </View>
+          )}
+          {Platform.OS === 'ios' && <View style={styles.headerBottomBorder} />}
+        </Animated.View>
 
         <Animated.ScrollView
           ref={contentRef}
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
           onScroll={scrollHandler}
-          scrollEventThrottle={16}
+          scrollEventThrottle={16} // Back to standard value
         >
           {/* Hero Section */}
-          <HeroSection
-            banner={metadata.banner}
-            poster={metadata.poster}
-            heroHeight={heroHeight}
-            heroScale={heroScale}
-            heroOpacity={heroOpacity}
-            dampedScrollY={dampedScrollY}
-          >
-            <HeroContent
-              logo={metadata.logo}
-              title={metadata.name}
-              logoAnimatedStyle={logoAnimatedStyle}
-              genresAnimatedStyle={genresAnimatedStyle}
-              genres={genreTagsElement}
-            >
-              {/* Watch Progress */}
-              <WatchProgressDisplay 
-                watchProgress={watchProgress}
-                type={type as 'movie' | 'series'}
-                getEpisodeDetails={getEpisodeDetails}
-                animatedStyle={watchProgressAnimatedStyle}
+          <Animated.View style={heroAnimatedStyle}>
+            <View style={styles.heroSection}>
+              {/* Use Animated.Image directly instead of ImageBackground with imageStyle */}
+              <Animated.Image 
+                source={{ uri: metadata.banner || metadata.poster }}
+                style={[styles.absoluteFill, parallaxImageStyle]}
+                resizeMode="cover"
               />
-            </HeroContent>
+              <LinearGradient
+                colors={[
+                  `${colors.darkBackground}00`,
+                  `${colors.darkBackground}20`,
+                  `${colors.darkBackground}50`,
+                  `${colors.darkBackground}C0`,
+                  `${colors.darkBackground}F8`,
+                  colors.darkBackground
+                ]}
+                locations={[0, 0.4, 0.65, 0.8, 0.9, 1]}
+                style={styles.heroGradient}
+              >
+                <View style={styles.heroContent}>
+                  {/* Title */}
+                  <View style={styles.logoContainer}>
+                    <Animated.View style={[styles.titleLogoContainer, logoAnimatedStyle]}>
+                      {metadata.logo ? (
+                        <Image
+                          source={{ uri: metadata.logo }}
+                          style={styles.titleLogo}
+                          contentFit="contain"
+                          transition={300}
+                        />
+                      ) : (
+                        <Text style={styles.heroTitle}>{metadata.name}</Text>
+                      )}
+                    </Animated.View>
+                  </View>
 
-            {/* Action Buttons */}
-            <ActionButtons 
-              handleShowStreams={handleShowStreams}
-              toggleLibrary={handleToggleLibrary}
-              inLibrary={inLibrary}
-              type={type as 'movie' | 'series'}
-              id={id}
-              navigation={navigation}
-              playButtonText={getPlayButtonText()}
-              animatedStyle={buttonsAnimatedStyle}
-            />
-          </HeroSection>
+                  {/* Watch Progress */}
+                  <WatchProgressDisplay 
+                    watchProgress={watchProgress}
+                    type={type as 'movie' | 'series'}
+                    getEpisodeDetails={getEpisodeDetails}
+                    animatedStyle={watchProgressAnimatedStyle}
+                  />
+
+                  {/* Genre Tags */}
+                  <Animated.View style={genresAnimatedStyle}>
+                    <View style={styles.genreContainer}>
+                      {renderGenres}
+                    </View>
+                  </Animated.View>
+
+                  {/* Action Buttons */}
+                  <ActionButtons 
+                    handleShowStreams={handleShowStreams}
+                    toggleLibrary={handleToggleLibrary}
+                    inLibrary={inLibrary}
+                    type={type as 'movie' | 'series'}
+                    id={id}
+                    navigation={navigation}
+                    playButtonText={getPlayButtonText()}
+                    animatedStyle={buttonsAnimatedStyle}
+                  />
+                </View>
+              </LinearGradient>
+            </View>
+          </Animated.View>
 
           {/* Main Content */}
           <Animated.View style={contentAnimatedStyle}>
             {/* Meta Info */}
-            <MetaInfo 
-              year={metadata.year}
-              runtime={metadata.runtime}
-              certification={metadata.certification}
-              imdbRating={metadata.imdbRating}
-            />
+            <View style={styles.metaInfo}>
+              {metadata.year && (
+                <Text style={styles.metaText}>{metadata.year}</Text>
+              )}
+              {metadata.runtime && (
+                <Text style={styles.metaText}>{metadata.runtime}</Text>
+              )}
+              {metadata.certification && (
+                <Text style={styles.metaText}>{metadata.certification}</Text>
+              )}
+              {metadata.imdbRating && (
+                <View style={styles.ratingContainer}>
+                  <Image 
+                    source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/IMDB_Logo_2016.svg/575px-IMDB_Logo_2016.svg.png' }}
+                    style={styles.imdbLogo}
+                    contentFit="contain"
+                  />
+                  <Text style={styles.ratingText}>{metadata.imdbRating}</Text>
+                </View>
+              )}
+            </View>
 
-            {/* Ratings Section */}
+            {/* Add RatingsSection right under the main metadata */}
             {imdbId && (
               <RatingsSection 
                 imdbId={imdbId}
@@ -943,14 +1259,49 @@ const MetadataScreen = () => {
             )}
 
             {/* Creator/Director Info */}
-            <CreatorInfo 
-              directors={metadata.directors}
-              creators={metadata.creators}
-            />
+            <Animated.View
+              entering={FadeIn.duration(500).delay(200)}
+              style={styles.creatorContainer}
+            >
+              {metadata.directors && metadata.directors.length > 0 && (
+                <View style={styles.creatorSection}>
+                  <Text style={styles.creatorLabel}>Director{metadata.directors.length > 1 ? 's' : ''}:</Text>
+                  <Text style={styles.creatorText}>{metadata.directors.join(', ')}</Text>
+                </View>
+              )}
+              {metadata.creators && metadata.creators.length > 0 && (
+                <View style={styles.creatorSection}>
+                  <Text style={styles.creatorLabel}>Creator{metadata.creators.length > 1 ? 's' : ''}:</Text>
+                  <Text style={styles.creatorText}>{metadata.creators.join(', ')}</Text>
+                </View>
+              )}
+            </Animated.View>
 
             {/* Description */}
             {metadata.description && (
-              <Description description={metadata.description} />
+              <Animated.View 
+                style={styles.descriptionContainer}
+                layout={Layout.duration(300).easing(Easing.inOut(Easing.ease))}
+              >
+                <TouchableOpacity 
+                  onPress={() => setIsFullDescriptionOpen(!isFullDescriptionOpen)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.description} numberOfLines={isFullDescriptionOpen ? undefined : 3}>
+                    {metadata.description}
+                  </Text>
+                  <View style={styles.showMoreButton}>
+                    <Text style={styles.showMoreText}>
+                      {isFullDescriptionOpen ? 'Show Less' : 'Show More'}
+                    </Text>
+                    <MaterialIcons 
+                      name={isFullDescriptionOpen ? "keyboard-arrow-up" : "keyboard-arrow-down"} 
+                      size={18} 
+                      color={colors.textMuted} 
+                    />
+                  </View>
+                </TouchableOpacity>
+              </Animated.View>
             )}
 
             {/* Cast Section */}
@@ -1046,6 +1397,291 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  heroSection: {
+    width: '100%',
+    height: height * 0.5,
+    backgroundColor: colors.black,
+    overflow: 'hidden',
+  },
+  absoluteFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  heroGradient: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    paddingBottom: 24,
+  },
+  heroContent: {
+    padding: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+  },
+  genreContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 16,
+    gap: 4,
+  },
+  genreText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  genreDot: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '500',
+    opacity: 0.6,
+    marginHorizontal: 4,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  titleLogoContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  titleLogo: {
+    width: width * 0.8,
+    height: 100,
+    marginBottom: 0,
+    alignSelf: 'center',
+  },
+  heroTitle: {
+    color: colors.highEmphasis,
+    fontSize: 28,
+    fontWeight: '900',
+    marginBottom: 12,
+    textShadowColor: 'rgba(0,0,0,0.75)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+    letterSpacing: -0.5,
+  },
+  metaInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  metaText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+    opacity: 0.9,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  imdbLogo: {
+    width: 35,
+    height: 18,
+    marginRight: 4,
+  },
+  ratingText: {
+    color: colors.text,
+    fontWeight: '700',
+    fontSize: 15,
+    letterSpacing: 0.3,
+  },
+  descriptionContainer: {
+    marginBottom: 16,
+    paddingHorizontal: 16,
+  },
+  description: {
+    color: colors.mediumEmphasis,
+    fontSize: 15,
+    lineHeight: 24,
+  },
+  showMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingVertical: 4,
+  },
+  showMoreText: {
+    color: colors.textMuted,
+    fontSize: 14,
+    marginRight: 4,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+    marginBottom: -12,
+    justifyContent: 'center',
+    width: '100%',
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 100,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    flex: 1,
+  },
+  playButton: {
+    backgroundColor: colors.white,
+  },
+  infoButton: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  iconButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderWidth: 2,
+    borderColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  playButtonText: {
+    color: '#000',
+    fontWeight: '600',
+    marginLeft: 8,
+    fontSize: 16,
+  },
+  infoButtonText: {
+    color: '#fff',
+    marginLeft: 8,
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  creatorContainer: {
+    marginBottom: 2,
+    paddingHorizontal: 16,
+  },
+  creatorSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    height: 20
+  },
+  creatorLabel: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '600',
+    marginRight: 8,
+    lineHeight: 20
+  },
+  creatorText: {
+    color: colors.lightGray,
+    fontSize: 14,
+    flex: 1,
+    lineHeight: 20
+  },
+  watchProgressContainer: {
+    marginTop: 6,
+    marginBottom: 8,
+    width: '100%',
+    alignItems: 'center',
+    overflow: 'hidden',
+    height: 48,
+  },
+  watchProgressBar: {
+    width: '75%',
+    height: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 1.5,
+    overflow: 'hidden',
+    marginBottom: 6
+  },
+  watchProgressFill: {
+    height: '100%',
+    backgroundColor: colors.primary,
+    borderRadius: 1.5,
+  },
+  watchProgressText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    textAlign: 'center',
+    opacity: 0.9,
+    letterSpacing: 0.2
+  },
+  floatingHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    overflow: 'hidden',
+    elevation: 4, // for Android shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  blurContainer: {
+    width: '100%',
+  },
+  floatingHeaderContent: {
+    height: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+  },
+  headerBottomBorder: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 0.5,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  headerTitleContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+  },
+  headerRightPlaceholder: {
+    width: 40, // same width as back button for symmetry
+  },
+  headerActionButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
+  },
+  floatingHeaderLogo: {
+    height: 42,
+    width: width * 0.6,
+    maxWidth: 240,
+  },
+  floatingHeaderTitle: {
+    color: colors.highEmphasis,
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
   },
 });
 

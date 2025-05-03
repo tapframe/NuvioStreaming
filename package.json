@@ -6,7 +6,8 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "postinstall": "node patch-package.js"
   },
   "dependencies": {
     "@expo/metro-runtime": "~4.0.1",
@@ -28,7 +29,7 @@
     "base64-js": "^1.5.1",
     "date-fns": "^4.1.0",
     "eventemitter3": "^5.0.1",
-    "expo": "52",
+    "expo": "~52.0.43",
     "expo-auth-session": "^6.0.3",
     "expo-blur": "^14.0.3",
     "expo-dev-client": "~5.0.20",
