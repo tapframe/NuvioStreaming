@@ -3,32 +3,95 @@ import {
   View,
   Text,
   StyleSheet,
-  Keyboard,
+  TextInput,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  useColorScheme,
   SafeAreaView,
   StatusBar,
-  ScrollView,
+  Keyboard,
   Dimensions,
+  ScrollView,
+  Animated as RNAnimated,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import debounce from 'lodash/debounce';
+import { MaterialIcons } from '@expo/vector-icons';
 import { colors } from '../styles';
 import { catalogService, StreamingContent } from '../services/catalogService';
+import { Image } from 'expo-image';
+import debounce from 'lodash/debounce';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Animated, { FadeIn, FadeOut, SlideInRight } from 'react-native-reanimated';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { logger } from '../utils/logger';
-import {
-  SearchBar,
-  SkeletonLoader,
-  RecentSearches,
-  ResultsCarousel,
-  EmptyResults
-} from '../components/search';
 
+const { width } = Dimensions.get('window');
+const HORIZONTAL_ITEM_WIDTH = width * 0.3;
+const HORIZONTAL_POSTER_HEIGHT = HORIZONTAL_ITEM_WIDTH * 1.5;
+const POSTER_WIDTH = 90;
+const POSTER_HEIGHT = 135;
 const RECENT_SEARCHES_KEY = 'recent_searches';
 const MAX_RECENT_SEARCHES = 10;
 
-const SearchScreen: React.FC = () => {
+const PLACEHOLDER_POSTER = 'https://placehold.co/300x450/222222/CCCCCC?text=No+Poster';
+
+const SkeletonLoader = () => {
+  const pulseAnim = React.useRef(new RNAnimated.Value(0)).current;
+
+  React.useEffect(() => {
+    const pulse = RNAnimated.loop(
+      RNAnimated.sequence([
+        RNAnimated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        RNAnimated.timing(pulseAnim, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [pulseAnim]);
+
+  const opacity = pulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 0.7],
+  });
+
+  const renderSkeletonItem = () => (
+    <View style={styles.skeletonVerticalItem}>
+      <RNAnimated.View style={[styles.skeletonPoster, { opacity }]} />
+      <View style={styles.skeletonItemDetails}>
+        <RNAnimated.View style={[styles.skeletonTitle, { opacity }]} />
+        <View style={styles.skeletonMetaRow}>
+          <RNAnimated.View style={[styles.skeletonMeta, { opacity }]} />
+          <RNAnimated.View style={[styles.skeletonMeta, { opacity }]} />
+        </View>
+      </View>
+    </View>
+  );
+
+  return (
+    <View style={styles.skeletonContainer}>
+      {[...Array(5)].map((_, index) => (
+        <View key={index}>
+          {index === 0 && (
+            <RNAnimated.View style={[styles.skeletonSectionHeader, { opacity }]} />
+          )}
+          {renderSkeletonItem()}
+        </View>
+      ))}
+    </View>
+  );
+};
+
+const SearchScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const isDarkMode = true;
   const [query, setQuery] = useState('');
@@ -117,13 +180,65 @@ const SearchScreen: React.FC = () => {
     loadRecentSearches();
   };
 
-  const handleRecentSearchSelect = (search: string) => {
-    setQuery(search);
-    Keyboard.dismiss();
+  const renderRecentSearches = () => {
+    if (!showRecent || recentSearches.length === 0) return null;
+
+    return (
+      <View style={styles.recentSearchesContainer}>
+        <Text style={[styles.carouselTitle, { color: isDarkMode ? colors.white : colors.black }]}>
+          Recent Searches
+        </Text>
+        {recentSearches.map((search, index) => (
+          <TouchableOpacity
+            key={index}
+            style={styles.recentSearchItem}
+            onPress={() => {
+              setQuery(search);
+              Keyboard.dismiss();
+            }}
+          >
+            <MaterialIcons
+              name="history"
+              size={20}
+              color={isDarkMode ? colors.lightGray : colors.mediumGray}
+              style={styles.recentSearchIcon}
+            />
+            <Text style={[
+              styles.recentSearchText,
+              { color: isDarkMode ? colors.white : colors.black }
+            ]}>
+              {search}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
   };
 
-  const handleItemPress = (item: StreamingContent) => {
-    navigation.navigate('Metadata', { id: item.id, type: item.type });
+  const renderHorizontalItem = ({ item }: { item: StreamingContent }) => {
+    return (
+      <TouchableOpacity
+        style={styles.horizontalItem}
+        onPress={() => {
+          navigation.navigate('Metadata', { id: item.id, type: item.type });
+        }}
+      >
+        <View style={styles.horizontalItemPosterContainer}>
+          <Image
+            source={{ uri: item.poster || PLACEHOLDER_POSTER }}
+            style={styles.horizontalItemPoster}
+            contentFit="cover"
+            transition={300}
+          />
+        </View>
+        <Text 
+          style={[styles.horizontalItemTitle, { color: isDarkMode ? colors.white : colors.black }]}
+          numberOfLines={2}
+        >
+          {item.name}
+        </Text>
+      </TouchableOpacity>
+    );
   };
   
   const movieResults = useMemo(() => {
@@ -150,17 +265,70 @@ const SearchScreen: React.FC = () => {
       
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Search</Text>
-        <SearchBar
-          query={query}
-          onChangeQuery={setQuery}
-          onClear={handleClearSearch}
-        />
+        <View style={[
+          styles.searchBar, 
+          { 
+            backgroundColor: colors.darkGray,
+            borderColor: 'transparent',
+          }
+        ]}>
+          <MaterialIcons 
+            name="search" 
+            size={24} 
+            color={colors.lightGray}
+            style={styles.searchIcon}
+          />
+          <TextInput
+            style={[
+              styles.searchInput,
+              { color: colors.white }
+            ]}
+            placeholder="Search movies, shows..."
+            placeholderTextColor={colors.lightGray}
+            value={query}
+            onChangeText={setQuery}
+            returnKeyType="search"
+            keyboardAppearance="dark"
+            autoFocus
+          />
+          {query.length > 0 && (
+            <TouchableOpacity 
+              onPress={handleClearSearch} 
+              style={styles.clearButton}
+              hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+            >
+              <MaterialIcons 
+                name="close" 
+                size={20} 
+                color={colors.lightGray}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {searching ? (
         <SkeletonLoader />
       ) : searched && !hasResultsToShow ? (
-        <EmptyResults isDarkMode={isDarkMode} />
+        <View style={styles.emptyContainer}>
+          <MaterialIcons 
+            name="search-off" 
+            size={64} 
+            color={isDarkMode ? colors.lightGray : colors.mediumGray}
+          />
+          <Text style={[
+            styles.emptyText,
+            { color: isDarkMode ? colors.white : colors.black }
+          ]}>
+            No results found
+          </Text>
+          <Text style={[
+            styles.emptySubtext,
+            { color: isDarkMode ? colors.lightGray : colors.mediumGray }
+          ]}>
+            Try different keywords or check your spelling
+          </Text>
+        </View>
       ) : (
         <ScrollView 
           style={styles.scrollView} 
@@ -168,30 +336,34 @@ const SearchScreen: React.FC = () => {
           keyboardShouldPersistTaps="handled"
           onScrollBeginDrag={Keyboard.dismiss}
         >
-          {showRecent && (
-            <RecentSearches
-              searches={recentSearches}
-              onSearchSelect={handleRecentSearchSelect}
-              isDarkMode={isDarkMode}
-            />
-          )}
+          {!query.trim() && renderRecentSearches()}
 
           {movieResults.length > 0 && (
-            <ResultsCarousel
-              title="Movies"
-              items={movieResults}
-              onItemPress={handleItemPress}
-              isDarkMode={isDarkMode}
-            />
+            <View style={styles.carouselContainer}>
+              <Text style={styles.carouselTitle}>Movies ({movieResults.length})</Text>
+              <FlatList
+                data={movieResults}
+                renderItem={renderHorizontalItem}
+                keyExtractor={item => `movie-${item.id}`}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalListContent}
+              />
+            </View>
           )}
 
           {seriesResults.length > 0 && (
-            <ResultsCarousel
-              title="TV Shows"
-              items={seriesResults}
-              onItemPress={handleItemPress}
-              isDarkMode={isDarkMode}
-            />
+            <View style={styles.carouselContainer}>
+              <Text style={styles.carouselTitle}>TV Shows ({seriesResults.length})</Text>
+              <FlatList
+                data={seriesResults}
+                renderItem={renderHorizontalItem}
+                keyExtractor={item => `series-${item.id}`}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalListContent}
+              />
+            </View>
           )}
           
         </ScrollView>
@@ -217,11 +389,151 @@ const styles = StyleSheet.create({
     color: colors.white,
     letterSpacing: 0.5,
   },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    height: 48,
+  },
+  searchIcon: {
+    marginRight: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    height: '100%',
+  },
+  clearButton: {
+    padding: 4,
+  },
   scrollView: {
     flex: 1,
   },
   scrollViewContent: {
     paddingBottom: 20,
+  },
+  carouselContainer: {
+    marginBottom: 24,
+  },
+  carouselTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.white,
+    marginBottom: 12,
+    paddingHorizontal: 16,
+  },
+  horizontalListContent: {
+    paddingHorizontal: 16,
+    paddingRight: 8,
+  },
+  horizontalItem: {
+    width: HORIZONTAL_ITEM_WIDTH,
+    marginRight: 12,
+  },
+  horizontalItemPosterContainer: {
+    width: HORIZONTAL_ITEM_WIDTH,
+    height: HORIZONTAL_POSTER_HEIGHT,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: colors.darkBackground,
+    marginBottom: 8,
+  },
+  horizontalItemPoster: {
+    width: '100%',
+    height: '100%',
+  },
+  horizontalItemTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    lineHeight: 18,
+    textAlign: 'left',
+  },
+  recentSearchesContainer: {
+    paddingHorizontal: 0,
+    paddingBottom: 16,
+  },
+  recentSearchItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  recentSearchIcon: {
+    marginRight: 12,
+  },
+  recentSearchText: {
+    fontSize: 16,
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  skeletonContainer: {
+    padding: 16,
+  },
+  skeletonVerticalItem: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  skeletonPoster: {
+    width: POSTER_WIDTH,
+    height: POSTER_HEIGHT,
+    borderRadius: 8,
+    backgroundColor: colors.darkBackground,
+  },
+  skeletonItemDetails: {
+    flex: 1,
+    marginLeft: 16,
+    justifyContent: 'center',
+  },
+  skeletonMetaRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  skeletonTitle: {
+    height: 20,
+    width: '80%',
+    marginBottom: 8,
+    backgroundColor: colors.darkBackground,
+    borderRadius: 4,
+  },
+  skeletonMeta: {
+    height: 14,
+    width: '30%',
+    backgroundColor: colors.darkBackground,
+    borderRadius: 4,
+  },
+  skeletonSectionHeader: {
+    height: 24,
+    width: '40%',
+    backgroundColor: colors.darkBackground,
+    marginBottom: 16,
+    borderRadius: 4,
   },
 });
 
