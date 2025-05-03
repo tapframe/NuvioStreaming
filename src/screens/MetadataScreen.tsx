@@ -690,10 +690,12 @@ const MetadataScreen = () => {
             if (id.startsWith('tmdb:')) {
               const tmdbId = id.split(':')[1];
               const tmdbType = type === 'series' ? 'tv' : 'movie';
-              logger.log(`[MetadataScreen] Attempting to fetch logo from TMDB for ${tmdbType} (ID: ${tmdbId})`);
+              const preferredLanguage = settings.tmdbLanguagePreference || 'en';
+              
+              logger.log(`[MetadataScreen] Attempting to fetch logo from TMDB for ${tmdbType} (ID: ${tmdbId}, preferred language: ${preferredLanguage})`);
               try {
                 const tmdbService = TMDBService.getInstance();
-                tmdbLogoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId);
+                tmdbLogoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId, preferredLanguage);
                 
                 if (tmdbLogoUrl) {
                   logger.log(`[MetadataScreen] Successfully fetched logo from TMDB: ${tmdbLogoUrl}`);
@@ -705,7 +707,8 @@ const MetadataScreen = () => {
               }
             } else if (imdbId) {
               // If we have IMDB ID but no direct TMDB ID, try to find TMDB ID
-              logger.log(`[MetadataScreen] Content has IMDB ID (${imdbId}), looking up TMDB ID for TMDB logo`);
+              const preferredLanguage = settings.tmdbLanguagePreference || 'en';
+              logger.log(`[MetadataScreen] Content has IMDB ID (${imdbId}), looking up TMDB ID for TMDB logo, preferred language: ${preferredLanguage}`);
               try {
                 const tmdbService = TMDBService.getInstance();
                 const foundTmdbId = await tmdbService.findTMDBIdByIMDB(imdbId);
@@ -714,7 +717,7 @@ const MetadataScreen = () => {
                   logger.log(`[MetadataScreen] Found TMDB ID ${foundTmdbId} for IMDB ID ${imdbId}`);
                   setFoundTmdbId(String(foundTmdbId)); // Save for banner fetching
                   
-                  tmdbLogoUrl = await tmdbService.getContentLogo(type === 'series' ? 'tv' : 'movie', foundTmdbId.toString());
+                  tmdbLogoUrl = await tmdbService.getContentLogo(type === 'series' ? 'tv' : 'movie', foundTmdbId.toString(), preferredLanguage);
                   
                   if (tmdbLogoUrl) {
                     logger.log(`[MetadataScreen] Successfully fetched logo from TMDB via IMDB lookup: ${tmdbLogoUrl}`);

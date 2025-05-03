@@ -81,10 +81,20 @@ const LogoSourceSettings = () => {
     settings.logoSourcePreference || 'metahub'
   );
   
+  // TMDB Language Preference
+  const [selectedTmdbLanguage, setSelectedTmdbLanguage] = useState<string>(
+    settings.tmdbLanguagePreference || 'en'
+  );
+  
   // Make sure logoSource stays in sync with settings
   useEffect(() => {
     setLogoSource(settings.logoSourcePreference || 'metahub');
   }, [settings.logoSourcePreference]);
+  
+  // Keep selectedTmdbLanguage in sync with settings
+  useEffect(() => {
+    setSelectedTmdbLanguage(settings.tmdbLanguagePreference || 'en');
+  }, [settings.tmdbLanguagePreference]);
   
   // Selected example show
   const [selectedShow, setSelectedShow] = useState(EXAMPLE_SHOWS[0]);
@@ -97,7 +107,6 @@ const LogoSourceSettings = () => {
   const [loadingLogos, setLoadingLogos] = useState(true);
   
   // State for TMDB language selection
-  const [selectedTmdbLanguage, setSelectedTmdbLanguage] = useState<string>('en');
   // Store unique language codes as strings
   const [uniqueTmdbLanguages, setUniqueTmdbLanguages] = useState<string[]>([]); 
   const [tmdbLogosData, setTmdbLogosData] = useState<Array<{ iso_639_1: string; file_path: string }> | null>(null);
@@ -117,7 +126,6 @@ const LogoSourceSettings = () => {
     // Reset unique languages and logos data
     setUniqueTmdbLanguages([]); 
     setTmdbLogosData(null);
-    setSelectedTmdbLanguage('en'); // Reset to default language
     
     try {
       const tmdbService = TMDBService.getInstance();
@@ -147,21 +155,31 @@ const LogoSourceSettings = () => {
             const uniqueCodes: string[] = [...new Set<string>(validLogoLanguages)];
             setUniqueTmdbLanguages(uniqueCodes);
             
-            // Find initial logo (prefer 'en')
+            // Find initial logo (prefer selectedTmdbLanguage, then 'en')
             let initialLogoPath: string | null = null;
-            let initialLanguage = 'en';
+            let initialLanguage = selectedTmdbLanguage;
             
-            const englishLogo = imagesData.logos.find((logo: { iso_639_1: string; file_path: string }) => logo.iso_639_1 === 'en');
+            // First try to find a logo in the user's preferred language
+            const preferredLogo = imagesData.logos.find((logo: { iso_639_1: string; file_path: string }) => logo.iso_639_1 === selectedTmdbLanguage);
             
-            if (englishLogo) {
-              initialLogoPath = englishLogo.file_path;
-              initialLanguage = 'en';
-              logger.log(`[LogoSourceSettings] Found initial English TMDB logo for ${show.name}`);
-            } else if (imagesData.logos[0]) {
-              // Fallback to the first available logo
-              initialLogoPath = imagesData.logos[0].file_path;
-              initialLanguage = imagesData.logos[0].iso_639_1;
-              logger.log(`[LogoSourceSettings] No English logo, using first available (${initialLanguage}) TMDB logo for ${show.name}`);
+            if (preferredLogo) {
+              initialLogoPath = preferredLogo.file_path;
+              initialLanguage = selectedTmdbLanguage;
+              logger.log(`[LogoSourceSettings] Found initial ${selectedTmdbLanguage} TMDB logo for ${show.name}`);
+            } else {
+              // Fallback to English logo
+              const englishLogo = imagesData.logos.find((logo: { iso_639_1: string; file_path: string }) => logo.iso_639_1 === 'en');
+              
+              if (englishLogo) {
+                initialLogoPath = englishLogo.file_path;
+                initialLanguage = 'en';
+                logger.log(`[LogoSourceSettings] Found initial English TMDB logo for ${show.name}`);
+              } else if (imagesData.logos[0]) {
+                // Fallback to the first available logo
+                initialLogoPath = imagesData.logos[0].file_path;
+                initialLanguage = imagesData.logos[0].iso_639_1;
+                logger.log(`[LogoSourceSettings] No English logo, using first available (${initialLanguage}) TMDB logo for ${show.name}`);
+              }
             }
             
             if (initialLogoPath) {
@@ -228,7 +246,7 @@ const LogoSourceSettings = () => {
       }
     };
 
-    // Apply setting and show confirmation
+    // Apply logo source setting and show confirmation
     const applyLogoSourceSetting = (source: 'metahub' | 'tmdb') => {
       setLogoSource(source);
       updateSetting('logoSourcePreference', source);
@@ -244,6 +262,26 @@ const LogoSourceSettings = () => {
       Alert.alert(
         'Settings Updated',
         `Logo and background source preference set to ${source === 'metahub' ? 'Metahub' : 'TMDB'}. Changes will apply when you navigate to content.`,
+        [{ text: 'OK' }]
+      );
+    };
+    
+    // Apply TMDB language setting
+    const applyTmdbLanguageSetting = (languageCode: string) => {
+      setSelectedTmdbLanguage(languageCode);
+      updateSetting('tmdbLanguagePreference', languageCode);
+      
+      // Clear any cached logo data in storage
+      try {
+        AsyncStorage.removeItem('_last_logos_');
+      } catch (e) {
+        console.error('Error clearing logo cache:', e);
+      }
+      
+      // Show confirmation toast or feedback
+      Alert.alert(
+        'TMDB Language Updated',
+        `TMDB logo language preference set to ${languageCode.toUpperCase()}. Changes will apply when you navigate to content.`,
         [{ text: 'OK' }]
       );
     };
@@ -323,7 +361,9 @@ const LogoSourceSettings = () => {
 
     // Handle TMDB language selection
     const handleTmdbLanguageSelect = (languageCode: string) => {
+      // Update local state for the example
       setSelectedTmdbLanguage(languageCode);
+      
       if (tmdbLogosData) {
         const selectedLogoData = tmdbLogosData.find(logo => logo.iso_639_1 === languageCode);
         if (selectedLogoData) {
@@ -333,6 +373,9 @@ const LogoSourceSettings = () => {
           logger.warn(`[LogoSourceSettings] Could not find logo data for selected language: ${languageCode}`);
         }
       }
+      
+      // Also update the app-wide setting
+      applyTmdbLanguageSetting(languageCode);
     };
 
     return (
@@ -447,7 +490,10 @@ const LogoSourceSettings = () => {
               {/* TMDB Language Selector */}
               {uniqueTmdbLanguages.length > 1 && (
                 <View style={styles.languageSelectorContainer}>
-                  <Text style={styles.languageSelectorLabel}>Available logo languages:</Text>
+                  <Text style={styles.languageSelectorTitle}>Logo Language</Text>
+                  <Text style={styles.languageSelectorDescription}>
+                    Select your preferred language for TMDB logos. This affects all content when TMDB is used as the logo source.
+                  </Text>
                   <ScrollView 
                     horizontal 
                     showsHorizontalScrollIndicator={false}
@@ -474,6 +520,9 @@ const LogoSourceSettings = () => {
                       </TouchableOpacity>
                     ))}
                   </ScrollView>
+                  <Text style={styles.noteText}>
+                    Note: Not all titles have logos in all languages. If a logo isn't available in your preferred language, English will be used as a fallback.
+                  </Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -633,6 +682,21 @@ const LogoSourceSettings = () => {
     },
     languageSelectorContainer: {
       marginTop: 16,
+      padding: 12,
+      backgroundColor: 'rgba(255,255,255,0.05)',
+      borderRadius: 8,
+    },
+    languageSelectorTitle: {
+      color: colors.white,
+      fontSize: 16,
+      fontWeight: '600',
+      marginBottom: 8,
+    },
+    languageSelectorDescription: {
+      color: colors.mediumEmphasis,
+      fontSize: 14,
+      lineHeight: 20,
+      marginBottom: 12,
     },
     languageSelectorLabel: {
       color: colors.mediumEmphasis,
@@ -640,7 +704,7 @@ const LogoSourceSettings = () => {
       marginBottom: 8,
     },
     languageScrollContent: {
-      paddingRight: 16, // Match container padding
+      paddingVertical: 4,
     },
     languageItem: {
       paddingHorizontal: 12,
@@ -662,6 +726,12 @@ const LogoSourceSettings = () => {
     },
     selectedLanguageItemText: {
       color: colors.white,
+    },
+    noteText: {
+      color: colors.mediumEmphasis,
+      fontSize: 12,
+      marginTop: 12,
+      fontStyle: 'italic',
     },
     bannerContainer: {
       height: 120,

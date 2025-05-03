@@ -568,14 +568,14 @@ export class TMDBService {
   /**
    * Get movie images (logos, posters, backdrops) by TMDB ID
    */
-  async getMovieImages(movieId: number | string): Promise<string | null> {
+  async getMovieImages(movieId: number | string, preferredLanguage: string = 'en'): Promise<string | null> {
     try {
-      logger.log(`[TMDBService] Fetching movie images for TMDB ID: ${movieId}`);
+      logger.log(`[TMDBService] Fetching movie images for TMDB ID: ${movieId}, preferred language: ${preferredLanguage}`);
       
       const response = await axios.get(`${BASE_URL}/movie/${movieId}/images`, {
         headers: await this.getHeaders(),
         params: await this.getParams({
-          include_image_language: 'en,null'
+          include_image_language: `${preferredLanguage},en,null`
         }),
       });
 
@@ -583,7 +583,40 @@ export class TMDBService {
       logger.log(`[TMDBService] Retrieved ${images?.logos?.length || 0} logos for movie ID ${movieId}`);
       
       if (images && images.logos && images.logos.length > 0) {
-        // First prioritize English SVG logos
+        // First prioritize preferred language SVG logos if not English
+        if (preferredLanguage !== 'en') {
+          const preferredSvgLogo = images.logos.find((logo: any) => 
+            logo.file_path && 
+            logo.file_path.endsWith('.svg') && 
+            logo.iso_639_1 === preferredLanguage
+          );
+          if (preferredSvgLogo) {
+            logger.log(`[TMDBService] Found ${preferredLanguage} SVG logo for movie ID ${movieId}: ${preferredSvgLogo.file_path}`);
+            return this.getImageUrl(preferredSvgLogo.file_path);
+          }
+
+          // Then preferred language PNG logos
+          const preferredPngLogo = images.logos.find((logo: any) => 
+            logo.file_path && 
+            logo.file_path.endsWith('.png') && 
+            logo.iso_639_1 === preferredLanguage
+          );
+          if (preferredPngLogo) {
+            logger.log(`[TMDBService] Found ${preferredLanguage} PNG logo for movie ID ${movieId}: ${preferredPngLogo.file_path}`);
+            return this.getImageUrl(preferredPngLogo.file_path);
+          }
+          
+          // Then any preferred language logo
+          const preferredLogo = images.logos.find((logo: any) => 
+            logo.iso_639_1 === preferredLanguage
+          );
+          if (preferredLogo) {
+            logger.log(`[TMDBService] Found ${preferredLanguage} logo for movie ID ${movieId}: ${preferredLogo.file_path}`);
+            return this.getImageUrl(preferredLogo.file_path);
+          }
+        }
+
+        // Then prioritize English SVG logos
         const enSvgLogo = images.logos.find((logo: any) => 
           logo.file_path && 
           logo.file_path.endsWith('.svg') && 
@@ -649,14 +682,14 @@ export class TMDBService {
   /**
    * Get TV show images (logos, posters, backdrops) by TMDB ID
    */
-  async getTvShowImages(showId: number | string): Promise<string | null> {
+  async getTvShowImages(showId: number | string, preferredLanguage: string = 'en'): Promise<string | null> {
     try {
-      logger.log(`[TMDBService] Fetching TV show images for TMDB ID: ${showId}`);
+      logger.log(`[TMDBService] Fetching TV show images for TMDB ID: ${showId}, preferred language: ${preferredLanguage}`);
       
       const response = await axios.get(`${BASE_URL}/tv/${showId}/images`, {
         headers: await this.getHeaders(),
         params: await this.getParams({
-          include_image_language: 'en,null'
+          include_image_language: `${preferredLanguage},en,null`
         }),
       });
 
@@ -664,6 +697,39 @@ export class TMDBService {
       logger.log(`[TMDBService] Retrieved ${images?.logos?.length || 0} logos for TV show ID ${showId}`);
       
       if (images && images.logos && images.logos.length > 0) {
+        // First prioritize preferred language SVG logos if not English
+        if (preferredLanguage !== 'en') {
+          const preferredSvgLogo = images.logos.find((logo: any) => 
+            logo.file_path && 
+            logo.file_path.endsWith('.svg') && 
+            logo.iso_639_1 === preferredLanguage
+          );
+          if (preferredSvgLogo) {
+            logger.log(`[TMDBService] Found ${preferredLanguage} SVG logo for TV show ID ${showId}: ${preferredSvgLogo.file_path}`);
+            return this.getImageUrl(preferredSvgLogo.file_path);
+          }
+
+          // Then preferred language PNG logos
+          const preferredPngLogo = images.logos.find((logo: any) => 
+            logo.file_path && 
+            logo.file_path.endsWith('.png') && 
+            logo.iso_639_1 === preferredLanguage
+          );
+          if (preferredPngLogo) {
+            logger.log(`[TMDBService] Found ${preferredLanguage} PNG logo for TV show ID ${showId}: ${preferredPngLogo.file_path}`);
+            return this.getImageUrl(preferredPngLogo.file_path);
+          }
+          
+          // Then any preferred language logo
+          const preferredLogo = images.logos.find((logo: any) => 
+            logo.iso_639_1 === preferredLanguage
+          );
+          if (preferredLogo) {
+            logger.log(`[TMDBService] Found ${preferredLanguage} logo for TV show ID ${showId}: ${preferredLogo.file_path}`);
+            return this.getImageUrl(preferredLogo.file_path);
+          }
+        }
+
         // First prioritize English SVG logos
         const enSvgLogo = images.logos.find((logo: any) => 
           logo.file_path && 
@@ -730,13 +796,13 @@ export class TMDBService {
   /**
    * Get content logo based on type (movie or TV show)
    */
-  async getContentLogo(type: 'movie' | 'tv', id: number | string): Promise<string | null> {
+  async getContentLogo(type: 'movie' | 'tv', id: number | string, preferredLanguage: string = 'en'): Promise<string | null> {
     try {
-      logger.log(`[TMDBService] Getting content logo for ${type} with ID ${id}`);
+      logger.log(`[TMDBService] Getting content logo for ${type} with ID ${id}, preferred language: ${preferredLanguage}`);
       
       const result = type === 'movie' 
-        ? await this.getMovieImages(id)
-        : await this.getTvShowImages(id);
+        ? await this.getMovieImages(id, preferredLanguage)
+        : await this.getTvShowImages(id, preferredLanguage);
         
       if (result) {
         logger.log(`[TMDBService] Successfully retrieved logo for ${type} ID ${id}: ${result}`);
