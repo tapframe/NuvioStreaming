@@ -12,7 +12,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { colors } from '../styles/colors';
+import { useTheme } from '../contexts/ThemeContext';
 import { useMetadata } from '../hooks/useMetadata';
 import { CastSection } from '../components/metadata/CastSection';
 import { SeriesContent } from '../components/metadata/SeriesContent';
@@ -47,6 +47,9 @@ const MetadataScreen = () => {
   
   // Add settings hook
   const { settings } = useSettings();
+
+  // Get theme context
+  const { currentTheme } = useTheme();
 
   // Get safe area insets
   const { top: safeAreaTop } = useSafeAreaInsets();
@@ -182,7 +185,9 @@ const MetadataScreen = () => {
   if (loading) {
     return (
       <SafeAreaView 
-        style={[styles.container, { backgroundColor: colors.darkBackground }]}
+        style={[styles.container, {
+          backgroundColor: currentTheme.colors.darkBackground
+        }]}
         edges={['bottom']}
       >
         <StatusBar
@@ -191,8 +196,10 @@ const MetadataScreen = () => {
           barStyle="light-content"
         />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.lightGray }]}>
+          <ActivityIndicator size="large" color={currentTheme.colors.primary} />
+          <Text style={[styles.loadingText, {
+            color: currentTheme.colors.mediumEmphasis
+          }]}>
             Loading content...
           </Text>
         </View>
@@ -203,7 +210,9 @@ const MetadataScreen = () => {
   if (metadataError || !metadata) {
     return (
       <SafeAreaView 
-        style={[styles.container, { backgroundColor: colors.darkBackground }]}
+        style={[styles.container, {
+          backgroundColor: currentTheme.colors.darkBackground
+        }]}
         edges={['bottom']}
       >
         <StatusBar
@@ -215,22 +224,24 @@ const MetadataScreen = () => {
           <MaterialIcons 
             name="error-outline" 
             size={64} 
-            color={colors.textMuted} 
+            color={currentTheme.colors.textMuted} 
           />
-          <Text style={[styles.errorText, { color: colors.text }]}>
+          <Text style={[styles.errorText, {
+            color: currentTheme.colors.highEmphasis
+          }]}>
             {metadataError || 'Content not found'}
           </Text>
           <TouchableOpacity
             style={[
               styles.retryButton,
-              { backgroundColor: colors.primary }
+              { backgroundColor: currentTheme.colors.primary }
             ]}
             onPress={loadMetadata}
           >
             <MaterialIcons 
               name="refresh" 
               size={20} 
-              color={colors.white}
+              color={currentTheme.colors.white}
               style={{ marginRight: 8 }}
             />
             <Text style={styles.retryButtonText}>Try Again</Text>
@@ -238,11 +249,11 @@ const MetadataScreen = () => {
           <TouchableOpacity
             style={[
               styles.backButton,
-              { borderColor: colors.primary }
+              { borderColor: currentTheme.colors.primary }
             ]}
             onPress={handleBack}
           >
-            <Text style={[styles.backButtonText, { color: colors.primary }]}>
+            <Text style={[styles.backButtonText, { color: currentTheme.colors.primary }]}>
               Go Back
             </Text>
           </TouchableOpacity>
@@ -253,7 +264,9 @@ const MetadataScreen = () => {
 
   return (
     <SafeAreaView 
-      style={[styles.container, { backgroundColor: colors.darkBackground }]}
+      style={[containerAnimatedStyle, styles.container, {
+        backgroundColor: currentTheme.colors.darkBackground
+      }]}
       edges={['bottom']}
     >
       <StatusBar
@@ -386,7 +399,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    textAlign: 'center',
   },
   errorContainer: {
     flex: 1,
@@ -395,11 +407,10 @@ const styles = StyleSheet.create({
     padding: 32,
   },
   errorText: {
-    fontSize: 16,
+    fontSize: 18,
     textAlign: 'center',
     marginTop: 16,
     marginBottom: 24,
-    lineHeight: 24,
   },
   retryButton: {
     flexDirection: 'row',
@@ -411,7 +422,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   retryButtonText: {
-    color: colors.white,
     fontSize: 16,
     fontWeight: '600',
   },

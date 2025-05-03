@@ -14,7 +14,7 @@ import { useNavigation, StackActions } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { StreamingContent } from '../../types/metadata';
-import { colors } from '../../styles/colors';
+import { useTheme } from '../../contexts/ThemeContext';
 import { TMDBService } from '../../services/tmdbService';
 import { catalogService } from '../../services/catalogService';
 
@@ -31,6 +31,7 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
   recommendations, 
   loadingRecommendations 
 }) => {
+  const { currentTheme } = useTheme();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
 
   const handleItemPress = async (item: StreamingContent) => {
@@ -69,11 +70,11 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
     >
       <Image
         source={{ uri: item.poster }}
-        style={styles.poster}
+        style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1 }]}
         contentFit="cover"
         transition={200}
       />
-      <Text style={styles.title} numberOfLines={2}>
+      <Text style={[styles.title, { color: currentTheme.colors.mediumEmphasis }]} numberOfLines={2}>
         {item.name}
       </Text>
     </TouchableOpacity>
@@ -82,7 +83,7 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
   if (loadingRecommendations) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="small" color={colors.primary} />
+        <ActivityIndicator size="small" color={currentTheme.colors.primary} />
       </View>
     );
   }
@@ -93,7 +94,7 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>More Like This</Text>
+      <Text style={[styles.sectionTitle, { color: currentTheme.colors.highEmphasis }]}>More Like This</Text>
       <FlatList
         data={recommendations}
         renderItem={renderItem}
@@ -115,7 +116,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: colors.highEmphasis,
     marginBottom: 12,
     marginTop: 8,
     paddingHorizontal: 16,
@@ -132,12 +132,10 @@ const styles = StyleSheet.create({
     width: POSTER_WIDTH,
     height: POSTER_HEIGHT,
     borderRadius: 8,
-    backgroundColor: colors.elevation1,
     marginBottom: 8,
   },
   title: {
     fontSize: 13,
-    color: colors.mediumEmphasis,
     fontWeight: '500',
     lineHeight: 18,
   },

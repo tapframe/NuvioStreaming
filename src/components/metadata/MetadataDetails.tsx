@@ -12,7 +12,7 @@ import Animated, {
   Easing,
   FadeIn,
 } from 'react-native-reanimated';
-import { colors } from '../../styles/colors';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface MetadataDetailsProps {
   metadata: any;
@@ -25,6 +25,7 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
   imdbId,
   type,
 }) => {
+  const { currentTheme } = useTheme();
   const [isFullDescriptionOpen, setIsFullDescriptionOpen] = useState(false);
 
   return (
@@ -32,13 +33,13 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
       {/* Meta Info */}
       <View style={styles.metaInfo}>
         {metadata.year && (
-          <Text style={styles.metaText}>{metadata.year}</Text>
+          <Text style={[styles.metaText, { color: currentTheme.colors.text }]}>{metadata.year}</Text>
         )}
         {metadata.runtime && (
-          <Text style={styles.metaText}>{metadata.runtime}</Text>
+          <Text style={[styles.metaText, { color: currentTheme.colors.text }]}>{metadata.runtime}</Text>
         )}
         {metadata.certification && (
-          <Text style={styles.metaText}>{metadata.certification}</Text>
+          <Text style={[styles.metaText, { color: currentTheme.colors.text }]}>{metadata.certification}</Text>
         )}
         {metadata.imdbRating && (
           <View style={styles.ratingContainer}>
@@ -47,7 +48,7 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
               style={styles.imdbLogo}
               contentFit="contain"
             />
-            <Text style={styles.ratingText}>{metadata.imdbRating}</Text>
+            <Text style={[styles.ratingText, { color: currentTheme.colors.text }]}>{metadata.imdbRating}</Text>
           </View>
         )}
       </View>
@@ -59,14 +60,14 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
       >
         {metadata.directors && metadata.directors.length > 0 && (
           <View style={styles.creatorSection}>
-            <Text style={styles.creatorLabel}>Director{metadata.directors.length > 1 ? 's' : ''}:</Text>
-            <Text style={styles.creatorText}>{metadata.directors.join(', ')}</Text>
+            <Text style={[styles.creatorLabel, { color: currentTheme.colors.white }]}>Director{metadata.directors.length > 1 ? 's' : ''}:</Text>
+            <Text style={[styles.creatorText, { color: currentTheme.colors.mediumEmphasis }]}>{metadata.directors.join(', ')}</Text>
           </View>
         )}
         {metadata.creators && metadata.creators.length > 0 && (
           <View style={styles.creatorSection}>
-            <Text style={styles.creatorLabel}>Creator{metadata.creators.length > 1 ? 's' : ''}:</Text>
-            <Text style={styles.creatorText}>{metadata.creators.join(', ')}</Text>
+            <Text style={[styles.creatorLabel, { color: currentTheme.colors.white }]}>Creator{metadata.creators.length > 1 ? 's' : ''}:</Text>
+            <Text style={[styles.creatorText, { color: currentTheme.colors.mediumEmphasis }]}>{metadata.creators.join(', ')}</Text>
           </View>
         )}
       </Animated.View>
@@ -81,17 +82,17 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
             onPress={() => setIsFullDescriptionOpen(!isFullDescriptionOpen)}
             activeOpacity={0.7}
           >
-            <Text style={styles.description} numberOfLines={isFullDescriptionOpen ? undefined : 3}>
+            <Text style={[styles.description, { color: currentTheme.colors.mediumEmphasis }]} numberOfLines={isFullDescriptionOpen ? undefined : 3}>
               {metadata.description}
             </Text>
             <View style={styles.showMoreButton}>
-              <Text style={styles.showMoreText}>
+              <Text style={[styles.showMoreText, { color: currentTheme.colors.textMuted }]}>
                 {isFullDescriptionOpen ? 'Show Less' : 'Show More'}
               </Text>
               <MaterialIcons 
                 name={isFullDescriptionOpen ? "keyboard-arrow-up" : "keyboard-arrow-down"} 
                 size={18} 
-                color={colors.textMuted} 
+                color={currentTheme.colors.textMuted} 
               />
             </View>
           </TouchableOpacity>
@@ -110,7 +111,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   metaText: {
-    color: colors.text,
     fontSize: 15,
     fontWeight: '700',
     letterSpacing: 0.3,
@@ -127,7 +127,6 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   ratingText: {
-    color: colors.text,
     fontWeight: '700',
     fontSize: 15,
     letterSpacing: 0.3,
@@ -143,14 +142,12 @@ const styles = StyleSheet.create({
     height: 20
   },
   creatorLabel: {
-    color: colors.white,
     fontSize: 14,
     fontWeight: '600',
     marginRight: 8,
     lineHeight: 20
   },
   creatorText: {
-    color: colors.lightGray,
     fontSize: 14,
     flex: 1,
     lineHeight: 20
@@ -160,7 +157,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   description: {
-    color: colors.mediumEmphasis,
     fontSize: 15,
     lineHeight: 24,
   },
@@ -171,7 +167,6 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   showMoreText: {
-    color: colors.textMuted,
     fontSize: 14,
     marginRight: 4,
   },

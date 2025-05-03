@@ -16,7 +16,7 @@ import Animated, {
   interpolate,
   Extrapolate,
 } from 'react-native-reanimated';
-import { colors } from '../../styles/colors';
+import { useTheme } from '../../contexts/ThemeContext';
 import { logger } from '../../utils/logger';
 
 const { width } = Dimensions.get('window');
@@ -46,6 +46,8 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
   safeAreaTop,
   setLogoLoadError,
 }) => {
+  const { currentTheme } = useTheme();
+  
   // Animated styles for the header
   const headerAnimatedStyle = useAnimatedStyle(() => ({
     opacity: headerOpacity.value,
@@ -74,7 +76,11 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
               onPress={handleBack}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <MaterialIcons name="arrow-back" size={24} color={colors.highEmphasis} />
+              <MaterialIcons 
+                name="arrow-back" 
+                size={24} 
+                color={currentTheme.colors.highEmphasis}
+              />
             </TouchableOpacity>
             
             <View style={styles.headerTitleContainer}>
@@ -90,7 +96,7 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
                   }}
                 />
               ) : (
-                <Text style={styles.floatingHeaderTitle} numberOfLines={1}>{metadata.name}</Text>
+                <Text style={[styles.floatingHeaderTitle, { color: currentTheme.colors.highEmphasis }]} numberOfLines={1}>{metadata.name}</Text>
               )}
             </View>
             
@@ -102,7 +108,7 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
               <MaterialIcons 
                 name={inLibrary ? 'bookmark' : 'bookmark-border'} 
                 size={22} 
-                color={colors.highEmphasis} 
+                color={currentTheme.colors.highEmphasis}
               />
             </TouchableOpacity>
           </Animated.View>
@@ -121,7 +127,11 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
               onPress={handleBack}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <MaterialIcons name="arrow-back" size={24} color={colors.highEmphasis} />
+              <MaterialIcons 
+                name="arrow-back" 
+                size={24} 
+                color={currentTheme.colors.highEmphasis}
+              />
             </TouchableOpacity>
             
             <View style={styles.headerTitleContainer}>
@@ -137,7 +147,7 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
                   }}
                 />
               ) : (
-                <Text style={styles.floatingHeaderTitle} numberOfLines={1}>{metadata.name}</Text>
+                <Text style={[styles.floatingHeaderTitle, { color: currentTheme.colors.highEmphasis }]} numberOfLines={1}>{metadata.name}</Text>
               )}
             </View>
             
@@ -149,13 +159,13 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
               <MaterialIcons 
                 name={inLibrary ? 'bookmark' : 'bookmark-border'} 
                 size={22} 
-                color={colors.highEmphasis} 
+                color={currentTheme.colors.highEmphasis}
               />
             </TouchableOpacity>
           </Animated.View>
         </View>
       )}
-      {Platform.OS === 'ios' && <View style={styles.headerBottomBorder} />}
+      {Platform.OS === 'ios' && <View style={[styles.headerBottomBorder, { backgroundColor: 'rgba(255,255,255,0.15)' }]} />}
     </Animated.View>
   );
 };
@@ -190,7 +200,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 0.5,
-    backgroundColor: 'rgba(255,255,255,0.15)',
   },
   headerTitleContainer: {
     flex: 1,
@@ -218,7 +227,6 @@ const styles = StyleSheet.create({
     maxWidth: 240,
   },
   floatingHeaderTitle: {
-    color: colors.highEmphasis,
     fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',

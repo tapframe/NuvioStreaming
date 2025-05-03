@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Image, Animated } from 'react-native';
-import { colors } from '../../styles/colors';
+import { useTheme } from '../../contexts/ThemeContext';
 import { useMDBListRatings } from '../../hooks/useMDBListRatings';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isMDBListEnabled, RATING_PROVIDERS_STORAGE_KEY } from '../../screens/MDBListSettingsScreen';
@@ -54,6 +54,7 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
   const [enabledProviders, setEnabledProviders] = useState<Record<string, boolean>>({});
   const [isMDBEnabled, setIsMDBEnabled] = useState(true);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const { currentTheme } = useTheme();
 
   useEffect(() => {
     loadProviderSettings();
@@ -120,7 +121,7 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="small" color={colors.primary} />
+        <ActivityIndicator size="small" color={currentTheme.colors.primary} />
       </View>
     );
   }
@@ -214,86 +215,128 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
         },
       ]}
     >
-      {displayRatings.map(([source, value]) => {
-        const config = ratingConfig[source as keyof typeof ratingConfig];
-        const numericValue = typeof value === 'string' ? parseFloat(value) : value;
-        const displayValue = config.transform(numericValue);
-        
-        // Get a short display name for the rating source
-        const getSourceLabel = (src: string): string => {
-          switch(src) {
-            case 'imdb': return 'IMDb';
-            case 'tmdb': return 'TMDB';
-            case 'tomatoes': return 'RT';
-            case 'audience': return 'Aud';
-            case 'metacritic': return 'Meta';
-            case 'letterboxd': return 'LBXD';
-            case 'trakt': return 'Trakt';
-            default: return src;
-          }
-        };
-        
-        return (
-          <View key={source} style={styles.ratingItem}>
-            {config.isImage ? (
-              <Image 
-                source={config.icon} 
-                style={styles.ratingIcon} 
-                resizeMode="contain"
-              />
-            ) : (
-              <config.icon 
-                width={16} 
-                height={16} 
-                style={styles.ratingIcon}
-              />
-            )}
-            <Text style={[styles.ratingValue, {color: config.color}]}>
-              {displayValue}{config.suffix}
-            </Text>
-          </View>
-        );
-      })}
+      <View style={styles.header}>
+        <Text style={[styles.title, { color: currentTheme.colors.highEmphasis }]}>Ratings</Text>
+      </View>
+      <View style={styles.ratingsContainer}>
+        {displayRatings.map(([source, value]) => {
+          const config = ratingConfig[source as keyof typeof ratingConfig];
+          const displayValue = config.transform(parseFloat(value as string));
+          
+          // Get a short display name for the rating source
+          const getSourceLabel = (src: string): string => {
+            switch(src) {
+              case 'imdb': return 'IMDb';
+              case 'tmdb': return 'TMDB';
+              case 'tomatoes': return 'RT';
+              case 'audience': return 'Aud';
+              case 'metacritic': return 'Meta';
+              case 'letterboxd': return 'LBXD';
+              case 'trakt': return 'Trakt';
+              default: return src;
+            }
+          };
+          
+          return (
+            <View key={source} style={styles.ratingItem}>
+              <View style={styles.ratingIconContainer}>
+                {config.isImage ? (
+                  <Image 
+                    source={config.icon as any}
+                    style={styles.ratingIconImage}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <View style={styles.svgContainer}>
+                    {React.createElement(config.icon as any, {
+                      width: 24,
+                      height: 24,
+                    })}
+                  </View>
+                )}
+              </View>
+              <Text 
+                style={[
+                  styles.ratingValue,
+                  { color: config.color }
+                ]}
+              >
+                {config.prefix}{displayValue}{config.suffix}
+              </Text>
+              <Text style={[styles.ratingSource, { color: currentTheme.colors.mediumEmphasis }]}>{getSourceLabel(source)}</Text>
+            </View>
+          );
+        })}
+      </View>
     </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-    marginBottom: 16,
-    paddingHorizontal: 12,
-    gap: 4,
+    marginBottom: 20,
+    paddingHorizontal: 16,
   },
   loadingContainer: {
-    alignItems: 'center',
+    height: 80,
     justifyContent: 'center',
-    height: 40,
-    marginVertical: 16,
+    alignItems: 'center',
   },
-  ratingItem: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    paddingVertical: 3,
-    paddingHorizontal: 4,
-    borderRadius: 4,
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
-  ratingIcon: {
-    width: 16,
-    height: 16,
-    marginRight: 3,
-    alignSelf: 'center',
+  title: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  ratingsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  ratingItem: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    width: 55,
+  },
+  ratingIconContainer: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  ratingIconImage: {
+    width: 32,
+    height: 32,
+  },
+  svgContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   ratingValue: {
-    fontSize: 13,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '700',
+    marginVertical: 2,
   },
-  ratingLabel: {
+  ratingSource: {
     fontSize: 11,
-    opacity: 0.9,
+    textAlign: 'center',
+  },
+  noRatingsText: {
+    fontSize: 14,
+    color: 'gray',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginVertical: 16,
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#ff0000',
+    textAlign: 'center',
+    marginVertical: 8,
   },
 }); 

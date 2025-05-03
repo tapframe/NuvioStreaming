@@ -14,7 +14,7 @@ import Animated, {
   interpolate,
   Extrapolate,
 } from 'react-native-reanimated';
-import { colors } from '../../styles/colors';
+import { useTheme } from '../../contexts/ThemeContext';
 import { logger } from '../../utils/logger';
 import { TMDBService } from '../../services/tmdbService';
 
@@ -77,6 +77,7 @@ const ActionButtons = React.memo(({
   playButtonText: string;
   animatedStyle: any;
 }) => {
+  const { currentTheme } = useTheme();
   return (
     <Animated.View style={[styles.actionButtons, animatedStyle]}>
       <TouchableOpacity
@@ -100,7 +101,7 @@ const ActionButtons = React.memo(({
         <MaterialIcons
           name={inLibrary ? 'bookmark' : 'bookmark-border'}
           size={24}
-          color="#fff"
+          color={currentTheme.colors.white}
         />
         <Text style={styles.infoButtonText}>
           {inLibrary ? 'Saved' : 'Save'}
@@ -155,7 +156,11 @@ const ActionButtons = React.memo(({
             }
           }}
         >
-          <MaterialIcons name="assessment" size={24} color="#fff" />
+          <MaterialIcons 
+            name="assessment" 
+            size={24} 
+            color={currentTheme.colors.white}
+          />
         </TouchableOpacity>
       )}
     </Animated.View>
@@ -174,6 +179,7 @@ const WatchProgressDisplay = React.memo(({
   getEpisodeDetails: (episodeId: string) => { seasonNumber: string; episodeNumber: string; episodeName: string } | null;
   animatedStyle: any;
 }) => {
+  const { currentTheme } = useTheme();
   if (!watchProgress || watchProgress.duration === 0) {
     return null;
   }
@@ -195,11 +201,14 @@ const WatchProgressDisplay = React.memo(({
         <View 
           style={[
             styles.watchProgressFill, 
-            { width: `${progressPercent}%` }
+            { 
+              width: `${progressPercent}%`,
+              backgroundColor: currentTheme.colors.primary 
+            }
           ]} 
         />
       </View>
-      <Text style={styles.watchProgressText}>
+      <Text style={[styles.watchProgressText, { color: currentTheme.colors.textMuted }]}>
         {progressPercent >= 95 ? 'Watched' : `${Math.round(progressPercent)}% watched`}{episodeInfo} • Last watched on {formattedTime}
       </Text>
     </Animated.View>
@@ -236,11 +245,12 @@ const HeroSection: React.FC<HeroSectionProps> = ({
   setBannerImage,
   setLogoLoadError,
 }) => {
+  const { currentTheme } = useTheme();
   // Animated styles
   const heroAnimatedStyle = useAnimatedStyle(() => ({
     width: '100%',
     height: heroHeight.value,
-    backgroundColor: colors.black,
+    backgroundColor: currentTheme.colors.black,
     transform: [{ scale: heroScale.value }],
     opacity: heroOpacity.value,
   }));
@@ -309,9 +319,13 @@ const HeroSection: React.FC<HeroSectionProps> = ({
 
     return genresToDisplay.slice(0, 4).map((genreName, index, array) => (
       <React.Fragment key={index}>
-        <Text style={styles.genreText}>{genreName}</Text>
+        <Text style={[styles.genreText, { color: currentTheme.colors.text }]}>
+          {genreName}
+        </Text>
         {index < array.length - 1 && (
-          <Text style={styles.genreDot}>•</Text>
+          <Text style={[styles.genreDot, { color: currentTheme.colors.text, opacity: 0.6 }]}>
+            •
+          </Text>
         )}
       </React.Fragment>
     ));
@@ -321,7 +335,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
     <Animated.View style={heroAnimatedStyle}>
       <View style={styles.heroSection}>
         {loadingBanner ? (
-          <View style={[styles.absoluteFill, { backgroundColor: colors.black }]} />
+          <View style={[styles.absoluteFill, { backgroundColor: currentTheme.colors.black }]} />
         ) : (
           <Animated.Image 
             source={{ uri: bannerImage || metadata.banner || metadata.poster }}
@@ -337,12 +351,12 @@ const HeroSection: React.FC<HeroSectionProps> = ({
         )}
         <LinearGradient
           colors={[
-            `${colors.darkBackground}00`,
-            `${colors.darkBackground}20`,
-            `${colors.darkBackground}50`,
-            `${colors.darkBackground}C0`,
-            `${colors.darkBackground}F8`,
-            colors.darkBackground
+            `${currentTheme.colors.darkBackground}00`,
+            `${currentTheme.colors.darkBackground}20`,
+            `${currentTheme.colors.darkBackground}50`,
+            `${currentTheme.colors.darkBackground}C0`,
+            `${currentTheme.colors.darkBackground}F8`,
+            currentTheme.colors.darkBackground
           ]}
           locations={[0, 0.4, 0.65, 0.8, 0.9, 1]}
           style={styles.heroGradient}
@@ -363,7 +377,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
                     }}
                   />
                 ) : (
-                  <Text style={styles.heroTitle}>{metadata.name}</Text>
+                  <Text style={[styles.heroTitle, { color: currentTheme.colors.highEmphasis }]}>{metadata.name}</Text>
                 )}
               </Animated.View>
             </View>
@@ -405,7 +419,7 @@ const styles = StyleSheet.create({
   heroSection: {
     width: '100%',
     height: height * 0.5,
-    backgroundColor: colors.black,
+    backgroundColor: '#000',
     overflow: 'hidden',
   },
   absoluteFill: {
@@ -442,7 +456,6 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   heroTitle: {
-    color: colors.highEmphasis,
     fontSize: 28,
     fontWeight: '900',
     marginBottom: 12,
@@ -461,15 +474,12 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   genreText: {
-    color: colors.text,
     fontSize: 12,
     fontWeight: '500',
   },
   genreDot: {
-    color: colors.text,
     fontSize: 12,
     fontWeight: '500',
-    opacity: 0.6,
     marginHorizontal: 4,
   },
   actionButtons: {
@@ -494,7 +504,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   playButton: {
-    backgroundColor: colors.white,
+    backgroundColor: '#fff',
   },
   infoButton: {
     backgroundColor: 'rgba(255,255,255,0.2)',
@@ -546,11 +556,9 @@ const styles = StyleSheet.create({
   },
   watchProgressFill: {
     height: '100%',
-    backgroundColor: colors.primary,
     borderRadius: 1.5,
   },
   watchProgressText: {
-    color: colors.textMuted,
     fontSize: 12,
     textAlign: 'center',
     opacity: 0.9,
