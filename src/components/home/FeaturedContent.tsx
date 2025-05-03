@@ -8,8 +8,7 @@ import {
   Dimensions,
   ViewStyle,
   TextStyle,
-  ImageStyle,
-  ActivityIndicator
+  ImageStyle
 } from 'react-native';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
@@ -284,12 +283,6 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
           </LinearGradient>
         </ImageBackground>
       </Animated.View>
-      
-      {!posterLoaded && (
-        <View style={styles.backgroundFallback}>
-          <ActivityIndicator color={colors.primary} size="large" />
-        </View>
-      )}
     </TouchableOpacity>
   );
 };
