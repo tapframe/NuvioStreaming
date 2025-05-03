@@ -460,7 +460,7 @@ const LogoSourceSettings = () => {
         <StatusBar barStyle="light-content" />
         
         {/* Header */}
-        <View style={[styles.header, { paddingTop: Platform.OS === 'android' ? insets.top : 0 }]}>
+        <View style={styles.header}>
           <TouchableOpacity 
             onPress={handleBack}
             style={styles.backButton}
@@ -469,11 +469,11 @@ const LogoSourceSettings = () => {
             <MaterialIcons name="arrow-back" size={24} color={colors.white} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Logo Source</Text>
-          <View style={styles.headerRight} />
         </View>
         
         <ScrollView 
           style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={true}
           scrollEventThrottle={32}
           decelerationRate="normal"
@@ -638,46 +638,46 @@ const LogoSourceSettings = () => {
     header: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: 12,
-      height: 48,
-      backgroundColor: colors.elevation2,
+      paddingHorizontal: 16,
+      paddingVertical: 16,
+      paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 16 : 16,
+      backgroundColor: colors.darkBackground,
     },
     backButton: {
-      width: 36,
-      height: 36,
-      alignItems: 'center',
-      justifyContent: 'center',
+      padding: 4,
     },
     headerTitle: {
-      color: colors.white,
-      fontSize: 18,
+      fontSize: 22,
       fontWeight: '600',
+      marginLeft: 16,
+      color: colors.white,
     },
     headerRight: {
-      width: 36,
+      width: 24,
     },
     scrollView: {
       flex: 1,
     },
+    scrollContent: {
+      paddingHorizontal: 16,
+      paddingBottom: 24,
+    },
     descriptionContainer: {
-      padding: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: 'rgba(255,255,255,0.1)',
+      marginBottom: 16,
     },
     description: {
-      color: colors.text,
-      fontSize: 14,
-      lineHeight: 20,
+      color: colors.mediumEmphasis,
+      fontSize: 15,
+      lineHeight: 22,
     },
     showSelectorContainer: {
-      padding: 12,
-      paddingBottom: 6,
+      marginBottom: 16,
     },
     selectorLabel: {
-      color: colors.text,
-      fontSize: 14,
-      marginBottom: 8,
+      color: colors.highEmphasis,
+      fontSize: 16,
+      fontWeight: '500',
+      marginBottom: 12,
     },
     showsScrollContent: {
       paddingRight: 16,
@@ -714,8 +714,8 @@ const LogoSourceSettings = () => {
       fontWeight: '600',
     },
     optionsContainer: {
-      padding: 10,
-      gap: 10,
+      marginBottom: 16,
+      gap: 12,
     },
     optionCard: {
       backgroundColor: colors.elevation2,
@@ -772,10 +772,10 @@ const LogoSourceSettings = () => {
       alignItems: 'center',
     },
     infoBox: {
-      margin: 10,
-      padding: 10,
+      marginBottom: 16,
+      padding: 12,
       backgroundColor: 'rgba(255,255,255,0.05)',
-      borderRadius: 6,
+      borderRadius: 8,
       borderLeftWidth: 3,
       borderLeftColor: colors.primary,
     },
