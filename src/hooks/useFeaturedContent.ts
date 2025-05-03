@@ -6,11 +6,22 @@ import * as Haptics from 'expo-haptics';
 import { useGenres } from '../contexts/GenreContext';
 import { useSettings, settingsEmitter } from './useSettings';
 
+// Create a persistent store outside of the hook to maintain state between navigation
+const persistentStore = {
+  featuredContent: null as StreamingContent | null,
+  allFeaturedContent: [] as StreamingContent[],
+  lastFetchTime: 0,
+  isFirstLoad: true
+};
+
+// Cache timeout in milliseconds (e.g., 5 minutes)
+const CACHE_TIMEOUT = 5 * 60 * 1000;
+
 export function useFeaturedContent() {
-  const [featuredContent, setFeaturedContent] = useState<StreamingContent | null>(null);
-  const [allFeaturedContent, setAllFeaturedContent] = useState<StreamingContent[]>([]);
+  const [featuredContent, setFeaturedContent] = useState<StreamingContent | null>(persistentStore.featuredContent);
+  const [allFeaturedContent, setAllFeaturedContent] = useState<StreamingContent[]>(persistentStore.allFeaturedContent);
   const [isSaved, setIsSaved] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(persistentStore.isFirstLoad);
   const currentIndexRef = useRef(0);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { settings } = useSettings();
@@ -32,7 +43,23 @@ export function useFeaturedContent() {
     }
   }, []);
 
-  const loadFeaturedContent = useCallback(async () => {
+  const loadFeaturedContent = useCallback(async (forceRefresh = false) => {
+    // Check if we should use cached data
+    const now = Date.now();
+    const cacheAge = now - persistentStore.lastFetchTime;
+    
+    if (!forceRefresh && 
+        persistentStore.featuredContent && 
+        persistentStore.allFeaturedContent.length > 0 && 
+        cacheAge < CACHE_TIMEOUT) {
+      // Use cached data
+      setFeaturedContent(persistentStore.featuredContent);
+      setAllFeaturedContent(persistentStore.allFeaturedContent);
+      setLoading(false);
+      persistentStore.isFirstLoad = false;
+      return;
+    }
+
     setLoading(true);
     cleanup();
     abortControllerRef.current = new AbortController();
@@ -101,12 +128,9 @@ export function useFeaturedContent() {
         const filteredCatalogs = selectedCatalogs && selectedCatalogs.length > 0 
           ? catalogs.filter(catalog => {
               const catalogId = `${catalog.addon}:${catalog.type}:${catalog.id}`;
-              console.log(`Checking catalog: ${catalogId}, selected: ${selectedCatalogs.includes(catalogId)}`);
               return selectedCatalogs.includes(catalogId);
             })
           : catalogs; // Use all catalogs if none specifically selected
-
-        console.log(`Original catalogs: ${catalogs.length}, Filtered catalogs: ${filteredCatalogs.length}`);
 
         // Flatten all catalog items into a single array, filter out items without posters
         const allItems = filteredCatalogs.flatMap(catalog => catalog.items)
@@ -122,16 +146,23 @@ export function useFeaturedContent() {
 
       if (signal.aborted) return;
 
+      // Update persistent store with the new data
+      persistentStore.allFeaturedContent = formattedContent;
+      persistentStore.lastFetchTime = now;
+      persistentStore.isFirstLoad = false;
+      
       setAllFeaturedContent(formattedContent);
       
       if (formattedContent.length > 0) {
+        persistentStore.featuredContent = formattedContent[0];
         setFeaturedContent(formattedContent[0]); 
         currentIndexRef.current = 0;
       } else {
+        persistentStore.featuredContent = null;
         setFeaturedContent(null);
       }
     } catch (error) {
-       if (signal.aborted) {
+      if (signal.aborted) {
         logger.info('Featured content fetch aborted');
       } else {
         logger.error('Failed to load featured content:', error);
@@ -147,12 +178,17 @@ export function useFeaturedContent() {
 
   // Load featured content initially and when content source changes
   useEffect(() => {
-    // Force a full refresh to get updated logos
-    if (contentSource === 'tmdb') {
+    const shouldForceRefresh = contentSource === 'tmdb' && 
+                               contentSource !== persistentStore.featuredContent?.type;
+    
+    if (shouldForceRefresh) {
       setAllFeaturedContent([]);
       setFeaturedContent(null);
+      persistentStore.allFeaturedContent = [];
+      persistentStore.featuredContent = null;
     }
-    loadFeaturedContent();
+    
+    loadFeaturedContent(shouldForceRefresh);
   }, [loadFeaturedContent, contentSource, selectedCatalogs]);
 
   useEffect(() => {
@@ -184,7 +220,10 @@ export function useFeaturedContent() {
     const rotateContent = () => {
       currentIndexRef.current = (currentIndexRef.current + 1) % allFeaturedContent.length;
       if (allFeaturedContent[currentIndexRef.current]) {
-        setFeaturedContent(allFeaturedContent[currentIndexRef.current]);
+        const newContent = allFeaturedContent[currentIndexRef.current];
+        setFeaturedContent(newContent);
+        // Also update the persistent store
+        persistentStore.featuredContent = newContent;
       }
     };
 
@@ -217,11 +256,14 @@ export function useFeaturedContent() {
     }
   }, [featuredContent, isSaved]);
 
+  // Function to force a refresh if needed
+  const refreshFeatured = useCallback(() => loadFeaturedContent(true), [loadFeaturedContent]);
+
   return { 
     featuredContent, 
     loading, 
     isSaved, 
     handleSaveToLibrary, 
-    refreshFeatured: loadFeaturedContent 
+    refreshFeatured
   };
 } 
