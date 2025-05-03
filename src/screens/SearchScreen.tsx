@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,9 @@ import {
   Dimensions,
   ScrollView,
   Animated as RNAnimated,
+  Pressable,
+  Platform,
+  Easing,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -23,9 +26,22 @@ import { catalogService, StreamingContent } from '../services/catalogService';
 import { Image } from 'expo-image';
 import debounce from 'lodash/debounce';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Animated, { FadeIn, FadeOut, SlideInRight } from 'react-native-reanimated';
+import Animated, { 
+  FadeIn, 
+  FadeOut, 
+  SlideInRight, 
+  useAnimatedStyle, 
+  useSharedValue, 
+  withTiming,
+  interpolate,
+  withSpring,
+  withDelay,
+  ZoomIn
+} from 'react-native-reanimated';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { logger } from '../utils/logger';
+import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 const HORIZONTAL_ITEM_WIDTH = width * 0.3;
@@ -36,6 +52,8 @@ const RECENT_SEARCHES_KEY = 'recent_searches';
 const MAX_RECENT_SEARCHES = 10;
 
 const PLACEHOLDER_POSTER = 'https://placehold.co/300x450/222222/CCCCCC?text=No+Poster';
+
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 const SkeletonLoader = () => {
   const pulseAnim = React.useRef(new RNAnimated.Value(0)).current;
@@ -91,6 +109,72 @@ const SkeletonLoader = () => {
   );
 };
 
+const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
+
+// Create a simple, elegant animation component
+const SimpleSearchAnimation = () => {
+  // Simple animation values that work reliably
+  const spinAnim = React.useRef(new RNAnimated.Value(0)).current;
+  const fadeAnim = React.useRef(new RNAnimated.Value(0)).current;
+  
+  React.useEffect(() => {
+    // Rotation animation
+    const spin = RNAnimated.loop(
+      RNAnimated.timing(spinAnim, {
+        toValue: 1,
+        duration: 1500,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    
+    // Fade animation
+    const fade = RNAnimated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    });
+    
+    // Start animations
+    spin.start();
+    fade.start();
+    
+    // Clean up
+    return () => {
+      spin.stop();
+    };
+  }, [spinAnim, fadeAnim]);
+  
+  // Simple rotation interpolation
+  const spin = spinAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+  
+  return (
+    <RNAnimated.View 
+      style={[
+        styles.simpleAnimationContainer,
+        { opacity: fadeAnim }
+      ]}
+    >
+      <View style={styles.simpleAnimationContent}>
+        <RNAnimated.View style={[
+          styles.spinnerContainer,
+          { transform: [{ rotate: spin }] }
+        ]}>
+          <MaterialIcons 
+            name="search" 
+            size={32} 
+            color={colors.white} 
+          />
+        </RNAnimated.View>
+        <Text style={styles.simpleAnimationText}>Searching</Text>
+      </View>
+    </RNAnimated.View>
+  );
+};
+
 const SearchScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const isDarkMode = true;
@@ -100,6 +184,30 @@ const SearchScreen = () => {
   const [searched, setSearched] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [showRecent, setShowRecent] = useState(true);
+  const inputRef = useRef<TextInput>(null);
+  const insets = useSafeAreaInsets();
+  
+  // Animation values
+  const searchBarWidth = useSharedValue(width - 32);
+  const searchBarOpacity = useSharedValue(1);
+  const backButtonOpacity = useSharedValue(0);
+
+  // Force consistent status bar settings
+  useEffect(() => {
+    const applyStatusBarConfig = () => {
+      StatusBar.setBarStyle('light-content');
+      if (Platform.OS === 'android') {
+        StatusBar.setTranslucent(true);
+        StatusBar.setBackgroundColor('transparent');
+      }
+    };
+    
+    applyStatusBarConfig();
+    
+    // Re-apply on focus
+    const unsubscribe = navigation.addListener('focus', applyStatusBarConfig);
+    return unsubscribe;
+  }, [navigation]);
 
   React.useLayoutEffect(() => {
     navigation.setOptions({
@@ -110,6 +218,55 @@ const SearchScreen = () => {
   useEffect(() => {
     loadRecentSearches();
   }, []);
+
+  const animatedSearchBarStyle = useAnimatedStyle(() => {
+    return {
+      width: searchBarWidth.value,
+      opacity: searchBarOpacity.value,
+    };
+  });
+
+  const animatedBackButtonStyle = useAnimatedStyle(() => {
+    return {
+      opacity: backButtonOpacity.value,
+      transform: [
+        { 
+          translateX: interpolate(
+            backButtonOpacity.value,
+            [0, 1],
+            [-20, 0]
+          ) 
+        }
+      ]
+    };
+  });
+
+  const handleSearchFocus = () => {
+    // Animate search bar when focused
+    searchBarWidth.value = withTiming(width - 80);
+    backButtonOpacity.value = withTiming(1);
+  };
+
+  const handleSearchBlur = () => {
+    if (!query) {
+      // Only animate back if query is empty
+      searchBarWidth.value = withTiming(width - 32);
+      backButtonOpacity.value = withTiming(0);
+    }
+  };
+
+  const handleBackPress = () => {
+    Keyboard.dismiss();
+    if (query) {
+      setQuery('');
+      setResults([]);
+      setSearched(false);
+      setShowRecent(true);
+      loadRecentSearches();
+    } else {
+      navigation.goBack();
+    }
+  };
 
   const loadRecentSearches = async () => {
     try {
@@ -147,7 +304,9 @@ const SearchScreen = () => {
       try {
         const searchResults = await catalogService.searchContentCinemeta(searchQuery);
         setResults(searchResults);
-        await saveRecentSearch(searchQuery);
+        if (searchResults.length > 0) {
+          await saveRecentSearch(searchQuery);
+        }
       } catch (error) {
         logger.error('Search failed:', error);
         setResults([]);
@@ -178,50 +337,66 @@ const SearchScreen = () => {
     setSearched(false);
     setShowRecent(true);
     loadRecentSearches();
+    inputRef.current?.focus();
   };
 
   const renderRecentSearches = () => {
     if (!showRecent || recentSearches.length === 0) return null;
 
     return (
-      <View style={styles.recentSearchesContainer}>
-        <Text style={[styles.carouselTitle, { color: isDarkMode ? colors.white : colors.black }]}>
+      <Animated.View 
+        style={styles.recentSearchesContainer}
+        entering={FadeIn.duration(300)}
+      >
+        <Text style={styles.carouselTitle}>
           Recent Searches
         </Text>
         {recentSearches.map((search, index) => (
-          <TouchableOpacity
+          <AnimatedTouchable
             key={index}
             style={styles.recentSearchItem}
             onPress={() => {
               setQuery(search);
               Keyboard.dismiss();
             }}
+            entering={FadeIn.duration(300).delay(index * 50)}
           >
             <MaterialIcons
               name="history"
               size={20}
-              color={isDarkMode ? colors.lightGray : colors.mediumGray}
+              color={colors.lightGray}
               style={styles.recentSearchIcon}
             />
-            <Text style={[
-              styles.recentSearchText,
-              { color: isDarkMode ? colors.white : colors.black }
-            ]}>
+            <Text style={styles.recentSearchText}>
               {search}
             </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                const newRecentSearches = [...recentSearches];
+                newRecentSearches.splice(index, 1);
+                setRecentSearches(newRecentSearches);
+                AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newRecentSearches));
+              }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={styles.recentSearchDeleteButton}
+            >
+              <MaterialIcons name="close" size={16} color={colors.lightGray} />
+            </TouchableOpacity>
+          </AnimatedTouchable>
         ))}
-      </View>
+      </Animated.View>
     );
   };
 
-  const renderHorizontalItem = ({ item }: { item: StreamingContent }) => {
+  const renderHorizontalItem = ({ item, index }: { item: StreamingContent, index: number }) => {
     return (
-      <TouchableOpacity
+      <AnimatedTouchable
         style={styles.horizontalItem}
         onPress={() => {
           navigation.navigate('Metadata', { id: item.id, type: item.type });
         }}
+        entering={FadeIn.duration(500).delay(index * 100)}
+        activeOpacity={0.7}
       >
         <View style={styles.horizontalItemPosterContainer}>
           <Image
@@ -230,14 +405,26 @@ const SearchScreen = () => {
             contentFit="cover"
             transition={300}
           />
+          <View style={styles.itemTypeContainer}>
+            <Text style={styles.itemTypeText}>{item.type === 'movie' ? 'MOVIE' : 'SERIES'}</Text>
+          </View>
+          {item.imdbRating && (
+            <View style={styles.ratingContainer}>
+              <MaterialIcons name="star" size={12} color="#FFC107" />
+              <Text style={styles.ratingText}>{item.imdbRating}</Text>
+            </View>
+          )}
         </View>
         <Text 
-          style={[styles.horizontalItemTitle, { color: isDarkMode ? colors.white : colors.black }]}
+          style={styles.horizontalItemTitle}
           numberOfLines={2}
         >
           {item.name}
         </Text>
-      </TouchableOpacity>
+        {item.year && (
+          <Text style={styles.yearText}>{item.year}</Text>
+        )}
+      </AnimatedTouchable>
     );
   };
   
@@ -253,148 +440,204 @@ const SearchScreen = () => {
      return movieResults.length > 0 || seriesResults.length > 0;
   }, [movieResults, seriesResults]);
 
+  const headerBaseHeight = Platform.OS === 'android' ? 80 : 60;
+  const topSpacing = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top;
+  const headerHeight = headerBaseHeight + topSpacing + 60;
+
   return (
-    <SafeAreaView style={[
-      styles.container,
-      { backgroundColor: colors.black }
-    ]}>
+    <View style={styles.container}>
       <StatusBar
         barStyle="light-content"
-        backgroundColor={colors.black}
+        backgroundColor="transparent"
+        translucent
       />
       
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Search</Text>
-        <View style={[
-          styles.searchBar, 
-          { 
-            backgroundColor: colors.darkGray,
-            borderColor: 'transparent',
-          }
-        ]}>
-          <MaterialIcons 
-            name="search" 
-            size={24} 
-            color={colors.lightGray}
-            style={styles.searchIcon}
-          />
-          <TextInput
-            style={[
-              styles.searchInput,
-              { color: colors.white }
-            ]}
-            placeholder="Search movies, shows..."
-            placeholderTextColor={colors.lightGray}
-            value={query}
-            onChangeText={setQuery}
-            returnKeyType="search"
-            keyboardAppearance="dark"
-            autoFocus
-          />
-          {query.length > 0 && (
-            <TouchableOpacity 
-              onPress={handleClearSearch} 
-              style={styles.clearButton}
-              hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+      {/* Fixed position header background to prevent shifts */}
+      <View style={[styles.headerBackground, { height: headerHeight }]} />
+      
+      <View style={{ flex: 1 }}>
+        {/* Header Section with proper top spacing */}
+        <View style={[styles.header, { height: headerHeight, paddingTop: topSpacing }]}>
+          <Text style={styles.headerTitle}>Search</Text>
+          <View style={[
+            styles.searchBar, 
+            { 
+              backgroundColor: colors.darkGray,
+              borderColor: 'transparent',
+            }
+          ]}>
+            <MaterialIcons 
+              name="search" 
+              size={24} 
+              color={colors.lightGray}
+              style={styles.searchIcon}
+            />
+            <TextInput
+              style={[
+                styles.searchInput,
+                { color: colors.white }
+              ]}
+              placeholder="Search movies, shows..."
+              placeholderTextColor={colors.lightGray}
+              value={query}
+              onChangeText={setQuery}
+              returnKeyType="search"
+              keyboardAppearance="dark"
+              autoFocus
+            />
+            {query.length > 0 && (
+              <TouchableOpacity 
+                onPress={handleClearSearch} 
+                style={styles.clearButton}
+                hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+              >
+                <MaterialIcons 
+                  name="close" 
+                  size={20} 
+                  color={colors.lightGray}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Content Container */}
+        <View style={styles.contentContainer}>
+          {searching ? (
+            <SimpleSearchAnimation />
+          ) : searched && !hasResultsToShow ? (
+            <Animated.View 
+              style={styles.emptyContainer}
+              entering={FadeIn.duration(300)}
             >
               <MaterialIcons 
-                name="close" 
-                size={20} 
+                name="search-off" 
+                size={64} 
                 color={colors.lightGray}
               />
-            </TouchableOpacity>
+              <Text style={styles.emptyText}>
+                No results found
+              </Text>
+              <Text style={styles.emptySubtext}>
+                Try different keywords or check your spelling
+              </Text>
+            </Animated.View>
+          ) : (
+            <Animated.ScrollView 
+              style={styles.scrollView} 
+              contentContainerStyle={styles.scrollViewContent}
+              keyboardShouldPersistTaps="handled"
+              onScrollBeginDrag={Keyboard.dismiss}
+              entering={FadeIn.duration(300)}
+              showsVerticalScrollIndicator={false}
+            >
+              {!query.trim() && renderRecentSearches()}
+
+              {movieResults.length > 0 && (
+                <Animated.View 
+                  style={styles.carouselContainer}
+                  entering={FadeIn.duration(300)}
+                >
+                  <Text style={styles.carouselTitle}>Movies ({movieResults.length})</Text>
+                  <FlatList
+                    data={movieResults}
+                    renderItem={renderHorizontalItem}
+                    keyExtractor={item => `movie-${item.id}`}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.horizontalListContent}
+                  />
+                </Animated.View>
+              )}
+
+              {seriesResults.length > 0 && (
+                <Animated.View 
+                  style={styles.carouselContainer}
+                  entering={FadeIn.duration(300).delay(100)}
+                >
+                  <Text style={styles.carouselTitle}>TV Shows ({seriesResults.length})</Text>
+                  <FlatList
+                    data={seriesResults}
+                    renderItem={renderHorizontalItem}
+                    keyExtractor={item => `series-${item.id}`}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.horizontalListContent}
+                  />
+                </Animated.View>
+              )}
+              
+            </Animated.ScrollView>
           )}
         </View>
       </View>
-
-      {searching ? (
-        <SkeletonLoader />
-      ) : searched && !hasResultsToShow ? (
-        <View style={styles.emptyContainer}>
-          <MaterialIcons 
-            name="search-off" 
-            size={64} 
-            color={isDarkMode ? colors.lightGray : colors.mediumGray}
-          />
-          <Text style={[
-            styles.emptyText,
-            { color: isDarkMode ? colors.white : colors.black }
-          ]}>
-            No results found
-          </Text>
-          <Text style={[
-            styles.emptySubtext,
-            { color: isDarkMode ? colors.lightGray : colors.mediumGray }
-          ]}>
-            Try different keywords or check your spelling
-          </Text>
-        </View>
-      ) : (
-        <ScrollView 
-          style={styles.scrollView} 
-          contentContainerStyle={styles.scrollViewContent}
-          keyboardShouldPersistTaps="handled"
-          onScrollBeginDrag={Keyboard.dismiss}
-        >
-          {!query.trim() && renderRecentSearches()}
-
-          {movieResults.length > 0 && (
-            <View style={styles.carouselContainer}>
-              <Text style={styles.carouselTitle}>Movies ({movieResults.length})</Text>
-              <FlatList
-                data={movieResults}
-                renderItem={renderHorizontalItem}
-                keyExtractor={item => `movie-${item.id}`}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.horizontalListContent}
-              />
-            </View>
-          )}
-
-          {seriesResults.length > 0 && (
-            <View style={styles.carouselContainer}>
-              <Text style={styles.carouselTitle}>TV Shows ({seriesResults.length})</Text>
-              <FlatList
-                data={seriesResults}
-                renderItem={renderHorizontalItem}
-                keyExtractor={item => `series-${item.id}`}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.horizontalListContent}
-              />
-            </View>
-          )}
-          
-        </ScrollView>
-      )}
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.black,
+  },
+  headerBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.black,
+    zIndex: 1,
+  },
+  contentContainer: {
+    flex: 1,
+    backgroundColor: colors.black,
+    paddingTop: 0,
   },
   header: {
-    paddingHorizontal: 16,
-    paddingTop: 40,
-    paddingBottom: 12,
-    backgroundColor: colors.black,
-    gap: 16,
+    paddingHorizontal: 20,
+    justifyContent: 'flex-end',
+    paddingBottom: 8,
+    backgroundColor: 'transparent',
+    zIndex: 2,
   },
   headerTitle: {
     fontSize: 32,
     fontWeight: '800',
     color: colors.white,
     letterSpacing: 0.5,
+    marginBottom: 12,
+  },
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  searchBarWrapper: {
+    flex: 1,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 24,
+    borderRadius: 12,
     paddingHorizontal: 16,
     height: 48,
+    backgroundColor: colors.darkGray,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  backButton: {
+    marginRight: 10,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   searchIcon: {
     marginRight: 12,
@@ -403,6 +646,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     height: '100%',
+    color: colors.white,
   },
   clearButton: {
     padding: 4,
@@ -412,6 +656,7 @@ const styles = StyleSheet.create({
   },
   scrollViewContent: {
     paddingBottom: 20,
+    paddingHorizontal: 0,
   },
   carouselContainer: {
     marginBottom: 24,
@@ -424,7 +669,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   horizontalListContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingRight: 8,
   },
   horizontalItem: {
@@ -434,10 +679,12 @@ const styles = StyleSheet.create({
   horizontalItemPosterContainer: {
     width: HORIZONTAL_ITEM_WIDTH,
     height: HORIZONTAL_POSTER_HEIGHT,
-    borderRadius: 8,
+    borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: colors.darkBackground,
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
   },
   horizontalItemPoster: {
     width: '100%',
@@ -445,19 +692,30 @@ const styles = StyleSheet.create({
   },
   horizontalItemTitle: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     lineHeight: 18,
     textAlign: 'left',
+    color: colors.white,
+  },
+  yearText: {
+    fontSize: 12,
+    color: colors.mediumGray,
+    marginTop: 2,
   },
   recentSearchesContainer: {
-    paddingHorizontal: 0,
+    paddingHorizontal: 16,
     paddingBottom: 16,
+    paddingTop: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+    marginBottom: 8,
   },
   recentSearchItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
     paddingHorizontal: 16,
+    marginVertical: 1,
   },
   recentSearchIcon: {
     marginRight: 12,
@@ -465,6 +723,10 @@ const styles = StyleSheet.create({
   recentSearchText: {
     fontSize: 16,
     flex: 1,
+    color: colors.white,
+  },
+  recentSearchDeleteButton: {
+    padding: 4,
   },
   loadingContainer: {
     flex: 1,
@@ -474,6 +736,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
+    color: colors.white,
   },
   emptyContainer: {
     flex: 1,
@@ -486,14 +749,20 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginTop: 16,
     marginBottom: 8,
+    color: colors.white,
   },
   emptySubtext: {
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
+    color: colors.lightGray,
   },
   skeletonContainer: {
-    padding: 16,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 12,
+    paddingTop: 16,
+    justifyContent: 'space-between',
   },
   skeletonVerticalItem: {
     flexDirection: 'row',
@@ -534,6 +803,67 @@ const styles = StyleSheet.create({
     backgroundColor: colors.darkBackground,
     marginBottom: 16,
     borderRadius: 4,
+  },
+  itemTypeContainer: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  itemTypeText: {
+    color: colors.white,
+    fontSize: 8,
+    fontWeight: '700',
+  },
+  ratingContainer: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  ratingText: {
+    color: colors.white,
+    fontSize: 10,
+    fontWeight: '700',
+    marginLeft: 2,
+  },
+  simpleAnimationContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  simpleAnimationContent: {
+    alignItems: 'center',
+  },
+  spinnerContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  simpleAnimationText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

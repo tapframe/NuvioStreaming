@@ -28,6 +28,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { StreamingContent } from '../../services/catalogService';
 import { SkeletonFeatured } from './SkeletonLoaders';
+import { isValidMetahubLogo, hasValidLogoFormat } from '../../utils/logoUtils';
 
 interface FeaturedContentProps {
   featuredContent: StreamingContent | null;
@@ -45,6 +46,8 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const prevContentIdRef = useRef<string | null>(null);
+  // Add state for tracking logo load errors
+  const [logoLoadError, setLogoLoadError] = useState(false);
   
   // Animation values
   const posterOpacity = useSharedValue(0);
@@ -74,14 +77,36 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
     if (imageCache[url]) return true;
     
     try {
+      // For Metahub logos, only do validation if enabled
+      // Note: Temporarily disable metahub validation until fixed
+      if (false && url.includes('metahub.space')) {
+        try {
+          const isValid = await isValidMetahubLogo(url);
+          if (!isValid) {
+            console.warn(`[FeaturedContent] Metahub logo validation failed: ${url}`);
+            return false;
+          }
+        } catch (validationError) {
+          // If validation fails, still try to load the image
+          console.warn(`[FeaturedContent] Logo validation error, will try to load anyway: ${url}`, validationError);
+        }
+      }
+      
+      // Always attempt to prefetch the image regardless of format validation
       await ExpoImage.prefetch(url);
       imageCache[url] = true;
+      console.log(`[FeaturedContent] Successfully preloaded image: ${url}`);
       return true;
     } catch (error) {
-      console.error('Error preloading image:', error);
+      console.error('[FeaturedContent] Error preloading image:', error);
       return false;
     }
   };
+
+  // Reset logo error state when content changes
+  useEffect(() => {
+    setLogoLoadError(false);
+  }, [featuredContent?.id]);
 
   // Load poster and logo
   useEffect(() => {
@@ -124,6 +149,10 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
             duration: 500,
             easing: Easing.bezier(0.25, 0.1, 0.25, 1)
           }));
+        } else {
+          // If prefetch fails, mark as error to show title text instead
+          setLogoLoadError(true);
+          console.warn(`[FeaturedContent] Logo prefetch failed, falling back to text: ${titleLogo}`);
         }
       }
     };
@@ -165,7 +194,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
             <Animated.View 
               style={[styles.featuredContentContainer as ViewStyle, contentAnimatedStyle]}
             >
-              {featuredContent.logo ? (
+              {featuredContent.logo && !logoLoadError ? (
                 <Animated.View style={logoAnimatedStyle}>
                   <ExpoImage 
                     source={{ uri: logoUrl || featuredContent.logo }} 
@@ -173,6 +202,10 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
                     contentFit="contain"
                     cachePolicy="memory-disk"
                     transition={400}
+                    onError={() => {
+                      console.warn(`[FeaturedContent] Logo failed to load: ${featuredContent.logo}`);
+                      setLogoLoadError(true);
+                    }}
                   />
                 </Animated.View>
               ) : (

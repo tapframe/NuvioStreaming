@@ -56,6 +56,7 @@ import { TMDBService } from '../services/tmdbService';
 import { storageService } from '../services/storageService';
 import { logger } from '../utils/logger';
 import { useGenres } from '../contexts/GenreContext';
+import { isValidMetahubLogo, isMetahubUrl, isTmdbUrl } from '../utils/logoUtils';
 
 const { width, height } = Dimensions.get('window');
 
@@ -264,6 +265,14 @@ const MetadataScreen = () => {
     episodeId?: string;
   } | null>(null);
 
+  // Add state to track image load errors
+  const [logoLoadError, setLogoLoadError] = useState(false);
+
+  // Reset logo load error when metadata changes
+  useEffect(() => {
+    setLogoLoadError(false);
+  }, [metadata?.logo]);
+
   // Add wrapper for toggleLibrary that includes haptic feedback
   const handleToggleLibrary = useCallback(() => {
     // Trigger appropriate haptic feedback based on action
@@ -324,7 +333,7 @@ const MetadataScreen = () => {
           
           logger.log(`[MetadataScreen] Attempting to fetch logo from Metahub for ${imdbId}`);
           
-          // Test if Metahub logo exists with a HEAD request
+          // For now, skip detailed validation and just check if URL is accessible
           try {
             const response = await fetch(metahubUrl, { method: 'HEAD' });
             if (response.ok) {
@@ -340,6 +349,8 @@ const MetadataScreen = () => {
                 logo: metahubUrl
               }));
               return; // Exit if Metahub logo was found
+            } else {
+              logger.warn(`[MetadataScreen] Metahub logo request failed with status ${response.status}`);
             }
           } catch (metahubError) {
             logger.warn(`[MetadataScreen] Failed to fetch logo from Metahub:`, metahubError);
@@ -367,8 +378,16 @@ const MetadataScreen = () => {
                 logo: logoUrl
               }));
             } else {
-              logger.warn(`[MetadataScreen] No logo found from either Metahub or TMDB for ${type} (ID: ${id})`);
+              // If both Metahub and TMDB fail, use the title as text instead of a logo
+              logger.warn(`[MetadataScreen] No logo found from either Metahub or TMDB for ${type} (ID: ${id}), using title text instead`);
+              
+              // Leave logo as null/undefined to trigger fallback to text
             }
+          } else {
+            // If no TMDB ID and Metahub failed, use the title as text instead of a logo
+            logger.warn(`[MetadataScreen] No logo found for ${type} (ID: ${id}), using title text instead`);
+            
+            // Leave logo as null/undefined to trigger fallback to text
           }
         } catch (error) {
           logger.error('[MetadataScreen] Failed to fetch logo from all sources:', {
@@ -385,6 +404,7 @@ const MetadataScreen = () => {
         - Content ID: ${id}
         - Content Type: ${type}
         - Logo URL: ${metadata.logo}
+        - Source: ${isMetahubUrl(metadata.logo) ? 'Metahub' : (isTmdbUrl(metadata.logo) ? 'TMDB' : 'Other')}
       `);
     }
   }, [id, type, metadata, setMetadata, imdbId]);
@@ -1077,12 +1097,16 @@ const MetadataScreen = () => {
                 </TouchableOpacity>
                 
                 <View style={styles.headerTitleContainer}>
-                  {metadata.logo ? (
+                  {metadata.logo && !logoLoadError ? (
                     <Image
                       source={{ uri: metadata.logo }}
                       style={styles.floatingHeaderLogo}
                       contentFit="contain"
                       transition={150}
+                      onError={() => {
+                        logger.warn(`[MetadataScreen] Logo failed to load: ${metadata.logo}`);
+                        setLogoLoadError(true);
+                      }}
                     />
                   ) : (
                     <Text style={styles.floatingHeaderTitle} numberOfLines={1}>{metadata.name}</Text>
@@ -1120,12 +1144,16 @@ const MetadataScreen = () => {
                 </TouchableOpacity>
                 
                 <View style={styles.headerTitleContainer}>
-                  {metadata.logo ? (
+                  {metadata.logo && !logoLoadError ? (
                     <Image
                       source={{ uri: metadata.logo }}
                       style={styles.floatingHeaderLogo}
                       contentFit="contain"
                       transition={150}
+                      onError={() => {
+                        logger.warn(`[MetadataScreen] Logo failed to load: ${metadata.logo}`);
+                        setLogoLoadError(true);
+                      }}
                     />
                   ) : (
                     <Text style={styles.floatingHeaderTitle} numberOfLines={1}>{metadata.name}</Text>
@@ -1181,12 +1209,16 @@ const MetadataScreen = () => {
                   {/* Title */}
                   <View style={styles.logoContainer}>
                     <Animated.View style={[styles.titleLogoContainer, logoAnimatedStyle]}>
-                      {metadata.logo ? (
+                      {metadata.logo && !logoLoadError ? (
                         <Image
                           source={{ uri: metadata.logo }}
                           style={styles.titleLogo}
                           contentFit="contain"
                           transition={300}
+                          onError={() => {
+                            logger.warn(`[MetadataScreen] Logo failed to load: ${metadata.logo}`);
+                            setLogoLoadError(true);
+                          }}
                         />
                       ) : (
                         <Text style={styles.heroTitle}>{metadata.name}</Text>

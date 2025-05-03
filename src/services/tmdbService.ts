@@ -375,8 +375,16 @@ export class TMDBService {
    * Get image URL for TMDB images
    */
   getImageUrl(path: string | null, size: 'original' | 'w500' | 'w300' | 'w185' | 'profile' = 'original'): string | null {
-    if (!path) return null;
-    return `https://image.tmdb.org/t/p/${size}${path}`;
+    if (!path) {
+      logger.warn(`[TMDBService] Cannot construct image URL from null path`);
+      return null;
+    }
+    
+    const baseImageUrl = 'https://image.tmdb.org/t/p/';
+    const fullUrl = `${baseImageUrl}${size}${path}`;
+    logger.log(`[TMDBService] Constructed image URL: ${fullUrl}`);
+    
+    return fullUrl;
   }
 
   /**
@@ -562,6 +570,8 @@ export class TMDBService {
    */
   async getMovieImages(movieId: number | string): Promise<string | null> {
     try {
+      logger.log(`[TMDBService] Fetching movie images for TMDB ID: ${movieId}`);
+      
       const response = await axios.get(`${BASE_URL}/movie/${movieId}/images`, {
         headers: await this.getHeaders(),
         params: await this.getParams({
@@ -570,6 +580,8 @@ export class TMDBService {
       });
 
       const images = response.data;
+      logger.log(`[TMDBService] Retrieved ${images?.logos?.length || 0} logos for movie ID ${movieId}`);
+      
       if (images && images.logos && images.logos.length > 0) {
         // First prioritize English SVG logos
         const enSvgLogo = images.logos.find((logo: any) => 
@@ -578,6 +590,7 @@ export class TMDBService {
           logo.iso_639_1 === 'en'
         );
         if (enSvgLogo) {
+          logger.log(`[TMDBService] Found English SVG logo for movie ID ${movieId}: ${enSvgLogo.file_path}`);
           return this.getImageUrl(enSvgLogo.file_path);
         }
 
@@ -588,6 +601,7 @@ export class TMDBService {
           logo.iso_639_1 === 'en'
         );
         if (enPngLogo) {
+          logger.log(`[TMDBService] Found English PNG logo for movie ID ${movieId}: ${enPngLogo.file_path}`);
           return this.getImageUrl(enPngLogo.file_path);
         }
         
@@ -596,6 +610,7 @@ export class TMDBService {
           logo.iso_639_1 === 'en'
         );
         if (enLogo) {
+          logger.log(`[TMDBService] Found English logo for movie ID ${movieId}: ${enLogo.file_path}`);
           return this.getImageUrl(enLogo.file_path);
         }
 
@@ -604,6 +619,7 @@ export class TMDBService {
           logo.file_path && logo.file_path.endsWith('.svg')
         );
         if (svgLogo) {
+          logger.log(`[TMDBService] Found SVG logo for movie ID ${movieId}: ${svgLogo.file_path}`);
           return this.getImageUrl(svgLogo.file_path);
         }
 
@@ -612,17 +628,20 @@ export class TMDBService {
           logo.file_path && logo.file_path.endsWith('.png')
         );
         if (pngLogo) {
+          logger.log(`[TMDBService] Found PNG logo for movie ID ${movieId}: ${pngLogo.file_path}`);
           return this.getImageUrl(pngLogo.file_path);
         }
          
         // Last resort: any logo
+        logger.log(`[TMDBService] Using first available logo for movie ID ${movieId}: ${images.logos[0].file_path}`);
         return this.getImageUrl(images.logos[0].file_path);
       }
 
+      logger.warn(`[TMDBService] No logos found for movie ID ${movieId}`);
       return null; // No logos found
     } catch (error) {
       // Log error but don't throw, just return null if fetching images fails
-      logger.error(`Failed to get movie images for ID ${movieId}:`, error);
+      logger.error(`[TMDBService] Failed to get movie images for ID ${movieId}:`, error);
       return null;
     }
   }
@@ -632,6 +651,8 @@ export class TMDBService {
    */
   async getTvShowImages(showId: number | string): Promise<string | null> {
     try {
+      logger.log(`[TMDBService] Fetching TV show images for TMDB ID: ${showId}`);
+      
       const response = await axios.get(`${BASE_URL}/tv/${showId}/images`, {
         headers: await this.getHeaders(),
         params: await this.getParams({
@@ -640,6 +661,8 @@ export class TMDBService {
       });
 
       const images = response.data;
+      logger.log(`[TMDBService] Retrieved ${images?.logos?.length || 0} logos for TV show ID ${showId}`);
+      
       if (images && images.logos && images.logos.length > 0) {
         // First prioritize English SVG logos
         const enSvgLogo = images.logos.find((logo: any) => 
@@ -648,6 +671,7 @@ export class TMDBService {
           logo.iso_639_1 === 'en'
         );
         if (enSvgLogo) {
+          logger.log(`[TMDBService] Found English SVG logo for TV show ID ${showId}: ${enSvgLogo.file_path}`);
           return this.getImageUrl(enSvgLogo.file_path);
         }
 
@@ -658,6 +682,7 @@ export class TMDBService {
           logo.iso_639_1 === 'en'
         );
         if (enPngLogo) {
+          logger.log(`[TMDBService] Found English PNG logo for TV show ID ${showId}: ${enPngLogo.file_path}`);
           return this.getImageUrl(enPngLogo.file_path);
         }
         
@@ -666,6 +691,7 @@ export class TMDBService {
           logo.iso_639_1 === 'en'
         );
         if (enLogo) {
+          logger.log(`[TMDBService] Found English logo for TV show ID ${showId}: ${enLogo.file_path}`);
           return this.getImageUrl(enLogo.file_path);
         }
 
@@ -674,6 +700,7 @@ export class TMDBService {
           logo.file_path && logo.file_path.endsWith('.svg')
         );
         if (svgLogo) {
+          logger.log(`[TMDBService] Found SVG logo for TV show ID ${showId}: ${svgLogo.file_path}`);
           return this.getImageUrl(svgLogo.file_path);
         }
 
@@ -682,17 +709,20 @@ export class TMDBService {
           logo.file_path && logo.file_path.endsWith('.png')
         );
         if (pngLogo) {
+          logger.log(`[TMDBService] Found PNG logo for TV show ID ${showId}: ${pngLogo.file_path}`);
           return this.getImageUrl(pngLogo.file_path);
         }
          
         // Last resort: any logo
+        logger.log(`[TMDBService] Using first available logo for TV show ID ${showId}: ${images.logos[0].file_path}`);
         return this.getImageUrl(images.logos[0].file_path);
       }
 
+      logger.warn(`[TMDBService] No logos found for TV show ID ${showId}`);
       return null; // No logos found
     } catch (error) {
       // Log error but don't throw, just return null if fetching images fails
-      logger.error(`Failed to get TV show images for ID ${showId}:`, error);
+      logger.error(`[TMDBService] Failed to get TV show images for ID ${showId}:`, error);
       return null;
     }
   }
@@ -702,11 +732,21 @@ export class TMDBService {
    */
   async getContentLogo(type: 'movie' | 'tv', id: number | string): Promise<string | null> {
     try {
-      return type === 'movie' 
+      logger.log(`[TMDBService] Getting content logo for ${type} with ID ${id}`);
+      
+      const result = type === 'movie' 
         ? await this.getMovieImages(id)
         : await this.getTvShowImages(id);
+        
+      if (result) {
+        logger.log(`[TMDBService] Successfully retrieved logo for ${type} ID ${id}: ${result}`);
+      } else {
+        logger.warn(`[TMDBService] No logo found for ${type} ID ${id}`);
+      }
+      
+      return result;
     } catch (error) {
-      logger.error(`Failed to get content logo for ${type} ID ${id}:`, error);
+      logger.error(`[TMDBService] Failed to get content logo for ${type} ID ${id}:`, error);
       return null;
     }
   }
