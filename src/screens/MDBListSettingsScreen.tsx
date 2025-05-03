@@ -19,7 +19,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { colors } from '../styles/colors';
+import { useTheme } from '../contexts/ThemeContext';
 import { logger } from '../utils/logger';
 import { RATING_PROVIDERS } from '../components/metadata/RatingsSection';
 
@@ -55,8 +55,312 @@ export const getMDBListAPIKey = async (): Promise<string | null> => {
   }
 };
 
+// Create a styles creator function that accepts the theme colors
+const createStyles = (colors: any) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.darkBackground,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 8 : 8,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+  },
+  backText: {
+    fontSize: 17,
+    fontWeight: '400',
+    color: colors.primary,
+    marginLeft: 0,
+  },
+  headerTitle: {
+    fontSize: 34,
+    fontWeight: '700',
+    color: colors.white,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    paddingTop: 8,
+  },
+  content: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.darkBackground,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 15,
+    color: colors.mediumGray,
+  },
+  card: {
+    backgroundColor: colors.elevation2,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
+  },
+  statusCard: {
+    backgroundColor: colors.elevation1,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  infoCard: {
+    backgroundColor: colors.elevation1,
+    borderRadius: 10,
+    padding: 12,
+  },
+  statusIcon: {
+    marginRight: 12,
+  },
+  statusTextContainer: {
+    flex: 1,
+  },
+  statusTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.white,
+    marginBottom: 2,
+  },
+  statusDescription: {
+    fontSize: 13,
+    color: colors.mediumGray,
+    lineHeight: 18,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.lightGray,
+    marginBottom: 10,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.elevation2,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  input: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    color: colors.white,
+    fontSize: 15,
+  },
+  inputFocused: {
+    borderColor: colors.primary,
+  },
+  pasteButton: {
+    padding: 8,
+    marginRight: 2,
+  },
+  testResultContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    marginTop: 10,
+    borderWidth: 1,
+  },
+  testResultSuccess: {
+    backgroundColor: colors.success + '15',
+    borderColor: colors.success + '40',
+  },
+  testResultError: {
+    backgroundColor: colors.error + '15',
+    borderColor: colors.error + '40',
+  },
+  testResultText: {
+    marginLeft: 8,
+    fontSize: 13,
+    flex: 1,
+  },
+  buttonContainer: {
+    marginTop: 12,
+    gap: 10, 
+  },
+  buttonIcon: {
+    marginRight: 6,
+  },
+  saveButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  saveButtonDisabled: {
+    backgroundColor: colors.elevation2, 
+    opacity: 0.8,
+  },
+  saveButtonText: {
+    color: colors.white,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  clearButton: {
+    backgroundColor: 'transparent',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.error + '40',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  clearButtonDisabled: {
+    borderColor: colors.border,
+  },
+  clearButtonText: {
+    color: colors.error,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  clearButtonTextDisabled: {
+    color: colors.darkGray,
+  },
+  infoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  infoHeaderText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.white,
+    marginLeft: 8,
+  },
+  infoSteps: {
+    marginBottom: 12,
+    gap: 6, 
+  },
+  infoStep: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  infoStepNumber: {
+    fontSize: 13,
+    color: colors.mediumGray,
+    width: 20,
+  },
+  infoStepText: {
+    color: colors.mediumGray,
+    fontSize: 13,
+    flex: 1,
+    lineHeight: 18,
+  },
+  boldText: {
+    fontWeight: '600',
+    color: colors.lightGray,
+  },
+  websiteButton: {
+    backgroundColor: colors.primary + '20',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 12,
+  },
+  websiteButtonText: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  websiteButtonDisabled: {
+    backgroundColor: colors.elevation1,
+  },
+  websiteButtonTextDisabled: {
+    color: colors.darkGray,
+  },
+  sectionDescription: {
+    fontSize: 13,
+    color: colors.mediumGray,
+    marginBottom: 12,
+  },
+  providerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  providerInfo: {
+    flex: 1,
+  },
+  providerName: {
+    fontSize: 15,
+    color: colors.white,
+    fontWeight: '500',
+  },
+  masterToggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  masterToggleInfo: {
+    flex: 1,
+  },
+  masterToggleTitle: {
+    fontSize: 15,
+    color: colors.white,
+    fontWeight: '600',
+  },
+  masterToggleDescription: {
+    fontSize: 13,
+    color: colors.mediumGray,
+    marginTop: 2,
+  },
+  disabledCard: {
+    opacity: 0.7,
+  },
+  disabledInput: {
+    borderColor: colors.border,
+    backgroundColor: colors.elevation1,
+  },
+  disabledText: {
+    color: colors.darkGray,
+  },
+  disabledBoldText: {
+    color: colors.darkGray,
+  },
+  darkGray: {
+    color: colors.darkGray || '#555555',
+  },
+});
+
 const MDBListSettingsScreen = () => {
   const navigation = useNavigation();
+  const { currentTheme } = useTheme();
+  const colors = currentTheme.colors;
+  const styles = createStyles(colors);
+  
   const [apiKey, setApiKey] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isKeySet, setIsKeySet] = useState(false);
@@ -522,303 +826,5 @@ const MDBListSettingsScreen = () => {
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.darkBackground,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 8 : 8,
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-  },
-  backText: {
-    fontSize: 17,
-    fontWeight: '400',
-    color: colors.primary,
-    marginLeft: 0,
-  },
-  headerTitle: {
-    fontSize: 34,
-    fontWeight: '700',
-    color: colors.white,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    paddingTop: 8,
-  },
-  content: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 20,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.darkBackground,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 15,
-    color: colors.mediumGray,
-  },
-  card: {
-    backgroundColor: colors.elevation2,
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 16,
-  },
-  statusCard: {
-    backgroundColor: colors.elevation1,
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  infoCard: {
-    backgroundColor: colors.elevation1,
-    borderRadius: 10,
-    padding: 12,
-  },
-  statusIcon: {
-    marginRight: 12,
-  },
-  statusTextContainer: {
-    flex: 1,
-  },
-  statusTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.white,
-    marginBottom: 2,
-  },
-  statusDescription: {
-    fontSize: 13,
-    color: colors.mediumGray,
-    lineHeight: 18,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.lightGray,
-    marginBottom: 10,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.elevation2,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  input: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    color: colors.white,
-    fontSize: 15,
-  },
-  inputFocused: {
-    borderColor: colors.primary,
-  },
-  pasteButton: {
-    padding: 8,
-    marginRight: 2,
-  },
-  testResultContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 6,
-    marginTop: 10,
-    borderWidth: 1,
-  },
-  testResultSuccess: {
-    backgroundColor: colors.success + '15',
-    borderColor: colors.success + '40',
-  },
-  testResultError: {
-    backgroundColor: colors.error + '15',
-    borderColor: colors.error + '40',
-  },
-  testResultText: {
-    marginLeft: 8,
-    fontSize: 13,
-    flex: 1,
-  },
-  buttonContainer: {
-    marginTop: 12,
-    gap: 10, 
-  },
-  buttonIcon: {
-    marginRight: 6,
-  },
-  saveButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  saveButtonDisabled: {
-    backgroundColor: colors.elevation2, 
-    opacity: 0.8,
-  },
-  saveButtonText: {
-    color: colors.white,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  clearButton: {
-    backgroundColor: 'transparent',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.error + '40',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  clearButtonDisabled: {
-    borderColor: colors.border,
-  },
-  clearButtonText: {
-    color: colors.error,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  clearButtonTextDisabled: {
-    color: colors.darkGray,
-  },
-  infoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  infoHeaderText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.white,
-    marginLeft: 8,
-  },
-  infoSteps: {
-    marginBottom: 12,
-    gap: 6, 
-  },
-  infoStep: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  infoStepNumber: {
-    fontSize: 13,
-    color: colors.mediumGray,
-    width: 20,
-  },
-  infoStepText: {
-    color: colors.mediumGray,
-    fontSize: 13,
-    flex: 1,
-    lineHeight: 18,
-  },
-  boldText: {
-    fontWeight: '600',
-    color: colors.lightGray,
-  },
-  websiteButton: {
-    backgroundColor: colors.primary + '20',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 12,
-  },
-  websiteButtonText: {
-    color: colors.primary,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  websiteButtonDisabled: {
-    backgroundColor: colors.elevation1,
-  },
-  websiteButtonTextDisabled: {
-    color: colors.darkGray,
-  },
-  sectionDescription: {
-    fontSize: 13,
-    color: colors.mediumGray,
-    marginBottom: 12,
-  },
-  providerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  providerInfo: {
-    flex: 1,
-  },
-  providerName: {
-    fontSize: 15,
-    color: colors.white,
-    fontWeight: '500',
-  },
-  masterToggleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-  },
-  masterToggleInfo: {
-    flex: 1,
-  },
-  masterToggleTitle: {
-    fontSize: 15,
-    color: colors.white,
-    fontWeight: '600',
-  },
-  masterToggleDescription: {
-    fontSize: 13,
-    color: colors.mediumGray,
-    marginTop: 2,
-  },
-  disabledCard: {
-    opacity: 0.7,
-  },
-  disabledInput: {
-    borderColor: colors.border,
-    backgroundColor: colors.elevation1,
-  },
-  disabledText: {
-    color: colors.darkGray,
-  },
-  disabledBoldText: {
-    color: colors.darkGray,
-  },
-  darkGray: {
-    color: colors.darkGray || '#555555',
-  },
-});
 
 export default MDBListSettingsScreen; 

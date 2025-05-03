@@ -16,7 +16,7 @@ import { useSettings } from '../hooks/useSettings';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { colors } from '../styles/colors';
+import { useTheme } from '../contexts/ThemeContext';
 import { RootStackParamList } from '../navigation/AppNavigator';
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
@@ -24,9 +24,10 @@ const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 interface SettingsCardProps {
   children: React.ReactNode;
   isDarkMode: boolean;
+  colors: any;
 }
 
-const SettingsCard: React.FC<SettingsCardProps> = ({ children, isDarkMode }) => (
+const SettingsCard: React.FC<SettingsCardProps> = ({ children, isDarkMode, colors }) => (
   <View style={[
     styles.card,
     { backgroundColor: isDarkMode ? colors.elevation2 : colors.white }
@@ -46,6 +47,7 @@ interface SettingItemProps {
   isLast?: boolean;
   onPress?: () => void;
   isDarkMode: boolean;
+  colors: any;
 }
 
 const SettingItem: React.FC<SettingItemProps> = ({
@@ -55,7 +57,8 @@ const SettingItem: React.FC<SettingItemProps> = ({
   renderControl,
   isLast = false,
   onPress,
-  isDarkMode
+  isDarkMode,
+  colors
 }) => {
   return (
     <TouchableOpacity 
@@ -89,7 +92,7 @@ const SettingItem: React.FC<SettingItemProps> = ({
   );
 };
 
-const SectionHeader: React.FC<{ title: string; isDarkMode: boolean }> = ({ title, isDarkMode }) => (
+const SectionHeader: React.FC<{ title: string; isDarkMode: boolean; colors: any }> = ({ title, isDarkMode, colors }) => (
   <View style={styles.sectionHeader}>
     <Text style={[
       styles.sectionHeaderText,
@@ -103,6 +106,8 @@ const SectionHeader: React.FC<{ title: string; isDarkMode: boolean }> = ({ title
 const HomeScreenSettings: React.FC = () => {
   const { settings, updateSetting } = useSettings();
   const systemColorScheme = useColorScheme();
+  const { currentTheme } = useTheme();
+  const colors = currentTheme.colors;
   const isDarkMode = systemColorScheme === 'dark' || settings.enableDarkMode;
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const [showSavedIndicator, setShowSavedIndicator] = useState(false);
@@ -161,7 +166,7 @@ const HomeScreenSettings: React.FC = () => {
           styles.radio, 
           { borderColor: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }
         ]}>
-          {selected && <View style={styles.radioInner} />}
+          {selected && <View style={[styles.radioInner, { backgroundColor: colors.primary }]} />}
         </View>
         <Text style={[
           styles.radioLabel, 
@@ -229,13 +234,14 @@ const HomeScreenSettings: React.FC = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        <SectionHeader title="DISPLAY OPTIONS" isDarkMode={isDarkMode} />
-        <SettingsCard isDarkMode={isDarkMode}>
+        <SectionHeader title="DISPLAY OPTIONS" isDarkMode={isDarkMode} colors={colors} />
+        <SettingsCard isDarkMode={isDarkMode} colors={colors}>
           <SettingItem
             title="Show Hero Section"
             description="Featured content at the top"
             icon="movie-filter"
             isDarkMode={isDarkMode}
+            colors={colors}
             renderControl={() => (
               <CustomSwitch 
                 value={settings.showHeroSection} 
@@ -248,6 +254,7 @@ const HomeScreenSettings: React.FC = () => {
             description={settings.featuredContentSource === 'tmdb' ? 'TMDB Trending' : 'From Catalogs'}
             icon="settings-input-component"
             isDarkMode={isDarkMode}
+            colors={colors}
             renderControl={() => <View />}
             isLast={!settings.showHeroSection || settings.featuredContentSource !== 'catalogs'}
           />
@@ -257,6 +264,7 @@ const HomeScreenSettings: React.FC = () => {
               description={getSelectedCatalogsText()}
               icon="list"
               isDarkMode={isDarkMode}
+              colors={colors}
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('HeroCatalogs')}
               isLast={true}
@@ -300,7 +308,7 @@ const HomeScreenSettings: React.FC = () => {
           </>
         )}
 
-        <SectionHeader title="ABOUT THESE SETTINGS" isDarkMode={isDarkMode} />
+        <SectionHeader title="ABOUT THESE SETTINGS" isDarkMode={isDarkMode} colors={colors} />
         <View style={[styles.infoCard, { backgroundColor: isDarkMode ? colors.elevation1 : 'rgba(0,0,0,0.03)' }]}>
           <Text style={[styles.infoText, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>
             These settings control how content is displayed on your Home screen. Changes are applied immediately without requiring an app restart.
@@ -401,7 +409,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginVertical: 8,
     borderRadius: 12,
-    backgroundColor: colors.elevation1,
+    backgroundColor: 'rgba(255,255,255,0.05)',
     overflow: 'hidden',
   },
   radioOption: {
@@ -424,7 +432,6 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: colors.primary,
   },
   radioLabel: {
     fontSize: 16,
