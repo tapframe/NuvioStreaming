@@ -17,7 +17,7 @@ import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../styles/colors';
-import { useSettings } from '../hooks/useSettings';
+import { useSettings, DEFAULT_SETTINGS } from '../hooks/useSettings';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TMDBService } from '../services/tmdbService';
 import { logger } from '../utils/logger';
@@ -340,46 +340,60 @@ const LogoSourceSettings = () => {
     };
     
     // Save language preference with proper persistence
-    const saveLanguagePreference = (languageCode: string) => {
-      // First use the settings hook to update the setting
-      updateSetting('tmdbLanguagePreference', languageCode);
+    const saveLanguagePreference = async (languageCode: string) => {
+      logger.log(`[LogoSourceSettings] Saving TMDB language preference: ${languageCode}`);
       
-      // For extra assurance, also save directly to AsyncStorage
       try {
-        // Get current settings
-        AsyncStorage.getItem('app_settings').then((settingsJson) => {
-          if (settingsJson) {
-            const currentSettings = JSON.parse(settingsJson);
-            // Update the language preference
-            const updatedSettings = {
-              ...currentSettings,
-              tmdbLanguagePreference: languageCode
-            };
-            // Save back to AsyncStorage
-            AsyncStorage.setItem('app_settings', JSON.stringify(updatedSettings))
-              .then(() => {
-                logger.log(`[LogoSourceSettings] Successfully saved TMDB language preference '${languageCode}' to AsyncStorage`);
-              })
-              .catch((error) => {
-                logger.error(`[LogoSourceSettings] Error saving TMDB language preference to AsyncStorage:`, error);
-              });
-          }
-        }).catch((error) => {
-          logger.error(`[LogoSourceSettings] Error getting current settings:`, error);
-        });
+        // First use the settings hook to update the setting - this is crucial
+        updateSetting('tmdbLanguagePreference', languageCode);
+        
+        // For extra assurance, also save directly to AsyncStorage
+        // Get current settings from AsyncStorage
+        const settingsJson = await AsyncStorage.getItem('app_settings');
+        
+        if (settingsJson) {
+          const currentSettings = JSON.parse(settingsJson);
+          
+          // Update the language preference
+          const updatedSettings = {
+            ...currentSettings,
+            tmdbLanguagePreference: languageCode
+          };
+          
+          // Save back to AsyncStorage using await to ensure it completes
+          await AsyncStorage.setItem('app_settings', JSON.stringify(updatedSettings));
+          logger.log(`[LogoSourceSettings] Successfully saved TMDB language preference '${languageCode}' to AsyncStorage`);
+        } else {
+          // If no settings exist yet, create new settings object with this preference
+          const newSettings = {
+            ...DEFAULT_SETTINGS,
+            tmdbLanguagePreference: languageCode
+          };
+          
+          // Save to AsyncStorage
+          await AsyncStorage.setItem('app_settings', JSON.stringify(newSettings));
+          logger.log(`[LogoSourceSettings] Created new settings with TMDB language preference '${languageCode}'`);
+        }
         
         // Clear any cached logo data
-        AsyncStorage.removeItem('_last_logos_');
+        await AsyncStorage.removeItem('_last_logos_');
+        
+        // Show confirmation toast or feedback
+        Alert.alert(
+          'TMDB Language Updated',
+          `TMDB logo language preference set to ${languageCode.toUpperCase()}. Changes will apply when you navigate to content.`,
+          [{ text: 'OK' }]
+        );
       } catch (e) {
         logger.error(`[LogoSourceSettings] Error in saveLanguagePreference:`, e);
+        
+        // Show error notification
+        Alert.alert(
+          'Error Saving Preference',
+          'There was a problem saving your language preference. Please try again.',
+          [{ text: 'OK' }]
+        );
       }
-      
-      // Show confirmation toast or feedback
-      Alert.alert(
-        'TMDB Language Updated',
-        `TMDB logo language preference set to ${languageCode.toUpperCase()}. Changes will apply when you navigate to content.`,
-        [{ text: 'OK' }]
-      );
     };
     
     // Save selected show to AsyncStorage to persist across navigation
