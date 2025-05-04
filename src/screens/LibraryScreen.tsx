@@ -373,6 +373,7 @@ const styles = StyleSheet.create({
   listContainer: {
     paddingHorizontal: 12,
     paddingVertical: 16,
+    paddingBottom: 90,
   },
   columnWrapper: {
     justifyContent: 'space-between',
@@ -463,6 +464,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
+    paddingBottom: 90,
   },
   emptyText: {
     fontSize: 20,

@@ -545,7 +545,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     width: '100%',
-    paddingBottom: 32,
+    paddingBottom: 90,
   },
   cardContainer: {
     width: '100%',

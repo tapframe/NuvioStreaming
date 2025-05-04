@@ -636,13 +636,13 @@ const styles = StyleSheet.create<any>({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: 90,
   },
   loadingMainContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingBottom: 40,
+    paddingBottom: 90,
   },
   loadingText: {
     marginTop: 12,

@@ -55,6 +55,7 @@ const useDiscoverStyles = () => {
       justifyContent: 'center',
       alignItems: 'center',
       paddingTop: 80,
+      paddingBottom: 90,
     },
     emptyText: {
       color: currentTheme.colors.mediumGray,
