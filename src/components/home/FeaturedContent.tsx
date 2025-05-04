@@ -122,153 +122,132 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
     if (!featuredContent || logoFetchInProgress.current) return;
     
     const fetchLogo = async () => {
-      // Set fetch in progress flag
       logoFetchInProgress.current = true;
       
       try {
         const contentId = featuredContent.id;
+        const contentData = featuredContent; // Use a clearer variable name
+        const currentLogo = contentData.logo;
         
-        // Get logo source preference from settings
-        const logoPreference = settings.logoSourcePreference || 'metahub'; // Default to metahub if not set
-        const preferredLanguage = settings.tmdbLanguagePreference || 'en'; // Get preferred language
+        // Get preferences
+        const logoPreference = settings.logoSourcePreference || 'metahub';
+        const preferredLanguage = settings.tmdbLanguagePreference || 'en';
         
-        // Check if current logo matches preferences
-        const currentLogo = featuredContent.logo;
-        if (currentLogo) {
-          const isCurrentMetahub = isMetahubUrl(currentLogo);
-          const isCurrentTmdb = isTmdbUrl(currentLogo);
-          
-          // If logo already matches preference, use it
-          if ((logoPreference === 'metahub' && isCurrentMetahub) || 
-              (logoPreference === 'tmdb' && isCurrentTmdb)) {
-            setLogoUrl(currentLogo);
-            logoFetchInProgress.current = false;
-            return;
-          }
+        // Reset state for new fetch
+        setLogoUrl(null);
+        setLogoLoadError(false);
+        
+        // Extract IDs
+        let imdbId: string | null = null;
+        if (contentData.id.startsWith('tt')) {
+          imdbId = contentData.id;
+        } else if ((contentData as any).imdbId) {
+          imdbId = (contentData as any).imdbId;
+        } else if ((contentData as any).externalIds?.imdb_id) {
+          imdbId = (contentData as any).externalIds.imdb_id;
         }
         
-        // Extract IMDB ID if available
-        let imdbId = null;
-        if (featuredContent.id.startsWith('tt')) {
-          // If the ID itself is an IMDB ID
-          imdbId = featuredContent.id;
-        } else if ((featuredContent as any).imdbId) {
-          // Try to get IMDB ID from the content object if available
-          imdbId = (featuredContent as any).imdbId;
+        let tmdbId: string | null = null;
+        if (contentData.id.startsWith('tmdb:')) {
+          tmdbId = contentData.id.split(':')[1];
+        } else if ((contentData as any).tmdb_id) {
+           tmdbId = String((contentData as any).tmdb_id);
         }
         
-        // Extract TMDB ID if available
-        let tmdbId = null;
-        if (contentId.startsWith('tmdb:')) {
-          tmdbId = contentId.split(':')[1];
-        }
-        
-        // First source based on preference
-        if (logoPreference === 'metahub' && imdbId) {
-          // Try to get logo from Metahub first
-          const metahubUrl = `https://images.metahub.space/logo/medium/${imdbId}/img`;
-          
+        // If we only have IMDB ID, try to find TMDB ID proactively
+        if (imdbId && !tmdbId) {
           try {
-            const response = await fetch(metahubUrl, { method: 'HEAD' });
-            if (response.ok) {
-              setLogoUrl(metahubUrl);
-              logoFetchInProgress.current = false;
-              return; // Exit if Metahub logo was found
+            const tmdbService = TMDBService.getInstance();
+            const foundData = await tmdbService.findTMDBIdByIMDB(imdbId);
+            if (foundData) {
+              tmdbId = String(foundData);
             }
-          } catch (error) {
-            // Removed logger.warn
+          } catch (findError) {
+            // logger.warn(`[FeaturedContent] Failed to find TMDB ID for ${imdbId}:`, findError);
           }
-          
-          // Fall back to TMDB if Metahub fails and we have a TMDB ID
-          if (tmdbId) {
-            const tmdbType = featuredContent.type === 'series' ? 'tv' : 'movie';
-            try {
-              const tmdbService = TMDBService.getInstance();
-              const logoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId, preferredLanguage);
-              
-              if (logoUrl) {
-                setLogoUrl(logoUrl);
-              } else if (currentLogo) {
-                // If TMDB fails too, use existing logo if any
-                setLogoUrl(currentLogo);
-              }
-            } catch (error) {
-              // Removed logger.error
-              if (currentLogo) setLogoUrl(currentLogo);
-            }
-          } else if (currentLogo) {
-            // Use existing logo if we don't have TMDB ID
-            setLogoUrl(currentLogo);
-          }
-        } else if (logoPreference === 'tmdb') {
-          // Try to get logo from TMDB first
-          if (tmdbId) {
-            const tmdbType = featuredContent.type === 'series' ? 'tv' : 'movie';
-            try {
-              const tmdbService = TMDBService.getInstance();
-              const logoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId, preferredLanguage);
-              
-              if (logoUrl) {
-                setLogoUrl(logoUrl);
-                logoFetchInProgress.current = false;
-                return; // Exit if TMDB logo was found
-              }
-            } catch (error) {
-              // Removed logger.error
-            }
-          } else if (imdbId) {
-            // If we have IMDB ID but no TMDB ID, try to find TMDB ID
-            try {
-              const tmdbService = TMDBService.getInstance();
-              const foundTmdbId = await tmdbService.findTMDBIdByIMDB(imdbId);
-              
-              if (foundTmdbId) {
-                const tmdbType = featuredContent.type === 'series' ? 'tv' : 'movie';
-                const logoUrl = await tmdbService.getContentLogo(tmdbType, foundTmdbId.toString(), preferredLanguage);
-                
-                if (logoUrl) {
-                  setLogoUrl(logoUrl);
-                  logoFetchInProgress.current = false;
-                  return; // Exit if TMDB logo was found
-                }
-              }
-            } catch (error) {
-              // Removed logger.error
-            }
-          }
-          
-          // Fall back to Metahub if TMDB fails and we have an IMDB ID
+        }
+        
+        const tmdbType = contentData.type === 'series' ? 'tv' : 'movie';
+        let finalLogoUrl: string | null = null;
+        let primaryAttempted = false;
+        let fallbackAttempted = false;
+        
+        // --- Logo Fetching Logic ---
+        
+        if (logoPreference === 'metahub') {
+          // Primary: Metahub (needs imdbId)
           if (imdbId) {
+            primaryAttempted = true;
             const metahubUrl = `https://images.metahub.space/logo/medium/${imdbId}/img`;
-            
             try {
               const response = await fetch(metahubUrl, { method: 'HEAD' });
               if (response.ok) {
-                setLogoUrl(metahubUrl);
-              } else if (currentLogo) {
-                // If Metahub fails too, use existing logo if any
-                setLogoUrl(currentLogo);
+                finalLogoUrl = metahubUrl;
               }
-            } catch (error) {
-              // Removed logger.warn
-              if (currentLogo) setLogoUrl(currentLogo);
-            }
-          } else if (currentLogo) {
-            // Use existing logo if we don't have IMDB ID
-            setLogoUrl(currentLogo);
+            } catch (error) { /* Log if needed */ }
+          }
+          
+          // Fallback: TMDB (needs tmdbId)
+          if (!finalLogoUrl && tmdbId) {
+            fallbackAttempted = true;
+            try {
+              const tmdbService = TMDBService.getInstance();
+              const logoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId, preferredLanguage);
+              if (logoUrl) {
+                finalLogoUrl = logoUrl;
+              }
+            } catch (error) { /* Log if needed */ }
+          }
+          
+        } else { // logoPreference === 'tmdb'
+          // Primary: TMDB (needs tmdbId)
+          if (tmdbId) {
+            primaryAttempted = true;
+            try {
+              const tmdbService = TMDBService.getInstance();
+              const logoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId, preferredLanguage);
+              if (logoUrl) {
+                finalLogoUrl = logoUrl;
+              }
+            } catch (error) { /* Log if needed */ }
+          }
+          
+          // Fallback: Metahub (needs imdbId)
+          if (!finalLogoUrl && imdbId) {
+            fallbackAttempted = true;
+            const metahubUrl = `https://images.metahub.space/logo/medium/${imdbId}/img`;
+            try {
+              const response = await fetch(metahubUrl, { method: 'HEAD' });
+              if (response.ok) {
+                finalLogoUrl = metahubUrl;
+              }
+            } catch (error) { /* Log if needed */ }
           }
         }
+        
+        // --- Set Final Logo ---
+        if (finalLogoUrl) {
+          setLogoUrl(finalLogoUrl);
+        } else if (currentLogo) {
+          // Use existing logo only if primary and fallback failed or weren't applicable
+          setLogoUrl(currentLogo);
+        } else {
+          // No logo found from any source
+          setLogoLoadError(true);
+          // logger.warn(`[FeaturedContent] No logo found for ${contentData.name} (${contentId}) with preference ${logoPreference}. Primary attempted: ${primaryAttempted}, Fallback attempted: ${fallbackAttempted}`);
+        }
+        
       } catch (error) {
-        // Removed logger.error
-        // Optionally set a fallback logo or handle the error state
-        setLogoUrl(featuredContent.logo ?? null); // Fallback to initial logo or null
+        // logger.error('[FeaturedContent] Error in fetchLogo:', error);
+        setLogoLoadError(true);
       } finally {
         logoFetchInProgress.current = false;
       }
     };
     
+    // Trigger fetch when content changes
     fetchLogo();
-  }, [featuredContent?.id, settings.logoSourcePreference, settings.tmdbLanguagePreference]);
+  }, [featuredContent, settings.logoSourcePreference, settings.tmdbLanguagePreference]);
 
   // Load poster and logo
   useEffect(() => {

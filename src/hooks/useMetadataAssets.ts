@@ -196,7 +196,15 @@ export const useMetadataAssets = (
     else if (shouldFetchLogo && logoFetchInProgress.current) {
          logger.log(`[useMetadataAssets:Logo] Skipping logo fetch because logoFetchInProgress is true.`);
     }
-  }, [id, type, metadata, setMetadata, imdbId, settings.logoSourcePreference, settings.tmdbLanguagePreference]); // Added tmdbLanguagePreference dependency
+  }, [
+    id, 
+    type, 
+    imdbId, 
+    metadata?.logo, // Depend on the logo value itself, not the whole object
+    settings.logoSourcePreference, 
+    settings.tmdbLanguagePreference,
+    setMetadata // Keep setMetadata, but ensure it's memoized in parent
+  ]);
 
   // Fetch banner image based on logo source preference - optimized version
   useEffect(() => {

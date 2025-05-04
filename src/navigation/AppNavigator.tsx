@@ -686,7 +686,8 @@ const AppNavigator = () => {
           />
           <Stack.Screen 
             name="Metadata" 
-            component={MetadataScreen as any} 
+            component={MetadataScreen}
+            options={{ headerShown: false, animation: Platform.OS === 'ios' ? 'slide_from_right' : 'default' }}
           />
           <Stack.Screen 
             name="Streams" 
@@ -700,22 +701,27 @@ const AppNavigator = () => {
           <Stack.Screen 
             name="Player" 
             component={VideoPlayer as any} 
+            options={{ animation: Platform.OS === 'ios' ? 'slide_from_right' : 'default' }}
           />
           <Stack.Screen 
             name="Catalog" 
             component={CatalogScreen as any} 
+            options={{ animation: Platform.OS === 'ios' ? 'slide_from_right' : 'default' }}
           />
           <Stack.Screen 
             name="Addons" 
             component={AddonsScreen as any} 
+            options={{ animation: Platform.OS === 'ios' ? 'slide_from_right' : 'default' }}
           />
           <Stack.Screen 
             name="Search" 
             component={SearchScreen as any} 
+            options={{ animation: Platform.OS === 'ios' ? 'slide_from_right' : 'default' }}
           />
           <Stack.Screen 
             name="CatalogSettings" 
             component={CatalogSettingsScreen as any} 
+            options={{ animation: Platform.OS === 'ios' ? 'slide_from_right' : 'default' }}
           />
           <Stack.Screen 
             name="HomeScreenSettings" 
@@ -765,10 +771,12 @@ const AppNavigator = () => {
           <Stack.Screen 
             name="Calendar" 
             component={CalendarScreen as any} 
+            options={{ animation: Platform.OS === 'ios' ? 'slide_from_right' : 'default' }}
           />
           <Stack.Screen 
             name="NotificationSettings" 
             component={NotificationSettingsScreen as any} 
+            options={{ animation: Platform.OS === 'ios' ? 'slide_from_right' : 'default' }}
           />
           <Stack.Screen 
             name="MDBListSettings" 

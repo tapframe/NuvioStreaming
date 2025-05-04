@@ -286,9 +286,10 @@ const HeroSection: React.FC<HeroSectionProps> = ({
   }));
 
   const parallaxImageStyle = useAnimatedStyle(() => ({
-    width: '100%',
-    height: '120%',
+    width: '120%',
+    height: '100%',
     top: '-10%',
+    left: '-10%',
     transform: [
       { 
         translateY: interpolate(
@@ -302,7 +303,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
         scale: interpolate(
           dampedScrollY.value,
           [0, 150, 300],
-          [1.1, 1.02, 0.95],
+          [1.05, 1.02, 0.99],
           Extrapolate.CLAMP
         )
       }
