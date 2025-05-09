@@ -150,8 +150,12 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
               
               if (isEpisode) {
                 setEpisodeStreams(updateState);
+                // Turn off loading when we get streams
+                setLoadingEpisodeStreams(false);
               } else {
                 setGroupedStreams(updateState);
+                // Turn off loading when we get streams
+                setLoadingStreams(false);
               }
             } else {
                logger.log(`🤷 [${logPrefix}:${sourceName}] No streams found for addon ${addonName} (${addonId})`);
@@ -634,15 +638,15 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
         return prev;
       });
 
+      // Add a delay before marking loading as complete to give Stremio addons more time
+      setTimeout(() => {
+        setLoadingStreams(false);
+      }, 10000); // 10 second delay to allow streams to load
+
     } catch (error) {
       console.error('❌ [loadStreams] Failed to load streams:', error);
       setError('Failed to load streams');
-    } finally {
-      // Loading is now complete when external sources finish, Stremio updates happen independently.
-      // We need a better way to track overall completion if we want a final 'FINISHED' log.
-      const endTime = Date.now() - startTime;
-      console.log(`🏁 [loadStreams] External sources FINISHED in ${endTime}ms`);
-      setLoadingStreams(false); // Mark loading=false, but Stremio might still be working
+      setLoadingStreams(false);
     }
   };
 
@@ -716,14 +720,15 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
         return prev;
       });
 
+      // Add a delay before marking loading as complete to give Stremio addons more time
+      setTimeout(() => {
+        setLoadingEpisodeStreams(false);
+      }, 10000); // 10 second delay to allow streams to load
+
     } catch (error) {
       console.error('❌ [loadEpisodeStreams] Failed to load episode streams:', error);
       setError('Failed to load episode streams');
-    } finally {
-      // Loading is now complete when external sources finish
-      const endTime = Date.now() - startTime;
-      console.log(`🏁 [loadEpisodeStreams] External sources FINISHED in ${endTime}ms`);
-      setLoadingEpisodeStreams(false); // Mark loading=false, but Stremio might still be working
+      setLoadingEpisodeStreams(false);
     }
   };
 

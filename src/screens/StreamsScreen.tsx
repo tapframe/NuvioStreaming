@@ -691,12 +691,12 @@ export const StreamsScreen = () => {
           >
             <LinearGradient
               colors={[
+                'rgba(0,0,0,0.2)',
                 'rgba(0,0,0,0.4)',
                 'rgba(0,0,0,0.6)',
-                'rgba(0,0,0,0.8)',
                 colors.darkBackground
               ]}
-              locations={[0, 0.3, 0.7, 1]}
+              locations={[0, 0.4, 0.7, 1]}
               style={styles.movieTitleGradient}
             >
               <View style={styles.movieTitleContent}>
@@ -738,12 +738,12 @@ export const StreamsScreen = () => {
                 <LinearGradient
                   colors={[
                     'rgba(0,0,0,0)',
-                    'rgba(0,0,0,0.4)',
-                    'rgba(0,0,0,0.6)',
-                    'rgba(0,0,0,0.8)',
+                    'rgba(0,0,0,0.3)',
+                    'rgba(0,0,0,0.5)',
+                    'rgba(0,0,0,0.7)',
                     colors.darkBackground
                   ]}
-                  locations={[0, 0.3, 0.5, 0.7, 1]}
+                  locations={[0, 0.4, 0.6, 0.8, 1]}
                   style={styles.streamsHeroGradient}
                 >
                   <View style={styles.streamsHeroContent}>
@@ -810,7 +810,7 @@ export const StreamsScreen = () => {
           )}
         </Animated.View>
 
-        {isLoading && Object.keys(streams).length === 0 ? (
+        {isLoading || (Object.keys(streams).length === 0 && (loadingStreams || loadingEpisodeStreams)) ? (
           <Animated.View 
             entering={FadeIn.duration(300)}
             style={styles.loadingContainer}
@@ -878,7 +878,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     padding: 14,
-    paddingTop: Platform.OS === 'android' ? 35 : 45,
+    paddingTop: Platform.OS === 'android' ? 20 : 15,
   },
   backButtonText: {
     color: colors.highEmphasis,
@@ -892,7 +892,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     zIndex: 1,
   },
   streamsMainContentMovie: {
-    paddingTop: Platform.OS === 'android' ? 90 : 100,
+    paddingTop: Platform.OS === 'android' ? 10 : 15,
   },
   filterContainer: {
     paddingHorizontal: 16,
@@ -1074,7 +1074,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   streamsHeroContainer: {
     width: '100%',
-    height: 300,
+    height: 220,
     marginBottom: 0,
     position: 'relative',
     backgroundColor: colors.black,
@@ -1203,7 +1203,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   movieTitleContainer: {
     width: '100%',
-    height: 180,
+    height: 200,
     backgroundColor: colors.black,
     pointerEvents: 'box-none',
   },
