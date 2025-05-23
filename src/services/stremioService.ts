@@ -379,17 +379,20 @@ class StremioService {
     return result;
   }
 
-  private getAddonBaseURL(url: string): string {
-    // Remove trailing manifest.json if present
-    let baseUrl = url.replace(/manifest\.json$/, '').replace(/\/$/, '');
+  private getAddonBaseURL(url: string): { baseUrl: string; queryParams?: string } {
+    // Extract query parameters if they exist
+    const [baseUrl, queryString] = url.split('?');
+    
+    // Remove trailing manifest.json and slashes
+    let cleanBaseUrl = baseUrl.replace(/manifest\.json$/, '').replace(/\/$/, '');
     
     // Ensure URL has protocol
-    if (!baseUrl.startsWith('http')) {
-      baseUrl = `https://${baseUrl}`;
+    if (!cleanBaseUrl.startsWith('http')) {
+      cleanBaseUrl = `https://${cleanBaseUrl}`;
     }
     
-    logger.log('Addon base URL:', baseUrl);
-    return baseUrl;
+    logger.log('Addon base URL:', cleanBaseUrl, queryString ? `with query: ${queryString}` : '');
+    return { baseUrl: cleanBaseUrl, queryParams: queryString };
   }
 
   async getCatalog(manifest: Manifest, type: string, id: string, page = 1, filters: CatalogFilter[] = []): Promise<Meta[]> {
@@ -431,7 +434,7 @@ class StremioService {
     }
     
     try {
-      const baseUrl = this.getAddonBaseURL(manifest.url);
+      const { baseUrl, queryParams } = this.getAddonBaseURL(manifest.url);
       
       // Build the catalog URL
       let url = `${baseUrl}/catalog/${type}/${id}.json`;
@@ -504,8 +507,8 @@ class StremioService {
         if (!metaResource) continue;
         
         try {
-          const baseUrl = this.getAddonBaseURL(addon.url || '');
-          const url = `${baseUrl}/meta/${type}/${id}.json`;
+          const { baseUrl, queryParams } = this.getAddonBaseURL(addon.url || '');
+          const url = queryParams ? `${baseUrl}/meta/${type}/${id}.json?${queryParams}` : `${baseUrl}/meta/${type}/${id}.json`;
           
           const response = await this.retryRequest(async () => {
             return await axios.get(url, { timeout: 10000 });
@@ -612,8 +615,8 @@ class StremioService {
             return;
           }
 
-          const baseUrl = this.getAddonBaseURL(addon.url);
-          const url = `${baseUrl}/stream/${type}/${id}.json`;
+          const { baseUrl, queryParams } = this.getAddonBaseURL(addon.url);
+          const url = queryParams ? `${baseUrl}/stream/${type}/${id}.json?${queryParams}` : `${baseUrl}/stream/${type}/${id}.json`;
           
           logger.log(`🔗 [getStreams] Requesting streams from ${addon.name} (${addon.id}): ${url}`);
           
@@ -656,8 +659,9 @@ class StremioService {
       return null;
     }
     
-    const baseUrl = this.getAddonBaseURL(addon.url);
-    const url = `${baseUrl}/stream/${type}/${id}.json`;
+    const { baseUrl, queryParams } = this.getAddonBaseURL(addon.url);
+    const streamPath = `/stream/${type}/${id}.json`;
+    const url = queryParams ? `${baseUrl}${streamPath}?${queryParams}` : `${baseUrl}${streamPath}`;
     
     logger.log(`Fetching streams from URL: ${url}`);
     
@@ -671,7 +675,7 @@ class StremioService {
           timeout,
           headers: {
             'Accept': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36'
           }
         });
       }, 5); // Increase retries for stream fetching
@@ -868,7 +872,7 @@ class StremioService {
     }
     
     try {
-      const baseUrl = this.getAddonBaseURL(openSubtitlesAddon.url || '');
+      const baseUrl = this.getAddonBaseURL(openSubtitlesAddon.url || '').baseUrl;
       
       // Construct the query URL with the correct format
       // For series episodes, use the videoId directly which includes series ID + episode info
