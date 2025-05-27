@@ -280,19 +280,41 @@ class HDRezkaService {
       const responseText = await response.text();
       logger.log(`[HDRezka] Translator page response length: ${responseText.length}`);
 
-      // Translator ID 238 represents the Original + subtitles player.
+      // 1. Check for "Original + Subtitles" specific ID (often ID 238)
       if (responseText.includes(`data-translator_id="238"`)) {
-        logger.log(`[HDRezka] Found translator ID 238 (Original + subtitles)`);
+        logger.log(`[HDRezka] Found specific translator ID 238 (Original + subtitles)`);
         return '238';
       }
 
+      // 2. Try to extract from the main CDN init function (e.g., initCDNMoviesEvents, initCDNSeriesEvents)
       const functionName = mediaType === 'movie' ? 'initCDNMoviesEvents' : 'initCDNSeriesEvents';
-      const regexPattern = new RegExp(`sof\\.tv\\.${functionName}\\(${id}, ([^,]+)`, 'i');
-      const match = responseText.match(regexPattern);
-      const translatorId = match ? match[1] : null;
+      const cdnEventsRegex = new RegExp(`sof\.tv\.${functionName}\(${id}, ([^,]+)`, 'i');
+      const cdnEventsMatch = responseText.match(cdnEventsRegex);
 
-      logger.log(`[HDRezka] Extracted translator ID: ${translatorId}`);
-      return translatorId;
+      if (cdnEventsMatch && cdnEventsMatch[1]) {
+        const translatorIdFromCdn = cdnEventsMatch[1].trim().replace(/['"]/g, ''); // Remove potential quotes
+        if (translatorIdFromCdn && translatorIdFromCdn !== 'false' && translatorIdFromCdn !== 'null') {
+          logger.log(`[HDRezka] Extracted translator ID from CDN init: ${translatorIdFromCdn}`);
+          return translatorIdFromCdn;
+        }
+      }
+      logger.log(`[HDRezka] CDN init function did not yield a valid translator ID.`);
+
+      // 3. Fallback: Try to find any other data-translator_id attribute in the HTML
+      // This regex looks for data-translator_id="<digits>"
+      const anyTranslatorRegex = /data-translator_id="(\d+)"/;
+      const anyTranslatorMatch = responseText.match(anyTranslatorRegex);
+
+      if (anyTranslatorMatch && anyTranslatorMatch[1]) {
+        const fallbackTranslatorId = anyTranslatorMatch[1].trim();
+        logger.log(`[HDRezka] Found fallback translator ID from data attribute: ${fallbackTranslatorId}`);
+        return fallbackTranslatorId;
+      }
+      logger.log(`[HDRezka] No fallback data-translator_id found.`);
+
+      // If all attempts fail
+      logger.log(`[HDRezka] Could not find any translator ID for id ${id} on page ${fullUrl}`);
+      return null;
     } catch (error) {
       logger.error(`[HDRezka] Failed to get translator ID: ${error}`);
       return null;

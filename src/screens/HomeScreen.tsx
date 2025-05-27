@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -83,7 +83,7 @@ interface ContinueWatchingRef {
   refresh: () => Promise<boolean>;
 }
 
-const DropUpMenu = ({ visible, onClose, item, onOptionSelect }: DropUpMenuProps) => {
+const DropUpMenu = React.memo(({ visible, onClose, item, onOptionSelect }: DropUpMenuProps) => {
   const translateY = useSharedValue(300);
   const opacity = useSharedValue(0);
   const isDarkMode = useColorScheme() === 'dark';
@@ -98,9 +98,15 @@ const DropUpMenu = ({ visible, onClose, item, onOptionSelect }: DropUpMenuProps)
       opacity.value = withTiming(0, { duration: 200 });
       translateY.value = withTiming(300, { duration: 300 });
     }
+    
+    // Cleanup animations when component unmounts
+    return () => {
+      opacity.value = 0;
+      translateY.value = 300;
+    };
   }, [visible]);
 
-  const gesture = Gesture.Pan()
+  const gesture = useMemo(() => Gesture.Pan()
     .onStart(() => {
       // Store initial position if needed
     })
@@ -124,7 +130,7 @@ const DropUpMenu = ({ visible, onClose, item, onOptionSelect }: DropUpMenuProps)
         translateY.value = withTiming(0, { duration: 300 });
         opacity.value = withTiming(1, { duration: 200 });
       }
-    });
+    }), [onClose]);
 
   const overlayStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -138,7 +144,7 @@ const DropUpMenu = ({ visible, onClose, item, onOptionSelect }: DropUpMenuProps)
     backgroundColor: isDarkMode ? currentTheme.colors.elevation2 : currentTheme.colors.white,
   }));
 
-  const menuOptions = [
+  const menuOptions = useMemo(() => [
     {
       icon: item.inLibrary ? 'bookmark' : 'bookmark-border',
       label: item.inLibrary ? 'Remove from Library' : 'Add to Library',
@@ -159,7 +165,12 @@ const DropUpMenu = ({ visible, onClose, item, onOptionSelect }: DropUpMenuProps)
       label: 'Share',
       action: 'share'
     }
-  ];
+  ], [item.inLibrary]);
+
+  const handleOptionSelect = useCallback((action: string) => {
+    onOptionSelect(action);
+    onClose();
+  }, [onOptionSelect, onClose]);
 
   return (
     <Modal
@@ -200,10 +211,7 @@ const DropUpMenu = ({ visible, onClose, item, onOptionSelect }: DropUpMenuProps)
                       { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' },
                       index === menuOptions.length - 1 && styles.lastMenuOption
                     ]}
-                    onPress={() => {
-                      onOptionSelect(option.action);
-                      onClose();
-                    }}
+                    onPress={() => handleOptionSelect(option.action)}
                   >
                     <MaterialIcons
                       name={option.icon as "bookmark" | "check-circle" | "playlist-add" | "share" | "bookmark-border"}
@@ -225,9 +233,9 @@ const DropUpMenu = ({ visible, onClose, item, onOptionSelect }: DropUpMenuProps)
       </GestureHandlerRootView>
     </Modal>
   );
-};
+});
 
-const ContentItem = ({ item: initialItem, onPress }: ContentItemProps) => {
+const ContentItem = React.memo(({ item: initialItem, onPress }: ContentItemProps) => {
   const [menuVisible, setMenuVisible] = useState(false);
   const [localItem, setLocalItem] = useState(initialItem);
   const [isWatched, setIsWatched] = useState(false);
@@ -256,8 +264,8 @@ const ContentItem = ({ item: initialItem, onPress }: ContentItemProps) => {
         setIsWatched(prev => !prev);
         break;
       case 'playlist':
-        break;
       case 'share':
+        // These options don't have implementations yet
         break;
     }
   }, [localItem]);
@@ -266,16 +274,20 @@ const ContentItem = ({ item: initialItem, onPress }: ContentItemProps) => {
     setMenuVisible(false);
   }, []);
 
+  // Only update localItem when initialItem changes
   useEffect(() => {
     setLocalItem(initialItem);
   }, [initialItem]);
 
+  // Subscribe to library updates
   useEffect(() => {
     const unsubscribe = catalogService.subscribeToLibraryUpdates((libraryItems) => {
       const isInLibrary = libraryItems.some(
         libraryItem => libraryItem.id === localItem.id && libraryItem.type === localItem.type
       );
-      setLocalItem(prev => ({ ...prev, inLibrary: isInLibrary }));
+      if (isInLibrary !== localItem.inLibrary) {
+        setLocalItem(prev => ({ ...prev, inLibrary: isInLibrary }));
+      }
     });
 
     return () => unsubscribe();
@@ -330,15 +342,24 @@ const ContentItem = ({ item: initialItem, onPress }: ContentItemProps) => {
         </View>
       </TouchableOpacity>
       
-      <DropUpMenu
-        visible={menuVisible}
-        onClose={handleMenuClose}
-        item={localItem}
-        onOptionSelect={handleOptionSelect}
-      />
+      {menuVisible && (
+        <DropUpMenu
+          visible={menuVisible}
+          onClose={handleMenuClose}
+          item={localItem}
+          onOptionSelect={handleOptionSelect}
+        />
+      )}
     </>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison function to prevent unnecessary re-renders
+  return (
+    prevProps.item.id === nextProps.item.id &&
+    prevProps.item.inLibrary === nextProps.item.inLibrary &&
+    prevProps.onPress === nextProps.onPress
+  );
+});
 
 // Sample categories (real app would get these from API)
 const SAMPLE_CATEGORIES: Category[] = [
@@ -347,7 +368,7 @@ const SAMPLE_CATEGORIES: Category[] = [
   { id: 'channel', name: 'Channels' },
 ];
 
-const SkeletonCatalog = () => {
+const SkeletonCatalog = React.memo(() => {
   const { currentTheme } = useTheme();
   return (
     <View style={styles.catalogContainer}>
@@ -356,7 +377,7 @@ const SkeletonCatalog = () => {
       </View>
     </View>
   );
-};
+});
 
 const HomeScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
@@ -385,7 +406,11 @@ const HomeScreen = () => {
   } = useFeaturedContent();
 
   // Only count feature section as loading if it's enabled in settings
-  const isLoading = (showHeroSection ? featuredLoading : false) || catalogsLoading;
+  const isLoading = useMemo(() => 
+    (showHeroSection ? featuredLoading : false) || catalogsLoading,
+    [showHeroSection, featuredLoading, catalogsLoading]
+  );
+  
   const isRefreshing = catalogsRefreshing;
 
   // React to settings changes
@@ -399,9 +424,6 @@ const HomeScreen = () => {
     const handleSettingsChange = () => {
       setShowHeroSection(settings.showHeroSection);
       setFeaturedContentSource(settings.featuredContentSource);
-      
-      // The featured content refresh is now handled by the useFeaturedContent hook
-      // No need to call refreshFeatured() here to avoid duplicate refreshes
     };
     
     // Subscribe to settings changes
@@ -409,18 +431,6 @@ const HomeScreen = () => {
     
     return unsubscribe;
   }, [settings]);
-
-  // Update the featured content refresh logic to handle persistence
-  useEffect(() => {
-    // This effect was causing duplicate refreshes - it's now handled in useFeaturedContent
-    // We'll keep it just to sync the local state with settings
-    if (showHeroSection && featuredContentSource !== settings.featuredContentSource) {
-      // Just update the local state
-      setFeaturedContentSource(settings.featuredContentSource);
-    }
-    
-    // No timeout needed since we're not refreshing here
-  }, [settings.featuredContentSource, showHeroSection]);
 
   useFocusEffect(
     useCallback(() => {
@@ -451,16 +461,15 @@ const HomeScreen = () => {
         StatusBar.setTranslucent(false);
         StatusBar.setBackgroundColor(currentTheme.colors.darkBackground);
       }
+      
+      // Clean up any lingering timeouts
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
     };
   }, [currentTheme.colors.darkBackground]);
 
-  useEffect(() => {
-    navigation.addListener('beforeRemove', () => {});
-    return () => {
-      navigation.removeListener('beforeRemove', () => {});
-    };
-  }, [navigation]);
-
+  // Preload images function - memoized to avoid recreating on every render
   const preloadImages = useCallback(async (content: StreamingContent[]) => {
     if (!content.length) return;
     
@@ -530,20 +539,37 @@ const HomeScreen = () => {
   }, []);
 
   useEffect(() => {
-    const handlePlaybackComplete = () => {
-      refreshContinueWatching();
-    };
-
     const unsubscribe = navigation.addListener('focus', () => {
       refreshContinueWatching();
     });
 
-    return () => {
-      unsubscribe();
-    };
+    return unsubscribe;
   }, [navigation, refreshContinueWatching]);
 
-  if (isLoading && !isRefreshing) {
+  // Memoize the loading screen to prevent unnecessary re-renders
+  const renderLoadingScreen = useMemo(() => {
+    if (isLoading && !isRefreshing) {
+      return (
+        <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
+          <StatusBar
+            barStyle="light-content"
+            backgroundColor="transparent"
+            translucent
+          />
+          <View style={styles.loadingMainContainer}>
+            <ActivityIndicator size="large" color={currentTheme.colors.primary} />
+            <Text style={[styles.loadingText, { color: currentTheme.colors.textMuted }]}>Loading your content...</Text>
+          </View>
+        </View>
+      );
+    }
+    return null;
+  }, [isLoading, isRefreshing, currentTheme.colors]);
+
+  // Memoize the main content section
+  const renderMainContent = useMemo(() => {
+    if (isLoading && !isRefreshing) return null;
+    
     return (
       <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
         <StatusBar
@@ -551,81 +577,84 @@ const HomeScreen = () => {
           backgroundColor="transparent"
           translucent
         />
-        <View style={styles.loadingMainContainer}>
-          <ActivityIndicator size="large" color={currentTheme.colors.primary} />
-          <Text style={[styles.loadingText, { color: currentTheme.colors.textMuted }]}>Loading your content...</Text>
-        </View>
+        <ScrollView
+          refreshControl={
+            <RefreshControl 
+              refreshing={isRefreshing} 
+              onRefresh={handleRefresh} 
+              tintColor={currentTheme.colors.primary} 
+              colors={[currentTheme.colors.primary, currentTheme.colors.secondary]}
+            />
+          }
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingTop: Platform.OS === 'ios' ? 100 : 90 }
+          ]}
+          showsVerticalScrollIndicator={false}
+          removeClippedSubviews={true}
+        >
+          {showHeroSection && (
+            <FeaturedContent 
+              key={`featured-${showHeroSection}-${featuredContentSource}`}
+              featuredContent={featuredContent}
+              isSaved={isSaved}
+              handleSaveToLibrary={handleSaveToLibrary}
+            />
+          )}
+
+          <Animated.View entering={FadeIn.duration(400).delay(150)}>
+            <ThisWeekSection />
+          </Animated.View>
+
+          {hasContinueWatching && (
+          <Animated.View entering={FadeIn.duration(400).delay(250)}>
+            <ContinueWatchingSection ref={continueWatchingRef} />
+          </Animated.View>
+          )}
+
+          {catalogs.length > 0 ? (
+            catalogs.map((catalog, index) => (
+              <View key={`${catalog.addon}-${catalog.id}-${index}`}>
+                <CatalogSection catalog={catalog} />
+              </View>
+            ))
+          ) : (
+            !catalogsLoading && (
+              <View style={[styles.emptyCatalog, { backgroundColor: currentTheme.colors.elevation1 }]}>
+                <MaterialIcons name="movie-filter" size={40} color={currentTheme.colors.textDark} />
+                <Text style={{ color: currentTheme.colors.textDark, marginTop: 8, fontSize: 16, textAlign: 'center' }}>
+                  No content available
+                </Text>
+                <TouchableOpacity
+                  style={[styles.addCatalogButton, { backgroundColor: currentTheme.colors.primary }]}
+                  onPress={() => navigation.navigate('Settings')}
+                >
+                  <MaterialIcons name="add-circle" size={20} color={currentTheme.colors.white} />
+                  <Text style={[styles.addCatalogButtonText, { color: currentTheme.colors.white }]}>Add Catalogs</Text>
+                </TouchableOpacity>
+              </View>
+            )
+          )}
+        </ScrollView>
       </View>
     );
-  }
+  }, [
+    isLoading, 
+    isRefreshing, 
+    currentTheme.colors, 
+    showHeroSection, 
+    featuredContent, 
+    isSaved, 
+    handleSaveToLibrary, 
+    hasContinueWatching, 
+    catalogs, 
+    catalogsLoading, 
+    handleRefresh,
+    navigation,
+    featuredContentSource
+  ]);
 
-  return (
-    <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor="transparent"
-        translucent
-      />
-      <ScrollView
-        refreshControl={
-          <RefreshControl 
-            refreshing={isRefreshing} 
-            onRefresh={handleRefresh} 
-            tintColor={currentTheme.colors.primary} 
-            colors={[currentTheme.colors.primary, currentTheme.colors.secondary]}
-          />
-        }
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingTop: Platform.OS === 'ios' ? 100 : 90 }
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        {showHeroSection && (
-          <FeaturedContent 
-            key={`featured-${showHeroSection}`}
-            featuredContent={featuredContent}
-            isSaved={isSaved}
-            handleSaveToLibrary={handleSaveToLibrary}
-          />
-        )}
-
-        <Animated.View entering={FadeIn.duration(400).delay(150)}>
-          <ThisWeekSection />
-        </Animated.View>
-
-        {hasContinueWatching && (
-        <Animated.View entering={FadeIn.duration(400).delay(250)}>
-          <ContinueWatchingSection ref={continueWatchingRef} />
-        </Animated.View>
-        )}
-
-        {catalogs.length > 0 ? (
-          catalogs.map((catalog, index) => (
-            <View key={`${catalog.addon}-${catalog.id}-${index}`}>
-              <CatalogSection catalog={catalog} />
-            </View>
-          ))
-        ) : (
-          !catalogsLoading && (
-            <View style={[styles.emptyCatalog, { backgroundColor: currentTheme.colors.elevation1 }]}>
-              <MaterialIcons name="movie-filter" size={40} color={currentTheme.colors.textDark} />
-              <Text style={{ color: currentTheme.colors.textDark, marginTop: 8, fontSize: 16, textAlign: 'center' }}>
-                No content available
-              </Text>
-              <TouchableOpacity
-                style={[styles.addCatalogButton, { backgroundColor: currentTheme.colors.primary }]}
-                onPress={() => navigation.navigate('Settings')}
-              >
-                <MaterialIcons name="add-circle" size={20} color={currentTheme.colors.white} />
-                <Text style={[styles.addCatalogButtonText, { color: currentTheme.colors.white }]}>Add Catalogs</Text>
-              </TouchableOpacity>
-            </View>
-          )
-        )}
-      </ScrollView>
-    </View>
-  );
+  return isLoading && !isRefreshing ? renderLoadingScreen : renderMainContent;
 };
 
 const { width, height } = Dimensions.get('window');
@@ -1045,4 +1074,4 @@ const styles = StyleSheet.create<any>({
   },
 });
 
-export default HomeScreen; 
+export default React.memo(HomeScreen); 
