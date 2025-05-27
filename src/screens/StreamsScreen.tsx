@@ -318,6 +318,13 @@ export const StreamsScreen = () => {
       logger.log("🏁 Stream loading finished. Processing results.");
       
       const currentStreamsData = type === 'series' ? episodeStreams : groupedStreams;
+      
+      // Find all providers that returned streams
+      const providersWithStreams = Object.entries(currentStreamsData)
+        .filter(([_, data]) => data.streams && data.streams.length > 0)
+        .map(([providerId]) => providerId);
+      
+      logger.log(`📊 Providers with streams: ${providersWithStreams.join(', ')}`);
 
       // Update simple loading flag: all expected providers are no longer loading
       setLoadingProviders(prevLoading => {
@@ -334,8 +341,8 @@ export const StreamsScreen = () => {
         expectedProviders.forEach(providerId => {
           if (newStatus[providerId]) { // Ensure the provider entry exists
             const providerHasStreams = currentStreamsData[providerId] && 
-                                       currentStreamsData[providerId].streams && 
-                                       currentStreamsData[providerId].streams.length > 0;
+                                      currentStreamsData[providerId].streams && 
+                                      currentStreamsData[providerId].streams.length > 0;
             
             newStatus[providerId] = {
               ...newStatus[providerId], // Preserve timeStarted
@@ -362,13 +369,32 @@ export const StreamsScreen = () => {
       });
 
       // Update the set of available providers based on what actually loaded streams
-      const providersWithStreams = new Set(Object.keys(currentStreamsData));
-      setAvailableProviders(providersWithStreams);
+      const providersWithStreamsSet = new Set(providersWithStreams);
+      setAvailableProviders(providersWithStreamsSet);
 
       // Reset loadStartTime to signify the end of this loading cycle
-      setLoadStartTime(0); 
+      setLoadStartTime(0);
     }
   }, [loadingStreams, loadingEpisodeStreams, groupedStreams, episodeStreams, type /* loadStartTime is intentionally omitted from deps here */]);
+
+  // Add useEffect to update availableProviders whenever streams change
+  useEffect(() => {
+    if (!loadingStreams && !loadingEpisodeStreams) {
+      const streams = type === 'series' ? episodeStreams : groupedStreams;
+      // Only include providers that actually have streams
+      const providers = new Set(
+        Object.entries(streams)
+          .filter(([_, data]) => data.streams && data.streams.length > 0)
+          .map(([providerId]) => providerId)
+      );
+      setAvailableProviders(providers);
+      
+      // Also reset the selected provider to 'all' if the current selection is no longer available
+      if (selectedProvider !== 'all' && !providers.has(selectedProvider)) {
+        setSelectedProvider('all');
+      }
+    }
+  }, [type, groupedStreams, episodeStreams, loadingStreams, loadingEpisodeStreams, selectedProvider]);
 
   React.useEffect(() => {
     if (type === 'series' && episodeId) {
@@ -628,10 +654,20 @@ export const StreamsScreen = () => {
   const filterItems = useMemo(() => {
     const installedAddons = stremioService.getInstalledAddons();
     const streams = type === 'series' ? episodeStreams : groupedStreams;
+    
+    // Make sure we include all providers with streams, not just those in availableProviders
+    const allProviders = new Set([
+      ...availableProviders,
+      ...Object.keys(streams).filter(key => 
+        streams[key] && 
+        streams[key].streams && 
+        streams[key].streams.length > 0
+      )
+    ]);
 
     return [
       { id: 'all', name: 'All Providers' },
-      ...Array.from(availableProviders)
+      ...Array.from(allProviders)
         .sort((a, b) => {
           // Always put HDRezka at the top
           if (a === 'hdrezka') return -1;

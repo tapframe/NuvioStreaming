@@ -2,6 +2,8 @@ import { logger } from '../utils/logger';
 import { Stream } from '../types/metadata';
 import { tmdbService } from './tmdbService';
 import axios from 'axios';
+import { settingsEmitter } from '../hooks/useSettings';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Use node-fetch if available, otherwise fallback to global fetch
 let fetchImpl: typeof fetch;
@@ -417,6 +419,16 @@ class HDRezkaService {
   async getStreams(mediaId: string, mediaType: string, season?: number, episode?: number): Promise<Stream[]> {
     try {
       logger.log(`[HDRezka] Getting streams for ${mediaType} with ID: ${mediaId}`);
+      
+      // First check if internal providers are enabled
+      const settingsJson = await AsyncStorage.getItem('app_settings');
+      if (settingsJson) {
+        const settings = JSON.parse(settingsJson);
+        if (settings.enableInternalProviders === false) {
+          logger.log('[HDRezka] Internal providers are disabled in settings, skipping HDRezka');
+          return [];
+        }
+      }
       
       // First, extract the actual title from TMDB if this is an ID
       let title = mediaId;

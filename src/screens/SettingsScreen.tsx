@@ -407,6 +407,17 @@ const SettingsScreen: React.FC = () => {
                 badge={catalogCount}
               />
               <SettingItem
+                title="Internal Providers"
+                description="Enable or disable built-in providers like HDRezka"
+                icon="source"
+                renderControl={() => (
+                  <CustomSwitch
+                    value={settings.enableInternalProviders}
+                    onValueChange={(value) => updateSetting('enableInternalProviders', value)}
+                  />
+                )}
+              />
+              <SettingItem
                 title="Home Screen"
                 description="Customize layout and content"
                 icon="home"
