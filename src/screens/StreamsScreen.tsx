@@ -42,7 +42,8 @@ import Animated, {
   Extrapolate,
   runOnJS,
   cancelAnimation,
-  SharedValue
+  SharedValue,
+  Layout
 } from 'react-native-reanimated';
 import { logger } from '../utils/logger';
 
@@ -76,78 +77,86 @@ const StreamCard = ({ stream, onPress, index, isLoading, statusMessage, theme }:
   const displayTitle = isHDRezka ? `HDRezka ${stream.title}` : (stream.name || stream.title || 'Unnamed Stream');
   const displayAddonName = isHDRezka ? '' : (stream.title || '');
 
+  // Animation delay based on index - stagger effect
+  const enterDelay = 100 + (index * 50);
+
   return (
-    <TouchableOpacity 
-      style={[
-        styles.streamCard, 
-        isLoading && styles.streamCardLoading
-      ]} 
-      onPress={onPress}
-      disabled={isLoading}
-      activeOpacity={0.7}
+    <Animated.View
+      entering={FadeInDown.duration(300).delay(enterDelay).springify()}
+      layout={Layout.springify()}
     >
-      <View style={styles.streamDetails}>
-        <View style={styles.streamNameRow}>
-          <View style={styles.streamTitleContainer}>
-            <Text style={[styles.streamName, { color: theme.colors.highEmphasis }]}>
-              {displayTitle}
-            </Text>
-            {displayAddonName && displayAddonName !== displayTitle && (
-              <Text style={[styles.streamAddonName, { color: theme.colors.mediumEmphasis }]}>
-                {displayAddonName}
+      <TouchableOpacity 
+        style={[
+          styles.streamCard, 
+          isLoading && styles.streamCardLoading
+        ]} 
+        onPress={onPress}
+        disabled={isLoading}
+        activeOpacity={0.7}
+      >
+        <View style={styles.streamDetails}>
+          <View style={styles.streamNameRow}>
+            <View style={styles.streamTitleContainer}>
+              <Text style={[styles.streamName, { color: theme.colors.highEmphasis }]}>
+                {displayTitle}
               </Text>
+              {displayAddonName && displayAddonName !== displayTitle && (
+                <Text style={[styles.streamAddonName, { color: theme.colors.mediumEmphasis }]}>
+                  {displayAddonName}
+                </Text>
+              )}
+            </View>
+            
+            {/* Show loading indicator if stream is loading */}
+            {isLoading && (
+              <View style={styles.loadingIndicator}>
+                <ActivityIndicator size="small" color={theme.colors.primary} />
+                <Text style={[styles.loadingText, { color: theme.colors.primary }]}>
+                  {statusMessage || "Loading..."}
+                </Text>
+              </View>
             )}
           </View>
           
-          {/* Show loading indicator if stream is loading */}
-          {isLoading && (
-            <View style={styles.loadingIndicator}>
-              <ActivityIndicator size="small" color={theme.colors.primary} />
-              <Text style={[styles.loadingText, { color: theme.colors.primary }]}>
-                {statusMessage || "Loading..."}
-              </Text>
-            </View>
-          )}
+          <View style={styles.streamMetaRow}>
+            {quality && quality >= "720" && (
+              <QualityBadge type="HD" />
+            )}
+            
+            {isDolby && (
+              <QualityBadge type="VISION" />
+            )}
+            
+            {size && (
+              <View style={[styles.chip, { backgroundColor: theme.colors.darkGray }]}>
+                <Text style={[styles.chipText, { color: theme.colors.white }]}>{size}</Text>
+              </View>
+            )}
+            
+            {isDebrid && (
+              <View style={[styles.chip, { backgroundColor: theme.colors.success }]}>
+                <Text style={[styles.chipText, { color: theme.colors.white }]}>DEBRID</Text>
+              </View>
+            )}
+            
+            {/* Special badge for HDRezka streams */}
+            {isHDRezka && (
+              <View style={[styles.chip, { backgroundColor: theme.colors.accent }]}>
+                <Text style={[styles.chipText, { color: theme.colors.white }]}>HDREZKA</Text>
+              </View>
+            )}
+          </View>
         </View>
         
-        <View style={styles.streamMetaRow}>
-          {quality && quality >= "720" && (
-            <QualityBadge type="HD" />
-          )}
-          
-          {isDolby && (
-            <QualityBadge type="VISION" />
-          )}
-          
-          {size && (
-            <View style={[styles.chip, { backgroundColor: theme.colors.darkGray }]}>
-              <Text style={[styles.chipText, { color: theme.colors.white }]}>{size}</Text>
-            </View>
-          )}
-          
-          {isDebrid && (
-            <View style={[styles.chip, { backgroundColor: theme.colors.success }]}>
-              <Text style={[styles.chipText, { color: theme.colors.white }]}>DEBRID</Text>
-            </View>
-          )}
-          
-          {/* Special badge for HDRezka streams */}
-          {isHDRezka && (
-            <View style={[styles.chip, { backgroundColor: theme.colors.accent }]}>
-              <Text style={[styles.chipText, { color: theme.colors.white }]}>HDREZKA</Text>
-            </View>
-          )}
+        <View style={styles.streamAction}>
+          <MaterialIcons 
+            name="play-arrow" 
+            size={24} 
+            color={theme.colors.primary} 
+          />
         </View>
-      </View>
-      
-      <View style={styles.streamAction}>
-        <MaterialIcons 
-          name="play-arrow" 
-          size={24} 
-          color={theme.colors.primary} 
-        />
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 
@@ -174,44 +183,53 @@ const ProviderFilter = memo(({
 }) => {
   const styles = React.useMemo(() => createStyles(theme.colors), [theme.colors]);
   
-  const renderItem = useCallback(({ item }: { item: { id: string; name: string } }) => (
-    <TouchableOpacity
-      key={item.id}
-      style={[
-        styles.filterChip,
-        selectedProvider === item.id && styles.filterChipSelected
-      ]}
-      onPress={() => onSelect(item.id)}
+  const renderItem = useCallback(({ item, index }: { item: { id: string; name: string }; index: number }) => (
+    <Animated.View
+      entering={FadeIn.duration(300).delay(100 + index * 40)}
+      layout={Layout.springify()}
     >
-      <Text style={[
-        styles.filterChipText,
-        selectedProvider === item.id && styles.filterChipTextSelected
-      ]}>
-        {item.name}
-      </Text>
-    </TouchableOpacity>
+      <TouchableOpacity
+        key={item.id}
+        style={[
+          styles.filterChip,
+          selectedProvider === item.id && styles.filterChipSelected
+        ]}
+        onPress={() => onSelect(item.id)}
+      >
+        <Text style={[
+          styles.filterChipText,
+          selectedProvider === item.id && styles.filterChipTextSelected
+        ]}>
+          {item.name}
+        </Text>
+      </TouchableOpacity>
+    </Animated.View>
   ), [selectedProvider, onSelect, styles]);
 
   return (
-    <FlatList
-      data={providers}
-      renderItem={renderItem}
-      keyExtractor={item => item.id}
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={styles.filterScroll}
-      bounces={true}
-      overScrollMode="never"
-      decelerationRate="fast"
-      initialNumToRender={5}
-      maxToRenderPerBatch={3}
-      windowSize={3}
-      getItemLayout={(data, index) => ({
-        length: 100, // Approximate width of each item
-        offset: 100 * index,
-        index,
-      })}
-    />
+    <Animated.View
+      entering={FadeIn.duration(300)}
+    >
+      <FlatList
+        data={providers}
+        renderItem={renderItem}
+        keyExtractor={item => item.id}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterScroll}
+        bounces={true}
+        overScrollMode="never"
+        decelerationRate="fast"
+        initialNumToRender={5}
+        maxToRenderPerBatch={3}
+        windowSize={3}
+        getItemLayout={(data, index) => ({
+          length: 100, // Approximate width of each item
+          offset: 100 * index,
+          index,
+        })}
+      />
+    </Animated.View>
   );
 });
 
@@ -807,13 +825,14 @@ export const StreamsScreen = () => {
     );
   }, [handleStreamPress, loadingProviders, providerStatus, currentTheme]);
 
-  const renderSectionHeader = useCallback(({ section }: { section: { title: string } }) => (
+  const renderSectionHeader = useCallback(({ section }: { section: { title: string; addonId: string } }) => (
     <Animated.View
-      entering={FadeIn.duration(300)}
+      entering={FadeIn.duration(400)}
+      layout={Layout.springify()}
     >
       <Text style={styles.streamGroupTitle}>{section.title}</Text>
     </Animated.View>
-  ), []);
+  ), [styles.streamGroupTitle]);
 
   return (
     <View style={styles.container}>
