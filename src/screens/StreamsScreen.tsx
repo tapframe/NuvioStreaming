@@ -267,41 +267,108 @@ export const StreamsScreen = () => {
     }
   }>({});
 
-  // Monitor streams loading start
+  // Monitor streams loading start and completion
   useEffect(() => {
+    const now = Date.now();
+    // Define all providers you expect to load. This could be dynamic.
+    const expectedProviders = ['stremio', 'hdrezka'];
+
     if (loadingStreams || loadingEpisodeStreams) {
-      logger.log("⏱️ Stream loading started");
-      const now = Date.now();
-      setLoadStartTime(now);
-      setProviderLoadTimes({});
+      // --- Stream Loading has STARTED or is IN PROGRESS ---
+      logger.log("⏱️ Stream loading started or in progress...");
       
-      // Reset provider status - include HDRezka
-      setProviderStatus({
-        'stremio': {
-          loading: true,
-          success: false,
-          error: false,
-          message: 'Loading...',
-          timeStarted: now,
-          timeCompleted: 0
-        },
-        'hdrezka': {
-          loading: true,
-          success: false,
-          error: false,
-          message: 'Loading...',
-          timeStarted: now,
-          timeCompleted: 0
-        }
-      });
+      // Set load start time only if this is the beginning of a new loading cycle
+      if (loadStartTime === 0) {
+        setLoadStartTime(now);
+      }
       
-      // Also update the simpler loading state - include HDRezka
-      setLoadingProviders({
-        'stremio': true,
-        'hdrezka': true
+      setProviderLoadTimes({}); // Reset individual provider load times tracker
+
+      // Update provider status to loading for all expected providers
+      setProviderStatus(prevStatus => {
+        const newStatus = { ...prevStatus };
+        expectedProviders.forEach(providerId => {
+          // If not already marked as loading, or if it's a fresh cycle, set to loading
+          if (!newStatus[providerId] || !newStatus[providerId].loading || loadStartTime === 0) {
+            newStatus[providerId] = {
+              loading: true,
+              success: false,
+              error: false,
+              message: 'Loading...',
+              timeStarted: (newStatus[providerId]?.loading && newStatus[providerId]?.timeStarted) ? newStatus[providerId].timeStarted : now,
+              timeCompleted: 0,
+            };
+          }
+        });
+        return newStatus;
       });
+
+      // Update simple loading flag for all expected providers
+      setLoadingProviders(prevLoading => {
+        const newLoading = { ...prevLoading };
+        expectedProviders.forEach(providerId => {
+          newLoading[providerId] = true;
+        });
+        return newLoading;
+      });
+
+    } else if (loadStartTime > 0) { 
+      // --- Stream Loading has FINISHED ---
+      // (loadStartTime > 0 implies a loading cycle was active and has now completed)
+      logger.log("🏁 Stream loading finished. Processing results.");
+      
+      const currentStreamsData = type === 'series' ? episodeStreams : groupedStreams;
+
+      // Update simple loading flag: all expected providers are no longer loading
+      setLoadingProviders(prevLoading => {
+        const newLoading = { ...prevLoading };
+        expectedProviders.forEach(providerId => {
+          newLoading[providerId] = false;
+        });
+        return newLoading;
+      });
+
+      // Update detailed provider status based on results
+      setProviderStatus(prevStatus => {
+        const newStatus = { ...prevStatus };
+        expectedProviders.forEach(providerId => {
+          if (newStatus[providerId]) { // Ensure the provider entry exists
+            const providerHasStreams = currentStreamsData[providerId] && 
+                                       currentStreamsData[providerId].streams && 
+                                       currentStreamsData[providerId].streams.length > 0;
+            
+            newStatus[providerId] = {
+              ...newStatus[providerId], // Preserve timeStarted
+              loading: false,
+              success: providerHasStreams,
+              // Mark error if it was loading and now no streams, and wasn't already successful
+              error: !providerHasStreams && newStatus[providerId].loading && !newStatus[providerId].success, 
+              message: providerHasStreams ? 'Loaded successfully' : (newStatus[providerId].error ? 'Error or no streams' : 'No streams found'),
+              timeCompleted: now,
+            };
+          } else {
+            // Fallback if somehow not initialized (should be caught by loading phase)
+            newStatus[providerId] = {
+              loading: false,
+              success: false,
+              error: true,
+              message: 'Provider status error (not initialized)',
+              timeStarted: 0, 
+              timeCompleted: now,
+            };
+          }
+        });
+        return newStatus;
+      });
+
+      // Update the set of available providers based on what actually loaded streams
+      const providersWithStreams = new Set(Object.keys(currentStreamsData));
+      setAvailableProviders(providersWithStreams);
+
+      // Reset loadStartTime to signify the end of this loading cycle
+      setLoadStartTime(0); 
     }
-  }, [loadingStreams, loadingEpisodeStreams]);
+  }, [loadingStreams, loadingEpisodeStreams, groupedStreams, episodeStreams, type /* loadStartTime is intentionally omitted from deps here */]);
 
   React.useEffect(() => {
     if (type === 'series' && episodeId) {
@@ -314,19 +381,13 @@ export const StreamsScreen = () => {
       loadEpisodeStreams(episodeId);
     } else if (type === 'movie') {
       logger.log(`🎬 Loading movie streams for: ${id}`);
-      setLoadingProviders({
-        'stremio': true, 
-        'hdrezka': true
-      });
+      // setLoadingProviders({ // This is now handled by the main effect
+      //   'stremio': true, 
+      //   'hdrezka': true
+      // });
       loadStreams();
     }
   }, [type, episodeId]);
-
-  React.useEffect(() => {
-    const streams = type === 'series' ? episodeStreams : groupedStreams;
-    const providers = new Set(Object.keys(streams));
-    setAvailableProviders(providers);
-  }, [type, groupedStreams, episodeStreams]);
 
   React.useEffect(() => {
     // Trigger entrance animations
@@ -609,6 +670,13 @@ export const StreamsScreen = () => {
     const streams = type === 'series' ? episodeStreams : groupedStreams;
     const installedAddons = stremioService.getInstalledAddons();
 
+    // Helper function to extract quality as a number for sorting
+    const getQualityNumeric = (title: string | undefined): number => {
+      if (!title) return 0;
+      const match = title.match(/(\d+)p/);
+      return match ? parseInt(match[1], 10) : 0;
+    };
+
     // Filter streams by selected provider - only if not "all"
     const filteredEntries = Object.entries(streams)
       .filter(([addonId]) => {
@@ -633,11 +701,21 @@ export const StreamsScreen = () => {
         if (indexB !== -1) return 1;
         return 0;
       })
-      .map(([addonId, { addonName, streams }]) => ({
-        title: addonName,
-        addonId,
-        data: streams
-      }));
+      .map(([addonId, { addonName, streams: providerStreams }]) => {
+        let sortedProviderStreams = providerStreams;
+        if (addonId === 'hdrezka') {
+          sortedProviderStreams = [...providerStreams].sort((a, b) => {
+            const qualityA = getQualityNumeric(a.title);
+            const qualityB = getQualityNumeric(b.title);
+            return qualityB - qualityA; // Sort descending (e.g., 1080p before 720p)
+          });
+        }
+        return {
+          title: addonName,
+          addonId,
+          data: sortedProviderStreams
+        };
+      });
       
     return filteredEntries;
   }, [selectedProvider, type, episodeStreams, groupedStreams]);
