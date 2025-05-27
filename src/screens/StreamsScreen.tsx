@@ -68,9 +68,13 @@ const StreamCard = ({ stream, onPress, index, isLoading, statusMessage, theme }:
   const isDolby = stream.title?.toLowerCase().includes('dolby') || stream.title?.includes('DV');
   const size = stream.title?.match(/💾\s*([\d.]+\s*[GM]B)/)?.[1];
   const isDebrid = stream.behaviorHints?.cached;
+  
+  // Determine if this is a HDRezka stream
+  const isHDRezka = stream.name === 'HDRezka';
 
-  const displayTitle = stream.name || stream.title || 'Unnamed Stream';
-  const displayAddonName = stream.title || '';
+  // For HDRezka streams, the title contains the quality information
+  const displayTitle = isHDRezka ? `HDRezka ${stream.title}` : (stream.name || stream.title || 'Unnamed Stream');
+  const displayAddonName = isHDRezka ? '' : (stream.title || '');
 
   return (
     <TouchableOpacity 
@@ -124,6 +128,13 @@ const StreamCard = ({ stream, onPress, index, isLoading, statusMessage, theme }:
           {isDebrid && (
             <View style={[styles.chip, { backgroundColor: theme.colors.success }]}>
               <Text style={[styles.chipText, { color: theme.colors.white }]}>DEBRID</Text>
+            </View>
+          )}
+          
+          {/* Special badge for HDRezka streams */}
+          {isHDRezka && (
+            <View style={[styles.chip, { backgroundColor: theme.colors.accent }]}>
+              <Text style={[styles.chipText, { color: theme.colors.white }]}>HDREZKA</Text>
             </View>
           )}
         </View>
@@ -264,9 +275,17 @@ export const StreamsScreen = () => {
       setLoadStartTime(now);
       setProviderLoadTimes({});
       
-      // Reset provider status - only for stremio addons
+      // Reset provider status - include HDRezka
       setProviderStatus({
         'stremio': {
+          loading: true,
+          success: false,
+          error: false,
+          message: 'Loading...',
+          timeStarted: now,
+          timeCompleted: 0
+        },
+        'hdrezka': {
           loading: true,
           success: false,
           error: false,
@@ -276,9 +295,10 @@ export const StreamsScreen = () => {
         }
       });
       
-      // Also update the simpler loading state - only for stremio
+      // Also update the simpler loading state - include HDRezka
       setLoadingProviders({
-        'stremio': true
+        'stremio': true,
+        'hdrezka': true
       });
     }
   }, [loadingStreams, loadingEpisodeStreams]);
@@ -287,14 +307,16 @@ export const StreamsScreen = () => {
     if (type === 'series' && episodeId) {
       logger.log(`🎬 Loading episode streams for: ${episodeId}`);
       setLoadingProviders({
-        'stremio': true
+        'stremio': true,
+        'hdrezka': true
       });
       setSelectedEpisode(episodeId);
       loadEpisodeStreams(episodeId);
     } else if (type === 'movie') {
       logger.log(`🎬 Loading movie streams for: ${id}`);
       setLoadingProviders({
-        'stremio': true
+        'stremio': true, 
+        'hdrezka': true
       });
       loadStreams();
     }
@@ -550,6 +572,11 @@ export const StreamsScreen = () => {
       { id: 'all', name: 'All Providers' },
       ...Array.from(availableProviders)
         .sort((a, b) => {
+          // Always put HDRezka at the top
+          if (a === 'hdrezka') return -1;
+          if (b === 'hdrezka') return 1;
+          
+          // Then sort Stremio addons by installation order
           const indexA = installedAddons.findIndex(addon => addon.id === a);
           const indexB = installedAddons.findIndex(addon => addon.id === b);
           
@@ -560,6 +587,13 @@ export const StreamsScreen = () => {
         })
         .map(provider => {
           const addonInfo = streams[provider];
+          
+          // Special handling for HDRezka
+          if (provider === 'hdrezka') {
+            return { id: provider, name: 'HDRezka' };
+          }
+          
+          // Standard handling for Stremio addons
           const installedAddon = installedAddons.find(addon => addon.id === provider);
           
           let displayName = provider;
@@ -586,6 +620,11 @@ export const StreamsScreen = () => {
         return addonId === selectedProvider;
       })
       .sort(([addonIdA], [addonIdB]) => {
+        // Always put HDRezka at the top
+        if (addonIdA === 'hdrezka') return -1;
+        if (addonIdB === 'hdrezka') return 1;
+        
+        // Then sort by Stremio addon installation order
         const indexA = installedAddons.findIndex(addon => addon.id === addonIdA);
         const indexB = installedAddons.findIndex(addon => addon.id === addonIdB);
         
@@ -636,6 +675,10 @@ export const StreamsScreen = () => {
   const renderItem = useCallback(({ item, index, section }: { item: Stream; index: number; section: any }) => {
     const stream = item;
     const isLoading = loadingProviders[section.addonId];
+    
+    // Special handling for HDRezka streams
+    const quality = stream.title?.match(/(\d+)p/)?.[1] || null;
+    const isHDRezka = section.addonId === 'hdrezka';
     
     return (
       <StreamCard 

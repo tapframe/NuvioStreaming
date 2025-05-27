@@ -3,6 +3,7 @@ import { StreamingContent } from '../services/catalogService';
 import { catalogService } from '../services/catalogService';
 import { stremioService } from '../services/stremioService';
 import { tmdbService } from '../services/tmdbService';
+import { hdrezkaService } from '../services/hdrezkaService';
 import { cacheService } from '../services/cacheService';
 import { Cast, Episode, GroupedEpisodes, GroupedStreams } from '../types/metadata';
 import { TMDBService } from '../services/tmdbService';
@@ -175,6 +176,43 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
     }
     // Note: This function completes when getStreams returns, not when all callbacks have fired.
     // Loading indicators should probably be managed based on callbacks completing.
+  };
+
+  const processHDRezkaSource = async (type: string, id: string, season?: number, episode?: number, isEpisode = false) => {
+    const sourceStartTime = Date.now();
+    const logPrefix = isEpisode ? 'loadEpisodeStreams' : 'loadStreams';
+    const sourceName = 'hdrezka';
+    
+    logger.log(`🔍 [${logPrefix}:${sourceName}] Starting fetch`);
+
+    try {
+      const streams = await hdrezkaService.getStreams(
+        id,
+        type,
+        season,
+        episode
+      );
+      
+      const processTime = Date.now() - sourceStartTime;
+      
+      if (streams && streams.length > 0) {
+        logger.log(`✅ [${logPrefix}:${sourceName}] Received ${streams.length} streams after ${processTime}ms`);
+        
+        // Format response similar to Stremio format for the UI
+        return {
+          'hdrezka': {
+            addonName: 'HDRezka',
+            streams
+          }
+        };
+      } else {
+        logger.log(`⚠️ [${logPrefix}:${sourceName}] No streams found after ${processTime}ms`);
+        return {};
+      }
+    } catch (error) {
+      logger.error(`❌ [${logPrefix}:${sourceName}] Error:`, error);
+      return {};
+    }
   };
 
   const processExternalSource = async (sourceType: string, promise: Promise<any>, isEpisode = false) => {
@@ -603,15 +641,18 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
       // Start Stremio request using the callback method
       processStremioSource(type, id, false);
 
-      // No external sources are used anymore
-      const fetchPromises: Promise<any>[] = [];
+      // Add HDRezka source
+      const hdrezkaPromise = processExternalSource('hdrezka', processHDRezkaSource(type, id), false);
+      
+      // Include HDRezka in fetchPromises array
+      const fetchPromises: Promise<any>[] = [hdrezkaPromise];
 
-      // Wait only for external promises now (none in this case)
+      // Wait only for external promises now
       const results = await Promise.allSettled(fetchPromises);
       const totalTime = Date.now() - startTime;
       console.log(`✅ [loadStreams] External source requests completed in ${totalTime}ms (Stremio continues in background)`);
       
-      const sourceTypes: string[] = []; // No external sources
+      const sourceTypes: string[] = ['hdrezka'];
       results.forEach((result, index) => {
         const source = sourceTypes[Math.min(index, sourceTypes.length - 1)];
         console.log(`📊 [loadStreams:${source}] Status: ${result.status}`);
@@ -679,19 +720,25 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
 
       console.log('🔄 [loadEpisodeStreams] Starting stream requests');
       
-      const fetchPromises: Promise<any>[] = [];
-      
       // Start Stremio request using the callback method
       processStremioSource('series', episodeId, true);
+      
+      // Add HDRezka source for episodes
+      const seasonNum = parseInt(season, 10);
+      const episodeNum = parseInt(episode, 10);
+      const hdrezkaPromise = processExternalSource('hdrezka',
+        processHDRezkaSource('series', id, seasonNum, episodeNum, true),
+        true
+      );
+      
+      const fetchPromises: Promise<any>[] = [hdrezkaPromise];
 
-      // No external sources are used anymore
-
-      // Wait only for external promises now (none in this case)
+      // Wait only for external promises now
       const results = await Promise.allSettled(fetchPromises);
       const totalTime = Date.now() - startTime;
       console.log(`✅ [loadEpisodeStreams] External source requests completed in ${totalTime}ms (Stremio continues in background)`);
       
-      const sourceTypes: string[] = []; // No external sources
+      const sourceTypes: string[] = ['hdrezka'];
       results.forEach((result, index) => {
         const source = sourceTypes[Math.min(index, sourceTypes.length - 1)];
         console.log(`📊 [loadEpisodeStreams:${source}] Status: ${result.status}`);
@@ -703,24 +750,15 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
       console.log('🧮 [loadEpisodeStreams] Summary:');
       console.log('  Total time for external sources:', totalTime + 'ms');
       
-      // Log the final states - might not include all Stremio addons yet
-      console.log('📦 [loadEpisodeStreams] Current combined streams count:', 
-        Object.keys(episodeStreams).length > 0 ? 
-        Object.values(episodeStreams).reduce((acc, group: any) => acc + group.streams.length, 0) : 
-        0
-      );
-
-      // Cache the final streams state - Might be incomplete
-      setEpisodeStreams(prev => {
-        // Cache episode streams - maybe incrementally?
-        setPreloadedEpisodeStreams(currentPreloaded => ({ 
-          ...currentPreloaded, 
-          [episodeId]: prev 
+      // Update preloaded episode streams for future use
+      if (Object.keys(episodeStreams).length > 0) {
+        setPreloadedEpisodeStreams(prev => ({
+          ...prev,
+          [episodeId]: { ...episodeStreams }
         }));
-        return prev;
-      });
+      }
 
-      // Add a delay before marking loading as complete to give Stremio addons more time
+      // Add a delay before marking loading as complete to give addons more time
       setTimeout(() => {
         setLoadingEpisodeStreams(false);
       }, 10000); // 10 second delay to allow streams to load
