@@ -68,8 +68,8 @@ const BackgroundImage = React.memo(({ uri, isActive }: { uri: string | null, isA
 
   useEffect(() => {
     opacity.value = withTiming(isActive ? 1 : 0, { 
-      duration: 250, 
-      easing: Easing.inOut(Easing.ease) 
+      duration: 800, 
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
     });
   }, [isActive, opacity]);
 
@@ -80,12 +80,15 @@ const BackgroundImage = React.memo(({ uri, isActive }: { uri: string | null, isA
   if (!uri) return null;
 
   return (
-    <Animated.Image
-      source={{ uri }}
-      style={[styles.backgroundImage, animatedStyle]}
-      blurRadius={Platform.OS === 'android' ? 20 : 50}
-      resizeMode="cover"
-    />
+    <Animated.View style={[styles.backgroundImage, animatedStyle]}>
+      <ExpoImage
+        source={{ uri }}
+        style={StyleSheet.absoluteFill}
+        contentFit="cover"
+        transition={500}
+        blurRadius={Platform.OS === 'android' ? 20 : 50}
+      />
+    </Animated.View>
   );
 });
 
@@ -234,11 +237,14 @@ const FeaturedCard = React.memo(({
         onPress={() => onCardPress(item.id, item.type)}
         disabled={!isCurrentCard}
       >
-        <ImageBackground
-          source={{ uri: cachedContent.bannerUrl || item.poster }}
-          style={styles.featuredImage as ViewStyle}
-          resizeMode="cover"
-        >
+        <View style={styles.featuredImage as ViewStyle}>
+          <ExpoImage
+            source={{ uri: cachedContent.bannerUrl || item.poster }}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            transition={400}
+            cachePolicy="memory-disk"
+          />
           <LinearGradient
             colors={[
               'transparent',
@@ -288,7 +294,7 @@ const FeaturedCard = React.memo(({
               </Animated.View>
             </View>
           </LinearGradient>
-        </ImageBackground>
+        </View>
       </TouchableOpacity>
     </Animated.View>
   );

@@ -3,7 +3,7 @@ import { StreamingContent } from '../services/catalogService';
 import { catalogService } from '../services/catalogService';
 import { stremioService } from '../services/stremioService';
 import { tmdbService } from '../services/tmdbService';
-import { hdrezkaService } from '../services/hdrezkaService';
+import { hdrezkaService } from '../services/providers/hdrezkaService';
 import { cacheService } from '../services/cacheService';
 import { Cast, Episode, GroupedEpisodes, GroupedStreams } from '../types/metadata';
 import { TMDBService } from '../services/tmdbService';

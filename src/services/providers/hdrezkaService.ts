@@ -1,9 +1,10 @@
-import { logger } from '../utils/logger';
-import { Stream } from '../types/metadata';
-import { tmdbService } from './tmdbService';
+import { logger } from '../../utils/logger';
+import { Stream } from '../../types/metadata';
+import { tmdbService } from '../tmdbService';
 import axios from 'axios';
-import { settingsEmitter } from '../hooks/useSettings';
+import { settingsEmitter } from '../../hooks/useSettings';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSettings } from '../../hooks/useSettings';
 
 // Use node-fetch if available, otherwise fallback to global fetch
 let fetchImpl: typeof fetch;
