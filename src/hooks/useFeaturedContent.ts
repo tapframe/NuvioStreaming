@@ -308,34 +308,43 @@ export function useFeaturedContent() {
     return () => cleanup();
   }, [cleanup]);
 
-  const handleSaveToLibrary = useCallback(async () => {
-    if (!featuredContent) return;
+  // Update function to handle saving a specific content item or the default featured content
+  const handleSaveToLibrary = useCallback(async (contentId?: string) => {
+    if (!featuredContent && !contentId) return;
     
     try {
-      const currentSavedStatus = isSaved;
-      setIsSaved(!currentSavedStatus);
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      
+      // Use the provided contentId if available, otherwise use the current featured content
+      const targetContent = contentId 
+        ? allFeaturedContent.find(item => item.id === contentId) || featuredContent 
+        : featuredContent;
+      
+      if (!targetContent) return;
 
-      if (currentSavedStatus) {
-        await catalogService.removeFromLibrary(featuredContent.type, featuredContent.id);
+      if (isSaved) {
+        // Remove from library
+        await catalogService.removeFromLibrary(targetContent.type, targetContent.id);
+        setIsSaved(false);
       } else {
-        const itemToAdd = { ...featuredContent, inLibrary: true }; 
-        await catalogService.addToLibrary(itemToAdd);
+        // Add to library
+        await catalogService.addToLibrary(targetContent);
+        setIsSaved(true);
       }
     } catch (error) {
-      logger.error('Error updating library:', error);
-      setIsSaved(prev => !prev); 
+      logger.error('[useFeaturedContent] Error toggling library status:', error);
     }
-  }, [featuredContent, isSaved]);
+  }, [featuredContent, allFeaturedContent, isSaved]);
 
   // Function to force a refresh if needed
   const refreshFeatured = useCallback(() => loadFeaturedContent(true), [loadFeaturedContent]);
 
-  return { 
-    featuredContent, 
-    loading, 
-    isSaved, 
-    handleSaveToLibrary, 
+  return {
+    featuredContent,
+    allFeaturedContent,
+    loading,
+    isSaved,
+    handleSaveToLibrary,
     refreshFeatured
   };
 } 

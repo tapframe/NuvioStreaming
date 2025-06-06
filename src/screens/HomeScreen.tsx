@@ -387,6 +387,14 @@ const HomeScreen = () => {
   const { settings } = useSettings();
   const [showHeroSection, setShowHeroSection] = useState(settings.showHeroSection);
   const [featuredContentSource, setFeaturedContentSource] = useState(settings.featuredContentSource);
+  const { 
+    featuredContent, 
+    allFeaturedContent,
+    loading: featuredLoading, 
+    isSaved, 
+    handleSaveToLibrary, 
+    refreshFeatured 
+  } = useFeaturedContent();
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [hasContinueWatching, setHasContinueWatching] = useState(false);
 
@@ -397,22 +405,6 @@ const HomeScreen = () => {
     refreshCatalogs 
   } = useHomeCatalogs();
   
-  const { 
-    featuredContent, 
-    loading: featuredLoading, 
-    isSaved, 
-    handleSaveToLibrary, 
-    refreshFeatured 
-  } = useFeaturedContent();
-
-  // Only count feature section as loading if it's enabled in settings
-  const isLoading = useMemo(() => 
-    (showHeroSection ? featuredLoading : false) || catalogsLoading,
-    [showHeroSection, featuredLoading, catalogsLoading]
-  );
-  
-  const isRefreshing = catalogsRefreshing;
-
   // React to settings changes
   useEffect(() => {
     setShowHeroSection(settings.showHeroSection);
@@ -548,7 +540,7 @@ const HomeScreen = () => {
 
   // Memoize the loading screen to prevent unnecessary re-renders
   const renderLoadingScreen = useMemo(() => {
-    if (isLoading && !isRefreshing) {
+    if (featuredLoading && !catalogsRefreshing) {
       return (
         <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
           <StatusBar
@@ -564,11 +556,11 @@ const HomeScreen = () => {
       );
     }
     return null;
-  }, [isLoading, isRefreshing, currentTheme.colors]);
+  }, [featuredLoading, catalogsRefreshing, currentTheme.colors]);
 
   // Memoize the main content section
   const renderMainContent = useMemo(() => {
-    if (isLoading && !isRefreshing) return null;
+    if (featuredLoading && !catalogsRefreshing) return null;
     
     return (
       <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
@@ -580,7 +572,7 @@ const HomeScreen = () => {
         <ScrollView
           refreshControl={
             <RefreshControl 
-              refreshing={isRefreshing} 
+              refreshing={catalogsRefreshing} 
               onRefresh={handleRefresh} 
               tintColor={currentTheme.colors.primary} 
               colors={[currentTheme.colors.primary, currentTheme.colors.secondary]}
@@ -596,7 +588,7 @@ const HomeScreen = () => {
           {showHeroSection && (
             <FeaturedContent 
               key={`featured-${showHeroSection}-${featuredContentSource}`}
-              featuredContent={featuredContent}
+              featuredContent={allFeaturedContent}
               isSaved={isSaved}
               handleSaveToLibrary={handleSaveToLibrary}
             />
@@ -639,11 +631,11 @@ const HomeScreen = () => {
       </View>
     );
   }, [
-    isLoading, 
-    isRefreshing, 
+    featuredLoading, 
+    catalogsRefreshing, 
     currentTheme.colors, 
     showHeroSection, 
-    featuredContent, 
+    allFeaturedContent, 
     isSaved, 
     handleSaveToLibrary, 
     hasContinueWatching, 
@@ -651,10 +643,9 @@ const HomeScreen = () => {
     catalogsLoading, 
     handleRefresh,
     navigation,
-    featuredContentSource
   ]);
 
-  return isLoading && !isRefreshing ? renderLoadingScreen : renderMainContent;
+  return featuredLoading && !catalogsRefreshing ? renderLoadingScreen : renderMainContent;
 };
 
 const { width, height } = Dimensions.get('window');
