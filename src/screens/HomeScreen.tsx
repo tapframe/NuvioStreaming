@@ -37,6 +37,7 @@ import Animated, {
   Extrapolate,
   runOnJS,
   useAnimatedGestureHandler,
+  useAnimatedScrollHandler
 } from 'react-native-reanimated';
 import { PanGestureHandler } from 'react-native-gesture-handler';
 import {
@@ -60,6 +61,7 @@ import { SkeletonFeatured } from '../components/home/SkeletonLoaders';
 import homeStyles, { sharedStyles } from '../styles/homeStyles';
 import { useTheme } from '../contexts/ThemeContext';
 import type { Theme } from '../contexts/ThemeContext';
+import { NuvioHeader } from '../components/NuvioHeader';
 
 // Define interfaces for our data
 interface Category {
@@ -397,6 +399,16 @@ const HomeScreen = () => {
   } = useFeaturedContent();
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [hasContinueWatching, setHasContinueWatching] = useState(false);
+  
+  // Create a shared scroll Y value for header transparency
+  const scrollY = useSharedValue(0);
+  
+  // Move the scroll handler outside of useMemo to ensure consistent hook calls
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = event.contentOffset.y;
+    }
+  });
 
   const { 
     catalogs, 
@@ -569,7 +581,11 @@ const HomeScreen = () => {
           backgroundColor="transparent"
           translucent
         />
-        <ScrollView
+        
+        {/* Add the NuvioHeader with scrollY */}
+        <NuvioHeader scrollY={scrollY} />
+        
+        <Animated.ScrollView
           refreshControl={
             <RefreshControl 
               refreshing={catalogsRefreshing} 
@@ -584,6 +600,8 @@ const HomeScreen = () => {
           ]}
           showsVerticalScrollIndicator={false}
           removeClippedSubviews={true}
+          onScroll={scrollHandler}
+          scrollEventThrottle={16}
         >
           {showHeroSection && (
             <FeaturedContent 
@@ -627,7 +645,7 @@ const HomeScreen = () => {
               </View>
             )
           )}
-        </ScrollView>
+        </Animated.ScrollView>
       </View>
     );
   }, [
@@ -643,6 +661,8 @@ const HomeScreen = () => {
     catalogsLoading, 
     handleRefresh,
     navigation,
+    scrollY,
+    scrollHandler // Add scrollHandler to dependencies
   ]);
 
   return featuredLoading && !catalogsRefreshing ? renderLoadingScreen : renderMainContent;

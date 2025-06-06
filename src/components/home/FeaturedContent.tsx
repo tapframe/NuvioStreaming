@@ -38,6 +38,8 @@ import { logger } from '../../utils/logger';
 import { useTheme } from '../../contexts/ThemeContext';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
 
+const HEADER_HEIGHT = Platform.OS === 'ios' ? 100 : 90;
+
 interface FeaturedContentProps {
   featuredContent: StreamingContent[] | null; // Changed to array
   isSaved: boolean;
@@ -112,10 +114,34 @@ const FeaturedCard = React.memo(({
   const { currentTheme } = useTheme();
   const [localLogoError, setLocalLogoError] = useState(false);
   
+  const titleOpacity = useSharedValue(0);
+  const titleTranslateY = useSharedValue(12);
+  const genreOpacity = useSharedValue(0);
+  const genreTranslateY = useSharedValue(8);
+  
   useEffect(() => {
     // Reset the local error state when cache changes
     setLocalLogoError(false);
   }, [cachedContent.logoUrl]);
+  
+  useEffect(() => {
+    // Animate text elements when this card becomes the current card
+    if (index === currentIndex) {
+      // Title animation
+      titleOpacity.value = withTiming(1, { duration: 180, easing: Easing.out(Easing.quad) });
+      titleTranslateY.value = withTiming(0, { duration: 180, easing: Easing.out(Easing.quad) });
+      
+      // Genre animation with delay
+      genreOpacity.value = withDelay(60, withTiming(1, { duration: 150, easing: Easing.out(Easing.quad) }));
+      genreTranslateY.value = withDelay(60, withTiming(0, { duration: 150, easing: Easing.out(Easing.quad) }));
+    } else {
+      // Reset animations when not the current card
+      titleOpacity.value = 0;
+      titleTranslateY.value = 12;
+      genreOpacity.value = 0;
+      genreTranslateY.value = 8;
+    }
+  }, [currentIndex, index, titleOpacity, titleTranslateY, genreOpacity, genreTranslateY]);
   
   const inputRange = [
     (index - 1) * CARD_WIDTH,
@@ -171,6 +197,20 @@ const FeaturedCard = React.memo(({
     };
   });
   
+  const animatedTitleStyle = useAnimatedStyle(() => {
+    return {
+      opacity: titleOpacity.value,
+      transform: [{ translateY: titleTranslateY.value }],
+    };
+  });
+  
+  const animatedGenreStyle = useAnimatedStyle(() => {
+    return {
+      opacity: genreOpacity.value,
+      transform: [{ translateY: genreTranslateY.value }],
+    };
+  });
+  
   const isCurrentCard = index === currentIndex;
   const hasLogoToShow = cachedContent.logoUrl && !cachedContent.logoLoadError && !localLogoError;
   
@@ -211,7 +251,7 @@ const FeaturedCard = React.memo(({
           >
             <View style={styles.featuredContentContainer as ViewStyle}>
               {hasLogoToShow ? (
-                <View style={styles.logoContainer}>
+                <Animated.View style={[styles.logoContainer, animatedTitleStyle]}>
                   <ExpoImage 
                     source={{ uri: cachedContent.logoUrl! }}
                     style={styles.featuredLogo as ImageStyle}
@@ -223,14 +263,18 @@ const FeaturedCard = React.memo(({
                       setLocalLogoError(true);
                     }}
                   />
-                </View>
+                </Animated.View>
               ) : (
-                <Text style={[styles.featuredTitleText as TextStyle, { color: currentTheme.colors.highEmphasis }]}>
+                <Animated.Text style={[
+                  styles.featuredTitleText as TextStyle, 
+                  { color: currentTheme.colors.highEmphasis },
+                  animatedTitleStyle
+                ]}>
                   {item.name}
-                </Text>
+                </Animated.Text>
               )}
               
-              <View style={styles.genreContainer as ViewStyle}>
+              <Animated.View style={[styles.genreContainer as ViewStyle, animatedGenreStyle]}>
                 {item.genres?.slice(0, 3).map((genre, genreIndex, array) => (
                   <React.Fragment key={genreIndex}>
                     <Text style={[styles.genreText as TextStyle, { color: currentTheme.colors.white }]}>
@@ -241,7 +285,7 @@ const FeaturedCard = React.memo(({
                     )}
                   </React.Fragment>
                 ))}
-              </View>
+              </Animated.View>
             </View>
           </LinearGradient>
         </ImageBackground>
@@ -277,7 +321,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
   }>>({});
   
   const logoFetchInProgress = useRef<Record<string, boolean>>({});
-  
+
   // Preload the image
   const preloadImage = async (url: string): Promise<boolean> => {
     if (!url) return false;
@@ -305,7 +349,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
       return false;
     }
   };
-  
+
   // Fetch logo for a content item
   const fetchLogoForContent = async (content: StreamingContent) => {
     if (!content || logoFetchInProgress.current[content.id]) return;
@@ -316,7 +360,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
     try {
       const contentId = content.id;
       const contentData = content;
-      const currentLogo = contentData.logo;
+        const currentLogo = contentData.logo;
       
       // If we already have a logo in the content object, use it
       if (currentLogo) {
@@ -334,54 +378,54 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
         logoFetchInProgress.current[content.id] = false;
         return;
       }
-      
-      // Get preferences
-      const logoPreference = settings.logoSourcePreference || 'metahub';
-      const preferredLanguage = settings.tmdbLanguagePreference || 'en';
-      
-      // Extract IDs
-      let imdbId: string | null = null;
-      if (contentData.id.startsWith('tt')) {
-        imdbId = contentData.id;
-      } else if ((contentData as any).imdbId) {
-        imdbId = (contentData as any).imdbId;
-      } else if ((contentData as any).externalIds?.imdb_id) {
-        imdbId = (contentData as any).externalIds.imdb_id;
-      }
-      
-      let tmdbId: string | null = null;
-      if (contentData.id.startsWith('tmdb:')) {
-        tmdbId = contentData.id.split(':')[1];
-      } else if ((contentData as any).tmdb_id) {
-         tmdbId = String((contentData as any).tmdb_id);
-      }
-      
-      // If we only have IMDB ID, try to find TMDB ID proactively
-      if (imdbId && !tmdbId) {
-        try {
-          const tmdbService = TMDBService.getInstance();
-          const foundData = await tmdbService.findTMDBIdByIMDB(imdbId);
-          if (foundData) {
-            tmdbId = String(foundData);
-          }
-        } catch (findError) {
+        
+        // Get preferences
+        const logoPreference = settings.logoSourcePreference || 'metahub';
+        const preferredLanguage = settings.tmdbLanguagePreference || 'en';
+        
+        // Extract IDs
+        let imdbId: string | null = null;
+        if (contentData.id.startsWith('tt')) {
+          imdbId = contentData.id;
+        } else if ((contentData as any).imdbId) {
+          imdbId = (contentData as any).imdbId;
+        } else if ((contentData as any).externalIds?.imdb_id) {
+          imdbId = (contentData as any).externalIds.imdb_id;
+        }
+        
+        let tmdbId: string | null = null;
+        if (contentData.id.startsWith('tmdb:')) {
+          tmdbId = contentData.id.split(':')[1];
+        } else if ((contentData as any).tmdb_id) {
+           tmdbId = String((contentData as any).tmdb_id);
+        }
+        
+        // If we only have IMDB ID, try to find TMDB ID proactively
+        if (imdbId && !tmdbId) {
+          try {
+            const tmdbService = TMDBService.getInstance();
+            const foundData = await tmdbService.findTMDBIdByIMDB(imdbId);
+            if (foundData) {
+              tmdbId = String(foundData);
+            }
+          } catch (findError) {
           console.warn(`[FeaturedContent] Failed to find TMDB ID for ${imdbId}:`, findError);
         }
-      }
-      
-      const tmdbType = contentData.type === 'series' ? 'tv' : 'movie';
-      let finalLogoUrl: string | null = null;
-      
-      // --- Logo Fetching Logic ---
-      
+        }
+        
+        const tmdbType = contentData.type === 'series' ? 'tv' : 'movie';
+        let finalLogoUrl: string | null = null;
+        
+        // --- Logo Fetching Logic ---
+        
       // First try Metahub
-      if (imdbId) {
-        const metahubUrl = `https://images.metahub.space/logo/medium/${imdbId}/img`;
-        try {
+          if (imdbId) {
+            const metahubUrl = `https://images.metahub.space/logo/medium/${imdbId}/img`;
+            try {
           console.log(`[FeaturedContent] Checking Metahub logo: ${metahubUrl}`);
-          const response = await fetch(metahubUrl, { method: 'HEAD' });
-          if (response.ok) {
-            finalLogoUrl = metahubUrl;
+              const response = await fetch(metahubUrl, { method: 'HEAD' });
+              if (response.ok) {
+                finalLogoUrl = metahubUrl;
             console.log(`[FeaturedContent] Found Metahub logo: ${finalLogoUrl}`);
           }
         } catch (error) { 
@@ -391,19 +435,19 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
       
       // Then try TMDB if needed
       if (!finalLogoUrl && tmdbId) {
-        try {
-          const tmdbService = TMDBService.getInstance();
-          const logoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId, preferredLanguage);
-          if (logoUrl) {
-            finalLogoUrl = logoUrl;
+            try {
+              const tmdbService = TMDBService.getInstance();
+              const logoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId, preferredLanguage);
+              if (logoUrl) {
+                finalLogoUrl = logoUrl;
             console.log(`[FeaturedContent] Found TMDB logo: ${finalLogoUrl}`);
           }
         } catch (error) {
           console.warn(`[FeaturedContent] TMDB logo fetch failed for ${tmdbId}`);
         }
-      }
-      
-      // --- Set Final Logo ---
+        }
+        
+        // --- Set Final Logo ---
       console.log(`[FeaturedContent] Setting logo for ${contentId}: ${finalLogoUrl || 'NO LOGO FOUND'}`);
       
       setContentCache(prev => ({
@@ -419,9 +463,9 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
       if (finalLogoUrl) {
         content.logo = finalLogoUrl;
         await preloadImage(finalLogoUrl);
-      }
-      
-    } catch (error) {
+        }
+        
+      } catch (error) {
       console.error('[FeaturedContent] Error in fetchLogo:', error);
       setContentCache(prev => ({
         ...prev,
@@ -430,7 +474,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
           logoLoadError: true
         }
       }));
-    } finally {
+      } finally {
       logoFetchInProgress.current[content.id] = false;
     }
   };
@@ -554,7 +598,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
   if (!limitedContent || limitedContent.length === 0) {
     return <SkeletonFeatured />;
   }
-  
+
   return (
     <View style={styles.container}>
       <View style={styles.backgroundContainer}>
@@ -610,7 +654,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   backgroundContainer: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: -HEADER_HEIGHT,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',

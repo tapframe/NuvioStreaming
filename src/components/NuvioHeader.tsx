@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, TouchableOpacity, Platform, StyleSheet, Image } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -8,13 +8,40 @@ import { BlurView as ExpoBlurView } from 'expo-blur';
 import { BlurView as CommunityBlurView } from '@react-native-community/blur';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { useTheme } from '../contexts/ThemeContext';
+import Animated, { 
+  useSharedValue, 
+  useAnimatedStyle, 
+  interpolate, 
+  Extrapolate,
+  withTiming,
+  useDerivedValue
+} from 'react-native-reanimated';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-export const NuvioHeader = () => {
+interface NuvioHeaderProps {
+  scrollY?: Animated.SharedValue<number>;
+}
+
+export const NuvioHeader = ({ scrollY }: NuvioHeaderProps) => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute();
   const { currentTheme } = useTheme();
+  
+  // Create a local shared value if none is provided
+  const localScrollY = useSharedValue(0);
+  const activeScrollY = scrollY || localScrollY;
+  
+  // Derived value for header opacity based on scroll position
+  const headerOpacity = useDerivedValue(() => {
+    // Start showing background after 10px of scroll
+    return interpolate(
+      activeScrollY.value,
+      [0, 40],
+      [0, 1],
+      Extrapolate.CLAMP
+    );
+  });
 
   // Only render the header if the current route is 'Home'
   if (route.name !== 'Home') {
@@ -23,27 +50,35 @@ export const NuvioHeader = () => {
   
   // Determine if running in Expo Go
   const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+  
+  const animatedBackgroundStyle = useAnimatedStyle(() => {
+    return {
+      opacity: headerOpacity.value,
+    };
+  });
 
   return (
     <View style={styles.container}>
       <View style={styles.headerContainer}>
-        {Platform.OS === 'ios' ? (
-          <ExpoBlurView intensity={60} style={styles.blurOverlay} tint="dark" />
-        ) : (
-          isExpoGo ? (
-            <View style={[styles.androidBlurContainer, styles.androidFallbackBlur]} />
+        <Animated.View style={[styles.blurContainer, animatedBackgroundStyle]}>
+          {Platform.OS === 'ios' ? (
+            <ExpoBlurView intensity={60} style={styles.blurOverlay} tint="dark" />
           ) : (
-            <View style={styles.androidBlurContainer}>
-              <CommunityBlurView
-                style={styles.androidBlur}
-                blurType="dark"
-                blurAmount={8}
-                overlayColor="rgba(0,0,0,0.4)"
-                reducedTransparencyFallbackColor="black"
-              />
-            </View>
-          )
-        )}
+            isExpoGo ? (
+              <View style={[styles.androidBlurContainer, styles.androidFallbackBlur]} />
+            ) : (
+              <View style={styles.androidBlurContainer}>
+                <CommunityBlurView
+                  style={styles.androidBlur}
+                  blurType="dark"
+                  blurAmount={8}
+                  overlayColor="rgba(0,0,0,0.4)"
+                  reducedTransparencyFallbackColor="black"
+                />
+              </View>
+            )
+          )}
+        </Animated.View>
         <View style={styles.contentContainer}>
           <View style={styles.logoContainer}>
             <Image
@@ -82,11 +117,13 @@ const styles = StyleSheet.create({
   headerContainer: {
     height: Platform.OS === 'ios' ? 100 : 90,
     paddingTop: Platform.OS === 'ios' ? 35 : 20,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  blurContainer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: -1,
   },
   blurOverlay: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: -1,
   },
   androidBlurContainer: {
     position: 'absolute',
@@ -94,7 +131,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: -1,
     overflow: 'hidden',
   },
   androidBlur: {
