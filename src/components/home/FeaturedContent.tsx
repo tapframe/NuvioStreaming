@@ -153,40 +153,43 @@ const FeaturedCard = React.memo(({
   ];
   
   const animatedCardStyle = useAnimatedStyle(() => {
+    // Use Math.floor to ensure integer pixel values
+    const pixelScrollX = Math.floor(scrollX.value);
+    
     const scale = interpolate(
-      scrollX.value,
+      pixelScrollX,
       inputRange,
       [0.9, 1, 0.9],
       'clamp'
     );
     
     const opacity = interpolate(
-      scrollX.value,
+      pixelScrollX,
       inputRange,
       [0.7, 1, 0.7],
       'clamp'
     );
     
-    const zIndex = interpolate(
-      scrollX.value,
+    const zIndex = Math.floor(interpolate(
+      pixelScrollX,
       inputRange,
       [0, 10, 0],
       'clamp'
-    );
+    ));
     
-    const translateY = interpolate(
-      scrollX.value,
+    const translateY = Math.floor(interpolate(
+      pixelScrollX,
       inputRange,
-      [25, 0, 25], // Increased for more depth
+      [25, 0, 25],
       'clamp'
-    );
+    ));
 
-    const rotateYValue = interpolate(
-      scrollX.value,
+    const rotateYValue = Math.floor(interpolate(
+      pixelScrollX,
       inputRange,
-      [20, 0, -20], // Rotate side cards
+      [20, 0, -20],
       'clamp'
-    );
+    ));
     
     return {
       transform: [
@@ -523,10 +526,15 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
   // Scroll handler
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
-      scrollX.value = event.contentOffset.x;
+      // Use floor to prevent precision errors with long decimal values
+      scrollX.value = Math.floor(event.contentOffset.x);
     },
     onMomentumEnd: (event) => {
-      const newIndex = Math.round(event.contentOffset.x / CARD_WIDTH);
+      // Ensure we're working with integer values to avoid precision errors
+      const position = Math.floor(event.contentOffset.x);
+      const cardWidth = Math.floor(CARD_WIDTH);
+      const newIndex = Math.round(position / cardWidth);
+      
       if (newIndex !== currentIndex) {
         runOnJS(setCurrentIndex)(newIndex);
       }
