@@ -6,7 +6,6 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  RefreshControl,
   SafeAreaView,
   StatusBar,
   useColorScheme,
@@ -381,6 +380,8 @@ const SkeletonCatalog = React.memo(() => {
   );
 });
 
+const MemoizedFeaturedContent = React.memo(FeaturedContent);
+
 const HomeScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const isDarkMode = useColorScheme() === 'dark';
@@ -395,7 +396,7 @@ const HomeScreen = () => {
     loading: featuredLoading, 
     isSaved, 
     handleSaveToLibrary, 
-    refreshFeatured 
+    refreshFeatured
   } = useFeaturedContent();
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [hasContinueWatching, setHasContinueWatching] = useState(false);
@@ -412,9 +413,7 @@ const HomeScreen = () => {
 
   const { 
     catalogs, 
-    loading: catalogsLoading, 
-    refreshing: catalogsRefreshing, 
-    refreshCatalogs 
+    loading: catalogsLoading,
   } = useHomeCatalogs();
   
   // React to settings changes
@@ -498,25 +497,6 @@ const HomeScreen = () => {
     }
   }, []);
 
-  const handleRefresh = useCallback(async () => {
-    try {
-      const refreshTasks = [
-        refreshCatalogs(),
-        continueWatchingRef.current?.refresh(),
-      ];
-      
-      // Only refresh featured content if hero section is enabled,
-      // and force refresh to bypass the cache
-      if (showHeroSection) {
-        refreshTasks.push(refreshFeatured());
-      }
-      
-      await Promise.all(refreshTasks);
-    } catch (error) {
-      logger.error('Error during refresh:', error);
-    }
-  }, [refreshFeatured, refreshCatalogs, showHeroSection]);
-
   const handleContentPress = useCallback((id: string, type: string) => {
     navigation.navigate('Metadata', { id, type });
   }, [navigation]);
@@ -552,7 +532,7 @@ const HomeScreen = () => {
 
   // Memoize the loading screen to prevent unnecessary re-renders
   const renderLoadingScreen = useMemo(() => {
-    if (featuredLoading && !catalogsRefreshing) {
+    if (featuredLoading) {
       return (
         <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
           <StatusBar
@@ -568,11 +548,15 @@ const HomeScreen = () => {
       );
     }
     return null;
-  }, [featuredLoading, catalogsRefreshing, currentTheme.colors]);
+  }, [featuredLoading, currentTheme.colors]);
+
+  const memoizedHandleSaveToLibrary = useCallback((contentId: string) => {
+    handleSaveToLibrary(contentId);
+  }, [handleSaveToLibrary]);
 
   // Memoize the main content section
   const renderMainContent = useMemo(() => {
-    if (featuredLoading && !catalogsRefreshing) return null;
+    if (featuredLoading) return null;
     
     return (
       <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
@@ -586,14 +570,6 @@ const HomeScreen = () => {
         <NuvioHeader scrollY={scrollY} />
         
         <Animated.ScrollView
-          refreshControl={
-            <RefreshControl 
-              refreshing={catalogsRefreshing} 
-              onRefresh={handleRefresh} 
-              tintColor={currentTheme.colors.primary} 
-              colors={[currentTheme.colors.primary, currentTheme.colors.secondary]}
-            />
-          }
           contentContainerStyle={[
             styles.scrollContent,
             { paddingTop: Platform.OS === 'ios' ? 100 : 90 }
@@ -602,13 +578,14 @@ const HomeScreen = () => {
           removeClippedSubviews={true}
           onScroll={scrollHandler}
           scrollEventThrottle={16}
+          bounces={false}
+          overScrollMode="never"
         >
           {showHeroSection && (
-            <FeaturedContent 
-              key={`featured-${showHeroSection}-${featuredContentSource}`}
+            <MemoizedFeaturedContent
               featuredContent={allFeaturedContent}
               isSaved={isSaved}
-              handleSaveToLibrary={handleSaveToLibrary}
+              handleSaveToLibrary={memoizedHandleSaveToLibrary}
             />
           )}
 
@@ -650,22 +627,19 @@ const HomeScreen = () => {
     );
   }, [
     featuredLoading, 
-    catalogsRefreshing, 
     currentTheme.colors, 
     showHeroSection, 
     allFeaturedContent, 
     isSaved, 
-    handleSaveToLibrary, 
-    hasContinueWatching, 
     catalogs, 
     catalogsLoading, 
-    handleRefresh,
     navigation,
     scrollY,
-    scrollHandler // Add scrollHandler to dependencies
+    scrollHandler,
+    memoizedHandleSaveToLibrary
   ]);
 
-  return featuredLoading && !catalogsRefreshing ? renderLoadingScreen : renderMainContent;
+  return featuredLoading ? renderLoadingScreen : renderMainContent;
 };
 
 const { width, height } = Dimensions.get('window');
