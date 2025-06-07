@@ -64,33 +64,39 @@ interface FeaturedCardProps {
 }
 
 const BackgroundImage = React.memo(({ uri, isActive }: { uri: string | null, isActive: boolean }) => {
-  const opacity = useSharedValue(0);
+  const opacity = useSharedValue(isActive ? 1 : 0);
 
   useEffect(() => {
     opacity.value = withTiming(isActive ? 1 : 0, { 
-      duration: 800, 
+      duration: 300,
       easing: Easing.bezier(0.25, 0.1, 0.25, 1),
     });
-  }, [isActive, opacity]);
+  }, [isActive]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
+    position: 'absolute',
+    width: '120%',
+    height: '120%',
+    top: 0,
+    left: 0,
   }));
 
   if (!uri) return null;
 
   return (
-    <Animated.View style={[styles.backgroundImage, animatedStyle]}>
+    <Animated.View style={animatedStyle}>
       <ExpoImage
         source={{ uri }}
         style={StyleSheet.absoluteFill}
         contentFit="cover"
-        transition={500}
+        transition={300}
+        cachePolicy="memory-disk"
         blurRadius={Platform.OS === 'android' ? 20 : 50}
       />
     </Animated.View>
   );
-});
+}, (prev, next) => prev.uri === next.uri && prev.isActive === next.isActive);
 
 // Cache to store preloaded images
 const imageCache: Record<string, boolean> = {};
@@ -98,8 +104,9 @@ const imageCache: Record<string, boolean> = {};
 const { width, height } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.7;
 const CARD_HEIGHT = height * 0.55;
-const VISIBLE_SIDE_CARD = width * 0.15;
-const CARD_SPACING = 0;
+const SPACING = width * 0.03; // 3% of screen width for spacing
+const SIDE_PADDING = (width - CARD_WIDTH) / 2;
+const ITEM_SIZE = CARD_WIDTH + SPACING;
 
 // Separate component for rendering individual cards
 const FeaturedCard = React.memo(({ 
@@ -147,73 +154,71 @@ const FeaturedCard = React.memo(({
   }, [currentIndex, index, titleOpacity, titleTranslateY, genreOpacity, genreTranslateY]);
   
   const inputRange = [
-    (index - 1) * CARD_WIDTH,
-    index * CARD_WIDTH,
-    (index + 1) * CARD_WIDTH
+    (index - 1) * ITEM_SIZE,
+    index * ITEM_SIZE,
+    (index + 1) * ITEM_SIZE
   ];
   
   const animatedCardStyle = useAnimatedStyle(() => {
-    // Use Math.floor to ensure integer pixel values
     const pixelScrollX = Math.floor(scrollX.value);
     
     const scale = interpolate(
       pixelScrollX,
       inputRange,
-      [0.9, 1, 0.9],
+      [0.92, 1, 0.92],
       'clamp'
     );
     
     const opacity = interpolate(
       pixelScrollX,
       inputRange,
-      [0.7, 1, 0.7],
+      [0.6, 1, 0.6],
       'clamp'
     );
-    
-    const zIndex = Math.floor(interpolate(
-      pixelScrollX,
-      inputRange,
-      [0, 10, 0],
-      'clamp'
-    ));
-    
-    const translateY = Math.floor(interpolate(
-      pixelScrollX,
-      inputRange,
-      [25, 0, 25],
-      'clamp'
-    ));
 
-    const rotateYValue = Math.floor(interpolate(
-      pixelScrollX,
-      inputRange,
-      [20, 0, -20],
-      'clamp'
-    ));
-    
     return {
       transform: [
-        { perspective: 1000 },
-        { scale }, 
-        { translateY },
-        { rotateY: `${rotateYValue}deg` }
+        { scale }
       ],
       opacity,
-      zIndex,
     };
   });
   
   const animatedTitleStyle = useAnimatedStyle(() => {
+    const pixelScrollX = Math.floor(scrollX.value);
+    
+    const opacity = interpolate(
+      pixelScrollX,
+      inputRange,
+      [0, 1, 0],
+      'clamp'
+    );
+
+    const scale = interpolate(
+      pixelScrollX,
+      inputRange,
+      [0.9, 1, 0.9],
+      'clamp'
+    );
+
     return {
-      opacity: titleOpacity.value,
-      transform: [{ translateY: titleTranslateY.value }],
+      opacity,
+      transform: [{ scale }]
     };
   });
   
   const animatedGenreStyle = useAnimatedStyle(() => {
+    const pixelScrollX = Math.floor(scrollX.value);
+    
+    const opacity = interpolate(
+      pixelScrollX,
+      inputRange,
+      [0, 1, 0],
+      'clamp'
+    );
+
     return {
-      opacity: genreOpacity.value,
-      transform: [{ translateY: genreTranslateY.value }],
+      opacity
     };
   });
   
@@ -249,14 +254,10 @@ const FeaturedCard = React.memo(({
             cachePolicy="memory-disk"
           />
           <LinearGradient
-            colors={[
-              'transparent',
-              'rgba(0,0,0,0.1)',
-              'rgba(0,0,0,0.7)',
-              currentTheme.colors.darkBackground,
-            ]}
-            locations={[0, 0.3, 0.7, 1]}
-            style={styles.featuredGradient as ViewStyle}
+            colors={['transparent', 'rgba(0,0,0,0.85)']}
+            style={styles.contentGradient}
+            start={{ x: 0, y: 0.6 }}
+            end={{ x: 0, y: 1 }}
           >
             <View style={styles.featuredContentContainer as ViewStyle}>
               {hasLogoToShow ? (
@@ -301,6 +302,12 @@ const FeaturedCard = React.memo(({
       </TouchableOpacity>
     </Animated.View>
   );
+}, (prev, next) => {
+  return prev.index === next.index &&
+    prev.currentIndex === next.currentIndex &&
+    prev.isSaved === next.isSaved &&
+    prev.cachedContent.bannerUrl === next.cachedContent.bannerUrl &&
+    prev.cachedContent.logoUrl === next.cachedContent.logoUrl;
 });
 
 const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: FeaturedContentProps) => {
@@ -526,14 +533,11 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
   // Scroll handler
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
-      // Use floor to prevent precision errors with long decimal values
-      scrollX.value = Math.floor(event.contentOffset.x);
+      scrollX.value = event.contentOffset.x;
     },
     onMomentumEnd: (event) => {
-      // Ensure we're working with integer values to avoid precision errors
-      const position = Math.floor(event.contentOffset.x);
-      const cardWidth = Math.floor(CARD_WIDTH);
-      const newIndex = Math.round(position / cardWidth);
+      const position = event.contentOffset.x;
+      const newIndex = Math.round(position / ITEM_SIZE);
       
       if (newIndex !== currentIndex) {
         runOnJS(setCurrentIndex)(newIndex);
@@ -636,24 +640,36 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
         keyExtractor={(item) => item.id}
         horizontal
         showsHorizontalScrollIndicator={false}
-        snapToInterval={CARD_WIDTH}
+        snapToInterval={ITEM_SIZE}
         decelerationRate="fast"
         contentContainerStyle={styles.scrollContent}
         onScroll={scrollHandler}
-        scrollEventThrottle={16}
+        scrollEventThrottle={8}
         initialScrollIndex={0}
         getItemLayout={(data, index) => ({
-          length: CARD_WIDTH,
-          offset: CARD_WIDTH * index,
+          length: ITEM_SIZE,
+          offset: ITEM_SIZE * index,
           index,
         })}
+        snapToAlignment="start"
+        bounces={false}
+        overScrollMode="never"
+        removeClippedSubviews={false}
+        maxToRenderPerBatch={7}
+        initialNumToRender={7}
+        windowSize={7}
+        maintainVisibleContentPosition={{
+          minIndexForVisible: 0,
+          autoscrollToTopThreshold: 10,
+        }}
         viewabilityConfig={{
           itemVisiblePercentThreshold: 50,
+          minimumViewTime: 100,
         }}
       />
 
       <LinearGradient
-        colors={[`${currentTheme.colors.background}00`, currentTheme.colors.background]}
+        colors={[`${currentTheme.colors.darkBackground}00`, currentTheme.colors.darkBackground]}
         style={styles.bottomFade}
         pointerEvents="none"
       />
@@ -687,13 +703,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   scrollContent: {
-    paddingHorizontal: VISIBLE_SIDE_CARD,
+    paddingHorizontal: SIDE_PADDING - SPACING / 2,
     paddingVertical: 10,
   },
   cardContainer: {
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
-    paddingHorizontal: 0,
+    marginHorizontal: SPACING / 2,
   },
   card: {
     width: '100%',
@@ -705,14 +721,18 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  featuredGradient: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'flex-end',
-    paddingBottom: 20,
+  contentGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '40%',
   },
   featuredContentContainer: {
-    justifyContent: 'flex-end',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     paddingHorizontal: 16,
     paddingBottom: 16,
     alignItems: 'center',
