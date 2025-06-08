@@ -31,14 +31,19 @@ interface HeroSectionProps {
   heroHeight: Animated.SharedValue<number>;
   heroOpacity: Animated.SharedValue<number>;
   heroScale: Animated.SharedValue<number>;
+  heroRotate: Animated.SharedValue<number>;
   logoOpacity: Animated.SharedValue<number>;
   logoScale: Animated.SharedValue<number>;
+  logoRotate: Animated.SharedValue<number>;
   genresOpacity: Animated.SharedValue<number>;
   genresTranslateY: Animated.SharedValue<number>;
+  genresScale: Animated.SharedValue<number>;
   buttonsOpacity: Animated.SharedValue<number>;
   buttonsTranslateY: Animated.SharedValue<number>;
+  buttonsScale: Animated.SharedValue<number>;
   watchProgressOpacity: Animated.SharedValue<number>;
   watchProgressScaleY: Animated.SharedValue<number>;
+  watchProgressWidth: Animated.SharedValue<number>;
   watchProgress: {
     currentTime: number;
     duration: number;
@@ -167,17 +172,19 @@ const ActionButtons = React.memo(({
   );
 });
 
-// Memoized WatchProgress Component
+// Memoized WatchProgress Component with enhanced animations
 const WatchProgressDisplay = React.memo(({ 
   watchProgress, 
   type, 
   getEpisodeDetails, 
-  animatedStyle 
+  animatedStyle,
+  progressBarStyle
 }: {
   watchProgress: { currentTime: number; duration: number; lastUpdated: number; episodeId?: string } | null;
   type: 'movie' | 'series';
   getEpisodeDetails: (episodeId: string) => { seasonNumber: string; episodeNumber: string; episodeName: string } | null;
   animatedStyle: any;
+  progressBarStyle: any;
 }) => {
   const { currentTheme } = useTheme();
   if (!watchProgress || watchProgress.duration === 0) {
@@ -198,9 +205,10 @@ const WatchProgressDisplay = React.memo(({
   return (
     <Animated.View style={[styles.watchProgressContainer, animatedStyle]}>
       <View style={styles.watchProgressBar}>
-        <View 
+        <Animated.View 
           style={[
             styles.watchProgressFill, 
+            progressBarStyle,
             { 
               width: `${progressPercent}%`,
               backgroundColor: currentTheme.colors.primary 
@@ -225,14 +233,19 @@ const HeroSection: React.FC<HeroSectionProps> = ({
   heroHeight,
   heroOpacity,
   heroScale,
+  heroRotate,
   logoOpacity,
   logoScale,
+  logoRotate,
   genresOpacity,
   genresTranslateY,
+  genresScale,
   buttonsOpacity,
   buttonsTranslateY,
+  buttonsScale,
   watchProgressOpacity,
   watchProgressScaleY,
+  watchProgressWidth,
   watchProgress,
   type,
   getEpisodeDetails,
@@ -246,18 +259,45 @@ const HeroSection: React.FC<HeroSectionProps> = ({
   setLogoLoadError,
 }) => {
   const { currentTheme } = useTheme();
-  // Animated styles
+  // Enhanced animated styles with sophisticated micro-animations
   const heroAnimatedStyle = useAnimatedStyle(() => ({
     width: '100%',
     height: heroHeight.value,
     backgroundColor: currentTheme.colors.black,
-    transform: [{ scale: heroScale.value }],
+    transform: [
+      { scale: heroScale.value },
+      { 
+        rotateZ: `${interpolate(
+          heroRotate.value,
+          [0, 1],
+          [0, 0.2],
+          Extrapolate.CLAMP
+        )}deg` 
+      }
+    ],
     opacity: heroOpacity.value,
   }));
 
   const logoAnimatedStyle = useAnimatedStyle(() => ({
     opacity: logoOpacity.value,
-    transform: [{ scale: logoScale.value }]
+    transform: [
+      { 
+        scale: interpolate(
+          logoScale.value,
+          [0, 1],
+          [0.95, 1],
+          Extrapolate.CLAMP
+        )
+      },
+      { 
+        rotateZ: `${interpolate(
+          logoRotate.value,
+          [0, 1],
+          [0, 0.5],
+          Extrapolate.CLAMP
+        )}deg` 
+      }
+    ]
   }));
 
   const watchProgressAnimatedStyle = useAnimatedStyle(() => ({
@@ -267,22 +307,50 @@ const HeroSection: React.FC<HeroSectionProps> = ({
         translateY: interpolate(
           watchProgressScaleY.value,
           [0, 1],
-          [-8, 0],
+          [-12, 0],
           Extrapolate.CLAMP
         )
       },
-      { scaleY: watchProgressScaleY.value }
+      { scaleY: watchProgressScaleY.value },
+      { scaleX: interpolate(watchProgressScaleY.value, [0, 1], [0.9, 1]) }
+    ]
+  }));
+
+  const watchProgressBarStyle = useAnimatedStyle(() => ({
+    width: `${watchProgressWidth.value * 100}%`,
+    transform: [
+      { scaleX: interpolate(watchProgressWidth.value, [0, 1], [0.8, 1]) }
     ]
   }));
 
   const genresAnimatedStyle = useAnimatedStyle(() => ({
     opacity: genresOpacity.value,
-    transform: [{ translateY: genresTranslateY.value }]
+    transform: [
+      { translateY: genresTranslateY.value },
+      { scale: genresScale.value }
+    ]
   }));
 
   const buttonsAnimatedStyle = useAnimatedStyle(() => ({
     opacity: buttonsOpacity.value,
-    transform: [{ translateY: buttonsTranslateY.value }]
+    transform: [
+      { 
+        translateY: interpolate(
+          buttonsTranslateY.value,
+          [0, 20],
+          [0, 8],
+          Extrapolate.CLAMP
+        )
+      },
+      { 
+        scale: interpolate(
+          buttonsScale.value,
+          [0, 1],
+          [0.98, 1],
+          Extrapolate.CLAMP
+        )
+      }
+    ]
   }));
 
   const parallaxImageStyle = useAnimatedStyle(() => ({
@@ -295,7 +363,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
         translateY: interpolate(
           dampedScrollY.value,
           [0, 100, 300],
-          [0, -30, -80],
+          [0, -35, -90],
           Extrapolate.CLAMP
         )
       },
@@ -303,9 +371,17 @@ const HeroSection: React.FC<HeroSectionProps> = ({
         scale: interpolate(
           dampedScrollY.value,
           [0, 150, 300],
-          [1.05, 1.03, 1.01],
+          [1.08, 1.05, 1.02],
           Extrapolate.CLAMP
         )
+      },
+      {
+        rotateZ: interpolate(
+          dampedScrollY.value,
+          [0, 300],
+          [0, -0.1],
+          Extrapolate.CLAMP
+        ) + 'deg'
       }
     ],
   }));
@@ -389,6 +465,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
               type={type}
               getEpisodeDetails={getEpisodeDetails}
               animatedStyle={watchProgressAnimatedStyle}
+              progressBarStyle={watchProgressBarStyle}
             />
 
             {/* Genre Tags */}
@@ -495,13 +572,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 100,
-    elevation: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 28,
+    elevation: 6,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
     flex: 1,
   },
   playButton: {
@@ -513,19 +591,19 @@ const styles = StyleSheet.create({
     borderColor: '#fff',
   },
   iconButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: 'rgba(255,255,255,0.2)',
     borderWidth: 2,
     borderColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 4,
+    elevation: 6,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
   },
   playButtonText: {
     color: '#000',

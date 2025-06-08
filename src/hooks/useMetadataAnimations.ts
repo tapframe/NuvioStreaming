@@ -4,6 +4,8 @@ import {
   useSharedValue,
   withTiming,
   withSpring,
+  withSequence,
+  withDelay,
   Easing,
   useAnimatedScrollHandler,
   interpolate,
@@ -12,233 +14,344 @@ import {
 
 const { width, height } = Dimensions.get('window');
 
-// Animation constants
+// Refined animation configurations
 const springConfig = {
-  damping: 20,
-  mass: 1,
-  stiffness: 100
+  damping: 25,
+  mass: 0.8,
+  stiffness: 120,
+  overshootClamping: false,
+  restDisplacementThreshold: 0.01,
+  restSpeedThreshold: 0.01,
 };
 
-// Animation timing constants for staggered appearance
-const ANIMATION_DELAY_CONSTANTS = {
-  HERO: 100,
-  LOGO: 250,
-  PROGRESS: 350,
-  GENRES: 400,
-  BUTTONS: 450,
-  CONTENT: 500
+const microSpringConfig = {
+  damping: 20,
+  mass: 0.5,
+  stiffness: 150,
+  overshootClamping: true,
+  restDisplacementThreshold: 0.001,
+  restSpeedThreshold: 0.001,
+};
+
+// Sophisticated easing curves
+const easings = {
+  // Smooth entrance with slight overshoot
+  entrance: Easing.bezier(0.34, 1.56, 0.64, 1),
+  // Gentle bounce for micro-interactions
+  microBounce: Easing.bezier(0.68, -0.55, 0.265, 1.55),
+  // Smooth exit
+  exit: Easing.bezier(0.25, 0.46, 0.45, 0.94),
+  // Natural movement
+  natural: Easing.bezier(0.25, 0.1, 0.25, 1),
+  // Subtle emphasis
+  emphasis: Easing.bezier(0.19, 1, 0.22, 1),
+};
+
+// Refined timing constants for orchestrated entrance
+const TIMING = {
+  // Quick initial setup
+  SCREEN_PREP: 50,
+  // Staggered content appearance
+  HERO_BASE: 150,
+  LOGO: 280,
+  PROGRESS: 380,
+  GENRES: 450,
+  BUTTONS: 520,
+  CONTENT: 650,
+  // Micro-delays for polish
+  MICRO_DELAY: 50,
 };
 
 export const useMetadataAnimations = (safeAreaTop: number, watchProgress: any) => {
-  // Animation values for screen entrance
-  const screenScale = useSharedValue(0.92);
+  // Enhanced screen entrance with micro-animations
+  const screenScale = useSharedValue(0.96);
   const screenOpacity = useSharedValue(0);
+  const screenBlur = useSharedValue(5);
   
-  // Animation values for hero section
+  // Refined hero section animations
   const heroHeight = useSharedValue(height * 0.5);
-  const heroScale = useSharedValue(1.05);
+  const heroScale = useSharedValue(1.08);
   const heroOpacity = useSharedValue(0);
-
-  // Animation values for content
-  const contentTranslateY = useSharedValue(60);
+  const heroRotate = useSharedValue(-0.5);
   
-  // Animation values for logo
+  // Enhanced content animations
+  const contentTranslateY = useSharedValue(40);
+  const contentScale = useSharedValue(0.98);
+  
+  // Sophisticated logo animations
   const logoOpacity = useSharedValue(0);
-  const logoScale = useSharedValue(0.9);
+  const logoScale = useSharedValue(0.85);
+  const logoRotate = useSharedValue(2);
   
-  // Animation values for progress
+  // Enhanced progress animations
   const watchProgressOpacity = useSharedValue(0);
   const watchProgressScaleY = useSharedValue(0);
+  const watchProgressWidth = useSharedValue(0);
   
-  // Animation values for genres
+  // Refined genre animations
   const genresOpacity = useSharedValue(0);
-  const genresTranslateY = useSharedValue(20);
+  const genresTranslateY = useSharedValue(15);
+  const genresScale = useSharedValue(0.95);
   
-  // Animation values for buttons
+  // Enhanced button animations
   const buttonsOpacity = useSharedValue(0);
-  const buttonsTranslateY = useSharedValue(30);
+  const buttonsTranslateY = useSharedValue(20);
+  const buttonsScale = useSharedValue(0.95);
   
-  // Scroll values for parallax effect
+  // Scroll values with enhanced parallax
   const scrollY = useSharedValue(0);
   const dampedScrollY = useSharedValue(0);
+  const velocityY = useSharedValue(0);
   
-  // Header animation values
+  // Sophisticated header animations
   const headerOpacity = useSharedValue(0);
-  const headerElementsY = useSharedValue(-10);
+  const headerElementsY = useSharedValue(-15);
   const headerElementsOpacity = useSharedValue(0);
+  const headerBlur = useSharedValue(10);
 
-  // Start entrance animation
+  // Orchestrated entrance animation sequence
   useEffect(() => {
-    // Use a timeout to ensure the animations starts after the component is mounted
-    const animationTimeout = setTimeout(() => {
-      // 1. First animate the container
-      screenScale.value = withSpring(1, springConfig);
-      screenOpacity.value = withSpring(1, springConfig);
+    const startAnimation = setTimeout(() => {
+      // Phase 1: Screen preparation with subtle bounce
+      screenScale.value = withSequence(
+        withTiming(1.02, { duration: 200, easing: easings.entrance }),
+        withTiming(1, { duration: 150, easing: easings.natural })
+      );
+      screenOpacity.value = withTiming(1, { 
+        duration: 300, 
+        easing: easings.emphasis 
+      });
+      screenBlur.value = withTiming(0, { 
+        duration: 400, 
+        easing: easings.natural 
+      });
       
-      // 2. Then animate the hero section with a slight delay
+      // Phase 2: Hero section with parallax feel
       setTimeout(() => {
-        heroOpacity.value = withSpring(1, {
-          damping: 14,
-          stiffness: 80
+        heroOpacity.value = withSequence(
+          withTiming(0.8, { duration: 200, easing: easings.entrance }),
+          withTiming(1, { duration: 100, easing: easings.natural })
+        );
+        heroScale.value = withSequence(
+          withTiming(1.02, { duration: 300, easing: easings.entrance }),
+          withTiming(1, { duration: 200, easing: easings.natural })
+        );
+        heroRotate.value = withTiming(0, { 
+          duration: 500, 
+          easing: easings.emphasis 
         });
-        heroScale.value = withSpring(1, {
-          damping: 18,
-          stiffness: 100
-        });
-      }, ANIMATION_DELAY_CONSTANTS.HERO);
+      }, TIMING.HERO_BASE);
       
-      // 3. Then animate the logo
+      // Phase 3: Logo with micro-bounce
       setTimeout(() => {
-        logoOpacity.value = withSpring(1, {
-          damping: 12,
-          stiffness: 100
+        logoOpacity.value = withTiming(1, { 
+          duration: 300, 
+          easing: easings.entrance 
         });
-        logoScale.value = withSpring(1, {
-          damping: 14,
-          stiffness: 90
+        logoScale.value = withSequence(
+          withTiming(1.05, { duration: 150, easing: easings.microBounce }),
+          withTiming(1, { duration: 100, easing: easings.natural })
+        );
+        logoRotate.value = withTiming(0, { 
+          duration: 300, 
+          easing: easings.emphasis 
         });
-      }, ANIMATION_DELAY_CONSTANTS.LOGO);
+      }, TIMING.LOGO);
       
-      // 4. Then animate the watch progress if applicable
+      // Phase 4: Progress bar with width animation
       setTimeout(() => {
         if (watchProgress && watchProgress.duration > 0) {
-          watchProgressOpacity.value = withSpring(1, {
-            damping: 14,
-            stiffness: 100
+          watchProgressOpacity.value = withTiming(1, { 
+            duration: 250, 
+            easing: easings.entrance 
           });
-          watchProgressScaleY.value = withSpring(1, {
-            damping: 18,
-            stiffness: 120
-          });
+          watchProgressScaleY.value = withSpring(1, microSpringConfig);
+          watchProgressWidth.value = withDelay(
+            100,
+            withTiming(1, { duration: 600, easing: easings.emphasis })
+          );
         }
-      }, ANIMATION_DELAY_CONSTANTS.PROGRESS);
+      }, TIMING.PROGRESS);
       
-      // 5. Then animate the genres
+      // Phase 5: Genres with staggered scale
       setTimeout(() => {
-        genresOpacity.value = withSpring(1, {
-          damping: 14,
-          stiffness: 100
+        genresOpacity.value = withTiming(1, { 
+          duration: 250, 
+          easing: easings.entrance 
         });
-        genresTranslateY.value = withSpring(0, {
-          damping: 18,
-          stiffness: 120
-        });
-      }, ANIMATION_DELAY_CONSTANTS.GENRES);
+        genresTranslateY.value = withSpring(0, microSpringConfig);
+        genresScale.value = withSequence(
+          withTiming(1.02, { duration: 150, easing: easings.microBounce }),
+          withTiming(1, { duration: 100, easing: easings.natural })
+        );
+      }, TIMING.GENRES);
       
-      // 6. Then animate the buttons
+      // Phase 6: Buttons with sophisticated bounce
       setTimeout(() => {
-        buttonsOpacity.value = withSpring(1, {
-          damping: 14,
-          stiffness: 100
+        buttonsOpacity.value = withTiming(1, { 
+          duration: 300, 
+          easing: easings.entrance 
         });
-        buttonsTranslateY.value = withSpring(0, {
-          damping: 18,
-          stiffness: 120
-        });
-      }, ANIMATION_DELAY_CONSTANTS.BUTTONS);
+        buttonsTranslateY.value = withSpring(0, springConfig);
+        buttonsScale.value = withSequence(
+          withTiming(1.03, { duration: 200, easing: easings.microBounce }),
+          withTiming(1, { duration: 150, easing: easings.natural })
+        );
+      }, TIMING.BUTTONS);
       
-      // 7. Finally animate the content section
+      // Phase 7: Content with layered entrance
       setTimeout(() => {
         contentTranslateY.value = withSpring(0, {
-          damping: 25,
-          mass: 1,
-          stiffness: 100
+          ...springConfig,
+          damping: 30,
+          stiffness: 100,
         });
-      }, ANIMATION_DELAY_CONSTANTS.CONTENT);
-    }, 50); // Small timeout to ensure component is fully mounted
+        contentScale.value = withSequence(
+          withTiming(1.01, { duration: 200, easing: easings.entrance }),
+          withTiming(1, { duration: 150, easing: easings.natural })
+        );
+      }, TIMING.CONTENT);
+    }, TIMING.SCREEN_PREP);
     
-    return () => clearTimeout(animationTimeout);
+    return () => clearTimeout(startAnimation);
   }, []);
   
-  // Effect to animate watch progress when it changes
+  // Enhanced watch progress animation with width effect
   useEffect(() => {
     if (watchProgress && watchProgress.duration > 0) {
-      watchProgressOpacity.value = withSpring(1, {
-        mass: 0.2,
-        stiffness: 100,
-        damping: 14
+      watchProgressOpacity.value = withTiming(1, {
+        duration: 300,
+        easing: easings.entrance
       });
-      watchProgressScaleY.value = withSpring(1, {
-        mass: 0.3,
-        stiffness: 120,
-        damping: 18
-      });
+      watchProgressScaleY.value = withSpring(1, microSpringConfig);
+      watchProgressWidth.value = withDelay(
+        150,
+        withTiming(1, { duration: 800, easing: easings.emphasis })
+      );
     } else {
-      watchProgressOpacity.value = withSpring(0, {
-        mass: 0.2,
-        stiffness: 100,
-        damping: 14
+      watchProgressOpacity.value = withTiming(0, {
+        duration: 200,
+        easing: easings.exit
       });
-      watchProgressScaleY.value = withSpring(0, {
-        mass: 0.3,
-        stiffness: 120,
-        damping: 18
+      watchProgressScaleY.value = withTiming(0, {
+        duration: 200,
+        easing: easings.exit
+      });
+      watchProgressWidth.value = withTiming(0, {
+        duration: 150,
+        easing: easings.exit
       });
     }
-  }, [watchProgress, watchProgressOpacity, watchProgressScaleY]);
+  }, [watchProgress, watchProgressOpacity, watchProgressScaleY, watchProgressWidth]);
   
-  // Effect to animate logo when it's available
+  // Enhanced logo animation with micro-interactions
   const animateLogo = (hasLogo: boolean) => {
     if (hasLogo) {
       logoOpacity.value = withTiming(1, {
-        duration: 500,
-        easing: Easing.out(Easing.ease)
+        duration: 400,
+        easing: easings.entrance
       });
+      logoScale.value = withSequence(
+        withTiming(1.05, { duration: 200, easing: easings.microBounce }),
+        withTiming(1, { duration: 150, easing: easings.natural })
+      );
     } else {
       logoOpacity.value = withTiming(0, {
-        duration: 200,
-        easing: Easing.in(Easing.ease)
+        duration: 250,
+        easing: easings.exit
+      });
+      logoScale.value = withTiming(0.9, {
+        duration: 250,
+        easing: easings.exit
       });
     }
   };
   
-  // Scroll handler
+  // Enhanced scroll handler with velocity tracking
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
       const rawScrollY = event.contentOffset.y;
-      scrollY.value = rawScrollY;
+      const lastScrollY = scrollY.value;
       
-      // Apply spring-like damping for smoother transitions
+      scrollY.value = rawScrollY;
+      velocityY.value = rawScrollY - lastScrollY;
+      
+      // Enhanced damped scroll with velocity-based easing
+      const dynamicDuration = Math.min(400, Math.max(200, Math.abs(velocityY.value) * 10));
       dampedScrollY.value = withTiming(rawScrollY, {
-        duration: 300,
-        easing: Easing.bezier(0.16, 1, 0.3, 1), // Custom spring-like curve
+        duration: dynamicDuration,
+        easing: easings.natural,
       });
 
-      // Update header opacity based on scroll position
-      const headerThreshold = height * 0.5 - safeAreaTop - 70; // Hero height - inset - buffer
+      // Sophisticated header animation with blur effect
+      const headerThreshold = height * 0.5 - safeAreaTop - 60;
+      const progress = Math.min(1, Math.max(0, (rawScrollY - headerThreshold + 50) / 100));
+      
       if (rawScrollY > headerThreshold) {
-        headerOpacity.value = withTiming(1, { duration: 200 });
-        headerElementsY.value = withTiming(0, { duration: 300 });
-        headerElementsOpacity.value = withTiming(1, { duration: 450 });
+        headerOpacity.value = withTiming(1, { 
+          duration: 300, 
+          easing: easings.entrance 
+        });
+        headerElementsY.value = withSpring(0, microSpringConfig);
+        headerElementsOpacity.value = withTiming(1, { 
+          duration: 400, 
+          easing: easings.emphasis 
+        });
+        headerBlur.value = withTiming(0, { 
+          duration: 300, 
+          easing: easings.natural 
+        });
       } else {
-        headerOpacity.value = withTiming(0, { duration: 150 });
-        headerElementsY.value = withTiming(-10, { duration: 200 });
-        headerElementsOpacity.value = withTiming(0, { duration: 200 });
+        headerOpacity.value = withTiming(0, { 
+          duration: 200, 
+          easing: easings.exit 
+        });
+        headerElementsY.value = withTiming(-15, { 
+          duration: 200, 
+          easing: easings.exit 
+        });
+        headerElementsOpacity.value = withTiming(0, { 
+          duration: 150, 
+          easing: easings.exit 
+        });
+        headerBlur.value = withTiming(5, { 
+          duration: 200, 
+          easing: easings.natural 
+        });
       }
     },
   });
 
   return {
-    // Animated values
+    // Enhanced animated values
     screenScale,
     screenOpacity,
+    screenBlur,
     heroHeight,
     heroScale,
     heroOpacity,
+    heroRotate,
     contentTranslateY,
+    contentScale,
     logoOpacity,
     logoScale,
+    logoRotate,
     watchProgressOpacity,
     watchProgressScaleY,
+    watchProgressWidth,
     genresOpacity,
     genresTranslateY,
+    genresScale,
     buttonsOpacity,
     buttonsTranslateY,
+    buttonsScale,
     scrollY,
     dampedScrollY,
+    velocityY,
     headerOpacity,
     headerElementsY,
     headerElementsOpacity,
+    headerBlur,
     
     // Functions
     scrollHandler,

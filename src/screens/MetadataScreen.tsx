@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -24,11 +24,15 @@ import Animated, {
   useAnimatedStyle,
   interpolate,
   Extrapolate,
+  useSharedValue,
+  withTiming,
+  runOnJS,
 } from 'react-native-reanimated';
 import { RouteProp } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useSettings } from '../hooks/useSettings';
+import { MetadataLoadingScreen } from '../components/loading/MetadataLoadingScreen';
 
 // Import our new components and hooks
 import HeroSection from '../components/metadata/HeroSection';
@@ -53,6 +57,11 @@ const MetadataScreen = () => {
 
   // Get safe area insets
   const { top: safeAreaTop } = useSafeAreaInsets();
+
+  // Add transition state management
+  const [showContent, setShowContent] = useState(false);
+  const loadingOpacity = useSharedValue(1);
+  const contentOpacity = useSharedValue(0);
 
   const {
     metadata,
@@ -90,6 +99,27 @@ const MetadataScreen = () => {
   } = useMetadataAssets(metadata, id, type, imdbId, settings, setMetadata);
 
   const animations = useMetadataAnimations(safeAreaTop, watchProgress);
+
+  // Handle smooth transition from loading to content
+  useEffect(() => {
+    if (!loading && metadata && !showContent) {
+      // Delay content appearance slightly to ensure everything is ready
+      const timer = setTimeout(() => {
+        setShowContent(true);
+        
+        // Animate transition
+        loadingOpacity.value = withTiming(0, { duration: 300 });
+        contentOpacity.value = withTiming(1, { duration: 300 });
+      }, 100);
+
+      return () => clearTimeout(timer);
+    } else if (loading && showContent) {
+      // Reset states when going back to loading
+      setShowContent(false);
+      loadingOpacity.value = 1;
+      contentOpacity.value = 0;
+    }
+  }, [loading, metadata, showContent]);
 
   // Add wrapper for toggleLibrary that includes haptic feedback
   const handleToggleLibrary = useCallback(() => {
@@ -165,45 +195,53 @@ const MetadataScreen = () => {
     navigation.goBack();
   }, [navigation]);
 
-  // Animated styles
+  // Enhanced animated styles with sophisticated effects
   const containerAnimatedStyle = useAnimatedStyle(() => ({
     flex: 1,
-    transform: [{ scale: animations.screenScale.value }],
-    opacity: animations.screenOpacity.value
+    transform: [
+      { scale: animations.screenScale.value },
+      { rotateZ: `${animations.heroRotate.value}deg` }
+    ],
+    opacity: animations.screenOpacity.value,
   }));
 
   const contentAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: animations.contentTranslateY.value }],
+    transform: [
+      { translateY: animations.contentTranslateY.value },
+      { scale: animations.contentScale.value }
+    ],
     opacity: interpolate(
       animations.contentTranslateY.value,
-      [60, 0],
+      [40, 0],
       [0, 1],
       Extrapolate.CLAMP
     )
   }));
 
-  if (loading) {
+  // Enhanced loading screen animated style
+  const loadingAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: loadingOpacity.value,
+    transform: [
+      { scale: interpolate(loadingOpacity.value, [1, 0], [1, 0.98]) }
+    ]
+  }));
+
+  // Enhanced content animated style for transition
+  const contentTransitionStyle = useAnimatedStyle(() => ({
+    opacity: contentOpacity.value,
+    transform: [
+      { scale: interpolate(contentOpacity.value, [0, 1], [0.98, 1]) },
+      { translateY: interpolate(contentOpacity.value, [0, 1], [10, 0]) }
+    ]
+  }));
+
+  if (loading || !showContent) {
     return (
-      <SafeAreaView 
-        style={[styles.container, {
-          backgroundColor: currentTheme.colors.darkBackground
-        }]}
-        edges={['bottom']}
-      >
-        <StatusBar
-          translucent={true}
-          backgroundColor="transparent"
-          barStyle="light-content"
+      <Animated.View style={[StyleSheet.absoluteFill, loadingAnimatedStyle]}>
+        <MetadataLoadingScreen 
+          type={metadata?.type === 'movie' ? 'movie' : 'series'} 
         />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={currentTheme.colors.primary} />
-          <Text style={[styles.loadingText, {
-            color: currentTheme.colors.mediumEmphasis
-          }]}>
-            Loading content...
-          </Text>
-        </View>
-      </SafeAreaView>
+      </Animated.View>
     );
   }
 
@@ -263,119 +301,126 @@ const MetadataScreen = () => {
   }
 
   return (
-    <SafeAreaView 
-      style={[containerAnimatedStyle, styles.container, {
-        backgroundColor: currentTheme.colors.darkBackground
-      }]}
-      edges={['bottom']}
-    >
-      <StatusBar
-        translucent={true}
-        backgroundColor="transparent"
-        barStyle="light-content"
-        animated={true}
-      />
-      <Animated.View style={containerAnimatedStyle}>
-        {/* Floating Header */}
-        <FloatingHeader 
-          metadata={metadata}
-          logoLoadError={logoLoadError}
-          handleBack={handleBack}
-          handleToggleLibrary={handleToggleLibrary}
-          inLibrary={inLibrary}
-          headerOpacity={animations.headerOpacity}
-          headerElementsY={animations.headerElementsY}
-          headerElementsOpacity={animations.headerElementsOpacity}
-          safeAreaTop={safeAreaTop}
-          setLogoLoadError={setLogoLoadError}
+    <Animated.View style={[StyleSheet.absoluteFill, contentTransitionStyle]}>
+      <SafeAreaView 
+        style={[containerAnimatedStyle, styles.container, {
+          backgroundColor: currentTheme.colors.darkBackground
+        }]}
+        edges={['bottom']}
+      >
+        <StatusBar
+          translucent={true}
+          backgroundColor="transparent"
+          barStyle="light-content"
+          animated={true}
         />
-
-        <Animated.ScrollView
-          style={styles.scrollView}
-          showsVerticalScrollIndicator={false}
-          onScroll={animations.scrollHandler}
-          scrollEventThrottle={16}
-        >
-          {/* Hero Section */}
-          <HeroSection 
+        <Animated.View style={containerAnimatedStyle}>
+          {/* Floating Header */}
+          <FloatingHeader 
             metadata={metadata}
-            bannerImage={bannerImage}
-            loadingBanner={loadingBanner}
             logoLoadError={logoLoadError}
-            scrollY={animations.scrollY}
-            dampedScrollY={animations.dampedScrollY}
-            heroHeight={animations.heroHeight}
-            heroOpacity={animations.heroOpacity}
-            heroScale={animations.heroScale}
-            logoOpacity={animations.logoOpacity}
-            logoScale={animations.logoScale}
-            genresOpacity={animations.genresOpacity}
-            genresTranslateY={animations.genresTranslateY}
-            buttonsOpacity={animations.buttonsOpacity}
-            buttonsTranslateY={animations.buttonsTranslateY}
-            watchProgressOpacity={animations.watchProgressOpacity}
-            watchProgressScaleY={animations.watchProgressScaleY}
-                    watchProgress={watchProgress}
-                    type={type as 'movie' | 'series'}
-                    getEpisodeDetails={getEpisodeDetails}
-                    handleShowStreams={handleShowStreams}
+            handleBack={handleBack}
             handleToggleLibrary={handleToggleLibrary}
-                    inLibrary={inLibrary}
-                    id={id}
-                    navigation={navigation}
-            getPlayButtonText={getPlayButtonText}
-            setBannerImage={setBannerImage}
+            inLibrary={inLibrary}
+            headerOpacity={animations.headerOpacity}
+            headerElementsY={animations.headerElementsY}
+            headerElementsOpacity={animations.headerElementsOpacity}
+            safeAreaTop={safeAreaTop}
             setLogoLoadError={setLogoLoadError}
-                  />
+          />
 
-          {/* Main Content */}
-          <Animated.View style={contentAnimatedStyle}>
-            {/* Metadata Details */}
-            <MetadataDetails 
+          <Animated.ScrollView
+            style={styles.scrollView}
+            showsVerticalScrollIndicator={false}
+            onScroll={animations.scrollHandler}
+            scrollEventThrottle={16}
+          >
+            {/* Hero Section */}
+            <HeroSection 
               metadata={metadata}
-              imdbId={imdbId}
+              bannerImage={bannerImage}
+              loadingBanner={loadingBanner}
+              logoLoadError={logoLoadError}
+              scrollY={animations.scrollY}
+              dampedScrollY={animations.dampedScrollY}
+              heroHeight={animations.heroHeight}
+              heroOpacity={animations.heroOpacity}
+              heroScale={animations.heroScale}
+              heroRotate={animations.heroRotate}
+              logoOpacity={animations.logoOpacity}
+              logoScale={animations.logoScale}
+              logoRotate={animations.logoRotate}
+              genresOpacity={animations.genresOpacity}
+              genresTranslateY={animations.genresTranslateY}
+              genresScale={animations.genresScale}
+              buttonsOpacity={animations.buttonsOpacity}
+              buttonsTranslateY={animations.buttonsTranslateY}
+              buttonsScale={animations.buttonsScale}
+              watchProgressOpacity={animations.watchProgressOpacity}
+              watchProgressScaleY={animations.watchProgressScaleY}
+              watchProgressWidth={animations.watchProgressWidth}
+              watchProgress={watchProgress}
               type={type as 'movie' | 'series'}
-              renderRatings={() => imdbId ? (
-                <RatingsSection 
-                  imdbId={imdbId}
-                  type={type === 'series' ? 'show' : 'movie'} 
-                />
-              ) : null}
+              getEpisodeDetails={getEpisodeDetails}
+              handleShowStreams={handleShowStreams}
+              handleToggleLibrary={handleToggleLibrary}
+              inLibrary={inLibrary}
+              id={id}
+              navigation={navigation}
+              getPlayButtonText={getPlayButtonText}
+              setBannerImage={setBannerImage}
+              setLogoLoadError={setLogoLoadError}
             />
 
-            {/* Cast Section */}
-            <CastSection
-              cast={cast}
-              loadingCast={loadingCast}
-              onSelectCastMember={handleSelectCastMember}
-            />
-
-            {/* More Like This Section - Only for movies */}
-            {type === 'movie' && (
-              <MoreLikeThisSection 
-                recommendations={recommendations}
-                loadingRecommendations={loadingRecommendations}
-              />
-            )}
-
-            {/* Type-specific content */}
-            {type === 'series' ? (
-              <SeriesContent
-                episodes={episodes}
-                selectedSeason={selectedSeason}
-                loadingSeasons={loadingSeasons}
-                onSeasonChange={handleSeasonChangeWithHaptics}
-                onSelectEpisode={handleEpisodeSelect}
-                groupedEpisodes={groupedEpisodes}
+            {/* Main Content */}
+            <Animated.View style={contentAnimatedStyle}>
+              {/* Metadata Details */}
+              <MetadataDetails 
                 metadata={metadata}
+                imdbId={imdbId}
+                type={type as 'movie' | 'series'}
+                renderRatings={() => imdbId ? (
+                  <RatingsSection 
+                    imdbId={imdbId}
+                    type={type === 'series' ? 'show' : 'movie'} 
+                  />
+                ) : null}
               />
-            ) : (
-              <MovieContent metadata={metadata} />
-            )}
-          </Animated.View>
-        </Animated.ScrollView>
-      </Animated.View>
-    </SafeAreaView>
+
+              {/* Cast Section */}
+              <CastSection
+                cast={cast}
+                loadingCast={loadingCast}
+                onSelectCastMember={handleSelectCastMember}
+              />
+
+              {/* More Like This Section - Only for movies */}
+              {type === 'movie' && (
+                <MoreLikeThisSection 
+                  recommendations={recommendations}
+                  loadingRecommendations={loadingRecommendations}
+                />
+              )}
+
+              {/* Type-specific content */}
+              {type === 'series' ? (
+                <SeriesContent
+                  episodes={episodes}
+                  selectedSeason={selectedSeason}
+                  loadingSeasons={loadingSeasons}
+                  onSeasonChange={handleSeasonChangeWithHaptics}
+                  onSelectEpisode={handleEpisodeSelect}
+                  groupedEpisodes={groupedEpisodes}
+                  metadata={metadata}
+                />
+              ) : (
+                <MovieContent metadata={metadata} />
+              )}
+            </Animated.View>
+          </Animated.ScrollView>
+        </Animated.View>
+      </SafeAreaView>
+    </Animated.View>
   );
 };
 
