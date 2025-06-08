@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, memo, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, memo, useState, useEffect, useRef, useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -13,8 +13,9 @@ import {
   StatusBar,
   Alert,
   Dimensions,
-  Linking
+  Linking,
 } from 'react-native';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { RouteProp } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -241,10 +242,22 @@ export const StreamsScreen = () => {
   const { currentTheme } = useTheme();
   const { colors } = currentTheme;
 
+  // Add ref to prevent excessive updates
+  const isMounted = useRef(true);
+  const loadStartTimeRef = useRef(0);
+  const hasDoneInitialLoadRef = useRef(false);
+
   // Add timing logs
   const [loadStartTime, setLoadStartTime] = useState(0);
   const [providerLoadTimes, setProviderLoadTimes] = useState<{[key: string]: number}>({});
   
+  // Prevent excessive re-renders by using this guard
+  const guardedSetState = useCallback((setter: () => void) => {
+    if (isMounted.current) {
+      setter();
+    }
+  }, []);
+
   const {
     metadata,
     episodes,
@@ -285,54 +298,64 @@ export const StreamsScreen = () => {
     }
   }>({});
 
-  // Monitor streams loading start and completion
+  // Monitor streams loading start and completion - FIXED to prevent loops
   useEffect(() => {
+    // Skip processing if component is unmounting
+    if (!isMounted.current) return;
+    
     const now = Date.now();
     // Define all providers you expect to load. This could be dynamic.
     const expectedProviders = ['stremio', 'hdrezka'];
 
+    // Prevent infinite rerendering by using refs
     if (loadingStreams || loadingEpisodeStreams) {
       // --- Stream Loading has STARTED or is IN PROGRESS ---
-      logger.log("⏱️ Stream loading started or in progress...");
-      
-      // Set load start time only if this is the beginning of a new loading cycle
-      if (loadStartTime === 0) {
+      // Only log once when loading starts
+      if (loadStartTimeRef.current === 0) {
+        logger.log("⏱️ Stream loading started or in progress...");
+        // Update ref directly to avoid render cycle
+        loadStartTimeRef.current = now;
+        // Also update state for components that need it
         setLoadStartTime(now);
       }
       
-      setProviderLoadTimes({}); // Reset individual provider load times tracker
+      // Only update these once per loading cycle
+      if (!hasDoneInitialLoadRef.current) {
+        hasDoneInitialLoadRef.current = true;
+        
+        // Use the guarded setState to prevent issues after unmount
+        guardedSetState(() => setProviderLoadTimes({}));
 
-      // Update provider status to loading for all expected providers
-      setProviderStatus(prevStatus => {
-        const newStatus = { ...prevStatus };
-        expectedProviders.forEach(providerId => {
-          // If not already marked as loading, or if it's a fresh cycle, set to loading
-          if (!newStatus[providerId] || !newStatus[providerId].loading || loadStartTime === 0) {
-            newStatus[providerId] = {
-              loading: true,
-              success: false,
-              error: false,
-              message: 'Loading...',
-              timeStarted: (newStatus[providerId]?.loading && newStatus[providerId]?.timeStarted) ? newStatus[providerId].timeStarted : now,
-              timeCompleted: 0,
-            };
-          }
-        });
-        return newStatus;
-      });
+        // Update provider status to loading for all expected providers
+        guardedSetState(() => setProviderStatus(prevStatus => {
+          const newStatus = { ...prevStatus };
+          expectedProviders.forEach(providerId => {
+            // If not already marked as loading, or if it's a fresh cycle, set to loading
+            if (!newStatus[providerId] || !newStatus[providerId].loading) {
+              newStatus[providerId] = {
+                loading: true,
+                success: false,
+                error: false,
+                message: 'Loading...',
+                timeStarted: (newStatus[providerId]?.loading && newStatus[providerId]?.timeStarted) ? newStatus[providerId].timeStarted : now,
+                timeCompleted: 0,
+              };
+            }
+          });
+          return newStatus;
+        }));
 
-      // Update simple loading flag for all expected providers
-      setLoadingProviders(prevLoading => {
-        const newLoading = { ...prevLoading };
-        expectedProviders.forEach(providerId => {
-          newLoading[providerId] = true;
-        });
-        return newLoading;
-      });
-
-    } else if (loadStartTime > 0) { 
+        // Update simple loading flag for all expected providers
+        guardedSetState(() => setLoadingProviders(prevLoading => {
+          const newLoading = { ...prevLoading };
+          expectedProviders.forEach(providerId => {
+            newLoading[providerId] = true;
+          });
+          return newLoading;
+        }));
+      }
+    } else if (loadStartTimeRef.current > 0) { 
       // --- Stream Loading has FINISHED ---
-      // (loadStartTime > 0 implies a loading cycle was active and has now completed)
       logger.log("🏁 Stream loading finished. Processing results.");
       
       const currentStreamsData = type === 'series' ? episodeStreams : groupedStreams;
@@ -344,56 +367,53 @@ export const StreamsScreen = () => {
       
       logger.log(`📊 Providers with streams: ${providersWithStreams.join(', ')}`);
 
-      // Update simple loading flag: all expected providers are no longer loading
-      setLoadingProviders(prevLoading => {
-        const newLoading = { ...prevLoading };
-        expectedProviders.forEach(providerId => {
-          newLoading[providerId] = false;
-        });
-        return newLoading;
-      });
+      // Reset refs for next load cycle
+      loadStartTimeRef.current = 0;
+      hasDoneInitialLoadRef.current = false;
+      
+      // Update states only if component is still mounted
+      if (isMounted.current) {
+        // Update simple loading flag: all expected providers are no longer loading
+        guardedSetState(() => setLoadingProviders(prevLoading => {
+          const newLoading = { ...prevLoading };
+          expectedProviders.forEach(providerId => {
+            newLoading[providerId] = false;
+          });
+          return newLoading;
+        }));
 
-      // Update detailed provider status based on results
-      setProviderStatus(prevStatus => {
-        const newStatus = { ...prevStatus };
-        expectedProviders.forEach(providerId => {
-          if (newStatus[providerId]) { // Ensure the provider entry exists
-            const providerHasStreams = currentStreamsData[providerId] && 
-                                      currentStreamsData[providerId].streams && 
-                                      currentStreamsData[providerId].streams.length > 0;
-            
-            newStatus[providerId] = {
-              ...newStatus[providerId], // Preserve timeStarted
-              loading: false,
-              success: providerHasStreams,
-              // Mark error if it was loading and now no streams, and wasn't already successful
-              error: !providerHasStreams && newStatus[providerId].loading && !newStatus[providerId].success, 
-              message: providerHasStreams ? 'Loaded successfully' : (newStatus[providerId].error ? 'Error or no streams' : 'No streams found'),
-              timeCompleted: now,
-            };
-          } else {
-            // Fallback if somehow not initialized (should be caught by loading phase)
-            newStatus[providerId] = {
-              loading: false,
-              success: false,
-              error: true,
-              message: 'Provider status error (not initialized)',
-              timeStarted: 0, 
-              timeCompleted: now,
-            };
-          }
-        });
-        return newStatus;
-      });
+        // Update detailed provider status based on results
+        guardedSetState(() => setProviderStatus(prevStatus => {
+          const newStatus = { ...prevStatus };
+          expectedProviders.forEach(providerId => {
+            if (newStatus[providerId]) { // Ensure the provider entry exists
+              const providerHasStreams = currentStreamsData[providerId] && 
+                                        currentStreamsData[providerId].streams && 
+                                        currentStreamsData[providerId].streams.length > 0;
+              
+              newStatus[providerId] = {
+                ...newStatus[providerId], // Preserve timeStarted
+                loading: false,
+                success: providerHasStreams,
+                // Mark error if it was loading and now no streams, and wasn't already successful
+                error: !providerHasStreams && newStatus[providerId].loading && !newStatus[providerId].success, 
+                message: providerHasStreams ? 'Loaded successfully' : (newStatus[providerId].error ? 'Error or no streams' : 'No streams found'),
+                timeCompleted: now,
+              };
+            }
+          });
+          return newStatus;
+        }));
 
-      // Update the set of available providers based on what actually loaded streams
-      const providersWithStreamsSet = new Set(providersWithStreams);
-      setAvailableProviders(providersWithStreamsSet);
+        // Update the set of available providers based on what actually loaded streams
+        const providersWithStreamsSet = new Set(providersWithStreams);
+        guardedSetState(() => setAvailableProviders(providersWithStreamsSet));
 
-      // Reset loadStartTime to signify the end of this loading cycle
-      setLoadStartTime(0);
+        // Reset loadStartTime to signify the end of this loading cycle
+        guardedSetState(() => setLoadStartTime(0));
+      }
     }
-  }, [loadingStreams, loadingEpisodeStreams, groupedStreams, episodeStreams, type /* loadStartTime is intentionally omitted from deps here */]);
+  }, [loadingStreams, loadingEpisodeStreams, groupedStreams, episodeStreams, type, guardedSetState]);
 
   // Add useEffect to update availableProviders whenever streams change
   useEffect(() => {
@@ -487,20 +507,44 @@ export const StreamsScreen = () => {
     );
   }, [selectedEpisode, groupedEpisodes, id]);
 
-  const navigateToPlayer = useCallback((stream: Stream) => {
-    navigation.navigate('Player', {
-      uri: stream.url,
-      title: metadata?.name || '',
-      episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
-      season: type === 'series' ? currentEpisode?.season_number : undefined,
-      episode: type === 'series' ? currentEpisode?.episode_number : undefined,
-      quality: stream.title?.match(/(\d+)p/)?.[1] || undefined,
-      year: metadata?.year,
-      streamProvider: stream.name,
-      id,
-      type,
-      episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined
-    });
+  const navigateToPlayer = useCallback(async (stream: Stream) => {
+    try {
+      // Lock orientation to landscape before navigation to prevent glitches
+      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+      
+      // Small delay to ensure orientation is set before navigation
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      navigation.navigate('Player', {
+        uri: stream.url,
+        title: metadata?.name || '',
+        episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
+        season: type === 'series' ? currentEpisode?.season_number : undefined,
+        episode: type === 'series' ? currentEpisode?.episode_number : undefined,
+        quality: stream.title?.match(/(\d+)p/)?.[1] || undefined,
+        year: metadata?.year,
+        streamProvider: stream.name,
+        id,
+        type,
+        episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined
+      });
+    } catch (error) {
+      logger.error('[StreamsScreen] Error locking orientation before navigation:', error);
+      // Fallback: navigate anyway
+      navigation.navigate('Player', {
+        uri: stream.url,
+        title: metadata?.name || '',
+        episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
+        season: type === 'series' ? currentEpisode?.season_number : undefined,
+        episode: type === 'series' ? currentEpisode?.episode_number : undefined,
+        quality: stream.title?.match(/(\d+)p/)?.[1] || undefined,
+        year: metadata?.year,
+        streamProvider: stream.name,
+        id,
+        type,
+        episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined
+      });
+    }
   }, [metadata, type, currentEpisode, navigation, id, selectedEpisode]);
 
   // Update handleStreamPress
@@ -833,6 +877,13 @@ export const StreamsScreen = () => {
       <Text style={styles.streamGroupTitle}>{section.title}</Text>
     </Animated.View>
   ), [styles.streamGroupTitle]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   return (
     <View style={styles.container}>

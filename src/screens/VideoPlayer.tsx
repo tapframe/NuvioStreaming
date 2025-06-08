@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, TouchableOpacity, StyleSheet, Text, Dimensions, Modal, Pressable, StatusBar, Platform, ScrollView, Animated } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Text, Dimensions, Modal, Pressable, StatusBar, Platform, ScrollView, Animated, ActivityIndicator } from 'react-native';
 import { VLCPlayer } from 'react-native-vlc-media-player';
 import { Ionicons } from '@expo/vector-icons';
-import { Slider } from 'react-native-awesome-slider';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSharedValue, runOnJS, withTiming } from 'react-native-reanimated';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -19,6 +18,27 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import { storageService } from '../services/storageService';
 import { logger } from '../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Debug flag - set back to false to disable verbose logging
+// WARNING: Setting this to true currently causes infinite render loops
+// Use selective logging instead if debugging is needed
+const DEBUG_MODE = true;
+
+// Safer debug function that won't cause render loops
+// Call this with any debugging info you need instead of using inline DEBUG_MODE checks
+const safeDebugLog = (message: string, data?: any) => {
+  // This function only runs once per call site, avoiding render loops
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    if (DEBUG_MODE) {
+      if (data) {
+        logger.log(`[VideoPlayer] ${message}`, data);
+      } else {
+        logger.log(`[VideoPlayer] ${message}`);
+      }
+    }
+  }, []); // Empty dependency array means this only runs once per mount
+};
 
 // Constants for resume preferences - add after type definitions
 const RESUME_PREF_KEY = '@video_resume_preference';
@@ -129,7 +149,16 @@ const languageMap: {[key: string]: string} = {
 const formatLanguage = (code?: string): string => {
   if (!code) return 'Unknown';
   const normalized = code.toLowerCase();
-  return languageMap[normalized] || code.toUpperCase();
+  const languageName = languageMap[normalized] || code.toUpperCase();
+  
+  // Debug logs removed to prevent render loops
+  
+  // If the result is still the uppercased code, it means we couldn't find it in our map.
+  if (languageName === code.toUpperCase()) {
+      return `Unknown (${code})`;
+  }
+
+  return languageName;
 };
 
 // Add VLC specific interface for their event structure
@@ -143,6 +172,20 @@ interface VlcMediaEvent {
   selectedAudioTrack?: number;
   selectedTextTrack?: number;
 }
+
+// Helper function to extract a display name from the track's name property
+const getTrackDisplayName = (track: { name?: string, id: number }): string => {
+  if (!track || !track.name) return `Track ${track.id}`;
+
+  // Try to extract language from name like "Some Info - [English]"
+  const languageMatch = track.name.match(/\[(.*?)\]/);
+  if (languageMatch && languageMatch[1]) {
+      return languageMatch[1];
+  }
+  
+  // If no language in brackets, or if the name is simple, use the full name
+  return track.name;
+};
 
 const VideoPlayer: React.FC = () => {
   const navigation = useNavigation();
@@ -163,19 +206,10 @@ const VideoPlayer: React.FC = () => {
     episodeId
   } = route.params;
 
-  // Log received props for debugging
-  logger.log("[VideoPlayer] Received props:", {
-    uri,
-    title,
-    season,
-    episode,
-    episodeTitle,
-    quality,
-    year,
-    streamProvider,
-    id,
-    type,
-    episodeId
+  // Use safer debug logging for props
+  safeDebugLog("Component mounted with props", {
+    uri, title, season, episode, episodeTitle, quality, year,
+    streamProvider, id, type, episodeId
   });
 
   const [paused, setPaused] = useState(false);
@@ -186,7 +220,7 @@ const VideoPlayer: React.FC = () => {
   const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
   const [selectedAudioTrack, setSelectedAudioTrack] = useState<number | null>(null);
   const [textTracks, setTextTracks] = useState<TextTrack[]>([]);
-  const [selectedTextTrack, setSelectedTextTrack] = useState<SelectedTrack | null>({ type: 'disabled' });
+  const [selectedTextTrack, setSelectedTextTrack] = useState<number>(-1); // Use -1 for "disabled"
   const [resizeMode, setResizeMode] = useState<ResizeModeType>('contain'); // State for resize mode
   const [buffered, setBuffered] = useState(0); // Add buffered state
   const vlcRef = useRef<any>(null);
@@ -212,6 +246,12 @@ const VideoPlayer: React.FC = () => {
   // Add animated value for controls opacity
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
+  // Add opening animation states and values
+  const [isOpeningAnimationComplete, setIsOpeningAnimationComplete] = useState(false);
+  const openingFadeAnim = useRef(new Animated.Value(0)).current;
+  const openingScaleAnim = useRef(new Animated.Value(0.8)).current;
+  const backgroundFadeAnim = useRef(new Animated.Value(1)).current;
+
   // Add VLC specific state and refs
   const [isBuffering, setIsBuffering] = useState(false);
 
@@ -219,17 +259,35 @@ const VideoPlayer: React.FC = () => {
   const [vlcAudioTracks, setVlcAudioTracks] = useState<Array<{id: number, name: string, language?: string}>>([]);
   const [vlcTextTracks, setVlcTextTracks] = useState<Array<{id: number, name: string, language?: string}>>([]);
 
+  // Add a new state to track if the player is ready for seeking
+  const [isPlayerReady, setIsPlayerReady] = useState(false);
+
+  // Animated value for smooth progress bar
+  const progressAnim = useRef(new Animated.Value(0)).current;
+
+  // Add ref for progress bar container to measure its width
+  const progressBarRef = useRef<View>(null);
+
+  // Add state for progress bar touch tracking
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Add a ref for debouncing seek operations
+  const seekDebounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const pendingSeekValue = useRef<number | null>(null);
+  const lastSeekTime = useRef<number>(0);
+
   // Lock screen to landscape when component mounts
   useEffect(() => {
-    const lockToLandscape = async () => {
-      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+    // Since orientation is now locked before navigation, we can start immediately
+    const initializePlayer = () => {
+      // Enable immersive mode 
+      enableImmersiveMode();
+      
+      // Start the opening animation immediately
+      startOpeningAnimation();
     };
 
-    // Lock to landscape
-    lockToLandscape();
-
-    // Enable immersive mode when component mounts
-    enableImmersiveMode();
+    initializePlayer();
 
     // Restore screen orientation and disable immersive mode when component unmounts
     return () => {
@@ -241,24 +299,68 @@ const VideoPlayer: React.FC = () => {
     };
   }, []);
 
+  // Opening animation sequence
+  const startOpeningAnimation = () => {
+    // Much shorter delay since rotation is already handled
+    setTimeout(() => {
+      // Start the main animation sequence
+      Animated.parallel([
+        // Fade in the video player
+        Animated.timing(openingFadeAnim, {
+          toValue: 1,
+          duration: 600, // Reduced back to original duration
+          useNativeDriver: true,
+        }),
+        // Scale up from 80% to 100%
+        Animated.timing(openingScaleAnim, {
+          toValue: 1,
+          duration: 700, // Reduced back to original duration
+          useNativeDriver: true,
+        }),
+        // Fade out the black background overlay
+        Animated.timing(backgroundFadeAnim, {
+          toValue: 0,
+          duration: 800, // Reduced back to original duration
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        // Animation is complete
+        setIsOpeningAnimationComplete(true);
+        
+        // Hide the background overlay completely after animation
+        setTimeout(() => {
+          backgroundFadeAnim.setValue(0);
+        }, 100);
+      });
+    }, 150); // Much shorter delay since no rotation is needed
+  };
+
   // Load saved watch progress on mount
   useEffect(() => {
     const loadWatchProgress = async () => {
       if (id && type) {
         try {
-          logger.log(`[VideoPlayer] Checking for saved progress with id=${id}, type=${type}, episodeId=${episodeId || 'none'}`);
+          if (DEBUG_MODE) {
+            logger.log(`[VideoPlayer] Checking for saved progress with id=${id}, type=${type}, episodeId=${episodeId || 'none'}`);
+          }
           const savedProgress = await storageService.getWatchProgress(id, type, episodeId);
           
           if (savedProgress) {
-            logger.log(`[VideoPlayer] Found saved progress:`, savedProgress);
+            if (DEBUG_MODE) {
+              logger.log(`[VideoPlayer] Found saved progress:`, savedProgress);
+            }
             
             if (savedProgress.currentTime > 0) {
               // Only auto-resume if less than 95% watched (not effectively complete)
               const progressPercent = (savedProgress.currentTime / savedProgress.duration) * 100;
-              logger.log(`[VideoPlayer] Progress percent: ${progressPercent.toFixed(2)}%`);
+              if (DEBUG_MODE) {
+                logger.log(`[VideoPlayer] Progress percent: ${progressPercent.toFixed(2)}%`);
+              }
               
               if (progressPercent < 95) {
-                logger.log(`[VideoPlayer] Setting initial position to ${savedProgress.currentTime}`);
+                if (DEBUG_MODE) {
+                  logger.log(`[VideoPlayer] Setting initial position to ${savedProgress.currentTime}`);
+                }
                 // Set resume position
                 setResumePosition(savedProgress.currentTime);
                 
@@ -266,25 +368,29 @@ const VideoPlayer: React.FC = () => {
                 const pref = await AsyncStorage.getItem(RESUME_PREF_KEY);
                 if (pref === RESUME_PREF.ALWAYS_RESUME) {
                   setInitialPosition(savedProgress.currentTime);
-                  logger.log(`[VideoPlayer] Auto-resuming based on saved preference`);
+                  if (DEBUG_MODE) {
+                    logger.log(`[VideoPlayer] Auto-resuming based on saved preference`);
+                  }
                 } else if (pref === RESUME_PREF.ALWAYS_START_OVER) {
                   setInitialPosition(0);
-                  logger.log(`[VideoPlayer] Auto-starting from beginning based on saved preference`);
+                  if (DEBUG_MODE) {
+                    logger.log(`[VideoPlayer] Auto-starting from beginning based on saved preference`);
+                  }
                 } else {
                   // Only show resume overlay if no preference or ALWAYS_ASK
                   setShowResumeOverlay(true);
                 }
-              } else {
+              } else if (DEBUG_MODE) {
                 logger.log(`[VideoPlayer] Progress >= 95%, starting from beginning`);
               }
             }
-          } else {
+          } else if (DEBUG_MODE) {
             logger.log(`[VideoPlayer] No saved progress found`);
           }
         } catch (error) {
           logger.error('[VideoPlayer] Error loading watch progress:', error);
         }
-      } else {
+      } else if (DEBUG_MODE) {
         logger.log(`[VideoPlayer] Missing id or type, can't load progress. id=${id}, type=${type}`);
       }
     };
@@ -335,11 +441,10 @@ const VideoPlayer: React.FC = () => {
       
       try {
         await storageService.setWatchProgress(id, type, progress, episodeId);
-        logger.log(`[VideoPlayer] Saved progress: ${currentTime.toFixed(1)}/${duration.toFixed(1)} (${((currentTime/duration)*100).toFixed(1)}%)`);
       } catch (error) {
         logger.error('[VideoPlayer] Error saving watch progress:', error);
       }
-    } else {
+    } else if (DEBUG_MODE) {
       logger.log(`[VideoPlayer] Cannot save progress: id=${id}, type=${type}, currentTime=${currentTime}, duration=${duration}`);
     }
   };
@@ -360,94 +465,160 @@ const VideoPlayer: React.FC = () => {
     }
   };
 
-  const onSliderValueChange = (value: number) => {
-    if (vlcRef.current) {
-      const newTime = Math.floor(value);
-      vlcRef.current.seek(newTime);
-      setCurrentTime(newTime);
-      progress.value = newTime;
+  // Replace the reset seek value effect
+  // useEffect(() => {
+  //   if (seekValue !== undefined) {
+  //     const timer = setTimeout(() => {
+  //       if (isMounted.current) {
+  //         setSeekValue(undefined);
+  //       }
+  //     }, 1000); // Longer timeout to ensure VLC processes the seek properly
+      
+  //     return () => clearTimeout(timer);
+  //   }
+  // }, [seekValue]);
+
+  // Simplify the seekToTime function to use VLC's direct methods
+  const seekToTime = (timeInSeconds: number) => {
+    if (!isPlayerReady || duration <= 0 || !vlcRef.current) return;
+    
+    // Calculate normalized position (0-1) for VLC
+    const normalizedPosition = Math.max(0, Math.min(timeInSeconds / duration, 1));
+    
+    try {
+      // Use VLC's direct setPosition method
+      if (typeof vlcRef.current.setPosition === 'function') {
+        vlcRef.current.setPosition(normalizedPosition);
+        if (DEBUG_MODE) {
+          logger.log(`[VideoPlayer] Called setPosition with ${normalizedPosition} for time: ${timeInSeconds}s`);
+        }
+      } else if (typeof vlcRef.current.seek === 'function') {
+        // Fallback to seek method if available
+        vlcRef.current.seek(normalizedPosition);
+        if (DEBUG_MODE) {
+          logger.log(`[VideoPlayer] Called seek with ${normalizedPosition} for time: ${timeInSeconds}s`);
+        }
+      } else {
+        logger.error('[VideoPlayer] No seek method available on VLC player');
+      }
+      
+      // Update UI immediately for responsiveness
+      const progressPercent = timeInSeconds / duration;
+      progressAnim.setValue(progressPercent);
+      
+    } catch (error) {
+      logger.error('[VideoPlayer] Error during seek operation:', error);
     }
   };
 
-  const togglePlayback = () => {
-    if (vlcRef.current) {
-      if (paused) {
-        vlcRef.current.resume();
-      } else {
-        vlcRef.current.pause();
+  // Simplify handleProgress to always update state
+  const handleProgress = (event: any) => {
+    const currentTimeInSeconds = event.currentTime / 1000; // VLC gives time in milliseconds
+    
+    // Always update state - let VLC manage the timing
+    if (Math.abs(currentTimeInSeconds - currentTime) > 0.5) {
+      safeSetState(() => setCurrentTime(currentTimeInSeconds));
+      progress.value = currentTimeInSeconds;
+      
+      // Animate the progress bar smoothly
+      const progressPercent = duration > 0 ? currentTimeInSeconds / duration : 0;
+      Animated.timing(progressAnim, {
+        toValue: progressPercent,
+        duration: 250,
+        useNativeDriver: false,
+      }).start();
+      
+      // Update buffered position
+      const bufferedTime = event.bufferTime / 1000 || currentTimeInSeconds;
+      safeSetState(() => setBuffered(bufferedTime));
+    }
+  };
+
+  // Enhanced onLoad handler to mark player as ready
+  const onLoad = (data: any) => {
+    setDuration(data.duration / 1000); // VLC returns duration in milliseconds
+    max.value = data.duration / 1000;
+    
+    // Mark player as ready for seeking
+    setIsPlayerReady(true);
+
+    // Get audio and subtitle tracks from onLoad data
+    const audioTracksFromLoad = data.audioTracks || [];
+    const textTracksFromLoad = data.textTracks || [];
+    setVlcAudioTracks(audioTracksFromLoad);
+    setVlcTextTracks(textTracksFromLoad);
+    
+    if (DEBUG_MODE) {
+      logger.log(`[VideoPlayer] Video loaded with duration: ${data.duration / 1000}`);
+      const methods = Object.keys(vlcRef.current || {}).filter(
+        key => typeof vlcRef.current[key] === 'function'
+      );
+      logger.log('[VideoPlayer] Available VLC methods:', methods);
+      logger.log('[VideoPlayer] Available audio tracks:', audioTracksFromLoad);
+      logger.log('[VideoPlayer] Available subtitle tracks:', textTracksFromLoad);
+    }
+
+    // Set default selected tracks
+    if (audioTracksFromLoad.length > 1) { // More than just "Disable"
+        const firstEnabledAudio = audioTracksFromLoad.find((t: any) => t.id !== -1);
+        if(firstEnabledAudio) {
+            setSelectedAudioTrack(firstEnabledAudio.id);
+        }
+    } else if (audioTracksFromLoad.length > 0) {
+        setSelectedAudioTrack(audioTracksFromLoad[0].id);
+    }
+    // Subtitles default to disabled (-1)
+    
+    // If we have an initial position to seek to, do it now
+    if (initialPosition !== null && !isInitialSeekComplete) {
+      if (DEBUG_MODE) {
+        logger.log(`[VideoPlayer] Will seek to saved position: ${initialPosition}`);
       }
-      setPaused(!paused);
+      
+      // Seek with a short delay to ensure video is ready
+      setTimeout(() => {
+        if (vlcRef.current && duration > 0 && isMounted.current) {
+          seekToTime(initialPosition);
+          setIsInitialSeekComplete(true);
+          if (DEBUG_MODE) {
+            logger.log(`[VideoPlayer] Initial seek completed to position: ${initialPosition}s`);
+          }
+        }
+      }, 1000);
     }
   };
 
   const skip = (seconds: number) => {
     if (vlcRef.current) {
       const newTime = Math.max(0, Math.min(currentTime + seconds, duration));
-      vlcRef.current.seek(newTime);
-      setCurrentTime(newTime);
-      progress.value = newTime;
-    }
-  };
-
-  const onProgress = (data: { currentTime: number }) => {
-    setCurrentTime(data.currentTime);
-    progress.value = data.currentTime;
-  };
-
-  const onLoad = (data: any) => {
-    setDuration(data.duration / 1000); // VLC returns duration in milliseconds
-    max.value = data.duration / 1000;
-    
-    logger.log(`[VideoPlayer] Video loaded with duration: ${data.duration / 1000}`);
-    
-    // If we have an initial position to seek to, do it now
-    if (initialPosition !== null && !isInitialSeekComplete && vlcRef.current) {
-      logger.log(`[VideoPlayer] Will seek to saved position: ${initialPosition}`);
-      
-      // Seek immediately with a small delay
-      setTimeout(() => {
-        if (vlcRef.current) {
-          try {
-            vlcRef.current.seek(initialPosition);
-            setCurrentTime(initialPosition);
-            progress.value = initialPosition;
-            setIsInitialSeekComplete(true);
-            logger.log(`[VideoPlayer] Successfully seeked to saved position: ${initialPosition}`);
-          } catch (error) {
-            logger.error('[VideoPlayer] Error seeking to saved position:', error);
-          }
-        } else {
-          logger.error('[VideoPlayer] vlcRef is no longer valid when attempting to seek');
-        }
-      }, 1000); // Increase delay to ensure video is fully loaded
-    } else {
-      if (initialPosition === null) {
-        logger.log(`[VideoPlayer] No initial position to seek to`);
-      } else if (isInitialSeekComplete) {
-        logger.log(`[VideoPlayer] Initial seek already completed`);
-      } else {
-        logger.log(`[VideoPlayer] vlcRef not available for seeking`);
-      }
+      seekToTime(newTime);
+      // Let seekToTime handle all state updates
     }
   };
 
   const onAudioTracks = (data: { audioTracks: AudioTrack[] }) => {
     const tracks = data.audioTracks || [];
     setAudioTracks(tracks);
-    logger.log(`[VideoPlayer] Available audio tracks:`, tracks);
+    if (DEBUG_MODE) {
+      logger.log(`[VideoPlayer] Available audio tracks:`, tracks);
+    }
   };
 
   const onTextTracks = (e: Readonly<{ textTracks: TextTrack[] }>) => {
     const tracks = e.textTracks || [];
     setTextTracks(tracks);
-    logger.log(`[VideoPlayer] Available subtitle tracks:`, tracks);
+    if (DEBUG_MODE) {
+      logger.log(`[VideoPlayer] Available subtitle tracks:`, tracks);
+    }
   };
 
   // Toggle through aspect ratio modes
   const cycleAspectRatio = () => {
     const currentIndex = resizeModes.indexOf(resizeMode);
     const nextIndex = (currentIndex + 1) % resizeModes.length;
-    logger.log(`[VideoPlayer] Changing aspect ratio from ${resizeMode} to ${resizeModes[nextIndex]}`);
+    if (DEBUG_MODE) {
+      logger.log(`[VideoPlayer] Changing aspect ratio from ${resizeMode} to ${resizeModes[nextIndex]}`);
+    }
     setResizeMode(resizeModes[nextIndex]);
   };
 
@@ -495,14 +666,14 @@ const VideoPlayer: React.FC = () => {
 
   // Add debug logs for modal visibility
   useEffect(() => {
-    if (showAudioModal) {
+    if (showAudioModal && DEBUG_MODE) {
       logger.log("[VideoPlayer] Audio modal should be visible now");
       logger.log("[VideoPlayer] Available audio tracks:", audioTracks);
     }
   }, [showAudioModal, audioTracks]);
 
   useEffect(() => {
-    if (showSubtitleModal) {
+    if (showSubtitleModal && DEBUG_MODE) {
       logger.log("[VideoPlayer] Subtitle modal should be visible now");
       logger.log("[VideoPlayer] Available text tracks:", textTracks);
     }
@@ -511,13 +682,15 @@ const VideoPlayer: React.FC = () => {
   // Attempt to seek once vlcRef is available
   useEffect(() => {
     if (initialPosition !== null && !isInitialSeekComplete && vlcRef.current) {
-      logger.log(`[VideoPlayer] vlcRef is now available, attempting to seek to: ${initialPosition}`);
+      if (DEBUG_MODE) {
+        logger.log(`[VideoPlayer] vlcRef is now available, attempting to seek to: ${initialPosition}`);
+      }
       try {
-        vlcRef.current.seek(initialPosition);
-        setCurrentTime(initialPosition);
-        progress.value = initialPosition;
+        seekToTime(initialPosition);
         setIsInitialSeekComplete(true);
-        logger.log(`[VideoPlayer] Successfully seeked to position: ${initialPosition}`);
+        if (DEBUG_MODE) {
+          logger.log(`[VideoPlayer] Successfully seeked to position: ${initialPosition}`);
+        }
       } catch (error) {
         logger.error('[VideoPlayer] Error seeking to position on ref available:', error);
       }
@@ -531,17 +704,23 @@ const VideoPlayer: React.FC = () => {
         const pref = await AsyncStorage.getItem(RESUME_PREF_KEY);
         if (pref) {
           setResumePreference(pref);
-          logger.log(`[VideoPlayer] Loaded resume preference: ${pref}`);
+          if (DEBUG_MODE) {
+            logger.log(`[VideoPlayer] Loaded resume preference: ${pref}`);
+          }
           
           // If user has a preference, apply it automatically
           if (pref === RESUME_PREF.ALWAYS_RESUME && resumePosition !== null) {
             setShowResumeOverlay(false);
             setInitialPosition(resumePosition);
-            logger.log(`[VideoPlayer] Auto-resuming based on saved preference`);
+            if (DEBUG_MODE) {
+              logger.log(`[VideoPlayer] Auto-resuming based on saved preference`);
+            }
           } else if (pref === RESUME_PREF.ALWAYS_START_OVER) {
             setShowResumeOverlay(false);
             setInitialPosition(0);
-            logger.log(`[VideoPlayer] Auto-starting from beginning based on saved preference`);
+            if (DEBUG_MODE) {
+              logger.log(`[VideoPlayer] Auto-starting from beginning based on saved preference`);
+            }
           }
         }
       } catch (error) {
@@ -557,7 +736,9 @@ const VideoPlayer: React.FC = () => {
     try {
       await AsyncStorage.removeItem(RESUME_PREF_KEY);
       setResumePreference(null);
-      logger.log(`[VideoPlayer] Reset resume preference`);
+      if (DEBUG_MODE) {
+        logger.log(`[VideoPlayer] Reset resume preference`);
+      }
     } catch (error) {
       logger.error('[VideoPlayer] Error resetting resume preference:', error);
     }
@@ -566,13 +747,17 @@ const VideoPlayer: React.FC = () => {
   // Handle resume from overlay - modified for VLC
   const handleResume = async () => {
     if (resumePosition !== null && vlcRef.current) {
-      logger.log(`[VideoPlayer] Resuming from ${resumePosition}`);
+      if (DEBUG_MODE) {
+        logger.log(`[VideoPlayer] Resuming from ${resumePosition}`);
+      }
       
       // Save preference if remember choice is checked
       if (rememberChoice) {
         try {
           await AsyncStorage.setItem(RESUME_PREF_KEY, RESUME_PREF.ALWAYS_RESUME);
-          logger.log(`[VideoPlayer] Saved resume preference: ${RESUME_PREF.ALWAYS_RESUME}`);
+          if (DEBUG_MODE) {
+            logger.log(`[VideoPlayer] Saved resume preference: ${RESUME_PREF.ALWAYS_RESUME}`);
+          }
         } catch (error) {
           logger.error('[VideoPlayer] Error saving resume preference:', error);
         }
@@ -586,7 +771,7 @@ const VideoPlayer: React.FC = () => {
       // Seek to position with VLC
       setTimeout(() => {
         if (vlcRef.current) {
-          vlcRef.current.seek(resumePosition);
+          seekToTime(resumePosition);
         }
       }, 500);
     }
@@ -594,13 +779,17 @@ const VideoPlayer: React.FC = () => {
 
   // Handle start from beginning - modified for VLC
   const handleStartFromBeginning = async () => {
-    logger.log(`[VideoPlayer] Starting from beginning`);
+    if (DEBUG_MODE) {
+      logger.log(`[VideoPlayer] Starting from beginning`);
+    }
     
     // Save preference if remember choice is checked
     if (rememberChoice) {
       try {
         await AsyncStorage.setItem(RESUME_PREF_KEY, RESUME_PREF.ALWAYS_START_OVER);
-        logger.log(`[VideoPlayer] Saved resume preference: ${RESUME_PREF.ALWAYS_START_OVER}`);
+        if (DEBUG_MODE) {
+          logger.log(`[VideoPlayer] Saved resume preference: ${RESUME_PREF.ALWAYS_START_OVER}`);
+        }
       } catch (error) {
         logger.error('[VideoPlayer] Error saving resume preference:', error);
       }
@@ -612,7 +801,7 @@ const VideoPlayer: React.FC = () => {
     setInitialPosition(0);
     // Make sure we seek to beginning
     if (vlcRef.current) {
-      vlcRef.current.seek(0);
+      seekToTime(0);
       setCurrentTime(0);
       progress.value = 0;
     }
@@ -631,29 +820,6 @@ const VideoPlayer: React.FC = () => {
     setShowControls(!showControls);
   };
 
-  // Handle VLC progress updates
-  const handleProgress = (event: any) => {
-    const currentTimeInSeconds = event.currentTime / 1000; // VLC gives time in milliseconds
-    setCurrentTime(currentTimeInSeconds);
-    progress.value = currentTimeInSeconds;
-    
-    // Update buffered position
-    const bufferedTime = event.bufferTime / 1000 || currentTimeInSeconds;
-    setBuffered(bufferedTime);
-    
-    // Calculate buffer ahead (cannot be negative)
-    const bufferAhead = Math.max(0, bufferedTime - currentTimeInSeconds);
-    const bufferPercentage = ((bufferedTime / (duration || 1)) * 100);
-
-    // Add detailed buffer logging
-    logger.log(`[VideoPlayer] Buffer Status:
-      Current Time: ${currentTimeInSeconds.toFixed(2)}s
-      Buffered: ${bufferedTime.toFixed(2)}s
-      Buffered Ahead: ${bufferAhead.toFixed(2)}s
-      Buffer Percentage: ${bufferPercentage.toFixed(1)}%
-    `);
-  };
-
   // Handle VLC errors
   const handleError = (error: any) => {
     logger.error('[VideoPlayer] Playback Error:', error);
@@ -663,7 +829,9 @@ const VideoPlayer: React.FC = () => {
   // Handle VLC buffering
   const onBuffering = (event: any) => {
     setIsBuffering(event.isBuffering);
-    logger.log(`[VideoPlayer] Buffering: ${event.isBuffering}`);
+    if (DEBUG_MODE) {
+      logger.log(`[VideoPlayer] Buffering: ${event.isBuffering}`);
+    }
   };
 
   // Handle VLC playback ended
@@ -671,111 +839,14 @@ const VideoPlayer: React.FC = () => {
     // Your existing playback ended logic here
   };
 
-  // Function to get audio tracks from VLC
-  const getAudioTracks = () => {
-    if (vlcRef.current) {
-      vlcRef.current.getAudioTracks().then((tracks: any) => {
-        setVlcAudioTracks(tracks || []);
-        logger.log("[VideoPlayer] Available VLC audio tracks:", tracks);
-      }).catch((error: any) => {
-        logger.error("[VideoPlayer] Failed to get audio tracks:", error);
-      });
-    }
-  };
-
   // Function to select audio track in VLC
   const selectAudioTrack = (trackId: number) => {
-    if (vlcRef.current) {
-      vlcRef.current.setAudioTrack(trackId);
-      setSelectedAudioTrack(trackId);
-    }
-  };
-
-  // Function to get subtitle tracks from VLC
-  const getTextTracks = () => {
-    if (vlcRef.current) {
-      vlcRef.current.getTextTracks().then((tracks: any) => {
-        setVlcTextTracks(tracks || []);
-        logger.log("[VideoPlayer] Available VLC subtitle tracks:", tracks);
-      }).catch((error: any) => {
-        logger.error("[VideoPlayer] Failed to get subtitle tracks:", error);
-      });
-    }
+    setSelectedAudioTrack(trackId);
   };
 
   // Function to select subtitle track in VLC
   const selectTextTrack = (trackId: number) => {
-    if (vlcRef.current) {
-      vlcRef.current.setTextTrack(trackId);
-      // Update your state accordingly
-      setSelectedTextTrack({ type: 'index', value: trackId });
-    }
-  };
-  
-  // Add this useEffect to get audio and subtitle tracks after player is loaded
-  useEffect(() => {
-    if (duration > 0 && vlcRef.current) {
-      // Wait a bit for VLC to fully initialize and recognize tracks
-      setTimeout(() => {
-        getAudioTracks();
-        getTextTracks();
-      }, 2000);
-    }
-  }, [duration]);
-
-  // Update audio modal to use VLC audio tracks
-  const renderAudioModal = () => {
-    if (!showAudioModal) return null;
-    
-    return (
-      <View style={styles.fullscreenOverlay}>
-        <View style={styles.enhancedModalContainer}>
-          <View style={styles.enhancedModalHeader}>
-            <Text style={styles.enhancedModalTitle}>Audio</Text>
-            <TouchableOpacity 
-              style={styles.enhancedCloseButton}
-              onPress={() => setShowAudioModal(false)}
-            >
-              <Ionicons name="close" size={24} color="white" />
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView style={styles.trackListScrollContainer}>
-            <View style={styles.trackListContainer}>
-              {vlcAudioTracks.length > 0 ? vlcAudioTracks.map(track => (
-                <TouchableOpacity
-                  key={track.id}
-                  style={styles.enhancedTrackItem}
-                  onPress={() => {
-                    selectAudioTrack(track.id);
-                    setShowAudioModal(false);
-                  }}
-                >
-                  <View style={styles.trackInfoContainer}>
-                    <Text style={styles.trackPrimaryText}>
-                      {formatLanguage(track.language) || track.name || `Track ${track.id}`}
-                    </Text>
-                    {(track.name && track.language) && (
-                      <Text style={styles.trackSecondaryText}>{track.name}</Text>
-                    )}
-                  </View>
-                  {selectedAudioTrack === track.id && (
-                    <View style={styles.selectedIndicatorContainer}>
-                      <Ionicons name="checkmark" size={22} color="#E50914" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              )) : (
-                <View style={styles.emptyStateContainer}>
-                  <Ionicons name="alert-circle-outline" size={40} color="#888" />
-                  <Text style={styles.emptyStateText}>No audio tracks available</Text>
-                </View>
-              )}
-            </View>
-          </ScrollView>
-        </View>
-      </View>
-    );
+    setSelectedTextTrack(trackId);
   };
   
   // Update subtitle modal to use VLC subtitle tracks
@@ -808,8 +879,7 @@ const VideoPlayer: React.FC = () => {
                 <View style={styles.trackInfoContainer}>
                   <Text style={styles.trackPrimaryText}>Off</Text>
                 </View>
-                {(selectedTextTrack?.type === 'disabled' || 
-                  (selectedTextTrack?.type === 'index' && selectedTextTrack.value === -1)) && (
+                {selectedTextTrack === -1 && (
                   <View style={styles.selectedIndicatorContainer}>
                     <Ionicons name="checkmark" size={22} color="#E50914" />
                   </View>
@@ -828,14 +898,13 @@ const VideoPlayer: React.FC = () => {
                 >
                   <View style={styles.trackInfoContainer}>
                     <Text style={styles.trackPrimaryText}>
-                      {formatLanguage(track.language) || track.name || `Subtitle ${track.id}`}
+                      {getTrackDisplayName(track)}
                     </Text>
                     {(track.name && track.language) && (
                       <Text style={styles.trackSecondaryText}>{track.name}</Text>
                     )}
                   </View>
-                  {selectedTextTrack?.type === 'index' && 
-                   selectedTextTrack?.value === track.id && (
+                  {selectedTextTrack === track.id && (
                     <View style={styles.selectedIndicatorContainer}>
                       <Ionicons name="checkmark" size={22} color="#E50914" />
                     </View>
@@ -881,7 +950,11 @@ const VideoPlayer: React.FC = () => {
   // VLC specific method to set playback speed
   const changePlaybackSpeed = (speed: number) => {
     if (vlcRef.current) {
-      vlcRef.current.setRate(speed);
+      if (typeof vlcRef.current.setRate === 'function') {
+        vlcRef.current.setRate(speed);
+      } else if (typeof vlcRef.current.setPlaybackRate === 'function') {
+        vlcRef.current.setPlaybackRate(speed);
+      }
       setPlaybackSpeed(speed);
     }
   };
@@ -890,237 +963,422 @@ const VideoPlayer: React.FC = () => {
   const setVolume = (volumeLevel: number) => {
     if (vlcRef.current) {
       // VLC volume is typically between 0-200
-      vlcRef.current.setVolume(volumeLevel * 200);
+      if (typeof vlcRef.current.setVolume === 'function') {
+        vlcRef.current.setVolume(volumeLevel * 200);
+      }
     }
+  };
+
+  // Added back the togglePlayback function
+  const togglePlayback = () => {
+    if (vlcRef.current) {
+      if (paused) {
+        // Check if resume function exists
+        if (typeof vlcRef.current.resume === 'function') {
+          vlcRef.current.resume();
+        } else if (typeof vlcRef.current.play === 'function') {
+          vlcRef.current.play();
+        } else {
+          // Fallback - use setPaused method or property if available
+          vlcRef.current.setPaused && vlcRef.current.setPaused(false);
+        }
+      } else {
+        // Check if pause function exists
+        if (typeof vlcRef.current.pause === 'function') {
+          vlcRef.current.pause();
+        } else {
+          // Fallback - use setPaused method or property if available
+          vlcRef.current.setPaused && vlcRef.current.setPaused(true);
+        }
+      }
+      setPaused(!paused);
+    }
+  };
+
+  // Re-add the renderAudioModal function
+  const renderAudioModal = () => {
+    if (!showAudioModal) return null;
+    
+    return (
+      <View style={styles.fullscreenOverlay}>
+        <View style={styles.enhancedModalContainer}>
+          <View style={styles.enhancedModalHeader}>
+            <Text style={styles.enhancedModalTitle}>Audio</Text>
+            <TouchableOpacity 
+              style={styles.enhancedCloseButton}
+              onPress={() => setShowAudioModal(false)}
+            >
+              <Ionicons name="close" size={24} color="white" />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.trackListScrollContainer}>
+            <View style={styles.trackListContainer}>
+              {vlcAudioTracks.length > 0 ? vlcAudioTracks.map(track => (
+                <TouchableOpacity
+                  key={track.id}
+                  style={styles.enhancedTrackItem}
+                  onPress={() => {
+                    selectAudioTrack(track.id);
+                    setShowAudioModal(false);
+                  }}
+                >
+                  <View style={styles.trackInfoContainer}>
+                    <Text style={styles.trackPrimaryText}>
+                      {getTrackDisplayName(track)}
+                    </Text>
+                    {(track.name && track.language) && (
+                      <Text style={styles.trackSecondaryText}>{track.name}</Text>
+                    )}
+                  </View>
+                  {selectedAudioTrack === track.id && (
+                    <View style={styles.selectedIndicatorContainer}>
+                      <Ionicons name="checkmark" size={22} color="#E50914" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              )) : (
+                <View style={styles.emptyStateContainer}>
+                  <Ionicons name="alert-circle-outline" size={40} color="#888" />
+                  <Text style={styles.emptyStateText}>No audio tracks available</Text>
+                </View>
+              )}
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    );
+  };
+
+  // Use a ref to track if we're mounted to prevent state updates after unmount
+  // This helps prevent potential memory leaks and strange behaviors with navigation
+  const isMounted = useRef(true);
+  
+  // Clean up when component unmounts
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+      if (seekDebounceTimer.current) {
+        clearTimeout(seekDebounceTimer.current);
+      }
+    };
+  }, []);
+  
+  // Wrap all setState calls with this check
+  const safeSetState = (setter: any) => {
+    if (isMounted.current) {
+      setter();
+    }
+  };
+
+  // Enhanced progress bar touch handling with drag support
+  const handleProgressBarTouch = (event: any) => {
+    if (!duration || duration <= 0) return;
+    
+    const { locationX } = event.nativeEvent;
+    processProgressTouch(locationX);
+  };
+  
+  const handleProgressBarDragStart = () => {
+    setIsDragging(true);
+  };
+  
+  const handleProgressBarDragMove = (event: any) => {
+    if (!isDragging || !duration || duration <= 0) return;
+    
+    const { locationX } = event.nativeEvent;
+    processProgressTouch(locationX);
+  };
+  
+  const handleProgressBarDragEnd = () => {
+    setIsDragging(false);
+  };
+  
+  // Helper function to process touch position and seek
+  const processProgressTouch = (locationX: number) => {
+    progressBarRef.current?.measure((x, y, width, height, pageX, pageY) => {
+      // Calculate percentage of touch position relative to progress bar width
+      const percentage = Math.max(0, Math.min(locationX / width, 1));
+      // Calculate time to seek to
+      const seekTime = percentage * duration;
+      
+      if (DEBUG_MODE) {
+        logger.log(`[VideoPlayer] Seeking to: ${seekTime}s (${percentage * 100}%)`);
+      }
+      
+      // Seek to the calculated time
+      seekToTime(seekTime);
+    });
   };
 
   return (
     <View style={styles.container}> 
-      <TouchableOpacity
-        style={styles.videoContainer}
-        onPress={toggleControls}
-        activeOpacity={1}
+      {/* Opening Animation Overlay - covers the entire screen during transition */}
+      <Animated.View 
+        style={[
+          styles.openingOverlay,
+          {
+            opacity: backgroundFadeAnim,
+            zIndex: isOpeningAnimationComplete ? -1 : 3000,
+          }
+        ]}
+        pointerEvents={isOpeningAnimationComplete ? 'none' : 'auto'}
       >
-        <VLCPlayer
-          ref={vlcRef}
-          source={{
-            uri: uri,
-          }}
-          style={styles.video}
-          paused={paused || showResumeOverlay}
-          resizeMode={resizeMode as any} // Type cast to avoid type error
-          onLoad={onLoad}
-          onProgress={handleProgress}
-          rate={playbackSpeed}
-          onError={handleError}
-          onEnd={onEnd}
-          // VLC specific props
-          autoAspectRatio={true}
-          // autoReloadOnError={true} - Removed, not supported by VLCPlayer
-          // Note: VLC handles audio tracks differently, we'll need to adjust the UI for this
-        />
+        <View style={styles.openingContent}>
+          <ActivityIndicator size="large" color="#E50914" />
+          <Text style={styles.openingText}>Loading video...</Text>
+        </View>
+      </Animated.View>
 
-        {/* Slider Container with buffer indicator */}
-        <Animated.View style={[styles.sliderContainer, { opacity: fadeAnim }]}>
-          <View style={styles.sliderBackground}>
-            {/* Buffered Progress */}
-            <View style={[styles.bufferProgress, { 
-              width: `${(buffered / (duration || 1)) * 100}%`
-            }]} />
-          </View>
-          <Slider
-            progress={progress}
-            minimumValue={min}
-            maximumValue={max}
-            style={styles.slider}
-            onValueChange={onSliderValueChange}
-            theme={{
-              minimumTrackTintColor: '#E50914',
-              maximumTrackTintColor: 'transparent',
-              bubbleBackgroundColor: '#E50914',
+      {/* Animated Video Player Container */}
+      <Animated.View 
+        style={[
+          styles.videoPlayerContainer,
+          {
+            opacity: openingFadeAnim,
+            transform: [{ scale: openingScaleAnim }],
+          }
+        ]}
+      >
+        <TouchableOpacity
+          style={styles.videoContainer}
+          onPress={toggleControls}
+          activeOpacity={1}
+        >
+          <VLCPlayer
+            ref={vlcRef}
+            source={{
+              uri: uri,
             }}
+            style={styles.video}
+            paused={paused || showResumeOverlay}
+            resizeMode={resizeMode as any}
+            onLoad={onLoad}
+            onProgress={handleProgress}
+            rate={playbackSpeed}
+            onError={handleError}
+            onEnd={onEnd}
+            audioTrack={selectedAudioTrack ?? undefined}
+            textTrack={selectedTextTrack}
+            autoAspectRatio={true}
           />
-          <View style={styles.timeDisplay}>
-            <Text style={styles.duration}>{formatTime(currentTime)}</Text>
-            <Text style={styles.duration}>{formatTime(duration)}</Text>
-          </View>
-        </Animated.View>
 
-        {/* Controls Overlay - Using Animated.View */}
-        <Animated.View style={[styles.controlsContainer, { opacity: fadeAnim }]}>
-          {/* Top Gradient & Header */}
-          <LinearGradient
-            colors={['rgba(0,0,0,0.7)', 'transparent']}
-            style={styles.topGradient}
-          >
-            <View style={styles.header}>
-              {/* Title Section - Enhanced with metadata */}
-              <View style={styles.titleSection}>
-                <Text style={styles.title}>{title}</Text>
-                {/* Show season and episode for series */}
-                {season && episode && (
-                  <Text style={styles.episodeInfo}>
-                    S{season}E{episode} {episodeTitle && `• ${episodeTitle}`}
-                  </Text>
-                )}
-                {/* Show year, quality, and provider */}
-                <View style={styles.metadataRow}>
-                  {year && <Text style={styles.metadataText}>{year}</Text>}
-                  {quality && <View style={styles.qualityBadge}><Text style={styles.qualityText}>{quality}</Text></View>}
-                  {streamProvider && <Text style={styles.providerText}>via {streamProvider}</Text>}
-                </View>
-              </View>
-              <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-                <Ionicons name="close" size={24} color="white" />
-              </TouchableOpacity>
-            </View>
-          </LinearGradient>
-
-          {/* Center Controls (Play/Pause, Skip) */}
-          <View style={styles.controls}>
-            <TouchableOpacity onPress={() => skip(-10)} style={styles.skipButton}>
-              <Ionicons name="play-back" size={24} color="white" />
-              <Text style={styles.skipText}>10</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={togglePlayback} style={styles.playButton}>
-              <Ionicons name={paused ? "play" : "pause"} size={40} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => skip(10)} style={styles.skipButton}>
-              <Ionicons name="play-forward" size={24} color="white" />
-              <Text style={styles.skipText}>10</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Bottom Gradient */}
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.7)']}
-            style={styles.bottomGradient}
-          >
-            <View style={styles.bottomControls}>
-              {/* Bottom Buttons Row */}
-              <View style={styles.bottomButtons}>
-                {/* Speed Button */}
-                <TouchableOpacity style={styles.bottomButton}>
-                  <Ionicons name="speedometer" size={20} color="white" />
-                  <Text style={styles.bottomButtonText}>Speed ({playbackSpeed}x)</Text>
-                </TouchableOpacity>
-
-                {/* Aspect Ratio Button - Added */}
-                <TouchableOpacity style={styles.bottomButton} onPress={cycleAspectRatio}>
-                  <Ionicons name="resize" size={20} color="white" />
-                  <Text style={styles.bottomButtonText}>
-                    Aspect ({resizeMode})
-                  </Text>
-                </TouchableOpacity>
-
-                {/* Audio Button - Updated language display */}
-                <TouchableOpacity 
-                  style={styles.bottomButton} 
-                  onPress={() => setShowAudioModal(true)}
-                  disabled={audioTracks.length <= 1}
-                >
-                  <Ionicons name="volume-high" size={20} color={audioTracks.length <= 1 ? 'grey' : 'white'} />
-                  <Text style={[styles.bottomButtonText, audioTracks.length <= 1 && {color: 'grey'}]}>
-                    {audioTracks.length > 0 && selectedAudioTrack !== null
-                      ? `Audio: ${formatLanguage(audioTracks.find(t => t.index === selectedAudioTrack)?.language)}`
-                      : 'Audio: Default'}
-                  </Text>
-                </TouchableOpacity>
-                
-                {/* Subtitle Button - Updated language display */}
-                <TouchableOpacity 
-                  style={styles.bottomButton}
-                  onPress={() => setShowSubtitleModal(true)}
-                  disabled={textTracks.length === 0}
-                >
-                  <Ionicons name="text" size={20} color={textTracks.length === 0 ? 'grey' : 'white'} />
-                  <Text style={[styles.bottomButtonText, textTracks.length === 0 && {color: 'grey'}]}>
-                    {selectedTextTrack?.type === 'disabled' 
-                      ? 'Subtitles: Off' 
-                      : `Subtitles: ${formatLanguage(textTracks.find(t => t.index === selectedTextTrack?.value)?.language)}`}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </LinearGradient>
-        </Animated.View>
-
-        {/* Resume Overlay */}
-        {showResumeOverlay && resumePosition !== null && (
-          <View style={styles.resumeOverlay}>
-            <LinearGradient
-              colors={['rgba(0,0,0,0.9)', 'rgba(0,0,0,0.7)']}
-              style={styles.resumeContainer}
+          {/* Progress bar with enhanced touch handling */}
+          <Animated.View style={[styles.sliderContainer, { opacity: fadeAnim }]}>
+            <View
+              style={styles.progressTouchArea}
+              onTouchStart={handleProgressBarDragStart}
+              onTouchMove={handleProgressBarDragMove}
+              onTouchEnd={handleProgressBarDragEnd}
             >
-              <View style={styles.resumeContent}>
-                <View style={styles.resumeIconContainer}>
-                  <Ionicons name="play-circle" size={40} color="#E50914" />
-                </View>
-                <View style={styles.resumeTextContainer}>
-                  <Text style={styles.resumeTitle}>Continue Watching</Text>
-                  <Text style={styles.resumeInfo}>
-                    {title}
-                    {season && episode && ` • S${season}E${episode}`}
-                  </Text>
-                  <View style={styles.resumeProgressContainer}>
-                    <View style={styles.resumeProgressBar}>
-                      <View 
-                        style={[
-                          styles.resumeProgressFill, 
-                          { width: `${duration > 0 ? (resumePosition / duration) * 100 : 0}%` }
-                        ]} 
-                      />
-                    </View>
-                    <Text style={styles.resumeTimeText}>
-                      {formatTime(resumePosition)} {duration > 0 ? `/ ${formatTime(duration)}` : ''}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Remember choice checkbox */}
-              <TouchableOpacity 
-                style={styles.rememberChoiceContainer}
-                onPress={() => setRememberChoice(!rememberChoice)}
-                activeOpacity={0.7}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={handleProgressBarTouch}
+                style={{width: '100%'}}
               >
-                <View style={styles.checkboxContainer}>
-                  <View style={[styles.checkbox, rememberChoice && styles.checkboxChecked]}>
-                    {rememberChoice && <Ionicons name="checkmark" size={12} color="white" />}
-                  </View>
-                  <Text style={styles.rememberChoiceText}>Remember my choice</Text>
+                <View 
+                  ref={progressBarRef}
+                  style={styles.progressBarContainer}
+                >
+                  {/* Buffered Progress */}
+                  <View style={[styles.bufferProgress, { 
+                    width: `${(buffered / (duration || 1)) * 100}%`
+                  }]} />
+                  {/* Animated Progress */}
+                  <Animated.View 
+                    style={[
+                      styles.progressBarFill, 
+                      { 
+                        width: progressAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ['0%', '100%']
+                        })
+                      }
+                    ]} 
+                  />
                 </View>
-                
-                {resumePreference && (
-                  <TouchableOpacity 
-                    onPress={resetResumePreference}
-                    style={styles.resetPreferenceButton}
-                  >
-                    <Text style={styles.resetPreferenceText}>Reset</Text>
-                  </TouchableOpacity>
-                )}
               </TouchableOpacity>
+            </View>
+            <View style={styles.timeDisplay}>
+              <Text style={styles.duration}>{formatTime(currentTime)}</Text>
+              <Text style={styles.duration}>{formatTime(duration)}</Text>
+            </View>
+          </Animated.View>
 
-              <View style={styles.resumeButtons}>
-                <TouchableOpacity 
-                  style={styles.resumeButton} 
-                  onPress={handleStartFromBeginning}
-                >
-                  <Ionicons name="refresh" size={16} color="white" style={styles.buttonIcon} />
-                  <Text style={styles.resumeButtonText}>Start Over</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.resumeButton, styles.resumeFromButton]} 
-                  onPress={handleResume}
-                >
-                  <Ionicons name="play" size={16} color="white" style={styles.buttonIcon} />
-                  <Text style={styles.resumeButtonText}>Resume</Text>
+          {/* Controls Overlay - Using Animated.View */}
+          <Animated.View style={[styles.controlsContainer, { opacity: fadeAnim }]}>
+            {/* Top Gradient & Header */}
+            <LinearGradient
+              colors={['rgba(0,0,0,0.7)', 'transparent']}
+              style={styles.topGradient}
+            >
+              <View style={styles.header}>
+                {/* Title Section - Enhanced with metadata */}
+                <View style={styles.titleSection}>
+                  <Text style={styles.title}>{title}</Text>
+                  {/* Show season and episode for series */}
+                  {season && episode && (
+                    <Text style={styles.episodeInfo}>
+                      S{season}E{episode} {episodeTitle && `• ${episodeTitle}`}
+                    </Text>
+                  )}
+                  {/* Show year, quality, and provider */}
+                  <View style={styles.metadataRow}>
+                    {year && <Text style={styles.metadataText}>{year}</Text>}
+                    {quality && <View style={styles.qualityBadge}><Text style={styles.qualityText}>{quality}</Text></View>}
+                    {streamProvider && <Text style={styles.providerText}>via {streamProvider}</Text>}
+                  </View>
+                </View>
+                <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
+                  <Ionicons name="close" size={24} color="white" />
                 </TouchableOpacity>
               </View>
             </LinearGradient>
-          </View>
-        )}
-      </TouchableOpacity> 
+
+            {/* Center Controls (Play/Pause, Skip) */}
+            <View style={styles.controls}>
+              <TouchableOpacity onPress={() => skip(-10)} style={styles.skipButton}>
+                <Ionicons name="play-back" size={24} color="white" />
+                <Text style={styles.skipText}>10</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={togglePlayback} style={styles.playButton}>
+                <Ionicons name={paused ? "play" : "pause"} size={40} color="white" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => skip(10)} style={styles.skipButton}>
+                <Ionicons name="play-forward" size={24} color="white" />
+                <Text style={styles.skipText}>10</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Bottom Gradient */}
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.7)']}
+              style={styles.bottomGradient}
+            >
+              <View style={styles.bottomControls}>
+                {/* Bottom Buttons Row */}
+                <View style={styles.bottomButtons}>
+                  {/* Speed Button */}
+                  <TouchableOpacity style={styles.bottomButton}>
+                    <Ionicons name="speedometer" size={20} color="white" />
+                    <Text style={styles.bottomButtonText}>Speed ({playbackSpeed}x)</Text>
+                  </TouchableOpacity>
+
+                  {/* Aspect Ratio Button - Added */}
+                  <TouchableOpacity style={styles.bottomButton} onPress={cycleAspectRatio}>
+                    <Ionicons name="resize" size={20} color="white" />
+                    <Text style={styles.bottomButtonText}>
+                      Aspect ({resizeMode})
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Audio Button - Updated to use vlcAudioTracks */}
+                  <TouchableOpacity
+                    style={styles.bottomButton}
+                    onPress={() => setShowAudioModal(true)}
+                    disabled={vlcAudioTracks.length <= 1}
+                  >
+                    <Ionicons name="volume-high" size={20} color={vlcAudioTracks.length <= 1 ? 'grey' : 'white'} />
+                    <Text style={[styles.bottomButtonText, vlcAudioTracks.length <= 1 && {color: 'grey'}]}>
+                      {`Audio: ${getTrackDisplayName(vlcAudioTracks.find(t => t.id === selectedAudioTrack) || {id: -1, name: 'Default'})}`}
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  {/* Subtitle Button - Updated to use vlcTextTracks */}
+                  <TouchableOpacity
+                    style={styles.bottomButton}
+                    onPress={() => setShowSubtitleModal(true)}
+                    disabled={vlcTextTracks.length === 0}
+                  >
+                    <Ionicons name="text" size={20} color={vlcTextTracks.length === 0 ? 'grey' : 'white'} />
+                    <Text style={[styles.bottomButtonText, vlcTextTracks.length === 0 && {color: 'grey'}]}>
+                      {(selectedTextTrack === -1)
+                        ? 'Subtitles'
+                        : `Subtitles: ${getTrackDisplayName(vlcTextTracks.find(t => t.id === selectedTextTrack) || {id: -1, name: 'On'})}`}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </LinearGradient>
+          </Animated.View>
+
+          {/* Resume Overlay */}
+          {showResumeOverlay && resumePosition !== null && (
+            <View style={styles.resumeOverlay}>
+              <LinearGradient
+                colors={['rgba(0,0,0,0.9)', 'rgba(0,0,0,0.7)']}
+                style={styles.resumeContainer}
+              >
+                <View style={styles.resumeContent}>
+                  <View style={styles.resumeIconContainer}>
+                    <Ionicons name="play-circle" size={40} color="#E50914" />
+                  </View>
+                  <View style={styles.resumeTextContainer}>
+                    <Text style={styles.resumeTitle}>Continue Watching</Text>
+                    <Text style={styles.resumeInfo}>
+                      {title}
+                      {season && episode && ` • S${season}E${episode}`}
+                    </Text>
+                    <View style={styles.resumeProgressContainer}>
+                      <View style={styles.resumeProgressBar}>
+                        <View 
+                          style={[
+                            styles.resumeProgressFill, 
+                            { width: `${duration > 0 ? (resumePosition / duration) * 100 : 0}%` }
+                          ]} 
+                        />
+                      </View>
+                      <Text style={styles.resumeTimeText}>
+                        {formatTime(resumePosition)} {duration > 0 ? `/ ${formatTime(duration)}` : ''}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Remember choice checkbox */}
+                <TouchableOpacity 
+                  style={styles.rememberChoiceContainer}
+                  onPress={() => setRememberChoice(!rememberChoice)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.checkboxContainer}>
+                    <View style={[styles.checkbox, rememberChoice && styles.checkboxChecked]}>
+                      {rememberChoice && <Ionicons name="checkmark" size={12} color="white" />}
+                    </View>
+                    <Text style={styles.rememberChoiceText}>Remember my choice</Text>
+                  </View>
+                  
+                  {resumePreference && (
+                    <TouchableOpacity 
+                      onPress={resetResumePreference}
+                      style={styles.resetPreferenceButton}
+                    >
+                      <Text style={styles.resetPreferenceText}>Reset</Text>
+                    </TouchableOpacity>
+                  )}
+                </TouchableOpacity>
+
+                <View style={styles.resumeButtons}>
+                  <TouchableOpacity 
+                    style={styles.resumeButton} 
+                    onPress={handleStartFromBeginning}
+                  >
+                    <Ionicons name="refresh" size={16} color="white" style={styles.buttonIcon} />
+                    <Text style={styles.resumeButtonText}>Start Over</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.resumeButton, styles.resumeFromButton]} 
+                    onPress={handleResume}
+                  >
+                    <Ionicons name="play" size={16} color="white" style={styles.buttonIcon} />
+                    <Text style={styles.resumeButtonText}>Resume</Text>
+                  </TouchableOpacity>
+                </View>
+              </LinearGradient>
+            </View>
+          )}
+        </TouchableOpacity> 
+      </Animated.View>
 
       {/* Use the new modal rendering functions */}
       {renderAudioModal()}
@@ -1242,16 +1500,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     zIndex: 1000,
   },
-  sliderBackground: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 3,
+  progressTouchArea: {
+    height: 30,  // Increase touch target height for easier interaction
+    justifyContent: 'center',
+    width: '100%',
+  },
+  progressBarContainer: {
+    height: 4,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 1.5,
+    borderRadius: 2,
     overflow: 'hidden',
-    marginHorizontal: 20,
-    top: 13.5, // Center with the slider thumb
+    marginHorizontal: 4,
+    position: 'relative',
   },
   bufferProgress: {
     position: 'absolute',
@@ -1260,17 +1520,20 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: 'rgba(255, 255, 255, 0.4)',
   },
-  slider: {
-    width: '100%',
-    height: 30,
-    zIndex: 1,
+  progressBarFill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: '#E50914',
+    height: '100%',
   },
   timeDisplay: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
     paddingHorizontal: 4,
-    marginTop: -4, // Reduced space between slider and time
+    marginTop: 4, // Increased space between progress bar and time
     marginBottom: 8, // Added space between time and buttons
   },
   duration: {
@@ -1564,6 +1827,33 @@ const styles = StyleSheet.create({
     color: '#E50914',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  openingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2000,
+  },
+  openingContent: {
+    padding: 20,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  openingText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 20,
+  },
+  videoPlayerContainer: {
+    flex: 1,
   },
 });
 

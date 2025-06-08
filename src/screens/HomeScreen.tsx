@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,8 @@ import {
   Platform,
   Image,
   Modal,
-  Pressable
+  Pressable,
+  Alert
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -60,6 +61,7 @@ import { SkeletonFeatured } from '../components/home/SkeletonLoaders';
 import homeStyles, { sharedStyles } from '../styles/homeStyles';
 import { useTheme } from '../contexts/ThemeContext';
 import type { Theme } from '../contexts/ThemeContext';
+import * as ScreenOrientation from 'expo-screen-orientation';
 
 // Define interfaces for our data
 interface Category {
@@ -517,18 +519,37 @@ const HomeScreen = () => {
     navigation.navigate('Metadata', { id, type });
   }, [navigation]);
 
-  const handlePlayStream = useCallback((stream: Stream) => {
+  const handlePlayStream = useCallback(async (stream: Stream) => {
     if (!featuredContent) return;
     
-    navigation.navigate('Player', {
-      uri: stream.url,
-      title: featuredContent.name,
-      year: featuredContent.year,
-      quality: stream.title?.match(/(\d+)p/)?.[1] || undefined,
-      streamProvider: stream.name,
-      id: featuredContent.id,
-      type: featuredContent.type
-    });
+    try {
+      // Lock orientation to landscape before navigation to prevent glitches
+      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+      
+      // Small delay to ensure orientation is set before navigation
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      navigation.navigate('Player', {
+        uri: stream.url,
+        title: featuredContent.name,
+        year: featuredContent.year,
+        quality: stream.title?.match(/(\d+)p/)?.[1] || undefined,
+        streamProvider: stream.name,
+        id: featuredContent.id,
+        type: featuredContent.type
+      });
+    } catch (error) {
+      // Fallback: navigate anyway
+      navigation.navigate('Player', {
+        uri: stream.url,
+        title: featuredContent.name,
+        year: featuredContent.year,
+        quality: stream.title?.match(/(\d+)p/)?.[1] || undefined,
+        streamProvider: stream.name,
+        id: featuredContent.id,
+        type: featuredContent.type
+      });
+    }
   }, [featuredContent, navigation]);
 
   const refreshContinueWatching = useCallback(async () => {
