@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,9 @@ import Animated, {
   useAnimatedStyle,
   interpolate,
   Extrapolate,
+  useSharedValue,
+  withTiming,
+  withSpring,
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
 import { logger } from '../../utils/logger';
@@ -259,6 +262,48 @@ const HeroSection: React.FC<HeroSectionProps> = ({
   setLogoLoadError,
 }) => {
   const { currentTheme } = useTheme();
+  
+  // State for backdrop image loading
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  
+  // Animation values for smooth backdrop transitions
+  const backdropOpacity = useSharedValue(1); // Start visible
+  const backdropScale = useSharedValue(1); // Start at normal scale
+  
+  // Handle image load success
+  const handleImageLoad = () => {
+    setImageLoaded(true);
+    setImageError(false);
+    // Enhance the image with subtle animation
+    backdropOpacity.value = withTiming(1, { duration: 300 });
+    backdropScale.value = withSpring(1, { 
+      damping: 25, 
+      stiffness: 120,
+      mass: 1 
+    });
+  };
+  
+  // Handle image load error
+  const handleImageError = () => {
+    logger.warn(`[HeroSection] Banner failed to load: ${bannerImage}`);
+    setImageError(true);
+    backdropOpacity.value = withTiming(0.7, { duration: 200 }); // Dim on error
+    if (bannerImage !== metadata.banner) {
+      setBannerImage(metadata.banner || metadata.poster);
+    }
+  };
+
+  // Reset animations when banner image changes
+  useEffect(() => {
+    if (bannerImage && !loadingBanner) {
+      setImageLoaded(false);
+      setImageError(false);
+      backdropOpacity.value = 0.8; // Start slightly dimmed
+      backdropScale.value = 0.98; // Start slightly smaller
+    }
+  }, [bannerImage, loadingBanner]);
+
   // Enhanced animated styles with sophisticated micro-animations
   const heroAnimatedStyle = useAnimatedStyle(() => ({
     width: '100%',
@@ -317,7 +362,6 @@ const HeroSection: React.FC<HeroSectionProps> = ({
   }));
 
   const watchProgressBarStyle = useAnimatedStyle(() => ({
-    width: `${watchProgressWidth.value * 100}%`,
     transform: [
       { scaleX: interpolate(watchProgressWidth.value, [0, 1], [0.8, 1]) }
     ]
@@ -373,7 +417,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
           [0, 150, 300],
           [1.08, 1.05, 1.02],
           Extrapolate.CLAMP
-        )
+        ) * backdropScale.value
       },
       {
         rotateZ: interpolate(
@@ -384,6 +428,42 @@ const HeroSection: React.FC<HeroSectionProps> = ({
         ) + 'deg'
       }
     ],
+  }));
+
+  // Backdrop image animated style for smooth transitions
+  const backdropImageStyle = useAnimatedStyle(() => ({
+    opacity: backdropOpacity.value,
+    transform: [
+      { 
+        translateY: interpolate(
+          dampedScrollY.value,
+          [0, 100, 300],
+          [0, -35, -90],
+          Extrapolate.CLAMP
+        )
+      },
+      { 
+        scale: interpolate(
+          dampedScrollY.value,
+          [0, 150, 300],
+          [1.08, 1.05, 1.02],
+          Extrapolate.CLAMP
+        ) * backdropScale.value
+      },
+      {
+        rotateZ: interpolate(
+          dampedScrollY.value,
+          [0, 300],
+          [0, -0.1],
+          Extrapolate.CLAMP
+        ) + 'deg'
+      }
+    ],
+  }));
+
+  // Loading skeleton animated style
+  const skeletonStyle = useAnimatedStyle(() => ({
+    opacity: loadingBanner ? 0.2 : 0,
   }));
 
   // Render genres
@@ -411,19 +491,22 @@ const HeroSection: React.FC<HeroSectionProps> = ({
   return (
     <Animated.View style={heroAnimatedStyle}>
       <View style={styles.heroSection}>
-        {loadingBanner ? (
-          <View style={[styles.absoluteFill, { backgroundColor: currentTheme.colors.black }]} />
-        ) : (
+        {/* Fallback dark background */}
+        <View style={[styles.absoluteFill, { backgroundColor: currentTheme.colors.black }]} />
+        
+        {/* Loading state with skeleton */}
+        {loadingBanner && (
+          <Animated.View style={[styles.absoluteFill, styles.skeletonGradient, skeletonStyle]} />
+        )}
+        
+        {/* Background image with smooth loading */}
+        {!loadingBanner && (bannerImage || metadata.banner || metadata.poster) && (
           <Animated.Image 
             source={{ uri: bannerImage || metadata.banner || metadata.poster }}
-            style={[styles.absoluteFill, parallaxImageStyle]}
+            style={[styles.absoluteFill, backdropImageStyle]}
             resizeMode="cover"
-            onError={() => {
-              logger.warn(`[HeroSection] Banner failed to load: ${bannerImage}`);
-              if (bannerImage !== metadata.banner) {
-                setBannerImage(metadata.banner || metadata.poster);
-              }
-            }}
+            onError={handleImageError}
+            onLoad={handleImageLoad}
           />
         )}
         <LinearGradient
@@ -642,6 +725,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.9,
     letterSpacing: 0.2
+  },
+  skeletonGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
 });
 
