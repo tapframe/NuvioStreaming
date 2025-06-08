@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, TouchableOpacity, StyleSheet, Text, Dimensions, Modal, Pressable, StatusBar, Platform, ScrollView, Animated } from 'react-native';
-import Video from 'react-native-video';
+import { VLCPlayer } from 'react-native-vlc-media-player';
 import { Ionicons } from '@expo/vector-icons';
 import { Slider } from 'react-native-awesome-slider';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -69,9 +69,9 @@ interface TextTrack {
   type?: string | null; // Adjusting type based on linter error
 }
 
-// Define the possible resize modes
-type ResizeModeType = 'contain' | 'cover' | 'stretch' | 'none';
-const resizeModes: ResizeModeType[] = ['contain', 'cover', 'stretch'];
+// Define the possible resize modes - adjust to match VLCPlayer's PlayerResizeMode options
+type ResizeModeType = 'contain' | 'cover' | 'fill' | 'none';
+const resizeModes: ResizeModeType[] = ['contain', 'cover', 'fill'];
 
 // Add language code to name mapping
 const languageMap: {[key: string]: string} = {
@@ -132,6 +132,18 @@ const formatLanguage = (code?: string): string => {
   return languageMap[normalized] || code.toUpperCase();
 };
 
+// Add VLC specific interface for their event structure
+interface VlcMediaEvent {
+  currentTime: number;
+  duration: number;
+  bufferTime?: number;
+  isBuffering?: boolean;
+  audioTracks?: Array<{id: number, name: string, language?: string}>;
+  textTracks?: Array<{id: number, name: string, language?: string}>;
+  selectedAudioTrack?: number;
+  selectedTextTrack?: number;
+}
+
 const VideoPlayer: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'Player'>>();
@@ -176,7 +188,8 @@ const VideoPlayer: React.FC = () => {
   const [textTracks, setTextTracks] = useState<TextTrack[]>([]);
   const [selectedTextTrack, setSelectedTextTrack] = useState<SelectedTrack | null>({ type: 'disabled' });
   const [resizeMode, setResizeMode] = useState<ResizeModeType>('contain'); // State for resize mode
-  const videoRef = useRef<any>(null);
+  const [buffered, setBuffered] = useState(0); // Add buffered state
+  const vlcRef = useRef<any>(null);
   const progress = useSharedValue(0);
   const min = useSharedValue(0);
   const max = useSharedValue(duration);
@@ -199,8 +212,12 @@ const VideoPlayer: React.FC = () => {
   // Add animated value for controls opacity
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
-  // Add buffered state
-  const [buffered, setBuffered] = useState<number>(0);
+  // Add VLC specific state and refs
+  const [isBuffering, setIsBuffering] = useState(false);
+
+  // Modify audio tracks handling for VLC
+  const [vlcAudioTracks, setVlcAudioTracks] = useState<Array<{id: number, name: string, language?: string}>>([]);
+  const [vlcTextTracks, setVlcTextTracks] = useState<Array<{id: number, name: string, language?: string}>>([]);
 
   // Lock screen to landscape when component mounts
   useEffect(() => {
@@ -344,22 +361,29 @@ const VideoPlayer: React.FC = () => {
   };
 
   const onSliderValueChange = (value: number) => {
-    if (videoRef.current) {
+    if (vlcRef.current) {
       const newTime = Math.floor(value);
-      videoRef.current.seek(newTime);
+      vlcRef.current.seek(newTime);
       setCurrentTime(newTime);
       progress.value = newTime;
     }
   };
 
   const togglePlayback = () => {
-    setPaused(!paused);
+    if (vlcRef.current) {
+      if (paused) {
+        vlcRef.current.resume();
+      } else {
+        vlcRef.current.pause();
+      }
+      setPaused(!paused);
+    }
   };
 
   const skip = (seconds: number) => {
-    if (videoRef.current) {
+    if (vlcRef.current) {
       const newTime = Math.max(0, Math.min(currentTime + seconds, duration));
-      videoRef.current.seek(newTime);
+      vlcRef.current.seek(newTime);
       setCurrentTime(newTime);
       progress.value = newTime;
     }
@@ -370,21 +394,21 @@ const VideoPlayer: React.FC = () => {
     progress.value = data.currentTime;
   };
 
-  const onLoad = (data: { duration: number }) => {
-    setDuration(data.duration);
-    max.value = data.duration;
+  const onLoad = (data: any) => {
+    setDuration(data.duration / 1000); // VLC returns duration in milliseconds
+    max.value = data.duration / 1000;
     
-    logger.log(`[VideoPlayer] Video loaded with duration: ${data.duration}`);
+    logger.log(`[VideoPlayer] Video loaded with duration: ${data.duration / 1000}`);
     
     // If we have an initial position to seek to, do it now
-    if (initialPosition !== null && !isInitialSeekComplete && videoRef.current) {
+    if (initialPosition !== null && !isInitialSeekComplete && vlcRef.current) {
       logger.log(`[VideoPlayer] Will seek to saved position: ${initialPosition}`);
       
       // Seek immediately with a small delay
       setTimeout(() => {
-        if (videoRef.current) {
+        if (vlcRef.current) {
           try {
-            videoRef.current.seek(initialPosition);
+            vlcRef.current.seek(initialPosition);
             setCurrentTime(initialPosition);
             progress.value = initialPosition;
             setIsInitialSeekComplete(true);
@@ -393,7 +417,7 @@ const VideoPlayer: React.FC = () => {
             logger.error('[VideoPlayer] Error seeking to saved position:', error);
           }
         } else {
-          logger.error('[VideoPlayer] videoRef is no longer valid when attempting to seek');
+          logger.error('[VideoPlayer] vlcRef is no longer valid when attempting to seek');
         }
       }, 1000); // Increase delay to ensure video is fully loaded
     } else {
@@ -402,7 +426,7 @@ const VideoPlayer: React.FC = () => {
       } else if (isInitialSeekComplete) {
         logger.log(`[VideoPlayer] Initial seek already completed`);
       } else {
-        logger.log(`[VideoPlayer] videoRef not available for seeking`);
+        logger.log(`[VideoPlayer] vlcRef not available for seeking`);
       }
     }
   };
@@ -484,12 +508,12 @@ const VideoPlayer: React.FC = () => {
     }
   }, [showSubtitleModal, textTracks]);
 
-  // Attempt to seek once videoRef is available
+  // Attempt to seek once vlcRef is available
   useEffect(() => {
-    if (initialPosition !== null && !isInitialSeekComplete && videoRef.current) {
-      logger.log(`[VideoPlayer] videoRef is now available, attempting to seek to: ${initialPosition}`);
+    if (initialPosition !== null && !isInitialSeekComplete && vlcRef.current) {
+      logger.log(`[VideoPlayer] vlcRef is now available, attempting to seek to: ${initialPosition}`);
       try {
-        videoRef.current.seek(initialPosition);
+        vlcRef.current.seek(initialPosition);
         setCurrentTime(initialPosition);
         progress.value = initialPosition;
         setIsInitialSeekComplete(true);
@@ -498,7 +522,7 @@ const VideoPlayer: React.FC = () => {
         logger.error('[VideoPlayer] Error seeking to position on ref available:', error);
       }
     }
-  }, [videoRef.current, initialPosition, isInitialSeekComplete]);
+  }, [vlcRef.current, initialPosition, isInitialSeekComplete]);
 
   // Load resume preference on mount
   useEffect(() => {
@@ -539,9 +563,9 @@ const VideoPlayer: React.FC = () => {
     }
   };
 
-  // Handle resume from overlay - modified to save preference
+  // Handle resume from overlay - modified for VLC
   const handleResume = async () => {
-    if (resumePosition !== null && videoRef.current) {
+    if (resumePosition !== null && vlcRef.current) {
       logger.log(`[VideoPlayer] Resuming from ${resumePosition}`);
       
       // Save preference if remember choice is checked
@@ -558,10 +582,17 @@ const VideoPlayer: React.FC = () => {
       setInitialPosition(resumePosition);
       // Hide overlay
       setShowResumeOverlay(false);
+      
+      // Seek to position with VLC
+      setTimeout(() => {
+        if (vlcRef.current) {
+          vlcRef.current.seek(resumePosition);
+        }
+      }, 500);
     }
   };
 
-  // Handle start from beginning - modified to save preference
+  // Handle start from beginning - modified for VLC
   const handleStartFromBeginning = async () => {
     logger.log(`[VideoPlayer] Starting from beginning`);
     
@@ -580,8 +611,8 @@ const VideoPlayer: React.FC = () => {
     // Set initial position to 0
     setInitialPosition(0);
     // Make sure we seek to beginning
-    if (videoRef.current) {
-      videoRef.current.seek(0);
+    if (vlcRef.current) {
+      vlcRef.current.seek(0);
       setCurrentTime(0);
       progress.value = 0;
     }
@@ -600,43 +631,267 @@ const VideoPlayer: React.FC = () => {
     setShowControls(!showControls);
   };
 
-  // Add onBuffer handler to Video component
-  const onBuffer = ({ isBuffering }: { isBuffering: boolean }) => {
-    // You can use this to show a loading indicator if needed
-    logger.log(`[VideoPlayer] Buffering: ${isBuffering}`);
-  };
-
-  // Add onProgress handler to track buffered data
-  const onLoadStart = () => {
-    setBuffered(0);
-  };
-
-  const handleProgress = (data: { currentTime: number, playableDuration: number, seekableDuration?: number }) => {
-    setCurrentTime(data.currentTime);
-    progress.value = data.currentTime;
+  // Handle VLC progress updates
+  const handleProgress = (event: any) => {
+    const currentTimeInSeconds = event.currentTime / 1000; // VLC gives time in milliseconds
+    setCurrentTime(currentTimeInSeconds);
+    progress.value = currentTimeInSeconds;
     
-    // Ensure playableDuration is always at least equal to currentTime
-    const effectivePlayableDuration = Math.max(data.currentTime, data.playableDuration);
-    setBuffered(effectivePlayableDuration);
-
+    // Update buffered position
+    const bufferedTime = event.bufferTime / 1000 || currentTimeInSeconds;
+    setBuffered(bufferedTime);
+    
     // Calculate buffer ahead (cannot be negative)
-    const bufferAhead = Math.max(0, effectivePlayableDuration - data.currentTime);
-    const bufferPercentage = ((effectivePlayableDuration / (duration || 1)) * 100);
+    const bufferAhead = Math.max(0, bufferedTime - currentTimeInSeconds);
+    const bufferPercentage = ((bufferedTime / (duration || 1)) * 100);
 
     // Add detailed buffer logging
     logger.log(`[VideoPlayer] Buffer Status:
-      Current Time: ${data.currentTime.toFixed(2)}s
-      Playable Duration: ${effectivePlayableDuration.toFixed(2)}s
+      Current Time: ${currentTimeInSeconds.toFixed(2)}s
+      Buffered: ${bufferedTime.toFixed(2)}s
       Buffered Ahead: ${bufferAhead.toFixed(2)}s
-      Seekable Duration: ${data.seekableDuration?.toFixed(2) || 'N/A'}s
       Buffer Percentage: ${bufferPercentage.toFixed(1)}%
     `);
   };
 
-  // Add onError handler
+  // Handle VLC errors
   const handleError = (error: any) => {
     logger.error('[VideoPlayer] Playback Error:', error);
     // Optionally, you could show an error message to the user here
+  };
+
+  // Handle VLC buffering
+  const onBuffering = (event: any) => {
+    setIsBuffering(event.isBuffering);
+    logger.log(`[VideoPlayer] Buffering: ${event.isBuffering}`);
+  };
+
+  // Handle VLC playback ended
+  const onEnd = () => {
+    // Your existing playback ended logic here
+  };
+
+  // Function to get audio tracks from VLC
+  const getAudioTracks = () => {
+    if (vlcRef.current) {
+      vlcRef.current.getAudioTracks().then((tracks: any) => {
+        setVlcAudioTracks(tracks || []);
+        logger.log("[VideoPlayer] Available VLC audio tracks:", tracks);
+      }).catch((error: any) => {
+        logger.error("[VideoPlayer] Failed to get audio tracks:", error);
+      });
+    }
+  };
+
+  // Function to select audio track in VLC
+  const selectAudioTrack = (trackId: number) => {
+    if (vlcRef.current) {
+      vlcRef.current.setAudioTrack(trackId);
+      setSelectedAudioTrack(trackId);
+    }
+  };
+
+  // Function to get subtitle tracks from VLC
+  const getTextTracks = () => {
+    if (vlcRef.current) {
+      vlcRef.current.getTextTracks().then((tracks: any) => {
+        setVlcTextTracks(tracks || []);
+        logger.log("[VideoPlayer] Available VLC subtitle tracks:", tracks);
+      }).catch((error: any) => {
+        logger.error("[VideoPlayer] Failed to get subtitle tracks:", error);
+      });
+    }
+  };
+
+  // Function to select subtitle track in VLC
+  const selectTextTrack = (trackId: number) => {
+    if (vlcRef.current) {
+      vlcRef.current.setTextTrack(trackId);
+      // Update your state accordingly
+      setSelectedTextTrack({ type: 'index', value: trackId });
+    }
+  };
+  
+  // Add this useEffect to get audio and subtitle tracks after player is loaded
+  useEffect(() => {
+    if (duration > 0 && vlcRef.current) {
+      // Wait a bit for VLC to fully initialize and recognize tracks
+      setTimeout(() => {
+        getAudioTracks();
+        getTextTracks();
+      }, 2000);
+    }
+  }, [duration]);
+
+  // Update audio modal to use VLC audio tracks
+  const renderAudioModal = () => {
+    if (!showAudioModal) return null;
+    
+    return (
+      <View style={styles.fullscreenOverlay}>
+        <View style={styles.enhancedModalContainer}>
+          <View style={styles.enhancedModalHeader}>
+            <Text style={styles.enhancedModalTitle}>Audio</Text>
+            <TouchableOpacity 
+              style={styles.enhancedCloseButton}
+              onPress={() => setShowAudioModal(false)}
+            >
+              <Ionicons name="close" size={24} color="white" />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.trackListScrollContainer}>
+            <View style={styles.trackListContainer}>
+              {vlcAudioTracks.length > 0 ? vlcAudioTracks.map(track => (
+                <TouchableOpacity
+                  key={track.id}
+                  style={styles.enhancedTrackItem}
+                  onPress={() => {
+                    selectAudioTrack(track.id);
+                    setShowAudioModal(false);
+                  }}
+                >
+                  <View style={styles.trackInfoContainer}>
+                    <Text style={styles.trackPrimaryText}>
+                      {formatLanguage(track.language) || track.name || `Track ${track.id}`}
+                    </Text>
+                    {(track.name && track.language) && (
+                      <Text style={styles.trackSecondaryText}>{track.name}</Text>
+                    )}
+                  </View>
+                  {selectedAudioTrack === track.id && (
+                    <View style={styles.selectedIndicatorContainer}>
+                      <Ionicons name="checkmark" size={22} color="#E50914" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              )) : (
+                <View style={styles.emptyStateContainer}>
+                  <Ionicons name="alert-circle-outline" size={40} color="#888" />
+                  <Text style={styles.emptyStateText}>No audio tracks available</Text>
+                </View>
+              )}
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    );
+  };
+  
+  // Update subtitle modal to use VLC subtitle tracks
+  const renderSubtitleModal = () => {
+    if (!showSubtitleModal) return null;
+    
+    return (
+      <View style={styles.fullscreenOverlay}>
+        <View style={styles.enhancedModalContainer}>
+          <View style={styles.enhancedModalHeader}>
+            <Text style={styles.enhancedModalTitle}>Subtitles</Text>
+            <TouchableOpacity 
+              style={styles.enhancedCloseButton}
+              onPress={() => setShowSubtitleModal(false)}
+            >
+              <Ionicons name="close" size={24} color="white" />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.trackListScrollContainer}>
+            <View style={styles.trackListContainer}>
+              {/* Off option with improved design */}
+              <TouchableOpacity
+                style={styles.enhancedTrackItem}
+                onPress={() => {
+                  selectTextTrack(-1); // -1 typically disables subtitles in VLC
+                  setShowSubtitleModal(false);
+                }}
+              >
+                <View style={styles.trackInfoContainer}>
+                  <Text style={styles.trackPrimaryText}>Off</Text>
+                </View>
+                {(selectedTextTrack?.type === 'disabled' || 
+                  (selectedTextTrack?.type === 'index' && selectedTextTrack.value === -1)) && (
+                  <View style={styles.selectedIndicatorContainer}>
+                    <Ionicons name="checkmark" size={22} color="#E50914" />
+                  </View>
+                )}
+              </TouchableOpacity>
+              
+              {/* Available subtitle tracks with improved design */}
+              {vlcTextTracks.length > 0 ? vlcTextTracks.map(track => (
+                <TouchableOpacity
+                  key={track.id}
+                  style={styles.enhancedTrackItem}
+                  onPress={() => {
+                    selectTextTrack(track.id);
+                    setShowSubtitleModal(false);
+                  }}
+                >
+                  <View style={styles.trackInfoContainer}>
+                    <Text style={styles.trackPrimaryText}>
+                      {formatLanguage(track.language) || track.name || `Subtitle ${track.id}`}
+                    </Text>
+                    {(track.name && track.language) && (
+                      <Text style={styles.trackSecondaryText}>{track.name}</Text>
+                    )}
+                  </View>
+                  {selectedTextTrack?.type === 'index' && 
+                   selectedTextTrack?.value === track.id && (
+                    <View style={styles.selectedIndicatorContainer}>
+                      <Ionicons name="checkmark" size={22} color="#E50914" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              )) : (
+                <View style={styles.emptyStateContainer}>
+                  <Ionicons name="alert-circle-outline" size={40} color="#888" />
+                  <Text style={styles.emptyStateText}>No subtitle tracks available</Text>
+                </View>
+              )}
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    );
+  };
+
+  // Update the getInfo method for VLC
+  const getInfo = async () => {
+    if (vlcRef.current) {
+      try {
+        const position = await vlcRef.current.getPosition();
+        const lengthResult = await vlcRef.current.getLength();
+        return {
+          currentTime: position,
+          duration: lengthResult / 1000 // Convert to seconds
+        };
+      } catch (e) {
+        logger.error('[VideoPlayer] Error getting playback info:', e);
+        return {
+          currentTime: currentTime,
+          duration: duration
+        };
+      }
+    }
+    return {
+      currentTime: 0,
+      duration: 0
+    };
+  };
+
+  // VLC specific method to set playback speed
+  const changePlaybackSpeed = (speed: number) => {
+    if (vlcRef.current) {
+      vlcRef.current.setRate(speed);
+      setPlaybackSpeed(speed);
+    }
+  };
+
+  // VLC specific method for volume control
+  const setVolume = (volumeLevel: number) => {
+    if (vlcRef.current) {
+      // VLC volume is typically between 0-200
+      vlcRef.current.setVolume(volumeLevel * 200);
+    }
   };
 
   return (
@@ -646,26 +901,23 @@ const VideoPlayer: React.FC = () => {
         onPress={toggleControls}
         activeOpacity={1}
       >
-        <Video
-          ref={videoRef}
-          source={{ uri }}
+        <VLCPlayer
+          ref={vlcRef}
+          source={{
+            uri: uri,
+          }}
           style={styles.video}
           paused={paused || showResumeOverlay}
-          resizeMode={resizeMode}
+          resizeMode={resizeMode as any} // Type cast to avoid type error
           onLoad={onLoad}
           onProgress={handleProgress}
           rate={playbackSpeed}
-          progressUpdateInterval={250}
-          selectedAudioTrack={selectedAudioTrack !== null ? 
-            { type: 'index', value: selectedAudioTrack } as any : 
-            undefined
-          }
-          onAudioTracks={onAudioTracks}
-          selectedTextTrack={selectedTextTrack as any}
-          onTextTracks={onTextTracks}
-          onBuffer={onBuffer}
-          onLoadStart={onLoadStart}
           onError={handleError}
+          onEnd={onEnd}
+          // VLC specific props
+          autoAspectRatio={true}
+          // autoReloadOnError={true} - Removed, not supported by VLCPlayer
+          // Note: VLC handles audio tracks differently, we'll need to adjust the UI for this
         />
 
         {/* Slider Container with buffer indicator */}
@@ -870,129 +1122,9 @@ const VideoPlayer: React.FC = () => {
         )}
       </TouchableOpacity> 
 
-      {/* Audio Selection Modal - Updated language display */}
-      {showAudioModal && (
-        <View style={styles.fullscreenOverlay}>
-          <View style={styles.enhancedModalContainer}>
-            <View style={styles.enhancedModalHeader}>
-              <Text style={styles.enhancedModalTitle}>Audio</Text>
-              <TouchableOpacity 
-                style={styles.enhancedCloseButton}
-                onPress={() => setShowAudioModal(false)}
-              >
-                <Ionicons name="close" size={24} color="white" />
-              </TouchableOpacity>
-            </View>
-            
-            <ScrollView style={styles.trackListScrollContainer}>
-              <View style={styles.trackListContainer}>
-                {audioTracks.length > 0 ? audioTracks.map(track => (
-                  <TouchableOpacity
-                    key={track.index}
-                    style={styles.enhancedTrackItem}
-                    onPress={() => {
-                      setSelectedAudioTrack(track.index);
-                      setShowAudioModal(false);
-                    }}
-                  >
-                    <View style={styles.trackInfoContainer}>
-                      <Text style={styles.trackPrimaryText}>
-                        {formatLanguage(track.language) || track.title || `Track ${track.index + 1}`}
-                      </Text>
-                      {(track.title && track.language) && (
-                        <Text style={styles.trackSecondaryText}>{track.title}</Text>
-                      )}
-                      {track.type && <Text style={styles.trackSecondaryText}>{track.type}</Text>}
-                    </View>
-                    {selectedAudioTrack === track.index && (
-                      <View style={styles.selectedIndicatorContainer}>
-                        <Ionicons name="checkmark" size={22} color="#E50914" />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                )) : (
-                  <View style={styles.emptyStateContainer}>
-                    <Ionicons name="alert-circle-outline" size={40} color="#888" />
-                    <Text style={styles.emptyStateText}>No audio tracks available</Text>
-                  </View>
-                )}
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      )}
-      
-      {/* Subtitle Selection Modal - Updated language display */}
-      {showSubtitleModal && (
-        <View style={styles.fullscreenOverlay}>
-          <View style={styles.enhancedModalContainer}>
-            <View style={styles.enhancedModalHeader}>
-              <Text style={styles.enhancedModalTitle}>Subtitles</Text>
-              <TouchableOpacity 
-                style={styles.enhancedCloseButton}
-                onPress={() => setShowSubtitleModal(false)}
-              >
-                <Ionicons name="close" size={24} color="white" />
-              </TouchableOpacity>
-            </View>
-            
-            <ScrollView style={styles.trackListScrollContainer}>
-              <View style={styles.trackListContainer}>
-                {/* Off option with improved design */}
-                <TouchableOpacity
-                  style={styles.enhancedTrackItem}
-                  onPress={() => {
-                    setSelectedTextTrack({ type: 'disabled' });
-                    setShowSubtitleModal(false);
-                  }}
-                >
-                  <View style={styles.trackInfoContainer}>
-                    <Text style={styles.trackPrimaryText}>Off</Text>
-                  </View>
-                  {selectedTextTrack?.type === 'disabled' && (
-                    <View style={styles.selectedIndicatorContainer}>
-                      <Ionicons name="checkmark" size={22} color="#E50914" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-                
-                {/* Available subtitle tracks with improved design */}
-                {textTracks.length > 0 ? textTracks.map(track => (
-                  <TouchableOpacity
-                    key={track.index}
-                    style={styles.enhancedTrackItem}
-                    onPress={() => {
-                      setSelectedTextTrack({ type: 'index', value: track.index });
-                      setShowSubtitleModal(false);
-                    }}
-                  >
-                    <View style={styles.trackInfoContainer}>
-                      <Text style={styles.trackPrimaryText}>
-                        {formatLanguage(track.language) || track.title || `Subtitle ${track.index + 1}`}
-                      </Text>
-                      {(track.title && track.language) && (
-                        <Text style={styles.trackSecondaryText}>{track.title}</Text>
-                      )}
-                      {track.type && <Text style={styles.trackSecondaryText}>{track.type}</Text>}
-                    </View>
-                    {selectedTextTrack?.type === 'index' && 
-                     selectedTextTrack?.value === track.index && (
-                      <View style={styles.selectedIndicatorContainer}>
-                        <Ionicons name="checkmark" size={22} color="#E50914" />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                )) : (
-                  <View style={styles.emptyStateContainer}>
-                    <Ionicons name="alert-circle-outline" size={40} color="#888" />
-                    <Text style={styles.emptyStateText}>No subtitle tracks available</Text>
-                  </View>
-                )}
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      )}
+      {/* Use the new modal rendering functions */}
+      {renderAudioModal()}
+      {renderSubtitleModal()}
     </View> 
   );
 };
