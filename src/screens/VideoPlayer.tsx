@@ -636,8 +636,65 @@ const VideoPlayer: React.FC = () => {
     }
   };
 
-  // Simplify handleProgress to always update state
+  // Enhanced progress bar touch handling with drag support
+  const handleProgressBarTouch = (event: any) => {
+    if (!duration || duration <= 0) return;
+    
+    const { locationX } = event.nativeEvent;
+    processProgressTouch(locationX);
+  };
+  
+  const handleProgressBarDragStart = () => {
+    setIsDragging(true);
+  };
+  
+  const handleProgressBarDragMove = (event: any) => {
+    if (!isDragging || !duration || duration <= 0) return;
+    
+    const { locationX } = event.nativeEvent;
+    processProgressTouch(locationX, true); // Pass true to indicate dragging
+  };
+  
+  const handleProgressBarDragEnd = () => {
+    setIsDragging(false);
+    // Apply the final seek when drag ends
+    if (pendingSeekValue.current !== null) {
+      seekToTime(pendingSeekValue.current);
+      pendingSeekValue.current = null;
+    }
+  };
+  
+  // Helper function to process touch position and seek
+  const processProgressTouch = (locationX: number, isDragging = false) => {
+    progressBarRef.current?.measure((x, y, width, height, pageX, pageY) => {
+      // Calculate percentage of touch position relative to progress bar width
+      const percentage = Math.max(0, Math.min(locationX / width, 1));
+      // Calculate time to seek to
+      const seekTime = percentage * duration;
+      
+      if (DEBUG_MODE) {
+        logger.log(`[VideoPlayer] Progress touch: ${seekTime.toFixed(1)}s (${(percentage * 100).toFixed(1)}%)`);
+      }
+
+      // Update the visual progress immediately
+      progress.value = seekTime;
+      progressAnim.setValue(percentage);
+      
+      // If dragging, update currentTime for visual feedback but don't seek yet
+      if (isDragging) {
+        pendingSeekValue.current = seekTime;
+        setCurrentTime(seekTime);
+      } else {
+        // If it's a tap (not dragging), seek immediately
+        seekToTime(seekTime);
+      }
+    });
+  };
+
+  // Update the handleProgress function to not update progress while dragging
   const handleProgress = (event: any) => {
+    if (isDragging) return; // Don't update progress while user is dragging
+    
     const currentTimeInSeconds = event.currentTime / 1000; // VLC gives time in milliseconds
     
     // Always update state - let VLC manage the timing
@@ -760,13 +817,13 @@ const VideoPlayer: React.FC = () => {
     }
     // Subtitles default to disabled (-1)
     
-    // Prefer external subtitles: Auto-search for external subtitles if IMDb ID is available
+    // Auto-search for English subtitles if IMDb ID is available
     if (imdbId && !customSubtitles.length) {
       if (DEBUG_MODE) {
-        logger.log(`[VideoPlayer] Auto-searching for external subtitles with IMDb ID: ${imdbId}`);
+        logger.log(`[VideoPlayer] Auto-searching for English subtitles with IMDb ID: ${imdbId}`);
       }
       setTimeout(() => {
-        fetchAvailableSubtitles(imdbId);
+        fetchAvailableSubtitles(imdbId, true); // true for autoSelectEnglish
       }, 2000); // Delay to let video start playing first
     }
     
@@ -1441,46 +1498,6 @@ const VideoPlayer: React.FC = () => {
     }
   };
 
-  // Enhanced progress bar touch handling with drag support
-  const handleProgressBarTouch = (event: any) => {
-    if (!duration || duration <= 0) return;
-    
-    const { locationX } = event.nativeEvent;
-    processProgressTouch(locationX);
-  };
-  
-  const handleProgressBarDragStart = () => {
-    setIsDragging(true);
-  };
-  
-  const handleProgressBarDragMove = (event: any) => {
-    if (!isDragging || !duration || duration <= 0) return;
-    
-    const { locationX } = event.nativeEvent;
-    processProgressTouch(locationX);
-  };
-  
-  const handleProgressBarDragEnd = () => {
-    setIsDragging(false);
-  };
-  
-  // Helper function to process touch position and seek
-  const processProgressTouch = (locationX: number) => {
-    progressBarRef.current?.measure((x, y, width, height, pageX, pageY) => {
-      // Calculate percentage of touch position relative to progress bar width
-      const percentage = Math.max(0, Math.min(locationX / width, 1));
-      // Calculate time to seek to
-      const seekTime = percentage * duration;
-      
-      if (DEBUG_MODE) {
-        logger.log(`[VideoPlayer] Seeking to: ${seekTime}s (${percentage * 100}%)`);
-      }
-      
-      // Seek to the calculated time
-      seekToTime(seekTime);
-    });
-  };
-
   // Add subtitle size management functions
   const loadSubtitleSize = async () => {
     try {
@@ -1605,7 +1622,7 @@ const VideoPlayer: React.FC = () => {
   };
 
   // Fetch available subtitles from Wyzie API
-  const fetchAvailableSubtitles = async (imdbIdParam?: string) => {
+  const fetchAvailableSubtitles = async (imdbIdParam?: string, autoSelectEnglish = false) => {
     const targetImdbId = imdbIdParam || imdbId;
     if (!targetImdbId) {
       logger.error('[VideoPlayer] No IMDb ID available for subtitle search');
@@ -1645,10 +1662,33 @@ const VideoPlayer: React.FC = () => {
       uniqueSubtitles.sort((a, b) => a.display.localeCompare(b.display));
       
       setAvailableSubtitles(uniqueSubtitles);
-      setShowSubtitleLanguageModal(true);
+
+      if (autoSelectEnglish) {
+        // Try to find English subtitles
+        const englishSubtitle = uniqueSubtitles.find(sub => 
+          sub.language.toLowerCase() === 'eng' || 
+          sub.language.toLowerCase() === 'en' ||
+          sub.display.toLowerCase().includes('english')
+        );
+
+        if (englishSubtitle) {
+          if (DEBUG_MODE) {
+            logger.log(`[VideoPlayer] Auto-selecting English subtitle: ${englishSubtitle.display}`);
+          }
+          loadWyzieSubtitle(englishSubtitle);
+          return;
+        } else if (DEBUG_MODE) {
+          logger.log(`[VideoPlayer] No English subtitles found for auto-selection`);
+        }
+      }
+
+      // Only show the modal if not auto-selecting or if no English subtitles found
+      if (!autoSelectEnglish) {
+        setShowSubtitleLanguageModal(true);
+      }
       
       if (DEBUG_MODE) {
-        logger.log(`[VideoPlayer] Found ${uniqueSubtitles.length} unique subtitle languages for search`);
+        logger.log(`[VideoPlayer] Found ${uniqueSubtitles.length} unique subtitle languages`);
       }
     } catch (error) {
       logger.error('[VideoPlayer] Error fetching subtitles from Wyzie API:', error);
@@ -2053,17 +2093,6 @@ const VideoPlayer: React.FC = () => {
                   {currentSubtitle}
                 </Text>
               </View>
-            </View>
-          )}
-
-          {/* Debug subtitle info when controls are visible */}
-          {DEBUG_MODE && showControls && (
-            <View style={styles.debugSubtitleInfo} pointerEvents="none">
-              <Text style={styles.debugText}>
-                Custom Subs: {useCustomSubtitles ? 'ON' : 'OFF'} | 
-                Cues: {customSubtitles.length} | 
-                Current: "{currentSubtitle}"
-              </Text>
             </View>
           )}
 
@@ -2689,6 +2718,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 1500, // Higher z-index to appear above other elements
   },
+  customSubtitleWrapper: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 10,
+    borderRadius: 5,
+  },
   customSubtitleText: {
     color: 'white',
     textAlign: 'center',
@@ -2899,26 +2933,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 12,
     marginTop: 2,
-  },
-  customSubtitleWrapper: {
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    padding: 10,
-    borderRadius: 5,
-  },
-  debugSubtitleInfo: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    padding: 5,
-    borderRadius: 5,
-    margin: 10,
-    zIndex: 1000,
-  },
-  debugText: {
-    color: 'white',
-    fontSize: 12,
   },
 });
 
