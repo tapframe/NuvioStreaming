@@ -710,7 +710,7 @@ const styles = StyleSheet.create({
   horizontalItemPosterContainer: {
     width: HORIZONTAL_ITEM_WIDTH,
     height: HORIZONTAL_POSTER_HEIGHT,
-    borderRadius: 12,
+    borderRadius: 8,
     overflow: 'hidden',
     marginBottom: 8,
     borderWidth: 1,

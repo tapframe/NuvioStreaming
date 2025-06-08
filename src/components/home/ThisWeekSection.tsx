@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
   episodeItem: {
     width: '100%',
     height: '100%',
-    borderRadius: 12,
+    borderRadius: 8,
     overflow: 'hidden',
   },
   poster: {

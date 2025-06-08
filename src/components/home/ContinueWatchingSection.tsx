@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
     width: POSTER_WIDTH,
     aspectRatio: 2/3,
     margin: 0,
-    borderRadius: 12,
+    borderRadius: 8,
     overflow: 'hidden',
     position: 'relative',
     elevation: 8,
@@ -332,14 +332,14 @@ const styles = StyleSheet.create({
   contentItemContainer: {
     width: '100%',
     height: '100%',
-    borderRadius: 12,
+    borderRadius: 8,
     overflow: 'hidden',
     position: 'relative',
   },
   poster: {
     width: '100%',
     height: '100%',
-    borderRadius: 12,
+    borderRadius: 8,
   },
   episodeInfoContainer: {
     position: 'absolute',

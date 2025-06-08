@@ -895,7 +895,7 @@ const styles = StyleSheet.create<any>({
     width: POSTER_WIDTH,
     aspectRatio: 2/3,
     margin: 0,
-    borderRadius: 16,
+    borderRadius: 8,
     overflow: 'hidden',
     position: 'relative',
     elevation: 8,
@@ -909,7 +909,7 @@ const styles = StyleSheet.create<any>({
   poster: {
     width: '100%',
     height: '100%',
-    borderRadius: 16,
+    borderRadius: 8,
   },
   imdbLogo: {
     width: 35,
@@ -948,7 +948,7 @@ const styles = StyleSheet.create<any>({
   contentItemContainer: {
     width: '100%',
     height: '100%',
-    borderRadius: 16,
+    borderRadius: 8,
     overflow: 'hidden',
     position: 'relative',
   },
@@ -1059,7 +1059,7 @@ const styles = StyleSheet.create<any>({
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 16,
+    borderRadius: 8,
   },
   featuredImage: {
     width: '100%',

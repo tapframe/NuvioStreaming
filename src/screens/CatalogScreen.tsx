@@ -85,7 +85,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   item: {
     width: ITEM_WIDTH,
     marginBottom: SPACING.lg,
-    borderRadius: 12,
+    borderRadius: 8,
     overflow: 'hidden',
     backgroundColor: colors.elevation2,
     shadowColor: '#000',
@@ -97,8 +97,8 @@ const createStyles = (colors: any) => StyleSheet.create({
   poster: {
     width: '100%',
     aspectRatio: 2/3,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
     backgroundColor: colors.elevation3,
   },
   itemContent: {
