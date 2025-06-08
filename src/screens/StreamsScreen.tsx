@@ -270,6 +270,7 @@ export const StreamsScreen = () => {
     loadEpisodeStreams,
     setSelectedEpisode,
     groupedEpisodes,
+    imdbId,
   } = useMetadata({ id, type });
 
   // Create styles using current theme colors
@@ -526,7 +527,8 @@ export const StreamsScreen = () => {
         streamProvider: stream.name,
         id,
         type,
-        episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined
+        episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined,
+        imdbId: imdbId || undefined,
       });
     } catch (error) {
       logger.error('[StreamsScreen] Error locking orientation before navigation:', error);
@@ -542,10 +544,11 @@ export const StreamsScreen = () => {
         streamProvider: stream.name,
         id,
         type,
-        episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined
+        episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined,
+        imdbId: imdbId || undefined,
       });
     }
-  }, [metadata, type, currentEpisode, navigation, id, selectedEpisode]);
+  }, [metadata, type, currentEpisode, navigation, id, selectedEpisode, imdbId]);
 
   // Update handleStreamPress
   const handleStreamPress = useCallback(async (stream: Stream) => {

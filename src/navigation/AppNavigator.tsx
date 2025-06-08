@@ -77,6 +77,7 @@ export type RootStackParamList = {
     id?: string;
     type?: string;
     episodeId?: string;
+    imdbId?: string;
   };
   Catalog: { id: string; type: string; addonId?: string; name?: string; genreFilter?: string };
   Credits: { mediaId: string; mediaType: string };

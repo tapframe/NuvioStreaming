@@ -27,6 +27,7 @@ export type RootStackParamList = {
       url: string;
       lang: string;
     }>;
+    imdbId?: string;
   };
   Catalog: {
     addonId?: string;

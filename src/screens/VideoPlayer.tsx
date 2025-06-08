@@ -1,13 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, TouchableOpacity, StyleSheet, Text, Dimensions, Modal, Pressable, StatusBar, Platform, ScrollView, Animated, ActivityIndicator } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Text, Dimensions, Modal, Pressable, StatusBar, Platform, ScrollView, Animated, ActivityIndicator, Image } from 'react-native';
 import { VLCPlayer } from 'react-native-vlc-media-player';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSharedValue, runOnJS, withTiming } from 'react-native-reanimated';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
-// Remove Gesture Handler imports
-// import { PinchGestureHandler, State, PinchGestureHandlerGestureEvent } from 'react-native-gesture-handler';
+// Add Gesture Handler imports for pinch zoom
+import { PinchGestureHandler, State, PinchGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 // Import for navigation bar hiding
 import { NativeModules } from 'react-native';
 // Import immersive mode package
@@ -22,7 +22,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Debug flag - set back to false to disable verbose logging
 // WARNING: Setting this to true currently causes infinite render loops
 // Use selective logging instead if debugging is needed
-const DEBUG_MODE = false;
+const DEBUG_MODE = true;
 
 // Safer debug function that won't cause render loops
 // Call this with any debugging info you need instead of using inline DEBUG_MODE checks
@@ -69,6 +69,7 @@ interface VideoPlayerProps {
   id?: string;
   type?: string;
   episodeId?: string;
+  imdbId?: string; // Add IMDb ID for subtitle fetching
 }
 
 // Match the react-native-video AudioTrack type
@@ -89,9 +90,9 @@ interface TextTrack {
   type?: string | null; // Adjusting type based on linter error
 }
 
-// Define the possible resize modes - adjust to match VLCPlayer's PlayerResizeMode options
-type ResizeModeType = 'contain' | 'cover' | 'fill' | 'none';
-const resizeModes: ResizeModeType[] = ['contain', 'cover', 'fill'];
+// Define the possible resize modes - force to stretch for absolute full screen
+type ResizeModeType = 'contain' | 'cover' | 'fill' | 'none' | 'stretch';
+const resizeModes: ResizeModeType[] = ['stretch']; // Force stretch mode for absolute full screen
 
 // Add language code to name mapping
 const languageMap: {[key: string]: string} = {
@@ -187,6 +188,30 @@ const getTrackDisplayName = (track: { name?: string, id: number }): string => {
   return track.name;
 };
 
+// Add subtitle-related constants and types
+const SUBTITLE_SIZE_KEY = '@subtitle_size_preference';
+const DEFAULT_SUBTITLE_SIZE = 16;
+
+interface SubtitleCue {
+  start: number;
+  end: number;
+  text: string;
+}
+
+// Add interface for Wyzie subtitle API response
+interface WyzieSubtitle {
+  id: string;
+  url: string;
+  flagUrl: string;
+  format: string;
+  encoding: string;
+  media: string;
+  display: string;
+  language: string;
+  isHearingImpaired: boolean;
+  source: string;
+}
+
 const VideoPlayer: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'Player'>>();
@@ -203,14 +228,19 @@ const VideoPlayer: React.FC = () => {
     streamProvider,
     id,
     type,
-    episodeId
+    episodeId,
+    imdbId
   } = route.params;
 
   // Use safer debug logging for props
   safeDebugLog("Component mounted with props", {
     uri, title, season, episode, episodeTitle, quality, year,
-    streamProvider, id, type, episodeId
+    streamProvider, id, type, episodeId, imdbId
   });
+
+  // Get exact screen dimensions
+  const screenData = Dimensions.get('screen'); // Use 'screen' instead of 'window' to include system UI areas
+  const [screenDimensions, setScreenDimensions] = useState(screenData);
 
   const [paused, setPaused] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -221,7 +251,7 @@ const VideoPlayer: React.FC = () => {
   const [selectedAudioTrack, setSelectedAudioTrack] = useState<number | null>(null);
   const [textTracks, setTextTracks] = useState<TextTrack[]>([]);
   const [selectedTextTrack, setSelectedTextTrack] = useState<number>(-1); // Use -1 for "disabled"
-  const [resizeMode, setResizeMode] = useState<ResizeModeType>('contain'); // State for resize mode
+  const [resizeMode, setResizeMode] = useState<ResizeModeType>('stretch'); // Force stretch mode for absolute full screen
   const [buffered, setBuffered] = useState(0); // Add buffered state
   const vlcRef = useRef<any>(null);
   const progress = useSharedValue(0);
@@ -279,11 +309,114 @@ const VideoPlayer: React.FC = () => {
   // Add state for tracking if the video is loaded
   const [isVideoLoaded, setIsVideoLoaded] = useState(false);
 
+  // Add state for tracking video aspect ratio
+  const [videoAspectRatio, setVideoAspectRatio] = useState<number | null>(null);
+  const [is16by9Content, setIs16by9Content] = useState(false);
+  const [customVideoStyles, setCustomVideoStyles] = useState<any>({});
+
+  // Add zoom state for pinch gesture
+  const [zoomScale, setZoomScale] = useState(1);
+  const [zoomTranslateX, setZoomTranslateX] = useState(0);
+  const [zoomTranslateY, setZoomTranslateY] = useState(0);
+  const [lastZoomScale, setLastZoomScale] = useState(1);
+  const [lastTranslateX, setLastTranslateX] = useState(0);
+  const [lastTranslateY, setLastTranslateY] = useState(0);
+  const pinchRef = useRef<PinchGestureHandler>(null);
+
+  // Add subtitle-related state
+  const [customSubtitles, setCustomSubtitles] = useState<SubtitleCue[]>([]);
+  const [currentSubtitle, setCurrentSubtitle] = useState<string>('');
+  const [subtitleSize, setSubtitleSize] = useState<number>(DEFAULT_SUBTITLE_SIZE);
+  const [useCustomSubtitles, setUseCustomSubtitles] = useState<boolean>(false);
+  const [isLoadingSubtitles, setIsLoadingSubtitles] = useState<boolean>(false);
+  
+  // Add Wyzie subtitle states
+  const [availableSubtitles, setAvailableSubtitles] = useState<WyzieSubtitle[]>([]);
+  const [showSubtitleLanguageModal, setShowSubtitleLanguageModal] = useState<boolean>(false);
+  const [isLoadingSubtitleList, setIsLoadingSubtitleList] = useState<boolean>(false);
+
+  // Calculate custom video styles based on aspect ratios - simplified approach
+  const calculateVideoStyles = (videoWidth: number, videoHeight: number, screenWidth: number, screenHeight: number) => {
+    // Always return full screen styles - let VLC resize modes handle the rest
+    return {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: screenWidth,
+      height: screenHeight,
+      backgroundColor: '#000',
+    };
+  };
+
+  // Pinch gesture handler for zoom functionality - center zoom only, no panning
+  const onPinchGestureEvent = (event: PinchGestureHandlerGestureEvent) => {
+    const { scale } = event.nativeEvent;
+    
+    // Calculate new scale (limit between 1x and 1.1x)
+    const newScale = Math.max(1, Math.min(lastZoomScale * scale, 1.1));
+    
+    // Only apply scale, no translation - always zoom from center
+    setZoomScale(newScale);
+    
+    if (DEBUG_MODE) {
+      logger.log(`[VideoPlayer] Center Zoom: ${newScale.toFixed(2)}x`);
+    }
+  };
+
+  const onPinchHandlerStateChange = (event: PinchGestureHandlerGestureEvent) => {
+    if (event.nativeEvent.state === State.END) {
+      // Save the current scale as the new baseline, no translation
+      setLastZoomScale(zoomScale);
+      
+      if (DEBUG_MODE) {
+        logger.log(`[VideoPlayer] Pinch ended - saved scale: ${zoomScale.toFixed(2)}x`);
+      }
+    }
+  };
+
+  // Reset zoom to appropriate level (1.1x for 16:9, 1x for others)
+  const resetZoom = () => {
+    const targetZoom = is16by9Content ? 1.1 : 1;
+    
+    setZoomScale(targetZoom);
+    setLastZoomScale(targetZoom);
+    // No translation needed for center zoom
+    
+    if (DEBUG_MODE) {
+      logger.log(`[VideoPlayer] Zoom reset to ${targetZoom}x (16:9: ${is16by9Content})`);
+    }
+  };
+
+  // Recalculate video styles when screen dimensions change
+  useEffect(() => {
+    if (videoAspectRatio && screenDimensions.width > 0 && screenDimensions.height > 0) {
+      const styles = calculateVideoStyles(
+        videoAspectRatio * 1000, // Reconstruct width from aspect ratio
+        1000, // Use 1000 as base height
+        screenDimensions.width,
+        screenDimensions.height
+      );
+      setCustomVideoStyles(styles);
+      
+      if (DEBUG_MODE) {
+        logger.log(`[VideoPlayer] Screen dimensions changed, recalculated styles:`, styles);
+      }
+    }
+  }, [screenDimensions, videoAspectRatio]);
+
   // Lock screen to landscape when component mounts
   useEffect(() => {
+    // Update screen dimensions when they change (orientation changes)
+    const subscription = Dimensions.addEventListener('change', ({ screen }) => {
+      setScreenDimensions(screen);
+    });
+
     // Since orientation is now locked before navigation, we can start immediately
     const initializePlayer = () => {
-      // Enable immersive mode 
+      // Force StatusBar to be completely hidden
+      StatusBar.setHidden(true, 'none');
+      
+      // Enable immersive mode with more aggressive settings
       enableImmersiveMode();
       
       // Start the opening animation immediately
@@ -294,6 +427,7 @@ const VideoPlayer: React.FC = () => {
 
     // Restore screen orientation and disable immersive mode when component unmounts
     return () => {
+      subscription?.remove();
       const unlockOrientation = async () => {
         await ScreenOrientation.unlockAsync();
       };
@@ -319,7 +453,7 @@ const VideoPlayer: React.FC = () => {
         duration: 600,
         useNativeDriver: true,
       }),
-      // Scale up from 80% to 100%
+      // Scale up from 80% to 100% and ensure it stays at 100%
       Animated.timing(openingScaleAnim, {
         toValue: 1,
         duration: 700,
@@ -332,7 +466,9 @@ const VideoPlayer: React.FC = () => {
         useNativeDriver: true,
       }),
     ]).start(() => {
-      // Animation is complete
+      // Animation is complete - ensure scale is exactly 1
+      openingScaleAnim.setValue(1);
+      openingFadeAnim.setValue(1);
       setIsOpeningAnimationComplete(true);
       
       // Hide the background overlay completely after animation
@@ -523,10 +659,64 @@ const VideoPlayer: React.FC = () => {
     }
   };
 
-  // Enhanced onLoad handler to mark player as ready
+  // Enhanced onLoad handler to detect aspect ratio and mark player as ready
   const onLoad = (data: any) => {
     setDuration(data.duration / 1000); // VLC returns duration in milliseconds
     max.value = data.duration / 1000;
+    
+    // Calculate and detect aspect ratio with custom styling
+    if (data.videoSize && data.videoSize.width && data.videoSize.height) {
+      const aspectRatio = data.videoSize.width / data.videoSize.height;
+      setVideoAspectRatio(aspectRatio);
+      
+      // Check if it's 16:9 content (1.777... ≈ 16/9)
+      const is16x9 = Math.abs(aspectRatio - (16/9)) < 0.1;
+      setIs16by9Content(is16x9);
+      
+      // Auto-zoom 16:9 content to 1.1x to fill more screen
+      if (is16x9) {
+        setZoomScale(1.1);
+        setLastZoomScale(1.1);
+        if (DEBUG_MODE) {
+          logger.log(`[VideoPlayer] Auto-zoomed 16:9 content to 1.1x`);
+        }
+      } else {
+        // Reset zoom for non-16:9 content
+        setZoomScale(1);
+        setLastZoomScale(1);
+      }
+      
+      // Calculate custom video styles for precise control
+      const styles = calculateVideoStyles(
+        data.videoSize.width,
+        data.videoSize.height,
+        screenDimensions.width,
+        screenDimensions.height
+      );
+      setCustomVideoStyles(styles);
+      
+      if (DEBUG_MODE) {
+        logger.log(`[VideoPlayer] Video aspect ratio: ${aspectRatio.toFixed(3)} (16:9: ${is16x9})`);
+        logger.log(`[VideoPlayer] Applied custom styles:`, styles);
+      }
+    } else {
+      // Fallback: assume 16:9 and apply default styles with auto-zoom
+      setIs16by9Content(true);
+      setZoomScale(1.1);
+      setLastZoomScale(1.1);
+      const defaultStyles = {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: screenDimensions.width,
+        height: screenDimensions.height,
+      };
+      setCustomVideoStyles(defaultStyles);
+      
+      if (DEBUG_MODE) {
+        logger.log(`[VideoPlayer] Could not detect video size, using default 16:9 styles with 1.1x zoom`);
+      }
+    }
     
     // Mark player as ready for seeking
     setIsPlayerReady(true);
@@ -539,10 +729,22 @@ const VideoPlayer: React.FC = () => {
     
     if (DEBUG_MODE) {
       logger.log(`[VideoPlayer] Video loaded with duration: ${data.duration / 1000}`);
+      logger.log(`[VideoPlayer] Screen dimensions: ${screenDimensions.width}x${screenDimensions.height}`);
+      logger.log(`[VideoPlayer] VLC Player custom styles applied`);
       const methods = Object.keys(vlcRef.current || {}).filter(
         key => typeof vlcRef.current[key] === 'function'
       );
       logger.log('[VideoPlayer] Available VLC methods:', methods);
+      
+      // Log track-related methods specifically
+      const trackMethods = methods.filter(method => 
+        method.toLowerCase().includes('track') || 
+        method.toLowerCase().includes('audio') || 
+        method.toLowerCase().includes('subtitle') ||
+        method.toLowerCase().includes('text')
+      );
+      logger.log('[VideoPlayer] Track-related VLC methods:', trackMethods);
+      
       logger.log('[VideoPlayer] Available audio tracks:', audioTracksFromLoad);
       logger.log('[VideoPlayer] Available subtitle tracks:', textTracksFromLoad);
     }
@@ -557,6 +759,16 @@ const VideoPlayer: React.FC = () => {
         setSelectedAudioTrack(audioTracksFromLoad[0].id);
     }
     // Subtitles default to disabled (-1)
+    
+    // Prefer external subtitles: Auto-search for external subtitles if IMDb ID is available
+    if (imdbId && !customSubtitles.length) {
+      if (DEBUG_MODE) {
+        logger.log(`[VideoPlayer] Auto-searching for external subtitles with IMDb ID: ${imdbId}`);
+      }
+      setTimeout(() => {
+        fetchAvailableSubtitles(imdbId);
+      }, 2000); // Delay to let video start playing first
+    }
     
     // If we have an initial position to seek to, do it now
     if (initialPosition !== null && !isInitialSeekComplete) {
@@ -604,27 +816,46 @@ const VideoPlayer: React.FC = () => {
     }
   };
 
-  // Toggle through aspect ratio modes
+  // Custom aspect ratio control - now toggles between 1x and 1.1x zoom
   const cycleAspectRatio = () => {
-    const currentIndex = resizeModes.indexOf(resizeMode);
-    const nextIndex = (currentIndex + 1) % resizeModes.length;
+    const newZoom = zoomScale === 1.1 ? 1 : 1.1;
+    
+    setZoomScale(newZoom);
+    setZoomTranslateX(0);
+    setZoomTranslateY(0);
+    setLastZoomScale(newZoom);
+    setLastTranslateX(0);
+    setLastTranslateY(0);
+    
     if (DEBUG_MODE) {
-      logger.log(`[VideoPlayer] Changing aspect ratio from ${resizeMode} to ${resizeModes[nextIndex]}`);
+      logger.log(`[VideoPlayer] Toggled zoom to ${newZoom}x`);
     }
-    setResizeMode(resizeModes[nextIndex]);
   };
 
-  // Function to enable immersive mode
+  // Enhanced immersive mode function
   const enableImmersiveMode = () => {
-    StatusBar.setHidden(true);
+    // Force hide status bar immediately without animation
+    StatusBar.setHidden(true, 'none');
     
     if (Platform.OS === 'android') {
-      // Full immersive mode - hides both status and navigation bars
-      // Use setBarMode with 'FullSticky' mode to hide all bars with sticky behavior
-      RNImmersiveMode.setBarMode('FullSticky');
-      
-      // Alternative: if you want to use fullLayout method (which is in the TypeScript definition)
-      RNImmersiveMode.fullLayout(true);
+      // Use multiple methods to ensure complete immersion
+      try {
+        // Method 1: RNImmersiveMode
+        RNImmersiveMode.setBarMode('FullSticky');
+        RNImmersiveMode.fullLayout(true);
+        
+        // Method 2: Additional native module call if available
+        if (NativeModules.StatusBarManager) {
+          NativeModules.StatusBarManager.setHidden(true);
+        }
+      } catch (error) {
+        console.log('Immersive mode error:', error);
+      }
+    }
+    
+    // For iOS, ensure status bar is hidden
+    if (Platform.OS === 'ios') {
+      StatusBar.setHidden(true, 'none');
     }
   };
 
@@ -816,11 +1047,24 @@ const VideoPlayer: React.FC = () => {
   // Function to select audio track in VLC
   const selectAudioTrack = (trackId: number) => {
     setSelectedAudioTrack(trackId);
+    if (DEBUG_MODE) {
+      logger.log(`[VideoPlayer] Selected audio track ID: ${trackId}`);
+    }
   };
 
   // Function to select subtitle track in VLC
   const selectTextTrack = (trackId: number) => {
-    setSelectedTextTrack(trackId);
+    if (trackId === -999) { // Special ID for custom subtitles
+      setUseCustomSubtitles(true);
+      setSelectedTextTrack(-1); // Disable VLC subtitles
+    } else {
+      setUseCustomSubtitles(false);
+      setSelectedTextTrack(trackId);
+    }
+    
+    if (DEBUG_MODE) {
+      logger.log(`[VideoPlayer] Selected subtitle track ID: ${trackId}, custom: ${trackId === -999}`);
+    }
   };
   
   // Update subtitle modal to use VLC subtitle tracks
@@ -829,12 +1073,178 @@ const VideoPlayer: React.FC = () => {
     
     return (
       <View style={styles.fullscreenOverlay}>
+        <View style={styles.modernModalContainer}>
+          <View style={styles.modernModalHeader}>
+            <Text style={styles.modernModalTitle}>Subtitle Settings</Text>
+            <TouchableOpacity 
+              style={styles.modernCloseButton}
+              onPress={() => setShowSubtitleModal(false)}
+            >
+              <Ionicons name="close" size={24} color="white" />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.modernTrackListScrollContainer} showsVerticalScrollIndicator={false}>
+            <View style={styles.modernTrackListContainer}>
+              
+              {/* External Subtitles Section - Priority */}
+              <View style={styles.sectionContainer}>
+                <Text style={styles.sectionTitle}>External Subtitles</Text>
+                <Text style={styles.sectionDescription}>High quality subtitles with size control</Text>
+                
+                {/* Custom subtitles option - show if loaded */}
+                {customSubtitles.length > 0 ? (
+                  <TouchableOpacity
+                    style={[styles.modernTrackItem, useCustomSubtitles && styles.modernSelectedTrackItem]}
+                    onPress={() => {
+                      selectTextTrack(-999);
+                      setShowSubtitleModal(false);
+                    }}
+                  >
+                    <View style={styles.trackIconContainer}>
+                      <Ionicons name="document-text" size={20} color="#4CAF50" />
+                    </View>
+                    <View style={styles.modernTrackInfoContainer}>
+                      <Text style={styles.modernTrackPrimaryText}>Custom Subtitles</Text>
+                      <Text style={styles.modernTrackSecondaryText}>
+                        {customSubtitles.length} cues • Size adjustable
+                      </Text>
+                    </View>
+                    {useCustomSubtitles && (
+                      <View style={styles.modernSelectedIndicator}>
+                        <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ) : null}
+
+                {/* Search for external subtitles */}
+                <TouchableOpacity
+                  style={styles.searchSubtitlesButton}
+                  onPress={() => {
+                    setShowSubtitleModal(false);
+                    fetchAvailableSubtitles();
+                  }}
+                  disabled={isLoadingSubtitleList}
+                >
+                  <View style={styles.searchButtonContent}>
+                    {isLoadingSubtitleList ? (
+                      <ActivityIndicator size="small" color="#2196F3" />
+                    ) : (
+                      <Ionicons name="search" size={20} color="#2196F3" />
+                    )}
+                    <Text style={styles.searchSubtitlesText}>
+                      {isLoadingSubtitleList ? 'Searching...' : 'Search Online Subtitles'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+
+              {/* Subtitle Size Controls - Only for custom subtitles */}
+              {useCustomSubtitles && (
+                <View style={styles.sectionContainer}>
+                  <Text style={styles.sectionTitle}>Size Control</Text>
+                  <View style={styles.modernSubtitleSizeContainer}>
+                    <TouchableOpacity 
+                      style={styles.modernSizeButton}
+                      onPress={decreaseSubtitleSize}
+                    >
+                      <Ionicons name="remove" size={20} color="white" />
+                    </TouchableOpacity>
+                    <View style={styles.sizeDisplayContainer}>
+                      <Text style={styles.modernSubtitleSizeText}>{subtitleSize}px</Text>
+                      <Text style={styles.sizeLabel}>Font Size</Text>
+                    </View>
+                    <TouchableOpacity 
+                      style={styles.modernSizeButton}
+                      onPress={increaseSubtitleSize}
+                    >
+                      <Ionicons name="add" size={20} color="white" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {/* Built-in Subtitles Section */}
+              <View style={styles.sectionContainer}>
+                <Text style={styles.sectionTitle}>Built-in Subtitles</Text>
+                <Text style={styles.sectionDescription}>System default sizing • No customization</Text>
+                
+                {/* Off option */}
+                <TouchableOpacity
+                  style={[styles.modernTrackItem, (selectedTextTrack === -1 && !useCustomSubtitles) && styles.modernSelectedTrackItem]}
+                  onPress={() => {
+                    selectTextTrack(-1);
+                    setShowSubtitleModal(false);
+                  }}
+                >
+                  <View style={styles.trackIconContainer}>
+                    <Ionicons name="close-circle" size={20} color="#9E9E9E" />
+                  </View>
+                  <View style={styles.modernTrackInfoContainer}>
+                    <Text style={styles.modernTrackPrimaryText}>Disabled</Text>
+                    <Text style={styles.modernTrackSecondaryText}>No subtitles</Text>
+                  </View>
+                  {(selectedTextTrack === -1 && !useCustomSubtitles) && (
+                    <View style={styles.modernSelectedIndicator}>
+                      <Ionicons name="checkmark-circle" size={24} color="#9E9E9E" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                {/* Available built-in subtitle tracks */}
+                {vlcTextTracks.length > 0 ? vlcTextTracks.map(track => (
+                  <TouchableOpacity
+                    key={track.id}
+                    style={[styles.modernTrackItem, (selectedTextTrack === track.id && !useCustomSubtitles) && styles.modernSelectedTrackItem]}
+                    onPress={() => {
+                      selectTextTrack(track.id);
+                      setShowSubtitleModal(false);
+                    }}
+                  >
+                    <View style={styles.trackIconContainer}>
+                      <Ionicons name="text" size={20} color="#FF9800" />
+                    </View>
+                    <View style={styles.modernTrackInfoContainer}>
+                      <Text style={styles.modernTrackPrimaryText}>
+                        {getTrackDisplayName(track)}
+                      </Text>
+                      <Text style={styles.modernTrackSecondaryText}>
+                        Built-in track • System font size
+                      </Text>
+                    </View>
+                    {(selectedTextTrack === track.id && !useCustomSubtitles) && (
+                      <View style={styles.modernSelectedIndicator}>
+                        <Ionicons name="checkmark-circle" size={24} color="#FF9800" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                )) : (
+                  <View style={styles.modernEmptyStateContainer}>
+                    <Ionicons name="information-circle-outline" size={24} color="#666" />
+                    <Text style={styles.modernEmptyStateText}>No built-in subtitles available</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    );
+  };
+
+  // Render subtitle language selection modal
+  const renderSubtitleLanguageModal = () => {
+    if (!showSubtitleLanguageModal) return null;
+    
+    return (
+      <View style={styles.fullscreenOverlay}>
         <View style={styles.enhancedModalContainer}>
           <View style={styles.enhancedModalHeader}>
-            <Text style={styles.enhancedModalTitle}>Subtitles</Text>
+            <Text style={styles.enhancedModalTitle}>Select Language</Text>
             <TouchableOpacity 
               style={styles.enhancedCloseButton}
-              onPress={() => setShowSubtitleModal(false)}
+              onPress={() => setShowSubtitleLanguageModal(false)}
             >
               <Ionicons name="close" size={24} color="white" />
             </TouchableOpacity>
@@ -842,52 +1252,38 @@ const VideoPlayer: React.FC = () => {
           
           <ScrollView style={styles.trackListScrollContainer}>
             <View style={styles.trackListContainer}>
-              {/* Off option with improved design */}
-              <TouchableOpacity
-                style={styles.enhancedTrackItem}
-                onPress={() => {
-                  selectTextTrack(-1); // -1 typically disables subtitles in VLC
-                  setShowSubtitleModal(false);
-                }}
-              >
-                <View style={styles.trackInfoContainer}>
-                  <Text style={styles.trackPrimaryText}>Off</Text>
-                </View>
-                {selectedTextTrack === -1 && (
-                  <View style={styles.selectedIndicatorContainer}>
-                    <Ionicons name="checkmark" size={22} color="#E50914" />
-                  </View>
-                )}
-              </TouchableOpacity>
-              
-              {/* Available subtitle tracks with improved design */}
-              {vlcTextTracks.length > 0 ? vlcTextTracks.map(track => (
+              {availableSubtitles.length > 0 ? availableSubtitles.map(subtitle => (
                 <TouchableOpacity
-                  key={track.id}
+                  key={subtitle.id}
                   style={styles.enhancedTrackItem}
-                  onPress={() => {
-                    selectTextTrack(track.id);
-                    setShowSubtitleModal(false);
-                  }}
+                  onPress={() => loadWyzieSubtitle(subtitle)}
+                  disabled={isLoadingSubtitles}
                 >
-                  <View style={styles.trackInfoContainer}>
-                    <Text style={styles.trackPrimaryText}>
-                      {getTrackDisplayName(track)}
-                    </Text>
-                    {(track.name && track.language) && (
-                      <Text style={styles.trackSecondaryText}>{track.name}</Text>
-                    )}
-                  </View>
-                  {selectedTextTrack === track.id && (
-                    <View style={styles.selectedIndicatorContainer}>
-                      <Ionicons name="checkmark" size={22} color="#E50914" />
+                  <View style={styles.subtitleLanguageItem}>
+                    <Image 
+                      source={{ uri: subtitle.flagUrl }}
+                      style={styles.flagIcon}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.trackInfoContainer}>
+                      <Text style={styles.trackPrimaryText}>
+                        {formatLanguage(subtitle.language)}
+                      </Text>
+                      <Text style={styles.trackSecondaryText}>
+                        {subtitle.display}
+                      </Text>
                     </View>
+                  </View>
+                  {isLoadingSubtitles && (
+                    <ActivityIndicator size="small" color="#E50914" />
                   )}
                 </TouchableOpacity>
               )) : (
                 <View style={styles.emptyStateContainer}>
                   <Ionicons name="alert-circle-outline" size={40} color="#888" />
-                  <Text style={styles.emptyStateText}>No subtitle tracks available</Text>
+                  <Text style={styles.emptyStateText}>
+                    No subtitles found for this content
+                  </Text>
                 </View>
               )}
             </View>
@@ -1085,8 +1481,330 @@ const VideoPlayer: React.FC = () => {
     });
   };
 
+  // Add subtitle size management functions
+  const loadSubtitleSize = async () => {
+    try {
+      const savedSize = await AsyncStorage.getItem(SUBTITLE_SIZE_KEY);
+      if (savedSize) {
+        setSubtitleSize(parseInt(savedSize, 10));
+      }
+    } catch (error) {
+      logger.error('[VideoPlayer] Error loading subtitle size:', error);
+    }
+  };
+
+  const saveSubtitleSize = async (size: number) => {
+    try {
+      await AsyncStorage.setItem(SUBTITLE_SIZE_KEY, size.toString());
+      setSubtitleSize(size);
+    } catch (error) {
+      logger.error('[VideoPlayer] Error saving subtitle size:', error);
+    }
+  };
+
+  // Enhanced SRT parser function - more robust
+  const parseSRT = (srtContent: string): SubtitleCue[] => {
+    const cues: SubtitleCue[] = [];
+    
+    if (!srtContent || srtContent.trim().length === 0) {
+      if (DEBUG_MODE) {
+        logger.log(`[VideoPlayer] SRT Parser: Empty content provided`);
+      }
+      return cues;
+    }
+
+    // Normalize line endings and clean up the content
+    const normalizedContent = srtContent
+      .replace(/\r\n/g, '\n')  // Convert Windows line endings
+      .replace(/\r/g, '\n')    // Convert Mac line endings
+      .trim();
+
+    // Split by double newlines, but also handle cases with multiple empty lines
+    const blocks = normalizedContent.split(/\n\s*\n/).filter(block => block.trim().length > 0);
+
+    if (DEBUG_MODE) {
+      logger.log(`[VideoPlayer] SRT Parser: Found ${blocks.length} blocks after normalization`);
+      logger.log(`[VideoPlayer] SRT Parser: First few characters: "${normalizedContent.substring(0, 300)}"`);
+    }
+
+    for (let i = 0; i < blocks.length; i++) {
+      const block = blocks[i].trim();
+      const lines = block.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+      
+      if (lines.length >= 3) {
+        // Find the timestamp line (could be line 1 or 2, depending on numbering)
+        let timeLineIndex = -1;
+        let timeMatch = null;
+        
+        for (let j = 0; j < Math.min(3, lines.length); j++) {
+          // More flexible time pattern matching
+          timeMatch = lines[j].match(/(\d{1,2}):(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(\d{1,2}):(\d{2}):(\d{2})[,.](\d{3})/);
+          if (timeMatch) {
+            timeLineIndex = j;
+            break;
+          }
+        }
+        
+        if (timeMatch && timeLineIndex !== -1) {
+          try {
+            const startTime = 
+              parseInt(timeMatch[1]) * 3600 + 
+              parseInt(timeMatch[2]) * 60 + 
+              parseInt(timeMatch[3]) + 
+              parseInt(timeMatch[4]) / 1000;
+            
+            const endTime = 
+              parseInt(timeMatch[5]) * 3600 + 
+              parseInt(timeMatch[6]) * 60 + 
+              parseInt(timeMatch[7]) + 
+              parseInt(timeMatch[8]) / 1000;
+
+            // Get text lines (everything after the timestamp line)
+            const textLines = lines.slice(timeLineIndex + 1);
+            if (textLines.length > 0) {
+              const text = textLines
+                .join('\n')
+                .replace(/<[^>]*>/g, '') // Remove HTML tags
+                .replace(/\{[^}]*\}/g, '') // Remove subtitle formatting tags like {italic}
+                .replace(/\\N/g, '\n') // Handle \N newlines
+                .trim();
+
+              if (text.length > 0) {
+                cues.push({
+                  start: startTime,
+                  end: endTime,
+                  text: text
+                });
+                
+                if (DEBUG_MODE && (i < 5 || cues.length <= 10)) {
+                  logger.log(`[VideoPlayer] SRT Parser: Cue ${cues.length}: ${startTime.toFixed(3)}s-${endTime.toFixed(3)}s: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
+                }
+              }
+            }
+          } catch (error) {
+            if (DEBUG_MODE) {
+              logger.log(`[VideoPlayer] SRT Parser: Error parsing times for block ${i + 1}: ${error}`);
+            }
+          }
+        } else if (DEBUG_MODE) {
+          logger.log(`[VideoPlayer] SRT Parser: No valid timestamp found in block ${i + 1}. Lines: ${JSON.stringify(lines.slice(0, 3))}`);
+        }
+      } else if (DEBUG_MODE && block.length > 0) {
+        logger.log(`[VideoPlayer] SRT Parser: Block ${i + 1} has insufficient lines (${lines.length}): "${block.substring(0, 100)}"`);
+      }
+    }
+
+    if (DEBUG_MODE) {
+      logger.log(`[VideoPlayer] SRT Parser: Successfully parsed ${cues.length} subtitle cues`);
+      if (cues.length > 0) {
+        logger.log(`[VideoPlayer] SRT Parser: Time range: ${cues[0].start.toFixed(1)}s to ${cues[cues.length-1].end.toFixed(1)}s`);
+      }
+    }
+
+    return cues;
+  };
+
+  // Fetch available subtitles from Wyzie API
+  const fetchAvailableSubtitles = async (imdbIdParam?: string) => {
+    const targetImdbId = imdbIdParam || imdbId;
+    if (!targetImdbId) {
+      logger.error('[VideoPlayer] No IMDb ID available for subtitle search');
+      return;
+    }
+
+    setIsLoadingSubtitleList(true);
+    try {
+      // Build search URL with season and episode parameters for TV shows
+      let searchUrl = `https://sub.wyzie.ru/search?id=${targetImdbId}&encoding=utf-8&source=all`;
+      
+      // Add season and episode parameters if available (for TV shows)
+      if (season && episode) {
+        searchUrl += `&season=${season}&episode=${episode}`;
+        if (DEBUG_MODE) {
+          logger.log(`[VideoPlayer] Searching for subtitles with IMDb ID: ${targetImdbId}, Season: ${season}, Episode: ${episode}`);
+        }
+      } else {
+        if (DEBUG_MODE) {
+          logger.log(`[VideoPlayer] Searching for subtitles with IMDb ID: ${targetImdbId} (movie or no season/episode info)`);
+        }
+      }
+      
+      const response = await fetch(searchUrl);
+      const subtitles: WyzieSubtitle[] = await response.json();
+      
+      // Filter out duplicates and sort by language
+      const uniqueSubtitles = subtitles.reduce((acc, current) => {
+        const exists = acc.find(item => item.language === current.language);
+        if (!exists) {
+          acc.push(current);
+        }
+        return acc;
+      }, [] as WyzieSubtitle[]);
+      
+      // Sort alphabetically by display name
+      uniqueSubtitles.sort((a, b) => a.display.localeCompare(b.display));
+      
+      setAvailableSubtitles(uniqueSubtitles);
+      setShowSubtitleLanguageModal(true);
+      
+      if (DEBUG_MODE) {
+        logger.log(`[VideoPlayer] Found ${uniqueSubtitles.length} unique subtitle languages for search`);
+      }
+    } catch (error) {
+      logger.error('[VideoPlayer] Error fetching subtitles from Wyzie API:', error);
+    } finally {
+      setIsLoadingSubtitleList(false);
+    }
+  };
+
+  // Load subtitle from selected Wyzie entry
+  const loadWyzieSubtitle = async (subtitle: WyzieSubtitle) => {
+    setShowSubtitleLanguageModal(false);
+    setIsLoadingSubtitles(true);
+    
+    try {
+      if (DEBUG_MODE) {
+        logger.log(`[VideoPlayer] Loading subtitle: ${subtitle.display} from ${subtitle.url}`);
+      }
+      
+      const response = await fetch(subtitle.url);
+      const srtContent = await response.text();
+      
+      if (DEBUG_MODE) {
+        logger.log(`[VideoPlayer] Downloaded subtitle content length: ${srtContent.length} characters`);
+        logger.log(`[VideoPlayer] First 200 characters of subtitle: ${srtContent.substring(0, 200)}`);
+      }
+      
+      const parsedCues = parseSRT(srtContent);
+      
+      if (DEBUG_MODE) {
+        logger.log(`[VideoPlayer] Parsed ${parsedCues.length} subtitle cues`);
+        if (parsedCues.length > 0) {
+          logger.log(`[VideoPlayer] First cue: ${parsedCues[0].start}s-${parsedCues[0].end}s: "${parsedCues[0].text}"`);
+          logger.log(`[VideoPlayer] Last cue: ${parsedCues[parsedCues.length-1].start}s-${parsedCues[parsedCues.length-1].end}s: "${parsedCues[parsedCues.length-1].text}"`);
+        }
+      }
+      
+      setCustomSubtitles(parsedCues);
+      setUseCustomSubtitles(true);
+      
+      // Disable VLC's built-in subtitles when using custom ones
+      setSelectedTextTrack(-1);
+      
+      if (DEBUG_MODE) {
+        logger.log(`[VideoPlayer] Successfully loaded subtitle: useCustomSubtitles=true, customSubtitles.length=${parsedCues.length}`);
+      }
+    } catch (error) {
+      logger.error('[VideoPlayer] Error loading Wyzie subtitle:', error);
+    } finally {
+      setIsLoadingSubtitles(false);
+    }
+  };
+
+  // Load external subtitle file (keep for backwards compatibility)
+  const loadExternalSubtitles = async (subtitleUrl: string) => {
+    if (!subtitleUrl) return;
+
+    setIsLoadingSubtitles(true);
+    try {
+      const response = await fetch(subtitleUrl);
+      const srtContent = await response.text();
+      const parsedCues = parseSRT(srtContent);
+      setCustomSubtitles(parsedCues);
+      setUseCustomSubtitles(true);
+      
+      // Disable VLC's built-in subtitles when using custom ones
+      setSelectedTextTrack(-1);
+      
+      if (DEBUG_MODE) {
+        logger.log(`[VideoPlayer] Loaded ${parsedCues.length} subtitle cues from external file`);
+      }
+    } catch (error) {
+      logger.error('[VideoPlayer] Error loading external subtitles:', error);
+    } finally {
+      setIsLoadingSubtitles(false);
+    }
+  };
+
+  // Update current subtitle based on playback time
+  useEffect(() => {
+    if (DEBUG_MODE) {
+      logger.log(`[VideoPlayer] Subtitle useEffect - useCustomSubtitles: ${useCustomSubtitles}, customSubtitles.length: ${customSubtitles.length}, currentTime: ${currentTime.toFixed(3)}`);
+      
+      // Show detailed info about subtitle cues for debugging
+      if (useCustomSubtitles && customSubtitles.length > 0 && customSubtitles.length <= 5) {
+        logger.log(`[VideoPlayer] All ${customSubtitles.length} subtitle cues:`);
+        customSubtitles.forEach((cue, index) => {
+          const isActive = currentTime >= cue.start && currentTime <= cue.end;
+          logger.log(`[VideoPlayer] Cue ${index + 1}: ${cue.start.toFixed(3)}s-${cue.end.toFixed(3)}s ${isActive ? '(ACTIVE)' : ''}: "${cue.text.substring(0, 50)}${cue.text.length > 50 ? '...' : ''}"`);
+        });
+      } else if (useCustomSubtitles && customSubtitles.length > 5) {
+        // For larger subtitle files, just show nearby cues
+        const nearbyCues = customSubtitles.filter(cue => 
+          Math.abs(cue.start - currentTime) <= 10 || Math.abs(cue.end - currentTime) <= 10
+        );
+        if (nearbyCues.length > 0) {
+          logger.log(`[VideoPlayer] Nearby subtitle cues (within 10s):`);
+          nearbyCues.slice(0, 3).forEach((cue, index) => {
+            const isActive = currentTime >= cue.start && currentTime <= cue.end;
+            logger.log(`[VideoPlayer] Nearby cue: ${cue.start.toFixed(3)}s-${cue.end.toFixed(3)}s ${isActive ? '(ACTIVE)' : ''}: "${cue.text.substring(0, 50)}${cue.text.length > 50 ? '...' : ''}"`);
+          });
+        }
+      }
+    }
+    
+    if (!useCustomSubtitles || customSubtitles.length === 0) {
+      if (currentSubtitle !== '') {
+        setCurrentSubtitle('');
+        if (DEBUG_MODE) {
+          logger.log(`[VideoPlayer] Cleared subtitle - useCustomSubtitles: ${useCustomSubtitles}, customSubtitles.length: ${customSubtitles.length}`);
+        }
+      }
+      return;
+    }
+
+    const currentCue = customSubtitles.find(cue => 
+      currentTime >= cue.start && currentTime <= cue.end
+    );
+
+    const newSubtitle = currentCue ? currentCue.text : '';
+    
+    if (DEBUG_MODE && newSubtitle !== currentSubtitle) {
+      logger.log(`[VideoPlayer] Subtitle changed from "${currentSubtitle}" to "${newSubtitle}" at time ${currentTime.toFixed(3)}`);
+      if (currentCue) {
+        logger.log(`[VideoPlayer] Current cue: ${currentCue.start.toFixed(3)}s - ${currentCue.end.toFixed(3)}s: "${currentCue.text}"`);
+      }
+    }
+
+    setCurrentSubtitle(newSubtitle);
+  }, [currentTime, customSubtitles, useCustomSubtitles]);
+
+  // Load subtitle size preference on mount
+  useEffect(() => {
+    loadSubtitleSize();
+  }, []);
+
+  // Add subtitle size adjustment functions
+  const increaseSubtitleSize = () => {
+    const newSize = Math.min(subtitleSize + 2, 32);
+    saveSubtitleSize(newSize);
+  };
+
+  const decreaseSubtitleSize = () => {
+    const newSize = Math.max(subtitleSize - 2, 8);
+    saveSubtitleSize(newSize);
+  };
+
+  
+
   return (
-    <View style={styles.container}> 
+    <View style={[styles.container, {
+      width: screenDimensions.width,
+      height: screenDimensions.height,
+      position: 'absolute',
+      top: 0,
+      left: 0,
+    }]}> 
       {/* Opening Animation Overlay - covers the entire screen during transition */}
       <Animated.View 
         style={[
@@ -1094,6 +1812,8 @@ const VideoPlayer: React.FC = () => {
           {
             opacity: backgroundFadeAnim,
             zIndex: isOpeningAnimationComplete ? -1 : 3000,
+            width: screenDimensions.width,
+            height: screenDimensions.height,
           }
         ]}
         pointerEvents={isOpeningAnimationComplete ? 'none' : 'auto'}
@@ -1104,38 +1824,86 @@ const VideoPlayer: React.FC = () => {
         </View>
       </Animated.View>
 
-      {/* Animated Video Player Container */}
+      {/* Animated Video Player Container - ensure no transform issues */}
       <Animated.View 
         style={[
           styles.videoPlayerContainer,
           {
             opacity: openingFadeAnim,
-            transform: [{ scale: openingScaleAnim }],
+            transform: isOpeningAnimationComplete ? [] : [{ scale: openingScaleAnim }],
+            width: screenDimensions.width,
+            height: screenDimensions.height,
           }
         ]}
       >
         <TouchableOpacity
-          style={styles.videoContainer}
+          style={[styles.videoContainer, {
+            width: screenDimensions.width,
+            height: screenDimensions.height,
+          }]}
           onPress={toggleControls}
           activeOpacity={1}
         >
-          <VLCPlayer
-            ref={vlcRef}
-            source={{
-              uri: uri,
-            }}
-            style={styles.video}
-            paused={paused || showResumeOverlay}
-            resizeMode={resizeMode as any}
-            onLoad={onLoad}
-            onProgress={handleProgress}
-            rate={playbackSpeed}
-            onError={handleError}
-            onEnd={onEnd}
-            audioTrack={selectedAudioTrack ?? undefined}
-            textTrack={selectedTextTrack}
-            autoAspectRatio={true}
-          />
+          <PinchGestureHandler
+            ref={pinchRef}
+            onGestureEvent={onPinchGestureEvent}
+            onHandlerStateChange={onPinchHandlerStateChange}
+          >
+            <View style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: screenDimensions.width,
+              height: screenDimensions.height,
+              backgroundColor: '#000',
+            }}>
+              <TouchableOpacity
+                style={{ flex: 1 }}
+                activeOpacity={1}
+                onPress={toggleControls}
+                onLongPress={resetZoom}
+                delayLongPress={300}
+              >
+                <VLCPlayer
+                  ref={vlcRef}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: screenDimensions.width,
+                    height: screenDimensions.height,
+                    backgroundColor: '#000',
+                    transform: [
+                      { scale: zoomScale },
+                    ],
+                  }}
+                  source={{
+                    uri: uri,
+                    initOptions: [
+                      '--rtsp-tcp',
+                      '--network-caching=150',
+                      '--rtsp-caching=150',
+                      '--no-audio-time-stretch',
+                      '--clock-jitter=0',
+                      '--clock-synchro=0',
+                      '--drop-late-frames',
+                      '--skip-frames',
+                    ],
+                  }}
+                  paused={paused}
+                  autoplay={true}
+                  autoAspectRatio={false}
+                  resizeMode={'stretch' as any}
+                  audioTrack={selectedAudioTrack || undefined}
+                  textTrack={selectedTextTrack === -1 ? undefined : selectedTextTrack}
+                  onLoad={onLoad}
+                  onProgress={handleProgress}
+                  onEnd={onEnd}
+                  onError={handleError}
+                />
+              </TouchableOpacity>
+            </View>
+          </PinchGestureHandler>
 
           {/* Progress bar with enhanced touch handling */}
           <Animated.View style={[styles.sliderContainer, { opacity: fadeAnim }]}>
@@ -1238,11 +2006,11 @@ const VideoPlayer: React.FC = () => {
                     <Text style={styles.bottomButtonText}>Speed ({playbackSpeed}x)</Text>
                   </TouchableOpacity>
 
-                  {/* Aspect Ratio Button - Added */}
+                  {/* Fill/Cover Button - Updated to show fill/cover modes */}
                   <TouchableOpacity style={styles.bottomButton} onPress={cycleAspectRatio}>
                     <Ionicons name="resize" size={20} color="white" />
-                    <Text style={styles.bottomButtonText}>
-                      Aspect ({resizeMode})
+                    <Text style={[styles.bottomButtonText, { fontSize: 14, textAlign: 'center' }]}>
+                      {zoomScale === 1.1 ? 'Fill' : 'Cover'}
                     </Text>
                   </TouchableOpacity>
 
@@ -1258,15 +2026,16 @@ const VideoPlayer: React.FC = () => {
                     </Text>
                   </TouchableOpacity>
                   
-                  {/* Subtitle Button - Updated to use vlcTextTracks */}
+                  {/* Subtitle Button - Always available for external subtitle search */}
                   <TouchableOpacity
                     style={styles.bottomButton}
                     onPress={() => setShowSubtitleModal(true)}
-                    disabled={vlcTextTracks.length === 0}
                   >
-                    <Ionicons name="text" size={20} color={vlcTextTracks.length === 0 ? 'grey' : 'white'} />
-                    <Text style={[styles.bottomButtonText, vlcTextTracks.length === 0 && {color: 'grey'}]}>
-                      {(selectedTextTrack === -1)
+                    <Ionicons name="text" size={20} color="white" />
+                    <Text style={styles.bottomButtonText}>
+                      {useCustomSubtitles 
+                        ? 'Subtitles: Custom'
+                        : (selectedTextTrack === -1)
                         ? 'Subtitles'
                         : `Subtitles: ${getTrackDisplayName(vlcTextTracks.find(t => t.id === selectedTextTrack) || {id: -1, name: 'On'})}`}
                     </Text>
@@ -1275,6 +2044,28 @@ const VideoPlayer: React.FC = () => {
               </View>
             </LinearGradient>
           </Animated.View>
+
+          {/* Custom Subtitle Overlay - Enhanced visibility and debugging */}
+          {(useCustomSubtitles && currentSubtitle) && (
+            <View style={styles.customSubtitleContainer} pointerEvents="none">
+              <View style={styles.customSubtitleWrapper}>
+                <Text style={[styles.customSubtitleText, { fontSize: subtitleSize }]}>
+                  {currentSubtitle}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Debug subtitle info when controls are visible */}
+          {DEBUG_MODE && showControls && (
+            <View style={styles.debugSubtitleInfo} pointerEvents="none">
+              <Text style={styles.debugText}>
+                Custom Subs: {useCustomSubtitles ? 'ON' : 'OFF'} | 
+                Cues: {customSubtitles.length} | 
+                Current: "{currentSubtitle}"
+              </Text>
+            </View>
+          )}
 
           {/* Resume Overlay */}
           {showResumeOverlay && resumePosition !== null && (
@@ -1357,44 +2148,64 @@ const VideoPlayer: React.FC = () => {
       {/* Use the new modal rendering functions */}
       {renderAudioModal()}
       {renderSubtitleModal()}
+      {renderSubtitleLanguageModal()}
     </View> 
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     backgroundColor: '#000',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    margin: 0,
+    padding: 0,
   },
   videoContainer: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    margin: 0,
+    padding: 0,
   },
   video: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    margin: 0,
+    padding: 0,
   },
   controlsContainer: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'space-between',
+    margin: 0,
+    padding: 0,
   },
   topGradient: {
-    paddingTop: Platform.OS === 'ios' ? 50 : 20, // Adjust top padding for safe area
+    paddingTop: 20,
     paddingHorizontal: 20,
-    paddingBottom: 10, // Add some padding at the bottom of the gradient
+    paddingBottom: 10,
   },
   bottomGradient: {
-    paddingBottom: Platform.OS === 'ios' ? 30 : 20,
+    paddingBottom: 20,
     paddingHorizontal: 20,
     paddingTop: 20,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start', // Align items to the top
+    alignItems: 'flex-start',
   },
-  // Styles for the title section and metadata
   titleSection: {
-    flex: 1, // Allow title section to take available space
-    marginRight: 10, // Add margin to avoid overlap with close button
+    flex: 1,
+    marginRight: 10,
   },
   title: {
     color: 'white',
@@ -1410,7 +2221,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 5,
-    flexWrap: 'wrap', // Allow items to wrap if needed
+    flexWrap: 'wrap',
   },
   metadataText: {
     color: 'rgba(255, 255, 255, 0.7)',
@@ -1432,7 +2243,7 @@ const styles = StyleSheet.create({
   providerText: {
     color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 12,
-    fontStyle: 'italic', // Italicize provider text
+    fontStyle: 'italic',
   },
   closeButton: {
     padding: 8,
@@ -1446,7 +2257,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     top: '50%',
-    transform: [{ translateY: -30 }], // Half the height of play button to center it perfectly
+    transform: [{ translateY: -30 }],
     zIndex: 1000,
   },
   playButton: {
@@ -1468,14 +2279,14 @@ const styles = StyleSheet.create({
   },
   sliderContainer: {
     position: 'absolute',
-    bottom: 55, // Moved closer to bottom buttons
+    bottom: 55,
     left: 0,
     right: 0,
     paddingHorizontal: 20,
     zIndex: 1000,
   },
   progressTouchArea: {
-    height: 30,  // Increase touch target height for easier interaction
+    height: 30,
     justifyContent: 'center',
     width: '100%',
   },
@@ -1507,8 +2318,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     width: '100%',
     paddingHorizontal: 4,
-    marginTop: 4, // Increased space between progress bar and time
-    marginBottom: 8, // Added space between time and buttons
+    marginTop: 4,
+    marginBottom: 8,
   },
   duration: {
     color: 'white',
@@ -1585,7 +2396,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     padding: 20,
   },
-  // New simplified modal styles
   fullscreenOverlay: {
     position: 'absolute',
     top: 0,
@@ -1674,7 +2484,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
-  // Resume overlay styles
   resumeOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
@@ -1812,6 +2621,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 2000,
+    margin: 0,
+    padding: 0,
   },
   openingContent: {
     padding: 20,
@@ -1827,7 +2638,287 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   videoPlayerContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    margin: 0,
+    padding: 0,
+  },
+  subtitleSizeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 12,
+    marginBottom: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 6,
+  },
+  subtitleSizeLabel: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  subtitleSizeControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  sizeButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  subtitleSizeText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
+    minWidth: 40,
+    textAlign: 'center',
+  },
+  customSubtitleContainer: {
+    position: 'absolute',
+    bottom: 120, // Position above controls and progress bar
+    left: 20,
+    right: 20,
+    alignItems: 'center',
+    zIndex: 1500, // Higher z-index to appear above other elements
+  },
+  customSubtitleText: {
+    color: 'white',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
+    lineHeight: undefined, // Let React Native calculate line height
+    fontWeight: '500',
+  },
+  loadSubtitlesButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    marginTop: 8,
+    borderRadius: 6,
+    backgroundColor: 'rgba(229, 9, 20, 0.2)',
+    borderWidth: 1,
+    borderColor: '#E50914',
+  },
+  loadSubtitlesText: {
+    color: '#E50914',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  disabledContainer: {
+    opacity: 0.5,
+  },
+  disabledText: {
+    color: '#666',
+  },
+  disabledButton: {
+    backgroundColor: '#666',
+  },
+  noteContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  noteText: {
+    color: '#aaa',
+    fontSize: 12,
+    marginLeft: 5,
+  },
+  subtitleLanguageItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
+  },
+  flagIcon: {
+    width: 24,
+    height: 18,
+    marginRight: 12,
+    borderRadius: 2,
+  },
+  modernModalContainer: {
+    width: '90%',
+    maxWidth: 500,
+    backgroundColor: '#181818',
+    borderRadius: 10,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  modernModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  modernModalTitle: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  modernCloseButton: {
+    padding: 4,
+  },
+  modernTrackListScrollContainer: {
+    maxHeight: 350,
+  },
+  modernTrackListContainer: {
+    padding: 6,
+  },
+  sectionContainer: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  sectionDescription: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 12,
+    marginBottom: 12,
+  },
+  trackIconContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modernTrackInfoContainer: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  modernTrackPrimaryText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  modernTrackSecondaryText: {
+    color: '#aaa',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  modernSelectedIndicator: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modernEmptyStateContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modernEmptyStateText: {
+    color: '#888',
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  searchSubtitlesButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    marginTop: 8,
+    borderRadius: 6,
+    backgroundColor: 'rgba(229, 9, 20, 0.2)',
+    borderWidth: 1,
+    borderColor: '#E50914',
+  },
+  searchButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  searchSubtitlesText: {
+    color: '#E50914',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  modernSubtitleSizeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  modernSizeButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modernTrackItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+    marginVertical: 4,
+    borderRadius: 8,
+    backgroundColor: '#222',
+  },
+  modernSelectedTrackItem: {
+    backgroundColor: 'rgba(76, 175, 80, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(76, 175, 80, 0.3)',
+  },
+  sizeDisplayContainer: {
+    alignItems: 'center',
+    flex: 1,
+    marginHorizontal: 20,
+  },
+  modernSubtitleSizeText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  sizeLabel: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  customSubtitleWrapper: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 10,
+    borderRadius: 5,
+  },
+  debugSubtitleInfo: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 5,
+    borderRadius: 5,
+    margin: 10,
+    zIndex: 1000,
+  },
+  debugText: {
+    color: 'white',
+    fontSize: 12,
   },
 });
 
