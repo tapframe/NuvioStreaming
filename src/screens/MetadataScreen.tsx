@@ -334,6 +334,9 @@ const MetadataScreen = () => {
             showsVerticalScrollIndicator={false}
             onScroll={animations.scrollHandler}
             scrollEventThrottle={16}
+            bounces={false}
+            overScrollMode="never"
+            contentContainerStyle={{ flexGrow: 1 }}
           >
             {/* Hero Section */}
             <HeroSection 
