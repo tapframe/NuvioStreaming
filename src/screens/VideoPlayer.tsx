@@ -22,7 +22,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Debug flag - set back to false to disable verbose logging
 // WARNING: Setting this to true currently causes infinite render loops
 // Use selective logging instead if debugging is needed
-const DEBUG_MODE = true;
+const DEBUG_MODE = false;
 
 // Safer debug function that won't cause render loops
 // Call this with any debugging info you need instead of using inline DEBUG_MODE checks
@@ -276,6 +276,9 @@ const VideoPlayer: React.FC = () => {
   const pendingSeekValue = useRef<number | null>(null);
   const lastSeekTime = useRef<number>(0);
 
+  // Add state for tracking if the video is loaded
+  const [isVideoLoaded, setIsVideoLoaded] = useState(false);
+
   // Lock screen to landscape when component mounts
   useEffect(() => {
     // Since orientation is now locked before navigation, we can start immediately
@@ -299,40 +302,44 @@ const VideoPlayer: React.FC = () => {
     };
   }, []);
 
-  // Opening animation sequence
+  // Opening animation sequence - modified to wait for video load
   const startOpeningAnimation = () => {
-    // Much shorter delay since rotation is already handled
-    setTimeout(() => {
-      // Start the main animation sequence
-      Animated.parallel([
-        // Fade in the video player
-        Animated.timing(openingFadeAnim, {
-          toValue: 1,
-          duration: 600, // Reduced back to original duration
-          useNativeDriver: true,
-        }),
-        // Scale up from 80% to 100%
-        Animated.timing(openingScaleAnim, {
-          toValue: 1,
-          duration: 700, // Reduced back to original duration
-          useNativeDriver: true,
-        }),
-        // Fade out the black background overlay
-        Animated.timing(backgroundFadeAnim, {
-          toValue: 0,
-          duration: 800, // Reduced back to original duration
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        // Animation is complete
-        setIsOpeningAnimationComplete(true);
-        
-        // Hide the background overlay completely after animation
-        setTimeout(() => {
-          backgroundFadeAnim.setValue(0);
-        }, 100);
-      });
-    }, 150); // Much shorter delay since no rotation is needed
+    // Keep everything black until video loads
+    // Only show loading indicator, no video player fade-in yet
+    // Note: All animations will be triggered by onLoad when video is ready
+  };
+
+  // Complete the opening animation when video loads
+  const completeOpeningAnimation = () => {
+    // Start all animations together when video is ready
+    Animated.parallel([
+      // Fade in the video player
+      Animated.timing(openingFadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      // Scale up from 80% to 100%
+      Animated.timing(openingScaleAnim, {
+        toValue: 1,
+        duration: 700,
+        useNativeDriver: true,
+      }),
+      // Fade out the black background overlay
+      Animated.timing(backgroundFadeAnim, {
+        toValue: 0,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // Animation is complete
+      setIsOpeningAnimationComplete(true);
+      
+      // Hide the background overlay completely after animation
+      setTimeout(() => {
+        backgroundFadeAnim.setValue(0);
+      }, 100);
+    });
   };
 
   // Load saved watch progress on mount
@@ -465,19 +472,6 @@ const VideoPlayer: React.FC = () => {
     }
   };
 
-  // Replace the reset seek value effect
-  // useEffect(() => {
-  //   if (seekValue !== undefined) {
-  //     const timer = setTimeout(() => {
-  //       if (isMounted.current) {
-  //         setSeekValue(undefined);
-  //       }
-  //     }, 1000); // Longer timeout to ensure VLC processes the seek properly
-      
-  //     return () => clearTimeout(timer);
-  //   }
-  // }, [seekValue]);
-
   // Simplify the seekToTime function to use VLC's direct methods
   const seekToTime = (timeInSeconds: number) => {
     if (!isPlayerReady || duration <= 0 || !vlcRef.current) return;
@@ -501,11 +495,6 @@ const VideoPlayer: React.FC = () => {
       } else {
         logger.error('[VideoPlayer] No seek method available on VLC player');
       }
-      
-      // Update UI immediately for responsiveness
-      const progressPercent = timeInSeconds / duration;
-      progressAnim.setValue(progressPercent);
-      
     } catch (error) {
       logger.error('[VideoPlayer] Error during seek operation:', error);
     }
@@ -586,13 +575,16 @@ const VideoPlayer: React.FC = () => {
         }
       }, 1000);
     }
+
+    // Mark video as loaded and complete opening animation
+    setIsVideoLoaded(true);
+    completeOpeningAnimation();
   };
 
   const skip = (seconds: number) => {
     if (vlcRef.current) {
       const newTime = Math.max(0, Math.min(currentTime + seconds, duration));
       seekToTime(newTime);
-      // Let seekToTime handle all state updates
     }
   };
 
@@ -678,24 +670,6 @@ const VideoPlayer: React.FC = () => {
       logger.log("[VideoPlayer] Available text tracks:", textTracks);
     }
   }, [showSubtitleModal, textTracks]);
-
-  // Attempt to seek once vlcRef is available
-  useEffect(() => {
-    if (initialPosition !== null && !isInitialSeekComplete && vlcRef.current) {
-      if (DEBUG_MODE) {
-        logger.log(`[VideoPlayer] vlcRef is now available, attempting to seek to: ${initialPosition}`);
-      }
-      try {
-        seekToTime(initialPosition);
-        setIsInitialSeekComplete(true);
-        if (DEBUG_MODE) {
-          logger.log(`[VideoPlayer] Successfully seeked to position: ${initialPosition}`);
-        }
-      } catch (error) {
-        logger.error('[VideoPlayer] Error seeking to position on ref available:', error);
-      }
-    }
-  }, [vlcRef.current, initialPosition, isInitialSeekComplete]);
 
   // Load resume preference on mount
   useEffect(() => {
