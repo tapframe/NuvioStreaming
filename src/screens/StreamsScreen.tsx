@@ -16,7 +16,7 @@ import {
   Linking,
 } from 'react-native';
 import * as ScreenOrientation from 'expo-screen-orientation';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { RouteProp } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -246,6 +246,9 @@ export const StreamsScreen = () => {
   const isMounted = useRef(true);
   const loadStartTimeRef = useRef(0);
   const hasDoneInitialLoadRef = useRef(false);
+  
+  // Add state for handling orientation transition
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   // Add timing logs
   const [loadStartTime, setLoadStartTime] = useState(0);
@@ -888,6 +891,44 @@ export const StreamsScreen = () => {
     };
   }, []);
 
+  // Add orientation handling when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      // Set transitioning state to mask any visual glitches
+      setIsTransitioning(true);
+      
+      // Immediately lock to portrait when returning to this screen
+      const lockToPortrait = async () => {
+        try {
+          await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+          // Small delay then unlock to allow natural portrait orientation
+          setTimeout(async () => {
+            try {
+              await ScreenOrientation.unlockAsync();
+              // Clear transition state after orientation is handled
+              setTimeout(() => {
+                setIsTransitioning(false);
+              }, 100);
+            } catch (error) {
+              logger.error('[StreamsScreen] Error unlocking orientation:', error);
+              setIsTransitioning(false);
+            }
+          }, 200);
+        } catch (error) {
+          logger.error('[StreamsScreen] Error locking to portrait:', error);
+          setIsTransitioning(false);
+        }
+      };
+
+      lockToPortrait();
+
+      return () => {
+        // Cleanup when screen loses focus
+        setIsTransitioning(false);
+      };
+    }, [])
+  );
+
   return (
     <View style={styles.container}>
       <StatusBar
@@ -895,6 +936,13 @@ export const StreamsScreen = () => {
         backgroundColor="transparent"
         barStyle="light-content"
       />
+      
+      {/* Transition overlay to mask orientation changes */}
+      {isTransitioning && (
+        <View style={styles.transitionOverlay}>
+          <ActivityIndicator size="small" color={colors.primary} />
+        </View>
+      )}
       
       <Animated.View
         entering={FadeIn.duration(300)}
@@ -1480,6 +1528,17 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.mediumEmphasis,
     fontSize: 13,
     fontWeight: '600',
+  },
+  transitionOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.darkBackground,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
   },
 });
 

@@ -219,7 +219,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
         style={[
           styles.episodeCard, 
           isTablet && styles.episodeCardTablet, 
-          { backgroundColor: currentTheme.colors.elevation2 }
+          { backgroundColor: currentTheme.colors.darkBackground }
         ]}
         onPress={() => onSelectEpisode(episode)}
         activeOpacity={0.7}
@@ -385,10 +385,10 @@ const styles = StyleSheet.create({
     elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(255,255,255,0.05)',
     height: 120,
   },
   episodeCardTablet: {
@@ -410,12 +410,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 8,
     right: 4,
-    backgroundColor: 'rgba(0,0,0,0.85)',
+    backgroundColor: 'rgba(0,0,0,0.9)',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: 'rgba(255,255,255,0.15)',
     zIndex: 1,
   },
   episodeNumberText: {
@@ -446,7 +446,7 @@ const styles = StyleSheet.create({
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.85)',
     paddingHorizontal: 4,
     paddingVertical: 2,
     borderRadius: 4,
@@ -557,7 +557,7 @@ const styles = StyleSheet.create({
   runtimeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.85)',
     paddingHorizontal: 4,
     paddingVertical: 2,
     borderRadius: 4,

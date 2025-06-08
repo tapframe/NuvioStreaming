@@ -466,10 +466,31 @@ const VideoPlayer: React.FC = () => {
   };
 
   const handleClose = () => {
-    ScreenOrientation.unlockAsync().then(() => {
+    // Start exit animation
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(openingFadeAnim, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Small delay to allow animation to start, then unlock orientation and navigate
+    setTimeout(() => {
+      ScreenOrientation.unlockAsync().then(() => {
         disableImmersiveMode();
         navigation.goBack();
-    });
+      }).catch(() => {
+        // Fallback: navigate even if orientation unlock fails
+        disableImmersiveMode();
+        navigation.goBack();
+      });
+    }, 100);
   };
     
   useEffect(() => {
