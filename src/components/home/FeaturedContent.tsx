@@ -441,6 +441,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
                 <TouchableOpacity 
                   style={styles.myListButton as ViewStyle}
                   onPress={handleSaveToLibrary}
+                  activeOpacity={0.7}
                 >
                   <MaterialIcons 
                     name={isSaved ? "bookmark" : "bookmark-border"} 
@@ -462,6 +463,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
                       });
                     }
                   }}
+                  activeOpacity={0.8}
                 >
                   <MaterialIcons name="play-arrow" size={24} color={currentTheme.colors.black} />
                   <Text style={[styles.playButtonText as TextStyle, { color: currentTheme.colors.black }]}>
@@ -479,6 +481,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
                       });
                     }
                   }}
+                  activeOpacity={0.7}
                 >
                   <MaterialIcons name="info-outline" size={24} color={currentTheme.colors.white} />
                   <Text style={[styles.infoButtonText as TextStyle, { color: currentTheme.colors.white }]}>
@@ -648,6 +651,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.15)',
     zIndex: 1,
+    pointerEvents: 'none',
   },
 });
 
