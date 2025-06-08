@@ -9,6 +9,7 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import { storageService } from '../../services/storageService';
 import { logger } from '../../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MaterialIcons } from '@expo/vector-icons';
 
 import { 
   DEFAULT_SUBTITLE_SIZE, 
@@ -747,6 +748,14 @@ const VideoPlayer: React.FC = () => {
         ]}
         pointerEvents={isOpeningAnimationComplete ? 'none' : 'auto'}
       >
+        <TouchableOpacity 
+          style={styles.loadingCloseButton}
+          onPress={handleClose}
+          activeOpacity={0.7}
+        >
+          <MaterialIcons name="close" size={24} color="#ffffff" />
+        </TouchableOpacity>
+        
         <View style={styles.openingContent}>
           <ActivityIndicator size="large" color="#E50914" />
           <Text style={styles.openingText}>Loading video...</Text>

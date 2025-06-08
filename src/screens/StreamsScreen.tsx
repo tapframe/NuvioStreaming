@@ -856,11 +856,8 @@ export const StreamsScreen = () => {
 
   const renderItem = useCallback(({ item, index, section }: { item: Stream; index: number; section: any }) => {
     const stream = item;
-    const isLoading = loadingProviders[section.addonId];
-    
-    // Special handling for HDRezka streams
-    const quality = stream.title?.match(/(\d+)p/)?.[1] || null;
-    const isHDRezka = section.addonId === 'hdrezka';
+    // Don't show loading for individual streams that are already available and displayed
+    const isLoading = false; // If streams are being rendered, they're available and shouldn't be loading
     
     return (
       <StreamCard 
@@ -869,20 +866,35 @@ export const StreamsScreen = () => {
         onPress={() => handleStreamPress(stream)} 
         index={index}
         isLoading={isLoading}
-        statusMessage={providerStatus[section.addonId]?.message}
+        statusMessage={undefined}
         theme={currentTheme}
       />
     );
-  }, [handleStreamPress, loadingProviders, providerStatus, currentTheme]);
+  }, [handleStreamPress, currentTheme]);
 
-  const renderSectionHeader = useCallback(({ section }: { section: { title: string; addonId: string } }) => (
-    <Animated.View
-      entering={FadeIn.duration(400)}
-      layout={Layout.springify()}
-    >
-      <Text style={styles.streamGroupTitle}>{section.title}</Text>
-    </Animated.View>
-  ), [styles.streamGroupTitle]);
+  const renderSectionHeader = useCallback(({ section }: { section: { title: string; addonId: string } }) => {
+    const isProviderLoading = loadingProviders[section.addonId];
+    
+    return (
+      <Animated.View
+        entering={FadeIn.duration(400)}
+        layout={Layout.springify()}
+        style={styles.sectionHeaderContainer}
+      >
+        <View style={styles.sectionHeaderContent}>
+          <Text style={styles.streamGroupTitle}>{section.title}</Text>
+          {isProviderLoading && (
+            <View style={styles.sectionLoadingIndicator}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={[styles.sectionLoadingText, { color: colors.primary }]}>
+                Loading...
+              </Text>
+            </View>
+          )}
+        </View>
+      </Animated.View>
+    );
+  }, [styles.streamGroupTitle, styles.sectionHeaderContainer, styles.sectionHeaderContent, styles.sectionLoadingIndicator, styles.sectionLoadingText, loadingProviders, colors.primary]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -1088,7 +1100,8 @@ export const StreamsScreen = () => {
           )}
         </Animated.View>
 
-        {isLoading || (Object.keys(streams).length === 0 && (loadingStreams || loadingEpisodeStreams)) ? (
+        {/* Show streams immediately as they become available, with loading indicators for pending providers */}
+        {Object.keys(streams).length === 0 && (loadingStreams || loadingEpisodeStreams) ? (
           <Animated.View 
             entering={FadeIn.duration(300)}
             style={styles.loadingContainer}
@@ -1096,7 +1109,7 @@ export const StreamsScreen = () => {
             <ActivityIndicator size="large" color={colors.primary} />
             <Text style={styles.loadingText}>Finding available streams...</Text>
           </Animated.View>
-        ) : Object.keys(streams).length === 0 ? (
+        ) : Object.keys(streams).length === 0 && !loadingStreams && !loadingEpisodeStreams ? (
           <Animated.View 
             entering={FadeIn.duration(300)}
             style={styles.noStreams}
@@ -1122,7 +1135,7 @@ export const StreamsScreen = () => {
               bounces={true}
               overScrollMode="never"
               ListFooterComponent={
-                isLoading ? (
+                (loadingStreams || loadingEpisodeStreams) ? (
                   <View style={styles.footerLoading}>
                     <ActivityIndicator size="small" color={colors.primary} />
                     <Text style={styles.footerLoadingText}>Loading more sources...</Text>
@@ -1539,6 +1552,21 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 9999,
+  },
+  sectionHeaderContainer: {
+    padding: 16,
+  },
+  sectionHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  sectionLoadingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sectionLoadingText: {
+    marginLeft: 8,
   },
 });
 

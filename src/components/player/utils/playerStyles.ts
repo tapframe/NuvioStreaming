@@ -752,4 +752,16 @@ export const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
+  loadingCloseButton: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    width: 44,
+    height: 44,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  },
 }); 
