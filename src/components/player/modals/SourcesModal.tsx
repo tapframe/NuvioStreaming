@@ -638,4 +638,4 @@ const SourcesModal: React.FC<SourcesModalProps> = ({
   );
 };
 
-export default SourcesModal; 
+export default SourcesModal;
