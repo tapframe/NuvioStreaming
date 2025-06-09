@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,6 @@ import Animated, {
   Extrapolate,
   useSharedValue,
   withTiming,
-  withSpring,
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
 import { logger } from '../../utils/logger';
@@ -23,29 +22,19 @@ import { TMDBService } from '../../services/tmdbService';
 
 const { width, height } = Dimensions.get('window');
 
-// Types
+// Types - optimized
 interface HeroSectionProps {
   metadata: any;
   bannerImage: string | null;
   loadingBanner: boolean;
   logoLoadError: boolean;
   scrollY: Animated.SharedValue<number>;
-  dampedScrollY: Animated.SharedValue<number>;
   heroHeight: Animated.SharedValue<number>;
   heroOpacity: Animated.SharedValue<number>;
-  heroScale: Animated.SharedValue<number>;
-  heroRotate: Animated.SharedValue<number>;
   logoOpacity: Animated.SharedValue<number>;
-  logoScale: Animated.SharedValue<number>;
-  logoRotate: Animated.SharedValue<number>;
-  genresOpacity: Animated.SharedValue<number>;
-  genresTranslateY: Animated.SharedValue<number>;
-  genresScale: Animated.SharedValue<number>;
   buttonsOpacity: Animated.SharedValue<number>;
   buttonsTranslateY: Animated.SharedValue<number>;
-  buttonsScale: Animated.SharedValue<number>;
   watchProgressOpacity: Animated.SharedValue<number>;
-  watchProgressScaleY: Animated.SharedValue<number>;
   watchProgressWidth: Animated.SharedValue<number>;
   watchProgress: {
     currentTime: number;
@@ -65,7 +54,7 @@ interface HeroSectionProps {
   setLogoLoadError: (error: boolean) => void;
 }
 
-// Memoized ActionButtons Component
+// Ultra-optimized ActionButtons Component with minimal re-renders
 const ActionButtons = React.memo(({ 
   handleShowStreams, 
   toggleLibrary, 
@@ -86,25 +75,59 @@ const ActionButtons = React.memo(({
   animatedStyle: any;
 }) => {
   const { currentTheme } = useTheme();
+  
+  // Memoized navigation handler for better performance
+  const handleRatingsPress = useMemo(() => async () => {
+    let finalTmdbId: number | null = null;
+    
+    if (id?.startsWith('tmdb:')) {
+      const numericPart = id.split(':')[1];
+      const parsedId = parseInt(numericPart, 10);
+      if (!isNaN(parsedId)) {
+        finalTmdbId = parsedId;
+      }
+    } else if (id?.startsWith('tt')) {
+      try {
+        const tmdbService = TMDBService.getInstance();
+        const convertedId = await tmdbService.findTMDBIdByIMDB(id);
+        if (convertedId) {
+          finalTmdbId = convertedId;
+          logger.log(`[HeroSection] Converted IMDb ID ${id} to TMDB ID: ${finalTmdbId}`);
+        }
+      } catch (error) {
+        logger.error(`[HeroSection] Error converting IMDb ID ${id}:`, error);
+      }
+    } else if (id) {
+      const parsedId = parseInt(id, 10);
+      if (!isNaN(parsedId)) {
+        finalTmdbId = parsedId;
+      }
+    }
+    
+    if (finalTmdbId !== null) {
+      navigation.navigate('ShowRatings', { showId: finalTmdbId });
+    }
+  }, [id, navigation]);
+
   return (
     <Animated.View style={[styles.actionButtons, animatedStyle]}>
       <TouchableOpacity
         style={[styles.actionButton, styles.playButton]}
         onPress={handleShowStreams}
+        activeOpacity={0.8}
       >
         <MaterialIcons 
           name={playButtonText === 'Resume' ? "play-circle-outline" : "play-arrow"} 
           size={24} 
           color="#000" 
         />
-        <Text style={styles.playButtonText}>
-          {playButtonText}
-        </Text>
+        <Text style={styles.playButtonText}>{playButtonText}</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
         style={[styles.actionButton, styles.infoButton]}
         onPress={toggleLibrary}
+        activeOpacity={0.8}
       >
         <MaterialIcons
           name={inLibrary ? 'bookmark' : 'bookmark-border'}
@@ -118,51 +141,9 @@ const ActionButtons = React.memo(({
 
       {type === 'series' && (
         <TouchableOpacity
-          style={[styles.iconButton]}
-          onPress={async () => {
-            let finalTmdbId: number | null = null;
-            
-            if (id && id.startsWith('tmdb:')) {
-              const numericPart = id.split(':')[1];
-              const parsedId = parseInt(numericPart, 10);
-              if (!isNaN(parsedId)) {
-                finalTmdbId = parsedId;
-              } else {
-                logger.error(`[HeroSection] Failed to parse TMDB ID from: ${id}`);
-              }
-            } else if (id && id.startsWith('tt')) {
-              // It's an IMDb ID, convert it
-              logger.log(`[HeroSection] Detected IMDb ID: ${id}, attempting conversion to TMDB ID.`);
-              try {
-                const tmdbService = TMDBService.getInstance();
-                const convertedId = await tmdbService.findTMDBIdByIMDB(id);
-                if (convertedId) {
-                  finalTmdbId = convertedId;
-                  logger.log(`[HeroSection] Successfully converted IMDb ID ${id} to TMDB ID: ${finalTmdbId}`);
-                } else {
-                  logger.error(`[HeroSection] Could not convert IMDb ID ${id} to TMDB ID.`);
-                }
-              } catch (error) {
-                logger.error(`[HeroSection] Error converting IMDb ID ${id}:`, error);
-              }
-            } else if (id) {
-              // Assume it might be a raw TMDB ID (numeric string)
-              const parsedId = parseInt(id, 10);
-              if (!isNaN(parsedId)) {
-                finalTmdbId = parsedId;
-              } else {
-                logger.error(`[HeroSection] Unrecognized ID format or invalid numeric ID: ${id}`);
-              }
-            }
-            
-            // Navigate if we have a valid TMDB ID
-            if (finalTmdbId !== null) {
-              navigation.navigate('ShowRatings', { showId: finalTmdbId });
-            } else {
-              logger.error(`[HeroSection] Could not navigate to ShowRatings, failed to obtain a valid TMDB ID from original id: ${id}`);
-              // Optionally show an error message to the user here
-            }
-          }}
+          style={styles.iconButton}
+          onPress={handleRatingsPress}
+          activeOpacity={0.8}
         >
           <MaterialIcons 
             name="assessment" 
@@ -175,52 +156,60 @@ const ActionButtons = React.memo(({
   );
 });
 
-// Memoized WatchProgress Component with enhanced animations
+// Ultra-optimized WatchProgress Component
 const WatchProgressDisplay = React.memo(({ 
   watchProgress, 
   type, 
   getEpisodeDetails, 
   animatedStyle,
-  progressBarStyle
 }: {
   watchProgress: { currentTime: number; duration: number; lastUpdated: number; episodeId?: string } | null;
   type: 'movie' | 'series';
   getEpisodeDetails: (episodeId: string) => { seasonNumber: string; episodeNumber: string; episodeName: string } | null;
   animatedStyle: any;
-  progressBarStyle: any;
 }) => {
   const { currentTheme } = useTheme();
-  if (!watchProgress || watchProgress.duration === 0) {
-    return null;
-  }
+  
+  // Memoized progress calculation
+  const progressData = useMemo(() => {
+    if (!watchProgress || watchProgress.duration === 0) return null;
 
-  const progressPercent = (watchProgress.currentTime / watchProgress.duration) * 100;
-  const formattedTime = new Date(watchProgress.lastUpdated).toLocaleDateString();
-  let episodeInfo = '';
+    const progressPercent = (watchProgress.currentTime / watchProgress.duration) * 100;
+    const formattedTime = new Date(watchProgress.lastUpdated).toLocaleDateString();
+    let episodeInfo = '';
 
-  if (type === 'series' && watchProgress.episodeId) {
-    const details = getEpisodeDetails(watchProgress.episodeId);
-    if (details) {
-      episodeInfo = ` • S${details.seasonNumber}:E${details.episodeNumber}${details.episodeName ? ` - ${details.episodeName}` : ''}`;
+    if (type === 'series' && watchProgress.episodeId) {
+      const details = getEpisodeDetails(watchProgress.episodeId);
+      if (details) {
+        episodeInfo = ` • S${details.seasonNumber}:E${details.episodeNumber}${details.episodeName ? ` - ${details.episodeName}` : ''}`;
+      }
     }
-  }
+
+    return {
+      progressPercent,
+      formattedTime,
+      episodeInfo,
+      displayText: progressPercent >= 95 ? 'Watched' : `${Math.round(progressPercent)}% watched`
+    };
+  }, [watchProgress, type, getEpisodeDetails]);
+
+  if (!progressData) return null;
 
   return (
     <Animated.View style={[styles.watchProgressContainer, animatedStyle]}>
       <View style={styles.watchProgressBar}>
-        <Animated.View 
+        <View 
           style={[
-            styles.watchProgressFill, 
-            progressBarStyle,
+            styles.watchProgressFill,
             { 
-              width: `${progressPercent}%`,
+              width: `${progressData.progressPercent}%`,
               backgroundColor: currentTheme.colors.primary 
             }
           ]} 
         />
       </View>
       <Text style={[styles.watchProgressText, { color: currentTheme.colors.textMuted }]}>
-        {progressPercent >= 95 ? 'Watched' : `${Math.round(progressPercent)}% watched`}{episodeInfo} • Last watched on {formattedTime}
+        {progressData.displayText}{progressData.episodeInfo} • Last watched on {progressData.formattedTime}
       </Text>
     </Animated.View>
   );
@@ -232,23 +221,12 @@ const HeroSection: React.FC<HeroSectionProps> = ({
   loadingBanner,
   logoLoadError,
   scrollY,
-  dampedScrollY,
   heroHeight,
   heroOpacity,
-  heroScale,
-  heroRotate,
   logoOpacity,
-  logoScale,
-  logoRotate,
-  genresOpacity,
-  genresTranslateY,
-  genresScale,
   buttonsOpacity,
   buttonsTranslateY,
-  buttonsScale,
   watchProgressOpacity,
-  watchProgressScaleY,
-  watchProgressWidth,
   watchProgress,
   type,
   getEpisodeDetails,
@@ -263,218 +241,80 @@ const HeroSection: React.FC<HeroSectionProps> = ({
 }) => {
   const { currentTheme } = useTheme();
   
-  // State for backdrop image loading
-  const [imageLoaded, setImageLoaded] = useState(false);
+  // Optimized state management
   const [imageError, setImageError] = useState(false);
+  const imageOpacity = useSharedValue(1);
   
-  // Animation values for smooth backdrop transitions
-  const backdropOpacity = useSharedValue(1); // Start visible
-  const backdropScale = useSharedValue(1); // Start at normal scale
+  // Memoized image source for better performance
+  const imageSource = useMemo(() => 
+    bannerImage || metadata.banner || metadata.poster
+  , [bannerImage, metadata.banner, metadata.poster]);
   
-  // Handle image load success
-  const handleImageLoad = () => {
-    setImageLoaded(true);
-    setImageError(false);
-    // Enhance the image with subtle animation
-    backdropOpacity.value = withTiming(1, { duration: 300 });
-    backdropScale.value = withSpring(1, { 
-      damping: 25, 
-      stiffness: 120,
-      mass: 1 
-    });
-  };
-  
-  // Handle image load error
+  // Optimized image handlers
   const handleImageError = () => {
-    logger.warn(`[HeroSection] Banner failed to load: ${bannerImage}`);
+    logger.warn(`[HeroSection] Banner failed to load: ${imageSource}`);
     setImageError(true);
-    backdropOpacity.value = withTiming(0.7, { duration: 200 }); // Dim on error
+    imageOpacity.value = withTiming(0.7, { duration: 150 });
     if (bannerImage !== metadata.banner) {
       setBannerImage(metadata.banner || metadata.poster);
     }
   };
 
-  // Reset animations when banner image changes
-  useEffect(() => {
-    if (bannerImage && !loadingBanner) {
-      setImageLoaded(false);
-      setImageError(false);
-      backdropOpacity.value = 0.8; // Start slightly dimmed
-      backdropScale.value = 0.98; // Start slightly smaller
-    }
-  }, [bannerImage, loadingBanner]);
+  const handleImageLoad = () => {
+    setImageError(false);
+    imageOpacity.value = withTiming(1, { duration: 200 });
+  };
 
-  // Enhanced animated styles with sophisticated micro-animations
+  // Ultra-optimized animated styles with minimal calculations
   const heroAnimatedStyle = useAnimatedStyle(() => ({
-    width: '100%',
     height: heroHeight.value,
-    backgroundColor: currentTheme.colors.black,
-    transform: [
-      { scale: heroScale.value },
-      { 
-        rotateZ: `${interpolate(
-          heroRotate.value,
-          [0, 1],
-          [0, 0.2],
-          Extrapolate.CLAMP
-        )}deg` 
-      }
-    ],
     opacity: heroOpacity.value,
-  }));
+  }), []);
 
   const logoAnimatedStyle = useAnimatedStyle(() => ({
     opacity: logoOpacity.value,
-    transform: [
-      { 
-        scale: interpolate(
-          logoScale.value,
-          [0, 1],
-          [0.95, 1],
-          Extrapolate.CLAMP
-        )
-      },
-      { 
-        rotateZ: `${interpolate(
-          logoRotate.value,
-          [0, 1],
-          [0, 0.5],
-          Extrapolate.CLAMP
-        )}deg` 
-      }
-    ]
-  }));
+  }), []);
 
   const watchProgressAnimatedStyle = useAnimatedStyle(() => ({
     opacity: watchProgressOpacity.value,
+  }), []);
+
+  // Simplified backdrop animation - fewer calculations
+  const backdropImageStyle = useAnimatedStyle(() => ({
+    opacity: imageOpacity.value,
     transform: [
       { 
         translateY: interpolate(
-          watchProgressScaleY.value,
-          [0, 1],
-          [-12, 0],
+          scrollY.value,
+          [0, 200],
+          [0, -60],
           Extrapolate.CLAMP
         )
       },
-      { scaleY: watchProgressScaleY.value },
-      { scaleX: interpolate(watchProgressScaleY.value, [0, 1], [0.9, 1]) }
-    ]
-  }));
-
-  const watchProgressBarStyle = useAnimatedStyle(() => ({
-    transform: [
-      { scaleX: interpolate(watchProgressWidth.value, [0, 1], [0.8, 1]) }
-    ]
-  }));
-
-  const genresAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: genresOpacity.value,
-    transform: [
-      { translateY: genresTranslateY.value },
-      { scale: genresScale.value }
-    ]
-  }));
+      { 
+        scale: interpolate(
+          scrollY.value,
+          [0, 200],
+          [1.05, 1.02],
+          Extrapolate.CLAMP
+        )
+      },
+    ],
+  }), []);
 
   const buttonsAnimatedStyle = useAnimatedStyle(() => ({
     opacity: buttonsOpacity.value,
-    transform: [
-      { 
-        translateY: interpolate(
-          buttonsTranslateY.value,
-          [0, 20],
-          [0, 8],
-          Extrapolate.CLAMP
-        )
-      },
-      { 
-        scale: interpolate(
-          buttonsScale.value,
-          [0, 1],
-          [0.98, 1],
-          Extrapolate.CLAMP
-        )
-      }
-    ]
-  }));
+    transform: [{ translateY: buttonsTranslateY.value }]
+  }), []);
 
-  const parallaxImageStyle = useAnimatedStyle(() => ({
-    width: '120%',
-    height: '110%',
-    top: '-10%',
-    left: '-10%',
-    transform: [
-      { 
-        translateY: interpolate(
-          dampedScrollY.value,
-          [0, 100, 300],
-          [0, -35, -90],
-          Extrapolate.CLAMP
-        )
-      },
-      { 
-        scale: interpolate(
-          dampedScrollY.value,
-          [0, 150, 300],
-          [1.08, 1.05, 1.02],
-          Extrapolate.CLAMP
-        ) * backdropScale.value
-      },
-      {
-        rotateZ: interpolate(
-          dampedScrollY.value,
-          [0, 300],
-          [0, -0.1],
-          Extrapolate.CLAMP
-        ) + 'deg'
-      }
-    ],
-  }));
-
-  // Backdrop image animated style for smooth transitions
-  const backdropImageStyle = useAnimatedStyle(() => ({
-    opacity: backdropOpacity.value,
-    transform: [
-      { 
-        translateY: interpolate(
-          dampedScrollY.value,
-          [0, 100, 300],
-          [0, -35, -90],
-          Extrapolate.CLAMP
-        )
-      },
-      { 
-        scale: interpolate(
-          dampedScrollY.value,
-          [0, 150, 300],
-          [1.08, 1.05, 1.02],
-          Extrapolate.CLAMP
-        ) * backdropScale.value
-      },
-      {
-        rotateZ: interpolate(
-          dampedScrollY.value,
-          [0, 300],
-          [0, -0.1],
-          Extrapolate.CLAMP
-        ) + 'deg'
-      }
-    ],
-  }));
-
-  // Loading skeleton animated style
-  const skeletonStyle = useAnimatedStyle(() => ({
-    opacity: loadingBanner ? 0.2 : 0,
-  }));
-
-  // Render genres
-  const renderGenres = () => {
+  // Memoized genre rendering for performance
+  const genreElements = useMemo(() => {
     if (!metadata?.genres || !Array.isArray(metadata.genres) || metadata.genres.length === 0) {
       return null;
     }
 
-    const genresToDisplay: string[] = metadata.genres as string[];
-
-    return genresToDisplay.slice(0, 4).map((genreName, index, array) => (
+    const genresToDisplay: string[] = metadata.genres.slice(0, 4);
+    return genresToDisplay.map((genreName: string, index: number, array: string[]) => (
       <React.Fragment key={index}>
         <Text style={[styles.genreText, { color: currentTheme.colors.text }]}>
           {genreName}
@@ -486,100 +326,98 @@ const HeroSection: React.FC<HeroSectionProps> = ({
         )}
       </React.Fragment>
     ));
-  };
+  }, [metadata.genres, currentTheme.colors.text]);
+
+  // Memoized play button text
+  const playButtonText = useMemo(() => getPlayButtonText(), [getPlayButtonText]);
 
   return (
-    <Animated.View style={heroAnimatedStyle}>
-      <View style={styles.heroSection}>
-        {/* Fallback dark background */}
-        <View style={[styles.absoluteFill, { backgroundColor: currentTheme.colors.black }]} />
-        
-        {/* Loading state with skeleton */}
-        {loadingBanner && (
-          <Animated.View style={[styles.absoluteFill, styles.skeletonGradient, skeletonStyle]} />
-        )}
-        
-        {/* Background image with smooth loading */}
-        {!loadingBanner && (bannerImage || metadata.banner || metadata.poster) && (
-          <Animated.Image 
-            source={{ uri: bannerImage || metadata.banner || metadata.poster }}
-            style={[styles.absoluteFill, backdropImageStyle]}
-            resizeMode="cover"
-            onError={handleImageError}
-            onLoad={handleImageLoad}
-          />
-        )}
-        <LinearGradient
-          colors={[
-            `${currentTheme.colors.darkBackground}00`,
-            `${currentTheme.colors.darkBackground}20`,
-            `${currentTheme.colors.darkBackground}50`,
-            `${currentTheme.colors.darkBackground}C0`,
-            `${currentTheme.colors.darkBackground}F8`,
-            currentTheme.colors.darkBackground
-          ]}
-          locations={[0, 0.4, 0.65, 0.8, 0.9, 1]}
-          style={styles.heroGradient}
-        >
-          <View style={styles.heroContent}>
-            {/* Title/Logo */}
-            <View style={styles.logoContainer}>
-              <Animated.View style={[styles.titleLogoContainer, logoAnimatedStyle]}>
-                {metadata.logo && !logoLoadError ? (
-                  <Image
-                    source={{ uri: metadata.logo }}
-                    style={styles.titleLogo}
-                    contentFit="contain"
-                    transition={300}
-                    onError={() => {
-                      logger.warn(`[HeroSection] Logo failed to load: ${metadata.logo}`);
-                      setLogoLoadError(true);
-                    }}
-                  />
-                ) : (
-                  <Text style={[styles.heroTitle, { color: currentTheme.colors.highEmphasis }]}>{metadata.name}</Text>
-                )}
-              </Animated.View>
-            </View>
+    <Animated.View style={[styles.heroSection, heroAnimatedStyle]}>
+      {/* Background Layer */}
+      <View style={[styles.absoluteFill, { backgroundColor: currentTheme.colors.black }]} />
+      
+      {/* Background Image - Optimized */}
+      {!loadingBanner && imageSource && (
+        <Animated.Image 
+          source={{ uri: imageSource }}
+          style={[styles.absoluteFill, backdropImageStyle]}
+          resizeMode="cover"
+          onError={handleImageError}
+          onLoad={handleImageLoad}
+        />
+      )}
 
-            {/* Watch Progress */}
-            <WatchProgressDisplay 
-              watchProgress={watchProgress}
-              type={type}
-              getEpisodeDetails={getEpisodeDetails}
-              animatedStyle={watchProgressAnimatedStyle}
-              progressBarStyle={watchProgressBarStyle}
-            />
-
-            {/* Genre Tags */}
-            <Animated.View style={genresAnimatedStyle}>
-              <View style={styles.genreContainer}>
-                {renderGenres()}
-              </View>
+      {/* Gradient Overlay */}
+      <LinearGradient
+        colors={[
+          `${currentTheme.colors.darkBackground}00`,
+          `${currentTheme.colors.darkBackground}30`,
+          `${currentTheme.colors.darkBackground}70`,
+          `${currentTheme.colors.darkBackground}E0`,
+          currentTheme.colors.darkBackground
+        ]}
+        locations={[0, 0.5, 0.7, 0.85, 1]}
+        style={styles.heroGradient}
+      >
+        <View style={styles.heroContent}>
+          {/* Title/Logo */}
+          <View style={styles.logoContainer}>
+            <Animated.View style={[styles.titleLogoContainer, logoAnimatedStyle]}>
+              {metadata.logo && !logoLoadError ? (
+                <Image
+                  source={{ uri: metadata.logo }}
+                  style={styles.titleLogo}
+                  contentFit="contain"
+                  transition={200}
+                  onError={() => {
+                    logger.warn(`[HeroSection] Logo failed to load: ${metadata.logo}`);
+                    setLogoLoadError(true);
+                  }}
+                />
+              ) : (
+                <Text style={[styles.heroTitle, { color: currentTheme.colors.highEmphasis }]}>
+                  {metadata.name}
+                </Text>
+              )}
             </Animated.View>
-
-            {/* Action Buttons */}
-            <ActionButtons 
-              handleShowStreams={handleShowStreams}
-              toggleLibrary={handleToggleLibrary}
-              inLibrary={inLibrary}
-              type={type}
-              id={id}
-              navigation={navigation}
-              playButtonText={getPlayButtonText()}
-              animatedStyle={buttonsAnimatedStyle}
-            />
           </View>
-        </LinearGradient>
-      </View>
+
+          {/* Watch Progress */}
+          <WatchProgressDisplay 
+            watchProgress={watchProgress}
+            type={type}
+            getEpisodeDetails={getEpisodeDetails}
+            animatedStyle={watchProgressAnimatedStyle}
+          />
+
+          {/* Genres */}
+          {genreElements && (
+            <View style={styles.genreContainer}>
+              {genreElements}
+            </View>
+          )}
+
+          {/* Action Buttons */}
+          <ActionButtons 
+            handleShowStreams={handleShowStreams}
+            toggleLibrary={handleToggleLibrary}
+            inLibrary={inLibrary}
+            type={type}
+            id={id}
+            navigation={navigation}
+            playButtonText={playButtonText}
+            animatedStyle={buttonsAnimatedStyle}
+          />
+        </View>
+      </LinearGradient>
     </Animated.View>
   );
 };
 
+// Optimized styles with minimal properties
 const styles = StyleSheet.create({
   heroSection: {
     width: '100%',
-    height: height * 0.5,
     backgroundColor: '#000',
     overflow: 'hidden',
   },
@@ -613,7 +451,6 @@ const styles = StyleSheet.create({
   titleLogo: {
     width: width * 0.8,
     height: 100,
-    marginBottom: 0,
     alignSelf: 'center',
   },
   heroTitle: {
@@ -624,6 +461,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
     letterSpacing: -0.5,
+    textAlign: 'center',
   },
   genreContainer: {
     flexDirection: 'row',
@@ -647,7 +485,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     alignItems: 'center',
-    marginBottom: -12,
     justifyContent: 'center',
     width: '100%',
   },
@@ -658,11 +495,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 28,
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
     flex: 1,
   },
   playButton: {
@@ -682,11 +514,6 @@ const styles = StyleSheet.create({
     borderColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
   },
   playButtonText: {
     color: '#000',
@@ -705,7 +532,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     width: '100%',
     alignItems: 'center',
-    overflow: 'hidden',
     height: 48,
   },
   watchProgressBar: {
@@ -725,14 +551,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.9,
     letterSpacing: 0.2
-  },
-  skeletonGradient: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
   },
 });
 
