@@ -1032,11 +1032,6 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                             height: 24,
                             borderRadius: 4,
                             marginRight: 16,
-                            elevation: 2,
-                            shadowColor: '#000',
-                            shadowOffset: { width: 0, height: 1 },
-                            shadowOpacity: 0.2,
-                            shadowRadius: 2,
                           }}
                           resizeMode="cover"
                         />
