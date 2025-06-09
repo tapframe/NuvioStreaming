@@ -64,7 +64,6 @@ const VideoPlayer: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [showControls, setShowControls] = useState(true);
-  const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
   const [selectedAudioTrack, setSelectedAudioTrack] = useState<number | null>(null);
   const [textTracks, setTextTracks] = useState<TextTrack[]>([]);
@@ -1004,7 +1003,6 @@ const VideoPlayer: React.FC = () => {
             streamName={currentStreamName}
             currentTime={currentTime}
             duration={duration}
-            playbackSpeed={playbackSpeed}
             zoomScale={zoomScale}
             vlcAudioTracks={vlcAudioTracks}
             selectedAudioTrack={selectedAudioTrack}

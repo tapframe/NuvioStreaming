@@ -19,7 +19,6 @@ interface PlayerControlsProps {
   streamName?: string;
   currentTime: number;
   duration: number;
-  playbackSpeed: number;
   zoomScale: number;
   vlcAudioTracks: Array<{id: number, name: string, language?: string}>;
   selectedAudioTrack: number | null;
@@ -55,7 +54,6 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   streamName,
   currentTime,
   duration,
-  playbackSpeed,
   zoomScale,
   vlcAudioTracks,
   selectedAudioTrack,
@@ -176,12 +174,6 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
           <View style={styles.bottomControls}>
             {/* Bottom Buttons Row */}
             <View style={styles.bottomButtons}>
-              {/* Speed Button */}
-              <TouchableOpacity style={styles.bottomButton}>
-                <Ionicons name="speedometer" size={20} color="white" />
-                <Text style={styles.bottomButtonText}>Speed ({playbackSpeed}x)</Text>
-              </TouchableOpacity>
-
               {/* Fill/Cover Button - Updated to show fill/cover modes */}
               <TouchableOpacity style={styles.bottomButton} onPress={cycleAspectRatio}>
                 <Ionicons name="resize" size={20} color="white" />
