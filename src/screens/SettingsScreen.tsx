@@ -462,17 +462,6 @@ const SettingsScreen: React.FC = () => {
                 icon="play-arrow"
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('PlayerSettings')}
-              />
-              <SettingItem
-                title="Auto-play First Stream"
-                description="Automatically play the first available stream without showing stream selection"
-                icon="auto-fix-high"
-                renderControl={() => (
-                  <CustomSwitch
-                    value={settings.autoPlayFirstStream}
-                    onValueChange={(value) => updateSetting('autoPlayFirstStream', value)}
-                  />
-                )}
                 isLast={true}
               />
             </SettingsCard>

@@ -22,12 +22,14 @@ interface PlayerControlsProps {
   zoomScale: number;
   vlcAudioTracks: Array<{id: number, name: string, language?: string}>;
   selectedAudioTrack: number | null;
+  availableStreams?: { [providerId: string]: { streams: any[]; addonName: string } };
   togglePlayback: () => void;
   skip: (seconds: number) => void;
   handleClose: () => void;
   cycleAspectRatio: () => void;
   setShowAudioModal: (show: boolean) => void;
   setShowSubtitleModal: (show: boolean) => void;
+  setShowSourcesModal?: (show: boolean) => void;
   progressBarRef: React.RefObject<View>;
   progressAnim: Animated.Value;
   handleProgressBarTouch: (event: any) => void;
@@ -55,12 +57,14 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   zoomScale,
   vlcAudioTracks,
   selectedAudioTrack,
+  availableStreams,
   togglePlayback,
   skip,
   handleClose,
   cycleAspectRatio,
   setShowAudioModal,
   setShowSubtitleModal,
+  setShowSourcesModal,
   progressBarRef,
   progressAnim,
   handleProgressBarTouch,
@@ -206,6 +210,19 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                   Subtitles
                 </Text>
               </TouchableOpacity>
+
+              {/* Change Source Button */}
+              {setShowSourcesModal && (
+                <TouchableOpacity
+                  style={styles.bottomButton}
+                  onPress={() => setShowSourcesModal(true)}
+                >
+                  <Ionicons name="swap-horizontal" size={20} color="white" />
+                  <Text style={styles.bottomButtonText}>
+                    Change Source
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </LinearGradient>

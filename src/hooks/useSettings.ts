@@ -35,7 +35,6 @@ export interface AppSettings {
   logoSourcePreference: 'metahub' | 'tmdb'; // Preferred source for title logos
   tmdbLanguagePreference: string; // Preferred language for TMDB logos (ISO 639-1 code)
   enableInternalProviders: boolean; // Toggle for internal providers like HDRezka
-  autoPlayFirstStream: boolean; // Auto-play first stream without showing streams selection
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -53,7 +52,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   logoSourcePreference: 'metahub', // Default to Metahub as first source
   tmdbLanguagePreference: 'en', // Default to English
   enableInternalProviders: true, // Enable internal providers by default
-  autoPlayFirstStream: false, // Default to false to maintain existing behavior
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';

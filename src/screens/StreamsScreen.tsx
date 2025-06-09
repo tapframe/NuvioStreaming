@@ -519,6 +519,9 @@ export const StreamsScreen = () => {
       // Small delay to ensure orientation is set before navigation
       await new Promise(resolve => setTimeout(resolve, 100));
       
+      // Prepare available streams for the change source feature
+      const streamsToPass = type === 'series' ? episodeStreams : groupedStreams;
+      
       navigation.navigate('Player', {
         uri: stream.url,
         title: metadata?.name || '',
@@ -532,10 +535,13 @@ export const StreamsScreen = () => {
         type,
         episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined,
         imdbId: imdbId || undefined,
+        availableStreams: streamsToPass,
       });
     } catch (error) {
       logger.error('[StreamsScreen] Error locking orientation before navigation:', error);
       // Fallback: navigate anyway
+      const streamsToPass = type === 'series' ? episodeStreams : groupedStreams;
+      
       navigation.navigate('Player', {
         uri: stream.url,
         title: metadata?.name || '',
@@ -549,9 +555,10 @@ export const StreamsScreen = () => {
         type,
         episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined,
         imdbId: imdbId || undefined,
+        availableStreams: streamsToPass,
       });
     }
-  }, [metadata, type, currentEpisode, navigation, id, selectedEpisode, imdbId]);
+  }, [metadata, type, currentEpisode, navigation, id, selectedEpisode, imdbId, episodeStreams, groupedStreams]);
 
   // Update handleStreamPress
   const handleStreamPress = useCallback(async (stream: Stream) => {

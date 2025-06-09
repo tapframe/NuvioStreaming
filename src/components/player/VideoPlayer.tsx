@@ -29,6 +29,7 @@ import AudioTrackModal from './modals/AudioTrackModal';
 import ResumeOverlay from './modals/ResumeOverlay';
 import PlayerControls from './controls/PlayerControls';
 import CustomSubtitles from './subtitles/CustomSubtitles';
+import SourcesModal from './modals/SourcesModal';
 
 const VideoPlayer: React.FC = () => {
   const navigation = useNavigation();
@@ -46,7 +47,8 @@ const VideoPlayer: React.FC = () => {
     id,
     type,
     episodeId,
-    imdbId
+    imdbId,
+    availableStreams: passedAvailableStreams
   } = route.params;
 
   safeDebugLog("Component mounted with props", {
@@ -112,7 +114,15 @@ const VideoPlayer: React.FC = () => {
   const [availableSubtitles, setAvailableSubtitles] = useState<WyzieSubtitle[]>([]);
   const [showSubtitleLanguageModal, setShowSubtitleLanguageModal] = useState<boolean>(false);
   const [isLoadingSubtitleList, setIsLoadingSubtitleList] = useState<boolean>(false);
-    const isMounted = useRef(true);
+  const [showSourcesModal, setShowSourcesModal] = useState<boolean>(false);
+  const [availableStreams, setAvailableStreams] = useState<{ [providerId: string]: { streams: any[]; addonName: string } }>(passedAvailableStreams || {});
+  const [currentStreamUrl, setCurrentStreamUrl] = useState<string>(uri);
+  const [isChangingSource, setIsChangingSource] = useState<boolean>(false);
+  const [pendingSeek, setPendingSeek] = useState<{ position: number; shouldPlay: boolean } | null>(null);
+  const [currentQuality, setCurrentQuality] = useState<string | undefined>(quality);
+  const [currentStreamProvider, setCurrentStreamProvider] = useState<string | undefined>(streamProvider);
+  const [currentStreamName, setCurrentStreamName] = useState<string | undefined>(undefined);
+  const isMounted = useRef(true);
 
   const calculateVideoStyles = (videoWidth: number, videoHeight: number, screenWidth: number, screenHeight: number) => {
     return {
@@ -728,6 +738,123 @@ const VideoPlayer: React.FC = () => {
     saveSubtitleSize(newSize);
   };
 
+  useEffect(() => {
+    if (pendingSeek && isPlayerReady && isVideoLoaded && duration > 0) {
+      logger.log(`[VideoPlayer] Player ready after source change, seeking to position: ${pendingSeek.position}s out of ${duration}s total`);
+      
+      if (pendingSeek.position > 0 && vlcRef.current) {
+        // Wait longer for the player to be fully ready and stable
+        setTimeout(() => {
+          if (vlcRef.current && duration > 0 && pendingSeek) {
+            logger.log(`[VideoPlayer] Executing seek to ${pendingSeek.position}s`);
+            
+            // Use our existing seekToTime function which handles VLC methods properly
+            seekToTime(pendingSeek.position);
+            
+            // Also update the current time state to reflect the seek
+            setCurrentTime(pendingSeek.position);
+            
+            // Resume playback if it was playing before the source change
+            if (pendingSeek.shouldPlay) {
+              setTimeout(() => {
+                logger.log('[VideoPlayer] Resuming playback after seek');
+                setPaused(false);
+                if (vlcRef.current && typeof vlcRef.current.play === 'function') {
+                  vlcRef.current.play();
+                }
+              }, 700); // Wait longer for seek to complete properly
+            }
+            
+            // Clean up after a reasonable delay
+            setTimeout(() => {
+              setPendingSeek(null);
+              setIsChangingSource(false);
+            }, 800);
+          }
+        }, 1500); // Increased delay to ensure player is fully stable
+      } else {
+        // No seeking needed, just resume playback if it was playing
+        if (pendingSeek.shouldPlay) {
+          setTimeout(() => {
+            logger.log('[VideoPlayer] No seek needed, just resuming playback');
+            setPaused(false);
+            if (vlcRef.current && typeof vlcRef.current.play === 'function') {
+              vlcRef.current.play();
+            }
+          }, 500);
+        }
+        
+        setTimeout(() => {
+          setPendingSeek(null);
+          setIsChangingSource(false);
+        }, 600);
+      }
+    }
+  }, [pendingSeek, isPlayerReady, isVideoLoaded, duration]);
+
+  const handleSelectStream = async (newStream: any) => {
+    if (newStream.url === currentStreamUrl) {
+      setShowSourcesModal(false);
+      return;
+    }
+
+    setIsChangingSource(true);
+    setShowSourcesModal(false);
+    
+    try {
+      // Save current state
+      const savedPosition = currentTime;
+      const wasPlaying = !paused;
+      
+      logger.log(`[VideoPlayer] Changing source from ${currentStreamUrl} to ${newStream.url}`);
+      logger.log(`[VideoPlayer] Saved position: ${savedPosition}, was playing: ${wasPlaying}`);
+      
+      // Extract quality and provider information from the new stream
+      let newQuality = newStream.quality;
+      if (!newQuality && newStream.title) {
+        // Try to extract quality from title (e.g., "1080p", "720p")
+        const qualityMatch = newStream.title.match(/(\d+)p/);
+        newQuality = qualityMatch ? qualityMatch[0] : undefined; // Use [0] to get full match like "1080p"
+      }
+      
+      // For provider, try multiple fields
+      const newProvider = newStream.addonName || newStream.name || newStream.addon || 'Unknown';
+      
+      // For stream name, prioritize the stream name over title
+      const newStreamName = newStream.name || newStream.title || 'Unknown Stream';
+      
+      logger.log(`[VideoPlayer] Stream object:`, newStream);
+      logger.log(`[VideoPlayer] Extracted - Quality: ${newQuality}, Provider: ${newProvider}, Stream Name: ${newStreamName}`);
+      logger.log(`[VideoPlayer] Available fields - quality: ${newStream.quality}, title: ${newStream.title}, addonName: ${newStream.addonName}, name: ${newStream.name}, addon: ${newStream.addon}`);
+      
+      // Stop current playback
+      if (vlcRef.current) {
+        vlcRef.current.pause && vlcRef.current.pause();
+      }
+      setPaused(true);
+      
+      // Set pending seek state
+      setPendingSeek({ position: savedPosition, shouldPlay: wasPlaying });
+      
+      // Update the stream URL and details immediately
+      setCurrentStreamUrl(newStream.url);
+      setCurrentQuality(newQuality);
+      setCurrentStreamProvider(newProvider);
+      setCurrentStreamName(newStreamName);
+      
+      // Reset player state for new source
+      setCurrentTime(0);
+      setDuration(0);
+      setIsPlayerReady(false);
+      setIsVideoLoaded(false);
+      
+    } catch (error) {
+      logger.error('[VideoPlayer] Error changing source:', error);
+      setPendingSeek(null);
+      setIsChangingSource(false);
+    }
+  };
+
   return (
     <View style={[styles.container, {
       width: screenDimensions.width,
@@ -761,6 +888,27 @@ const VideoPlayer: React.FC = () => {
           <Text style={styles.openingText}>Loading video...</Text>
         </View>
       </Animated.View>
+
+      {/* Source Change Loading Overlay */}
+      {isChangingSource && (
+        <Animated.View 
+          style={[
+            styles.sourceChangeOverlay,
+            {
+              width: screenDimensions.width,
+              height: screenDimensions.height,
+              opacity: fadeAnim,
+            }
+          ]}
+          pointerEvents="auto"
+        >
+          <View style={styles.sourceChangeContent}>
+            <ActivityIndicator size="large" color="#E50914" />
+            <Text style={styles.sourceChangeText}>Changing source...</Text>
+            <Text style={styles.sourceChangeSubtext}>Please wait while we load the new stream</Text>
+          </View>
+        </Animated.View>
+      )}
 
       <Animated.View 
         style={[
@@ -814,7 +962,7 @@ const VideoPlayer: React.FC = () => {
                     ],
                   }}
                   source={{
-                    uri: uri,
+                    uri: currentStreamUrl,
                     initOptions: [
                       '--rtsp-tcp',
                       '--network-caching=150',
@@ -849,21 +997,23 @@ const VideoPlayer: React.FC = () => {
             episodeTitle={episodeTitle}
             season={season}
             episode={episode}
-            quality={quality}
+            quality={currentQuality || quality}
             year={year}
-            streamProvider={streamProvider}
+            streamProvider={currentStreamProvider || streamProvider}
             currentTime={currentTime}
             duration={duration}
             playbackSpeed={playbackSpeed}
             zoomScale={zoomScale}
             vlcAudioTracks={vlcAudioTracks}
             selectedAudioTrack={selectedAudioTrack}
+            availableStreams={availableStreams}
             togglePlayback={togglePlayback}
             skip={skip}
             handleClose={handleClose}
             cycleAspectRatio={cycleAspectRatio}
             setShowAudioModal={setShowAudioModal}
             setShowSubtitleModal={setShowSubtitleModal}
+            setShowSourcesModal={setShowSourcesModal}
             progressBarRef={progressBarRef}
             progressAnim={progressAnim}
             handleProgressBarTouch={handleProgressBarTouch}
@@ -922,6 +1072,15 @@ const VideoPlayer: React.FC = () => {
         selectTextTrack={selectTextTrack}
         increaseSubtitleSize={increaseSubtitleSize}
         decreaseSubtitleSize={decreaseSubtitleSize}
+      />
+      
+      <SourcesModal
+        showSourcesModal={showSourcesModal}
+        setShowSourcesModal={setShowSourcesModal}
+        availableStreams={availableStreams}
+        currentStreamUrl={currentStreamUrl}
+        onSelectStream={handleSelectStream}
+        isChangingSource={isChangingSource}
       />
     </View> 
   );
