@@ -74,6 +74,7 @@ export type RootStackParamList = {
     quality?: string; 
     year?: number; 
     streamProvider?: string;
+    streamName?: string;
     id?: string;
     type?: string;
     episodeId?: string;

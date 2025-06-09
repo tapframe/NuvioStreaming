@@ -44,6 +44,7 @@ const VideoPlayer: React.FC = () => {
     quality,
     year,
     streamProvider,
+    streamName,
     id,
     type,
     episodeId,
@@ -121,7 +122,7 @@ const VideoPlayer: React.FC = () => {
   const [pendingSeek, setPendingSeek] = useState<{ position: number; shouldPlay: boolean } | null>(null);
   const [currentQuality, setCurrentQuality] = useState<string | undefined>(quality);
   const [currentStreamProvider, setCurrentStreamProvider] = useState<string | undefined>(streamProvider);
-  const [currentStreamName, setCurrentStreamName] = useState<string | undefined>(undefined);
+  const [currentStreamName, setCurrentStreamName] = useState<string | undefined>(streamName);
   const isMounted = useRef(true);
 
   const calculateVideoStyles = (videoWidth: number, videoHeight: number, screenWidth: number, screenHeight: number) => {
@@ -1000,6 +1001,7 @@ const VideoPlayer: React.FC = () => {
             quality={currentQuality || quality}
             year={year}
             streamProvider={currentStreamProvider || streamProvider}
+            streamName={currentStreamName}
             currentTime={currentTime}
             duration={duration}
             playbackSpeed={playbackSpeed}

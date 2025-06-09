@@ -522,6 +522,10 @@ export const StreamsScreen = () => {
       // Prepare available streams for the change source feature
       const streamsToPass = type === 'series' ? episodeStreams : groupedStreams;
       
+      // Determine the stream name using the same logic as StreamCard
+      const isHDRezka = stream.name === 'HDRezka';
+      const streamName = isHDRezka ? `HDRezka ${stream.title}` : (stream.name || stream.title || 'Unnamed Stream');
+      
       navigation.navigate('Player', {
         uri: stream.url,
         title: metadata?.name || '',
@@ -531,6 +535,7 @@ export const StreamsScreen = () => {
         quality: stream.title?.match(/(\d+)p/)?.[1] || undefined,
         year: metadata?.year,
         streamProvider: stream.name,
+        streamName: streamName,
         id,
         type,
         episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined,

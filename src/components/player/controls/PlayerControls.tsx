@@ -16,6 +16,7 @@ interface PlayerControlsProps {
   quality?: string;
   year?: number;
   streamProvider?: string;
+  streamName?: string;
   currentTime: number;
   duration: number;
   playbackSpeed: number;
@@ -51,6 +52,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   quality,
   year,
   streamProvider,
+  streamName,
   currentTime,
   duration,
   playbackSpeed,
@@ -142,7 +144,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
               <View style={styles.metadataRow}>
                 {year && <Text style={styles.metadataText}>{year}</Text>}
                 {quality && <View style={styles.qualityBadge}><Text style={styles.qualityText}>{quality}</Text></View>}
-                {streamProvider && <Text style={styles.providerText}>via {streamProvider}</Text>}
+                {streamName && <Text style={styles.providerText}>via {streamName}</Text>}
               </View>
             </View>
             <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
