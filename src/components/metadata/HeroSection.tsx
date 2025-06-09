@@ -15,6 +15,7 @@ import Animated, {
   Extrapolate,
   useSharedValue,
   withTiming,
+  runOnJS,
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
 import { logger } from '../../utils/logger';
@@ -22,7 +23,12 @@ import { TMDBService } from '../../services/tmdbService';
 
 const { width, height } = Dimensions.get('window');
 
-// Types - optimized
+// Ultra-optimized animation constants
+const PARALLAX_FACTOR = 0.3;
+const SCALE_FACTOR = 1.02;
+const FADE_THRESHOLD = 200;
+
+// Types - streamlined
 interface HeroSectionProps {
   metadata: any;
   bannerImage: string | null;
@@ -54,7 +60,7 @@ interface HeroSectionProps {
   setLogoLoadError: (error: boolean) => void;
 }
 
-// Ultra-optimized ActionButtons Component with minimal re-renders
+// Ultra-optimized ActionButtons Component - minimal re-renders
 const ActionButtons = React.memo(({ 
   handleShowStreams, 
   toggleLibrary, 
@@ -76,7 +82,7 @@ const ActionButtons = React.memo(({
 }) => {
   const { currentTheme } = useTheme();
   
-  // Memoized navigation handler for better performance
+  // Memoized navigation handler
   const handleRatingsPress = useMemo(() => async () => {
     let finalTmdbId: number | null = null;
     
@@ -92,7 +98,6 @@ const ActionButtons = React.memo(({
         const convertedId = await tmdbService.findTMDBIdByIMDB(id);
         if (convertedId) {
           finalTmdbId = convertedId;
-          logger.log(`[HeroSection] Converted IMDb ID ${id} to TMDB ID: ${finalTmdbId}`);
         }
       } catch (error) {
         logger.error(`[HeroSection] Error converting IMDb ID ${id}:`, error);
@@ -114,7 +119,7 @@ const ActionButtons = React.memo(({
       <TouchableOpacity
         style={[styles.actionButton, styles.playButton]}
         onPress={handleShowStreams}
-        activeOpacity={0.8}
+        activeOpacity={0.85}
       >
         <MaterialIcons 
           name={playButtonText === 'Resume' ? "play-circle-outline" : "play-arrow"} 
@@ -127,7 +132,7 @@ const ActionButtons = React.memo(({
       <TouchableOpacity
         style={[styles.actionButton, styles.infoButton]}
         onPress={toggleLibrary}
-        activeOpacity={0.8}
+        activeOpacity={0.85}
       >
         <MaterialIcons
           name={inLibrary ? 'bookmark' : 'bookmark-border'}
@@ -143,7 +148,7 @@ const ActionButtons = React.memo(({
         <TouchableOpacity
           style={styles.iconButton}
           onPress={handleRatingsPress}
-          activeOpacity={0.8}
+          activeOpacity={0.85}
         >
           <MaterialIcons 
             name="assessment" 
@@ -241,31 +246,32 @@ const HeroSection: React.FC<HeroSectionProps> = ({
 }) => {
   const { currentTheme } = useTheme();
   
-  // Optimized state management
+  // Minimal state for image handling
   const [imageError, setImageError] = useState(false);
   const imageOpacity = useSharedValue(1);
   
-  // Memoized image source for better performance
+  // Memoized image source
   const imageSource = useMemo(() => 
     bannerImage || metadata.banner || metadata.poster
   , [bannerImage, metadata.banner, metadata.poster]);
   
-  // Optimized image handlers
+  // Ultra-fast image handlers
   const handleImageError = () => {
-    logger.warn(`[HeroSection] Banner failed to load: ${imageSource}`);
     setImageError(true);
-    imageOpacity.value = withTiming(0.7, { duration: 150 });
-    if (bannerImage !== metadata.banner) {
-      setBannerImage(metadata.banner || metadata.poster);
-    }
+    imageOpacity.value = withTiming(0.6, { duration: 150 });
+    runOnJS(() => {
+      if (bannerImage !== metadata.banner) {
+        setBannerImage(metadata.banner || metadata.poster);
+      }
+    })();
   };
 
   const handleImageLoad = () => {
     setImageError(false);
-    imageOpacity.value = withTiming(1, { duration: 200 });
+    imageOpacity.value = withTiming(1, { duration: 150 });
   };
 
-  // Ultra-optimized animated styles with minimal calculations
+  // Ultra-optimized animated styles - single calculations
   const heroAnimatedStyle = useAnimatedStyle(() => ({
     height: heroHeight.value,
     opacity: heroOpacity.value,
@@ -273,56 +279,60 @@ const HeroSection: React.FC<HeroSectionProps> = ({
 
   const logoAnimatedStyle = useAnimatedStyle(() => ({
     opacity: logoOpacity.value,
+    transform: [{ 
+      translateY: interpolate(
+        scrollY.value,
+        [0, 100],
+        [0, -20],
+        Extrapolate.CLAMP
+      )
+    }]
   }), []);
 
   const watchProgressAnimatedStyle = useAnimatedStyle(() => ({
     opacity: watchProgressOpacity.value,
   }), []);
 
-  // Simplified backdrop animation - fewer calculations
-  const backdropImageStyle = useAnimatedStyle(() => ({
-    opacity: imageOpacity.value,
-    transform: [
-      { 
-        translateY: interpolate(
-          scrollY.value,
-          [0, 200],
-          [0, -60],
-          Extrapolate.CLAMP
-        )
-      },
-      { 
-        scale: interpolate(
-          scrollY.value,
-          [0, 200],
-          [1.05, 1.02],
-          Extrapolate.CLAMP
-        )
-      },
-    ],
-  }), []);
+  // Ultra-optimized backdrop with minimal calculations
+  const backdropImageStyle = useAnimatedStyle(() => {
+    'worklet';
+    const translateY = scrollY.value * PARALLAX_FACTOR;
+    const scale = 1 + (scrollY.value * 0.0001); // Micro scale effect
+    
+    return {
+      opacity: imageOpacity.value,
+      transform: [
+        { translateY: -Math.min(translateY, 100) }, // Cap translation
+        { scale: Math.min(scale, SCALE_FACTOR) }    // Cap scale
+      ],
+    };
+  }, []);
 
+  // Simplified buttons animation
   const buttonsAnimatedStyle = useAnimatedStyle(() => ({
     opacity: buttonsOpacity.value,
-    transform: [{ translateY: buttonsTranslateY.value }]
+    transform: [{ 
+      translateY: interpolate(
+        buttonsTranslateY.value,
+        [0, 20],
+        [0, 20],
+        Extrapolate.CLAMP
+      )
+    }]
   }), []);
 
-  // Memoized genre rendering for performance
+  // Ultra-optimized genre rendering
   const genreElements = useMemo(() => {
-    if (!metadata?.genres || !Array.isArray(metadata.genres) || metadata.genres.length === 0) {
-      return null;
-    }
+    if (!metadata?.genres?.length) return null;
 
-    const genresToDisplay: string[] = metadata.genres.slice(0, 4);
+    const genresToDisplay = metadata.genres.slice(0, 3); // Reduced to 3 for performance
     return genresToDisplay.map((genreName: string, index: number, array: string[]) => (
-      <React.Fragment key={index}>
+      <React.Fragment key={`${genreName}-${index}`}>
         <Text style={[styles.genreText, { color: currentTheme.colors.text }]}>
           {genreName}
         </Text>
         {index < array.length - 1 && (
-          <Text style={[styles.genreDot, { color: currentTheme.colors.text, opacity: 0.6 }]}>
-            •
-          </Text>
+          <Text style={[styles.genreDot, { color: currentTheme.colors.text }]}>•</Text>
         )}
       </React.Fragment>
     ));
@@ -333,11 +343,11 @@ const HeroSection: React.FC<HeroSectionProps> = ({
 
   return (
     <Animated.View style={[styles.heroSection, heroAnimatedStyle]}>
-      {/* Background Layer */}
+      {/* Optimized Background */}
       <View style={[styles.absoluteFill, { backgroundColor: currentTheme.colors.black }]} />
       
-      {/* Background Image - Optimized */}
-      {!loadingBanner && imageSource && (
+      {/* Ultra-optimized Background Image */}
+      {imageSource && !loadingBanner && (
         <Animated.Image 
           source={{ uri: imageSource }}
           style={[styles.absoluteFill, backdropImageStyle]}
@@ -347,20 +357,19 @@ const HeroSection: React.FC<HeroSectionProps> = ({
         />
       )}
 
-      {/* Gradient Overlay */}
+      {/* Simplified Gradient */}
       <LinearGradient
         colors={[
-          `${currentTheme.colors.darkBackground}00`,
-          `${currentTheme.colors.darkBackground}30`,
-          `${currentTheme.colors.darkBackground}70`,
-          `${currentTheme.colors.darkBackground}E0`,
+          'rgba(0,0,0,0)',
+          'rgba(0,0,0,0.4)',
+          'rgba(0,0,0,0.8)',
           currentTheme.colors.darkBackground
         ]}
-        locations={[0, 0.5, 0.7, 0.85, 1]}
+        locations={[0, 0.6, 0.85, 1]}
         style={styles.heroGradient}
       >
         <View style={styles.heroContent}>
-          {/* Title/Logo */}
+          {/* Optimized Title/Logo */}
           <View style={styles.logoContainer}>
             <Animated.View style={[styles.titleLogoContainer, logoAnimatedStyle]}>
               {metadata.logo && !logoLoadError ? (
@@ -368,10 +377,9 @@ const HeroSection: React.FC<HeroSectionProps> = ({
                   source={{ uri: metadata.logo }}
                   style={styles.titleLogo}
                   contentFit="contain"
-                  transition={200}
+                  transition={150}
                   onError={() => {
-                    logger.warn(`[HeroSection] Logo failed to load: ${metadata.logo}`);
-                    setLogoLoadError(true);
+                    runOnJS(setLogoLoadError)(true);
                   }}
                 />
               ) : (
@@ -382,7 +390,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
             </Animated.View>
           </View>
 
-          {/* Watch Progress */}
+          {/* Optimized Watch Progress */}
           <WatchProgressDisplay 
             watchProgress={watchProgress}
             type={type}
@@ -390,14 +398,14 @@ const HeroSection: React.FC<HeroSectionProps> = ({
             animatedStyle={watchProgressAnimatedStyle}
           />
 
-          {/* Genres */}
+          {/* Optimized Genres */}
           {genreElements && (
             <View style={styles.genreContainer}>
               {genreElements}
             </View>
           )}
 
-          {/* Action Buttons */}
+          {/* Optimized Action Buttons */}
           <ActionButtons 
             handleShowStreams={handleShowStreams}
             toggleLibrary={handleToggleLibrary}
@@ -414,7 +422,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
   );
 };
 
-// Optimized styles with minimal properties
+// Ultra-optimized styles
 const styles = StyleSheet.create({
   heroSection: {
     width: '100%',
@@ -431,17 +439,18 @@ const styles = StyleSheet.create({
   heroGradient: {
     flex: 1,
     justifyContent: 'flex-end',
-    paddingBottom: 24,
+    paddingBottom: 20,
   },
   heroContent: {
     padding: 16,
-    paddingTop: 12,
-    paddingBottom: 12,
+    paddingTop: 8,
+    paddingBottom: 8,
   },
   logoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
+    marginBottom: 4,
   },
   titleLogoContainer: {
     alignItems: 'center',
@@ -449,18 +458,18 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   titleLogo: {
-    width: width * 0.8,
-    height: 100,
+    width: width * 0.75,
+    height: 90,
     alignSelf: 'center',
   },
   heroTitle: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '900',
-    marginBottom: 12,
-    textShadowColor: 'rgba(0,0,0,0.75)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-    letterSpacing: -0.5,
+    marginBottom: 8,
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+    letterSpacing: -0.3,
     textAlign: 'center',
   },
   genreContainer: {
@@ -468,18 +477,20 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 16,
-    gap: 4,
+    marginTop: 6,
+    marginBottom: 14,
+    gap: 6,
   },
   genreText: {
     fontSize: 12,
     fontWeight: '500',
+    opacity: 0.9,
   },
   genreDot: {
     fontSize: 12,
     fontWeight: '500',
-    marginHorizontal: 4,
+    opacity: 0.6,
+    marginHorizontal: 2,
   },
   actionButtons: {
     flexDirection: 'row',
@@ -492,65 +503,70 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: 11,
     paddingHorizontal: 16,
-    borderRadius: 28,
+    borderRadius: 26,
     flex: 1,
   },
   playButton: {
     backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
   },
   infoButton: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderWidth: 2,
-    borderColor: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.7)',
   },
   iconButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderWidth: 2,
-    borderColor: '#fff',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.7)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   playButtonText: {
     color: '#000',
-    fontWeight: '600',
-    marginLeft: 8,
-    fontSize: 16,
+    fontWeight: '700',
+    marginLeft: 6,
+    fontSize: 15,
   },
   infoButtonText: {
     color: '#fff',
-    marginLeft: 8,
+    marginLeft: 6,
     fontWeight: '600',
-    fontSize: 16,
+    fontSize: 15,
   },
   watchProgressContainer: {
-    marginTop: 6,
-    marginBottom: 8,
+    marginTop: 4,
+    marginBottom: 6,
     width: '100%',
     alignItems: 'center',
-    height: 48,
+    height: 44,
   },
   watchProgressBar: {
-    width: '75%',
-    height: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 1.5,
+    width: '70%',
+    height: 2.5,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 1.25,
     overflow: 'hidden',
     marginBottom: 6
   },
   watchProgressFill: {
     height: '100%',
-    borderRadius: 1.5,
+    borderRadius: 1.25,
   },
   watchProgressText: {
-    fontSize: 12,
+    fontSize: 11,
     textAlign: 'center',
-    opacity: 0.9,
-    letterSpacing: 0.2
+    opacity: 0.85,
+    letterSpacing: 0.1
   },
 });
 

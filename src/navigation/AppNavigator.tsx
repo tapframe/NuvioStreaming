@@ -658,6 +658,32 @@ const MainTabs = () => {
   );
 };
 
+// Create custom fade animation interpolator for MetadataScreen
+const customFadeInterpolator = ({ current, layouts }: any) => {
+  return {
+    cardStyle: {
+      opacity: current.progress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 1],
+      }),
+      transform: [
+        {
+          scale: current.progress.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0.95, 1],
+          }),
+        },
+      ],
+    },
+    overlayStyle: {
+      opacity: current.progress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 0.3],
+      }),
+    },
+  };
+};
+
 // Stack Navigator
 const AppNavigator = () => {
   const { currentTheme } = useTheme();
@@ -731,8 +757,14 @@ const AppNavigator = () => {
               component={MetadataScreen}
               options={{ 
                 headerShown: false, 
-                animation: 'slide_from_right',
+                animation: Platform.OS === 'ios' ? 'fade' : 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
+                ...(Platform.OS === 'ios' && {
+                  cardStyleInterpolator: customFadeInterpolator,
+                  animationTypeForReplace: 'push',
+                  gestureEnabled: true,
+                  gestureDirection: 'horizontal',
+                }),
                 contentStyle: {
                   backgroundColor: currentTheme.colors.darkBackground,
                 },
