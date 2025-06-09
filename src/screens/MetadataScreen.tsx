@@ -12,6 +12,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { useTheme } from '../contexts/ThemeContext';
 import { useMetadata } from '../hooks/useMetadata';
 import { CastSection } from '../components/metadata/CastSection';
@@ -20,6 +21,7 @@ import { MovieContent } from '../components/metadata/MovieContent';
 import { MoreLikeThisSection } from '../components/metadata/MoreLikeThisSection';
 import { RatingsSection } from '../components/metadata/RatingsSection';
 import { RouteParams, Episode } from '../types/metadata';
+import { Stream, GroupedStreams } from '../types/streams';
 import Animated, {
   useAnimatedStyle,
   interpolate,
@@ -75,6 +77,10 @@ const MetadataScreen: React.FC = () => {
     loadingRecommendations,
     setMetadata,
     imdbId,
+    loadStreams,
+    loadEpisodeStreams,
+    groupedStreams,
+    episodeStreams,
   } = useMetadata({ id, type });
 
   // Optimized hooks with memoization
@@ -107,8 +113,127 @@ const MetadataScreen: React.FC = () => {
     handleSeasonChange(seasonNumber);
   }, [handleSeasonChange]);
 
-  const handleShowStreams = useCallback(() => {
+  // Helper function to get the first available stream from grouped streams
+  const getFirstAvailableStream = useCallback((streams: GroupedStreams): Stream | null => {
+    const providers = Object.values(streams);
+    for (const provider of providers) {
+      if (provider.streams && provider.streams.length > 0) {
+        // Try to find a cached stream first
+        const cachedStream = provider.streams.find(stream => 
+          stream.behaviorHints?.cached === true
+        );
+        if (cachedStream) {
+          return cachedStream;
+        }
+        
+        // Otherwise return the first stream
+        return provider.streams[0];
+      }
+    }
+    return null;
+  }, []);
+
+  const handleShowStreams = useCallback(async () => {
     const { watchProgress } = watchProgressData;
+    
+    // Check if auto-play is enabled
+    if (settings.autoPlayFirstStream) {
+      try {
+        console.log('Auto-play enabled, attempting to load streams...');
+        
+        // Determine the target episode for series
+        let targetEpisodeId: string | undefined;
+        if (type === 'series') {
+          targetEpisodeId = watchProgress?.episodeId || episodeId || (episodes.length > 0 ? 
+            (episodes[0].stremioId || `${id}:${episodes[0].season_number}:${episodes[0].episode_number}`) : undefined);
+        }
+
+        // Load streams without locking orientation yet
+        let streamsLoaded = false;
+        if (type === 'series' && targetEpisodeId) {
+          console.log('Loading episode streams for:', targetEpisodeId);
+          await loadEpisodeStreams(targetEpisodeId);
+          streamsLoaded = true;
+        } else if (type === 'movie') {
+          console.log('Loading movie streams...');
+          await loadStreams();
+          streamsLoaded = true;
+        }
+
+        if (streamsLoaded) {
+          // Wait a bit longer for streams to be processed and state to update
+          console.log('Waiting for streams to be processed...');
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          
+          // Check if we have any streams available
+          const availableStreams = type === 'series' ? episodeStreams : groupedStreams;
+          console.log('Available streams:', Object.keys(availableStreams));
+          
+          const firstStream = getFirstAvailableStream(availableStreams);
+          
+          if (firstStream) {
+            console.log('Found stream, navigating to player:', firstStream);
+            
+            // Now lock orientation to landscape before navigation
+            await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+            await new Promise(resolve => setTimeout(resolve, 200));
+            
+            if (type === 'series' && targetEpisodeId) {
+              // Get episode details for navigation
+              const targetEpisode = episodes.find(ep => 
+                ep.stremioId === targetEpisodeId || 
+                `${id}:${ep.season_number}:${ep.episode_number}` === targetEpisodeId
+              );
+              
+              // Navigate directly to player with the first stream
+              navigation.navigate('Player', {
+                uri: firstStream.url,
+                title: metadata?.name || 'Unknown',
+                season: targetEpisode?.season_number,
+                episode: targetEpisode?.episode_number,
+                episodeTitle: targetEpisode?.name,
+                quality: firstStream.title?.match(/(\d+)p/)?.[1] || 'Unknown',
+                year: metadata?.year,
+                streamProvider: firstStream.name || 'Unknown',
+                id,
+                type,
+                episodeId: targetEpisodeId,
+                imdbId: imdbId || id,
+              });
+              return;
+            } else if (type === 'movie') {
+              // Navigate directly to player with the first stream
+              navigation.navigate('Player', {
+                uri: firstStream.url,
+                title: metadata?.name || 'Unknown',
+                quality: firstStream.title?.match(/(\d+)p/)?.[1] || 'Unknown',
+                year: metadata?.year,
+                streamProvider: firstStream.name || 'Unknown',
+                id,
+                type,
+                imdbId: imdbId || id,
+              });
+              return;
+            }
+          } else {
+            console.log('No streams found after waiting, disabling auto-play for this session');
+            // Don't fall back to streams screen, just show an alert
+            alert('No streams available for auto-play. Please try selecting streams manually.');
+            return;
+          }
+        }
+        
+        console.log('Auto-play failed, falling back to manual selection');
+      } catch (error) {
+        console.error('Auto-play failed with error:', error);
+        // Don't fall back on error, just show alert
+        alert('Auto-play failed. Please try selecting streams manually.');
+        return;
+      }
+    }
+    
+    // Normal behavior: navigate to streams screen (only if auto-play is disabled or not attempted)
+    console.log('Navigating to streams screen (normal flow)');
     if (type === 'series') {
       const targetEpisodeId = watchProgress?.episodeId || episodeId || (episodes.length > 0 ? 
         (episodes[0].stremioId || `${id}:${episodes[0].season_number}:${episodes[0].episode_number}`) : undefined);
@@ -119,7 +244,7 @@ const MetadataScreen: React.FC = () => {
       }
     }
     navigation.navigate('Streams', { id, type, episodeId });
-  }, [navigation, id, type, episodes, episodeId, watchProgressData.watchProgress]);
+  }, [settings.autoPlayFirstStream, navigation, id, type, episodes, episodeId, watchProgressData, metadata, loadEpisodeStreams, loadStreams, episodeStreams, groupedStreams, imdbId, getFirstAvailableStream]);
 
   const handleEpisodeSelect = useCallback((episode: Episode) => {
     const episodeId = episode.stremioId || `${id}:${episode.season_number}:${episode.episode_number}`;
