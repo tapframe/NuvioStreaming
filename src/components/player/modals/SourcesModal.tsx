@@ -95,9 +95,9 @@ const SourcesModal: React.FC<SourcesModalProps> = ({
                         </Text>
                         
                         {isSelected && (
-                          <View style={styles.currentSourceBadge}>
+                          <View style={styles.currentStreamBadge}>
                             <MaterialIcons name="play-arrow" size={16} color="#E50914" />
-                            <Text style={styles.currentSourceText}>Current</Text>
+                            <Text style={styles.currentSourceItem}>Current</Text>
                           </View>
                         )}
                         
