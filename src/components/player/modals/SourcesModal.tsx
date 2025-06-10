@@ -38,6 +38,10 @@ interface SourcesModalProps {
 
 const { width, height } = Dimensions.get('window');
 
+// Fixed dimensions for the modal
+const MODAL_WIDTH = Math.min(width - 32, 520);
+const MODAL_MAX_HEIGHT = height * 0.85;
+
 const QualityIndicator = ({ quality }: { quality: string | null }) => {
   if (!quality) return null;
   
@@ -229,14 +233,16 @@ const SourcesModal: React.FC<SourcesModalProps> = ({
       <Animated.View
         style={[
           {
-            width: Math.min(width - 32, 520),
-            maxHeight: height * 0.85,
+            width: MODAL_WIDTH,
+            maxHeight: MODAL_MAX_HEIGHT,
+            minHeight: height * 0.3,
             overflow: 'hidden',
             elevation: 25,
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 12 },
             shadowOpacity: 0.4,
             shadowRadius: 25,
+            alignSelf: 'center',
           },
           modalStyle,
         ]}
@@ -249,6 +255,8 @@ const SourcesModal: React.FC<SourcesModalProps> = ({
             borderRadius: 28,
             overflow: 'hidden',
             backgroundColor: 'rgba(26, 26, 26, 0.8)',
+            width: '100%',
+            height: '100%',
           }}
         >
           {/* Header */}
@@ -267,6 +275,7 @@ const SourcesModal: React.FC<SourcesModalProps> = ({
               justifyContent: 'space-between',
               borderBottomWidth: 1,
               borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+              width: '100%',
             }}
           >
             <Animated.View 
@@ -319,13 +328,15 @@ const SourcesModal: React.FC<SourcesModalProps> = ({
           {/* Content */}
           <ScrollView 
             style={{ 
-              maxHeight: height * 0.6,
+              maxHeight: MODAL_MAX_HEIGHT - 100, // Account for header height
               backgroundColor: 'transparent',
+              width: '100%',
             }}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ 
               padding: 24,
               paddingBottom: 32,
+              width: '100%',
             }}
             bounces={false}
           >
@@ -336,6 +347,7 @@ const SourcesModal: React.FC<SourcesModalProps> = ({
                 layout={Layout.springify()}
                 style={{
                   marginBottom: streams.length > 0 ? 32 : 0,
+                  width: '100%',
                 }}
               >
                 {/* Provider Header */}
@@ -346,6 +358,7 @@ const SourcesModal: React.FC<SourcesModalProps> = ({
                   paddingBottom: 12,
                   borderBottomWidth: 1,
                   borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+                  width: '100%',
                 }}>
                   <LinearGradient
                     colors={providerId === 'hdrezka' ? ['#00d4aa', '#00a085'] : ['#E50914', '#B00610']}
@@ -400,7 +413,7 @@ const SourcesModal: React.FC<SourcesModalProps> = ({
                 </View>
                 
                 {/* Streams Grid */}
-                <View style={{ gap: 16 }}>
+                <View style={{ gap: 16, width: '100%' }}>
                   {streams.map((stream, index) => {
                     const quality = getQualityFromTitle(stream.title);
                     const isSelected = isStreamSelected(stream);
@@ -415,6 +428,7 @@ const SourcesModal: React.FC<SourcesModalProps> = ({
                         key={`${stream.url}-${index}`}
                         entering={FadeInDown.duration(300).delay((providerIndex * 80) + (index * 40))}
                         layout={Layout.springify()}
+                        style={{ width: '100%' }}
                       >
                         <TouchableOpacity
                           style={{
@@ -433,6 +447,7 @@ const SourcesModal: React.FC<SourcesModalProps> = ({
                             shadowOpacity: isSelected ? 0.3 : 0.1,
                             shadowRadius: isSelected ? 12 : 6,
                             transform: [{ scale: isSelected ? 1.02 : 1 }],
+                            width: '100%',
                           }}
                           onPress={() => handleStreamSelect(stream)}
                           disabled={isChangingSource || isSelected}
@@ -442,6 +457,7 @@ const SourcesModal: React.FC<SourcesModalProps> = ({
                             flexDirection: 'row',
                             alignItems: 'flex-start',
                             justifyContent: 'space-between',
+                            width: '100%',
                           }}>
                             {/* Stream Info */}
                             <View style={{ flex: 1, marginRight: 16 }}>

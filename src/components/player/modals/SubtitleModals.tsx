@@ -49,6 +49,10 @@ interface SubtitleModalsProps {
 
 const { width, height } = Dimensions.get('window');
 
+// Fixed dimensions for the modals
+const MODAL_WIDTH = Math.min(width - 32, 520);
+const MODAL_MAX_HEIGHT = height * 0.85;
+
 const SubtitleBadge = ({ 
   text, 
   color, 
@@ -206,14 +210,16 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
         <Animated.View
           style={[
             {
-              width: Math.min(width - 32, 520),
-              maxHeight: height * 0.85,
+              width: MODAL_WIDTH,
+              maxHeight: MODAL_MAX_HEIGHT,
+              minHeight: height * 0.3,
               overflow: 'hidden',
               elevation: 25,
               shadowColor: '#000',
               shadowOffset: { width: 0, height: 12 },
               shadowOpacity: 0.4,
               shadowRadius: 25,
+              alignSelf: 'center',
             },
             modalStyle,
           ]}
@@ -226,6 +232,8 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
               borderRadius: 28,
               overflow: 'hidden',
               backgroundColor: 'rgba(26, 26, 26, 0.8)',
+              width: '100%',
+              height: '100%',
             }}
           >
             {/* Header */}
@@ -244,6 +252,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                 justifyContent: 'space-between',
                 borderBottomWidth: 1,
                 borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+                width: '100%',
               }}
             >
               <Animated.View 
@@ -296,13 +305,15 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
             {/* Content */}
             <ScrollView 
               style={{ 
-                maxHeight: height * 0.6,
+                maxHeight: MODAL_MAX_HEIGHT - 100, // Account for header height
                 backgroundColor: 'transparent',
+                width: '100%',
               }}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ 
                 padding: 24,
                 paddingBottom: 32,
+                width: '100%',
               }}
               bounces={false}
             >
@@ -890,14 +901,16 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
         <Animated.View
           style={[
             {
-              width: Math.min(width - 32, 520),
-              maxHeight: height * 0.85,
+              width: MODAL_WIDTH,
+              maxHeight: MODAL_MAX_HEIGHT,
+              minHeight: height * 0.3,
               overflow: 'hidden',
               elevation: 25,
               shadowColor: '#000',
               shadowOffset: { width: 0, height: 12 },
               shadowOpacity: 0.4,
               shadowRadius: 25,
+              alignSelf: 'center',
             },
             languageModalStyle,
           ]}
@@ -910,6 +923,8 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
               borderRadius: 28,
               overflow: 'hidden',
               backgroundColor: 'rgba(26, 26, 26, 0.8)',
+              width: '100%',
+              height: '100%',
             }}
           >
             {/* Header */}
@@ -928,6 +943,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                 justifyContent: 'space-between',
                 borderBottomWidth: 1,
                 borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+                width: '100%',
               }}
             >
               <Animated.View 
@@ -980,13 +996,15 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
             {/* Content */}
             <ScrollView 
               style={{ 
-                maxHeight: height * 0.6,
+                maxHeight: MODAL_MAX_HEIGHT - 100, // Account for header height
                 backgroundColor: 'transparent',
+                width: '100%',
               }}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ 
                 padding: 24,
                 paddingBottom: 32,
+                width: '100%',
               }}
               bounces={false}
             >

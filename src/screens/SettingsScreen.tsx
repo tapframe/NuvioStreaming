@@ -410,12 +410,8 @@ const SettingsScreen: React.FC = () => {
                 title="Internal Providers"
                 description="Enable or disable built-in providers like HDRezka"
                 icon="source"
-                renderControl={() => (
-                  <CustomSwitch
-                    value={settings.enableInternalProviders}
-                    onValueChange={(value) => updateSetting('enableInternalProviders', value)}
-                  />
-                )}
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('InternalProvidersSettings')}
               />
               <SettingItem
                 title="Home Screen"

@@ -36,6 +36,10 @@ interface AudioTrackModalProps {
 
 const { width, height } = Dimensions.get('window');
 
+// Fixed dimensions for the modal
+const MODAL_WIDTH = Math.min(width - 32, 520);
+const MODAL_MAX_HEIGHT = height * 0.85;
+
 const AudioBadge = ({ 
   text, 
   color, 
@@ -152,14 +156,16 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
       <Animated.View
         style={[
           {
-            width: Math.min(width - 32, 520),
-            maxHeight: height * 0.85,
+            width: MODAL_WIDTH,
+            maxHeight: MODAL_MAX_HEIGHT,
+            minHeight: height * 0.3,
             overflow: 'hidden',
             elevation: 25,
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 12 },
             shadowOpacity: 0.4,
             shadowRadius: 25,
+            alignSelf: 'center',
           },
           modalStyle,
         ]}
@@ -172,6 +178,8 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
             borderRadius: 28,
             overflow: 'hidden',
             backgroundColor: 'rgba(26, 26, 26, 0.8)',
+            width: '100%',
+            height: '100%',
           }}
         >
           {/* Header */}
@@ -190,6 +198,7 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
               justifyContent: 'space-between',
               borderBottomWidth: 1,
               borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+              width: '100%',
             }}
           >
             <Animated.View 
@@ -242,215 +251,156 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
           {/* Content */}
           <ScrollView 
             style={{ 
-              maxHeight: height * 0.6,
+              maxHeight: MODAL_MAX_HEIGHT - 100, // Account for header height
               backgroundColor: 'transparent',
+              width: '100%',
             }}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ 
               padding: 24,
               paddingBottom: 32,
+              width: '100%',
             }}
             bounces={false}
           >
-            {/* Audio Tracks Section */}
-            <Animated.View 
-              entering={FadeInDown.duration(400).delay(150)}
-              layout={Layout.springify()}
-              style={{
-                marginBottom: 16,
-              }}
-            >
-              <View style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                marginBottom: 20,
-                paddingBottom: 12,
-                borderBottomWidth: 1,
-                borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-              }}>
-                <LinearGradient
-                  colors={['#F97316', '#EA580C']}
-                  style={{
-                    width: 12,
-                    height: 12,
-                    borderRadius: 6,
-                    marginRight: 16,
-                    elevation: 3,
-                    shadowColor: '#F97316',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.4,
-                    shadowRadius: 4,
+            <View style={styles.modernTrackListContainer}>
+              {vlcAudioTracks.length > 0 ? vlcAudioTracks.map((track, index) => (
+                <Animated.View
+                  key={track.id}
+                  entering={FadeInDown.duration(300).delay(150 + (index * 50))}
+                  layout={Layout.springify()}
+                  style={{ 
+                    marginBottom: 16,
+                    width: '100%',
                   }}
-                />
-                <View style={{ flex: 1 }}>
-                  <Text style={{
-                    color: '#fff',
-                    fontSize: 18,
-                    fontWeight: '700',
-                    letterSpacing: -0.3,
-                  }}>
-                    Available Audio Tracks
-                  </Text>
-                  <Text style={{
-                    color: 'rgba(255, 255, 255, 0.6)',
-                    fontSize: 12,
-                    marginTop: 1,
-                    fontWeight: '500',
-                  }}>
-                    Select your preferred audio language
-                  </Text>
-                </View>
-              </View>
-
-              {/* Audio Tracks List */}
-              {vlcAudioTracks.length > 0 ? vlcAudioTracks.map((track, index) => {
-                const isSelected = selectedAudioTrack === track.id;
-                
-                return (
-                  <Animated.View
-                    key={track.id}
-                    entering={FadeInDown.duration(300).delay(200 + (index * 50))}
-                    layout={Layout.springify()}
-                    style={{ marginBottom: 16 }}
+                >
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: selectedAudioTrack === track.id 
+                        ? 'rgba(249, 115, 22, 0.08)' 
+                        : 'rgba(255, 255, 255, 0.03)',
+                      borderRadius: 20,
+                      padding: 20,
+                      borderWidth: 2,
+                      borderColor: selectedAudioTrack === track.id 
+                        ? 'rgba(249, 115, 22, 0.4)' 
+                        : 'rgba(255, 255, 255, 0.08)',
+                      elevation: selectedAudioTrack === track.id ? 8 : 3,
+                      shadowColor: selectedAudioTrack === track.id ? '#F97316' : '#000',
+                      shadowOffset: { width: 0, height: selectedAudioTrack === track.id ? 4 : 2 },
+                      shadowOpacity: selectedAudioTrack === track.id ? 0.3 : 0.1,
+                      shadowRadius: selectedAudioTrack === track.id ? 12 : 6,
+                      width: '100%',
+                    }}
+                    onPress={() => {
+                      selectAudioTrack(track.id);
+                      handleClose();
+                    }}
+                    activeOpacity={0.85}
                   >
-                    <TouchableOpacity
-                      style={{
-                        backgroundColor: isSelected 
-                          ? 'rgba(249, 115, 22, 0.08)' 
-                          : 'rgba(255, 255, 255, 0.03)',
-                        borderRadius: 20,
-                        padding: 20,
-                        borderWidth: 2,
-                        borderColor: isSelected 
-                          ? 'rgba(249, 115, 22, 0.4)' 
-                          : 'rgba(255, 255, 255, 0.08)',
-                        elevation: isSelected ? 8 : 3,
-                        shadowColor: isSelected ? '#F97316' : '#000',
-                        shadowOffset: { width: 0, height: isSelected ? 4 : 2 },
-                        shadowOpacity: isSelected ? 0.3 : 0.1,
-                        shadowRadius: isSelected ? 12 : 6,
-                      }}
-                      onPress={() => {
-                        selectAudioTrack(track.id);
-                        handleClose();
-                      }}
-                      activeOpacity={0.85}
-                    >
-                      <View style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                      }}>
-                        <View style={{ flex: 1, marginRight: 16 }}>
-                          <View style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            marginBottom: 8,
-                            gap: 12,
+                    <View style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      width: '100%',
+                    }}>
+                      <View style={{ flex: 1, marginRight: 16 }}>
+                        <View style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          marginBottom: 8,
+                          gap: 12,
+                        }}>
+                          <Text style={{
+                            color: selectedAudioTrack === track.id ? '#fff' : 'rgba(255, 255, 255, 0.95)',
+                            fontSize: 16,
+                            fontWeight: '700',
+                            letterSpacing: -0.2,
+                            flex: 1,
                           }}>
-                            <Text style={{
-                              color: isSelected ? '#fff' : 'rgba(255, 255, 255, 0.95)',
-                              fontSize: 16,
-                              fontWeight: '700',
-                              letterSpacing: -0.2,
-                              flex: 1,
-                            }}>
-                              {getTrackDisplayName(track)}
-                            </Text>
-                            
-                            {isSelected && (
-                              <Animated.View 
-                                entering={BounceIn.duration(300)}
-                                style={{
-                                  flexDirection: 'row',
-                                  alignItems: 'center',
-                                  backgroundColor: 'rgba(249, 115, 22, 0.25)',
-                                  paddingHorizontal: 10,
-                                  paddingVertical: 5,
-                                  borderRadius: 14,
-                                  borderWidth: 1,
-                                  borderColor: 'rgba(249, 115, 22, 0.5)',
-                                }}
-                              >
-                                <MaterialIcons name="volume-up" size={12} color="#F97316" />
-                                <Text style={{
-                                  color: '#F97316',
-                                  fontSize: 10,
-                                  fontWeight: '800',
-                                  marginLeft: 3,
-                                  letterSpacing: 0.3,
-                                }}>
-                                  ACTIVE
-                                </Text>
-                              </Animated.View>
-                            )}
-                          </View>
+                            {getTrackDisplayName(track)}
+                          </Text>
                           
-                          {(track.name && track.language) && (
-                            <Text style={{
-                              color: 'rgba(255, 255, 255, 0.65)',
-                              fontSize: 13,
-                              marginBottom: 8,
-                              lineHeight: 18,
-                              fontWeight: '400',
-                            }}>
-                              {track.name}
-                            </Text>
+                          {selectedAudioTrack === track.id && (
+                            <Animated.View 
+                              entering={BounceIn.duration(300)}
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                backgroundColor: 'rgba(249, 115, 22, 0.25)',
+                                paddingHorizontal: 10,
+                                paddingVertical: 5,
+                                borderRadius: 14,
+                                borderWidth: 1,
+                                borderColor: 'rgba(249, 115, 22, 0.5)',
+                              }}
+                            >
+                              <MaterialIcons name="volume-up" size={12} color="#F97316" />
+                              <Text style={{
+                                color: '#F97316',
+                                fontSize: 10,
+                                fontWeight: '800',
+                                marginLeft: 3,
+                                letterSpacing: 0.3,
+                              }}>
+                                ACTIVE
+                              </Text>
+                            </Animated.View>
                           )}
-                          
-                          <View style={{
-                            flexDirection: 'row',
-                            flexWrap: 'wrap',
-                            gap: 6,
-                            alignItems: 'center',
-                          }}>
-                            <AudioBadge 
-                              text="AUDIO TRACK" 
-                              color="#F97316" 
-                              bgColor="rgba(249, 115, 22, 0.15)"
-                              icon="audiotrack"
-                            />
-                            {track.language && (
-                              <AudioBadge 
-                                text={track.language.toUpperCase()} 
-                                color="#6B7280" 
-                                bgColor="rgba(107, 114, 128, 0.15)"
-                                icon="language"
-                                delay={50}
-                              />
-                            )}
-                          </View>
                         </View>
                         
                         <View style={{
-                          width: 48,
-                          height: 48,
-                          borderRadius: 24,
-                          backgroundColor: isSelected 
-                            ? 'rgba(249, 115, 22, 0.15)' 
-                            : 'rgba(255, 255, 255, 0.05)',
-                          justifyContent: 'center',
+                          flexDirection: 'row',
+                          flexWrap: 'wrap',
+                          gap: 6,
                           alignItems: 'center',
-                          borderWidth: 2,
-                          borderColor: isSelected 
-                            ? 'rgba(249, 115, 22, 0.3)' 
-                            : 'rgba(255, 255, 255, 0.1)',
                         }}>
-                          {isSelected ? (
-                            <Animated.View entering={ZoomIn.duration(200)}>
-                              <MaterialIcons name="check-circle" size={24} color="#F97316" />
-                            </Animated.View>
-                          ) : (
-                            <MaterialIcons name="volume-up" size={24} color="rgba(255,255,255,0.6)" />
+                          <AudioBadge 
+                            text="AUDIO TRACK" 
+                            color="#F97316" 
+                            bgColor="rgba(249, 115, 22, 0.15)"
+                            icon="audiotrack"
+                          />
+                          {track.language && (
+                            <AudioBadge 
+                              text={track.language.toUpperCase()} 
+                              color="#6B7280" 
+                              bgColor="rgba(107, 114, 128, 0.15)"
+                              icon="language"
+                              delay={50}
+                            />
                           )}
                         </View>
                       </View>
-                    </TouchableOpacity>
-                  </Animated.View>
-                );
-              }) : (
+                      
+                      <View style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: 24,
+                        backgroundColor: selectedAudioTrack === track.id 
+                          ? 'rgba(249, 115, 22, 0.15)' 
+                          : 'rgba(255, 255, 255, 0.05)',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        borderWidth: 2,
+                        borderColor: selectedAudioTrack === track.id 
+                          ? 'rgba(249, 115, 22, 0.3)' 
+                          : 'rgba(255, 255, 255, 0.1)',
+                      }}>
+                        {selectedAudioTrack === track.id ? (
+                          <Animated.View entering={ZoomIn.duration(200)}>
+                            <MaterialIcons name="check-circle" size={24} color="#F97316" />
+                          </Animated.View>
+                        ) : (
+                          <MaterialIcons name="volume-up" size={24} color="rgba(255,255,255,0.6)" />
+                        )}
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                </Animated.View>
+              )) : (
                 <Animated.View 
-                  entering={FadeInDown.duration(300).delay(200)}
+                  entering={FadeInDown.duration(300).delay(150)}
                   style={{
                     backgroundColor: 'rgba(255, 255, 255, 0.02)',
                     borderRadius: 20,
@@ -458,6 +408,7 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
                     alignItems: 'center',
                     borderWidth: 1,
                     borderColor: 'rgba(255, 255, 255, 0.05)',
+                    width: '100%',
                   }}
                 >
                   <MaterialIcons name="volume-off" size={48} color="rgba(255, 255, 255, 0.3)" />
@@ -469,7 +420,7 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
                     textAlign: 'center',
                     letterSpacing: -0.3,
                   }}>
-                    No audio tracks available
+                    No audio tracks found
                   </Text>
                   <Text style={{
                     color: 'rgba(255, 255, 255, 0.4)',
@@ -478,11 +429,11 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
                     textAlign: 'center',
                     lineHeight: 20,
                   }}>
-                    This content doesn't have multiple audio tracks.{'\n'}The default audio will be used.
+                    No audio tracks are available for this content.{'\n'}Try a different source or check your connection.
                   </Text>
                 </Animated.View>
               )}
-            </Animated.View>
+            </View>
           </ScrollView>
         </BlurView>
       </Animated.View>

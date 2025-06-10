@@ -39,6 +39,7 @@ import PlayerSettingsScreen from '../screens/PlayerSettingsScreen';
 import LogoSourceSettings from '../screens/LogoSourceSettings';
 import ThemeScreen from '../screens/ThemeScreen';
 import ProfilesScreen from '../screens/ProfilesScreen';
+import InternalProvidersSettings from '../screens/InternalProvidersSettings';
 
 // Stack navigator types
 export type RootStackParamList = {
@@ -100,6 +101,7 @@ export type RootStackParamList = {
   LogoSourceSettings: undefined;
   ThemeSettings: undefined;
   ProfilesSettings: undefined;
+  InternalProvidersSettings: undefined;
 };
 
 export type RootStackNavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -1000,6 +1002,21 @@ const AppNavigator = () => {
             <Stack.Screen 
               name="ProfilesSettings" 
               component={ProfilesScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="InternalProvidersSettings" 
+              component={InternalProvidersSettings}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,

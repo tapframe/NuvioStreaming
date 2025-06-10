@@ -420,12 +420,22 @@ class HDRezkaService {
     try {
       logger.log(`[HDRezka] Getting streams for ${mediaType} with ID: ${mediaId}`);
       
-      // First check if internal providers are enabled
-      const settingsJson = await AsyncStorage.getItem('app_settings');
-      if (settingsJson) {
-        const settings = JSON.parse(settingsJson);
-        if (settings.enableInternalProviders === false) {
+      // Check if internal providers are enabled globally
+      const appSettingsJson = await AsyncStorage.getItem('app_settings');
+      if (appSettingsJson) {
+        const appSettings = JSON.parse(appSettingsJson);
+        if (appSettings.enableInternalProviders === false) {
           logger.log('[HDRezka] Internal providers are disabled in settings, skipping HDRezka');
+          return [];
+        }
+      }
+
+      // Check if HDRezka specifically is enabled
+      const hdrezkaSettingsJson = await AsyncStorage.getItem('hdrezka_settings');
+      if (hdrezkaSettingsJson) {
+        const hdrezkaSettings = JSON.parse(hdrezkaSettingsJson);
+        if (hdrezkaSettings.enabled === false) {
+          logger.log('[HDRezka] HDRezka provider is disabled in settings, skipping HDRezka');
           return [];
         }
       }

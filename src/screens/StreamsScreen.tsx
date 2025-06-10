@@ -749,11 +749,15 @@ export const StreamsScreen = () => {
       { id: 'all', name: 'All Providers' },
       ...Array.from(allProviders)
         .sort((a, b) => {
-          // Always put HDRezka at the top
+          // Always put XPRIME at the top (primary source)
+          if (a === 'xprime') return -1;
+          if (b === 'xprime') return 1;
+          
+          // Then put HDRezka second
           if (a === 'hdrezka') return -1;
           if (b === 'hdrezka') return 1;
           
-          // Then sort Stremio addons by installation order
+          // Then sort by Stremio addon installation order
           const indexA = installedAddons.findIndex(addon => addon.id === a);
           const indexB = installedAddons.findIndex(addon => addon.id === b);
           
@@ -789,8 +793,44 @@ export const StreamsScreen = () => {
     // Helper function to extract quality as a number for sorting
     const getQualityNumeric = (title: string | undefined): number => {
       if (!title) return 0;
-      const match = title.match(/(\d+)p/);
-      return match ? parseInt(match[1], 10) : 0;
+      
+      // First try to match quality with "p" (e.g., "1080p", "720p")
+      const matchWithP = title.match(/(\d+)p/i);
+      if (matchWithP) {
+        return parseInt(matchWithP[1], 10);
+      }
+      
+      // Then try to match standalone quality numbers at the end of the title
+      // This handles XPRIME format where quality is just "1080", "720", etc.
+      const matchAtEnd = title.match(/\b(\d{3,4})\s*$/);
+      if (matchAtEnd) {
+        const quality = parseInt(matchAtEnd[1], 10);
+        // Only return if it looks like a video quality (between 240 and 8000)
+        if (quality >= 240 && quality <= 8000) {
+          return quality;
+        }
+      }
+      
+      // Try to match quality patterns anywhere in the title with common formats
+      const qualityPatterns = [
+        /\b(\d{3,4})p\b/i,  // 1080p, 720p, etc.
+        /\b(\d{3,4})\s*$/,   // 1080, 720 at end
+        /\s(\d{3,4})\s/,     // 720 surrounded by spaces
+        /-\s*(\d{3,4})\s*$/,  // -720 at end
+        /\b(240|360|480|720|1080|1440|2160|4320|8000)\b/i // specific quality values
+      ];
+      
+      for (const pattern of qualityPatterns) {
+        const match = title.match(pattern);
+        if (match) {
+          const quality = parseInt(match[1], 10);
+          if (quality >= 240 && quality <= 8000) {
+            return quality;
+          }
+        }
+      }
+      
+      return 0;
     };
 
     // Filter streams by selected provider - only if not "all"
@@ -804,7 +844,11 @@ export const StreamsScreen = () => {
         return addonId === selectedProvider;
       })
       .sort(([addonIdA], [addonIdB]) => {
-        // Always put HDRezka at the top
+        // Always put XPRIME at the top (primary source)
+        if (addonIdA === 'xprime') return -1;
+        if (addonIdB === 'xprime') return 1;
+        
+        // Then put HDRezka second
         if (addonIdA === 'hdrezka') return -1;
         if (addonIdB === 'hdrezka') return 1;
         
@@ -824,6 +868,14 @@ export const StreamsScreen = () => {
             const qualityA = getQualityNumeric(a.title);
             const qualityB = getQualityNumeric(b.title);
             return qualityB - qualityA; // Sort descending (e.g., 1080p before 720p)
+          });
+        } else if (addonId === 'xprime') {
+          // Sort XPRIME streams by quality in descending order (highest quality first)
+          // For XPRIME, quality is in the 'name' field
+          sortedProviderStreams = [...providerStreams].sort((a, b) => {
+            const qualityA = getQualityNumeric(a.name);
+            const qualityB = getQualityNumeric(b.name);
+            return qualityB - qualityA; // Sort descending (e.g., 1080 before 720)
           });
         }
         return {
