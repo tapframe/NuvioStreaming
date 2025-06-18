@@ -1,4 +1,4 @@
-// Test script for HDRezka service
+d// Test script for HDRezka service
 // Run with: node scripts/test-hdrezka.js
 
 const fetch = require('node-fetch');

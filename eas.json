@@ -13,7 +13,12 @@
     },
     "production": {
       "autoIncrement": true,
-      "extends": "apk"
+      "extends": "apk",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease",
+        "image": "latest"
+      }
     },
     "release": {
       "distribution": "store",
@@ -23,7 +28,8 @@
     },
     "apk": {
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
       }
     }
   },

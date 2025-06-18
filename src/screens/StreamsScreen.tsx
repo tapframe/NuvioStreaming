@@ -749,11 +749,7 @@ export const StreamsScreen = () => {
       { id: 'all', name: 'All Providers' },
       ...Array.from(allProviders)
         .sort((a, b) => {
-          // Always put XPRIME at the top (primary source)
-          if (a === 'xprime') return -1;
-          if (b === 'xprime') return 1;
-          
-          // Then put HDRezka second
+          // Put HDRezka first
           if (a === 'hdrezka') return -1;
           if (b === 'hdrezka') return 1;
           
@@ -801,7 +797,6 @@ export const StreamsScreen = () => {
       }
       
       // Then try to match standalone quality numbers at the end of the title
-      // This handles XPRIME format where quality is just "1080", "720", etc.
       const matchAtEnd = title.match(/\b(\d{3,4})\s*$/);
       if (matchAtEnd) {
         const quality = parseInt(matchAtEnd[1], 10);
@@ -844,11 +839,7 @@ export const StreamsScreen = () => {
         return addonId === selectedProvider;
       })
       .sort(([addonIdA], [addonIdB]) => {
-        // Always put XPRIME at the top (primary source)
-        if (addonIdA === 'xprime') return -1;
-        if (addonIdB === 'xprime') return 1;
-        
-        // Then put HDRezka second
+        // Put HDRezka first
         if (addonIdA === 'hdrezka') return -1;
         if (addonIdB === 'hdrezka') return 1;
         
@@ -869,13 +860,12 @@ export const StreamsScreen = () => {
             const qualityB = getQualityNumeric(b.title);
             return qualityB - qualityA; // Sort descending (e.g., 1080p before 720p)
           });
-        } else if (addonId === 'xprime') {
-          // Sort XPRIME streams by quality in descending order (highest quality first)
-          // For XPRIME, quality is in the 'name' field
+        } else {
+          // Sort other streams by quality if possible
           sortedProviderStreams = [...providerStreams].sort((a, b) => {
-            const qualityA = getQualityNumeric(a.name);
-            const qualityB = getQualityNumeric(b.name);
-            return qualityB - qualityA; // Sort descending (e.g., 1080 before 720)
+            const qualityA = getQualityNumeric(a.name || a.title);
+            const qualityB = getQualityNumeric(b.name || b.title);
+            return qualityB - qualityA; // Sort descending
           });
         }
         return {

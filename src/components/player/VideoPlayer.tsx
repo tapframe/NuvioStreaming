@@ -297,16 +297,56 @@ const VideoPlayer: React.FC = () => {
   const seekToTime = (timeInSeconds: number) => {
     if (!isPlayerReady || duration <= 0 || !vlcRef.current) return;
     const normalizedPosition = Math.max(0, Math.min(timeInSeconds / duration, 1));
+    
     try {
-      if (typeof vlcRef.current.setPosition === 'function') {
+      if (Platform.OS === 'android') {
+        // On Android, we need to handle seeking differently to prevent black screens
+        setIsBuffering(true);
+        
+        // Set a small timeout to prevent overwhelming the player
+        const now = Date.now();
+        if (now - lastSeekTime.current < 300) {
+          // Throttle seeks that are too close together
+          if (seekDebounceTimer.current) {
+            clearTimeout(seekDebounceTimer.current);
+          }
+          
+          seekDebounceTimer.current = setTimeout(() => {
+            if (vlcRef.current) {
+              // Set position instead of using seek on Android
+              vlcRef.current.setPosition(normalizedPosition);
+              lastSeekTime.current = Date.now();
+              
+              // Give the player some time to recover
+              setTimeout(() => {
+                setIsBuffering(false);
+              }, 500);
+            }
+          }, 300);
+          return;
+        }
+        
+        // Directly set position
         vlcRef.current.setPosition(normalizedPosition);
-      } else if (typeof vlcRef.current.seek === 'function') {
-        vlcRef.current.seek(normalizedPosition);
+        lastSeekTime.current = now;
+        
+        // Reset buffering state after a delay
+        setTimeout(() => {
+          setIsBuffering(false);
+        }, 500);
       } else {
-        logger.error('[VideoPlayer] No seek method available on VLC player');
+        // For iOS, keep the original behavior
+        if (typeof vlcRef.current.setPosition === 'function') {
+          vlcRef.current.setPosition(normalizedPosition);
+        } else if (typeof vlcRef.current.seek === 'function') {
+          vlcRef.current.seek(normalizedPosition);
+        } else {
+          logger.error('[VideoPlayer] No seek method available on VLC player');
+        }
       }
     } catch (error) {
       logger.error('[VideoPlayer] Error during seek operation:', error);
+      setIsBuffering(false);
     }
   };
 
@@ -329,8 +369,18 @@ const VideoPlayer: React.FC = () => {
   const handleProgressBarDragEnd = () => {
     setIsDragging(false);
     if (pendingSeekValue.current !== null) {
-      seekToTime(pendingSeekValue.current);
-      pendingSeekValue.current = null;
+      // For Android, add a small delay to ensure UI updates before the seek happens
+      if (Platform.OS === 'android') {
+        setTimeout(() => {
+          if (pendingSeekValue.current !== null) {
+            seekToTime(pendingSeekValue.current);
+            pendingSeekValue.current = null;
+          }
+        }, 150);
+      } else {
+        seekToTime(pendingSeekValue.current);
+        pendingSeekValue.current = null;
+      }
     }
   };
   
@@ -743,35 +793,63 @@ const VideoPlayer: React.FC = () => {
       logger.log(`[VideoPlayer] Player ready after source change, seeking to position: ${pendingSeek.position}s out of ${duration}s total`);
       
       if (pendingSeek.position > 0 && vlcRef.current) {
-        // Wait longer for the player to be fully ready and stable
+        // Longer delay for Android to ensure player is stable
+        const delayTime = Platform.OS === 'android' ? 2500 : 1500;
+        
         setTimeout(() => {
           if (vlcRef.current && duration > 0 && pendingSeek) {
             logger.log(`[VideoPlayer] Executing seek to ${pendingSeek.position}s`);
             
-            // Use our existing seekToTime function which handles VLC methods properly
-            seekToTime(pendingSeek.position);
-            
-            // Also update the current time state to reflect the seek
-            setCurrentTime(pendingSeek.position);
-            
-            // Resume playback if it was playing before the source change
-            if (pendingSeek.shouldPlay) {
+            if (Platform.OS === 'android') {
+              // On Android, wait longer and set isBuffering to improve visual feedback
+              setIsBuffering(true);
+              
+              // For Android, use setPosition directly with normalized value
+              const normalizedPosition = Math.max(0, Math.min(pendingSeek.position / duration, 1));
+              vlcRef.current.setPosition(normalizedPosition);
+              
+              // Update the current time
+              setCurrentTime(pendingSeek.position);
+              
+              // Give the player time to recover from the seek
               setTimeout(() => {
-                logger.log('[VideoPlayer] Resuming playback after seek');
-                setPaused(false);
-                if (vlcRef.current && typeof vlcRef.current.play === 'function') {
-                  vlcRef.current.play();
+                setIsBuffering(false);
+                
+                // Resume playback after a delay if needed
+                if (pendingSeek.shouldPlay) {
+                  setPaused(false);
                 }
-              }, 700); // Wait longer for seek to complete properly
+                
+                // Clean up
+                setPendingSeek(null);
+                setIsChangingSource(false);
+              }, 800);
+            } else {
+              // iOS - use the normal seekToTime function
+              seekToTime(pendingSeek.position);
+              
+              // Also update the current time state
+              setCurrentTime(pendingSeek.position);
+              
+              // Resume playback if needed
+              if (pendingSeek.shouldPlay) {
+                setTimeout(() => {
+                  logger.log('[VideoPlayer] Resuming playback after seek');
+                  setPaused(false);
+                  if (vlcRef.current && typeof vlcRef.current.play === 'function') {
+                    vlcRef.current.play();
+                  }
+                }, 700);
+              }
+              
+              // Clean up
+              setTimeout(() => {
+                setPendingSeek(null);
+                setIsChangingSource(false);
+              }, 800);
             }
-            
-            // Clean up after a reasonable delay
-            setTimeout(() => {
-              setPendingSeek(null);
-              setIsChangingSource(false);
-            }, 800);
           }
-        }, 1500); // Increased delay to ensure player is fully stable
+        }, delayTime);
       } else {
         // No seeking needed, just resume playback if it was playing
         if (pendingSeek.shouldPlay) {
@@ -963,7 +1041,19 @@ const VideoPlayer: React.FC = () => {
                   }}
                   source={{
                     uri: currentStreamUrl,
-                    initOptions: [
+                    initOptions: Platform.OS === 'android' ? [
+                      '--rtsp-tcp',
+                      '--network-caching=1500',
+                      '--rtsp-caching=1500',
+                      '--no-audio-time-stretch',
+                      '--clock-jitter=0',
+                      '--clock-synchro=0',
+                      '--drop-late-frames',
+                      '--skip-frames',
+                      '--aout=opensles',
+                      '--file-caching=1500',
+                      '--sout-mux-caching=1500',
+                    ] : [
                       '--rtsp-tcp',
                       '--network-caching=150',
                       '--rtsp-caching=150',
@@ -984,6 +1074,7 @@ const VideoPlayer: React.FC = () => {
                   onProgress={handleProgress}
                   onEnd={onEnd}
                   onError={handleError}
+                  onBuffering={onBuffering}
                 />
               </TouchableOpacity>
             </View>

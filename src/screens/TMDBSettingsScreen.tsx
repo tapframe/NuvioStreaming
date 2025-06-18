@@ -115,13 +115,12 @@ const TMDBSettingsScreen = () => {
 
   const testApiKey = async (key: string): Promise<boolean> => {
     try {
-      // Simple API call to test the key
+      // Simple API call to test the key using the API key parameter method
       const response = await fetch(
-        'https://api.themoviedb.org/3/configuration',
+        `https://api.themoviedb.org/3/configuration?api_key=${key}`,
         {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${key}`,
             'Content-Type': 'application/json',
           }
         }
@@ -523,7 +522,7 @@ const TMDBSettingsScreen = () => {
                     setApiKey(text);
                     if (testResult) setTestResult(null);
                   }}
-                  placeholder="Paste your TMDb API key (v4 auth)"
+                  placeholder="Paste your TMDb API key (v3)"
                   placeholderTextColor={currentTheme.colors.mediumGray}
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -591,7 +590,7 @@ const TMDBSettingsScreen = () => {
             <View style={styles.infoCard}>
               <MaterialIcons name="info-outline" size={22} color={currentTheme.colors.primary} style={styles.infoIcon} />
               <Text style={styles.infoText}>
-                To get your own TMDb API key (v4 auth token), you need to create a TMDb account and request an API key from their website.
+                To get your own TMDb API key (v3), you need to create a TMDb account and request an API key from their website.
                 Using your own API key gives you dedicated quota and may improve app performance.
               </Text>
             </View>

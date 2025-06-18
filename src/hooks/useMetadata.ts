@@ -4,12 +4,13 @@ import { catalogService } from '../services/catalogService';
 import { stremioService } from '../services/stremioService';
 import { tmdbService } from '../services/tmdbService';
 import { hdrezkaService } from '../services/hdrezkaService';
-import { xprimeService } from '../services/xprimeService';
 import { cacheService } from '../services/cacheService';
 import { Cast, Episode, GroupedEpisodes, GroupedStreams } from '../types/metadata';
 import { TMDBService } from '../services/tmdbService';
 import { logger } from '../utils/logger';
 import { usePersistentSeasons } from './usePersistentSeasons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Stream } from '../types/metadata';
 
 // Constants for timeouts and retries
 const API_TIMEOUT = 10000; // 10 seconds
@@ -115,6 +116,8 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
   const [recommendations, setRecommendations] = useState<StreamingContent[]>([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
   const [imdbId, setImdbId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [availableStreams, setAvailableStreams] = useState<{ [sourceType: string]: Stream }>({});
 
   // Add hook for persistent seasons
   const { getSeason, saveSeason } = usePersistentSeasons();
@@ -216,78 +219,43 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
     }
   };
 
-  const processXprimeSource = async (type: string, id: string, season?: number, episode?: number, isEpisode = false) => {
-    const sourceStartTime = Date.now();
-    const logPrefix = isEpisode ? 'loadEpisodeStreams' : 'loadStreams';
-    const sourceName = 'xprime';
-    
-    logger.log(`🔍 [${logPrefix}:${sourceName}] Starting fetch`);
-
-    try {
-      const streams = await xprimeService.getStreams(
-        id,
-        type,
-        season,
-        episode
-      );
-      
-      const processTime = Date.now() - sourceStartTime;
-      
-      if (streams && streams.length > 0) {
-        logger.log(`✅ [${logPrefix}:${sourceName}] Received ${streams.length} streams after ${processTime}ms`);
-        
-        // Format response similar to Stremio format for the UI
-        return {
-          'xprime': {
-            addonName: 'XPRIME',
-            streams
-          }
-        };
-      } else {
-        logger.log(`⚠️ [${logPrefix}:${sourceName}] No streams found after ${processTime}ms`);
-        return {};
-      }
-    } catch (error) {
-      logger.error(`❌ [${logPrefix}:${sourceName}] Error:`, error);
-      return {};
-    }
-  };
-
   const processExternalSource = async (sourceType: string, promise: Promise<any>, isEpisode = false) => {
-    const sourceStartTime = Date.now();
-    const logPrefix = isEpisode ? 'loadEpisodeStreams' : 'loadStreams';
-    
     try {
-      logger.log(`🔍 [${logPrefix}:${sourceType}] Starting fetch`);
+      const startTime = Date.now();
       const result = await promise;
-      logger.log(`✅ [${logPrefix}:${sourceType}] Completed in ${Date.now() - sourceStartTime}ms`);
+      const processingTime = Date.now() - startTime;
       
-      if (Object.keys(result).length > 0) {
-        const totalStreams = Object.values(result).reduce((acc, group: any) => acc + (group.streams?.length || 0), 0);
-        logger.log(`📦 [${logPrefix}:${sourceType}] Found ${totalStreams} streams`);
-        
+      if (result && Object.keys(result).length > 0) {
+        // Update the appropriate state based on whether this is for an episode or not
         const updateState = (prevState: GroupedStreams) => {
-          logger.log(`🔄 [${logPrefix}:${sourceType}] Updating state with ${Object.keys(result).length} providers`);
+          const newState = { ...prevState };
           
-          // If this is XPRIME, put it first; otherwise append to the end
-          if (sourceType === 'xprime') {
-            return { ...result, ...prevState };
-          } else {
-            return { ...prevState, ...result };
-          }
+          // Merge in the new streams
+          Object.entries(result).forEach(([provider, data]: [string, any]) => {
+            newState[provider] = data;
+          });
+          
+          return newState;
         };
-
+        
         if (isEpisode) {
           setEpisodeStreams(updateState);
         } else {
           setGroupedStreams(updateState);
         }
+        
+        console.log(`✅ [processExternalSource:${sourceType}] Processed in ${processingTime}ms, found streams:`, 
+          Object.values(result).reduce((acc: number, curr: any) => acc + (curr.streams?.length || 0), 0)
+        );
+        
+        // Return the result for the promise chain
+        return result;
       } else {
-        logger.log(`⚠️ [${logPrefix}:${sourceType}] No streams found`);
+        console.log(`⚠️ [processExternalSource:${sourceType}] No streams found after ${processingTime}ms`);
+        return {};
       }
-      return result;
     } catch (error) {
-      logger.error(`❌ [${logPrefix}:${sourceType}] Error:`, error);
+      console.error(`❌ [processExternalSource:${sourceType}] Error:`, error);
       return {};
     }
   };
@@ -661,9 +629,6 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
       console.log('🚀 [loadStreams] START - Loading streams for:', id);
       updateLoadingState();
 
-      // Always clear streams first to ensure we don't show stale data
-      setGroupedStreams({});
-
       // Get TMDB ID for external sources first before starting parallel requests
       console.log('🔍 [loadStreams] Getting TMDB ID for:', id);
       let tmdbId;
@@ -679,27 +644,22 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
         tmdbId = id;
         console.log('ℹ️ [loadStreams] Using ID as TMDB ID:', tmdbId);
       }
-
-      console.log('🔄 [loadStreams] Starting stream requests');
       
       // Start Stremio request using the callback method
       processStremioSource(type, id, false);
-
-      // Add Xprime source (PRIMARY)
-      const xprimePromise = processExternalSource('xprime', processXprimeSource(type, id), false);
       
       // Add HDRezka source  
       const hdrezkaPromise = processExternalSource('hdrezka', processHDRezkaSource(type, id), false);
       
-      // Include Xprime and HDRezka in fetchPromises array (Xprime first)
-      const fetchPromises: Promise<any>[] = [xprimePromise, hdrezkaPromise];
+      // Include HDRezka in fetchPromises array
+      const fetchPromises: Promise<any>[] = [hdrezkaPromise];
 
       // Wait only for external promises now
       const results = await Promise.allSettled(fetchPromises);
       const totalTime = Date.now() - startTime;
       console.log(`✅ [loadStreams] External source requests completed in ${totalTime}ms (Stremio continues in background)`);
       
-      const sourceTypes: string[] = ['xprime', 'hdrezka'];
+      const sourceTypes: string[] = ['hdrezka'];
       results.forEach((result, index) => {
         const source = sourceTypes[Math.min(index, sourceTypes.length - 1)];
         console.log(`📊 [loadStreams:${source}] Status: ${result.status}`);
@@ -770,26 +730,20 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
       // Start Stremio request using the callback method
       processStremioSource('series', episodeId, true);
       
-      // Add Xprime source for episodes (PRIMARY)
-      const xprimeEpisodePromise = processExternalSource('xprime',
-        processXprimeSource('series', id, parseInt(season), parseInt(episode), true),
-        true
-      );
-      
       // Add HDRezka source for episodes
       const hdrezkaEpisodePromise = processExternalSource('hdrezka',
         processHDRezkaSource('series', id, parseInt(season), parseInt(episode), true),
         true
       );
       
-      const fetchPromises: Promise<any>[] = [xprimeEpisodePromise, hdrezkaEpisodePromise];
+      const fetchPromises: Promise<any>[] = [hdrezkaEpisodePromise];
 
       // Wait only for external promises now
       const results = await Promise.allSettled(fetchPromises);
       const totalTime = Date.now() - startTime;
       console.log(`✅ [loadEpisodeStreams] External source requests completed in ${totalTime}ms (Stremio continues in background)`);
       
-      const sourceTypes: string[] = ['xprime', 'hdrezka'];
+      const sourceTypes: string[] = ['hdrezka'];
       results.forEach((result, index) => {
         const source = sourceTypes[Math.min(index, sourceTypes.length - 1)];
         console.log(`📊 [loadEpisodeStreams:${source}] Status: ${result.status}`);

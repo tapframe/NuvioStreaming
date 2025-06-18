@@ -197,91 +197,9 @@ class XprimeService {
   }
 
   async getStreams(mediaId: string, mediaType: string, season?: number, episode?: number): Promise<Stream[]> {
-    try {
-      logger.log(`[XPRIME] Getting streams for ${mediaType} with ID: ${mediaId}`);
-      
-      // First check if internal providers are enabled
-      const settingsJson = await AsyncStorage.getItem('app_settings');
-      if (settingsJson) {
-        const settings = JSON.parse(settingsJson);
-        if (settings.enableInternalProviders === false) {
-          logger.log('[XPRIME] Internal providers are disabled in settings, skipping Xprime.tv');
-          return [];
-        }
-      }
-      
-      // Check individual XPRIME provider setting
-      const xprimeSettingsJson = await AsyncStorage.getItem('xprime_settings');
-      if (xprimeSettingsJson) {
-        const xprimeSettings = JSON.parse(xprimeSettingsJson);
-        if (xprimeSettings.enabled === false) {
-          logger.log('[XPRIME] XPRIME provider is disabled in settings, skipping Xprime.tv');
-          return [];
-        }
-      }
-      
-      // Extract the actual title from TMDB if this is an ID
-      let title = mediaId;
-      let year: number | undefined = undefined;
-      
-      if (mediaId.startsWith('tt') || mediaId.startsWith('tmdb:')) {
-        let tmdbId: number | null = null;
-        
-        // Handle IMDB IDs
-        if (mediaId.startsWith('tt')) {
-          logger.log(`[XPRIME] Converting IMDB ID to TMDB ID: ${mediaId}`);
-          tmdbId = await tmdbService.findTMDBIdByIMDB(mediaId);
-        } 
-        // Handle TMDB IDs
-        else if (mediaId.startsWith('tmdb:')) {
-          tmdbId = parseInt(mediaId.split(':')[1], 10);
-        }
-        
-        if (tmdbId) {
-          // Fetch metadata from TMDB API
-          if (mediaType === 'movie') {
-            logger.log(`[XPRIME] Fetching movie details from TMDB for ID: ${tmdbId}`);
-            const movieDetails = await tmdbService.getMovieDetails(tmdbId.toString());
-            if (movieDetails) {
-              title = movieDetails.title;
-              year = movieDetails.release_date ? parseInt(movieDetails.release_date.substring(0, 4), 10) : undefined;
-              logger.log(`[XPRIME] Using movie title "${title}" (${year}) for search`);
-            }
-          } else {
-            logger.log(`[XPRIME] Fetching TV show details from TMDB for ID: ${tmdbId}`);
-            const showDetails = await tmdbService.getTVShowDetails(tmdbId);
-            if (showDetails) {
-              title = showDetails.name;
-              year = showDetails.first_air_date ? parseInt(showDetails.first_air_date.substring(0, 4), 10) : undefined;
-              logger.log(`[XPRIME] Using TV show title "${title}" (${year}) for search`);
-            }
-          }
-        }
-      }
-
-      if (!title || !year) {
-        logger.log('[XPRIME] Skipping fetch: title or year is missing.');
-        return [];
-      }
-
-      const rawXprimeStreams = await this.getXprimeStreams(title, year, mediaType, season, episode);
-      
-      // Convert to Stream format
-      const streams: Stream[] = rawXprimeStreams.map(xprimeStream => ({
-        name: `XPRIME ${xprimeStream.quality.toUpperCase()}`,
-        title: xprimeStream.size !== 'Unknown size' ? xprimeStream.size : '',
-        url: xprimeStream.url,
-        behaviorHints: {
-          notWebReady: false
-        }
-      }));
-      
-      logger.log(`[XPRIME] Found ${streams.length} streams`);
-      return streams;
-    } catch (error) {
-      logger.error(`[XPRIME] Error getting streams:`, error);
-      return [];
-    }
+    // XPRIME service has been removed from internal providers
+    logger.log('[XPRIME] Service has been removed from internal providers');
+    return [];
   }
 
   private async getXprimeStreams(title: string, year: number, type: string, seasonNum?: number, episodeNum?: number): Promise<XprimeStream[]> {

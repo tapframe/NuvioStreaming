@@ -104,20 +104,13 @@ const InternalProvidersSettings: React.FC = () => {
   const navigation = useNavigation();
   
   // Individual provider states
-  const [xprimeEnabled, setXprimeEnabled] = useState(true);
   const [hdrezkaEnabled, setHdrezkaEnabled] = useState(true);
   
   // Load individual provider settings
   useEffect(() => {
     const loadProviderSettings = async () => {
       try {
-        const xprimeSettings = await AsyncStorage.getItem('xprime_settings');
         const hdrezkaSettings = await AsyncStorage.getItem('hdrezka_settings');
-        
-        if (xprimeSettings) {
-          const parsed = JSON.parse(xprimeSettings);
-          setXprimeEnabled(parsed.enabled !== false);
-        }
         
         if (hdrezkaSettings) {
           const parsed = JSON.parse(hdrezkaSettings);
@@ -139,7 +132,7 @@ const InternalProvidersSettings: React.FC = () => {
     if (!enabled) {
       Alert.alert(
         'Disable Internal Providers',
-        'This will disable all built-in streaming providers (XPRIME, HDRezka). You can still use external Stremio addons.',
+        'This will disable all built-in streaming providers (HDRezka). You can still use external Stremio addons.',
         [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -155,15 +148,6 @@ const InternalProvidersSettings: React.FC = () => {
       updateSetting('enableInternalProviders', true);
     }
   }, [updateSetting]);
-
-  const handleXprimeToggle = useCallback(async (enabled: boolean) => {
-    setXprimeEnabled(enabled);
-    try {
-      await AsyncStorage.setItem('xprime_settings', JSON.stringify({ enabled }));
-    } catch (error) {
-      console.error('Error saving XPRIME settings:', error);
-    }
-  }, []);
 
   const handleHdrezkaToggle = useCallback(async (enabled: boolean) => {
     setHdrezkaEnabled(enabled);
@@ -257,14 +241,6 @@ const InternalProvidersSettings: React.FC = () => {
                 { backgroundColor: currentTheme.colors.elevation2 },
               ]}
             >
-              <SettingItem
-                title="XPRIME"
-                description="High-quality streams with various resolutions"
-                icon="star"
-                value={xprimeEnabled}
-                onValueChange={handleXprimeToggle}
-                badge="NEW"
-              />
               <SettingItem
                 title="HDRezka"
                 description="Popular streaming service with multiple quality options"

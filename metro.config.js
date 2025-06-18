@@ -1,28 +1,31 @@
 const { getDefaultConfig } = require('expo/metro-config');
 
-module.exports = (() => {
-  const config = getDefaultConfig(__dirname);
+const config = getDefaultConfig(__dirname);
 
-  const { transformer, resolver } = config;
-
-  config.transformer = {
-    ...transformer,
-    babelTransformerPath: require.resolve('react-native-svg-transformer'),
-    minifierConfig: {
-      compress: {
-        // Remove console.* statements in release builds
-        drop_console: true,
-        // Keep error logging for critical issues
-        pure_funcs: ['console.info', 'console.log', 'console.debug', 'console.warn'],
-      },
+// Enable tree shaking and better minification
+config.transformer = {
+  ...config.transformer,
+  babelTransformerPath: require.resolve('react-native-svg-transformer'),
+  minifierConfig: {
+    ecma: 8,
+    keep_fnames: true,
+    mangle: {
+      keep_fnames: true,
     },
-  };
+    compress: {
+      drop_console: true,
+      drop_debugger: true,
+      pure_funcs: ['console.log', 'console.info', 'console.debug'],
+    },
+  },
+};
 
-  config.resolver = {
-    ...resolver,
-    assetExts: resolver.assetExts.filter((ext) => ext !== 'svg'),
-    sourceExts: [...resolver.sourceExts, 'svg'],
-  };
+// Optimize resolver for better tree shaking and SVG support
+config.resolver = {
+  ...config.resolver,
+  assetExts: config.resolver.assetExts.filter((ext) => ext !== 'svg'),
+  sourceExts: [...config.resolver.sourceExts, 'svg'],
+  resolverMainFields: ['react-native', 'browser', 'main'],
+};
 
-  return config;
-})(); 
+module.exports = config; 
