@@ -320,34 +320,50 @@ const SearchScreen = () => {
       }
 
       try {
+        logger.info('Performing search for:', searchQuery);
         const searchResults = await catalogService.searchContentCinemeta(searchQuery);
         setResults(searchResults);
         if (searchResults.length > 0) {
           await saveRecentSearch(searchQuery);
         }
+        logger.info('Search completed, found', searchResults.length, 'results');
       } catch (error) {
         logger.error('Search failed:', error);
         setResults([]);
       } finally {
         setSearching(false);
       }
-    }, 200),
+    }, 800),
     [recentSearches]
   );
 
   useEffect(() => {
-    if (query.trim()) {
+    if (query.trim() && query.trim().length >= 2) {
       setSearching(true);
       setSearched(true);
       setShowRecent(false);
       debouncedSearch(query);
+    } else if (query.trim().length < 2 && query.trim().length > 0) {
+      // Show that we're waiting for more characters
+      setSearching(false);
+      setSearched(false);
+      setShowRecent(false);
+      setResults([]);
     } else {
+      // Cancel any pending search when query is cleared
+      debouncedSearch.cancel();
       setResults([]);
       setSearched(false);
+      setSearching(false);
       setShowRecent(true);
       loadRecentSearches();
     }
-  }, [query]);
+    
+    // Cleanup function to cancel pending searches
+    return () => {
+      debouncedSearch.cancel();
+    };
+  }, [query, debouncedSearch]);
 
   const handleClearSearch = () => {
     setQuery('');
@@ -544,6 +560,23 @@ const SearchScreen = () => {
         <View style={[styles.contentContainer, { backgroundColor: currentTheme.colors.darkBackground }]}>
           {searching ? (
             <SimpleSearchAnimation />
+          ) : query.trim().length === 1 ? (
+            <Animated.View 
+              style={styles.emptyContainer}
+              entering={FadeIn.duration(300)}
+            >
+              <MaterialIcons 
+                name="search" 
+                size={64} 
+                color={currentTheme.colors.lightGray}
+              />
+              <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>
+                Keep typing...
+              </Text>
+              <Text style={[styles.emptySubtext, { color: currentTheme.colors.lightGray }]}>
+                Type at least 2 characters to search
+              </Text>
+            </Animated.View>
           ) : searched && !hasResultsToShow ? (
             <Animated.View 
               style={styles.emptyContainer}
