@@ -19,7 +19,32 @@ import { TMDBService } from '../../services/tmdbService';
 import { catalogService } from '../../services/catalogService';
 
 const { width } = Dimensions.get('window');
-const POSTER_WIDTH = (width - 48) / 3.5; // Adjust number for desired items visible
+
+// Dynamic poster calculation based on screen width for More Like This section
+const calculatePosterLayout = (screenWidth: number) => {
+  const MIN_POSTER_WIDTH = 100; // Slightly smaller for more items in this section
+  const MAX_POSTER_WIDTH = 130; // Maximum poster width
+  const HORIZONTAL_PADDING = 48; // Total horizontal padding/margins
+  
+  // Calculate how many posters can fit (aim for slightly more items than main sections)
+  const availableWidth = screenWidth - HORIZONTAL_PADDING;
+  const maxColumns = Math.floor(availableWidth / MIN_POSTER_WIDTH);
+  
+  // Limit to reasonable number of columns (3-7 for this section)
+  const numColumns = Math.min(Math.max(maxColumns, 3), 7);
+  
+  // Calculate actual poster width
+  const posterWidth = Math.min(availableWidth / numColumns, MAX_POSTER_WIDTH);
+  
+  return {
+    numColumns,
+    posterWidth,
+    spacing: 12 // Space between posters
+  };
+};
+
+const posterLayout = calculatePosterLayout(width);
+const POSTER_WIDTH = posterLayout.posterWidth;
 const POSTER_HEIGHT = POSTER_WIDTH * 1.5;
 
 interface MoreLikeThisSectionProps {

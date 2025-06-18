@@ -41,9 +41,35 @@ const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
 // Screen dimensions and grid layout
 const { width } = Dimensions.get('window');
-const NUM_COLUMNS = 3;
+
+// Dynamic column calculation based on screen width
+const calculateCatalogLayout = (screenWidth: number) => {
+  const MIN_ITEM_WIDTH = 110; // Minimum item width for readability
+  const MAX_ITEM_WIDTH = 150; // Maximum item width
+  const HORIZONTAL_PADDING = SPACING.lg * 2; // Total horizontal padding
+  const ITEM_MARGIN_TOTAL = SPACING.sm * 2; // Total margin per item
+  
+  // Calculate how many columns can fit
+  const availableWidth = screenWidth - HORIZONTAL_PADDING;
+  const maxColumns = Math.floor(availableWidth / (MIN_ITEM_WIDTH + ITEM_MARGIN_TOTAL));
+  
+  // Limit to reasonable number of columns (2-6)
+  const numColumns = Math.min(Math.max(maxColumns, 2), 6);
+  
+  // Calculate actual item width
+  const totalMargins = ITEM_MARGIN_TOTAL * numColumns;
+  const itemWidth = Math.min((availableWidth - totalMargins) / numColumns, MAX_ITEM_WIDTH);
+  
+  return {
+    numColumns,
+    itemWidth
+  };
+};
+
+const catalogLayout = calculateCatalogLayout(width);
+const NUM_COLUMNS = catalogLayout.numColumns;
 const ITEM_MARGIN = SPACING.sm;
-const ITEM_WIDTH = (width - (SPACING.lg * 2) - (ITEM_MARGIN * 2 * NUM_COLUMNS)) / NUM_COLUMNS;
+const ITEM_WIDTH = catalogLayout.itemWidth;
 
 // Create a styles creator function that accepts the theme colors
 const createStyles = (colors: any) => StyleSheet.create({

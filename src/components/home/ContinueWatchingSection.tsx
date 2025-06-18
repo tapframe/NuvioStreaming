@@ -33,8 +33,32 @@ interface ContinueWatchingRef {
   refresh: () => Promise<boolean>;
 }
 
+// Dynamic poster calculation based on screen width for Continue Watching section
+const calculatePosterLayout = (screenWidth: number) => {
+  const MIN_POSTER_WIDTH = 120; // Slightly larger for continue watching items
+  const MAX_POSTER_WIDTH = 160; // Maximum poster width for this section
+  const HORIZONTAL_PADDING = 40; // Total horizontal padding/margins
+  
+  // Calculate how many posters can fit (fewer items for continue watching)
+  const availableWidth = screenWidth - HORIZONTAL_PADDING;
+  const maxColumns = Math.floor(availableWidth / MIN_POSTER_WIDTH);
+  
+  // Limit to reasonable number of columns (2-5 for continue watching)
+  const numColumns = Math.min(Math.max(maxColumns, 2), 5);
+  
+  // Calculate actual poster width
+  const posterWidth = Math.min(availableWidth / numColumns, MAX_POSTER_WIDTH);
+  
+  return {
+    numColumns,
+    posterWidth,
+    spacing: 12 // Space between posters
+  };
+};
+
 const { width } = Dimensions.get('window');
-const POSTER_WIDTH = (width - 40) / 2.7;
+const posterLayout = calculatePosterLayout(width);
+const POSTER_WIDTH = posterLayout.posterWidth;
 
 // Create a proper imperative handle with React.forwardRef and updated type
 const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, ref) => {
