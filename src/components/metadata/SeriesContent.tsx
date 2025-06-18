@@ -334,15 +334,48 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
         style={[
           styles.episodeCardHorizontal,
           isTablet && styles.episodeCardHorizontalTablet,
-          // Add subtle highlight border only
+          // Enhanced border styling
           { 
             borderWidth: 2,
-            borderColor: currentTheme.colors.primary + '40', // 40% opacity for subtle effect
+            borderColor: 'transparent', // Make base border transparent
+            // Add gradient border effect using shadow
+            shadowColor: currentTheme.colors.primary,
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.6,
+            shadowRadius: 8,
+            elevation: 12,
           }
         ]}
         onPress={() => onSelectEpisode(episode)}
         activeOpacity={0.85}
       >
+        {/* Gradient Border Container */}
+        <View style={{
+          position: 'absolute',
+          top: -2,
+          left: -2,
+          right: -2,
+          bottom: -2,
+          borderRadius: 18,
+          zIndex: -1,
+        }}>
+          <LinearGradient
+            colors={[
+              currentTheme.colors.primary + '80', // 80% opacity
+              currentTheme.colors.primary + '40', // 40% opacity
+              currentTheme.colors.primary + '20', // 20% opacity
+              currentTheme.colors.primary + '40', // 40% opacity
+              currentTheme.colors.primary + '80', // 80% opacity
+            ]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{
+              flex: 1,
+              borderRadius: 18,
+            }}
+          />
+        </View>
+
         {/* Background Image */}
         <Image
           source={{ uri: episodeImage }}
@@ -423,10 +456,6 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
             </View>
           )}
           
-          {/* More Options Button */}
-          <TouchableOpacity style={styles.moreButton} activeOpacity={0.7}>
-            <MaterialIcons name="more-horiz" size={24} color="rgba(255,255,255,0.9)" />
-          </TouchableOpacity>
         </LinearGradient>
       </TouchableOpacity>
     );
@@ -701,6 +730,7 @@ const styles = StyleSheet.create({
     height: 200,
     position: 'relative',
     width: '100%',
+    backgroundColor: 'transparent',
   },
   episodeCardHorizontalTablet: {
     height: 180,
@@ -809,17 +839,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#fff',
-  },
-  moreButton: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
   },
 
   // Season Selector Styles
