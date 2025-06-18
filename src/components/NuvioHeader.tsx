@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     height: Platform.OS === 'ios' ? 100 : 90,
-    paddingTop: Platform.OS === 'ios' ? 35 : 20,
+    paddingTop: Platform.OS === 'ios' ? 35 : 35,
     backgroundColor: 'rgba(0,0,0,0.3)',
   },
   blurOverlay: {
