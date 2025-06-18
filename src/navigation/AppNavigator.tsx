@@ -824,8 +824,8 @@ const AppNavigator = () => {
               name="Search" 
               component={SearchScreen as any} 
               options={{ 
-                animation: 'slide_from_right',
-                animationDuration: Platform.OS === 'android' ? 250 : 300,
+                animation: 'fade',
+                animationDuration: Platform.OS === 'android' ? 300 : 350,
                 contentStyle: {
                   backgroundColor: currentTheme.colors.darkBackground,
                 },
