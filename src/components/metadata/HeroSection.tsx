@@ -5,10 +5,14 @@ import {
   StyleSheet,
   Dimensions,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
+import { BlurView as ExpoBlurView } from 'expo-blur';
+import { BlurView as CommunityBlurView } from '@react-native-community/blur';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import Animated, {
   useAnimatedStyle,
   interpolate,
@@ -135,6 +139,21 @@ const ActionButtons = React.memo(({
         onPress={toggleLibrary}
         activeOpacity={0.85}
       >
+        {Platform.OS === 'ios' ? (
+          <ExpoBlurView intensity={80} style={styles.blurBackground} tint="dark" />
+        ) : (
+          Constants.executionEnvironment === ExecutionEnvironment.StoreClient ? (
+            <View style={styles.androidFallbackBlur} />
+          ) : (
+            <CommunityBlurView
+              style={styles.blurBackground}
+              blurType="dark"
+              blurAmount={8}
+              overlayColor="rgba(255,255,255,0.1)"
+              reducedTransparencyFallbackColor="rgba(255,255,255,0.15)"
+            />
+          )
+        )}
         <MaterialIcons
           name={inLibrary ? 'bookmark' : 'bookmark-border'}
           size={24}
@@ -151,6 +170,21 @@ const ActionButtons = React.memo(({
           onPress={handleRatingsPress}
           activeOpacity={0.85}
         >
+          {Platform.OS === 'ios' ? (
+            <ExpoBlurView intensity={80} style={styles.blurBackgroundRound} tint="dark" />
+          ) : (
+            Constants.executionEnvironment === ExecutionEnvironment.StoreClient ? (
+              <View style={styles.androidFallbackBlurRound} />
+            ) : (
+              <CommunityBlurView
+                style={styles.blurBackgroundRound}
+                blurType="dark"
+                blurAmount={8}
+                overlayColor="rgba(255,255,255,0.1)"
+                reducedTransparencyFallbackColor="rgba(255,255,255,0.15)"
+              />
+            )
+          )}
           <MaterialIcons 
             name="assessment" 
             size={24} 
@@ -563,19 +597,19 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   infoButton: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.7)',
+    overflow: 'hidden',
   },
   iconButton: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: 'rgba(255,255,255,0.15)',
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.7)',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   playButtonText: {
     color: '#000',
@@ -613,6 +647,40 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.85,
     letterSpacing: 0.1
+  },
+  blurBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 20,
+  },
+  androidFallbackBlur: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  blurBackgroundRound: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 25,
+  },
+  androidFallbackBlurRound: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
 });
 
