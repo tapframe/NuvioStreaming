@@ -235,6 +235,11 @@ const SearchScreen = () => {
 
   useEffect(() => {
     loadRecentSearches();
+    
+    // Cleanup function to cancel pending searches on unmount
+    return () => {
+      debouncedSearch.cancel();
+    };
   }, []);
 
   const animatedSearchBarStyle = useAnimatedStyle(() => {
@@ -299,13 +304,17 @@ const SearchScreen = () => {
 
   const saveRecentSearch = async (searchQuery: string) => {
     try {
-      const newRecentSearches = [
-        searchQuery,
-        ...recentSearches.filter(s => s !== searchQuery)
-      ].slice(0, MAX_RECENT_SEARCHES);
-      
-      setRecentSearches(newRecentSearches);
-      await AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newRecentSearches));
+      setRecentSearches(prevSearches => {
+        const newRecentSearches = [
+          searchQuery,
+          ...prevSearches.filter(s => s !== searchQuery)
+        ].slice(0, MAX_RECENT_SEARCHES);
+        
+        // Save to AsyncStorage
+        AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newRecentSearches));
+        
+        return newRecentSearches;
+      });
     } catch (error) {
       logger.error('Failed to save recent search:', error);
     }
@@ -334,7 +343,7 @@ const SearchScreen = () => {
         setSearching(false);
       }
     }, 800),
-    [recentSearches]
+    []
   );
 
   useEffect(() => {
