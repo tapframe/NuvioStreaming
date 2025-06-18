@@ -44,25 +44,28 @@ const { width } = Dimensions.get('window');
 
 // Dynamic column calculation based on screen width
 const calculateCatalogLayout = (screenWidth: number) => {
-  const MIN_ITEM_WIDTH = 110; // Minimum item width for readability
-  const MAX_ITEM_WIDTH = 150; // Maximum item width
+  const MIN_ITEM_WIDTH = 120; // Increased minimum for better readability
+  const MAX_ITEM_WIDTH = 160; // Adjusted maximum
   const HORIZONTAL_PADDING = SPACING.lg * 2; // Total horizontal padding
-  const ITEM_MARGIN_TOTAL = SPACING.sm * 2; // Total margin per item
+  const ITEM_SPACING = SPACING.sm; // Space between items
   
   // Calculate how many columns can fit
   const availableWidth = screenWidth - HORIZONTAL_PADDING;
-  const maxColumns = Math.floor(availableWidth / (MIN_ITEM_WIDTH + ITEM_MARGIN_TOTAL));
+  const maxColumns = Math.floor(availableWidth / (MIN_ITEM_WIDTH + ITEM_SPACING));
   
-  // Limit to reasonable number of columns (2-6)
-  const numColumns = Math.min(Math.max(maxColumns, 2), 6);
+  // Limit to reasonable number of columns (2-4 for better UX)
+  const numColumns = Math.min(Math.max(maxColumns, 2), 4);
   
-  // Calculate actual item width
-  const totalMargins = ITEM_MARGIN_TOTAL * numColumns;
-  const itemWidth = Math.min((availableWidth - totalMargins) / numColumns, MAX_ITEM_WIDTH);
+  // Calculate actual item width with proper spacing
+  const totalSpacing = ITEM_SPACING * (numColumns - 1);
+  const itemWidth = (availableWidth - totalSpacing) / numColumns;
+  
+  // For 2 columns, ensure we use the full available width
+  const finalItemWidth = numColumns === 2 ? itemWidth : Math.min(itemWidth, MAX_ITEM_WIDTH);
   
   return {
     numColumns,
-    itemWidth
+    itemWidth: finalItemWidth
   };
 };
 
@@ -105,11 +108,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     padding: SPACING.lg,
     paddingTop: SPACING.sm,
   },
-  columnWrapper: {
-    justifyContent: 'space-between',
-  },
   item: {
-    width: ITEM_WIDTH,
     marginBottom: SPACING.lg,
     borderRadius: 8,
     overflow: 'hidden',
@@ -441,10 +440,22 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
     }
   }, [loading, hasMore, page, loadItems]);
 
-  const renderItem = useCallback(({ item }: { item: Meta }) => {
+  const renderItem = useCallback(({ item, index }: { item: Meta; index: number }) => {
+    // Calculate if this is the last item in a row
+    const isLastInRow = (index + 1) % NUM_COLUMNS === 0;
+    // For 2-column layout, ensure proper spacing
+    const rightMargin = isLastInRow ? 0 : SPACING.sm;
+    
     return (
       <TouchableOpacity
-        style={styles.item}
+        style={[
+          styles.item,
+          { 
+            marginRight: rightMargin,
+            // For 2 columns, ensure items fill the available space properly
+            width: NUM_COLUMNS === 2 ? ITEM_WIDTH : ITEM_WIDTH
+          }
+        ]}
         onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type })}
         activeOpacity={0.7}
       >
@@ -469,7 +480,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
         </View>
       </TouchableOpacity>
     );
-  }, [navigation, styles]);
+  }, [navigation, styles, NUM_COLUMNS, ITEM_WIDTH]);
 
   const renderEmptyState = () => (
     <View style={styles.centered}>
@@ -568,6 +579,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           renderItem={renderItem}
           keyExtractor={(item) => `${item.id}-${item.type}`}
           numColumns={NUM_COLUMNS}
+          key={NUM_COLUMNS}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -586,7 +598,6 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
             ) : null
           }
           contentContainerStyle={styles.list}
-          columnWrapperStyle={styles.columnWrapper}
           showsVerticalScrollIndicator={false}
         />
       ) : renderEmptyState()}
