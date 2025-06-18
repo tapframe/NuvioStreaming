@@ -333,7 +333,12 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
         key={episode.id}
         style={[
           styles.episodeCardHorizontal,
-          isTablet && styles.episodeCardHorizontalTablet
+          isTablet && styles.episodeCardHorizontalTablet,
+          // Add subtle highlight border only
+          { 
+            borderWidth: 2,
+            borderColor: currentTheme.colors.primary + '40', // 40% opacity for subtle effect
+          }
         ]}
         onPress={() => onSelectEpisode(episode)}
         activeOpacity={0.85}
@@ -345,21 +350,24 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
           contentFit="cover"
         />
         
-        {/* Gradient Overlay */}
+        {/* Standard Gradient Overlay */}
         <LinearGradient
           colors={[
-            'rgba(0,0,0,0.1)',
-            'rgba(0,0,0,0.3)', 
-            'rgba(0,0,0,0.8)',
+            'rgba(0,0,0,0.05)',
+            'rgba(0,0,0,0.2)', 
+            'rgba(0,0,0,0.6)',
+            'rgba(0,0,0,0.85)',
             'rgba(0,0,0,0.95)'
           ]}
-          locations={[0, 0.3, 0.7, 1]}
+          locations={[0, 0.2, 0.5, 0.8, 1]}
           style={styles.episodeGradient}
         >
           {/* Content Container */}
           <View style={styles.episodeContent}>
             {/* Episode Number Badge */}
-            <Text style={styles.episodeNumberHorizontal}>{episodeString}</Text>
+            <View style={styles.episodeNumberBadgeHorizontal}>
+              <Text style={styles.episodeNumberHorizontal}>{episodeString}</Text>
+            </View>
             
             {/* Episode Title */}
             <Text style={styles.episodeTitleHorizontal} numberOfLines={2}>
@@ -374,9 +382,11 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
             {/* Metadata Row */}
             <View style={styles.episodeMetadataRowHorizontal}>
               {episode.runtime && (
-                <Text style={styles.runtimeTextHorizontal}>
-                  {formatRuntime(episode.runtime)}
-                </Text>
+                <View style={styles.runtimeContainerHorizontal}>
+                  <Text style={styles.runtimeTextHorizontal}>
+                    {formatRuntime(episode.runtime)}
+                  </Text>
+                </View>
               )}
               {episode.vote_average > 0 && (
                 <View style={styles.ratingContainerHorizontal}>
@@ -395,7 +405,10 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               <View 
                 style={[
                   styles.progressBarHorizontal,
-                  { width: `${progressPercent}%`, backgroundColor: currentTheme.colors.primary }
+                  { 
+                    width: `${progressPercent}%`, 
+                    backgroundColor: currentTheme.colors.primary,
+                  }
                 ]} 
               />
             </View>
@@ -403,14 +416,16 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
           
           {/* Completed Badge */}
           {progressPercent >= 95 && (
-            <View style={[styles.completedBadgeHorizontal, { backgroundColor: currentTheme.colors.primary }]}>
+            <View style={[styles.completedBadgeHorizontal, { 
+              backgroundColor: currentTheme.colors.primary,
+            }]}>
               <MaterialIcons name="check" size={16} color="#fff" />
             </View>
           )}
           
-          {/* More Options */}
+          {/* More Options Button */}
           <TouchableOpacity style={styles.moreButton} activeOpacity={0.7}>
-            <MaterialIcons name="more-horiz" size={24} color="rgba(255,255,255,0.8)" />
+            <MaterialIcons name="more-horiz" size={24} color="rgba(255,255,255,0.9)" />
           </TouchableOpacity>
         </LinearGradient>
       </TouchableOpacity>
@@ -708,6 +723,14 @@ const styles = StyleSheet.create({
     padding: 12,
     paddingBottom: 16,
   },
+  episodeNumberBadgeHorizontal: {
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+    marginBottom: 6,
+    alignSelf: 'flex-start',
+  },
   episodeNumberHorizontal: {
     color: 'rgba(255,255,255,0.8)',
     fontSize: 10,
@@ -735,6 +758,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  runtimeContainerHorizontal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 3,
   },
   runtimeTextHorizontal: {
     color: 'rgba(255,255,255,0.8)',
