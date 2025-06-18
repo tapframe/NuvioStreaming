@@ -6,7 +6,6 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  RefreshControl,
   SafeAreaView,
   StatusBar,
   useColorScheme,
@@ -395,7 +394,6 @@ const HomeScreen = () => {
   const { 
     catalogs, 
     loading: catalogsLoading, 
-    refreshing: catalogsRefreshing, 
     refreshCatalogs 
   } = useHomeCatalogs();
   
@@ -412,8 +410,6 @@ const HomeScreen = () => {
     (showHeroSection ? featuredLoading : false) || catalogsLoading,
     [showHeroSection, featuredLoading, catalogsLoading]
   );
-  
-  const isRefreshing = catalogsRefreshing;
 
   // React to settings changes
   useEffect(() => {
@@ -496,25 +492,6 @@ const HomeScreen = () => {
     }
   }, []);
 
-  const handleRefresh = useCallback(async () => {
-    try {
-      const refreshTasks = [
-        refreshCatalogs(),
-        continueWatchingRef.current?.refresh(),
-      ];
-      
-      // Only refresh featured content if hero section is enabled,
-      // and force refresh to bypass the cache
-      if (showHeroSection) {
-        refreshTasks.push(refreshFeatured());
-      }
-      
-      await Promise.all(refreshTasks);
-    } catch (error) {
-      logger.error('Error during refresh:', error);
-    }
-  }, [refreshFeatured, refreshCatalogs, showHeroSection]);
-
   const handleContentPress = useCallback((id: string, type: string) => {
     navigation.navigate('Metadata', { id, type });
   }, [navigation]);
@@ -569,7 +546,7 @@ const HomeScreen = () => {
 
   // Memoize the loading screen to prevent unnecessary re-renders
   const renderLoadingScreen = useMemo(() => {
-    if (isLoading && !isRefreshing) {
+    if (isLoading) {
       return (
         <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
           <StatusBar
@@ -585,11 +562,11 @@ const HomeScreen = () => {
       );
     }
     return null;
-  }, [isLoading, isRefreshing, currentTheme.colors]);
+  }, [isLoading, currentTheme.colors]);
 
   // Memoize the main content section
   const renderMainContent = useMemo(() => {
-    if (isLoading && !isRefreshing) return null;
+    if (isLoading) return null;
     
     return (
       <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
@@ -599,14 +576,6 @@ const HomeScreen = () => {
           translucent
         />
         <ScrollView
-          refreshControl={
-            <RefreshControl 
-              refreshing={isRefreshing} 
-              onRefresh={handleRefresh} 
-              tintColor={currentTheme.colors.primary} 
-              colors={[currentTheme.colors.primary, currentTheme.colors.secondary]}
-            />
-          }
           contentContainerStyle={[
             styles.scrollContent,
             { paddingTop: Platform.OS === 'ios' ? 100 : 90 }
@@ -661,7 +630,6 @@ const HomeScreen = () => {
     );
   }, [
     isLoading, 
-    isRefreshing, 
     currentTheme.colors, 
     showHeroSection, 
     featuredContent, 
@@ -669,13 +637,12 @@ const HomeScreen = () => {
     handleSaveToLibrary, 
     hasContinueWatching, 
     catalogs, 
-    catalogsLoading, 
-    handleRefresh,
+    catalogsLoading,
     navigation,
     featuredContentSource
   ]);
 
-  return isLoading && !isRefreshing ? renderLoadingScreen : renderMainContent;
+  return isLoading ? renderLoadingScreen : renderMainContent;
 };
 
 const { width, height } = Dimensions.get('window');
