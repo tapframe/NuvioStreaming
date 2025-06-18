@@ -1223,7 +1223,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     padding: 14,
-    paddingTop: Platform.OS === 'android' ? 20 : 15,
+    paddingTop: Platform.OS === 'android' ? 45 : 15,
   },
   backButtonText: {
     color: colors.highEmphasis,

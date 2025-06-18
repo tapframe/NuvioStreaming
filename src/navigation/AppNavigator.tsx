@@ -761,7 +761,7 @@ const AppNavigator = () => {
               component={MetadataScreen}
               options={{ 
                 headerShown: false, 
-                animation: Platform.OS === 'ios' ? 'fade' : 'slide_from_right',
+                animation: 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
                 ...(Platform.OS === 'ios' && {
                   cardStyleInterpolator: customFadeInterpolator,
