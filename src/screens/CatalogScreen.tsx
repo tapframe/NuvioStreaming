@@ -193,13 +193,60 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dataSource, setDataSource] = useState<DataSource>(DataSource.STREMIO_ADDONS);
+  const [actualCatalogName, setActualCatalogName] = useState<string | null>(null);
   const { currentTheme } = useTheme();
   const colors = currentTheme.colors;
   const styles = createStyles(colors);
   const isDarkMode = true;
 
   const { getCustomName, isLoadingCustomNames } = useCustomCatalogNames();
-  const displayName = getCustomName(addonId || '', type || '', id || '', originalName || '');
+  
+  // Create display name with proper type suffix
+  const createDisplayName = (catalogName: string) => {
+    if (!catalogName) return '';
+    
+    // Check if the name already includes content type indicators
+    const lowerName = catalogName.toLowerCase();
+    const contentType = type === 'movie' ? 'Movies' : type === 'series' ? 'TV Shows' : `${type.charAt(0).toUpperCase() + type.slice(1)}s`;
+    
+    // If the name already contains type information, return as is
+    if (lowerName.includes('movie') || lowerName.includes('tv') || lowerName.includes('show') || lowerName.includes('series')) {
+      return catalogName;
+    }
+    
+    // Otherwise append the content type
+    return `${catalogName} ${contentType}`;
+  };
+  
+  // Use actual catalog name if available, otherwise fallback to custom name or original name
+  const displayName = actualCatalogName 
+    ? getCustomName(addonId || '', type || '', id || '', createDisplayName(actualCatalogName))
+    : getCustomName(addonId || '', type || '', id || '', originalName ? createDisplayName(originalName) : '') || 
+      (genreFilter ? `${genreFilter} ${type === 'movie' ? 'Movies' : 'TV Shows'}` : 
+       `${type.charAt(0).toUpperCase() + type.slice(1)}s`);
+
+  // Add effect to get the actual catalog name from addon manifest
+  useEffect(() => {
+    const getActualCatalogName = async () => {
+      if (addonId && type && id) {
+        try {
+          const manifests = await stremioService.getInstalledAddonsAsync();
+          const addon = manifests.find(a => a.id === addonId);
+          
+          if (addon && addon.catalogs) {
+            const catalog = addon.catalogs.find(c => c.type === type && c.id === id);
+            if (catalog && catalog.name) {
+              setActualCatalogName(catalog.name);
+            }
+          }
+        } catch (error) {
+          logger.error('Failed to get actual catalog name:', error);
+        }
+      }
+    };
+    
+    getActualCatalogName();
+  }, [addonId, type, id]);
 
   // Add effect to get data source preference when component mounts
   useEffect(() => {
