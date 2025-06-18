@@ -16,6 +16,7 @@ import Animated, {
   useSharedValue,
   withTiming,
   runOnJS,
+  withRepeat,
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
 import { logger } from '../../utils/logger';
@@ -246,19 +247,47 @@ const HeroSection: React.FC<HeroSectionProps> = ({
 }) => {
   const { currentTheme } = useTheme();
   
-  // Minimal state for image handling
+  // Enhanced state for smooth image loading
   const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const imageOpacity = useSharedValue(1);
+  const imageLoadOpacity = useSharedValue(0);
+  const shimmerOpacity = useSharedValue(0.3);
   
   // Memoized image source
   const imageSource = useMemo(() => 
     bannerImage || metadata.banner || metadata.poster
   , [bannerImage, metadata.banner, metadata.poster]);
   
-  // Ultra-fast image handlers
+  // Start shimmer animation for loading state
+  useEffect(() => {
+    if (!imageLoaded && imageSource) {
+      // Start shimmer animation
+      shimmerOpacity.value = withRepeat(
+        withTiming(0.8, { duration: 1200 }),
+        -1,
+        true
+      );
+    } else {
+      // Stop shimmer when loaded
+      shimmerOpacity.value = withTiming(0.3, { duration: 300 });
+    }
+  }, [imageLoaded, imageSource]);
+  
+  // Reset loading state when image source changes
+  useEffect(() => {
+    if (imageSource) {
+      setImageLoaded(false);
+      imageLoadOpacity.value = 0;
+    }
+  }, [imageSource]);
+  
+  // Enhanced image handlers with smooth transitions
   const handleImageError = () => {
     setImageError(true);
+    setImageLoaded(false);
     imageOpacity.value = withTiming(0.6, { duration: 150 });
+    imageLoadOpacity.value = withTiming(0, { duration: 150 });
     runOnJS(() => {
       if (bannerImage !== metadata.banner) {
         setBannerImage(metadata.banner || metadata.poster);
@@ -268,7 +297,10 @@ const HeroSection: React.FC<HeroSectionProps> = ({
 
   const handleImageLoad = () => {
     setImageError(false);
+    setImageLoaded(true);
     imageOpacity.value = withTiming(1, { duration: 150 });
+    // Smooth fade-in for the loaded image
+    imageLoadOpacity.value = withTiming(1, { duration: 400 });
   };
 
   // Ultra-optimized animated styles - single calculations
@@ -293,14 +325,14 @@ const HeroSection: React.FC<HeroSectionProps> = ({
     opacity: watchProgressOpacity.value,
   }), []);
 
-  // Ultra-optimized backdrop with minimal calculations
+  // Enhanced backdrop with smooth loading animation
   const backdropImageStyle = useAnimatedStyle(() => {
     'worklet';
     const translateY = scrollY.value * PARALLAX_FACTOR;
     const scale = 1 + (scrollY.value * 0.0001); // Micro scale effect
     
     return {
-      opacity: imageOpacity.value,
+      opacity: imageOpacity.value * imageLoadOpacity.value,
       transform: [
         { translateY: -Math.min(translateY, 100) }, // Cap translation
         { scale: Math.min(scale, SCALE_FACTOR) }    // Cap scale
@@ -346,7 +378,21 @@ const HeroSection: React.FC<HeroSectionProps> = ({
       {/* Optimized Background */}
       <View style={[styles.absoluteFill, { backgroundColor: currentTheme.colors.black }]} />
       
-      {/* Ultra-optimized Background Image */}
+      {/* Loading placeholder for smooth transition */}
+      {((imageSource && !imageLoaded) || loadingBanner) && (
+        <Animated.View style={[styles.absoluteFill, {
+          opacity: shimmerOpacity,
+        }]}>
+          <LinearGradient
+            colors={['#111', '#222', '#111']}
+            style={styles.absoluteFill}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          />
+        </Animated.View>
+      )}
+      
+      {/* Enhanced Background Image with smooth loading */}
       {imageSource && !loadingBanner && (
         <Animated.Image 
           source={{ uri: imageSource }}

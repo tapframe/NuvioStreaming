@@ -55,7 +55,9 @@ const MetadataScreen: React.FC = () => {
 
   // Optimized state management - reduced state variables
   const [isContentReady, setIsContentReady] = useState(false);
+  const [showSkeleton, setShowSkeleton] = useState(true);
   const transitionOpacity = useSharedValue(0);
+  const skeletonOpacity = useSharedValue(1);
 
   const {
     metadata,
@@ -85,14 +87,26 @@ const MetadataScreen: React.FC = () => {
   // Memoized derived values for performance
   const isReady = useMemo(() => !loading && metadata && !metadataError, [loading, metadata, metadataError]);
   
-  // Ultra-fast content transition
+  // Smooth skeleton to content transition
   useEffect(() => {
     if (isReady && !isContentReady) {
-      setIsContentReady(true);
-      transitionOpacity.value = withTiming(1, { duration: 200 });
+      // Small delay to ensure skeleton is rendered before starting transition
+      setTimeout(() => {
+        // Start fade out skeleton and fade in content simultaneously
+        skeletonOpacity.value = withTiming(0, { duration: 300 });
+        transitionOpacity.value = withTiming(1, { duration: 400 });
+        
+        // Hide skeleton after fade out completes
+        setTimeout(() => {
+          setShowSkeleton(false);
+          setIsContentReady(true);
+        }, 300);
+      }, 100);
     } else if (!isReady && isContentReady) {
       setIsContentReady(false);
+      setShowSkeleton(true);
       transitionOpacity.value = 0;
+      skeletonOpacity.value = 1;
     }
   }, [isReady, isContentReady]);
 
@@ -143,6 +157,10 @@ const MetadataScreen: React.FC = () => {
     opacity: transitionOpacity.value,
   }), []);
 
+  const skeletonStyle = useAnimatedStyle(() => ({
+    opacity: skeletonOpacity.value,
+  }), []);
+
   // Memoized error component for performance
   const ErrorComponent = useMemo(() => {
     if (!metadataError) return null;
@@ -181,110 +199,123 @@ const MetadataScreen: React.FC = () => {
     return ErrorComponent;
   }
 
-  // Show loading screen
-  if (loading || !isContentReady) {
-    return <MetadataLoadingScreen type={metadata?.type === 'movie' ? 'movie' : 'series'} />;
-  }
-
   return (
-    <Animated.View style={[StyleSheet.absoluteFill, transitionStyle]}>
-      <SafeAreaView 
-        style={[containerStyle, styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}
-        edges={['bottom']}
-      >
-        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" animated />
-        
-        {/* Floating Header - Optimized */}
-        <FloatingHeader 
-          metadata={metadata}
-          logoLoadError={assetData.logoLoadError}
-          handleBack={handleBack}
-          handleToggleLibrary={handleToggleLibrary}
-          headerElementsY={animations.headerElementsY}
-          inLibrary={inLibrary}
-          headerOpacity={animations.headerOpacity}
-          headerElementsOpacity={animations.headerElementsOpacity}
-          safeAreaTop={safeAreaTop}
-          setLogoLoadError={assetData.setLogoLoadError}
-        />
-
-        <Animated.ScrollView
-          style={styles.scrollView}
-          showsVerticalScrollIndicator={false}
-          onScroll={animations.scrollHandler}
-          scrollEventThrottle={16}
-          bounces={false}
-          overScrollMode="never"
-          contentContainerStyle={styles.scrollContent}
+    <View style={StyleSheet.absoluteFill}>
+      {/* Skeleton Loading Screen - with fade out transition */}
+      {showSkeleton && (
+        <Animated.View 
+          style={[StyleSheet.absoluteFill, skeletonStyle]}
+          pointerEvents={isContentReady ? 'none' : 'auto'}
         >
-          {/* Hero Section - Optimized */}
-          <HeroSection 
-            metadata={metadata}
-            bannerImage={assetData.bannerImage}
-            loadingBanner={assetData.loadingBanner}
-            logoLoadError={assetData.logoLoadError}
-            scrollY={animations.scrollY}
-            heroHeight={animations.heroHeight}
-            heroOpacity={animations.heroOpacity}
-            logoOpacity={animations.logoOpacity}
-            buttonsOpacity={animations.buttonsOpacity}
-            buttonsTranslateY={animations.buttonsTranslateY}
-            watchProgressOpacity={animations.watchProgressOpacity}
-            watchProgressWidth={animations.watchProgressWidth}
-            watchProgress={watchProgressData.watchProgress}
-            type={type as 'movie' | 'series'}
-            getEpisodeDetails={watchProgressData.getEpisodeDetails}
-            handleShowStreams={handleShowStreams}
-            handleToggleLibrary={handleToggleLibrary}
-            inLibrary={inLibrary}
-            id={id}
-            navigation={navigation}
-            getPlayButtonText={watchProgressData.getPlayButtonText}
-            setBannerImage={assetData.setBannerImage}
-            setLogoLoadError={assetData.setLogoLoadError}
-          />
+          <MetadataLoadingScreen type={metadata?.type === 'movie' ? 'movie' : 'series'} />
+        </Animated.View>
+      )}
 
-          {/* Main Content - Optimized */}
-          <Animated.View style={contentStyle}>
-            <MetadataDetails 
+      {/* Main Content - with fade in transition */}
+      {metadata && (
+        <Animated.View 
+          style={[StyleSheet.absoluteFill, transitionStyle]}
+          pointerEvents={isContentReady ? 'auto' : 'none'}
+        >
+          <SafeAreaView 
+            style={[containerStyle, styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}
+            edges={['bottom']}
+          >
+            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" animated />
+            
+            {/* Floating Header - Optimized */}
+            <FloatingHeader 
               metadata={metadata}
-              imdbId={imdbId}
-              type={type as 'movie' | 'series'}
-              renderRatings={() => imdbId ? (
-                <RatingsSection imdbId={imdbId} type={type === 'series' ? 'show' : 'movie'} />
-              ) : null}
+              logoLoadError={assetData.logoLoadError}
+              handleBack={handleBack}
+              handleToggleLibrary={handleToggleLibrary}
+              headerElementsY={animations.headerElementsY}
+              inLibrary={inLibrary}
+              headerOpacity={animations.headerOpacity}
+              headerElementsOpacity={animations.headerElementsOpacity}
+              safeAreaTop={safeAreaTop}
+              setLogoLoadError={assetData.setLogoLoadError}
             />
 
-            <CastSection
-              cast={cast}
-              loadingCast={loadingCast}
-              onSelectCastMember={handleSelectCastMember}
-            />
-
-            {type === 'movie' && (
-              <MoreLikeThisSection 
-                recommendations={recommendations}
-                loadingRecommendations={loadingRecommendations}
+            <Animated.ScrollView
+              style={styles.scrollView}
+              showsVerticalScrollIndicator={false}
+              onScroll={animations.scrollHandler}
+              scrollEventThrottle={16}
+              bounces={false}
+              overScrollMode="never"
+              contentContainerStyle={styles.scrollContent}
+            >
+              {/* Hero Section - Optimized */}
+              <HeroSection 
+                metadata={metadata}
+                bannerImage={assetData.bannerImage}
+                loadingBanner={assetData.loadingBanner}
+                logoLoadError={assetData.logoLoadError}
+                scrollY={animations.scrollY}
+                heroHeight={animations.heroHeight}
+                heroOpacity={animations.heroOpacity}
+                logoOpacity={animations.logoOpacity}
+                buttonsOpacity={animations.buttonsOpacity}
+                buttonsTranslateY={animations.buttonsTranslateY}
+                watchProgressOpacity={animations.watchProgressOpacity}
+                watchProgressWidth={animations.watchProgressWidth}
+                watchProgress={watchProgressData.watchProgress}
+                type={type as 'movie' | 'series'}
+                getEpisodeDetails={watchProgressData.getEpisodeDetails}
+                handleShowStreams={handleShowStreams}
+                handleToggleLibrary={handleToggleLibrary}
+                inLibrary={inLibrary}
+                id={id}
+                navigation={navigation}
+                getPlayButtonText={watchProgressData.getPlayButtonText}
+                setBannerImage={assetData.setBannerImage}
+                setLogoLoadError={assetData.setLogoLoadError}
               />
-            )}
 
-            {type === 'series' ? (
-              <SeriesContent
-                episodes={episodes}
-                selectedSeason={selectedSeason}
-                loadingSeasons={loadingSeasons}
-                onSeasonChange={handleSeasonChangeWithHaptics}
-                onSelectEpisode={handleEpisodeSelect}
-                groupedEpisodes={groupedEpisodes}
-                metadata={metadata || undefined}
-              />
-            ) : (
-              metadata && <MovieContent metadata={metadata} />
-            )}
-          </Animated.View>
-        </Animated.ScrollView>
-      </SafeAreaView>
-    </Animated.View>
+              {/* Main Content - Optimized */}
+              <Animated.View style={contentStyle}>
+                <MetadataDetails 
+                  metadata={metadata}
+                  imdbId={imdbId}
+                  type={type as 'movie' | 'series'}
+                  renderRatings={() => imdbId ? (
+                    <RatingsSection imdbId={imdbId} type={type === 'series' ? 'show' : 'movie'} />
+                  ) : null}
+                />
+
+                <CastSection
+                  cast={cast}
+                  loadingCast={loadingCast}
+                  onSelectCastMember={handleSelectCastMember}
+                />
+
+                {type === 'movie' && (
+                  <MoreLikeThisSection 
+                    recommendations={recommendations}
+                    loadingRecommendations={loadingRecommendations}
+                  />
+                )}
+
+                {type === 'series' ? (
+                  <SeriesContent
+                    episodes={episodes}
+                    selectedSeason={selectedSeason}
+                    loadingSeasons={loadingSeasons}
+                    onSeasonChange={handleSeasonChangeWithHaptics}
+                    onSelectEpisode={handleEpisodeSelect}
+                    groupedEpisodes={groupedEpisodes}
+                    metadata={metadata || undefined}
+                  />
+                ) : (
+                  metadata && <MovieContent metadata={metadata} />
+                )}
+              </Animated.View>
+            </Animated.ScrollView>
+          </SafeAreaView>
+        </Animated.View>
+      )}
+    </View>
   );
 };
 

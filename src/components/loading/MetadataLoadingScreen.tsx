@@ -22,19 +22,11 @@ export const MetadataLoadingScreen: React.FC<MetadataLoadingScreenProps> = ({
 }) => {
   const { currentTheme } = useTheme();
   
-  // Animation values
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  // Animation values - removed fadeAnim since parent handles transitions
   const pulseAnim = useRef(new Animated.Value(0.3)).current;
   const shimmerAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Start entrance animation
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 800,
-      useNativeDriver: true,
-    }).start();
-
     // Continuous pulse animation for skeleton elements
     const pulseAnimation = Animated.loop(
       Animated.sequence([
@@ -138,10 +130,7 @@ export const MetadataLoadingScreen: React.FC<MetadataLoadingScreenProps> = ({
         barStyle="light-content"
       />
       
-      <Animated.View style={[
-        styles.content,
-        { opacity: fadeAnim }
-      ]}>
+      <View style={styles.content}>
         {/* Hero Skeleton */}
         <View style={styles.heroSection}>
           <SkeletonElement 
@@ -230,7 +219,7 @@ export const MetadataLoadingScreen: React.FC<MetadataLoadingScreenProps> = ({
             </View>
           )}
         </View>
-      </Animated.View>
+      </View>
     </SafeAreaView>
   );
 };
