@@ -32,18 +32,18 @@ const easings = {
 };
 
 export const useMetadataAnimations = (safeAreaTop: number, watchProgress: any) => {
-  // Consolidated entrance animations - fewer shared values
-  const screenOpacity = useSharedValue(0);
-  const contentOpacity = useSharedValue(0);
+  // Consolidated entrance animations - start with visible values for Android compatibility
+  const screenOpacity = useSharedValue(1);
+  const contentOpacity = useSharedValue(1);
   
   // Combined hero animations 
-  const heroOpacity = useSharedValue(0);
-  const heroScale = useSharedValue(0.95); // Combined scale for micro-animation
+  const heroOpacity = useSharedValue(1);
+  const heroScale = useSharedValue(1); // Start at 1 for Android compatibility
   const heroHeightValue = useSharedValue(height * 0.5);
   
   // Combined UI element animations
-  const uiElementsOpacity = useSharedValue(0);
-  const uiElementsTranslateY = useSharedValue(10);
+  const uiElementsOpacity = useSharedValue(1);
+  const uiElementsTranslateY = useSharedValue(0);
   
   // Progress animation - simplified to single value
   const progressOpacity = useSharedValue(0);
@@ -57,10 +57,11 @@ export const useMetadataAnimations = (safeAreaTop: number, watchProgress: any) =
   
   // Ultra-fast entrance sequence - batch animations for better performance
   useEffect(() => {
-    'worklet';
-    
     // Batch all entrance animations to run simultaneously
     const enterAnimations = () => {
+      'worklet';
+      
+      // Start with slightly reduced values and animate to full visibility
       screenOpacity.value = withTiming(1, { 
         duration: 250, 
         easing: easings.fast 
@@ -92,14 +93,17 @@ export const useMetadataAnimations = (safeAreaTop: number, watchProgress: any) =
   
   // Optimized watch progress animation
   useEffect(() => {
-    'worklet';
-    
     const hasProgress = watchProgress && watchProgress.duration > 0;
     
-    progressOpacity.value = withTiming(hasProgress ? 1 : 0, {
-      duration: hasProgress ? 200 : 150,
-      easing: easings.fast
-    });
+    const updateProgress = () => {
+      'worklet';
+      progressOpacity.value = withTiming(hasProgress ? 1 : 0, {
+        duration: hasProgress ? 200 : 150,
+        easing: easings.fast
+      });
+    };
+    
+    runOnUI(updateProgress)();
   }, [watchProgress]);
   
   // Ultra-optimized scroll handler with minimal calculations

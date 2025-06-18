@@ -697,19 +697,20 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     height: 36,
-    width: 160,
+    width: 180,
     marginRight: 8,
   },
   selectorButton: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
   selectorText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
+    textAlign: 'center',
   },
   profileLockContainer: {
     padding: 16,

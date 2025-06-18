@@ -679,39 +679,18 @@ export const StreamsScreen = () => {
                   navigateToPlayer(stream);
                 });
             } else {
-              // For direct video URLs, use the S.Browser.ACTION_VIEW approach
-              // This is a more reliable way to force Android to show all video apps
+              // For direct video URLs, use the VideoPlayerService to show the Android app chooser
+              const success = await VideoPlayerService.playVideo(stream.url, {
+                useExternalPlayer: true,
+                title: metadata?.name || 'Video',
+                episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
+                episodeNumber: type === 'series' && currentEpisode ? `S${currentEpisode.season_number}E${currentEpisode.episode_number}` : undefined,
+              });
               
-              // Strip query parameters if they exist as they can cause issues with some apps
-              let cleanUrl = stream.url;
-              if (cleanUrl.includes('?')) {
-                cleanUrl = cleanUrl.split('?')[0];
+              if (!success) {
+                console.log('VideoPlayerService failed, falling back to built-in player');
+                navigateToPlayer(stream);
               }
-              
-              // Create an Android intent URL that forces the chooser
-              // Set component=null to ensure chooser is shown
-              // Set action=android.intent.action.VIEW to open the content
-              const intentUrl = `intent:${cleanUrl}#Intent;action=android.intent.action.VIEW;category=android.intent.category.DEFAULT;component=;type=video/*;launchFlags=0x10000000;end`;
-              
-              console.log(`Using intent URL: ${intentUrl}`);
-              
-              Linking.openURL(intentUrl)
-                .then(() => console.log('Successfully opened with intent URL'))
-                .catch(err => {
-                  console.error('Failed to open with intent URL:', err);
-                  
-                  // First fallback: Try direct URL with regular Linking API
-                  console.log('Trying plain URL as fallback');
-                  Linking.openURL(stream.url)
-                    .then(() => console.log('Opened with direct URL'))
-                    .catch(directErr => {
-                      console.error('Failed to open direct URL:', directErr);
-                      
-                      // Final fallback: Use built-in player
-                      console.log('All external player attempts failed, using built-in player');
-                      navigateToPlayer(stream);
-                    });
-                });
             }
           } catch (error) {
             console.error('Error with external player:', error);
