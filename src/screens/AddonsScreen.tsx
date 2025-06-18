@@ -29,7 +29,9 @@ import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { logger } from '../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { BlurView } from 'expo-blur';
+import { BlurView as ExpoBlurView } from 'expo-blur';
+import { BlurView as CommunityBlurView } from '@react-native-community/blur';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import axios from 'axios';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -551,6 +553,36 @@ const createStyles = (colors: any) => StyleSheet.create({
   addonActionButtons: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  blurOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  androidBlurContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  androidBlur: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  androidFallbackBlur: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'black',
   },
 });
 
@@ -1233,7 +1265,24 @@ const AddonsScreen = () => {
           setAddonDetails(null);
         }}
       >
-        <BlurView intensity={80} style={styles.modalContainer} tint="dark">
+        <View style={styles.modalContainer}>
+          {Platform.OS === 'ios' ? (
+            <ExpoBlurView intensity={80} style={styles.blurOverlay} tint="dark" />
+          ) : (
+            Constants.executionEnvironment === ExecutionEnvironment.StoreClient ? (
+              <View style={[styles.androidBlurContainer, styles.androidFallbackBlur]} />
+            ) : (
+              <View style={styles.androidBlurContainer}>
+                <CommunityBlurView
+                  style={styles.androidBlur}
+                  blurType="dark"
+                  blurAmount={8}
+                  overlayColor="rgba(0,0,0,0.4)"
+                  reducedTransparencyFallbackColor="black"
+                />
+              </View>
+            )
+          )}
           <View style={styles.modalContent}>
             {addonDetails && (
               <>
@@ -1332,7 +1381,7 @@ const AddonsScreen = () => {
               </>
             )}
           </View>
-        </BlurView>
+        </View>
       </Modal>
     </SafeAreaView>
   );

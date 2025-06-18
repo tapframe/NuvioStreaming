@@ -367,6 +367,51 @@ const SettingsScreen: React.FC = () => {
                 icon="palette"
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('ThemeSettings')}
+              />
+              <SettingItem
+                title="Episode Layout"
+                description={settings.episodeLayoutStyle === 'horizontal' ? 'Horizontal Cards' : 'Vertical List'}
+                icon="view-module"
+                renderControl={() => (
+                  <View style={styles.selectorContainer}>
+                    <TouchableOpacity
+                      style={[
+                        styles.selectorButton,
+                        settings.episodeLayoutStyle === 'vertical' && {
+                          backgroundColor: currentTheme.colors.primary
+                        }
+                      ]}
+                      onPress={() => updateSetting('episodeLayoutStyle', 'vertical')}
+                    >
+                      <Text style={[
+                        styles.selectorText,
+                        { color: currentTheme.colors.mediumEmphasis },
+                        settings.episodeLayoutStyle === 'vertical' && {
+                          color: currentTheme.colors.white,
+                          fontWeight: '600'
+                        }
+                      ]}>Vertical</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.selectorButton,
+                        settings.episodeLayoutStyle === 'horizontal' && {
+                          backgroundColor: currentTheme.colors.primary
+                        }
+                      ]}
+                      onPress={() => updateSetting('episodeLayoutStyle', 'horizontal')}
+                    >
+                      <Text style={[
+                        styles.selectorText,
+                        { color: currentTheme.colors.mediumEmphasis },
+                        settings.episodeLayoutStyle === 'horizontal' && {
+                          color: currentTheme.colors.white,
+                          fontWeight: '600'
+                        }
+                      ]}>Horizontal</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
                 isLast={true}
               />
             </SettingsCard>
