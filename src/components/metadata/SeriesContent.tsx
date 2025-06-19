@@ -334,14 +334,13 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
         style={[
           styles.episodeCardHorizontal,
           isTablet && styles.episodeCardHorizontalTablet,
-          // Enhanced border styling
+          // Gradient border styling
           { 
-            borderWidth: 2,
-            borderColor: 'transparent', // Make base border transparent
-            // Add gradient border effect using shadow
-            shadowColor: currentTheme.colors.primary,
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: 0.6,
+            borderWidth: 1,
+            borderColor: 'transparent',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
             shadowRadius: 8,
             elevation: 12,
           }
@@ -352,26 +351,26 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
         {/* Gradient Border Container */}
         <View style={{
           position: 'absolute',
-          top: -2,
-          left: -2,
-          right: -2,
-          bottom: -2,
-          borderRadius: 18,
+          top: -1,
+          left: -1,
+          right: -1,
+          bottom: -1,
+          borderRadius: 17,
           zIndex: -1,
         }}>
           <LinearGradient
             colors={[
-              currentTheme.colors.primary + '80', // 80% opacity
-              currentTheme.colors.primary + '40', // 40% opacity
-              currentTheme.colors.primary + '20', // 20% opacity
-              currentTheme.colors.primary + '40', // 40% opacity
-              currentTheme.colors.primary + '80', // 80% opacity
+              '#ffffff80', // White with 50% opacity
+              '#ffffff40', // White with 25% opacity  
+              '#ffffff20', // White with 12% opacity
+              '#ffffff40', // White with 25% opacity
+              '#ffffff80', // White with 50% opacity
             ]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={{
               flex: 1,
-              borderRadius: 18,
+              borderRadius: 17,
             }}
           />
         </View>
