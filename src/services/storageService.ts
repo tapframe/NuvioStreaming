@@ -208,10 +208,11 @@ class StorageService {
         };
         await this.setWatchProgress(id, type, newProgress, episodeId);
       } else {
-        // Merge with existing local progress
-        const shouldUseTraktProgress = traktTimestamp > localProgress.lastUpdated;
+        // Always prioritize Trakt progress when merging
+        const localProgressPercent = (localProgress.currentTime / localProgress.duration) * 100;
         
-        if (shouldUseTraktProgress && localProgress.duration > 0) {
+        if (localProgress.duration > 0) {
+          // Use Trakt progress, keeping the existing duration
           const updatedProgress: WatchProgress = {
             ...localProgress,
             currentTime: (traktProgress / 100) * localProgress.duration,
@@ -221,9 +222,20 @@ class StorageService {
             traktProgress
           };
           await this.setWatchProgress(id, type, updatedProgress, episodeId);
+          logger.log(`[StorageService] Replaced local progress (${localProgressPercent.toFixed(1)}%) with Trakt progress (${traktProgress}%)`);
         } else {
-          // Local is newer, just mark as needing sync
-          await this.updateTraktSyncStatus(id, type, false, undefined, episodeId);
+          // If no duration, estimate it from Trakt progress
+          const estimatedDuration = traktProgress > 0 ? (100 / traktProgress) * 100 : 3600;
+          const updatedProgress: WatchProgress = {
+            currentTime: (traktProgress / 100) * estimatedDuration,
+            duration: estimatedDuration,
+            lastUpdated: traktTimestamp,
+            traktSynced: true,
+            traktLastSynced: Date.now(),
+            traktProgress
+          };
+          await this.setWatchProgress(id, type, updatedProgress, episodeId);
+          logger.log(`[StorageService] Replaced local progress (${localProgressPercent.toFixed(1)}%) with Trakt progress (${traktProgress}%) - estimated duration`);
         }
       }
     } catch (error) {

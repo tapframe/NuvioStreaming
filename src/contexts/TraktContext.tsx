@@ -15,6 +15,7 @@ interface TraktContextProps {
   isEpisodeWatched: (imdbId: string, season: number, episode: number) => Promise<boolean>;
   markMovieAsWatched: (imdbId: string, watchedAt?: Date) => Promise<boolean>;
   markEpisodeAsWatched: (imdbId: string, season: number, episode: number, watchedAt?: Date) => Promise<boolean>;
+  forceSyncTraktProgress?: () => Promise<boolean>;
 }
 
 const TraktContext = createContext<TraktContextProps | undefined>(undefined);

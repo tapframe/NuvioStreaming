@@ -330,18 +330,18 @@ const TraktSettingsScreen: React.FC = () => {
               <View style={styles.settingItem}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={[
-                      styles.settingLabel,
-                      { color: isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark }
-                    ]}>
-                      Auto-sync playback progress
-                    </Text>
-                    <Text style={[
-                      styles.settingDescription,
-                      { color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark }
-                    ]}>
+                <Text style={[
+                  styles.settingLabel,
+                  { color: isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark }
+                ]}>
+                  Auto-sync playback progress
+                </Text>
+                <Text style={[
+                  styles.settingDescription,
+                  { color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark }
+                ]}>
                       Automatically sync watch progress to Trakt
-                    </Text>
+                </Text>
                   </View>
                   <Switch
                     value={autosyncSettings.enabled}

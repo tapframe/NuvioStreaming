@@ -13,15 +13,20 @@ export function useTraktIntegration() {
 
   // Check authentication status
   const checkAuthStatus = useCallback(async () => {
+    logger.log('[useTraktIntegration] checkAuthStatus called');
     setIsLoading(true);
     try {
       const authenticated = await traktService.isAuthenticated();
+      logger.log(`[useTraktIntegration] Authentication check result: ${authenticated}`);
       setIsAuthenticated(authenticated);
       
       if (authenticated) {
+        logger.log('[useTraktIntegration] User is authenticated, fetching profile...');
         const profile = await traktService.getUserProfile();
+        logger.log(`[useTraktIntegration] User profile: ${profile.username}`);
         setUserProfile(profile);
       } else {
+        logger.log('[useTraktIntegration] User is not authenticated');
         setUserProfile(null);
       }
       
@@ -187,10 +192,18 @@ export function useTraktIntegration() {
 
   // Get playback progress from Trakt
   const getTraktPlaybackProgress = useCallback(async (type?: 'movies' | 'shows'): Promise<TraktPlaybackItem[]> => {
-    if (!isAuthenticated) return [];
+    logger.log(`[useTraktIntegration] getTraktPlaybackProgress called - isAuthenticated: ${isAuthenticated}, type: ${type || 'all'}`);
+    
+    if (!isAuthenticated) {
+      logger.log('[useTraktIntegration] getTraktPlaybackProgress: Not authenticated');
+      return [];
+    }
     
     try {
-      return await traktService.getPlaybackProgress(type);
+      logger.log('[useTraktIntegration] Calling traktService.getPlaybackProgress...');
+      const result = await traktService.getPlaybackProgress(type);
+      logger.log(`[useTraktIntegration] traktService.getPlaybackProgress returned ${result.length} items`);
+      return result;
     } catch (error) {
       logger.error('[useTraktIntegration] Error getting playback progress:', error);
       return [];
@@ -260,10 +273,22 @@ export function useTraktIntegration() {
 
   // Fetch and merge Trakt progress with local progress
   const fetchAndMergeTraktProgress = useCallback(async (): Promise<boolean> => {
-    if (!isAuthenticated) return false;
+    logger.log(`[useTraktIntegration] fetchAndMergeTraktProgress called - isAuthenticated: ${isAuthenticated}`);
+    
+    if (!isAuthenticated) {
+      logger.log('[useTraktIntegration] Not authenticated, skipping Trakt progress fetch');
+      return false;
+    }
     
     try {
+      logger.log('[useTraktIntegration] Fetching Trakt playback progress...');
       const traktProgress = await getTraktPlaybackProgress();
+      logger.log(`[useTraktIntegration] Retrieved ${traktProgress.length} Trakt progress items`);
+      
+      if (traktProgress.length === 0) {
+        logger.log('[useTraktIntegration] No Trakt progress found - user may not have any content in progress');
+        return true; // Not an error, just no data
+      }
       
       for (const item of traktProgress) {
         try {
@@ -274,14 +299,18 @@ export function useTraktIntegration() {
           if (item.type === 'movie' && item.movie) {
             id = item.movie.ids.imdb;
             type = 'movie';
+            logger.log(`[useTraktIntegration] Processing Trakt movie: ${item.movie.title} (${id}) - ${item.progress}%`);
           } else if (item.type === 'episode' && item.show && item.episode) {
             id = item.show.ids.imdb;
             type = 'series';
-            episodeId = `S${item.episode.season}E${item.episode.number}`;
+            episodeId = `${id}:${item.episode.season}:${item.episode.number}`;
+            logger.log(`[useTraktIntegration] Processing Trakt episode: ${item.show.title} S${item.episode.season}E${item.episode.number} (${id}) - ${item.progress}%`);
           } else {
+            logger.warn(`[useTraktIntegration] Skipping invalid Trakt item:`, item);
             continue;
           }
           
+          logger.log(`[useTraktIntegration] Merging progress for ${type} ${id}: ${item.progress}% from ${item.paused_at}`);
           await storageService.mergeWithTraktProgress(
             id,
             type,
@@ -294,7 +323,7 @@ export function useTraktIntegration() {
         }
       }
       
-      logger.log(`[useTraktIntegration] Merged ${traktProgress.length} Trakt progress entries`);
+      logger.log(`[useTraktIntegration] Successfully merged ${traktProgress.length} Trakt progress entries`);
       return true;
     } catch (error) {
       logger.error('[useTraktIntegration] Error fetching and merging Trakt progress:', error);
@@ -314,12 +343,45 @@ export function useTraktIntegration() {
     }
   }, [isAuthenticated, loadWatchedItems]);
 
-  // Auto-sync when authenticated changes
+  // Auto-sync when authenticated changes OR when auth status is refreshed
   useEffect(() => {
     if (isAuthenticated) {
       // Fetch Trakt progress and merge with local
-      fetchAndMergeTraktProgress();
+      logger.log('[useTraktIntegration] User authenticated, fetching Trakt progress to replace local data');
+      fetchAndMergeTraktProgress().then((success) => {
+        if (success) {
+          logger.log('[useTraktIntegration] Trakt progress merged successfully - local data replaced with Trakt data');
+        } else {
+          logger.warn('[useTraktIntegration] Failed to merge Trakt progress');
+        }
+        // Small delay to ensure storage subscribers are notified
+        setTimeout(() => {
+          logger.log('[useTraktIntegration] Trakt progress merge completed, UI should refresh');
+        }, 100);
+      });
     }
+  }, [isAuthenticated, fetchAndMergeTraktProgress]);
+
+  // Trigger sync when auth status is manually refreshed (for login scenarios)
+  useEffect(() => {
+    if (isAuthenticated) {
+      logger.log('[useTraktIntegration] Auth status refresh detected, triggering Trakt progress merge');
+      fetchAndMergeTraktProgress().then((success) => {
+        if (success) {
+          logger.log('[useTraktIntegration] Trakt progress merged after manual auth refresh');
+        }
+      });
+    }
+  }, [lastAuthCheck, isAuthenticated, fetchAndMergeTraktProgress]);
+
+  // Manual force sync function for testing/troubleshooting
+  const forceSyncTraktProgress = useCallback(async (): Promise<boolean> => {
+    logger.log('[useTraktIntegration] Manual force sync triggered');
+    if (!isAuthenticated) {
+      logger.log('[useTraktIntegration] Cannot force sync - not authenticated');
+      return false;
+    }
+    return await fetchAndMergeTraktProgress();
   }, [isAuthenticated, fetchAndMergeTraktProgress]);
 
   return {
@@ -341,6 +403,7 @@ export function useTraktIntegration() {
     syncProgress, // legacy
     getTraktPlaybackProgress,
     syncAllProgress,
-    fetchAndMergeTraktProgress
+    fetchAndMergeTraktProgress,
+    forceSyncTraktProgress // For manual testing
   };
 } 

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTraktContext } from '../contexts/TraktContext';
 import { logger } from '../utils/logger';
 import { storageService } from '../services/storageService';
 
@@ -8,6 +9,8 @@ interface WatchProgressData {
   duration: number;
   lastUpdated: number;
   episodeId?: string;
+  traktSynced?: boolean;
+  traktProgress?: number;
 }
 
 export const useWatchProgress = (
@@ -17,6 +20,7 @@ export const useWatchProgress = (
   episodes: any[] = []
 ) => {
   const [watchProgress, setWatchProgress] = useState<WatchProgressData | null>(null);
+  const { isAuthenticated: isTraktAuthenticated } = useTraktContext();
   
   // Function to get episode details from episodeId
   const getEpisodeDetails = useCallback((episodeId: string): { seasonNumber: string; episodeNumber: string; episodeName: string } | null => {
@@ -52,7 +56,7 @@ export const useWatchProgress = (
     return null;
   }, [episodes]);
   
-  // Load watch progress
+  // Enhanced load watch progress with Trakt integration
   const loadWatchProgress = useCallback(async () => {
     try {
       if (id && type) {
@@ -119,9 +123,20 @@ export const useWatchProgress = (
                       `${id}:${nextEpisode.season_number}:${nextEpisode.episode_number}`;
                     const nextProgress = await storageService.getWatchProgress(id, type, nextEpisodeId);
                     if (nextProgress) {
-                      setWatchProgress({ ...nextProgress, episodeId: nextEpisodeId });
+                      setWatchProgress({ 
+                        ...nextProgress, 
+                        episodeId: nextEpisodeId,
+                        traktSynced: nextProgress.traktSynced,
+                        traktProgress: nextProgress.traktProgress
+                      });
                     } else {
-                      setWatchProgress({ currentTime: 0, duration: 0, lastUpdated: Date.now(), episodeId: nextEpisodeId });
+                      setWatchProgress({ 
+                        currentTime: 0, 
+                        duration: 0, 
+                        lastUpdated: Date.now(), 
+                        episodeId: nextEpisodeId,
+                        traktSynced: false
+                      });
                     }
                     return;
                   }
@@ -132,7 +147,12 @@ export const useWatchProgress = (
               }
               
               // If current episode is not finished, show its progress
-              setWatchProgress({ ...progress, episodeId });
+              setWatchProgress({ 
+                ...progress, 
+                episodeId,
+                traktSynced: progress.traktSynced,
+                traktProgress: progress.traktProgress
+              });
             } else {
               setWatchProgress(null);
             }
@@ -151,9 +171,20 @@ export const useWatchProgress = (
                 `${id}:${unfinishedEpisode.season_number}:${unfinishedEpisode.episode_number}`;
               const progress = await storageService.getWatchProgress(id, type, epId);
               if (progress) {
-                setWatchProgress({ ...progress, episodeId: epId });
+                setWatchProgress({ 
+                  ...progress, 
+                  episodeId: epId,
+                  traktSynced: progress.traktSynced,
+                  traktProgress: progress.traktProgress
+                });
               } else {
-                setWatchProgress({ currentTime: 0, duration: 0, lastUpdated: Date.now(), episodeId: epId });
+                setWatchProgress({ 
+                  currentTime: 0, 
+                  duration: 0, 
+                  lastUpdated: Date.now(), 
+                  episodeId: epId,
+                  traktSynced: false
+                });
               }
             } else {
               setWatchProgress(null);
@@ -167,7 +198,12 @@ export const useWatchProgress = (
             if (progressPercent >= 95) {
               setWatchProgress(null);
             } else {
-              setWatchProgress({ ...progress, episodeId });
+              setWatchProgress({ 
+                ...progress, 
+                episodeId,
+                traktSynced: progress.traktSynced,
+                traktProgress: progress.traktProgress
+              });
             }
           } else {
             setWatchProgress(null);
@@ -180,7 +216,7 @@ export const useWatchProgress = (
     }
   }, [id, type, episodeId, episodes]);
 
-  // Function to get play button text based on watch progress
+  // Enhanced function to get play button text with Trakt awareness
   const getPlayButtonText = useCallback(() => {
     if (!watchProgress || watchProgress.currentTime <= 0) {
       return 'Play';
@@ -192,8 +228,20 @@ export const useWatchProgress = (
       return 'Play';
     }
 
+    // If we have Trakt data and it differs significantly from local, show "Resume" 
+    // but the UI will show the discrepancy
     return 'Resume';
   }, [watchProgress]);
+
+  // Subscribe to storage changes for real-time updates
+  useEffect(() => {
+    const unsubscribe = storageService.subscribeToWatchProgressUpdates(() => {
+      logger.log('[useWatchProgress] Storage updated, reloading progress');
+      loadWatchProgress();
+    });
+    
+    return unsubscribe;
+  }, [loadWatchProgress]);
 
   // Initial load
   useEffect(() => {
@@ -206,6 +254,16 @@ export const useWatchProgress = (
       loadWatchProgress();
     }, [loadWatchProgress])
   );
+
+  // Re-load when Trakt authentication status changes
+  useEffect(() => {
+    if (isTraktAuthenticated !== undefined) {
+      // Small delay to ensure Trakt context is fully initialized
+      setTimeout(() => {
+        loadWatchProgress();
+      }, 100);
+    }
+  }, [isTraktAuthenticated, loadWatchProgress]);
 
   return {
     watchProgress,

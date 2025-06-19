@@ -23,6 +23,7 @@ import Animated, {
   withRepeat,
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useTraktContext } from '../../contexts/TraktContext';
 import { logger } from '../../utils/logger';
 import { TMDBService } from '../../services/tmdbService';
 
@@ -52,6 +53,8 @@ interface HeroSectionProps {
     duration: number;
     lastUpdated: number;
     episodeId?: string;
+    traktSynced?: boolean;
+    traktProgress?: number;
   } | null;
   type: 'movie' | 'series';
   getEpisodeDetails: (episodeId: string) => { seasonNumber: string; episodeNumber: string; episodeName: string } | null;
@@ -196,21 +199,29 @@ const ActionButtons = React.memo(({
   );
 });
 
-// Ultra-optimized WatchProgress Component
+// Enhanced WatchProgress Component with Trakt integration
 const WatchProgressDisplay = React.memo(({ 
   watchProgress, 
   type, 
   getEpisodeDetails, 
   animatedStyle,
 }: {
-  watchProgress: { currentTime: number; duration: number; lastUpdated: number; episodeId?: string } | null;
+  watchProgress: { 
+    currentTime: number; 
+    duration: number; 
+    lastUpdated: number; 
+    episodeId?: string;
+    traktSynced?: boolean;
+    traktProgress?: number;
+  } | null;
   type: 'movie' | 'series';
   getEpisodeDetails: (episodeId: string) => { seasonNumber: string; episodeNumber: string; episodeName: string } | null;
   animatedStyle: any;
 }) => {
   const { currentTheme } = useTheme();
+  const { isAuthenticated: isTraktAuthenticated } = useTraktContext();
   
-  // Memoized progress calculation
+  // Memoized progress calculation with Trakt integration
   const progressData = useMemo(() => {
     if (!watchProgress || watchProgress.duration === 0) return null;
 
@@ -225,13 +236,33 @@ const WatchProgressDisplay = React.memo(({
       }
     }
 
+    // Enhanced display text with Trakt integration
+    let displayText = progressPercent >= 95 ? 'Watched' : `${Math.round(progressPercent)}% watched`;
+    let syncStatus = '';
+    
+    // Show Trakt sync status if user is authenticated
+    if (isTraktAuthenticated) {
+      if (watchProgress.traktSynced) {
+        syncStatus = ' • Synced with Trakt';
+        // If we have specific Trakt progress that differs from local, mention it
+        if (watchProgress.traktProgress !== undefined && 
+            Math.abs(progressPercent - watchProgress.traktProgress) > 5) {
+          displayText = `${Math.round(progressPercent)}% watched (${Math.round(watchProgress.traktProgress)}% on Trakt)`;
+        }
+      } else {
+        syncStatus = ' • Sync pending';
+      }
+    }
+
     return {
       progressPercent,
       formattedTime,
       episodeInfo,
-      displayText: progressPercent >= 95 ? 'Watched' : `${Math.round(progressPercent)}% watched`
+      displayText,
+      syncStatus,
+      isTraktSynced: watchProgress.traktSynced && isTraktAuthenticated
     };
-  }, [watchProgress, type, getEpisodeDetails]);
+  }, [watchProgress, type, getEpisodeDetails, isTraktAuthenticated]);
 
   if (!progressData) return null;
 
@@ -243,13 +274,26 @@ const WatchProgressDisplay = React.memo(({
             styles.watchProgressFill,
             { 
               width: `${progressData.progressPercent}%`,
-              backgroundColor: currentTheme.colors.primary 
+              backgroundColor: progressData.isTraktSynced 
+                ? '#E50914' // Netflix red for Trakt synced content
+                : currentTheme.colors.primary 
             }
           ]} 
         />
+        {/* Trakt sync indicator */}
+        {progressData.isTraktSynced && (
+          <View style={styles.traktSyncIndicator}>
+            <MaterialIcons 
+              name="sync" 
+              size={8} 
+              color="rgba(255,255,255,0.9)" 
+            />
+          </View>
+        )}
       </View>
       <Text style={[styles.watchProgressText, { color: currentTheme.colors.textMuted }]}>
         {progressData.displayText}{progressData.episodeInfo} • Last watched on {progressData.formattedTime}
+        {progressData.syncStatus}
       </Text>
     </Animated.View>
   );
@@ -280,6 +324,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
   setLogoLoadError,
 }) => {
   const { currentTheme } = useTheme();
+  const { isAuthenticated: isTraktAuthenticated } = useTraktContext();
   
   // Enhanced state for smooth image loading
   const [imageError, setImageError] = useState(false);
@@ -470,7 +515,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
             </Animated.View>
           </View>
 
-          {/* Optimized Watch Progress */}
+          {/* Enhanced Watch Progress with Trakt integration */}
           <WatchProgressDisplay 
             watchProgress={watchProgress}
             type={type}
@@ -636,11 +681,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 1.25,
     overflow: 'hidden',
-    marginBottom: 6
+    marginBottom: 6,
+    position: 'relative',
   },
   watchProgressFill: {
     height: '100%',
     borderRadius: 1.25,
+  },
+  traktSyncIndicator: {
+    position: 'absolute',
+    right: 2,
+    top: -2,
+    bottom: -2,
+    width: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   watchProgressText: {
     fontSize: 11,
