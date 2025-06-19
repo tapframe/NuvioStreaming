@@ -688,14 +688,17 @@ const HomeScreen = () => {
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
+      // Only refresh continue watching section on focus
       refreshContinueWatching();
-      // Also refresh catalogs when returning to home screen
-      // This ensures new addons are shown even if the context event was missed
-      loadCatalogsProgressively();
+      // Don't reload catalogs unless they haven't been loaded yet
+      // Catalogs will be refreshed through context updates when addons change
+      if (catalogs.length === 0 && !catalogsLoading) {
+        loadCatalogsProgressively();
+      }
     });
 
     return unsubscribe;
-  }, [navigation, refreshContinueWatching, loadCatalogsProgressively]);
+  }, [navigation, refreshContinueWatching, loadCatalogsProgressively, catalogs.length, catalogsLoading]);
 
   // Memoize the loading screen to prevent unnecessary re-renders
   const renderLoadingScreen = useMemo(() => {
