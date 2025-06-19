@@ -322,7 +322,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   }, [navigation]);
 
   // If no continue watching items, don't render anything
-  if (continueWatchingItems.length === 0 && !loading) {
+  if (continueWatchingItems.length === 0) {
     return null;
   }
 

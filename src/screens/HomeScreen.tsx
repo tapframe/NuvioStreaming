@@ -624,49 +624,6 @@ const HomeScreen = () => {
             <ThisWeekSection />
           </Animated.View>
 
-          {/* Debug buttons for Continue Watching */}
-          <View style={{ flexDirection: 'row', padding: 16, gap: 10 }}>
-            <TouchableOpacity 
-              style={{
-                backgroundColor: currentTheme.colors.primary,
-                padding: 10,
-                borderRadius: 8,
-                flex: 1
-              }}
-              onPress={addTestWatchProgress}
-            >
-              <Text style={{ color: 'white', textAlign: 'center', fontSize: 12 }}>
-                Add Test Progress
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={{
-                backgroundColor: currentTheme.colors.error || '#ff4444',
-                padding: 10,
-                borderRadius: 8,
-                flex: 1
-              }}
-              onPress={clearAllWatchProgress}
-            >
-              <Text style={{ color: 'white', textAlign: 'center', fontSize: 12 }}>
-                Clear All Progress
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={{
-                backgroundColor: currentTheme.colors.secondary,
-                padding: 10,
-                borderRadius: 8,
-                flex: 1
-              }}
-              onPress={refreshContinueWatching}
-            >
-              <Text style={{ color: 'white', textAlign: 'center', fontSize: 12 }}>
-                Refresh
-              </Text>
-            </TouchableOpacity>
-          </View>
-
             <ContinueWatchingSection ref={continueWatchingRef} />
 
           {catalogs.length > 0 ? (
@@ -708,58 +665,6 @@ const HomeScreen = () => {
     navigation,
     featuredContentSource
   ]);
-
-  // Debug function to add test watch progress
-  const addTestWatchProgress = useCallback(async () => {
-    console.log('[HomeScreen] Adding test watch progress data...');
-    try {
-      // Add a test movie with 50% progress
-      await storageService.setWatchProgress(
-        'tt1375666', // Inception IMDB ID
-        'movie',
-        {
-          currentTime: 3600, // 1 hour
-          duration: 7200,    // 2 hours (50% progress)
-          lastUpdated: Date.now()
-        }
-      );
-      
-      // Add a test series episode with 30% progress
-      await storageService.setWatchProgress(
-        'tt0944947', // Game of Thrones IMDB ID
-        'series',
-        {
-          currentTime: 1800, // 30 minutes
-          duration: 6000,    // 100 minutes (30% progress)
-          lastUpdated: Date.now() - 86400000 // 1 day ago
-        },
-        'tt0944947:1:1' // Season 1, Episode 1
-      );
-      
-      console.log('[HomeScreen] Test watch progress added successfully');
-      
-      // Refresh the continue watching section
-      await refreshContinueWatching();
-    } catch (error) {
-      console.error('[HomeScreen] Error adding test watch progress:', error);
-    }
-  }, [refreshContinueWatching]);
-
-  // Debug function to clear all watch progress
-  const clearAllWatchProgress = useCallback(async () => {
-    console.log('[HomeScreen] Clearing all watch progress...');
-    try {
-      const allProgress = await storageService.getAllWatchProgress();
-      for (const key of Object.keys(allProgress)) {
-        const [type, id, episodeId] = key.split(':');
-        await storageService.removeWatchProgress(id, type, episodeId);
-      }
-      console.log('[HomeScreen] All watch progress cleared');
-      await refreshContinueWatching();
-    } catch (error) {
-      console.error('[HomeScreen] Error clearing watch progress:', error);
-    }
-  }, [refreshContinueWatching]);
 
   return isLoading ? renderLoadingScreen : renderMainContent;
 };
