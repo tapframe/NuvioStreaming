@@ -415,14 +415,11 @@ class StremioService {
         });
       }
       
-      logger.log(`Cinemeta catalog request URL: ${url}`);
-      
       const response = await this.retryRequest(async () => {
         return await axios.get(url);
       });
       
       if (response.data && response.data.metas && Array.isArray(response.data.metas)) {
-        logger.log(`Cinemeta returned ${response.data.metas.length} items`);
         return response.data.metas;
       }
       return [];
@@ -453,14 +450,11 @@ class StremioService {
         });
       }
       
-      logger.log(`${manifest.name} catalog request URL: ${url}`);
-      
       const response = await this.retryRequest(async () => {
         return await axios.get(url);
       });
       
       if (response.data && response.data.metas && Array.isArray(response.data.metas)) {
-        logger.log(`${manifest.name} returned ${response.data.metas.length} items`);
         return response.data.metas;
       }
       return [];
