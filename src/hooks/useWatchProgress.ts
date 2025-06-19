@@ -103,36 +103,27 @@ export const useWatchProgress = (
               setWatchProgress(null);
             }
           } else {
-            // Find the first unfinished episode
-            const unfinishedEpisode = episodes.find(ep => {
-              const epId = ep.stremioId || `${id}:${ep.season_number}:${ep.episode_number}`;
-              const progress = seriesProgresses.find(p => p.episodeId === epId);
-              if (!progress) return true;
-              const percent = (progress.progress.currentTime / progress.progress.duration) * 100;
-              return percent < 95;
-            });
-
-            if (unfinishedEpisode) {
-              const epId = unfinishedEpisode.stremioId || 
-                `${id}:${unfinishedEpisode.season_number}:${unfinishedEpisode.episode_number}`;
-              const progress = await storageService.getWatchProgress(id, type, epId);
-              if (progress) {
-                setWatchProgress({ 
-                  ...progress, 
-                  episodeId: epId,
-                  traktSynced: progress.traktSynced,
-                  traktProgress: progress.traktProgress
-                });
-              } else {
-                setWatchProgress({ 
-                  currentTime: 0, 
-                  duration: 0, 
-                  lastUpdated: Date.now(), 
-                  episodeId: epId,
-                  traktSynced: false
-                });
-              }
+            // FIXED: Find the most recently watched episode instead of first unfinished
+            // Sort by lastUpdated timestamp (most recent first)
+            const sortedProgresses = seriesProgresses.sort((a, b) => 
+              b.progress.lastUpdated - a.progress.lastUpdated
+            );
+            
+            if (sortedProgresses.length > 0) {
+              // Use the most recently watched episode
+              const mostRecentProgress = sortedProgresses[0];
+              const progress = mostRecentProgress.progress;
+              
+              logger.log(`[useWatchProgress] Using most recent progress for ${mostRecentProgress.episodeId}, updated at ${new Date(progress.lastUpdated).toLocaleString()}`);
+              
+              setWatchProgress({
+                ...progress,
+                episodeId: mostRecentProgress.episodeId,
+                traktSynced: progress.traktSynced,
+                traktProgress: progress.traktProgress
+              });
             } else {
+              // No watched episodes found
               setWatchProgress(null);
             }
           }

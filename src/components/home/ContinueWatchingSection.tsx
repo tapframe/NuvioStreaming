@@ -393,16 +393,16 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                      <View style={styles.episodeRow}>
                        <Text style={[styles.episodeText, { color: currentTheme.colors.mediumEmphasis }]}>
                          Season {item.season}
-                       </Text>
-                       {item.episodeTitle && (
+                  </Text>
+                  {item.episodeTitle && (
                          <Text 
                            style={[styles.episodeTitle, { color: currentTheme.colors.mediumEmphasis }]}
                            numberOfLines={1}
                          >
-                           {item.episodeTitle}
-                         </Text>
-                       )}
-                     </View>
+                      {item.episodeTitle}
+                    </Text>
+                  )}
+                </View>
                    );
                  } else {
                   return (
@@ -416,15 +416,15 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
               {/* Progress Bar */}
               <View style={styles.wideProgressContainer}>
                 <View style={styles.wideProgressTrack}>
-                  <View 
-                    style={[
+                <View 
+                  style={[
                       styles.wideProgressBar, 
                       { 
                         width: `${item.progress}%`, 
                         backgroundColor: currentTheme.colors.primary 
                       }
-                    ]} 
-                  />
+                  ]} 
+                />
                 </View>
                 <Text style={[styles.progressLabel, { color: currentTheme.colors.textMuted }]}>
                   {Math.round(item.progress)}% watched

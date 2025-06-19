@@ -533,9 +533,9 @@ const HomeScreen = () => {
     console.log('[HomeScreen] Refreshing continue watching...');
     if (continueWatchingRef.current) {
       try {
-        const hasContent = await continueWatchingRef.current.refresh();
+      const hasContent = await continueWatchingRef.current.refresh();
         console.log(`[HomeScreen] Continue watching has content: ${hasContent}`);
-        setHasContinueWatching(hasContent);
+      setHasContinueWatching(hasContent);
         
         // Debug: Let's check what's in storage
         const allProgress = await storageService.getAllWatchProgress();
@@ -667,7 +667,7 @@ const HomeScreen = () => {
             </TouchableOpacity>
           </View>
 
-          <ContinueWatchingSection ref={continueWatchingRef} />
+            <ContinueWatchingSection ref={continueWatchingRef} />
 
           {catalogs.length > 0 ? (
             catalogs.map((catalog, index) => (

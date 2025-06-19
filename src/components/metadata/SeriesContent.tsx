@@ -40,16 +40,17 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   const { width } = useWindowDimensions();
   const isTablet = width > 768;
   const isDarkMode = useColorScheme() === 'dark';
-  const [episodeProgress, setEpisodeProgress] = useState<{ [key: string]: { currentTime: number; duration: number } }>({});
+  const [episodeProgress, setEpisodeProgress] = useState<{ [key: string]: { currentTime: number; duration: number; lastUpdated: number } }>({});
   
-  // Add ref for the season selector ScrollView
+  // Add refs for the scroll views
   const seasonScrollViewRef = useRef<ScrollView | null>(null);
+  const episodeScrollViewRef = useRef<ScrollView | null>(null);
 
   const loadEpisodesProgress = async () => {
     if (!metadata?.id) return;
     
     const allProgress = await storageService.getAllWatchProgress();
-    const progress: { [key: string]: { currentTime: number; duration: number } } = {};
+    const progress: { [key: string]: { currentTime: number; duration: number; lastUpdated: number } } = {};
     
     episodes.forEach(episode => {
       const episodeId = episode.stremioId || `${metadata.id}:${episode.season_number}:${episode.episode_number}`;
@@ -57,12 +58,74 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
       if (allProgress[key]) {
         progress[episodeId] = {
           currentTime: allProgress[key].currentTime,
-          duration: allProgress[key].duration
+          duration: allProgress[key].duration,
+          lastUpdated: allProgress[key].lastUpdated
         };
       }
     });
     
     setEpisodeProgress(progress);
+  };
+
+  // Function to find and scroll to the most recently watched episode
+  const scrollToMostRecentEpisode = () => {
+    if (!metadata?.id || !episodeScrollViewRef.current || settings.episodeLayoutStyle !== 'horizontal') {
+      console.log('[SeriesContent] Scroll conditions not met:', {
+        hasMetadataId: !!metadata?.id,
+        hasScrollRef: !!episodeScrollViewRef.current,
+        isHorizontal: settings.episodeLayoutStyle === 'horizontal'
+      });
+      return;
+    }
+    
+    const currentSeasonEpisodes = groupedEpisodes[selectedSeason] || [];
+    if (currentSeasonEpisodes.length === 0) {
+      console.log('[SeriesContent] No episodes in current season:', selectedSeason);
+      return;
+    }
+    
+    // Find the most recently watched episode in the current season
+    let mostRecentEpisodeIndex = -1;
+    let mostRecentTimestamp = 0;
+    let mostRecentEpisodeName = '';
+    
+    currentSeasonEpisodes.forEach((episode, index) => {
+      const episodeId = episode.stremioId || `${metadata.id}:${episode.season_number}:${episode.episode_number}`;
+      const progress = episodeProgress[episodeId];
+      
+      if (progress && progress.lastUpdated > mostRecentTimestamp && progress.currentTime > 0) {
+        mostRecentTimestamp = progress.lastUpdated;
+        mostRecentEpisodeIndex = index;
+        mostRecentEpisodeName = episode.name;
+      }
+    });
+    
+    console.log('[SeriesContent] Episode scroll analysis:', {
+      totalEpisodes: currentSeasonEpisodes.length,
+      mostRecentIndex: mostRecentEpisodeIndex,
+      mostRecentEpisode: mostRecentEpisodeName,
+      selectedSeason
+    });
+    
+    // Scroll to the most recently watched episode if found
+    if (mostRecentEpisodeIndex >= 0) {
+      const cardWidth = isTablet ? width * 0.4 + 16 : width * 0.85 + 16;
+      const scrollPosition = mostRecentEpisodeIndex * cardWidth;
+      
+      console.log('[SeriesContent] Scrolling to episode:', {
+        index: mostRecentEpisodeIndex,
+        cardWidth,
+        scrollPosition,
+        episodeName: mostRecentEpisodeName
+      });
+      
+      setTimeout(() => {
+        episodeScrollViewRef.current?.scrollTo({
+          x: scrollPosition,
+          animated: true
+        });
+      }, 500); // Delay to ensure the season has loaded
+    }
   };
 
   // Initial load of watch progress
@@ -95,6 +158,13 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
       }
     }
   }, [selectedSeason, groupedEpisodes]);
+
+  // Add effect to scroll to most recently watched episode when season changes or progress loads
+  useEffect(() => {
+    if (Object.keys(episodeProgress).length > 0 && selectedSeason) {
+      scrollToMostRecentEpisode();
+    }
+  }, [selectedSeason, episodeProgress, settings.episodeLayoutStyle, groupedEpisodes]);
 
   if (loadingSeasons) {
     return (
@@ -480,6 +550,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
         {settings.episodeLayoutStyle === 'horizontal' ? (
           // Horizontal Layout (Netflix-style)
           <ScrollView 
+            ref={episodeScrollViewRef}
             horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.episodeList}

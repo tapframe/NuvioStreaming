@@ -11,6 +11,7 @@ import { logger } from '../utils/logger';
 import { usePersistentSeasons } from './usePersistentSeasons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stream } from '../types/metadata';
+import { storageService } from '../services/storageService';
 
 // Constants for timeouts and retries
 const API_TIMEOUT = 10000; // 10 seconds
@@ -589,14 +590,61 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
         // Get the first available season as fallback
         const firstSeason = Math.min(...Object.keys(allEpisodes).map(Number));
         
-        // Get saved season from persistence, fallback to first season if not found
-        const persistedSeason = getSeason(id, firstSeason);
+        // Check for watch progress to auto-select season
+        let selectedSeasonNumber = firstSeason;
         
-        // Set the selected season from persistence
-        setSelectedSeason(persistedSeason);
+        try {
+          // Check watch progress for auto-season selection
+          const allProgress = await storageService.getAllWatchProgress();
+          
+          // Find the most recently watched episode for this series
+          let mostRecentEpisodeId = '';
+          let mostRecentTimestamp = 0;
+          
+          Object.entries(allProgress).forEach(([key, progress]) => {
+            if (key.includes(`series:${id}:`)) {
+              const episodeId = key.split(`series:${id}:`)[1];
+              if (progress.lastUpdated > mostRecentTimestamp && progress.currentTime > 0) {
+                mostRecentTimestamp = progress.lastUpdated;
+                mostRecentEpisodeId = episodeId;
+              }
+            }
+          });
+          
+          if (mostRecentEpisodeId) {
+            // Parse season number from episode ID
+            const parts = mostRecentEpisodeId.split(':');
+            if (parts.length === 3) {
+              const watchProgressSeason = parseInt(parts[1], 10);
+              if (transformedEpisodes[watchProgressSeason]) {
+                selectedSeasonNumber = watchProgressSeason;
+                logger.log(`[useMetadata] Auto-selected season ${selectedSeasonNumber} based on most recent watch progress for ${mostRecentEpisodeId}`);
+              }
+            } else {
+              // Try to find episode by stremioId to get season
+              const allEpisodesList = Object.values(transformedEpisodes).flat();
+              const episode = allEpisodesList.find(ep => ep.stremioId === mostRecentEpisodeId);
+              if (episode) {
+                selectedSeasonNumber = episode.season_number;
+                logger.log(`[useMetadata] Auto-selected season ${selectedSeasonNumber} based on most recent watch progress for episode with stremioId ${mostRecentEpisodeId}`);
+              }
+            }
+          } else {
+            // No watch progress found, use persistent storage as fallback
+            selectedSeasonNumber = getSeason(id, firstSeason);
+            logger.log(`[useMetadata] No watch progress found, using persistent season ${selectedSeasonNumber}`);
+          }
+        } catch (error) {
+          logger.error('[useMetadata] Error checking watch progress for season selection:', error);
+          // Fall back to persistent storage
+          selectedSeasonNumber = getSeason(id, firstSeason);
+        }
+        
+        // Set the selected season
+        setSelectedSeason(selectedSeasonNumber);
         
         // Set episodes for the selected season
-        setEpisodes(transformedEpisodes[persistedSeason] || []);
+        setEpisodes(transformedEpisodes[selectedSeasonNumber] || []);
       }
     } catch (error) {
       console.error('Failed to load episodes:', error);
