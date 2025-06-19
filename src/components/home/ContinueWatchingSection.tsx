@@ -80,13 +80,10 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   // Modified loadContinueWatching to be more efficient
   const loadContinueWatching = useCallback(async () => {
     try {
-      console.log('[ContinueWatching] Starting to load continue watching items...');
       setLoading(true);
       const allProgress = await storageService.getAllWatchProgress();
-      console.log(`[ContinueWatching] Found ${Object.keys(allProgress).length} progress items in storage`);
       
       if (Object.keys(allProgress).length === 0) {
-        console.log('[ContinueWatching] No progress items found, setting empty array');
         setContinueWatchingItems([]);
         return;
       }
@@ -97,24 +94,16 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       
       // Process each saved progress
       for (const key in allProgress) {
-        console.log(`[ContinueWatching] Raw key from storage: "${key}"`);
-        
         // Parse the key to get type and id
         const keyParts = key.split(':');
-        console.log(`[ContinueWatching] Key parts:`, keyParts);
-        
         const [type, id, ...episodeIdParts] = keyParts;
         const episodeId = episodeIdParts.length > 0 ? episodeIdParts.join(':') : undefined;
         const progress = allProgress[key];
         
-        console.log(`[ContinueWatching] Parsed - type: "${type}", id: "${id}", episodeId: "${episodeId}"`);
-        
         // Skip items that are more than 95% complete (effectively finished)
         const progressPercent = (progress.currentTime / progress.duration) * 100;
-        console.log(`[ContinueWatching] Progress for ${key}: ${progressPercent.toFixed(1)}%`);
         
         if (progressPercent >= 95) {
-          console.log(`[ContinueWatching] Skipping ${key} - too high progress (${progressPercent.toFixed(1)}%)`);
           continue;
         }
         
@@ -122,34 +111,27 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
           try {
             // Validate IMDB ID format before attempting to fetch
             if (!isValidImdbId(id)) {
-              console.log(`[ContinueWatching] Skipping ${type}:${id} - invalid IMDB ID format`);
               return;
             }
             
-            console.log(`[ContinueWatching] Fetching content details for ${type}:${id}`);
             let content: StreamingContent | null = null;
             
             // Get content details using catalogService
             content = await catalogService.getContentDetails(type, id);
             
             if (content) {
-              console.log(`[ContinueWatching] Successfully fetched content: ${content.name}`);
-              
               // Extract season and episode info from episodeId if available
               let season: number | undefined;
               let episode: number | undefined;
               let episodeTitle: string | undefined;
               
               if (episodeId && type === 'series') {
-                console.log(`[ContinueWatching] Parsing episode ID: ${episodeId}`);
-                
                 // Try different episode ID formats
                 let match = episodeId.match(/s(\d+)e(\d+)/i); // Format: s1e1
                 if (match) {
                   season = parseInt(match[1], 10);
                   episode = parseInt(match[2], 10);
                   episodeTitle = `Episode ${episode}`;
-                  console.log(`[ContinueWatching] Parsed s1e1 format: S${season}E${episode}`);
                 } else {
                   // Try format: seriesId:season:episode (e.g., tt0108778:4:6)
                   const parts = episodeId.split(':');
@@ -164,13 +146,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                       season = seasonNum;
                       episode = episodeNum;
                       episodeTitle = `Episode ${episode}`;
-                      console.log(`[ContinueWatching] Parsed colon format: S${season}E${episode}`);
                     }
                   }
-                }
-                
-                if (!season || !episode) {
-                  console.log(`[ContinueWatching] Failed to parse episode details from: ${episodeId}`);
                 }
               }
               
@@ -183,31 +160,18 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                 episodeTitle
               };
               
-              console.log(`[ContinueWatching] Created item for ${content.name}:`, {
-                type,
-                season,
-                episode,
-                episodeTitle,
-                episodeId,
-                originalKey: key
-              });
-              
               if (type === 'series') {
                 // For series, keep only the latest watched episode for each show
                 if (!latestEpisodes[id] || latestEpisodes[id].lastUpdated < progress.lastUpdated) {
                   latestEpisodes[id] = continueWatchingItem;
-                  console.log(`[ContinueWatching] Updated latest episode for series ${id}`);
                 }
               } else {
                 // For movies, add to the list directly
                 progressItems.push(continueWatchingItem);
-                console.log(`[ContinueWatching] Added movie to progress items`);
               }
-            } else {
-              console.log(`[ContinueWatching] Failed to fetch content details for ${type}:${id}`);
             }
           } catch (error) {
-            console.error(`[ContinueWatching] Failed to get content details for ${type}:${id}`, error);
+            logger.error(`Failed to get content details for ${type}:${id}`, error);
           }
         })();
         
@@ -215,35 +179,20 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       }
       
       // Wait for all content to be processed
-      console.log(`[ContinueWatching] Waiting for ${contentPromises.length} content promises...`);
       await Promise.all(contentPromises);
       
       // Add the latest episodes for each series to the items list
       progressItems.push(...Object.values(latestEpisodes));
-      console.log(`[ContinueWatching] Total items after processing: ${progressItems.length}`);
       
       // Sort by last updated time (most recent first)
       progressItems.sort((a, b) => b.lastUpdated - a.lastUpdated);
       
       // Limit to 10 items
       const finalItems = progressItems.slice(0, 10);
-      console.log(`[ContinueWatching] Final continue watching items: ${finalItems.length}`);
-      
-      // Debug: Log the final items with their episode details
-      finalItems.forEach((item, index) => {
-        console.log(`[ContinueWatching] Item ${index}:`, {
-          name: item.name,
-          type: item.type,
-          season: item.season,
-          episode: item.episode,
-          episodeTitle: item.episodeTitle,
-          progress: item.progress
-        });
-      });
       
       setContinueWatchingItems(finalItems);
     } catch (error) {
-      console.error('[ContinueWatching] Failed to load continue watching items:', error);
+      logger.error('Failed to load continue watching items:', error);
     } finally {
       setLoading(false);
     }
@@ -308,11 +257,9 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   // Properly expose the refresh method
   React.useImperativeHandle(ref, () => ({
     refresh: async () => {
-      console.log('[ContinueWatching] Refresh method called');
       await loadContinueWatching();
       // Return whether there are items to help parent determine visibility
       const hasItems = continueWatchingItems.length > 0;
-      console.log(`[ContinueWatching] Refresh returning hasItems: ${hasItems}, items count: ${continueWatchingItems.length}`);
       return hasItems;
     }
   }));
@@ -379,32 +326,23 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
 
               {/* Episode Info or Year */}
               {(() => {
-                console.log(`[ContinueWatching] Rendering item:`, {
-                  name: item.name,
-                  type: item.type,
-                  season: item.season,
-                  episode: item.episode,
-                  episodeTitle: item.episodeTitle,
-                  hasSeasonAndEpisode: !!(item.season && item.episode)
-                });
-                
-                                 if (item.type === 'series' && item.season && item.episode) {
-                   return (
-                     <View style={styles.episodeRow}>
-                       <Text style={[styles.episodeText, { color: currentTheme.colors.mediumEmphasis }]}>
-                         Season {item.season}
-                  </Text>
-                  {item.episodeTitle && (
-                         <Text 
-                           style={[styles.episodeTitle, { color: currentTheme.colors.mediumEmphasis }]}
-                           numberOfLines={1}
-                         >
-                      {item.episodeTitle}
-                    </Text>
-                  )}
-                </View>
-                   );
-                 } else {
+                if (item.type === 'series' && item.season && item.episode) {
+                  return (
+                    <View style={styles.episodeRow}>
+                      <Text style={[styles.episodeText, { color: currentTheme.colors.mediumEmphasis }]}>
+                        Season {item.season}
+                      </Text>
+                      {item.episodeTitle && (
+                        <Text 
+                          style={[styles.episodeTitle, { color: currentTheme.colors.mediumEmphasis }]}
+                          numberOfLines={1}
+                        >
+                          {item.episodeTitle}
+                        </Text>
+                      )}
+                    </View>
+                  );
+                } else {
                   return (
                     <Text style={[styles.yearText, { color: currentTheme.colors.mediumEmphasis }]}>
                       {item.year} • {item.type === 'movie' ? 'Movie' : 'Series'}
