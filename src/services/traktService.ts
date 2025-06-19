@@ -47,6 +47,79 @@ export interface TraktWatchedItem {
   last_watched_at: string;
 }
 
+export interface TraktWatchlistItem {
+  movie?: {
+    title: string;
+    year: number;
+    ids: {
+      trakt: number;
+      slug: string;
+      imdb: string;
+      tmdb: number;
+    };
+  };
+  show?: {
+    title: string;
+    year: number;
+    ids: {
+      trakt: number;
+      slug: string;
+      imdb: string;
+      tmdb: number;
+    };
+  };
+  listed_at: string;
+}
+
+export interface TraktCollectionItem {
+  movie?: {
+    title: string;
+    year: number;
+    ids: {
+      trakt: number;
+      slug: string;
+      imdb: string;
+      tmdb: number;
+    };
+  };
+  show?: {
+    title: string;
+    year: number;
+    ids: {
+      trakt: number;
+      slug: string;
+      imdb: string;
+      tmdb: number;
+    };
+  };
+  collected_at: string;
+}
+
+export interface TraktRatingItem {
+  movie?: {
+    title: string;
+    year: number;
+    ids: {
+      trakt: number;
+      slug: string;
+      imdb: string;
+      tmdb: number;
+    };
+  };
+  show?: {
+    title: string;
+    year: number;
+    ids: {
+      trakt: number;
+      slug: string;
+      imdb: string;
+      tmdb: number;
+    };
+  };
+  rating: number;
+  rated_at: string;
+}
+
 // New types for scrobbling
 export interface TraktPlaybackItem {
   progress: number;
@@ -576,6 +649,42 @@ export class TraktService {
    */
   public async getWatchedShows(): Promise<TraktWatchedItem[]> {
     return this.apiRequest<TraktWatchedItem[]>('/sync/watched/shows');
+  }
+
+  /**
+   * Get the user's watchlist movies
+   */
+  public async getWatchlistMovies(): Promise<TraktWatchlistItem[]> {
+    return this.apiRequest<TraktWatchlistItem[]>('/sync/watchlist/movies');
+  }
+
+  /**
+   * Get the user's watchlist shows
+   */
+  public async getWatchlistShows(): Promise<TraktWatchlistItem[]> {
+    return this.apiRequest<TraktWatchlistItem[]>('/sync/watchlist/shows');
+  }
+
+  /**
+   * Get the user's collection movies
+   */
+  public async getCollectionMovies(): Promise<TraktCollectionItem[]> {
+    return this.apiRequest<TraktCollectionItem[]>('/sync/collection/movies');
+  }
+
+  /**
+   * Get the user's collection shows
+   */
+  public async getCollectionShows(): Promise<TraktCollectionItem[]> {
+    return this.apiRequest<TraktCollectionItem[]>('/sync/collection/shows');
+  }
+
+  /**
+   * Get the user's ratings
+   */
+  public async getRatings(type?: 'movies' | 'shows'): Promise<TraktRatingItem[]> {
+    const endpoint = type ? `/sync/ratings/${type}` : '/sync/ratings';
+    return this.apiRequest<TraktRatingItem[]>(endpoint);
   }
 
   /**

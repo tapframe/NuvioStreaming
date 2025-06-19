@@ -1,6 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import { traktService, TraktUser, TraktWatchedItem, TraktContentData, TraktPlaybackItem } from '../services/traktService';
+import { 
+  traktService, 
+  TraktUser, 
+  TraktWatchedItem, 
+  TraktWatchlistItem,
+  TraktCollectionItem,
+  TraktRatingItem,
+  TraktContentData, 
+  TraktPlaybackItem 
+} from '../services/traktService';
 import { storageService } from '../services/storageService';
 import { logger } from '../utils/logger';
 
@@ -10,6 +19,12 @@ export function useTraktIntegration() {
   const [userProfile, setUserProfile] = useState<TraktUser | null>(null);
   const [watchedMovies, setWatchedMovies] = useState<TraktWatchedItem[]>([]);
   const [watchedShows, setWatchedShows] = useState<TraktWatchedItem[]>([]);
+  const [watchlistMovies, setWatchlistMovies] = useState<TraktWatchlistItem[]>([]);
+  const [watchlistShows, setWatchlistShows] = useState<TraktWatchlistItem[]>([]);
+  const [collectionMovies, setCollectionMovies] = useState<TraktCollectionItem[]>([]);
+  const [collectionShows, setCollectionShows] = useState<TraktCollectionItem[]>([]);
+  const [continueWatching, setContinueWatching] = useState<TraktPlaybackItem[]>([]);
+  const [ratedContent, setRatedContent] = useState<TraktRatingItem[]>([]);
   const [lastAuthCheck, setLastAuthCheck] = useState<number>(Date.now());
 
   // Check authentication status
@@ -60,6 +75,41 @@ export function useTraktIntegration() {
       setWatchedShows(shows);
     } catch (error) {
       logger.error('[useTraktIntegration] Error loading watched items:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isAuthenticated]);
+
+  // Load all collections (watchlist, collection, continue watching, ratings)
+  const loadAllCollections = useCallback(async () => {
+    if (!isAuthenticated) return;
+    
+    setIsLoading(true);
+    try {
+      const [
+        watchlistMovies,
+        watchlistShows,
+        collectionMovies,
+        collectionShows,
+        continueWatching,
+        ratings
+      ] = await Promise.all([
+        traktService.getWatchlistMovies(),
+        traktService.getWatchlistShows(),
+        traktService.getCollectionMovies(),
+        traktService.getCollectionShows(),
+        traktService.getPlaybackProgress(),
+        traktService.getRatings()
+      ]);
+      
+      setWatchlistMovies(watchlistMovies);
+      setWatchlistShows(watchlistShows);
+      setCollectionMovies(collectionMovies);
+      setCollectionShows(collectionShows);
+      setContinueWatching(continueWatching);
+      setRatedContent(ratings);
+    } catch (error) {
+      logger.error('[useTraktIntegration] Error loading all collections:', error);
     } finally {
       setIsLoading(false);
     }
@@ -436,8 +486,15 @@ export function useTraktIntegration() {
     userProfile,
     watchedMovies,
     watchedShows,
+    watchlistMovies,
+    watchlistShows,
+    collectionMovies,
+    collectionShows,
+    continueWatching,
+    ratedContent,
     checkAuthStatus,
     loadWatchedItems,
+    loadAllCollections,
     isMovieWatched,
     isEpisodeWatched,
     markMovieAsWatched,

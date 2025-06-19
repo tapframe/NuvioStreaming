@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -42,10 +42,20 @@ interface TraktDisplayItem {
   type: 'movie' | 'series';
   poster: string;
   year?: number;
-  lastWatched: string;
-  plays: number;
+  lastWatched?: string;
+  plays?: number;
+  rating?: number;
   imdbId?: string;
   traktId: number;
+}
+
+interface TraktFolder {
+  id: string;
+  name: string;
+  icon: keyof typeof MaterialIcons.glyphMap;
+  description: string;
+  itemCount: number;
+  gradient: [string, string];
 }
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
@@ -116,6 +126,7 @@ const LibraryScreen = () => {
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
   const [filter, setFilter] = useState<'all' | 'movies' | 'series'>('all');
   const [showTraktContent, setShowTraktContent] = useState(false);
+  const [selectedTraktFolder, setSelectedTraktFolder] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
   const { currentTheme } = useTheme();
   
@@ -125,7 +136,14 @@ const LibraryScreen = () => {
     isLoading: traktLoading,
     watchedMovies,
     watchedShows,
-    loadWatchedItems
+    watchlistMovies,
+    watchlistShows,
+    collectionMovies,
+    collectionShows,
+    continueWatching,
+    ratedContent,
+    loadWatchedItems,
+    loadAllCollections
   } = useTraktContext();
 
   // Force consistent status bar settings
@@ -177,6 +195,57 @@ const LibraryScreen = () => {
     return true;
   });
 
+  // Generate Trakt collection folders
+  const traktFolders = useMemo((): TraktFolder[] => {
+    if (!traktAuthenticated) return [];
+
+    const folders: TraktFolder[] = [
+      {
+        id: 'watched',
+        name: 'Watched',
+        icon: 'visibility',
+        description: 'Your watched content',
+        itemCount: (watchedMovies?.length || 0) + (watchedShows?.length || 0),
+        gradient: ['#4CAF50', '#2E7D32']
+      },
+      {
+        id: 'continue-watching',
+        name: 'Continue Watching',
+        icon: 'play-circle-outline',
+        description: 'Resume your progress',
+        itemCount: continueWatching?.length || 0,
+        gradient: ['#FF9800', '#F57C00']
+      },
+      {
+        id: 'watchlist',
+        name: 'Watchlist',
+        icon: 'bookmark',
+        description: 'Want to watch',
+        itemCount: (watchlistMovies?.length || 0) + (watchlistShows?.length || 0),
+        gradient: ['#2196F3', '#1976D2']
+      },
+      {
+        id: 'collection',
+        name: 'Collection',
+        icon: 'library-add',
+        description: 'Your collection',
+        itemCount: (collectionMovies?.length || 0) + (collectionShows?.length || 0),
+        gradient: ['#9C27B0', '#7B1FA2']
+      },
+      {
+        id: 'ratings',
+        name: 'Rated',
+        icon: 'star',
+        description: 'Your ratings',
+        itemCount: ratedContent?.length || 0,
+        gradient: ['#FF5722', '#D84315']
+      }
+    ];
+
+    // Only return folders that have content
+    return folders.filter(folder => folder.itemCount > 0);
+  }, [traktAuthenticated, watchedMovies, watchedShows, watchlistMovies, watchlistShows, collectionMovies, collectionShows, continueWatching, ratedContent]);
+
   // Prepare Trakt items with proper poster URLs
   const traktItems = useMemo(() => {
     if (!traktAuthenticated || (!watchedMovies?.length && !watchedShows?.length)) {
@@ -226,7 +295,11 @@ const LibraryScreen = () => {
     }
 
     // Sort by last watched date (most recent first)
-    return items.sort((a, b) => new Date(b.lastWatched).getTime() - new Date(a.lastWatched).getTime());
+    return items.sort((a, b) => {
+      const dateA = a.lastWatched ? new Date(a.lastWatched).getTime() : 0;
+      const dateB = b.lastWatched ? new Date(b.lastWatched).getTime() : 0;
+      return dateB - dateA;
+    });
   }, [traktAuthenticated, watchedMovies, watchedShows]);
 
   // State for tracking poster URLs
@@ -348,6 +421,41 @@ const LibraryScreen = () => {
     </TouchableOpacity>
   );
 
+  // Render individual Trakt collection folder
+  const renderTraktCollectionFolder = ({ folder }: { folder: TraktFolder }) => (
+    <TouchableOpacity
+      style={[styles.itemContainer, { width: itemWidth }]}
+      onPress={() => {
+        setSelectedTraktFolder(folder.id);
+        loadAllCollections(); // Load all collections when entering a specific folder
+      }}
+      activeOpacity={0.7}
+    >
+      <View style={[styles.posterContainer, styles.folderContainer, { shadowColor: currentTheme.colors.black }]}>
+        <LinearGradient
+          colors={folder.gradient}
+          style={styles.folderGradient}
+        >
+          <MaterialIcons 
+            name={folder.icon} 
+            size={60} 
+            color={currentTheme.colors.white} 
+            style={{ marginBottom: 12 }} 
+          />
+          <Text style={[styles.folderTitle, { color: currentTheme.colors.white }]}>
+            {folder.name}
+          </Text>
+          <Text style={styles.folderCount}>
+            {folder.itemCount} items
+          </Text>
+          <Text style={styles.folderSubtitle}>
+            {folder.description}
+          </Text>
+        </LinearGradient>
+      </View>
+    </TouchableOpacity>
+  );
+
   const renderTraktFolder = () => (
     <TouchableOpacity
       style={[styles.itemContainer, { width: itemWidth }]}
@@ -356,6 +464,8 @@ const LibraryScreen = () => {
           navigation.navigate('TraktSettings');
         } else {
           setShowTraktContent(true);
+          setSelectedTraktFolder(null); // Reset to folder view
+          loadAllCollections(); // Load all collections when opening
         }
       }}
       activeOpacity={0.7}
@@ -427,7 +537,7 @@ const LibraryScreen = () => {
             <Text style={styles.lastWatched}>
               Last watched: {item.lastWatched}
             </Text>
-            {item.plays > 1 && (
+            {item.plays && item.plays > 1 && (
               <Text style={styles.playsCount}>
                 {item.plays} plays
               </Text>
@@ -446,18 +556,265 @@ const LibraryScreen = () => {
     );
   };
 
+  // Get items for a specific Trakt folder
+  const getTraktFolderItems = useCallback((folderId: string): TraktDisplayItem[] => {
+    const items: TraktDisplayItem[] = [];
+
+    switch (folderId) {
+      case 'watched':
+        // Add watched movies
+        if (watchedMovies) {
+          for (const watchedMovie of watchedMovies) {
+            const movie = watchedMovie.movie;
+            if (movie) {
+              items.push({
+                id: String(movie.ids.trakt),
+                name: movie.title,
+                type: 'movie',
+                poster: 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
+                year: movie.year,
+                lastWatched: new Date(watchedMovie.last_watched_at).toLocaleDateString(),
+                plays: watchedMovie.plays,
+                imdbId: movie.ids.imdb,
+                traktId: movie.ids.trakt,
+              });
+            }
+          }
+        }
+        // Add watched shows
+        if (watchedShows) {
+          for (const watchedShow of watchedShows) {
+            const show = watchedShow.show;
+            if (show) {
+              items.push({
+                id: String(show.ids.trakt),
+                name: show.title,
+                type: 'series',
+                poster: 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
+                year: show.year,
+                lastWatched: new Date(watchedShow.last_watched_at).toLocaleDateString(),
+                plays: watchedShow.plays,
+                imdbId: show.ids.imdb,
+                traktId: show.ids.trakt,
+              });
+            }
+          }
+        }
+        break;
+
+      case 'continue-watching':
+        // Add continue watching items
+        if (continueWatching) {
+          for (const item of continueWatching) {
+            if (item.type === 'movie' && item.movie) {
+              items.push({
+                id: String(item.movie.ids.trakt),
+                name: item.movie.title,
+                type: 'movie',
+                poster: 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
+                year: item.movie.year,
+                lastWatched: new Date(item.paused_at).toLocaleDateString(),
+                imdbId: item.movie.ids.imdb,
+                traktId: item.movie.ids.trakt,
+              });
+            } else if (item.type === 'episode' && item.show && item.episode) {
+              items.push({
+                id: `${item.show.ids.trakt}:${item.episode.season}:${item.episode.number}`,
+                name: `${item.show.title} S${item.episode.season}E${item.episode.number}`,
+                type: 'series',
+                poster: 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
+                year: item.show.year,
+                lastWatched: new Date(item.paused_at).toLocaleDateString(),
+                imdbId: item.show.ids.imdb,
+                traktId: item.show.ids.trakt,
+              });
+            }
+          }
+        }
+        break;
+
+      case 'watchlist':
+        // Add watchlist movies
+        if (watchlistMovies) {
+          for (const watchlistMovie of watchlistMovies) {
+            const movie = watchlistMovie.movie;
+            if (movie) {
+              items.push({
+                id: String(movie.ids.trakt),
+                name: movie.title,
+                type: 'movie',
+                poster: 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
+                year: movie.year,
+                lastWatched: new Date(watchlistMovie.listed_at).toLocaleDateString(),
+                imdbId: movie.ids.imdb,
+                traktId: movie.ids.trakt,
+              });
+            }
+          }
+        }
+        // Add watchlist shows
+        if (watchlistShows) {
+          for (const watchlistShow of watchlistShows) {
+            const show = watchlistShow.show;
+            if (show) {
+              items.push({
+                id: String(show.ids.trakt),
+                name: show.title,
+                type: 'series',
+                poster: 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
+                year: show.year,
+                lastWatched: new Date(watchlistShow.listed_at).toLocaleDateString(),
+                imdbId: show.ids.imdb,
+                traktId: show.ids.trakt,
+              });
+            }
+          }
+        }
+        break;
+
+      case 'collection':
+        // Add collection movies
+        if (collectionMovies) {
+          for (const collectionMovie of collectionMovies) {
+            const movie = collectionMovie.movie;
+            if (movie) {
+              items.push({
+                id: String(movie.ids.trakt),
+                name: movie.title,
+                type: 'movie',
+                poster: 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
+                year: movie.year,
+                lastWatched: new Date(collectionMovie.collected_at).toLocaleDateString(),
+                imdbId: movie.ids.imdb,
+                traktId: movie.ids.trakt,
+              });
+            }
+          }
+        }
+        // Add collection shows
+        if (collectionShows) {
+          for (const collectionShow of collectionShows) {
+            const show = collectionShow.show;
+            if (show) {
+              items.push({
+                id: String(show.ids.trakt),
+                name: show.title,
+                type: 'series',
+                poster: 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
+                year: show.year,
+                lastWatched: new Date(collectionShow.collected_at).toLocaleDateString(),
+                imdbId: show.ids.imdb,
+                traktId: show.ids.trakt,
+              });
+            }
+          }
+        }
+        break;
+
+      case 'ratings':
+        // Add rated content
+        if (ratedContent) {
+          for (const ratedItem of ratedContent) {
+            if (ratedItem.movie) {
+              const movie = ratedItem.movie;
+              items.push({
+                id: String(movie.ids.trakt),
+                name: movie.title,
+                type: 'movie',
+                poster: 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
+                year: movie.year,
+                lastWatched: new Date(ratedItem.rated_at).toLocaleDateString(),
+                rating: ratedItem.rating,
+                imdbId: movie.ids.imdb,
+                traktId: movie.ids.trakt,
+              });
+            } else if (ratedItem.show) {
+              const show = ratedItem.show;
+              items.push({
+                id: String(show.ids.trakt),
+                name: show.title,
+                type: 'series',
+                poster: 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
+                year: show.year,
+                lastWatched: new Date(ratedItem.rated_at).toLocaleDateString(),
+                rating: ratedItem.rating,
+                imdbId: show.ids.imdb,
+                traktId: show.ids.trakt,
+              });
+            }
+          }
+        }
+        break;
+    }
+
+    // Sort by last watched/added date (most recent first)
+    return items.sort((a, b) => {
+      const dateA = a.lastWatched ? new Date(a.lastWatched).getTime() : 0;
+      const dateB = b.lastWatched ? new Date(b.lastWatched).getTime() : 0;
+      return dateB - dateA;
+    });
+  }, [watchedMovies, watchedShows, watchlistMovies, watchlistShows, collectionMovies, collectionShows, continueWatching, ratedContent]);
+
   const renderTraktContent = () => {
     if (traktLoading) {
       return <SkeletonLoader />;
     }
 
-    if (traktItems.length === 0) {
+    // If no specific folder is selected, show the folder structure
+    if (!selectedTraktFolder) {
+      if (traktFolders.length === 0) {
+        return (
+          <View style={styles.emptyContainer}>
+            <TraktIcon width={80} height={80} style={{ opacity: 0.7, marginBottom: 16 }} />
+            <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>No Trakt collections</Text>
+            <Text style={[styles.emptySubtext, { color: currentTheme.colors.mediumGray }]}>
+              Your Trakt collections will appear here once you start using Trakt
+            </Text>
+            <TouchableOpacity 
+              style={[styles.exploreButton, { 
+                backgroundColor: currentTheme.colors.primary,
+                shadowColor: currentTheme.colors.black
+              }]}
+              onPress={() => {
+                loadAllCollections();
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.exploreButtonText, { color: currentTheme.colors.white }]}>Load Collections</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      }
+
+      // Show collection folders
+      return (
+        <FlatList
+          data={traktFolders}
+          renderItem={({ item }) => renderTraktCollectionFolder({ folder: item })}
+          keyExtractor={item => item.id}
+          numColumns={2}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          columnWrapperStyle={styles.columnWrapper}
+          initialNumToRender={6}
+          maxToRenderPerBatch={6}
+          windowSize={5}
+          removeClippedSubviews={Platform.OS === 'android'}
+        />
+      );
+    }
+
+    // Show content for specific folder
+    const folderItems = getTraktFolderItems(selectedTraktFolder);
+    
+    if (folderItems.length === 0) {
+      const folderName = traktFolders.find(f => f.id === selectedTraktFolder)?.name || 'Collection';
       return (
         <View style={styles.emptyContainer}>
           <TraktIcon width={80} height={80} style={{ opacity: 0.7, marginBottom: 16 }} />
-          <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>No watched content</Text>
+          <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>No content in {folderName}</Text>
           <Text style={[styles.emptySubtext, { color: currentTheme.colors.mediumGray }]}>
-            Your Trakt watched history will appear here
+            This collection is empty
           </Text>
           <TouchableOpacity 
             style={[styles.exploreButton, { 
@@ -465,7 +822,7 @@ const LibraryScreen = () => {
               shadowColor: currentTheme.colors.black
             }]}
             onPress={() => {
-              loadWatchedItems();
+              loadAllCollections();
             }}
             activeOpacity={0.7}
           >
@@ -475,9 +832,9 @@ const LibraryScreen = () => {
       );
     }
 
-    // Separate movies and shows
-    const movies = traktItems.filter(item => item.type === 'movie');
-    const shows = traktItems.filter(item => item.type === 'series');
+    // Separate movies and shows for the selected folder
+    const movies = folderItems.filter(item => item.type === 'movie');
+    const shows = folderItems.filter(item => item.type === 'series');
 
     return (
       <ScrollView 
@@ -656,7 +1013,13 @@ const LibraryScreen = () => {
               <>
                 <TouchableOpacity
                   style={styles.backButton}
-                  onPress={() => setShowTraktContent(false)}
+                  onPress={() => {
+                    if (selectedTraktFolder) {
+                      setSelectedTraktFolder(null);
+                    } else {
+                      setShowTraktContent(false);
+                    }
+                  }}
                   activeOpacity={0.7}
                 >
                   <MaterialIcons 
@@ -667,7 +1030,10 @@ const LibraryScreen = () => {
                 </TouchableOpacity>
                 <View style={styles.headerTitleContainer}>
                   <Text style={[styles.headerTitle, { color: currentTheme.colors.white }]}>
-                    Trakt Collection
+                    {selectedTraktFolder 
+                      ? traktFolders.find(f => f.id === selectedTraktFolder)?.name || 'Collection'
+                      : 'Trakt Collection'
+                    }
                   </Text>
                 </View>
                 <View style={styles.headerSpacer} />

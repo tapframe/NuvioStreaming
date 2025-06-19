@@ -1,6 +1,13 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useTraktIntegration } from '../hooks/useTraktIntegration';
-import { TraktUser, TraktWatchedItem } from '../services/traktService';
+import { 
+  TraktUser, 
+  TraktWatchedItem, 
+  TraktWatchlistItem, 
+  TraktCollectionItem, 
+  TraktRatingItem,
+  TraktPlaybackItem 
+} from '../services/traktService';
 
 interface TraktContextProps {
   isAuthenticated: boolean;
@@ -8,9 +15,16 @@ interface TraktContextProps {
   userProfile: TraktUser | null;
   watchedMovies: TraktWatchedItem[];
   watchedShows: TraktWatchedItem[];
+  watchlistMovies: TraktWatchlistItem[];
+  watchlistShows: TraktWatchlistItem[];
+  collectionMovies: TraktCollectionItem[];
+  collectionShows: TraktCollectionItem[];
+  continueWatching: TraktPlaybackItem[];
+  ratedContent: TraktRatingItem[];
   checkAuthStatus: () => Promise<void>;
   refreshAuthStatus: () => Promise<void>;
   loadWatchedItems: () => Promise<void>;
+  loadAllCollections: () => Promise<void>;
   isMovieWatched: (imdbId: string) => Promise<boolean>;
   isEpisodeWatched: (imdbId: string, season: number, episode: number) => Promise<boolean>;
   markMovieAsWatched: (imdbId: string, watchedAt?: Date) => Promise<boolean>;
