@@ -440,30 +440,30 @@ const WatchProgressDisplay = React.memo(({
         
         {/* Enhanced progress bar with glow effects */}
         <Animated.View style={[styles.watchProgressBarContainer, celebrationAnimatedStyle]}>
-          <View style={styles.watchProgressBar}>
+      <View style={styles.watchProgressBar}>
             {/* Background glow for completed content */}
             {isCompleted && (
               <Animated.View style={[styles.completionGlow, glowAnimatedStyle]} />
             )}
             
             <Animated.View 
-              style={[
-                styles.watchProgressFill,
+          style={[
+            styles.watchProgressFill,
                 !isCompleted && progressPulseStyle,
-                { 
-                  width: `${progressData.progressPercent}%`,
+            { 
+              width: `${progressData.progressPercent}%`,
                   backgroundColor: isCompleted
                     ? '#00ff88' // Bright green for completed
-                    : progressData.isTraktSynced 
-                      ? '#E50914' // Netflix red for Trakt synced content
+                : progressData.isTraktSynced 
+                  ? '#E50914' // Netflix red for Trakt synced content
                       : currentTheme.colors.primary,
                   // Add gradient effect for completed content
                   ...(isCompleted && {
                     background: 'linear-gradient(90deg, #00ff88, #00cc6a)',
                   })
-                }
-              ]} 
-            />
+            }
+          ]} 
+        />
             
             {/* Shimmer effect for active progress */}
             {!isCompleted && progressData.progressPercent > 0 && (
@@ -489,9 +489,9 @@ const WatchProgressDisplay = React.memo(({
                 <Text style={styles.percentageText}>
                   {Math.round(progressData.progressPercent)}%
                 </Text>
-              </View>
-            )}
           </View>
+        )}
+      </View>
           
           <Text style={[styles.watchProgressSubText, { 
             color: isCompleted ? 'rgba(0,255,136,0.7)' : currentTheme.colors.textMuted,
@@ -510,31 +510,31 @@ const WatchProgressDisplay = React.memo(({
               <Text style={[styles.syncStatusText, {
                 color: progressData.isTraktSynced ? "#E50914" : "rgba(255,255,255,0.6)"
               }]}>
-                {progressData.syncStatus}
-              </Text>
-              
+          {progressData.syncStatus}
+        </Text>
+        
               {/* Enhanced manual Trakt sync button - moved inline */}
-              {isTraktAuthenticated && forceSyncTraktProgress && (
-                <TouchableOpacity 
+        {isTraktAuthenticated && forceSyncTraktProgress && (
+          <TouchableOpacity 
                   style={styles.traktSyncButtonInline}
-                  onPress={handleTraktSync}
-                  activeOpacity={0.7}
+            onPress={handleTraktSync}
+            activeOpacity={0.7}
                 >
                   <LinearGradient
                     colors={['#E50914', '#B8070F']}
                     style={styles.syncButtonGradientInline}
-                  >
-                    <MaterialIcons 
-                      name="refresh" 
+          >
+            <MaterialIcons 
+              name="refresh" 
                       size={12} 
                       color="#fff" 
-                    />
+            />
                   </LinearGradient>
-                </TouchableOpacity>
+          </TouchableOpacity>
               )}
             </View>
-          )}
-        </View>
+        )}
+      </View>
       </Animated.View>
     </Animated.View>
   );
@@ -637,15 +637,15 @@ const HeroSection: React.FC<HeroSectionProps> = ({
     const logoScale = hasProgress ? 0.85 : 1;
     
     return {
-      opacity: logoOpacity.value,
+    opacity: logoOpacity.value,
       transform: [
         { 
-          translateY: interpolate(
-            scrollY.value,
-            [0, 100],
-            [0, -20],
-            Extrapolate.CLAMP
-          )
+      translateY: interpolate(
+        scrollY.value,
+        [0, 100],
+        [0, -20],
+        Extrapolate.CLAMP
+      )
         },
         { scale: withTiming(logoScale, { duration: 300 }) }
       ]
