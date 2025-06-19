@@ -13,26 +13,40 @@ interface ContentItemProps {
 
 const { width } = Dimensions.get('window');
 
-// Dynamic poster calculation based on screen width
+// Dynamic poster calculation based on screen width - show 1/4 of next poster
 const calculatePosterLayout = (screenWidth: number) => {
-  const MIN_POSTER_WIDTH = 110; // Minimum poster width for readability
-  const MAX_POSTER_WIDTH = 140; // Maximum poster width to prevent oversized posters
-  const HORIZONTAL_PADDING = 50; // Total horizontal padding/margins
+  const MIN_POSTER_WIDTH = 100; // Reduced minimum for more posters
+  const MAX_POSTER_WIDTH = 130; // Reduced maximum for more posters
+  const LEFT_PADDING = 16; // Left padding
+  const SPACING = 8; // Space between posters
   
-  // Calculate how many posters can fit
-  const availableWidth = screenWidth - HORIZONTAL_PADDING;
-  const maxColumns = Math.floor(availableWidth / MIN_POSTER_WIDTH);
+  // Calculate available width for posters (reserve space for left padding)
+  const availableWidth = screenWidth - LEFT_PADDING;
   
-  // Limit to reasonable number of columns (3-6)
-  const numColumns = Math.min(Math.max(maxColumns, 3), 6);
+  // Try different numbers of full posters to find the best fit
+  let bestLayout = { numFullPosters: 3, posterWidth: 120 };
   
-  // Calculate actual poster width
-  const posterWidth = Math.min(availableWidth / numColumns, MAX_POSTER_WIDTH);
+  for (let n = 3; n <= 6; n++) {
+    // Calculate poster width needed for N full posters + 0.25 partial poster
+    // Formula: N * posterWidth + (N-1) * spacing + 0.25 * posterWidth = availableWidth - rightPadding
+    // Simplified: posterWidth * (N + 0.25) + (N-1) * spacing = availableWidth - rightPadding
+    // We'll use minimal right padding (8px) to maximize space
+    const usableWidth = availableWidth - 8;
+    const posterWidth = (usableWidth - (n - 1) * SPACING) / (n + 0.25);
+    
+    console.log(`[ContentItem] Testing ${n} posters: width=${posterWidth.toFixed(1)}px, screen=${screenWidth}px`);
+    
+    if (posterWidth >= MIN_POSTER_WIDTH && posterWidth <= MAX_POSTER_WIDTH) {
+      bestLayout = { numFullPosters: n, posterWidth };
+      console.log(`[ContentItem] Selected layout: ${n} full posters at ${posterWidth.toFixed(1)}px each`);
+    }
+  }
   
   return {
-    numColumns,
-    posterWidth,
-    spacing: 12 // Space between posters
+    numFullPosters: bestLayout.numFullPosters,
+    posterWidth: bestLayout.posterWidth,
+    spacing: SPACING,
+    partialPosterWidth: bestLayout.posterWidth * 0.25 // 1/4 of next poster
   };
 };
 
@@ -157,28 +171,28 @@ const styles = StyleSheet.create({
     width: POSTER_WIDTH,
     aspectRatio: 2/3,
     margin: 0,
-    borderRadius: 8,
+    borderRadius: 4,
     overflow: 'hidden',
     position: 'relative',
-    elevation: 8,
+    elevation: 6,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   contentItemContainer: {
     width: '100%',
     height: '100%',
-    borderRadius: 8,
+    borderRadius: 4,
     overflow: 'hidden',
     position: 'relative',
   },
   poster: {
     width: '100%',
     height: '100%',
-    borderRadius: 8,
+    borderRadius: 4,
   },
   loadingOverlay: {
     position: 'absolute',
