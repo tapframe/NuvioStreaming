@@ -31,10 +31,13 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
   const { settings: autosyncSettings } = useTraktAutosyncSettings();
   
   const hasStartedWatching = useRef(false);
+  const hasStopped = useRef(false); // New: Track if we've already stopped for this session
+  const isSessionComplete = useRef(false); // New: Track if session is completely finished (scrobbled)
   const lastSyncTime = useRef(0);
   const lastSyncProgress = useRef(0);
   const sessionKey = useRef<string | null>(null);
   const unmountCount = useRef(0);
+  const lastStopCall = useRef(0); // New: Track last stop call timestamp
   
   // Generate a unique session key for this content instance
   useEffect(() => {
@@ -42,6 +45,12 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
       ? `movie:${options.imdbId}`
       : `episode:${options.imdbId}:${options.season}:${options.episode}`;
     sessionKey.current = `${contentKey}:${Date.now()}`;
+    
+    // Reset all session state for new content
+    hasStartedWatching.current = false;
+    hasStopped.current = false;
+    isSessionComplete.current = false;
+    lastStopCall.current = 0;
     
     logger.log(`[TraktAutosync] Session started for: ${sessionKey.current}`);
     
@@ -93,10 +102,27 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
 
   // Start watching (scrobble start)
   const handlePlaybackStart = useCallback(async (currentTime: number, duration: number) => {
-    logger.log(`[TraktAutosync] handlePlaybackStart called: time=${currentTime}, duration=${duration}, authenticated=${isAuthenticated}, enabled=${autosyncSettings.enabled}, alreadyStarted=${hasStartedWatching.current}, session=${sessionKey.current}`);
+    logger.log(`[TraktAutosync] handlePlaybackStart called: time=${currentTime}, duration=${duration}, authenticated=${isAuthenticated}, enabled=${autosyncSettings.enabled}, alreadyStarted=${hasStartedWatching.current}, alreadyStopped=${hasStopped.current}, sessionComplete=${isSessionComplete.current}, session=${sessionKey.current}`);
     
-    if (!isAuthenticated || !autosyncSettings.enabled || hasStartedWatching.current) {
-      logger.log(`[TraktAutosync] Skipping handlePlaybackStart: authenticated=${isAuthenticated}, enabled=${autosyncSettings.enabled}, alreadyStarted=${hasStartedWatching.current}`);
+    if (!isAuthenticated || !autosyncSettings.enabled) {
+      logger.log(`[TraktAutosync] Skipping handlePlaybackStart: authenticated=${isAuthenticated}, enabled=${autosyncSettings.enabled}`);
+      return;
+    }
+
+    // PREVENT SESSION RESTART: Don't start if session is complete (scrobbled)
+    if (isSessionComplete.current) {
+      logger.log(`[TraktAutosync] Skipping handlePlaybackStart: session is complete, preventing any restart`);
+      return;
+    }
+
+    // PREVENT SESSION RESTART: Don't start if we've already stopped this session
+    if (hasStopped.current) {
+      logger.log(`[TraktAutosync] Skipping handlePlaybackStart: session already stopped, preventing restart`);
+      return;
+    }
+
+    if (hasStartedWatching.current) {
+      logger.log(`[TraktAutosync] Skipping handlePlaybackStart: already started=${hasStartedWatching.current}`);
       return;
     }
 
@@ -112,6 +138,7 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
       const success = await startWatching(contentData, progressPercent);
       if (success) {
         hasStartedWatching.current = true;
+        hasStopped.current = false; // Reset stop flag when starting
         logger.log(`[TraktAutosync] Started watching: ${contentData.title} (session: ${sessionKey.current})`);
       }
     } catch (error) {
@@ -126,6 +153,11 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
     force: boolean = false
   ) => {
     if (!isAuthenticated || !autosyncSettings.enabled || duration <= 0) {
+      return;
+    }
+
+    // Skip if session is already complete
+    if (isSessionComplete.current) {
       return;
     }
 
@@ -166,10 +198,30 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
 
   // Handle playback end/pause
   const handlePlaybackEnd = useCallback(async (currentTime: number, duration: number, reason: 'ended' | 'unmount' = 'ended') => {
-    logger.log(`[TraktAutosync] handlePlaybackEnd called: reason=${reason}, time=${currentTime}, duration=${duration}, authenticated=${isAuthenticated}, enabled=${autosyncSettings.enabled}, started=${hasStartedWatching.current}, session=${sessionKey.current}, unmountCount=${unmountCount.current}`);
+    const now = Date.now();
+    
+    logger.log(`[TraktAutosync] handlePlaybackEnd called: reason=${reason}, time=${currentTime}, duration=${duration}, authenticated=${isAuthenticated}, enabled=${autosyncSettings.enabled}, started=${hasStartedWatching.current}, stopped=${hasStopped.current}, complete=${isSessionComplete.current}, session=${sessionKey.current}, unmountCount=${unmountCount.current}`);
     
     if (!isAuthenticated || !autosyncSettings.enabled) {
       logger.log(`[TraktAutosync] Skipping handlePlaybackEnd: authenticated=${isAuthenticated}, enabled=${autosyncSettings.enabled}`);
+      return;
+    }
+
+    // ENHANCED DEDUPLICATION: Check if session is already complete
+    if (isSessionComplete.current) {
+      logger.log(`[TraktAutosync] Session already complete, skipping end call (reason: ${reason})`);
+      return;
+    }
+
+    // ENHANCED DEDUPLICATION: Check if we've already stopped this session
+    if (hasStopped.current) {
+      logger.log(`[TraktAutosync] Already stopped this session, skipping duplicate call (reason: ${reason})`);
+      return;
+    }
+
+    // ENHANCED DEDUPLICATION: Prevent rapid successive calls (within 5 seconds)
+    if (now - lastStopCall.current < 5000) {
+      logger.log(`[TraktAutosync] Ignoring rapid successive stop call within 5 seconds (reason: ${reason})`);
       return;
     }
 
@@ -208,6 +260,10 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
         return;
       }
       
+      // Mark stop attempt and update timestamp
+      lastStopCall.current = now;
+      hasStopped.current = true;
+      
       const contentData = buildContentData();
       
       // Use stopWatching for proper scrobble stop
@@ -222,6 +278,18 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
           progressPercent,
           options.episodeId
         );
+        
+        // Mark session as complete if high progress (scrobbled)
+        if (progressPercent >= 80) {
+          isSessionComplete.current = true;
+          logger.log(`[TraktAutosync] Session marked as complete (scrobbled) at ${progressPercent.toFixed(1)}%`);
+        }
+        
+        logger.log(`[TraktAutosync] Successfully stopped watching: ${contentData.title} (${progressPercent.toFixed(1)}% - ${reason})`);
+      } else {
+        // If stop failed, reset the stop flag so we can try again later
+        hasStopped.current = false;
+        logger.warn(`[TraktAutosync] Failed to stop watching, reset stop flag for retry`);
       }
       
       // Reset state only for natural end or very high progress unmounts
@@ -232,19 +300,23 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
         logger.log(`[TraktAutosync] Reset session state for ${reason} at ${progressPercent.toFixed(1)}%`);
       }
       
-      logger.log(`[TraktAutosync] Ended watching: ${options.title} (${reason})`);
     } catch (error) {
       logger.error('[TraktAutosync] Error ending watch:', error);
+      // Reset stop flag on error so we can try again
+      hasStopped.current = false;
     }
   }, [isAuthenticated, autosyncSettings.enabled, stopWatching, buildContentData, options]);
 
   // Reset state (useful when switching content)
   const resetState = useCallback(() => {
     hasStartedWatching.current = false;
+    hasStopped.current = false;
+    isSessionComplete.current = false;
     lastSyncTime.current = 0;
     lastSyncProgress.current = 0;
     unmountCount.current = 0;
     sessionKey.current = null;
+    lastStopCall.current = 0;
     logger.log(`[TraktAutosync] Manual state reset for: ${options.title}`);
   }, [options.title]);
 

@@ -163,8 +163,40 @@ export class TraktService {
   private readonly SCROBBLE_EXPIRY_MS = 46 * 60 * 1000; // 46 minutes (based on Trakt's expiry window)
   private scrobbledTimestamps: Map<string, number> = new Map();
 
+  // Track currently watching sessions to avoid duplicate starts
+  private currentlyWatching: Set<string> = new Set();
+  private lastSyncTime: number = 0;
+  private readonly SYNC_DEBOUNCE_MS = 60000; // 60 seconds
+  
+  // Enhanced deduplication for stop calls
+  private lastStopCalls: Map<string, number> = new Map();
+  private readonly STOP_DEBOUNCE_MS = 10000; // 10 seconds debounce for stop calls
+
   private constructor() {
     // Initialization happens in initialize method
+    
+    // Cleanup old stop call records every 5 minutes
+    setInterval(() => {
+      this.cleanupOldStopCalls();
+    }, 5 * 60 * 1000);
+  }
+
+  /**
+   * Cleanup old stop call records to prevent memory leaks
+   */
+  private cleanupOldStopCalls(): void {
+    const now = Date.now();
+    const cutoff = now - (this.STOP_DEBOUNCE_MS * 2); // Keep records for 2x the debounce time
+    
+    for (const [key, timestamp] of this.lastStopCalls.entries()) {
+      if (timestamp < cutoff) {
+        this.lastStopCalls.delete(key);
+      }
+    }
+    
+    if (this.lastStopCalls.size > 0) {
+      logger.log(`[TraktService] Cleaned up old stop call records. Remaining: ${this.lastStopCalls.size}`);
+    }
   }
 
   public static getInstance(): TraktService {
@@ -877,13 +909,6 @@ export class TraktService {
   }
 
   /**
-   * Track currently watching sessions to avoid duplicate starts
-   */
-  private currentlyWatching: Set<string> = new Set();
-  private lastSyncTime: number = 0;
-  private readonly SYNC_DEBOUNCE_MS = 60000; // 60 seconds
-
-  /**
    * Generate a unique key for content being watched
    */
   private getWatchingKey(contentData: TraktContentData): string {
@@ -903,9 +928,19 @@ export class TraktService {
         return false;
       }
 
+      const watchingKey = this.getWatchingKey(contentData);
+
       // Check if this content was recently scrobbled (to prevent duplicates from component remounts)
       if (this.isRecentlyScrobbled(contentData)) {
         logger.log(`[TraktService] Content was recently scrobbled, skipping start: ${contentData.title}`);
+        return true;
+      }
+
+      // ENHANCED PROTECTION: Check if we recently stopped this content with high progress
+      // This prevents restarting sessions for content that was just completed
+      const lastStopTime = this.lastStopCalls.get(watchingKey);
+      if (lastStopTime && (Date.now() - lastStopTime) < 30000) { // 30 seconds
+        logger.log(`[TraktService] Recently stopped this content (${((Date.now() - lastStopTime) / 1000).toFixed(1)}s ago), preventing restart: ${contentData.title}`);
         return true;
       }
 
@@ -920,11 +955,10 @@ export class TraktService {
         showTitle: contentData.showTitle,
         progress: progress
       });
-
-      const watchingKey = this.getWatchingKey(contentData);
       
       // Only start if not already watching this content
       if (this.currentlyWatching.has(watchingKey)) {
+        logger.log(`[TraktService] Already watching this content, skipping start: ${contentData.title}`);
         return true; // Already started
       }
 
@@ -995,6 +1029,17 @@ export class TraktService {
       }
 
       const watchingKey = this.getWatchingKey(contentData);
+      const now = Date.now();
+      
+      // Enhanced deduplication: Check if we recently stopped this content
+      const lastStopTime = this.lastStopCalls.get(watchingKey);
+      if (lastStopTime && (now - lastStopTime) < this.STOP_DEBOUNCE_MS) {
+        logger.log(`[TraktService] Ignoring duplicate stop call for ${contentData.title} (last stop ${((now - lastStopTime) / 1000).toFixed(1)}s ago)`);
+        return true; // Return success to avoid error handling
+      }
+
+      // Record this stop attempt
+      this.lastStopCalls.set(watchingKey, now);
 
       const result = await this.queueRequest(async () => {
         return await this.stopWatching(contentData, progress);
@@ -1003,10 +1048,11 @@ export class TraktService {
       if (result) {
         this.currentlyWatching.delete(watchingKey);
         
-        // Mark as scrobbled if >= 80% to prevent future duplicates
+        // Mark as scrobbled if >= 80% to prevent future duplicates and restarts
         if (progress >= 80) {
           this.scrobbledItems.add(watchingKey);
           this.scrobbledTimestamps.set(watchingKey, Date.now());
+          logger.log(`[TraktService] Marked as scrobbled to prevent restarts: ${watchingKey}`);
         }
         
         // The stop endpoint automatically handles the 80%+ completion logic
@@ -1015,6 +1061,9 @@ export class TraktService {
         logger.log(`[TraktService] Stopped watching ${contentData.type}: ${contentData.title} (${progress.toFixed(1)}% - ${action})`);
         
         return true;
+      } else {
+        // If failed, remove from lastStopCalls so we can try again
+        this.lastStopCalls.delete(watchingKey);
       }
 
       return false;

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { traktService, TraktUser, TraktWatchedItem, TraktContentData, TraktPlaybackItem } from '../services/traktService';
 import { storageService } from '../services/storageService';
 import { logger } from '../utils/logger';
@@ -383,22 +384,28 @@ export function useTraktIntegration() {
     }
   }, [isAuthenticated, fetchAndMergeTraktProgress]);
 
-  // Periodic sync - check for updates every 2 minutes when authenticated
+  // App focus sync - sync when app comes back into focus (much smarter than periodic)
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    const intervalId = setInterval(() => {
-      logger.log('[useTraktIntegration] Periodic Trakt sync check');
-      fetchAndMergeTraktProgress().then((success) => {
-        if (success) {
-          logger.log('[useTraktIntegration] Periodic sync completed successfully');
-        }
-      }).catch(error => {
-        logger.error('[useTraktIntegration] Periodic sync failed:', error);
-      });
-    }, 2 * 60 * 1000); // 2 minutes
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        logger.log('[useTraktIntegration] App became active, syncing Trakt data');
+        fetchAndMergeTraktProgress().then((success) => {
+          if (success) {
+            logger.log('[useTraktIntegration] App focus sync completed successfully');
+          }
+        }).catch(error => {
+          logger.error('[useTraktIntegration] App focus sync failed:', error);
+        });
+      }
+    };
 
-    return () => clearInterval(intervalId);
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    
+    return () => {
+      subscription?.remove();
+    };
   }, [isAuthenticated, fetchAndMergeTraktProgress]);
 
   // Trigger sync when auth status is manually refreshed (for login scenarios)
