@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logger } from '../utils/logger';
+import { imageCacheService } from './imageCacheService';
 
 // Storage keys
 export const TRAKT_ACCESS_TOKEN_KEY = 'trakt_access_token';
@@ -32,6 +33,7 @@ export interface TraktWatchedItem {
       imdb: string;
       tmdb: number;
     };
+    images?: TraktImages;
   };
   show?: {
     title: string;
@@ -42,6 +44,7 @@ export interface TraktWatchedItem {
       imdb: string;
       tmdb: number;
     };
+    images?: TraktImages;
   };
   plays: number;
   last_watched_at: string;
@@ -57,6 +60,7 @@ export interface TraktWatchlistItem {
       imdb: string;
       tmdb: number;
     };
+    images?: TraktImages;
   };
   show?: {
     title: string;
@@ -67,6 +71,7 @@ export interface TraktWatchlistItem {
       imdb: string;
       tmdb: number;
     };
+    images?: TraktImages;
   };
   listed_at: string;
 }
@@ -81,6 +86,7 @@ export interface TraktCollectionItem {
       imdb: string;
       tmdb: number;
     };
+    images?: TraktImages;
   };
   show?: {
     title: string;
@@ -91,6 +97,7 @@ export interface TraktCollectionItem {
       imdb: string;
       tmdb: number;
     };
+    images?: TraktImages;
   };
   collected_at: string;
 }
@@ -105,6 +112,7 @@ export interface TraktRatingItem {
       imdb: string;
       tmdb: number;
     };
+    images?: TraktImages;
   };
   show?: {
     title: string;
@@ -115,9 +123,31 @@ export interface TraktRatingItem {
       imdb: string;
       tmdb: number;
     };
+    images?: TraktImages;
   };
   rating: number;
   rated_at: string;
+}
+
+export interface TraktImages {
+  fanart?: string[];
+  poster?: string[];
+  logo?: string[];
+  clearart?: string[];
+  banner?: string[];
+  thumb?: string[];
+}
+
+export interface TraktItemWithImages {
+  title: string;
+  year: number;
+  ids: {
+    trakt: number;
+    slug: string;
+    imdb: string;
+    tmdb: number;
+  };
+  images?: TraktImages;
 }
 
 // New types for scrobbling
@@ -135,6 +165,7 @@ export interface TraktPlaybackItem {
       imdb: string;
       tmdb: number;
     };
+    images?: TraktImages;
   };
   episode?: {
     season: number;
@@ -146,6 +177,7 @@ export interface TraktPlaybackItem {
       imdb?: string;
       tmdb?: number;
     };
+    images?: TraktImages;
   };
   show?: {
     title: string;
@@ -157,6 +189,7 @@ export interface TraktPlaybackItem {
       imdb: string;
       tmdb: number;
     };
+    images?: TraktImages;
   };
 }
 
@@ -685,6 +718,124 @@ export class TraktService {
   public async getRatings(type?: 'movies' | 'shows'): Promise<TraktRatingItem[]> {
     const endpoint = type ? `/sync/ratings/${type}` : '/sync/ratings';
     return this.apiRequest<TraktRatingItem[]>(endpoint);
+  }
+
+  /**
+   * Get the user's watched movies with images
+   */
+  public async getWatchedMoviesWithImages(): Promise<TraktWatchedItem[]> {
+    return this.apiRequest<TraktWatchedItem[]>('/sync/watched/movies?extended=images');
+  }
+
+  /**
+   * Get the user's watched shows with images
+   */
+  public async getWatchedShowsWithImages(): Promise<TraktWatchedItem[]> {
+    return this.apiRequest<TraktWatchedItem[]>('/sync/watched/shows?extended=images');
+  }
+
+  /**
+   * Get the user's watchlist movies with images
+   */
+  public async getWatchlistMoviesWithImages(): Promise<TraktWatchlistItem[]> {
+    return this.apiRequest<TraktWatchlistItem[]>('/sync/watchlist/movies?extended=images');
+  }
+
+  /**
+   * Get the user's watchlist shows with images
+   */
+  public async getWatchlistShowsWithImages(): Promise<TraktWatchlistItem[]> {
+    return this.apiRequest<TraktWatchlistItem[]>('/sync/watchlist/shows?extended=images');
+  }
+
+  /**
+   * Get the user's collection movies with images
+   */
+  public async getCollectionMoviesWithImages(): Promise<TraktCollectionItem[]> {
+    return this.apiRequest<TraktCollectionItem[]>('/sync/collection/movies?extended=images');
+  }
+
+  /**
+   * Get the user's collection shows with images
+   */
+  public async getCollectionShowsWithImages(): Promise<TraktCollectionItem[]> {
+    return this.apiRequest<TraktCollectionItem[]>('/sync/collection/shows?extended=images');
+  }
+
+  /**
+   * Get the user's ratings with images
+   */
+  public async getRatingsWithImages(type?: 'movies' | 'shows'): Promise<TraktRatingItem[]> {
+    const endpoint = type ? `/sync/ratings/${type}?extended=images` : '/sync/ratings?extended=images';
+    return this.apiRequest<TraktRatingItem[]>(endpoint);
+  }
+
+  /**
+   * Get playback progress with images
+   */
+  public async getPlaybackProgressWithImages(type?: 'movies' | 'shows'): Promise<TraktPlaybackItem[]> {
+    try {
+      const endpoint = type ? `/sync/playback/${type}?extended=images` : '/sync/playback?extended=images';
+      return this.apiRequest<TraktPlaybackItem[]>(endpoint);
+    } catch (error) {
+      logger.error('[TraktService] Failed to get playback progress with images:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Extract poster URL from Trakt images with basic caching
+   */
+  public static getTraktPosterUrl(images?: TraktImages): string | null {
+    if (!images || !images.poster || images.poster.length === 0) {
+      return null;
+    }
+    
+    // Get the first poster and add https prefix
+    const posterPath = images.poster[0];
+    const fullUrl = posterPath.startsWith('http') ? posterPath : `https://${posterPath}`;
+    
+    // Try to use cached version synchronously (basic cache check)
+    const isCached = imageCacheService.isCached(fullUrl);
+    if (isCached) {
+      logger.log(`[TraktService] 🎯 Using cached poster: ${fullUrl.substring(0, 60)}...`);
+    } else {
+      logger.log(`[TraktService] 📥 New poster URL: ${fullUrl.substring(0, 60)}...`);
+      // Queue for async caching
+      imageCacheService.getCachedImageUrl(fullUrl).catch(error => {
+        logger.error('[TraktService] Background caching failed:', error);
+      });
+    }
+    
+    return fullUrl;
+  }
+  
+  /**
+   * Extract poster URL from Trakt images with async caching
+   */
+  public static async getTraktPosterUrlCached(images?: TraktImages): Promise<string | null> {
+    const url = this.getTraktPosterUrl(images);
+    if (!url) return null;
+    
+    try {
+      return await imageCacheService.getCachedImageUrl(url);
+    } catch (error) {
+      logger.error('[TraktService] Failed to cache image:', error);
+      return url;
+    }
+  }
+
+  /**
+   * Extract fanart URL from Trakt images
+   */
+  public static getTraktFanartUrl(images?: TraktImages): string | null {
+    if (!images || !images.fanart || images.fanart.length === 0) {
+      return null;
+    }
+    
+    // Get the first fanart and add https prefix
+    const fanartPath = images.fanart[0];
+    return fanartPath.startsWith('http') ? fanartPath : `https://${fanartPath}`;
   }
 
   /**
@@ -1268,6 +1419,17 @@ export class TraktService {
       }
     } catch (error) {
       logger.error('[TraktService] DEBUG: Error fetching playback progress:', error);
+    }
+  }
+  /**
+   * Debug image cache status
+   */
+  public static debugImageCache(): void {
+    try {
+      logger.log('[TraktService] === IMAGE CACHE DEBUG ===');
+      imageCacheService.logCacheStatus();
+    } catch (error) {
+      logger.error('[TraktService] Debug image cache failed:', error);
     }
   }
 }

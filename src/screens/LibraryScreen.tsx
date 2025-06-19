@@ -28,7 +28,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTraktContext } from '../contexts/TraktContext';
 import TraktIcon from '../../assets/rating-icons/trakt.svg';
-import { TMDBService } from '../services/tmdbService';
+import { traktService, TraktService } from '../services/traktService';
 
 // Define interfaces for proper typing
 interface LibraryItem extends StreamingContent {
@@ -246,7 +246,10 @@ const LibraryScreen = () => {
     return folders.filter(folder => folder.itemCount > 0);
   }, [traktAuthenticated, watchedMovies, watchedShows, watchlistMovies, watchlistShows, collectionMovies, collectionShows, continueWatching, ratedContent]);
 
-  // Prepare Trakt items with proper poster URLs
+  // State for poster URLs (since they're now async)
+  const [traktPostersMap, setTraktPostersMap] = useState<Map<string, string>>(new Map());
+
+  // Prepare Trakt items with placeholders, then load posters async
   const traktItems = useMemo(() => {
     if (!traktAuthenticated || (!watchedMovies?.length && !watchedShows?.length)) {
       return [];
@@ -259,11 +262,14 @@ const LibraryScreen = () => {
       for (const watchedMovie of watchedMovies) {
         const movie = watchedMovie.movie;
         if (movie) {
+          const itemId = String(movie.ids.trakt);
+          const cachedPoster = traktPostersMap.get(itemId);
+          
           items.push({
-            id: String(movie.ids.trakt),
+            id: itemId,
             name: movie.title,
             type: 'movie',
-            poster: 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
+            poster: cachedPoster || 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
             year: movie.year,
             lastWatched: new Date(watchedMovie.last_watched_at).toLocaleDateString(),
             plays: watchedMovie.plays,
@@ -279,11 +285,14 @@ const LibraryScreen = () => {
       for (const watchedShow of watchedShows) {
         const show = watchedShow.show;
         if (show) {
+          const itemId = String(show.ids.trakt);
+          const cachedPoster = traktPostersMap.get(itemId);
+          
           items.push({
-            id: String(show.ids.trakt),
+            id: itemId,
             name: show.title,
             type: 'series',
-            poster: 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
+            poster: cachedPoster || 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
             year: show.year,
             lastWatched: new Date(watchedShow.last_watched_at).toLocaleDateString(),
             plays: watchedShow.plays,
@@ -300,69 +309,72 @@ const LibraryScreen = () => {
       const dateB = b.lastWatched ? new Date(b.lastWatched).getTime() : 0;
       return dateB - dateA;
     });
-  }, [traktAuthenticated, watchedMovies, watchedShows]);
+  }, [traktAuthenticated, watchedMovies, watchedShows, traktPostersMap]);
 
-  // State for tracking poster URLs
-  const [traktPostersMap, setTraktPostersMap] = useState<Map<string, string>>(new Map());
-
-  // Effect to fetch poster URLs for Trakt items
+  // Effect to load cached poster URLs
   useEffect(() => {
-    const fetchTraktPosters = async () => {
-      if (!traktAuthenticated || traktItems.length === 0) return;
+    const loadCachedPosters = async () => {
+      if (!traktAuthenticated) return;
 
-      const tmdbService = TMDBService.getInstance();
+      const postersToLoad = new Map<string, any>();
 
-      // Process items individually and update state as each poster is fetched
-      for (const item of traktItems) {
-        try {
-          // Get TMDB ID from the original Trakt data
-          let tmdbId: number | null = null;
-          
-          if (item.type === 'movie' && watchedMovies) {
-            const watchedMovie = watchedMovies.find(wm => wm.movie?.ids.trakt === item.traktId);
-            tmdbId = watchedMovie?.movie?.ids.tmdb || null;
-          } else if (item.type === 'series' && watchedShows) {
-            const watchedShow = watchedShows.find(ws => ws.show?.ids.trakt === item.traktId);
-            tmdbId = watchedShow?.show?.ids.tmdb || null;
-          }
-
-          if (tmdbId) {
-            // Fetch details from TMDB to get poster path
-            let posterPath: string | null = null;
-            
-            if (item.type === 'movie') {
-              const movieDetails = await tmdbService.getMovieDetails(String(tmdbId));
-              posterPath = movieDetails?.poster_path || null;
-            } else {
-              const showDetails = await tmdbService.getTVShowDetails(tmdbId);
-              posterPath = showDetails?.poster_path || null;
-            }
-
-            if (posterPath) {
-              const fullPosterUrl = tmdbService.getImageUrl(posterPath, 'w500');
-              if (fullPosterUrl) {
-                // Update state immediately for this item
-                setTraktPostersMap(prevMap => {
-                  const newMap = new Map(prevMap);
-                  newMap.set(item.id, fullPosterUrl);
-                  return newMap;
-                });
-              }
+      // Collect movies that need posters
+      if (watchedMovies) {
+        for (const watchedMovie of watchedMovies) {
+          const movie = watchedMovie.movie;
+          if (movie) {
+            const itemId = String(movie.ids.trakt);
+            if (!traktPostersMap.has(itemId)) {
+              postersToLoad.set(itemId, movie.images);
             }
           }
-        } catch (error) {
-          logger.error(`Failed to fetch poster for Trakt item ${item.id}:`, error);
         }
       }
+
+      // Collect shows that need posters
+      if (watchedShows) {
+        for (const watchedShow of watchedShows) {
+          const show = watchedShow.show;
+          if (show) {
+            const itemId = String(show.ids.trakt);
+            if (!traktPostersMap.has(itemId)) {
+              postersToLoad.set(itemId, show.images);
+            }
+          }
+        }
+      }
+
+      // Load posters in parallel
+      const posterPromises = Array.from(postersToLoad.entries()).map(async ([itemId, images]) => {
+        try {
+          const posterUrl = await TraktService.getTraktPosterUrl(images);
+          return {
+            itemId,
+            posterUrl: posterUrl || 'https://via.placeholder.com/300x450/cccccc/666666?text=No+Poster'
+          };
+        } catch (error) {
+          logger.error(`Failed to get cached poster for ${itemId}:`, error);
+          return {
+            itemId,
+            posterUrl: 'https://via.placeholder.com/300x450/cccccc/666666?text=No+Poster'
+          };
+        }
+      });
+
+      const results = await Promise.all(posterPromises);
+      
+      // Update state with new posters
+      setTraktPostersMap(prevMap => {
+        const newMap = new Map(prevMap);
+        results.forEach(({ itemId, posterUrl }) => {
+          newMap.set(itemId, posterUrl);
+        });
+        return newMap;
+      });
     };
 
-    fetchTraktPosters();
-  }, [traktItems, traktAuthenticated, watchedMovies, watchedShows]);
-
-  // Log when posters map updates
-  useEffect(() => {
-    // Removed debugging logs
-  }, [traktPostersMap]);
+    loadCachedPosters();
+  }, [traktAuthenticated, watchedMovies, watchedShows]);
 
   const itemWidth = (width - 48) / 2; // 2 items per row with padding
 
@@ -503,7 +515,7 @@ const LibraryScreen = () => {
   );
 
   const renderTraktItem = ({ item, customWidth }: { item: TraktDisplayItem; customWidth?: number }) => {
-    const posterUrl = traktPostersMap.get(item.id) || 'https://via.placeholder.com/300x450/ff0000/ffffff?text=No+Poster';
+    const posterUrl = item.poster || 'https://via.placeholder.com/300x450/ff0000/ffffff?text=No+Poster';
     const width = customWidth || itemWidth;
     
     return (
@@ -567,11 +579,14 @@ const LibraryScreen = () => {
           for (const watchedMovie of watchedMovies) {
             const movie = watchedMovie.movie;
             if (movie) {
+              const itemId = String(movie.ids.trakt);
+              const cachedPoster = traktPostersMap.get(itemId);
+              
               items.push({
-                id: String(movie.ids.trakt),
+                id: itemId,
                 name: movie.title,
                 type: 'movie',
-                poster: 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
+                poster: cachedPoster || 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
                 year: movie.year,
                 lastWatched: new Date(watchedMovie.last_watched_at).toLocaleDateString(),
                 plays: watchedMovie.plays,
@@ -586,11 +601,14 @@ const LibraryScreen = () => {
           for (const watchedShow of watchedShows) {
             const show = watchedShow.show;
             if (show) {
+              const itemId = String(show.ids.trakt);
+              const cachedPoster = traktPostersMap.get(itemId);
+              
               items.push({
-                id: String(show.ids.trakt),
+                id: itemId,
                 name: show.title,
                 type: 'series',
-                poster: 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
+                poster: cachedPoster || 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
                 year: show.year,
                 lastWatched: new Date(watchedShow.last_watched_at).toLocaleDateString(),
                 plays: watchedShow.plays,
@@ -607,22 +625,28 @@ const LibraryScreen = () => {
         if (continueWatching) {
           for (const item of continueWatching) {
             if (item.type === 'movie' && item.movie) {
+              const itemId = String(item.movie.ids.trakt);
+              const cachedPoster = traktPostersMap.get(itemId);
+              
               items.push({
-                id: String(item.movie.ids.trakt),
+                id: itemId,
                 name: item.movie.title,
                 type: 'movie',
-                poster: 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
+                poster: cachedPoster || 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
                 year: item.movie.year,
                 lastWatched: new Date(item.paused_at).toLocaleDateString(),
                 imdbId: item.movie.ids.imdb,
                 traktId: item.movie.ids.trakt,
               });
             } else if (item.type === 'episode' && item.show && item.episode) {
+              const itemId = String(item.show.ids.trakt);
+              const cachedPoster = traktPostersMap.get(itemId);
+              
               items.push({
                 id: `${item.show.ids.trakt}:${item.episode.season}:${item.episode.number}`,
                 name: `${item.show.title} S${item.episode.season}E${item.episode.number}`,
                 type: 'series',
-                poster: 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
+                poster: cachedPoster || 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
                 year: item.show.year,
                 lastWatched: new Date(item.paused_at).toLocaleDateString(),
                 imdbId: item.show.ids.imdb,
@@ -639,11 +663,15 @@ const LibraryScreen = () => {
           for (const watchlistMovie of watchlistMovies) {
             const movie = watchlistMovie.movie;
             if (movie) {
+              const itemId = String(movie.ids.trakt);
+              const posterUrl = TraktService.getTraktPosterUrl(movie.images) || 
+                               'https://via.placeholder.com/300x450/cccccc/666666?text=No+Poster';
+              
               items.push({
-                id: String(movie.ids.trakt),
+                id: itemId,
                 name: movie.title,
                 type: 'movie',
-                poster: 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
+                poster: posterUrl,
                 year: movie.year,
                 lastWatched: new Date(watchlistMovie.listed_at).toLocaleDateString(),
                 imdbId: movie.ids.imdb,
@@ -657,11 +685,15 @@ const LibraryScreen = () => {
           for (const watchlistShow of watchlistShows) {
             const show = watchlistShow.show;
             if (show) {
+              const itemId = String(show.ids.trakt);
+              const posterUrl = TraktService.getTraktPosterUrl(show.images) || 
+                               'https://via.placeholder.com/300x450/cccccc/666666?text=No+Poster';
+              
               items.push({
-                id: String(show.ids.trakt),
+                id: itemId,
                 name: show.title,
                 type: 'series',
-                poster: 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
+                poster: posterUrl,
                 year: show.year,
                 lastWatched: new Date(watchlistShow.listed_at).toLocaleDateString(),
                 imdbId: show.ids.imdb,
@@ -678,11 +710,15 @@ const LibraryScreen = () => {
           for (const collectionMovie of collectionMovies) {
             const movie = collectionMovie.movie;
             if (movie) {
+              const itemId = String(movie.ids.trakt);
+              const posterUrl = TraktService.getTraktPosterUrl(movie.images) || 
+                               'https://via.placeholder.com/300x450/cccccc/666666?text=No+Poster';
+              
               items.push({
-                id: String(movie.ids.trakt),
+                id: itemId,
                 name: movie.title,
                 type: 'movie',
-                poster: 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
+                poster: posterUrl,
                 year: movie.year,
                 lastWatched: new Date(collectionMovie.collected_at).toLocaleDateString(),
                 imdbId: movie.ids.imdb,
@@ -696,11 +732,15 @@ const LibraryScreen = () => {
           for (const collectionShow of collectionShows) {
             const show = collectionShow.show;
             if (show) {
+              const itemId = String(show.ids.trakt);
+              const posterUrl = TraktService.getTraktPosterUrl(show.images) || 
+                               'https://via.placeholder.com/300x450/cccccc/666666?text=No+Poster';
+              
               items.push({
-                id: String(show.ids.trakt),
+                id: itemId,
                 name: show.title,
                 type: 'series',
-                poster: 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
+                poster: posterUrl,
                 year: show.year,
                 lastWatched: new Date(collectionShow.collected_at).toLocaleDateString(),
                 imdbId: show.ids.imdb,
@@ -717,11 +757,15 @@ const LibraryScreen = () => {
           for (const ratedItem of ratedContent) {
             if (ratedItem.movie) {
               const movie = ratedItem.movie;
+              const itemId = String(movie.ids.trakt);
+              const posterUrl = TraktService.getTraktPosterUrl(movie.images) || 
+                               'https://via.placeholder.com/300x450/cccccc/666666?text=No+Poster';
+              
               items.push({
-                id: String(movie.ids.trakt),
+                id: itemId,
                 name: movie.title,
                 type: 'movie',
-                poster: 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
+                poster: posterUrl,
                 year: movie.year,
                 lastWatched: new Date(ratedItem.rated_at).toLocaleDateString(),
                 rating: ratedItem.rating,
@@ -730,11 +774,15 @@ const LibraryScreen = () => {
               });
             } else if (ratedItem.show) {
               const show = ratedItem.show;
+              const itemId = String(show.ids.trakt);
+              const posterUrl = TraktService.getTraktPosterUrl(show.images) || 
+                               'https://via.placeholder.com/300x450/cccccc/666666?text=No+Poster';
+              
               items.push({
-                id: String(show.ids.trakt),
+                id: itemId,
                 name: show.title,
                 type: 'series',
-                poster: 'https://via.placeholder.com/300x450/cccccc/666666?text=Loading...',
+                poster: posterUrl,
                 year: show.year,
                 lastWatched: new Date(ratedItem.rated_at).toLocaleDateString(),
                 rating: ratedItem.rating,
@@ -753,7 +801,7 @@ const LibraryScreen = () => {
       const dateB = b.lastWatched ? new Date(b.lastWatched).getTime() : 0;
       return dateB - dateA;
     });
-  }, [watchedMovies, watchedShows, watchlistMovies, watchlistShows, collectionMovies, collectionShows, continueWatching, ratedContent]);
+  }, [watchedMovies, watchedShows, watchlistMovies, watchlistShows, collectionMovies, collectionShows, continueWatching, ratedContent, traktPostersMap]);
 
   const renderTraktContent = () => {
     if (traktLoading) {

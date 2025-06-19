@@ -68,8 +68,8 @@ export function useTraktIntegration() {
     setIsLoading(true);
     try {
       const [movies, shows] = await Promise.all([
-        traktService.getWatchedMovies(),
-        traktService.getWatchedShows()
+        traktService.getWatchedMoviesWithImages(),
+        traktService.getWatchedShowsWithImages()
       ]);
       setWatchedMovies(movies);
       setWatchedShows(shows);
@@ -94,12 +94,12 @@ export function useTraktIntegration() {
         continueWatching,
         ratings
       ] = await Promise.all([
-        traktService.getWatchlistMovies(),
-        traktService.getWatchlistShows(),
-        traktService.getCollectionMovies(),
-        traktService.getCollectionShows(),
-        traktService.getPlaybackProgress(),
-        traktService.getRatings()
+        traktService.getWatchlistMoviesWithImages(),
+        traktService.getWatchlistShowsWithImages(),
+        traktService.getCollectionMoviesWithImages(),
+        traktService.getCollectionShowsWithImages(),
+        traktService.getPlaybackProgressWithImages(),
+        traktService.getRatingsWithImages()
       ]);
       
       setWatchlistMovies(watchlistMovies);
