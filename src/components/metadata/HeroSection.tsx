@@ -256,6 +256,14 @@ const WatchProgressDisplay = React.memo(({
   const { currentTheme } = useTheme();
   const { isAuthenticated: isTraktAuthenticated, forceSyncTraktProgress } = useTraktContext();
   
+  // Animated values for enhanced effects
+  const completionGlow = useSharedValue(0);
+  const celebrationScale = useSharedValue(1);
+  const progressPulse = useSharedValue(1);
+  const progressBoxOpacity = useSharedValue(0);
+  const progressBoxScale = useSharedValue(0.8);
+  const progressBoxTranslateY = useSharedValue(20);
+  
   // Handle manual Trakt sync
   const handleTraktSync = useMemo(() => async () => {
     if (isTraktAuthenticated && forceSyncTraktProgress) {
@@ -357,69 +365,177 @@ const WatchProgressDisplay = React.memo(({
     };
   }, [watchProgress, type, getEpisodeDetails, isTraktAuthenticated, isWatched]);
 
+  // Trigger appearance and completion animations
+  useEffect(() => {
+    if (progressData) {
+      // Smooth entrance animation for the glassmorphic box
+      progressBoxOpacity.value = withTiming(1, { duration: 400 });
+      progressBoxScale.value = withTiming(1, { duration: 400 });
+      progressBoxTranslateY.value = withTiming(0, { duration: 400 });
+      
+      if (progressData.isWatched || (progressData.progressPercent && progressData.progressPercent >= 95)) {
+        // Celebration animation sequence
+        celebrationScale.value = withRepeat(
+          withTiming(1.05, { duration: 200 }),
+          2,
+          true
+        );
+        
+        // Glow effect
+        completionGlow.value = withRepeat(
+          withTiming(1, { duration: 1500 }),
+          -1,
+          true
+        );
+      } else {
+        // Subtle progress pulse for ongoing content
+        progressPulse.value = withRepeat(
+          withTiming(1.02, { duration: 2000 }),
+          -1,
+          true
+        );
+      }
+    } else {
+      // Hide animation when no progress data
+      progressBoxOpacity.value = withTiming(0, { duration: 300 });
+      progressBoxScale.value = withTiming(0.8, { duration: 300 });
+      progressBoxTranslateY.value = withTiming(20, { duration: 300 });
+    }
+  }, [progressData]);
+
+  // Animated styles for enhanced effects
+  const celebrationAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: celebrationScale.value }],
+  }));
+
+  const glowAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(completionGlow.value, [0, 1], [0.3, 0.8], Extrapolate.CLAMP),
+  }));
+
+  const progressPulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: progressPulse.value }],
+  }));
+
+  const progressBoxAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: progressBoxOpacity.value,
+    transform: [
+      { scale: progressBoxScale.value },
+      { translateY: progressBoxTranslateY.value }
+    ],
+  }));
+
   if (!progressData) return null;
+
+  const isCompleted = progressData.isWatched || progressData.progressPercent >= 95;
 
   return (
     <Animated.View style={[styles.watchProgressContainer, animatedStyle]}>
-      <View style={styles.watchProgressBar}>
-        <View 
-          style={[
-            styles.watchProgressFill,
-            { 
-              width: `${progressData.progressPercent}%`,
-              backgroundColor: progressData.isWatched 
-                ? '#666' // Subtle gray for completed
-                : progressData.isTraktSynced 
-                  ? '#E50914' // Netflix red for Trakt synced content
-                  : currentTheme.colors.primary 
-            }
-          ]} 
-        />
-        {/* Subtle watched indicator */}
-        {progressData.isWatched && (
-          <View style={styles.watchedProgressIndicator}>
-            <MaterialIcons 
-              name="check" 
-              size={6} 
-              color="rgba(255,255,255,0.8)" 
-            />
-          </View>
+      {/* Glass morphism background with entrance animation */}
+      <Animated.View style={[styles.progressGlassBackground, progressBoxAnimatedStyle]}>
+        {Platform.OS === 'ios' ? (
+          <ExpoBlurView intensity={20} style={styles.blurBackground} tint="dark" />
+        ) : (
+          <View style={styles.androidProgressBlur} />
         )}
-        {/* Trakt sync indicator for non-watched content */}
-        {progressData.isTraktSynced && !progressData.isWatched && (
-          <View style={styles.traktSyncIndicator}>
-            <MaterialIcons 
-              name="sync" 
-              size={8} 
-              color="rgba(255,255,255,0.9)" 
-            />
-          </View>
-        )}
-      </View>
-      <View style={styles.watchProgressTextContainer}>
-        <Text style={[styles.watchProgressText, { 
-          color: progressData.isWatched ? 'rgba(255,255,255,0.6)' : currentTheme.colors.textMuted,
-          fontSize: progressData.isWatched ? 10 : 11
-        }]}>
-          {progressData.displayText}{progressData.episodeInfo} • Last watched on {progressData.formattedTime}
-          {progressData.syncStatus}
-        </Text>
         
-        {/* Manual Trakt sync button */}
-        {isTraktAuthenticated && forceSyncTraktProgress && (
-          <TouchableOpacity 
-            style={styles.traktSyncButton}
-            onPress={handleTraktSync}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons 
-              name="refresh" 
-              size={14} 
-              color={currentTheme.colors.textMuted} 
+        {/* Enhanced progress bar with glow effects */}
+        <Animated.View style={[styles.watchProgressBarContainer, celebrationAnimatedStyle]}>
+          <View style={styles.watchProgressBar}>
+            {/* Background glow for completed content */}
+            {isCompleted && (
+              <Animated.View style={[styles.completionGlow, glowAnimatedStyle]} />
+            )}
+            
+            <Animated.View 
+              style={[
+                styles.watchProgressFill,
+                !isCompleted && progressPulseStyle,
+                { 
+                  width: `${progressData.progressPercent}%`,
+                  backgroundColor: isCompleted
+                    ? '#00ff88' // Bright green for completed
+                    : progressData.isTraktSynced 
+                      ? '#E50914' // Netflix red for Trakt synced content
+                      : currentTheme.colors.primary,
+                  // Add gradient effect for completed content
+                  ...(isCompleted && {
+                    background: 'linear-gradient(90deg, #00ff88, #00cc6a)',
+                  })
+                }
+              ]} 
             />
-          </TouchableOpacity>
-        )}
-      </View>
+            
+            {/* Shimmer effect for active progress */}
+            {!isCompleted && progressData.progressPercent > 0 && (
+              <View style={styles.progressShimmer} />
+            )}
+          </View>
+        </Animated.View>
+
+        {/* Enhanced text container with better typography */}
+        <View style={styles.watchProgressTextContainer}>
+          <View style={styles.progressInfoMain}>
+            <Text style={[styles.watchProgressMainText, { 
+              color: isCompleted ? '#00ff88' : currentTheme.colors.white,
+              fontSize: isCompleted ? 13 : 12,
+              fontWeight: isCompleted ? '700' : '600'
+            }]}>
+              {progressData.displayText}
+            </Text>
+            
+            {/* Progress percentage badge */}
+            {!isCompleted && (
+              <View style={styles.percentageBadge}>
+                <Text style={styles.percentageText}>
+                  {Math.round(progressData.progressPercent)}%
+                </Text>
+              </View>
+            )}
+          </View>
+          
+          <Text style={[styles.watchProgressSubText, { 
+            color: isCompleted ? 'rgba(0,255,136,0.7)' : currentTheme.colors.textMuted,
+          }]}>
+            {progressData.episodeInfo} • Last watched {progressData.formattedTime}
+          </Text>
+          
+          {/* Trakt sync status with enhanced styling */}
+          {progressData.syncStatus && (
+            <View style={styles.syncStatusContainer}>
+              <MaterialIcons 
+                name={progressData.isTraktSynced ? "sync" : "sync-problem"} 
+                size={12} 
+                color={progressData.isTraktSynced ? "#E50914" : "rgba(255,255,255,0.6)"} 
+              />
+              <Text style={[styles.syncStatusText, {
+                color: progressData.isTraktSynced ? "#E50914" : "rgba(255,255,255,0.6)"
+              }]}>
+                {progressData.syncStatus}
+              </Text>
+              
+              {/* Enhanced manual Trakt sync button - moved inline */}
+              {isTraktAuthenticated && forceSyncTraktProgress && (
+                <TouchableOpacity 
+                  style={styles.traktSyncButtonInline}
+                  onPress={handleTraktSync}
+                  activeOpacity={0.7}
+                >
+                  <LinearGradient
+                    colors={['#E50914', '#B8070F']}
+                    style={styles.syncButtonGradientInline}
+                  >
+                    <MaterialIcons 
+                      name="refresh" 
+                      size={12} 
+                      color="#fff" 
+                    />
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+        </View>
+      </Animated.View>
     </Animated.View>
   );
 });
@@ -513,17 +629,28 @@ const HeroSection: React.FC<HeroSectionProps> = ({
     opacity: heroOpacity.value,
   }), []);
 
-  const logoAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: logoOpacity.value,
-    transform: [{ 
-      translateY: interpolate(
-        scrollY.value,
-        [0, 100],
-        [0, -20],
-        Extrapolate.CLAMP
-      )
-    }]
-  }), []);
+  const logoAnimatedStyle = useAnimatedStyle(() => {
+    // Determine if progress bar should be shown
+    const hasProgress = watchProgress && watchProgress.duration > 0;
+    
+    // Scale down logo when progress bar is present
+    const logoScale = hasProgress ? 0.85 : 1;
+    
+    return {
+      opacity: logoOpacity.value,
+      transform: [
+        { 
+          translateY: interpolate(
+            scrollY.value,
+            [0, 100],
+            [0, -20],
+            Extrapolate.CLAMP
+          )
+        },
+        { scale: withTiming(logoScale, { duration: 300 }) }
+      ]
+    };
+  }, [watchProgress]);
 
   const watchProgressAnimatedStyle = useAnimatedStyle(() => ({
     opacity: watchProgressOpacity.value,
@@ -818,18 +945,40 @@ const styles = StyleSheet.create({
   },
   watchProgressContainer: {
     marginTop: 4,
-    marginBottom: 6,
+    marginBottom: 4,
     width: '100%',
     alignItems: 'center',
-    height: 44,
+    minHeight: 36,
+    position: 'relative',
+  },
+  progressGlassBackground: {
+    width: '75%',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 12,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    overflow: 'hidden',
+  },
+  androidProgressBlur: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  watchProgressBarContainer: {
+    position: 'relative',
+    marginBottom: 6,
   },
   watchProgressBar: {
-    width: '70%',
-    height: 2.5,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 1.25,
+    width: '100%',
+    height: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 1.5,
     overflow: 'hidden',
-    marginBottom: 6,
     position: 'relative',
   },
   watchProgressFill: {
@@ -845,6 +994,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  traktSyncIndicatorEnhanced: {
+    position: 'absolute',
+    right: 4,
+    top: -2,
+    bottom: -2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
   watchedProgressIndicator: {
     position: 'absolute',
     right: 2,
@@ -855,10 +1016,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   watchProgressTextContainer: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    width: '100%',
   },
   watchProgressText: {
     fontSize: 11,
@@ -932,6 +1093,138 @@ const styles = StyleSheet.create({
       fontWeight: '700',
       marginLeft: 6,
       fontSize: 15,
+    },
+    // Enhanced progress indicator styles
+    progressShimmer: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      borderRadius: 2,
+      backgroundColor: 'rgba(255,255,255,0.1)',
+    },
+    completionGlow: {
+      position: 'absolute',
+      top: -2,
+      left: -2,
+      right: -2,
+      bottom: -2,
+      borderRadius: 4,
+      backgroundColor: 'rgba(0,255,136,0.2)',
+    },
+    completionIndicator: {
+      position: 'absolute',
+      right: 4,
+      top: -6,
+      bottom: -6,
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    completionGradient: {
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    sparkleContainer: {
+      position: 'absolute',
+      top: -10,
+      left: 0,
+      right: 0,
+      bottom: -10,
+      borderRadius: 2,
+    },
+    sparkle: {
+      position: 'absolute',
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    progressInfoMain: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 2,
+    },
+    watchProgressMainText: {
+      fontSize: 11,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+    percentageBadge: {
+      backgroundColor: 'rgba(255,255,255,0.2)',
+      borderRadius: 8,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      marginLeft: 8,
+    },
+    percentageText: {
+      fontSize: 10,
+      fontWeight: '600',
+      color: '#fff',
+    },
+    watchProgressSubText: {
+      fontSize: 9,
+      textAlign: 'center',
+      opacity: 0.8,
+      marginBottom: 1,
+    },
+    syncStatusContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 2,
+      width: '100%',
+      flexWrap: 'wrap',
+    },
+    syncStatusText: {
+      fontSize: 9,
+      marginLeft: 4,
+      fontWeight: '500',
+    },
+    traktSyncButtonEnhanced: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      overflow: 'hidden',
+    },
+    traktSyncButtonInline: {
+      marginLeft: 8,
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      overflow: 'hidden',
+    },
+    syncButtonGradient: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    syncButtonGradientInline: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    traktIndicatorGradient: {
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
 });
 
