@@ -107,13 +107,19 @@ export function useTraktAutosyncSettings() {
       logger.log('[useTraktAutosyncSettings] Starting manual sync...');
       
       // First, fetch and merge Trakt progress with local
-      await fetchAndMergeTraktProgress();
+      const fetchSuccess = await fetchAndMergeTraktProgress();
       
       // Then, sync any unsynced local progress to Trakt
-      const success = await syncAllProgress();
+      const uploadSuccess = await syncAllProgress();
       
-      logger.log(`[useTraktAutosyncSettings] Manual sync ${success ? 'completed' : 'failed'}`);
-      return success;
+      // Consider sync successful if either:
+      // 1. We successfully fetched from Trakt (main purpose of manual sync)
+      // 2. We successfully uploaded local progress to Trakt
+      // 3. Everything was already in sync (uploadSuccess = false is OK if fetchSuccess = true)
+      const overallSuccess = fetchSuccess || uploadSuccess;
+      
+      logger.log(`[useTraktAutosyncSettings] Manual sync ${overallSuccess ? 'completed' : 'failed'}`);
+      return overallSuccess;
     } catch (error) {
       logger.error('[useTraktAutosyncSettings] Error during manual sync:', error);
       return false;

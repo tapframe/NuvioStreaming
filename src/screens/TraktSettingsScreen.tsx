@@ -401,57 +401,7 @@ const TraktSettingsScreen: React.FC = () => {
                 )}
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[
-                  styles.button,
-                  { 
-                    backgroundColor: isDarkMode ? '#FF6B35' + '40' : '#FF6B35' + '20',
-                    marginTop: 8
-                  }
-                ]}
-                onPress={async () => {
-                  await traktService.debugPlaybackProgress();
-                  Alert.alert(
-                    'Debug Complete',
-                    'Check the app logs for current Trakt playback progress. Look for lines starting with "[TraktService] DEBUG".',
-                    [{ text: 'OK' }]
-                  );
-                }}
-              >
-                <Text style={[
-                  styles.buttonText,
-                  { color: '#FF6B35' }
-                ]}>
-                  Debug Trakt Progress
-                </Text>
-              </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[
-                  styles.button,
-                  { 
-                    backgroundColor: isDarkMode ? '#9B59B6' + '40' : '#9B59B6' + '20',
-                    marginTop: 8
-                  }
-                ]}
-                onPress={async () => {
-                  const result = await traktService.debugTraktConnection();
-                  Alert.alert(
-                    'Connection Test',
-                    result.authenticated 
-                      ? `Connection successful! User: ${result.user?.username || 'Unknown'}` 
-                      : `Connection failed: ${result.error}`,
-                    [{ text: 'OK' }]
-                  );
-                }}
-              >
-                <Text style={[
-                  styles.buttonText,
-                  { color: '#9B59B6' }
-                ]}>
-                  Test API Connection
-                </Text>
-              </TouchableOpacity>
             </View>
           </View>
         )}
