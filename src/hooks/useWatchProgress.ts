@@ -91,62 +91,8 @@ export const useWatchProgress = (
           if (episodeId) {
             const progress = await storageService.getWatchProgress(id, type, episodeId);
             if (progress) {
-              const progressPercent = (progress.currentTime / progress.duration) * 100;
-              
-              // If current episode is finished (≥95%), try to find next unwatched episode
-              if (progressPercent >= 95) {
-                const currentEpNum = getEpisodeNumber(episodeId);
-                if (currentEpNum && episodes.length > 0) {
-                  // Find the next episode
-                  const nextEpisode = episodes.find(ep => {
-                    // First check in same season
-                    if (ep.season_number === currentEpNum.season && ep.episode_number > currentEpNum.episode) {
-                      const epId = ep.stremioId || `${id}:${ep.season_number}:${ep.episode_number}`;
-                      const epProgress = seriesProgresses.find(p => p.episodeId === epId);
-                      if (!epProgress) return true;
-                      const percent = (epProgress.progress.currentTime / epProgress.progress.duration) * 100;
-                      return percent < 95;
-                    }
-                    // Then check next seasons
-                    if (ep.season_number > currentEpNum.season) {
-                      const epId = ep.stremioId || `${id}:${ep.season_number}:${ep.episode_number}`;
-                      const epProgress = seriesProgresses.find(p => p.episodeId === epId);
-                      if (!epProgress) return true;
-                      const percent = (epProgress.progress.currentTime / epProgress.progress.duration) * 100;
-                      return percent < 95;
-                    }
-                    return false;
-                  });
-
-                  if (nextEpisode) {
-                    const nextEpisodeId = nextEpisode.stremioId || 
-                      `${id}:${nextEpisode.season_number}:${nextEpisode.episode_number}`;
-                    const nextProgress = await storageService.getWatchProgress(id, type, nextEpisodeId);
-                    if (nextProgress) {
-                      setWatchProgress({ 
-                        ...nextProgress, 
-                        episodeId: nextEpisodeId,
-                        traktSynced: nextProgress.traktSynced,
-                        traktProgress: nextProgress.traktProgress
-                      });
-                    } else {
-                      setWatchProgress({ 
-                        currentTime: 0, 
-                        duration: 0, 
-                        lastUpdated: Date.now(), 
-                        episodeId: nextEpisodeId,
-                        traktSynced: false
-                      });
-                    }
-                    return;
-                  }
-                }
-                // If no next episode found or current episode is finished, show no progress
-                setWatchProgress(null);
-                return;
-              }
-              
-              // If current episode is not finished, show its progress
+              // Always show the current episode progress when viewing it specifically
+              // This allows HeroSection to properly display watched state
               setWatchProgress({ 
                 ...progress, 
                 episodeId,
@@ -194,17 +140,14 @@ export const useWatchProgress = (
           // For movies
           const progress = await storageService.getWatchProgress(id, type, episodeId);
           if (progress && progress.currentTime > 0) {
-            const progressPercent = (progress.currentTime / progress.duration) * 100;
-            if (progressPercent >= 95) {
-              setWatchProgress(null);
-            } else {
-              setWatchProgress({ 
-                ...progress, 
-                episodeId,
-                traktSynced: progress.traktSynced,
-                traktProgress: progress.traktProgress
-              });
-            }
+            // Always show progress data, even if watched (≥95%)
+            // The HeroSection will handle the "watched" state display
+            setWatchProgress({ 
+              ...progress, 
+              episodeId,
+              traktSynced: progress.traktSynced,
+              traktProgress: progress.traktProgress
+            });
           } else {
             setWatchProgress(null);
           }

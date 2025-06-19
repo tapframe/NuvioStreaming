@@ -77,7 +77,9 @@ const ActionButtons = React.memo(({
   id, 
   navigation, 
   playButtonText,
-  animatedStyle
+  animatedStyle,
+  isWatched,
+  watchProgress
 }: {
   handleShowStreams: () => void;
   toggleLibrary: () => void;
@@ -87,6 +89,8 @@ const ActionButtons = React.memo(({
   navigation: any;
   playButtonText: string;
   animatedStyle: any;
+  isWatched: boolean;
+  watchProgress: any;
 }) => {
   const { currentTheme } = useTheme();
   
@@ -122,19 +126,48 @@ const ActionButtons = React.memo(({
     }
   }, [id, navigation]);
 
+  // Determine play button style and text based on watched status
+  const playButtonStyle = useMemo(() => {
+    if (isWatched) {
+      return [styles.actionButton, styles.playButton, styles.watchedPlayButton];
+    }
+    return [styles.actionButton, styles.playButton];
+  }, [isWatched]);
+
+  const playButtonTextStyle = useMemo(() => {
+    if (isWatched) {
+      return [styles.playButtonText, styles.watchedPlayButtonText];
+    }
+    return styles.playButtonText;
+  }, [isWatched]);
+
+  const finalPlayButtonText = useMemo(() => {
+    if (isWatched) {
+      return 'Watch Again';
+    }
+    return playButtonText;
+  }, [isWatched, playButtonText]);
+
   return (
     <Animated.View style={[styles.actionButtons, animatedStyle]}>
       <TouchableOpacity
-        style={[styles.actionButton, styles.playButton]}
+        style={playButtonStyle}
         onPress={handleShowStreams}
         activeOpacity={0.85}
       >
         <MaterialIcons 
-          name={playButtonText === 'Resume' ? "play-circle-outline" : "play-arrow"} 
+          name={isWatched ? "replay" : (playButtonText === 'Resume' ? "play-circle-outline" : "play-arrow")} 
           size={24} 
-          color="#000" 
+          color={isWatched ? "#fff" : "#000"} 
         />
-        <Text style={styles.playButtonText}>{playButtonText}</Text>
+        <Text style={playButtonTextStyle}>{finalPlayButtonText}</Text>
+        
+        {/* Subtle watched indicator in play button */}
+        {isWatched && (
+          <View style={styles.watchedIndicator}>
+            <MaterialIcons name="check" size={12} color="#fff" />
+          </View>
+        )}
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -199,12 +232,13 @@ const ActionButtons = React.memo(({
   );
 });
 
-// Enhanced WatchProgress Component with Trakt integration
+// Enhanced WatchProgress Component with Trakt integration and watched status
 const WatchProgressDisplay = React.memo(({ 
   watchProgress, 
   type, 
   getEpisodeDetails, 
   animatedStyle,
+  isWatched
 }: {
   watchProgress: { 
     currentTime: number; 
@@ -217,15 +251,68 @@ const WatchProgressDisplay = React.memo(({
   type: 'movie' | 'series';
   getEpisodeDetails: (episodeId: string) => { seasonNumber: string; episodeNumber: string; episodeName: string } | null;
   animatedStyle: any;
+  isWatched: boolean;
 }) => {
   const { currentTheme } = useTheme();
-  const { isAuthenticated: isTraktAuthenticated } = useTraktContext();
+  const { isAuthenticated: isTraktAuthenticated, forceSyncTraktProgress } = useTraktContext();
+  
+  // Handle manual Trakt sync
+  const handleTraktSync = useMemo(() => async () => {
+    if (isTraktAuthenticated && forceSyncTraktProgress) {
+      logger.log('[HeroSection] Manual Trakt sync requested');
+      try {
+        const success = await forceSyncTraktProgress();
+        logger.log(`[HeroSection] Manual Trakt sync ${success ? 'successful' : 'failed'}`);
+      } catch (error) {
+        logger.error('[HeroSection] Manual Trakt sync error:', error);
+      }
+    }
+  }, [isTraktAuthenticated, forceSyncTraktProgress]);
   
   // Memoized progress calculation with Trakt integration
   const progressData = useMemo(() => {
+    // If content is fully watched, show watched status instead of progress
+    if (isWatched) {
+      let episodeInfo = '';
+      if (type === 'series' && watchProgress?.episodeId) {
+        const details = getEpisodeDetails(watchProgress.episodeId);
+        if (details) {
+          episodeInfo = ` • S${details.seasonNumber}:E${details.episodeNumber}${details.episodeName ? ` - ${details.episodeName}` : ''}`;
+        }
+      }
+      
+      const watchedDate = watchProgress?.lastUpdated 
+        ? new Date(watchProgress.lastUpdated).toLocaleDateString()
+        : new Date().toLocaleDateString();
+      
+      // Determine if watched via Trakt or local
+      const watchedViaTrakt = isTraktAuthenticated && 
+        watchProgress?.traktProgress !== undefined && 
+        watchProgress.traktProgress >= 95;
+      
+      return {
+        progressPercent: 100,
+        formattedTime: watchedDate,
+        episodeInfo,
+        displayText: watchedViaTrakt ? 'Watched on Trakt' : 'Watched',
+        syncStatus: isTraktAuthenticated && watchProgress?.traktSynced ? '' : '', // Clean look for watched
+        isTraktSynced: watchProgress?.traktSynced && isTraktAuthenticated,
+        isWatched: true
+      };
+    }
+
     if (!watchProgress || watchProgress.duration === 0) return null;
 
-    const progressPercent = (watchProgress.currentTime / watchProgress.duration) * 100;
+    // Determine which progress to show - prioritize Trakt if available and authenticated
+    let progressPercent;
+    let isUsingTraktProgress = false;
+    
+    if (isTraktAuthenticated && watchProgress.traktProgress !== undefined) {
+      progressPercent = watchProgress.traktProgress;
+      isUsingTraktProgress = true;
+    } else {
+      progressPercent = (watchProgress.currentTime / watchProgress.duration) * 100;
+    }
     const formattedTime = new Date(watchProgress.lastUpdated).toLocaleDateString();
     let episodeInfo = '';
 
@@ -242,7 +329,12 @@ const WatchProgressDisplay = React.memo(({
     
     // Show Trakt sync status if user is authenticated
     if (isTraktAuthenticated) {
-      if (watchProgress.traktSynced) {
+      if (isUsingTraktProgress) {
+        syncStatus = ' • Using Trakt progress';
+        if (watchProgress.traktSynced) {
+          syncStatus = ' • Synced with Trakt';
+        }
+      } else if (watchProgress.traktSynced) {
         syncStatus = ' • Synced with Trakt';
         // If we have specific Trakt progress that differs from local, mention it
         if (watchProgress.traktProgress !== undefined && 
@@ -260,9 +352,10 @@ const WatchProgressDisplay = React.memo(({
       episodeInfo,
       displayText,
       syncStatus,
-      isTraktSynced: watchProgress.traktSynced && isTraktAuthenticated
+      isTraktSynced: watchProgress.traktSynced && isTraktAuthenticated,
+      isWatched: false
     };
-  }, [watchProgress, type, getEpisodeDetails, isTraktAuthenticated]);
+  }, [watchProgress, type, getEpisodeDetails, isTraktAuthenticated, isWatched]);
 
   if (!progressData) return null;
 
@@ -274,14 +367,26 @@ const WatchProgressDisplay = React.memo(({
             styles.watchProgressFill,
             { 
               width: `${progressData.progressPercent}%`,
-              backgroundColor: progressData.isTraktSynced 
-                ? '#E50914' // Netflix red for Trakt synced content
-                : currentTheme.colors.primary 
+              backgroundColor: progressData.isWatched 
+                ? '#666' // Subtle gray for completed
+                : progressData.isTraktSynced 
+                  ? '#E50914' // Netflix red for Trakt synced content
+                  : currentTheme.colors.primary 
             }
           ]} 
         />
-        {/* Trakt sync indicator */}
-        {progressData.isTraktSynced && (
+        {/* Subtle watched indicator */}
+        {progressData.isWatched && (
+          <View style={styles.watchedProgressIndicator}>
+            <MaterialIcons 
+              name="check" 
+              size={6} 
+              color="rgba(255,255,255,0.8)" 
+            />
+          </View>
+        )}
+        {/* Trakt sync indicator for non-watched content */}
+        {progressData.isTraktSynced && !progressData.isWatched && (
           <View style={styles.traktSyncIndicator}>
             <MaterialIcons 
               name="sync" 
@@ -291,10 +396,30 @@ const WatchProgressDisplay = React.memo(({
           </View>
         )}
       </View>
-      <Text style={[styles.watchProgressText, { color: currentTheme.colors.textMuted }]}>
-        {progressData.displayText}{progressData.episodeInfo} • Last watched on {progressData.formattedTime}
-        {progressData.syncStatus}
-      </Text>
+      <View style={styles.watchProgressTextContainer}>
+        <Text style={[styles.watchProgressText, { 
+          color: progressData.isWatched ? 'rgba(255,255,255,0.6)' : currentTheme.colors.textMuted,
+          fontSize: progressData.isWatched ? 10 : 11
+        }]}>
+          {progressData.displayText}{progressData.episodeInfo} • Last watched on {progressData.formattedTime}
+          {progressData.syncStatus}
+        </Text>
+        
+        {/* Manual Trakt sync button */}
+        {isTraktAuthenticated && forceSyncTraktProgress && (
+          <TouchableOpacity 
+            style={styles.traktSyncButton}
+            onPress={handleTraktSync}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons 
+              name="refresh" 
+              size={14} 
+              color={currentTheme.colors.textMuted} 
+            />
+          </TouchableOpacity>
+        )}
+      </View>
     </Animated.View>
   );
 });
@@ -452,6 +577,25 @@ const HeroSection: React.FC<HeroSectionProps> = ({
   // Memoized play button text
   const playButtonText = useMemo(() => getPlayButtonText(), [getPlayButtonText]);
 
+  // Calculate if content is watched (>=95% progress) - check both local and Trakt progress
+  const isWatched = useMemo(() => {
+    if (!watchProgress) return false;
+    
+    // Check Trakt progress first if available and user is authenticated
+    if (isTraktAuthenticated && watchProgress.traktProgress !== undefined) {
+      const traktWatched = watchProgress.traktProgress >= 95;
+      logger.log(`[HeroSection] Trakt authenticated: ${isTraktAuthenticated}, Trakt progress: ${watchProgress.traktProgress}%, Watched: ${traktWatched}`);
+      return traktWatched;
+    }
+    
+    // Fall back to local progress
+    if (watchProgress.duration === 0) return false;
+    const progressPercent = (watchProgress.currentTime / watchProgress.duration) * 100;
+    const localWatched = progressPercent >= 95;
+    logger.log(`[HeroSection] Local progress: ${progressPercent.toFixed(1)}%, Watched: ${localWatched}`);
+    return localWatched;
+  }, [watchProgress, isTraktAuthenticated]);
+
   return (
     <Animated.View style={[styles.heroSection, heroAnimatedStyle]}>
       {/* Optimized Background */}
@@ -521,6 +665,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
             type={type}
             getEpisodeDetails={getEpisodeDetails}
             animatedStyle={watchProgressAnimatedStyle}
+            isWatched={isWatched}
           />
 
           {/* Optimized Genres */}
@@ -540,6 +685,8 @@ const HeroSection: React.FC<HeroSectionProps> = ({
             navigation={navigation}
             playButtonText={playButtonText}
             animatedStyle={buttonsAnimatedStyle}
+            isWatched={isWatched}
+            watchProgress={watchProgress}
           />
         </View>
       </LinearGradient>
@@ -623,6 +770,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
+    position: 'relative',
   },
   actionButton: {
     flexDirection: 'row',
@@ -697,11 +845,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  watchedProgressIndicator: {
+    position: 'absolute',
+    right: 2,
+    top: -1,
+    bottom: -1,
+    width: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  watchProgressTextContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
   watchProgressText: {
     fontSize: 11,
     textAlign: 'center',
     opacity: 0.85,
-    letterSpacing: 0.1
+    letterSpacing: 0.1,
+    flex: 1,
+  },
+  traktSyncButton: {
+    padding: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   blurBackground: {
     position: 'absolute',
@@ -737,6 +906,33 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     backgroundColor: 'rgba(255,255,255,0.15)',
   },
+          watchedIndicator: {
+      position: 'absolute',
+      top: 4,
+      right: 4,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      borderRadius: 8,
+      width: 16,
+      height: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    watchedPlayButton: {
+      backgroundColor: '#1e1e1e',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.3)',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+      elevation: 4,
+    },
+    watchedPlayButtonText: {
+      color: '#fff',
+      fontWeight: '700',
+      marginLeft: 6,
+      fontSize: 15,
+    },
 });
 
 export default React.memo(HeroSection); 

@@ -281,15 +281,16 @@ export function useTraktIntegration() {
     }
     
     try {
-      logger.log('[useTraktIntegration] Fetching Trakt playback progress...');
-      const traktProgress = await getTraktPlaybackProgress();
-      logger.log(`[useTraktIntegration] Retrieved ${traktProgress.length} Trakt progress items`);
+      // Fetch both playback progress and recently watched movies
+      logger.log('[useTraktIntegration] Fetching Trakt playback progress and watched movies...');
+      const [traktProgress, watchedMovies] = await Promise.all([
+        getTraktPlaybackProgress(),
+        traktService.getWatchedMovies()
+      ]);
       
-      if (traktProgress.length === 0) {
-        logger.log('[useTraktIntegration] No Trakt progress found - user may not have any content in progress');
-        return true; // Not an error, just no data
-      }
+      logger.log(`[useTraktIntegration] Retrieved ${traktProgress.length} Trakt progress items, ${watchedMovies.length} watched movies`);
       
+      // Process playback progress (in-progress items)
       for (const item of traktProgress) {
         try {
           let id: string;
@@ -299,14 +300,14 @@ export function useTraktIntegration() {
           if (item.type === 'movie' && item.movie) {
             id = item.movie.ids.imdb;
             type = 'movie';
-            logger.log(`[useTraktIntegration] Processing Trakt movie: ${item.movie.title} (${id}) - ${item.progress}%`);
+            logger.log(`[useTraktIntegration] Processing Trakt movie progress: ${item.movie.title} (${id}) - ${item.progress}%`);
           } else if (item.type === 'episode' && item.show && item.episode) {
             id = item.show.ids.imdb;
             type = 'series';
             episodeId = `${id}:${item.episode.season}:${item.episode.number}`;
-            logger.log(`[useTraktIntegration] Processing Trakt episode: ${item.show.title} S${item.episode.season}E${item.episode.number} (${id}) - ${item.progress}%`);
+            logger.log(`[useTraktIntegration] Processing Trakt episode progress: ${item.show.title} S${item.episode.season}E${item.episode.number} (${id}) - ${item.progress}%`);
           } else {
-            logger.warn(`[useTraktIntegration] Skipping invalid Trakt item:`, item);
+            logger.warn(`[useTraktIntegration] Skipping invalid Trakt progress item:`, item);
             continue;
           }
           
@@ -323,7 +324,27 @@ export function useTraktIntegration() {
         }
       }
       
-      logger.log(`[useTraktIntegration] Successfully merged ${traktProgress.length} Trakt progress entries`);
+      // Process watched movies (100% completed)
+      for (const movie of watchedMovies) {
+        try {
+          if (movie.movie?.ids?.imdb) {
+            const id = movie.movie.ids.imdb;
+            const watchedAt = movie.last_watched_at;
+            logger.log(`[useTraktIntegration] Processing watched movie: ${movie.movie.title} (${id}) - 100% watched on ${watchedAt}`);
+            
+            await storageService.mergeWithTraktProgress(
+              id,
+              'movie',
+              100, // 100% progress for watched items
+              watchedAt
+            );
+          }
+        } catch (error) {
+          logger.error('[useTraktIntegration] Error merging watched movie:', error);
+        }
+      }
+      
+      logger.log(`[useTraktIntegration] Successfully merged ${traktProgress.length} progress items + ${watchedMovies.length} watched movies`);
       return true;
     } catch (error) {
       logger.error('[useTraktIntegration] Error fetching and merging Trakt progress:', error);
@@ -360,6 +381,24 @@ export function useTraktIntegration() {
         }, 100);
       });
     }
+  }, [isAuthenticated, fetchAndMergeTraktProgress]);
+
+  // Periodic sync - check for updates every 2 minutes when authenticated
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const intervalId = setInterval(() => {
+      logger.log('[useTraktIntegration] Periodic Trakt sync check');
+      fetchAndMergeTraktProgress().then((success) => {
+        if (success) {
+          logger.log('[useTraktIntegration] Periodic sync completed successfully');
+        }
+      }).catch(error => {
+        logger.error('[useTraktIntegration] Periodic sync failed:', error);
+      });
+    }, 2 * 60 * 1000); // 2 minutes
+
+    return () => clearInterval(intervalId);
   }, [isAuthenticated, fetchAndMergeTraktProgress]);
 
   // Trigger sync when auth status is manually refreshed (for login scenarios)
