@@ -541,7 +541,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    paddingVertical: 16,
   },
   centeredContainer: {
     flex: 1,
@@ -558,6 +558,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     marginBottom: 16,
+    paddingHorizontal: 16,
   },
   episodeList: {
     flex: 1,
@@ -566,6 +567,7 @@ const styles = StyleSheet.create({
   // Vertical Layout Styles
   episodeListContentVertical: {
     paddingBottom: 20,
+    paddingHorizontal: 16,
   },
   episodeListContentVerticalTablet: {
     paddingHorizontal: 8,
@@ -706,7 +708,7 @@ const styles = StyleSheet.create({
 
   // Horizontal Layout Styles
   episodeListContentHorizontal: {
-    paddingLeft: 0,
+    paddingLeft: 16,
     paddingRight: 16,
   },
   episodeCardWrapperHorizontal: {
@@ -843,6 +845,7 @@ const styles = StyleSheet.create({
   // Season Selector Styles
   seasonSelectorWrapper: {
     marginBottom: 20,
+    paddingHorizontal: 16,
   },
   seasonSelectorTitle: {
     fontSize: 18,
