@@ -305,11 +305,11 @@ const SearchScreen = () => {
   const saveRecentSearch = async (searchQuery: string) => {
     try {
       setRecentSearches(prevSearches => {
-        const newRecentSearches = [
-          searchQuery,
+      const newRecentSearches = [
+        searchQuery,
           ...prevSearches.filter(s => s !== searchQuery)
-        ].slice(0, MAX_RECENT_SEARCHES);
-        
+      ].slice(0, MAX_RECENT_SEARCHES);
+      
         // Save to AsyncStorage
         AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newRecentSearches));
         

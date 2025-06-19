@@ -637,7 +637,7 @@ const HomeScreen = () => {
     handleSaveToLibrary, 
     hasContinueWatching, 
     catalogs, 
-    catalogsLoading,
+    catalogsLoading, 
     navigation,
     featuredContentSource
   ]);

@@ -689,7 +689,7 @@ export const StreamsScreen = () => {
               
               if (!success) {
                 console.log('VideoPlayerService failed, falling back to built-in player');
-                navigateToPlayer(stream);
+                      navigateToPlayer(stream);
               }
             }
           } catch (error) {

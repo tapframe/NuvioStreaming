@@ -11,6 +11,7 @@ import { logger } from '../../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import AndroidVideoPlayer from './AndroidVideoPlayer';
+import { useTraktAutosync } from '../../hooks/useTraktAutosync';
 
 import { 
   DEFAULT_SUBTITLE_SIZE, 
@@ -57,6 +58,21 @@ const VideoPlayer: React.FC = () => {
     imdbId,
     availableStreams: passedAvailableStreams
   } = route.params;
+
+  // Initialize Trakt autosync
+  const traktAutosync = useTraktAutosync({
+    id: id || '',
+    type: type === 'series' ? 'series' : 'movie',
+    title: episodeTitle || title,
+    year: year || 0,
+    imdbId: imdbId || '',
+    season: season,
+    episode: episode,
+    showTitle: title,
+    showYear: year,
+    showImdbId: imdbId,
+    episodeId: episodeId
+  });
 
   safeDebugLog("Component mounted with props", {
     uri, title, season, episode, episodeTitle, quality, year,
@@ -271,6 +287,9 @@ const VideoPlayer: React.FC = () => {
       };
       try {
         await storageService.setWatchProgress(id, type, progress, episodeId);
+        
+        // Sync to Trakt if authenticated
+        await traktAutosync.handleProgressUpdate(currentTime, duration);
       } catch (error) {
         logger.error('[VideoPlayer] Error saving watch progress:', error);
       }
@@ -297,6 +316,8 @@ const VideoPlayer: React.FC = () => {
     return () => {
       if (id && type && duration > 0) {
         saveWatchProgress();
+        // Final Trakt sync on component unmount
+        traktAutosync.handlePlaybackEnd(currentTime, duration, 'unmount');
       }
     };
   }, [id, type, currentTime, duration]);
@@ -304,6 +325,11 @@ const VideoPlayer: React.FC = () => {
   const onPlaying = () => {
     if (isMounted.current && !isSeeking.current) {
       setPaused(false);
+      
+      // Start Trakt watching session only if duration is loaded
+      if (duration > 0) {
+        traktAutosync.handlePlaybackStart(currentTime, duration);
+      }
     }
   };
 
@@ -490,6 +516,12 @@ const VideoPlayer: React.FC = () => {
   };
 
   const handleClose = () => {
+    logger.log('[VideoPlayer] Close button pressed - syncing to Trakt before closing');
+    logger.log(`[VideoPlayer] Current progress: ${currentTime}/${duration} (${duration > 0 ? ((currentTime / duration) * 100).toFixed(1) : 0}%)`);
+    
+    // Sync progress to Trakt before closing
+    traktAutosync.handlePlaybackEnd(currentTime, duration, 'unmount');
+    
     // Start exit animation
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -603,7 +635,8 @@ const VideoPlayer: React.FC = () => {
   };
 
   const onEnd = () => {
-    // End logic here
+    // Sync final progress to Trakt
+    traktAutosync.handlePlaybackEnd(currentTime, duration, 'ended');
   };
 
   const selectAudioTrack = (trackId: number) => {

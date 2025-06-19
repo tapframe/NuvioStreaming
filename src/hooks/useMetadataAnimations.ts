@@ -97,10 +97,10 @@ export const useMetadataAnimations = (safeAreaTop: number, watchProgress: any) =
     
     const updateProgress = () => {
       'worklet';
-      progressOpacity.value = withTiming(hasProgress ? 1 : 0, {
-        duration: hasProgress ? 200 : 150,
-        easing: easings.fast
-      });
+    progressOpacity.value = withTiming(hasProgress ? 1 : 0, {
+      duration: hasProgress ? 200 : 150,
+      easing: easings.fast
+    });
     };
     
     runOnUI(updateProgress)();

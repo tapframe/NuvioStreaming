@@ -11,6 +11,8 @@ import {
   ScrollView,
   StatusBar,
   Platform,
+  Linking,
+  Switch,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { makeRedirectUri, useAuthRequest, ResponseType, Prompt, CodeChallengeMethod } from 'expo-auth-session';
@@ -20,6 +22,9 @@ import { useSettings } from '../hooks/useSettings';
 import { logger } from '../utils/logger';
 import TraktIcon from '../../assets/rating-icons/trakt.svg';
 import { useTheme } from '../contexts/ThemeContext';
+import { useTraktIntegration } from '../hooks/useTraktIntegration';
+import { useTraktAutosyncSettings } from '../hooks/useTraktAutosyncSettings';
+import { colors } from '../styles';
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
@@ -44,6 +49,21 @@ const TraktSettingsScreen: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userProfile, setUserProfile] = useState<TraktUser | null>(null);
   const { currentTheme } = useTheme();
+  
+  const {
+    settings: autosyncSettings,
+    isSyncing,
+    setAutosyncEnabled,
+    performManualSync
+  } = useTraktAutosyncSettings();
+
+  const {
+    isLoading: traktLoading,
+    refreshAuthStatus
+  } = useTraktIntegration();
+
+  const [showSyncFrequencyModal, setShowSyncFrequencyModal] = useState(false);
+  const [showThresholdModal, setShowThresholdModal] = useState(false);
 
   const checkAuthStatus = useCallback(async () => {
     setIsLoading(true);
@@ -180,7 +200,7 @@ const TraktSettingsScreen: React.FC = () => {
         </TouchableOpacity>
         <Text style={[
           styles.headerTitle,
-          { color: isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark }
+          { color: isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark}
         ]}>
           Trakt Settings
         </Text>
@@ -308,18 +328,31 @@ const TraktSettingsScreen: React.FC = () => {
                 Sync Settings
               </Text>
               <View style={styles.settingItem}>
-                <Text style={[
-                  styles.settingLabel,
-                  { color: isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark }
-                ]}>
-                  Auto-sync playback progress
-                </Text>
-                <Text style={[
-                  styles.settingDescription,
-                  { color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark }
-                ]}>
-                  Coming soon
-                </Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[
+                      styles.settingLabel,
+                      { color: isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark }
+                    ]}>
+                      Auto-sync playback progress
+                    </Text>
+                    <Text style={[
+                      styles.settingDescription,
+                      { color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark }
+                    ]}>
+                      Automatically sync watch progress to Trakt
+                    </Text>
+                  </View>
+                  <Switch
+                    value={autosyncSettings.enabled}
+                    onValueChange={setAutosyncEnabled}
+                    trackColor={{ 
+                      false: isDarkMode ? 'rgba(120,120,128,0.3)' : 'rgba(120,120,128,0.2)',
+                      true: currentTheme.colors.primary + '80'
+                    }}
+                    thumbColor={autosyncSettings.enabled ? currentTheme.colors.primary : (isDarkMode ? '#ffffff' : '#f4f3f4')}
+                  />
+                </View>
               </View>
               <View style={styles.settingItem}>
                 <Text style={[
@@ -338,15 +371,85 @@ const TraktSettingsScreen: React.FC = () => {
               <TouchableOpacity
                 style={[
                   styles.button,
-                  { backgroundColor: isDarkMode ? 'rgba(120,120,128,0.2)' : 'rgba(120,120,128,0.1)' }
+                  { 
+                    backgroundColor: isDarkMode ? currentTheme.colors.primary + '40' : currentTheme.colors.primary + '20',
+                    opacity: isSyncing ? 0.6 : 1
+                  }
                 ]}
-                disabled={true}
+                disabled={isSyncing}
+                onPress={async () => {
+                  const success = await performManualSync();
+                  Alert.alert(
+                    'Sync Complete',
+                    success ? 'Successfully synced your watch progress with Trakt.' : 'Sync failed. Please try again.',
+                    [{ text: 'OK' }]
+                  );
+                }}
+              >
+                {isSyncing ? (
+                  <ActivityIndicator 
+                    size="small" 
+                    color={isDarkMode ? currentTheme.colors.primary : currentTheme.colors.primary} 
+                  />
+                ) : (
+                  <Text style={[
+                    styles.buttonText,
+                    { color: isDarkMode ? currentTheme.colors.primary : currentTheme.colors.primary }
+                  ]}>
+                    Sync Now
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.button,
+                  { 
+                    backgroundColor: isDarkMode ? '#FF6B35' + '40' : '#FF6B35' + '20',
+                    marginTop: 8
+                  }
+                ]}
+                onPress={async () => {
+                  await traktService.debugPlaybackProgress();
+                  Alert.alert(
+                    'Debug Complete',
+                    'Check the app logs for current Trakt playback progress. Look for lines starting with "[TraktService] DEBUG".',
+                    [{ text: 'OK' }]
+                  );
+                }}
               >
                 <Text style={[
                   styles.buttonText,
-                  { color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark }
+                  { color: '#FF6B35' }
                 ]}>
-                  Sync Now (Coming Soon)
+                  Debug Trakt Progress
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.button,
+                  { 
+                    backgroundColor: isDarkMode ? '#9B59B6' + '40' : '#9B59B6' + '20',
+                    marginTop: 8
+                  }
+                ]}
+                onPress={async () => {
+                  const result = await traktService.debugTraktConnection();
+                  Alert.alert(
+                    'Connection Test',
+                    result.authenticated 
+                      ? `Connection successful! User: ${result.user?.username || 'Unknown'}` 
+                      : `Connection failed: ${result.error}`,
+                    [{ text: 'OK' }]
+                  );
+                }}
+              >
+                <Text style={[
+                  styles.buttonText,
+                  { color: '#9B59B6' }
+                ]}>
+                  Test API Connection
                 </Text>
               </TouchableOpacity>
             </View>

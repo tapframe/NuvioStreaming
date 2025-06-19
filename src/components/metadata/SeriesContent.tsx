@@ -399,7 +399,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
           <View style={styles.episodeContent}>
             {/* Episode Number Badge */}
             <View style={styles.episodeNumberBadgeHorizontal}>
-              <Text style={styles.episodeNumberHorizontal}>{episodeString}</Text>
+            <Text style={styles.episodeNumberHorizontal}>{episodeString}</Text>
             </View>
             
             {/* Episode Title */}
@@ -416,9 +416,9 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
             <View style={styles.episodeMetadataRowHorizontal}>
               {episode.runtime && (
                 <View style={styles.runtimeContainerHorizontal}>
-                  <Text style={styles.runtimeTextHorizontal}>
-                    {formatRuntime(episode.runtime)}
-                  </Text>
+                <Text style={styles.runtimeTextHorizontal}>
+                  {formatRuntime(episode.runtime)}
+                </Text>
                 </View>
               )}
               {episode.vote_average > 0 && (

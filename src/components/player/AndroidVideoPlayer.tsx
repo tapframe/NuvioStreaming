@@ -10,6 +10,7 @@ import { storageService } from '../../services/storageService';
 import { logger } from '../../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTraktAutosync } from '../../hooks/useTraktAutosync';
 
 import { 
   DEFAULT_SUBTITLE_SIZE, 
@@ -62,6 +63,21 @@ const AndroidVideoPlayer: React.FC = () => {
     imdbId,
     availableStreams: passedAvailableStreams
   } = route.params;
+
+  // Initialize Trakt autosync
+  const traktAutosync = useTraktAutosync({
+    id: id || '',
+    type: type === 'series' ? 'series' : 'movie',
+    title: episodeTitle || title,
+    year: year || 0,
+    imdbId: imdbId || '',
+    season: season,
+    episode: episode,
+    showTitle: title,
+    showYear: year,
+    showImdbId: imdbId,
+    episodeId: episodeId
+  });
 
   safeDebugLog("Android Component mounted with props", {
     uri, title, season, episode, episodeTitle, quality, year,
@@ -276,6 +292,9 @@ const AndroidVideoPlayer: React.FC = () => {
       };
       try {
         await storageService.setWatchProgress(id, type, progress, episodeId);
+        
+        // Sync to Trakt if authenticated
+        await traktAutosync.handleProgressUpdate(currentTime, duration);
       } catch (error) {
         logger.error('[AndroidVideoPlayer] Error saving watch progress:', error);
       }
@@ -302,6 +321,8 @@ const AndroidVideoPlayer: React.FC = () => {
     return () => {
       if (id && type && duration > 0) {
         saveWatchProgress();
+        // Final Trakt sync on component unmount
+        traktAutosync.handlePlaybackEnd(currentTime, duration, 'unmount');
       }
     };
   }, [id, type, currentTime, duration]);
@@ -431,6 +452,9 @@ const AndroidVideoPlayer: React.FC = () => {
       setIsVideoLoaded(true);
       setIsPlayerReady(true);
       
+      // Start Trakt watching session when video loads
+      traktAutosync.handlePlaybackStart(currentTime, data.duration || duration);
+      
       if (initialPosition && !isInitialSeekComplete) {
         setTimeout(() => {
           if (videoRef.current && duration > 0 && isMounted.current) {
@@ -484,6 +508,12 @@ const AndroidVideoPlayer: React.FC = () => {
   };
 
   const handleClose = () => {
+    logger.log('[AndroidVideoPlayer] Close button pressed - syncing to Trakt before closing');
+    logger.log(`[AndroidVideoPlayer] Current progress: ${currentTime}/${duration} (${duration > 0 ? ((currentTime / duration) * 100).toFixed(1) : 0}%)`);
+    
+    // Sync progress to Trakt before closing
+    traktAutosync.handlePlaybackEnd(currentTime, duration, 'unmount');
+    
     // Start exit animation
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -597,7 +627,8 @@ const AndroidVideoPlayer: React.FC = () => {
   };
 
   const onEnd = () => {
-    // End logic here
+    // Sync final progress to Trakt
+    traktAutosync.handlePlaybackEnd(currentTime, duration, 'ended');
   };
 
   const selectAudioTrack = (trackId: number) => {

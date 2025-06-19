@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { traktService, TraktUser, TraktWatchedItem } from '../services/traktService';
+import { traktService, TraktUser, TraktWatchedItem, TraktContentData, TraktPlaybackItem } from '../services/traktService';
+import { storageService } from '../services/storageService';
 import { logger } from '../utils/logger';
 
 export function useTraktIntegration() {
@@ -128,6 +129,179 @@ export function useTraktIntegration() {
     }
   }, [isAuthenticated, loadWatchedItems]);
 
+  // Start watching content (scrobble start)
+  const startWatching = useCallback(async (contentData: TraktContentData, progress: number): Promise<boolean> => {
+    if (!isAuthenticated) return false;
+    
+    try {
+      return await traktService.scrobbleStart(contentData, progress);
+    } catch (error) {
+      logger.error('[useTraktIntegration] Error starting watch:', error);
+      return false;
+    }
+  }, [isAuthenticated]);
+
+  // Update progress while watching (scrobble pause)
+  const updateProgress = useCallback(async (
+    contentData: TraktContentData, 
+    progress: number, 
+    force: boolean = false
+  ): Promise<boolean> => {
+    if (!isAuthenticated) return false;
+    
+    try {
+      return await traktService.scrobblePause(contentData, progress, force);
+    } catch (error) {
+      logger.error('[useTraktIntegration] Error updating progress:', error);
+      return false;
+    }
+  }, [isAuthenticated]);
+
+  // Stop watching content (scrobble stop)
+  const stopWatching = useCallback(async (contentData: TraktContentData, progress: number): Promise<boolean> => {
+    if (!isAuthenticated) return false;
+    
+    try {
+      return await traktService.scrobbleStop(contentData, progress);
+    } catch (error) {
+      logger.error('[useTraktIntegration] Error stopping watch:', error);
+      return false;
+    }
+  }, [isAuthenticated]);
+
+  // Sync progress to Trakt (legacy method)
+  const syncProgress = useCallback(async (
+    contentData: TraktContentData, 
+    progress: number, 
+    force: boolean = false
+  ): Promise<boolean> => {
+    if (!isAuthenticated) return false;
+    
+    try {
+      return await traktService.syncProgressToTrakt(contentData, progress, force);
+    } catch (error) {
+      logger.error('[useTraktIntegration] Error syncing progress:', error);
+      return false;
+    }
+  }, [isAuthenticated]);
+
+  // Get playback progress from Trakt
+  const getTraktPlaybackProgress = useCallback(async (type?: 'movies' | 'shows'): Promise<TraktPlaybackItem[]> => {
+    if (!isAuthenticated) return [];
+    
+    try {
+      return await traktService.getPlaybackProgress(type);
+    } catch (error) {
+      logger.error('[useTraktIntegration] Error getting playback progress:', error);
+      return [];
+    }
+  }, [isAuthenticated]);
+
+  // Sync all local progress to Trakt
+  const syncAllProgress = useCallback(async (): Promise<boolean> => {
+    if (!isAuthenticated) return false;
+    
+    try {
+      const unsyncedProgress = await storageService.getUnsyncedProgress();
+      logger.log(`[useTraktIntegration] Found ${unsyncedProgress.length} unsynced progress entries`);
+      
+      let syncedCount = 0;
+      const batchSize = 5; // Process in smaller batches
+      const delayBetweenBatches = 2000; // 2 seconds between batches
+      
+      // Process items in batches to avoid overwhelming the API
+      for (let i = 0; i < unsyncedProgress.length; i += batchSize) {
+        const batch = unsyncedProgress.slice(i, i + batchSize);
+        
+        // Process batch items with individual error handling
+        const batchPromises = batch.map(async (item) => {
+          try {
+            // Build content data from stored progress
+            const contentData: TraktContentData = {
+              type: item.type as 'movie' | 'episode',
+              imdbId: item.id,
+              title: 'Unknown', // We don't store title in progress, this would need metadata lookup
+              year: 0,
+              season: item.episodeId ? parseInt(item.episodeId.split('S')[1]?.split('E')[0] || '0') : undefined,
+              episode: item.episodeId ? parseInt(item.episodeId.split('E')[1] || '0') : undefined
+            };
+            
+            const progressPercent = (item.progress.currentTime / item.progress.duration) * 100;
+            
+            const success = await traktService.syncProgressToTrakt(contentData, progressPercent, true);
+            if (success) {
+              await storageService.updateTraktSyncStatus(item.id, item.type, true, progressPercent, item.episodeId);
+              return true;
+            }
+            return false;
+          } catch (error) {
+            logger.error('[useTraktIntegration] Error syncing individual progress:', error);
+            return false;
+          }
+        });
+        
+        // Wait for batch to complete
+        const batchResults = await Promise.all(batchPromises);
+        syncedCount += batchResults.filter(result => result).length;
+        
+        // Delay between batches to avoid rate limiting
+        if (i + batchSize < unsyncedProgress.length) {
+          await new Promise(resolve => setTimeout(resolve, delayBetweenBatches));
+        }
+      }
+      
+      logger.log(`[useTraktIntegration] Synced ${syncedCount}/${unsyncedProgress.length} progress entries`);
+      return syncedCount > 0;
+    } catch (error) {
+      logger.error('[useTraktIntegration] Error syncing all progress:', error);
+      return false;
+    }
+  }, [isAuthenticated]);
+
+  // Fetch and merge Trakt progress with local progress
+  const fetchAndMergeTraktProgress = useCallback(async (): Promise<boolean> => {
+    if (!isAuthenticated) return false;
+    
+    try {
+      const traktProgress = await getTraktPlaybackProgress();
+      
+      for (const item of traktProgress) {
+        try {
+          let id: string;
+          let type: string;
+          let episodeId: string | undefined;
+          
+          if (item.type === 'movie' && item.movie) {
+            id = item.movie.ids.imdb;
+            type = 'movie';
+          } else if (item.type === 'episode' && item.show && item.episode) {
+            id = item.show.ids.imdb;
+            type = 'series';
+            episodeId = `S${item.episode.season}E${item.episode.number}`;
+          } else {
+            continue;
+          }
+          
+          await storageService.mergeWithTraktProgress(
+            id,
+            type,
+            item.progress,
+            item.paused_at,
+            episodeId
+          );
+        } catch (error) {
+          logger.error('[useTraktIntegration] Error merging individual Trakt progress:', error);
+        }
+      }
+      
+      logger.log(`[useTraktIntegration] Merged ${traktProgress.length} Trakt progress entries`);
+      return true;
+    } catch (error) {
+      logger.error('[useTraktIntegration] Error fetching and merging Trakt progress:', error);
+      return false;
+    }
+  }, [isAuthenticated, getTraktPlaybackProgress]);
+
   // Initialize and check auth status
   useEffect(() => {
     checkAuthStatus();
@@ -139,6 +313,14 @@ export function useTraktIntegration() {
       loadWatchedItems();
     }
   }, [isAuthenticated, loadWatchedItems]);
+
+  // Auto-sync when authenticated changes
+  useEffect(() => {
+    if (isAuthenticated) {
+      // Fetch Trakt progress and merge with local
+      fetchAndMergeTraktProgress();
+    }
+  }, [isAuthenticated, fetchAndMergeTraktProgress]);
 
   return {
     isAuthenticated,
@@ -152,6 +334,13 @@ export function useTraktIntegration() {
     isEpisodeWatched,
     markMovieAsWatched,
     markEpisodeAsWatched,
-    refreshAuthStatus
+    refreshAuthStatus,
+    startWatching,
+    updateProgress,
+    stopWatching,
+    syncProgress, // legacy
+    getTraktPlaybackProgress,
+    syncAllProgress,
+    fetchAndMergeTraktProgress
   };
 } 

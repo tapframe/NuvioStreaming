@@ -592,33 +592,33 @@ const LibraryScreen = () => {
 
     if (allItems.length === 0) {
       return (
-        <View style={styles.emptyContainer}>
-          <MaterialIcons 
-            name="video-library" 
-            size={80} 
-            color={currentTheme.colors.mediumGray}
-            style={{ opacity: 0.7 }}
-          />
-          <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>Your library is empty</Text>
-          <Text style={[styles.emptySubtext, { color: currentTheme.colors.mediumGray }]}>
-            Add content to your library to keep track of what you're watching
-          </Text>
-          <TouchableOpacity 
-            style={[styles.exploreButton, { 
-              backgroundColor: currentTheme.colors.primary,
-              shadowColor: currentTheme.colors.black
-            }]}
-            onPress={() => navigation.navigate('Discover')}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.exploreButtonText, { color: currentTheme.colors.white }]}>Explore Content</Text>
-          </TouchableOpacity>
-        </View>
+            <View style={styles.emptyContainer}>
+              <MaterialIcons 
+                name="video-library" 
+                size={80} 
+                color={currentTheme.colors.mediumGray}
+                style={{ opacity: 0.7 }}
+              />
+              <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>Your library is empty</Text>
+              <Text style={[styles.emptySubtext, { color: currentTheme.colors.mediumGray }]}>
+                Add content to your library to keep track of what you're watching
+              </Text>
+              <TouchableOpacity 
+                style={[styles.exploreButton, { 
+                  backgroundColor: currentTheme.colors.primary,
+                  shadowColor: currentTheme.colors.black
+                }]}
+                onPress={() => navigation.navigate('Discover')}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.exploreButtonText, { color: currentTheme.colors.white }]}>Explore Content</Text>
+              </TouchableOpacity>
+            </View>
       );
     }
 
     return (
-      <FlatList
+            <FlatList
         data={allItems}
         renderItem={({ item }) => {
           if (item.type === 'trakt-folder') {
@@ -626,16 +626,16 @@ const LibraryScreen = () => {
           }
           return renderItem({ item: item as LibraryItem });
         }}
-        keyExtractor={item => item.id}
-        numColumns={2}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        columnWrapperStyle={styles.columnWrapper}
-        initialNumToRender={6}
-        maxToRenderPerBatch={6}
-        windowSize={5}
-        removeClippedSubviews={Platform.OS === 'android'}
-      />
+              keyExtractor={item => item.id}
+              numColumns={2}
+              contentContainerStyle={styles.listContainer}
+              showsVerticalScrollIndicator={false}
+              columnWrapperStyle={styles.columnWrapper}
+              initialNumToRender={6}
+              maxToRenderPerBatch={6}
+              windowSize={5}
+              removeClippedSubviews={Platform.OS === 'android'}
+            />
     );
   };
 
