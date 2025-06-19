@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { styles } from '../utils/playerStyles';
 import { formatTime } from '../utils/playerUtils';
+import { logger } from '../../../utils/logger';
 
 interface ResumeOverlayProps {
   showResumeOverlay: boolean;
@@ -34,7 +35,16 @@ export const ResumeOverlay: React.FC<ResumeOverlayProps> = ({
   handleResume,
   handleStartFromBeginning,
 }) => {
-  if (!showResumeOverlay || resumePosition === null) return null;
+  useEffect(() => {
+    logger.log(`[ResumeOverlay] Props changed: showOverlay=${showResumeOverlay}, resumePosition=${resumePosition}, duration=${duration}, title=${title}`);
+  }, [showResumeOverlay, resumePosition, duration, title]);
+
+  if (!showResumeOverlay || resumePosition === null) {
+    logger.log(`[ResumeOverlay] Not showing overlay: showOverlay=${showResumeOverlay}, resumePosition=${resumePosition}`);
+    return null;
+  }
+  
+  logger.log(`[ResumeOverlay] Rendering overlay for ${title} at ${resumePosition}s`);
   
   return (
     <View style={styles.resumeOverlay}>

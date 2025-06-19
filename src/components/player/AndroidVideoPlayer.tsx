@@ -260,24 +260,42 @@ const AndroidVideoPlayer: React.FC = () => {
     const loadWatchProgress = async () => {
       if (id && type) {
         try {
+          logger.log(`[AndroidVideoPlayer] Loading watch progress for ${type}:${id}${episodeId ? `:${episodeId}` : ''}`);
           const savedProgress = await storageService.getWatchProgress(id, type, episodeId);
+          logger.log(`[AndroidVideoPlayer] Saved progress:`, savedProgress);
+          
           if (savedProgress) {
             const progressPercent = (savedProgress.currentTime / savedProgress.duration) * 100;
+            logger.log(`[AndroidVideoPlayer] Progress: ${progressPercent.toFixed(1)}% (${savedProgress.currentTime}/${savedProgress.duration})`);
+            
             if (progressPercent < 95) {
               setResumePosition(savedProgress.currentTime);
+              logger.log(`[AndroidVideoPlayer] Set resume position to: ${savedProgress.currentTime}`);
+              
               const pref = await AsyncStorage.getItem(RESUME_PREF_KEY);
+              logger.log(`[AndroidVideoPlayer] Resume preference: ${pref}`);
+              
               if (pref === RESUME_PREF.ALWAYS_RESUME) {
                 setInitialPosition(savedProgress.currentTime);
+                logger.log(`[AndroidVideoPlayer] Auto-resuming due to preference`);
               } else if (pref === RESUME_PREF.ALWAYS_START_OVER) {
                 setInitialPosition(0);
+                logger.log(`[AndroidVideoPlayer] Auto-starting over due to preference`);
               } else {
                 setShowResumeOverlay(true);
+                logger.log(`[AndroidVideoPlayer] Showing resume overlay`);
               }
+            } else {
+              logger.log(`[AndroidVideoPlayer] Progress too high (${progressPercent.toFixed(1)}%), not showing resume overlay`);
             }
+          } else {
+            logger.log(`[AndroidVideoPlayer] No saved progress found`);
           }
         } catch (error) {
           logger.error('[AndroidVideoPlayer] Error loading watch progress:', error);
         }
+      } else {
+        logger.log(`[AndroidVideoPlayer] Missing id or type: id=${id}, type=${type}`);
       }
     };
     loadWatchProgress();
@@ -420,8 +438,9 @@ const AndroidVideoPlayer: React.FC = () => {
       logger.log('[AndroidVideoPlayer] Video loaded:', data);
     }
     if (isMounted.current) {
+      const videoDuration = data.duration;
       if (data.duration > 0) {
-        setDuration(data.duration);
+        setDuration(videoDuration);
       }
       
       // Set aspect ratio from video dimensions
@@ -452,14 +471,20 @@ const AndroidVideoPlayer: React.FC = () => {
       setIsVideoLoaded(true);
       setIsPlayerReady(true);
       
-      // Start Trakt watching session when video loads
-      traktAutosync.handlePlaybackStart(currentTime, data.duration || duration);
+      // Start Trakt watching session when video loads with proper duration
+      if (videoDuration > 0) {
+        traktAutosync.handlePlaybackStart(currentTime, videoDuration);
+      }
       
       if (initialPosition && !isInitialSeekComplete) {
+        logger.log(`[AndroidVideoPlayer] Seeking to initial position: ${initialPosition}s (duration: ${videoDuration}s)`);
         setTimeout(() => {
-          if (videoRef.current && duration > 0 && isMounted.current) {
+          if (videoRef.current && videoDuration > 0 && isMounted.current) {
             seekToTime(initialPosition);
             setIsInitialSeekComplete(true);
+            logger.log(`[AndroidVideoPlayer] Initial seek completed to: ${initialPosition}s`);
+          } else {
+            logger.error(`[AndroidVideoPlayer] Initial seek failed: videoRef=${!!videoRef.current}, duration=${videoDuration}, mounted=${isMounted.current}`);
           }
         }, 1000);
       }
@@ -544,16 +569,24 @@ const AndroidVideoPlayer: React.FC = () => {
   useEffect(() => {
     const loadResumePreference = async () => {
       try {
+        logger.log(`[AndroidVideoPlayer] Loading resume preference, resumePosition=${resumePosition}`);
         const pref = await AsyncStorage.getItem(RESUME_PREF_KEY);
+        logger.log(`[AndroidVideoPlayer] Resume preference loaded: ${pref}`);
+        
         if (pref) {
           setResumePreference(pref);
           if (pref === RESUME_PREF.ALWAYS_RESUME && resumePosition !== null) {
+            logger.log(`[AndroidVideoPlayer] Auto-resuming due to preference`);
             setShowResumeOverlay(false);
             setInitialPosition(resumePosition);
           } else if (pref === RESUME_PREF.ALWAYS_START_OVER) {
+            logger.log(`[AndroidVideoPlayer] Auto-starting over due to preference`);
             setShowResumeOverlay(false);
             setInitialPosition(0);
           }
+          // Don't override overlay if no specific preference or preference doesn't match
+        } else {
+          logger.log(`[AndroidVideoPlayer] No resume preference found, keeping overlay state`);
         }
       } catch (error) {
         logger.error('[AndroidVideoPlayer] Error loading resume preference:', error);
