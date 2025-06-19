@@ -365,7 +365,7 @@ const TraktSettingsScreen: React.FC = () => {
                   styles.settingDescription,
                   { color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark }
                 ]}>
-                  Coming soon
+                  Use "Sync Now" to import your watch history and progress from Trakt
                 </Text>
               </View>
               <TouchableOpacity

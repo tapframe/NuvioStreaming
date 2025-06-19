@@ -303,8 +303,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   title: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 19,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   viewAllButton: {
     flexDirection: 'row',
