@@ -508,7 +508,7 @@ const VideoPlayer: React.FC = () => {
         }, 1000);
       }
       completeOpeningAnimation();
-      controlsTimeout.current = setTimeout(hideControls, 3000);
+      controlsTimeout.current = setTimeout(hideControls, 5000);
     }
   };
 
@@ -681,7 +681,7 @@ const VideoPlayer: React.FC = () => {
         useNativeDriver: true,
       }).start();
       if (newShowControls) {
-        controlsTimeout.current = setTimeout(hideControls, 3000);
+        controlsTimeout.current = setTimeout(hideControls, 5000);
       }
       return newShowControls;
     });
