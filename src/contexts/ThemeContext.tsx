@@ -45,9 +45,9 @@ export const DEFAULT_THEMES: Theme[] = [
     name: 'Moonlight',
     colors: {
       ...defaultColors,
-      primary: '#a786df',
-      secondary: '#5e72e4',
-      darkBackground: '#0f0f1a',
+      primary: '#c084fc',
+      secondary: '#60a5fa',
+      darkBackground: '#060609',
     },
     isEditable: false,
   },

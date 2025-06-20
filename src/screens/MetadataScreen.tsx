@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -24,35 +24,41 @@ import Animated, {
   useAnimatedStyle,
   interpolate,
   Extrapolate,
+  useSharedValue,
+  withTiming,
 } from 'react-native-reanimated';
 import { RouteProp } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useSettings } from '../hooks/useSettings';
+import { MetadataLoadingScreen } from '../components/loading/MetadataLoadingScreen';
 
-// Import our new components and hooks
+// Import our optimized components and hooks
 import HeroSection from '../components/metadata/HeroSection';
 import FloatingHeader from '../components/metadata/FloatingHeader';
 import MetadataDetails from '../components/metadata/MetadataDetails';
 import { useMetadataAnimations } from '../hooks/useMetadataAnimations';
 import { useMetadataAssets } from '../hooks/useMetadataAssets';
 import { useWatchProgress } from '../hooks/useWatchProgress';
+import { TraktService, TraktPlaybackItem } from '../services/traktService';
 
 const { height } = Dimensions.get('window');
 
-const MetadataScreen = () => {
-  const route = useRoute<RouteProp<Record<string, RouteParams & { episodeId?: string }>, string>>();
+const MetadataScreen: React.FC = () => {
+  const route = useRoute<RouteProp<Record<string, RouteParams & { episodeId?: string; addonId?: string }>, string>>();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
-  const { id, type, episodeId } = route.params;
+  const { id, type, episodeId, addonId } = route.params;
   
-  // Add settings hook
+  // Consolidated hooks for better performance
   const { settings } = useSettings();
-
-  // Get theme context
   const { currentTheme } = useTheme();
-
-  // Get safe area insets
   const { top: safeAreaTop } = useSafeAreaInsets();
+
+  // Optimized state management - reduced state variables
+  const [isContentReady, setIsContentReady] = useState(false);
+  const [showSkeleton, setShowSkeleton] = useState(true);
+  const transitionOpacity = useSharedValue(0);
+  const skeletonOpacity = useSharedValue(1);
 
   const {
     metadata,
@@ -72,331 +78,357 @@ const MetadataScreen = () => {
     loadingRecommendations,
     setMetadata,
     imdbId,
-  } = useMetadata({ id, type });
+  } = useMetadata({ id, type, addonId });
 
-  // Use our new hooks
-  const {
-    watchProgress,
-    getEpisodeDetails,
-    getPlayButtonText,
-  } = useWatchProgress(id, type as 'movie' | 'series', episodeId, episodes);
+  // Optimized hooks with memoization
+  const watchProgressData = useWatchProgress(id, type as 'movie' | 'series', episodeId, episodes);
+  const assetData = useMetadataAssets(metadata, id, type, imdbId, settings, setMetadata);
+  const animations = useMetadataAnimations(safeAreaTop, watchProgressData.watchProgress);
 
-  const {
-    bannerImage,
-    loadingBanner,
-    logoLoadError,
-    setLogoLoadError,
-    setBannerImage,
-  } = useMetadataAssets(metadata, id, type, imdbId, settings, setMetadata);
+  // Fetch and log Trakt progress data when entering the screen
+  useEffect(() => {
+    const fetchTraktProgress = async () => {
+      try {
+        const traktService = TraktService.getInstance();
+        const isAuthenticated = await traktService.isAuthenticated();
+        
+        console.log(`[MetadataScreen] === TRAKT PROGRESS DATA FOR ${type.toUpperCase()}: ${metadata?.name || id} ===`);
+        console.log(`[MetadataScreen] IMDB ID: ${id}`);
+        console.log(`[MetadataScreen] Trakt authenticated: ${isAuthenticated}`);
+        
+        if (!isAuthenticated) {
+          console.log(`[MetadataScreen] Not authenticated with Trakt, no progress data available`);
+          return;
+        }
 
-  const animations = useMetadataAnimations(safeAreaTop, watchProgress);
+        // Get all playback progress from Trakt
+        const allProgress = await traktService.getPlaybackProgress();
+        console.log(`[MetadataScreen] Total Trakt progress items: ${allProgress.length}`);
+        
+        if (allProgress.length === 0) {
+          console.log(`[MetadataScreen] No Trakt progress data found`);
+          return;
+        }
 
-  // Add wrapper for toggleLibrary that includes haptic feedback
-  const handleToggleLibrary = useCallback(() => {
-    // Trigger appropriate haptic feedback based on action
-    if (inLibrary) {
-      // Removed from library - light impact
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } else {
-      // Added to library - success feedback
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        // Filter progress for current content
+        let relevantProgress: TraktPlaybackItem[] = [];
+        
+        if (type === 'movie') {
+          relevantProgress = allProgress.filter(item => 
+            item.type === 'movie' && 
+            item.movie?.ids.imdb === id.replace('tt', '')
+          );
+        } else if (type === 'series') {
+          relevantProgress = allProgress.filter(item => 
+            item.type === 'episode' && 
+            item.show?.ids.imdb === id.replace('tt', '')
+          );
+        }
+
+        console.log(`[MetadataScreen] Relevant progress items for this ${type}: ${relevantProgress.length}`);
+        
+        if (relevantProgress.length === 0) {
+          console.log(`[MetadataScreen] No Trakt progress found for this ${type}`);
+          return;
+        }
+
+        // Log detailed progress information
+        relevantProgress.forEach((item, index) => {
+          console.log(`[MetadataScreen] --- Progress Item ${index + 1} ---`);
+          console.log(`[MetadataScreen] Type: ${item.type}`);
+          console.log(`[MetadataScreen] Progress: ${item.progress.toFixed(2)}%`);
+          console.log(`[MetadataScreen] Paused at: ${item.paused_at}`);
+          console.log(`[MetadataScreen] Trakt ID: ${item.id}`);
+          
+          if (item.movie) {
+            console.log(`[MetadataScreen] Movie: ${item.movie.title} (${item.movie.year})`);
+            console.log(`[MetadataScreen] Movie IMDB: tt${item.movie.ids.imdb}`);
+            console.log(`[MetadataScreen] Movie TMDB: ${item.movie.ids.tmdb}`);
+          }
+          
+          if (item.episode && item.show) {
+            console.log(`[MetadataScreen] Show: ${item.show.title} (${item.show.year})`);
+            console.log(`[MetadataScreen] Show IMDB: tt${item.show.ids.imdb}`);
+            console.log(`[MetadataScreen] Episode: S${item.episode.season}E${item.episode.number} - ${item.episode.title}`);
+            console.log(`[MetadataScreen] Episode IMDB: ${item.episode.ids.imdb || 'N/A'}`);
+            console.log(`[MetadataScreen] Episode TMDB: ${item.episode.ids.tmdb || 'N/A'}`);
+          }
+          
+          console.log(`[MetadataScreen] Raw item:`, JSON.stringify(item, null, 2));
+        });
+
+        // Find most recent progress if multiple episodes
+        if (type === 'series' && relevantProgress.length > 1) {
+          const mostRecent = relevantProgress.sort((a, b) => 
+            new Date(b.paused_at).getTime() - new Date(a.paused_at).getTime()
+          )[0];
+          
+          console.log(`[MetadataScreen] === MOST RECENT EPISODE PROGRESS ===`);
+          if (mostRecent.episode && mostRecent.show) {
+            console.log(`[MetadataScreen] Most recent: S${mostRecent.episode.season}E${mostRecent.episode.number} - ${mostRecent.episode.title}`);
+            console.log(`[MetadataScreen] Progress: ${mostRecent.progress.toFixed(2)}%`);
+            console.log(`[MetadataScreen] Watched on: ${new Date(mostRecent.paused_at).toLocaleString()}`);
+          }
+        }
+
+        console.log(`[MetadataScreen] === END TRAKT PROGRESS DATA ===`);
+        
+      } catch (error) {
+        console.error(`[MetadataScreen] Failed to fetch Trakt progress:`, error);
+      }
+    };
+
+    // Only fetch when we have metadata loaded
+    if (metadata && id) {
+      fetchTraktProgress();
     }
-    
-    // Call the original toggleLibrary function
+  }, [metadata, id, type]);
+
+  // Memoized derived values for performance
+  const isReady = useMemo(() => !loading && metadata && !metadataError, [loading, metadata, metadataError]);
+  
+  // Smooth skeleton to content transition
+  useEffect(() => {
+    if (isReady && !isContentReady) {
+      // Small delay to ensure skeleton is rendered before starting transition
+      setTimeout(() => {
+        // Start fade out skeleton and fade in content simultaneously
+        skeletonOpacity.value = withTiming(0, { duration: 300 });
+        transitionOpacity.value = withTiming(1, { duration: 400 });
+        
+        // Hide skeleton after fade out completes
+        setTimeout(() => {
+          setShowSkeleton(false);
+          setIsContentReady(true);
+        }, 300);
+      }, 100);
+    } else if (!isReady && isContentReady) {
+      setIsContentReady(false);
+      setShowSkeleton(true);
+      transitionOpacity.value = 0;
+      skeletonOpacity.value = 1;
+    }
+  }, [isReady, isContentReady]);
+
+  // Optimized callback functions with reduced dependencies
+  const handleToggleLibrary = useCallback(() => {
+    Haptics.impactAsync(inLibrary ? Haptics.ImpactFeedbackStyle.Light : Haptics.ImpactFeedbackStyle.Medium);
     toggleLibrary();
   }, [inLibrary, toggleLibrary]);
 
-  // Add wrapper for season change with distinctive haptic feedback
   const handleSeasonChangeWithHaptics = useCallback((seasonNumber: number) => {
-    // Change to Light impact for a more subtle feedback
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
-    // Wait a tiny bit before changing season, making the feedback more noticeable
-    setTimeout(() => {
-      handleSeasonChange(seasonNumber);
-    }, 10);
+    handleSeasonChange(seasonNumber);
   }, [handleSeasonChange]);
 
-  // Handler functions
   const handleShowStreams = useCallback(() => {
+    const { watchProgress } = watchProgressData;
     if (type === 'series') {
-      // If we have watch progress with an episodeId, use that
-      if (watchProgress?.episodeId) {
-        navigation.navigate('Streams', { 
-          id, 
-          type, 
-          episodeId: watchProgress.episodeId 
-        });
-        return;
-      }
+      const targetEpisodeId = watchProgress?.episodeId || episodeId || (episodes.length > 0 ? 
+        (episodes[0].stremioId || `${id}:${episodes[0].season_number}:${episodes[0].episode_number}`) : undefined);
       
-      // If we have a specific episodeId from route params, use that
-      if (episodeId) {
-        navigation.navigate('Streams', { id, type, episodeId });
-        return;
-      }
-      
-      // Otherwise, if we have episodes, start with the first one
-      if (episodes.length > 0) {
-        const firstEpisode = episodes[0];
-        const newEpisodeId = firstEpisode.stremioId || `${id}:${firstEpisode.season_number}:${firstEpisode.episode_number}`;
-        navigation.navigate('Streams', { id, type, episodeId: newEpisodeId });
+      if (targetEpisodeId) {
+        navigation.navigate('Streams', { id, type, episodeId: targetEpisodeId });
         return;
       }
     }
-    
     navigation.navigate('Streams', { id, type, episodeId });
-  }, [navigation, id, type, episodes, episodeId, watchProgress]);
-
-  const handleSelectCastMember = useCallback((castMember: any) => {
-    // Future implementation
-  }, []);
+  }, [navigation, id, type, episodes, episodeId, watchProgressData.watchProgress]);
 
   const handleEpisodeSelect = useCallback((episode: Episode) => {
     const episodeId = episode.stremioId || `${id}:${episode.season_number}:${episode.episode_number}`;
-    navigation.navigate('Streams', {
-      id,
-      type,
-      episodeId
-    });
+    navigation.navigate('Streams', { id, type, episodeId });
   }, [navigation, id, type]);
 
-  const handleBack = useCallback(() => {
-    navigation.goBack();
-  }, [navigation]);
+  const handleBack = useCallback(() => navigation.goBack(), [navigation]);
+  const handleSelectCastMember = useCallback(() => {}, []); // Simplified for performance
 
-  // Animated styles
-  const containerAnimatedStyle = useAnimatedStyle(() => ({
-    flex: 1,
-    transform: [{ scale: animations.screenScale.value }],
-    opacity: animations.screenOpacity.value
-  }));
+  // Ultra-optimized animated styles - minimal calculations
+  const containerStyle = useAnimatedStyle(() => ({
+    opacity: animations.screenOpacity.value,
+  }), []);
 
-  const contentAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: animations.contentTranslateY.value }],
-    opacity: interpolate(
-      animations.contentTranslateY.value,
-      [60, 0],
-      [0, 1],
-      Extrapolate.CLAMP
-    )
-  }));
+  const contentStyle = useAnimatedStyle(() => ({
+    opacity: animations.contentOpacity.value,
+    transform: [{ translateY: animations.uiElementsTranslateY.value }]
+  }), []);
 
-  if (loading) {
+  const transitionStyle = useAnimatedStyle(() => ({
+    opacity: transitionOpacity.value,
+  }), []);
+
+  const skeletonStyle = useAnimatedStyle(() => ({
+    opacity: skeletonOpacity.value,
+  }), []);
+
+  // Memoized error component for performance
+  const ErrorComponent = useMemo(() => {
+    if (!metadataError) return null;
+    
     return (
       <SafeAreaView 
-        style={[styles.container, {
-          backgroundColor: currentTheme.colors.darkBackground
-        }]}
+        style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}
         edges={['bottom']}
       >
-        <StatusBar
-          translucent={true}
-          backgroundColor="transparent"
-          barStyle="light-content"
-        />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={currentTheme.colors.primary} />
-          <Text style={[styles.loadingText, {
-            color: currentTheme.colors.mediumEmphasis
-          }]}>
-            Loading content...
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (metadataError || !metadata) {
-    return (
-      <SafeAreaView 
-        style={[styles.container, {
-          backgroundColor: currentTheme.colors.darkBackground
-        }]}
-        edges={['bottom']}
-      >
-        <StatusBar
-          translucent={true}
-          backgroundColor="transparent"
-          barStyle="light-content"
-        />
+        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
         <View style={styles.errorContainer}>
-          <MaterialIcons 
-            name="error-outline" 
-            size={64} 
-            color={currentTheme.colors.textMuted} 
-          />
-          <Text style={[styles.errorText, {
-            color: currentTheme.colors.highEmphasis
-          }]}>
+          <MaterialIcons name="error-outline" size={64} color={currentTheme.colors.textMuted} />
+          <Text style={[styles.errorText, { color: currentTheme.colors.highEmphasis }]}>
             {metadataError || 'Content not found'}
           </Text>
           <TouchableOpacity
-            style={[
-              styles.retryButton,
-              { backgroundColor: currentTheme.colors.primary }
-            ]}
+            style={[styles.retryButton, { backgroundColor: currentTheme.colors.primary }]}
             onPress={loadMetadata}
           >
-            <MaterialIcons 
-              name="refresh" 
-              size={20} 
-              color={currentTheme.colors.white}
-              style={{ marginRight: 8 }}
-            />
+            <MaterialIcons name="refresh" size={20} color={currentTheme.colors.white} style={{ marginRight: 8 }} />
             <Text style={styles.retryButtonText}>Try Again</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[
-              styles.backButton,
-              { borderColor: currentTheme.colors.primary }
-            ]}
+            style={[styles.backButton, { borderColor: currentTheme.colors.primary }]}
             onPress={handleBack}
           >
-            <Text style={[styles.backButtonText, { color: currentTheme.colors.primary }]}>
-              Go Back
-            </Text>
+            <Text style={[styles.backButtonText, { color: currentTheme.colors.primary }]}>Go Back</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
+  }, [metadataError, currentTheme, loadMetadata, handleBack]);
+
+  // Show error if exists
+  if (metadataError || (!loading && !metadata)) {
+    return ErrorComponent;
   }
 
   return (
-    <SafeAreaView 
-      style={[containerAnimatedStyle, styles.container, {
-        backgroundColor: currentTheme.colors.darkBackground
-      }]}
-      edges={['bottom']}
-    >
-      <StatusBar
-        translucent={true}
-        backgroundColor="transparent"
-        barStyle="light-content"
-        animated={true}
-      />
-      <Animated.View style={containerAnimatedStyle}>
-        {/* Floating Header */}
-        <FloatingHeader 
-          metadata={metadata}
-          logoLoadError={logoLoadError}
-          handleBack={handleBack}
-          handleToggleLibrary={handleToggleLibrary}
-          inLibrary={inLibrary}
-          headerOpacity={animations.headerOpacity}
-          headerElementsY={animations.headerElementsY}
-          headerElementsOpacity={animations.headerElementsOpacity}
-          safeAreaTop={safeAreaTop}
-          setLogoLoadError={setLogoLoadError}
-        />
-
-        <Animated.ScrollView
-          style={styles.scrollView}
-          showsVerticalScrollIndicator={false}
-          onScroll={animations.scrollHandler}
-          scrollEventThrottle={16}
+    <View style={StyleSheet.absoluteFill}>
+      {/* Skeleton Loading Screen - with fade out transition */}
+      {showSkeleton && (
+        <Animated.View 
+          style={[StyleSheet.absoluteFill, skeletonStyle]}
+          pointerEvents={metadata ? 'none' : 'auto'}
         >
-          {/* Hero Section */}
-          <HeroSection 
-            metadata={metadata}
-            bannerImage={bannerImage}
-            loadingBanner={loadingBanner}
-            logoLoadError={logoLoadError}
-            scrollY={animations.scrollY}
-            dampedScrollY={animations.dampedScrollY}
-            heroHeight={animations.heroHeight}
-            heroOpacity={animations.heroOpacity}
-            heroScale={animations.heroScale}
-            logoOpacity={animations.logoOpacity}
-            logoScale={animations.logoScale}
-            genresOpacity={animations.genresOpacity}
-            genresTranslateY={animations.genresTranslateY}
-            buttonsOpacity={animations.buttonsOpacity}
-            buttonsTranslateY={animations.buttonsTranslateY}
-            watchProgressOpacity={animations.watchProgressOpacity}
-            watchProgressScaleY={animations.watchProgressScaleY}
-                    watchProgress={watchProgress}
-                    type={type as 'movie' | 'series'}
-                    getEpisodeDetails={getEpisodeDetails}
-                    handleShowStreams={handleShowStreams}
-            handleToggleLibrary={handleToggleLibrary}
-                    inLibrary={inLibrary}
-                    id={id}
-                    navigation={navigation}
-            getPlayButtonText={getPlayButtonText}
-            setBannerImage={setBannerImage}
-            setLogoLoadError={setLogoLoadError}
-                  />
+          <MetadataLoadingScreen type={metadata?.type === 'movie' ? 'movie' : 'series'} />
+        </Animated.View>
+      )}
 
-          {/* Main Content */}
-          <Animated.View style={contentAnimatedStyle}>
-            {/* Metadata Details */}
-            <MetadataDetails 
+      {/* Main Content - with fade in transition */}
+      {metadata && (
+        <Animated.View 
+          style={[StyleSheet.absoluteFill, transitionStyle]}
+          pointerEvents={metadata ? 'auto' : 'none'}
+        >
+          <SafeAreaView 
+            style={[containerStyle, styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}
+            edges={['bottom']}
+          >
+            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" animated />
+            
+            {/* Floating Header - Optimized */}
+            <FloatingHeader 
               metadata={metadata}
-              imdbId={imdbId}
-              type={type as 'movie' | 'series'}
-              renderRatings={() => imdbId ? (
-                <RatingsSection 
-                  imdbId={imdbId}
-                  type={type === 'series' ? 'show' : 'movie'} 
-                />
-              ) : null}
+              logoLoadError={assetData.logoLoadError}
+              handleBack={handleBack}
+              handleToggleLibrary={handleToggleLibrary}
+              headerElementsY={animations.headerElementsY}
+              inLibrary={inLibrary}
+              headerOpacity={animations.headerOpacity}
+              headerElementsOpacity={animations.headerElementsOpacity}
+              safeAreaTop={safeAreaTop}
+              setLogoLoadError={assetData.setLogoLoadError}
             />
 
-            {/* Cast Section */}
-            <CastSection
-              cast={cast}
-              loadingCast={loadingCast}
-              onSelectCastMember={handleSelectCastMember}
-            />
-
-            {/* More Like This Section - Only for movies */}
-            {type === 'movie' && (
-              <MoreLikeThisSection 
-                recommendations={recommendations}
-                loadingRecommendations={loadingRecommendations}
-              />
-            )}
-
-            {/* Type-specific content */}
-            {type === 'series' ? (
-              <SeriesContent
-                episodes={episodes}
-                selectedSeason={selectedSeason}
-                loadingSeasons={loadingSeasons}
-                onSeasonChange={handleSeasonChangeWithHaptics}
-                onSelectEpisode={handleEpisodeSelect}
-                groupedEpisodes={groupedEpisodes}
+            <Animated.ScrollView
+              style={styles.scrollView}
+              showsVerticalScrollIndicator={false}
+              onScroll={animations.scrollHandler}
+              scrollEventThrottle={16}
+              bounces={false}
+              overScrollMode="never"
+              contentContainerStyle={styles.scrollContent}
+            >
+              {/* Hero Section - Optimized */}
+              <HeroSection 
                 metadata={metadata}
+                bannerImage={assetData.bannerImage}
+                loadingBanner={assetData.loadingBanner}
+                logoLoadError={assetData.logoLoadError}
+                scrollY={animations.scrollY}
+                heroHeight={animations.heroHeight}
+                heroOpacity={animations.heroOpacity}
+                logoOpacity={animations.logoOpacity}
+                buttonsOpacity={animations.buttonsOpacity}
+                buttonsTranslateY={animations.buttonsTranslateY}
+                watchProgressOpacity={animations.watchProgressOpacity}
+                watchProgressWidth={animations.watchProgressWidth}
+                watchProgress={watchProgressData.watchProgress}
+                type={type as 'movie' | 'series'}
+                getEpisodeDetails={watchProgressData.getEpisodeDetails}
+                handleShowStreams={handleShowStreams}
+                handleToggleLibrary={handleToggleLibrary}
+                inLibrary={inLibrary}
+                id={id}
+                navigation={navigation}
+                getPlayButtonText={watchProgressData.getPlayButtonText}
+                setBannerImage={assetData.setBannerImage}
+                setLogoLoadError={assetData.setLogoLoadError}
               />
-            ) : (
-              <MovieContent metadata={metadata} />
-            )}
-          </Animated.View>
-        </Animated.ScrollView>
-      </Animated.View>
-    </SafeAreaView>
+
+              {/* Main Content - Optimized */}
+              <Animated.View style={contentStyle}>
+                <MetadataDetails 
+                  metadata={metadata}
+                  imdbId={imdbId}
+                  type={type as 'movie' | 'series'}
+                  renderRatings={() => imdbId ? (
+                    <RatingsSection imdbId={imdbId} type={type === 'series' ? 'show' : 'movie'} />
+                  ) : null}
+                />
+
+                <CastSection
+                  cast={cast}
+                  loadingCast={loadingCast}
+                  onSelectCastMember={handleSelectCastMember}
+                />
+
+                {type === 'movie' && (
+                  <MoreLikeThisSection 
+                    recommendations={recommendations}
+                    loadingRecommendations={loadingRecommendations}
+                  />
+                )}
+
+                {type === 'series' ? (
+                  <SeriesContent
+                    episodes={episodes}
+                    selectedSeason={selectedSeason}
+                    loadingSeasons={loadingSeasons}
+                    onSeasonChange={handleSeasonChangeWithHaptics}
+                    onSelectEpisode={handleEpisodeSelect}
+                    groupedEpisodes={groupedEpisodes}
+                    metadata={metadata || undefined}
+                  />
+                ) : (
+                  metadata && <MovieContent metadata={metadata} />
+                )}
+              </Animated.View>
+            </Animated.ScrollView>
+          </SafeAreaView>
+        </Animated.View>
+      )}
+    </View>
   );
 };
 
+// Optimized styles with minimal properties
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'transparent',
-    paddingTop: 0,
   },
   scrollView: {
     flex: 1,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
+  scrollContent: {
+    flexGrow: 1,
   },
   errorContainer: {
     flex: 1,
@@ -422,13 +454,13 @@ const styles = StyleSheet.create({
   retryButtonText: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#fff',
   },
   backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
+    borderWidth: 2,
   },
   backButtonText: {
     fontSize: 16,

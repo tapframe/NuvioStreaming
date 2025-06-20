@@ -14,14 +14,53 @@ interface CatalogSectionProps {
 }
 
 const { width } = Dimensions.get('window');
-const POSTER_WIDTH = (width - 50) / 3;
+
+// Dynamic poster calculation based on screen width - show 1/4 of next poster
+const calculatePosterLayout = (screenWidth: number) => {
+  const MIN_POSTER_WIDTH = 100; // Reduced minimum for more posters
+  const MAX_POSTER_WIDTH = 130; // Reduced maximum for more posters
+  const LEFT_PADDING = 16; // Left padding
+  const SPACING = 8; // Space between posters
+  
+  // Calculate available width for posters (reserve space for left padding)
+  const availableWidth = screenWidth - LEFT_PADDING;
+  
+  // Try different numbers of full posters to find the best fit
+  let bestLayout = { numFullPosters: 3, posterWidth: 120 };
+  
+  for (let n = 3; n <= 6; n++) {
+    // Calculate poster width needed for N full posters + 0.25 partial poster
+    // Formula: N * posterWidth + (N-1) * spacing + 0.25 * posterWidth = availableWidth - rightPadding
+    // Simplified: posterWidth * (N + 0.25) + (N-1) * spacing = availableWidth - rightPadding
+    // We'll use minimal right padding (8px) to maximize space
+    const usableWidth = availableWidth - 8;
+    const posterWidth = (usableWidth - (n - 1) * SPACING) / (n + 0.25);
+    
+    console.log(`[CatalogSection] Testing ${n} posters: width=${posterWidth.toFixed(1)}px, screen=${screenWidth}px`);
+    
+    if (posterWidth >= MIN_POSTER_WIDTH && posterWidth <= MAX_POSTER_WIDTH) {
+      bestLayout = { numFullPosters: n, posterWidth };
+      console.log(`[CatalogSection] Selected layout: ${n} full posters at ${posterWidth.toFixed(1)}px each`);
+    }
+  }
+  
+  return {
+    numFullPosters: bestLayout.numFullPosters,
+    posterWidth: bestLayout.posterWidth,
+    spacing: SPACING,
+    partialPosterWidth: bestLayout.posterWidth * 0.25 // 1/4 of next poster
+  };
+};
+
+const posterLayout = calculatePosterLayout(width);
+const POSTER_WIDTH = posterLayout.posterWidth;
 
 const CatalogSection = ({ catalog }: CatalogSectionProps) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
 
   const handleContentPress = (id: string, type: string) => {
-    navigation.navigate('Metadata', { id, type });
+    navigation.navigate('Metadata', { id, type, addonId: catalog.addon });
   };
 
   const renderContentItem = ({ item, index }: { item: StreamingContent, index: number }) => {
@@ -73,18 +112,18 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
         keyExtractor={(item) => `${item.id}-${item.type}`}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.catalogList}
-        snapToInterval={POSTER_WIDTH + 12}
+        contentContainerStyle={[styles.catalogList, { paddingRight: 16 - posterLayout.partialPosterWidth }]}
+        snapToInterval={POSTER_WIDTH + 8}
         decelerationRate="fast"
         snapToAlignment="start"
-        ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
+        ItemSeparatorComponent={() => <View style={{ width: 8 }} />}
         initialNumToRender={4}
         maxToRenderPerBatch={4}
         windowSize={5}
         removeClippedSubviews={Platform.OS === 'android'}
         getItemLayout={(data, index) => ({
-          length: POSTER_WIDTH + 12,
-          offset: (POSTER_WIDTH + 12) * index,
+          length: POSTER_WIDTH + 8,
+          offset: (POSTER_WIDTH + 8) * index,
           index,
         })}
       />
@@ -107,19 +146,19 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   catalogTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 6,
+    fontSize: 19,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+    marginBottom: 4,
   },
   titleUnderline: {
     position: 'absolute',
-    bottom: -4,
+    bottom: -2,
     left: 0,
-    width: 60,
-    height: 3,
-    borderRadius: 1.5,
+    width: 35,
+    height: 2,
+    borderRadius: 1,
+    opacity: 0.8,
   },
   seeAllButton: {
     flexDirection: 'row',

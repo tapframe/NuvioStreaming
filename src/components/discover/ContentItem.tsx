@@ -51,7 +51,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
   },
   posterContainer: {
-    borderRadius: 16,
+    borderRadius: 8,
     overflow: 'hidden',
     backgroundColor: 'rgba(255,255,255,0.03)',
     elevation: 5,

@@ -8,6 +8,7 @@ import {
   Platform,
   TouchableOpacity,
   StatusBar,
+  Switch,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSettings, AppSettings } from '../hooks/useSettings';
@@ -217,6 +218,68 @@ const PlayerSettingsScreen: React.FC = () => {
                 isLast={index === playerOptions.length - 1}
               />
             ))}
+          </View>
+        </View>
+        
+        <View style={styles.section}>
+          <Text
+            style={[
+              styles.sectionTitle,
+              { color: currentTheme.colors.textMuted },
+            ]}
+          >
+            PLAYBACK OPTIONS
+          </Text>
+          <View
+            style={[
+              styles.card,
+              {
+                backgroundColor: currentTheme.colors.elevation2,
+              },
+            ]}
+          >
+            <View style={styles.settingItem}>
+              <View style={styles.settingContent}>
+                <View style={[
+                  styles.settingIconContainer,
+                  { backgroundColor: 'rgba(255,255,255,0.1)' }
+                ]}>
+                  <MaterialIcons
+                    name="play-arrow"
+                    size={20}
+                    color={currentTheme.colors.primary}
+                  />
+                </View>
+                <View style={styles.settingText}>
+                  <Text
+                    style={[
+                      styles.settingTitle,
+                      { color: currentTheme.colors.text },
+                    ]}
+                  >
+                    Auto-play Best Stream
+                  </Text>
+                  <Text
+                    style={[
+                      styles.settingDescription,
+                      { color: currentTheme.colors.textMuted },
+                    ]}
+                  >
+                    Automatically play the highest quality stream when available
+                  </Text>
+                </View>
+                <Switch
+                  value={settings.autoplayBestStream}
+                  onValueChange={(value) => updateSetting('autoplayBestStream', value)}
+                  trackColor={{ 
+                    false: 'rgba(255,255,255,0.2)', 
+                    true: currentTheme.colors.primary + '40' 
+                  }}
+                  thumbColor={settings.autoplayBestStream ? currentTheme.colors.primary : 'rgba(255,255,255,0.8)'}
+                  ios_backgroundColor="rgba(255,255,255,0.2)"
+                />
+              </View>
+            </View>
           </View>
         </View>
       </ScrollView>

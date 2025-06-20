@@ -5,7 +5,7 @@
  * @format
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   StyleSheet
@@ -24,6 +24,7 @@ import { CatalogProvider } from './src/contexts/CatalogContext';
 import { GenreProvider } from './src/contexts/GenreContext';
 import { TraktProvider } from './src/contexts/TraktContext';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
+import SplashScreen from './src/components/SplashScreen';
 
 // This fixes many navigation layout issues by using native screen containers
 enableScreens(true);
@@ -31,6 +32,7 @@ enableScreens(true);
 // Inner app component that uses the theme context
 const ThemedApp = () => {
   const { currentTheme } = useTheme();
+  const [isAppReady, setIsAppReady] = useState(false);
   
   // Create custom themes based on current theme
   const customDarkTheme = {
@@ -50,6 +52,11 @@ const ThemedApp = () => {
       background: currentTheme.colors.darkBackground,
     }
   };
+
+  // Handler for splash screen completion  
+  const handleSplashComplete = () => {
+    setIsAppReady(true);
+  };
   
   return (
     <PaperProvider theme={customDarkTheme}>
@@ -62,7 +69,8 @@ const ThemedApp = () => {
           <StatusBar
             style="light"
           />
-          <AppNavigator />
+          {!isAppReady && <SplashScreen onFinish={handleSplashComplete} />}
+          {isAppReady && <AppNavigator />}
         </View>
       </NavigationContainer>
     </PaperProvider>

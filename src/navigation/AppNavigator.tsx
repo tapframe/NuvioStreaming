@@ -21,7 +21,7 @@ import DiscoverScreen from '../screens/DiscoverScreen';
 import LibraryScreen from '../screens/LibraryScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import MetadataScreen from '../screens/MetadataScreen';
-import VideoPlayer from '../screens/VideoPlayer';
+import VideoPlayer from '../components/player/VideoPlayer';
 import CatalogScreen from '../screens/CatalogScreen';
 import AddonsScreen from '../screens/AddonsScreen';
 import SearchScreen from '../screens/SearchScreen';
@@ -39,6 +39,7 @@ import PlayerSettingsScreen from '../screens/PlayerSettingsScreen';
 import LogoSourceSettings from '../screens/LogoSourceSettings';
 import ThemeScreen from '../screens/ThemeScreen';
 import ProfilesScreen from '../screens/ProfilesScreen';
+import InternalProvidersSettings from '../screens/InternalProvidersSettings';
 
 // Stack navigator types
 export type RootStackParamList = {
@@ -53,6 +54,7 @@ export type RootStackParamList = {
     id: string; 
     type: string;
     episodeId?: string;
+    addonId?: string;
   };
   Streams: { 
     id: string; 
@@ -74,9 +76,12 @@ export type RootStackParamList = {
     quality?: string; 
     year?: number; 
     streamProvider?: string;
+    streamName?: string;
     id?: string;
     type?: string;
     episodeId?: string;
+    imdbId?: string;
+    availableStreams?: { [providerId: string]: { streams: any[]; addonName: string } };
   };
   Catalog: { id: string; type: string; addonId?: string; name?: string; genreFilter?: string };
   Credits: { mediaId: string; mediaType: string };
@@ -97,6 +102,7 @@ export type RootStackParamList = {
   LogoSourceSettings: undefined;
   ThemeSettings: undefined;
   ProfilesSettings: undefined;
+  InternalProvidersSettings: undefined;
 };
 
 export type RootStackNavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -657,9 +663,44 @@ const MainTabs = () => {
   );
 };
 
+// Create custom fade animation interpolator for MetadataScreen
+const customFadeInterpolator = ({ current, layouts }: any) => {
+  return {
+    cardStyle: {
+      opacity: current.progress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 1],
+      }),
+      transform: [
+        {
+          scale: current.progress.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0.95, 1],
+          }),
+        },
+      ],
+    },
+    overlayStyle: {
+      opacity: current.progress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 0.3],
+      }),
+    },
+  };
+};
+
 // Stack Navigator
 const AppNavigator = () => {
   const { currentTheme } = useTheme();
+  
+  // Handle Android-specific optimizations
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      // Ensure consistent background color for Android
+      StatusBar.setBackgroundColor('transparent', true);
+      StatusBar.setTranslucent(true);
+    }
+  }, []);
   
   return (
     <SafeAreaProvider>
@@ -669,213 +710,352 @@ const AppNavigator = () => {
         barStyle="light-content"
       />
       <PaperProvider theme={CustomDarkTheme}>
-        <Stack.Navigator
-          screenOptions={{
-            headerShown: false,
-            // Disable animations for smoother transitions
-            animation: 'none',
-            // Ensure content is not popping in and out
-            contentStyle: {
-              backgroundColor: currentTheme.colors.darkBackground,
-            }
-          }}
-        >
-          <Stack.Screen 
-            name="MainTabs" 
-            component={MainTabs as any} 
-          />
-          <Stack.Screen 
-            name="Metadata" 
-            component={MetadataScreen as any} 
-          />
-          <Stack.Screen 
-            name="Streams" 
-            component={StreamsScreen as any} 
-            options={{
+        <View style={{ 
+          flex: 1, 
+          backgroundColor: currentTheme.colors.darkBackground,
+          ...(Platform.OS === 'android' && {
+            // Prevent white flashes on Android
+            opacity: 1,
+          })
+        }}>
+          <Stack.Navigator
+            screenOptions={{
               headerShown: false,
-              animation: Platform.OS === 'ios' ? 'slide_from_bottom' : 'fade_from_bottom',
-              ...(Platform.OS === 'ios' && { presentation: 'modal' }),
-            }}
-          />
-          <Stack.Screen 
-            name="Player" 
-            component={VideoPlayer as any} 
-          />
-          <Stack.Screen 
-            name="Catalog" 
-            component={CatalogScreen as any} 
-          />
-          <Stack.Screen 
-            name="Addons" 
-            component={AddonsScreen as any} 
-          />
-          <Stack.Screen 
-            name="Search" 
-            component={SearchScreen as any} 
-          />
-          <Stack.Screen 
-            name="CatalogSettings" 
-            component={CatalogSettingsScreen as any} 
-          />
-          <Stack.Screen 
-            name="HomeScreenSettings" 
-            component={HomeScreenSettings}
-            options={{
-              animation: 'fade',
-              animationDuration: 200,
-              presentation: 'card',
-              gestureEnabled: true,
-              gestureDirection: 'horizontal',
-              headerShown: false,
+              // Use slide_from_right for consistency and smooth transitions
+              animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
+              animationDuration: Platform.OS === 'android' ? 250 : 300,
+              // Ensure consistent background during transitions
               contentStyle: {
                 backgroundColor: currentTheme.colors.darkBackground,
               },
+              // Improve Android performance with custom interpolator
+              ...(Platform.OS === 'android' && {
+                cardStyleInterpolator: ({ current, layouts }: any) => {
+                  return {
+                    cardStyle: {
+                      transform: [
+                        {
+                          translateX: current.progress.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [layouts.screen.width, 0],
+                          }),
+                        },
+                      ],
+                      backgroundColor: currentTheme.colors.darkBackground,
+                    },
+                  };
+                },
+              }),
             }}
-          />
-          <Stack.Screen 
-            name="HeroCatalogs" 
-            component={HeroCatalogsScreen}
-            options={{
-              animation: 'fade',
-              animationDuration: 200,
-              presentation: 'card',
-              gestureEnabled: true,
-              gestureDirection: 'horizontal',
-              headerShown: false,
-              contentStyle: {
-                backgroundColor: currentTheme.colors.darkBackground,
-              },
-            }}
-          />
-          <Stack.Screen 
-            name="ShowRatings" 
-            component={ShowRatingsScreen}
-            options={{
-              animation: 'fade',
-              animationDuration: 200,
-              ...(Platform.OS === 'ios' && { presentation: 'modal' }),
-              gestureEnabled: true,
-              gestureDirection: 'horizontal',
-              headerShown: false,
-              contentStyle: {
-                backgroundColor: 'transparent',
-              },
-            }}
-          />
-          <Stack.Screen 
-            name="Calendar" 
-            component={CalendarScreen as any} 
-          />
-          <Stack.Screen 
-            name="NotificationSettings" 
-            component={NotificationSettingsScreen as any} 
-          />
-          <Stack.Screen 
-            name="MDBListSettings" 
-            component={MDBListSettingsScreen}
-            options={{
-              animation: 'fade',
-              animationDuration: 200,
-              presentation: 'card',
-              gestureEnabled: true,
-              gestureDirection: 'horizontal',
-              headerShown: false,
-              contentStyle: {
-                backgroundColor: currentTheme.colors.darkBackground,
-              },
-            }}
-          />
-          <Stack.Screen 
-            name="TMDBSettings" 
-            component={TMDBSettingsScreen}
-            options={{
-              animation: 'fade',
-              animationDuration: 200,
-              presentation: 'card',
-              gestureEnabled: true,
-              gestureDirection: 'horizontal',
-              headerShown: false,
-              contentStyle: {
-                backgroundColor: currentTheme.colors.darkBackground,
-              },
-            }}
-          />
-          <Stack.Screen 
-            name="TraktSettings" 
-            component={TraktSettingsScreen}
-            options={{
-              animation: 'fade',
-              animationDuration: 200,
-              presentation: 'card',
-              gestureEnabled: true,
-              gestureDirection: 'horizontal',
-              headerShown: false,
-              contentStyle: {
-                backgroundColor: currentTheme.colors.darkBackground,
-              },
-            }}
-          />
-          <Stack.Screen 
-            name="PlayerSettings" 
-            component={PlayerSettingsScreen}
-            options={{
-              animation: 'fade',
-              animationDuration: 200,
-              presentation: 'card',
-              gestureEnabled: true,
-              gestureDirection: 'horizontal',
-              headerShown: false,
-              contentStyle: {
-                backgroundColor: currentTheme.colors.darkBackground,
-              },
-            }}
-          />
-          <Stack.Screen 
-            name="LogoSourceSettings" 
-            component={LogoSourceSettings}
-            options={{
-              animation: 'fade',
-              animationDuration: 200,
-              presentation: 'card',
-              gestureEnabled: true,
-              gestureDirection: 'horizontal',
-              headerShown: false,
-              contentStyle: {
-                backgroundColor: currentTheme.colors.darkBackground,
-              },
-            }}
-          />
-          <Stack.Screen 
-            name="ThemeSettings" 
-            component={ThemeScreen}
-            options={{
-              animation: 'fade',
-              animationDuration: 200,
-              presentation: 'card',
-              gestureEnabled: true,
-              gestureDirection: 'horizontal',
-              headerShown: false,
-              contentStyle: {
-                backgroundColor: currentTheme.colors.darkBackground,
-              },
-            }}
-          />
-          <Stack.Screen 
-            name="ProfilesSettings" 
-            component={ProfilesScreen}
-            options={{
-              animation: 'fade',
-              animationDuration: 200,
-              presentation: 'card',
-              gestureEnabled: true,
-              gestureDirection: 'horizontal',
-              headerShown: false,
-              contentStyle: {
-                backgroundColor: currentTheme.colors.darkBackground,
-              },
-            }}
-          />
-        </Stack.Navigator>
+          >
+            <Stack.Screen 
+              name="MainTabs" 
+              component={MainTabs as any} 
+              options={{
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="Metadata" 
+              component={MetadataScreen}
+              options={{ 
+                headerShown: false, 
+                animation: 'fade',
+                animationDuration: Platform.OS === 'android' ? 250 : 300,
+                ...(Platform.OS === 'ios' && {
+                  cardStyleInterpolator: customFadeInterpolator,
+                  animationTypeForReplace: 'push',
+                  gestureEnabled: true,
+                  gestureDirection: 'horizontal',
+                }),
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="Streams" 
+              component={StreamsScreen as any} 
+              options={{
+                headerShown: false,
+                animation: Platform.OS === 'ios' ? 'slide_from_bottom' : 'none',
+                animationDuration: Platform.OS === 'android' ? 0 : 300,
+                gestureEnabled: true,
+                gestureDirection: Platform.OS === 'ios' ? 'vertical' : 'horizontal',
+                ...(Platform.OS === 'ios' && { presentation: 'modal' }),
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="Player" 
+              component={VideoPlayer as any} 
+              options={{ 
+                animation: 'slide_from_right',
+                animationDuration: Platform.OS === 'android' ? 200 : 300,
+                contentStyle: {
+                  backgroundColor: '#000000', // Pure black for video player
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="Catalog" 
+              component={CatalogScreen as any} 
+              options={{ 
+                animation: 'slide_from_right',
+                animationDuration: Platform.OS === 'android' ? 250 : 300,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="Addons" 
+              component={AddonsScreen as any} 
+              options={{ 
+                animation: 'slide_from_right',
+                animationDuration: Platform.OS === 'android' ? 250 : 300,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="Search" 
+              component={SearchScreen as any} 
+              options={{ 
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 250 : 350,
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                ...(Platform.OS === 'android' && {
+                  cardStyleInterpolator: ({ current, layouts }: any) => {
+                    return {
+                      cardStyle: {
+                        transform: [
+                          {
+                            translateX: current.progress.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [layouts.screen.width, 0],
+                            }),
+                          },
+                        ],
+                        opacity: current.progress.interpolate({
+                          inputRange: [0, 0.3, 1],
+                          outputRange: [0, 0.85, 1],
+                        }),
+                      },
+                    };
+                  },
+                }),
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="CatalogSettings" 
+              component={CatalogSettingsScreen as any} 
+              options={{ 
+                animation: 'slide_from_right',
+                animationDuration: Platform.OS === 'android' ? 250 : 300,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="HomeScreenSettings" 
+              component={HomeScreenSettings}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="HeroCatalogs" 
+              component={HeroCatalogsScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="ShowRatings" 
+              component={ShowRatingsScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'fade_from_bottom' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 200 : 200,
+                ...(Platform.OS === 'ios' && { presentation: 'modal' }),
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: 'transparent',
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="Calendar" 
+              component={CalendarScreen as any} 
+              options={{ 
+                animation: 'slide_from_right',
+                animationDuration: Platform.OS === 'android' ? 250 : 300,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="NotificationSettings" 
+              component={NotificationSettingsScreen as any} 
+              options={{ 
+                animation: 'slide_from_right',
+                animationDuration: Platform.OS === 'android' ? 250 : 300,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="MDBListSettings" 
+              component={MDBListSettingsScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="TMDBSettings" 
+              component={TMDBSettingsScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="TraktSettings" 
+              component={TraktSettingsScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="PlayerSettings" 
+              component={PlayerSettingsScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="LogoSourceSettings" 
+              component={LogoSourceSettings}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="ThemeSettings" 
+              component={ThemeScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="ProfilesSettings" 
+              component={ProfilesScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="InternalProvidersSettings" 
+              component={InternalProvidersSettings}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+          </Stack.Navigator>
+        </View>
       </PaperProvider>
     </SafeAreaProvider>
   );

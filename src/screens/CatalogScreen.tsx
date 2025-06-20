@@ -41,9 +41,38 @@ const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
 // Screen dimensions and grid layout
 const { width } = Dimensions.get('window');
-const NUM_COLUMNS = 3;
+
+// Dynamic column calculation based on screen width
+const calculateCatalogLayout = (screenWidth: number) => {
+  const MIN_ITEM_WIDTH = 120; // Increased minimum for better readability
+  const MAX_ITEM_WIDTH = 160; // Adjusted maximum
+  const HORIZONTAL_PADDING = SPACING.lg * 2; // Total horizontal padding
+  const ITEM_SPACING = SPACING.sm; // Space between items
+  
+  // Calculate how many columns can fit
+  const availableWidth = screenWidth - HORIZONTAL_PADDING;
+  const maxColumns = Math.floor(availableWidth / (MIN_ITEM_WIDTH + ITEM_SPACING));
+  
+  // Limit to reasonable number of columns (2-4 for better UX)
+  const numColumns = Math.min(Math.max(maxColumns, 2), 4);
+  
+  // Calculate actual item width with proper spacing
+  const totalSpacing = ITEM_SPACING * (numColumns - 1);
+  const itemWidth = (availableWidth - totalSpacing) / numColumns;
+  
+  // For 2 columns, ensure we use the full available width
+  const finalItemWidth = numColumns === 2 ? itemWidth : Math.min(itemWidth, MAX_ITEM_WIDTH);
+  
+  return {
+    numColumns,
+    itemWidth: finalItemWidth
+  };
+};
+
+const catalogLayout = calculateCatalogLayout(width);
+const NUM_COLUMNS = catalogLayout.numColumns;
 const ITEM_MARGIN = SPACING.sm;
-const ITEM_WIDTH = (width - (SPACING.lg * 2) - (ITEM_MARGIN * 2 * NUM_COLUMNS)) / NUM_COLUMNS;
+const ITEM_WIDTH = catalogLayout.itemWidth;
 
 // Create a styles creator function that accepts the theme colors
 const createStyles = (colors: any) => StyleSheet.create({
@@ -79,13 +108,9 @@ const createStyles = (colors: any) => StyleSheet.create({
     padding: SPACING.lg,
     paddingTop: SPACING.sm,
   },
-  columnWrapper: {
-    justifyContent: 'space-between',
-  },
   item: {
-    width: ITEM_WIDTH,
     marginBottom: SPACING.lg,
-    borderRadius: 12,
+    borderRadius: 8,
     overflow: 'hidden',
     backgroundColor: colors.elevation2,
     shadowColor: '#000',
@@ -97,8 +122,8 @@ const createStyles = (colors: any) => StyleSheet.create({
   poster: {
     width: '100%',
     aspectRatio: 2/3,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
     backgroundColor: colors.elevation3,
   },
   itemContent: {
@@ -168,13 +193,60 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dataSource, setDataSource] = useState<DataSource>(DataSource.STREMIO_ADDONS);
+  const [actualCatalogName, setActualCatalogName] = useState<string | null>(null);
   const { currentTheme } = useTheme();
   const colors = currentTheme.colors;
   const styles = createStyles(colors);
   const isDarkMode = true;
 
   const { getCustomName, isLoadingCustomNames } = useCustomCatalogNames();
-  const displayName = getCustomName(addonId || '', type || '', id || '', originalName || '');
+  
+  // Create display name with proper type suffix
+  const createDisplayName = (catalogName: string) => {
+    if (!catalogName) return '';
+    
+    // Check if the name already includes content type indicators
+    const lowerName = catalogName.toLowerCase();
+    const contentType = type === 'movie' ? 'Movies' : type === 'series' ? 'TV Shows' : `${type.charAt(0).toUpperCase() + type.slice(1)}s`;
+    
+    // If the name already contains type information, return as is
+    if (lowerName.includes('movie') || lowerName.includes('tv') || lowerName.includes('show') || lowerName.includes('series')) {
+      return catalogName;
+    }
+    
+    // Otherwise append the content type
+    return `${catalogName} ${contentType}`;
+  };
+  
+  // Use actual catalog name if available, otherwise fallback to custom name or original name
+  const displayName = actualCatalogName 
+    ? getCustomName(addonId || '', type || '', id || '', createDisplayName(actualCatalogName))
+    : getCustomName(addonId || '', type || '', id || '', originalName ? createDisplayName(originalName) : '') || 
+      (genreFilter ? `${genreFilter} ${type === 'movie' ? 'Movies' : 'TV Shows'}` : 
+       `${type.charAt(0).toUpperCase() + type.slice(1)}s`);
+
+  // Add effect to get the actual catalog name from addon manifest
+  useEffect(() => {
+    const getActualCatalogName = async () => {
+      if (addonId && type && id) {
+        try {
+          const manifests = await stremioService.getInstalledAddonsAsync();
+          const addon = manifests.find(a => a.id === addonId);
+          
+          if (addon && addon.catalogs) {
+            const catalog = addon.catalogs.find(c => c.type === type && c.id === id);
+            if (catalog && catalog.name) {
+              setActualCatalogName(catalog.name);
+            }
+          }
+        } catch (error) {
+          logger.error('Failed to get actual catalog name:', error);
+        }
+      }
+    };
+    
+    getActualCatalogName();
+  }, [addonId, type, id]);
 
   // Add effect to get data source preference when component mounts
   useEffect(() => {
@@ -415,11 +487,23 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
     }
   }, [loading, hasMore, page, loadItems]);
 
-  const renderItem = useCallback(({ item }: { item: Meta }) => {
+  const renderItem = useCallback(({ item, index }: { item: Meta; index: number }) => {
+    // Calculate if this is the last item in a row
+    const isLastInRow = (index + 1) % NUM_COLUMNS === 0;
+    // For 2-column layout, ensure proper spacing
+    const rightMargin = isLastInRow ? 0 : SPACING.sm;
+    
     return (
       <TouchableOpacity
-        style={styles.item}
-        onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type })}
+        style={[
+          styles.item,
+          { 
+            marginRight: rightMargin,
+            // For 2 columns, ensure items fill the available space properly
+            width: NUM_COLUMNS === 2 ? ITEM_WIDTH : ITEM_WIDTH
+          }
+        ]}
+        onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type, addonId })}
         activeOpacity={0.7}
       >
         <Image
@@ -443,7 +527,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
         </View>
       </TouchableOpacity>
     );
-  }, [navigation, styles]);
+  }, [navigation, styles, NUM_COLUMNS, ITEM_WIDTH]);
 
   const renderEmptyState = () => (
     <View style={styles.centered}>
@@ -542,6 +626,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           renderItem={renderItem}
           keyExtractor={(item) => `${item.id}-${item.type}`}
           numColumns={NUM_COLUMNS}
+          key={NUM_COLUMNS}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -560,7 +645,6 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
             ) : null
           }
           contentContainerStyle={styles.list}
-          columnWrapperStyle={styles.columnWrapper}
           showsVerticalScrollIndicator={false}
         />
       ) : renderEmptyState()}

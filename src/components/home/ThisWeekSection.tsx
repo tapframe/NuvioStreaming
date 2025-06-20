@@ -303,8 +303,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   title: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 19,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   viewAllButton: {
     flexDirection: 'row',
@@ -329,7 +330,7 @@ const styles = StyleSheet.create({
   episodeItem: {
     width: '100%',
     height: '100%',
-    borderRadius: 12,
+    borderRadius: 8,
     overflow: 'hidden',
   },
   poster: {

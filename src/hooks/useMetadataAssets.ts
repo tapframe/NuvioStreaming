@@ -196,7 +196,15 @@ export const useMetadataAssets = (
     else if (shouldFetchLogo && logoFetchInProgress.current) {
          logger.log(`[useMetadataAssets:Logo] Skipping logo fetch because logoFetchInProgress is true.`);
     }
-  }, [id, type, metadata, setMetadata, imdbId, settings.logoSourcePreference, settings.tmdbLanguagePreference]); // Added tmdbLanguagePreference dependency
+  }, [
+    id, 
+    type, 
+    imdbId, 
+    metadata?.logo, // Depend on the logo value itself, not the whole object
+    settings.logoSourcePreference, 
+    settings.tmdbLanguagePreference,
+    setMetadata // Keep setMetadata, but ensure it's memoized in parent
+  ]);
 
   // Fetch banner image based on logo source preference - optimized version
   useEffect(() => {
@@ -217,9 +225,15 @@ export const useMetadataAssets = (
     
     const fetchBanner = async () => {
       logger.log(`[useMetadataAssets:Banner] Starting banner fetch.`);
-        setLoadingBanner(true);
-      setBannerImage(null); // Clear existing banner to prevent mixed sources
-      setBannerSource(null); // Clear source tracking
+      setLoadingBanner(true);
+      
+      // Show fallback banner immediately to prevent blank state
+      const fallbackBanner = metadata?.banner || metadata?.poster || null;
+      if (fallbackBanner && !bannerImage) {
+        setBannerImage(fallbackBanner);
+        setBannerSource('default');
+        logger.log(`[useMetadataAssets:Banner] Setting immediate fallback banner: ${fallbackBanner}`);
+      }
       
       let finalBanner: string | null = null;
       let bannerSourceType: 'tmdb' | 'metahub' | 'default' = 'default';
@@ -411,17 +425,31 @@ export const useMetadataAssets = (
         
         // Set the final state
         logger.log(`[useMetadataAssets:Banner] Final decision: Setting banner to ${finalBanner} (Source: ${bannerSourceType})`);
-        setBannerImage(finalBanner);
-        setBannerSource(bannerSourceType); // Track the source of the final image
+        
+        // Only update if the banner actually changed to avoid unnecessary re-renders
+        if (finalBanner !== bannerImage || bannerSourceType !== bannerSource) {
+          setBannerImage(finalBanner);
+          setBannerSource(bannerSourceType); // Track the source of the final image
+          logger.log(`[useMetadataAssets:Banner] Banner updated from ${bannerImage} to ${finalBanner}`);
+        } else {
+          logger.log(`[useMetadataAssets:Banner] Banner unchanged, skipping update`);
+        }
+        
         forcedBannerRefreshDone.current = true; // Mark this cycle as complete
 
       } catch (error) {
         logger.error(`[useMetadataAssets:Banner] Error in outer fetchBanner try block:`, error);
         // Ensure fallback to default even on outer error
         const defaultBanner = metadata?.banner || metadata?.poster || null;
-        setBannerImage(defaultBanner);
-        setBannerSource('default');
-        logger.log(`[useMetadataAssets:Banner] Setting default banner due to outer error: ${defaultBanner}`);
+        
+        // Only set if it's different from current banner
+        if (defaultBanner !== bannerImage) {
+          setBannerImage(defaultBanner);
+          setBannerSource('default');
+          logger.log(`[useMetadataAssets:Banner] Setting default banner due to outer error: ${defaultBanner}`);
+        } else {
+          logger.log(`[useMetadataAssets:Banner] Default banner already set, skipping update`);
+        }
       } finally {
          logger.log(`[useMetadataAssets:Banner] Finished banner fetch attempt.`);
         setLoadingBanner(false);

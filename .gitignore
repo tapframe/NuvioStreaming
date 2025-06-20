@@ -36,3 +36,5 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+plan.md
+release_announcement.md

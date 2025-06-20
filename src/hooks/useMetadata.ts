@@ -3,11 +3,15 @@ import { StreamingContent } from '../services/catalogService';
 import { catalogService } from '../services/catalogService';
 import { stremioService } from '../services/stremioService';
 import { tmdbService } from '../services/tmdbService';
+import { hdrezkaService } from '../services/hdrezkaService';
 import { cacheService } from '../services/cacheService';
 import { Cast, Episode, GroupedEpisodes, GroupedStreams } from '../types/metadata';
 import { TMDBService } from '../services/tmdbService';
 import { logger } from '../utils/logger';
 import { usePersistentSeasons } from './usePersistentSeasons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Stream } from '../types/metadata';
+import { storageService } from '../services/storageService';
 
 // Constants for timeouts and retries
 const API_TIMEOUT = 10000; // 10 seconds
@@ -56,6 +60,7 @@ const withRetry = async <T>(
 interface UseMetadataProps {
   id: string;
   type: string;
+  addonId?: string;
 }
 
 interface UseMetadataReturn {
@@ -90,7 +95,7 @@ interface UseMetadataReturn {
   imdbId: string | null;
 }
 
-export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn => {
+export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadataReturn => {
   const [metadata, setMetadata] = useState<StreamingContent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -113,6 +118,8 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
   const [recommendations, setRecommendations] = useState<StreamingContent[]>([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
   const [imdbId, setImdbId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [availableStreams, setAvailableStreams] = useState<{ [sourceType: string]: Stream }>({});
 
   // Add hook for persistent seasons
   const { getSeason, saveSeason } = usePersistentSeasons();
@@ -150,8 +157,12 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
               
               if (isEpisode) {
                 setEpisodeStreams(updateState);
+                // Turn off loading when we get streams
+                setLoadingEpisodeStreams(false);
               } else {
                 setGroupedStreams(updateState);
+                // Turn off loading when we get streams
+                setLoadingStreams(false);
               }
             } else {
                logger.log(`🤷 [${logPrefix}:${sourceName}] No streams found for addon ${addonName} (${addonId})`);
@@ -173,35 +184,80 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
     // Loading indicators should probably be managed based on callbacks completing.
   };
 
-  const processExternalSource = async (sourceType: string, promise: Promise<any>, isEpisode = false) => {
+  const processHDRezkaSource = async (type: string, id: string, season?: number, episode?: number, isEpisode = false) => {
     const sourceStartTime = Date.now();
     const logPrefix = isEpisode ? 'loadEpisodeStreams' : 'loadStreams';
+    const sourceName = 'hdrezka';
     
-    try {
-      logger.log(`🔍 [${logPrefix}:${sourceType}] Starting fetch`);
-      const result = await promise;
-      logger.log(`✅ [${logPrefix}:${sourceType}] Completed in ${Date.now() - sourceStartTime}ms`);
-      
-      if (Object.keys(result).length > 0) {
-        const totalStreams = Object.values(result).reduce((acc, group: any) => acc + (group.streams?.length || 0), 0);
-        logger.log(`📦 [${logPrefix}:${sourceType}] Found ${totalStreams} streams`);
-        
-        const updateState = (prevState: GroupedStreams) => {
-          logger.log(`🔄 [${logPrefix}:${sourceType}] Updating state with ${Object.keys(result).length} providers`);
-          return { ...prevState, ...result };
-        };
+    logger.log(`🔍 [${logPrefix}:${sourceName}] Starting fetch`);
 
+    try {
+      const streams = await hdrezkaService.getStreams(
+        id,
+        type,
+        season,
+        episode
+      );
+      
+      const processTime = Date.now() - sourceStartTime;
+      
+      if (streams && streams.length > 0) {
+        logger.log(`✅ [${logPrefix}:${sourceName}] Received ${streams.length} streams after ${processTime}ms`);
+        
+        // Format response similar to Stremio format for the UI
+        return {
+          'hdrezka': {
+            addonName: 'HDRezka',
+            streams
+          }
+        };
+      } else {
+        logger.log(`⚠️ [${logPrefix}:${sourceName}] No streams found after ${processTime}ms`);
+        return {};
+      }
+    } catch (error) {
+      logger.error(`❌ [${logPrefix}:${sourceName}] Error:`, error);
+      return {};
+    }
+  };
+
+  const processExternalSource = async (sourceType: string, promise: Promise<any>, isEpisode = false) => {
+    try {
+      const startTime = Date.now();
+      const result = await promise;
+      const processingTime = Date.now() - startTime;
+      
+      if (result && Object.keys(result).length > 0) {
+        // Update the appropriate state based on whether this is for an episode or not
+        const updateState = (prevState: GroupedStreams) => {
+          const newState = { ...prevState };
+          
+          // Merge in the new streams
+          Object.entries(result).forEach(([provider, data]: [string, any]) => {
+            newState[provider] = data;
+          });
+          
+          return newState;
+        };
+        
         if (isEpisode) {
           setEpisodeStreams(updateState);
         } else {
           setGroupedStreams(updateState);
         }
+        
+        console.log(`✅ [processExternalSource:${sourceType}] Processed in ${processingTime}ms, found streams:`, 
+          Object.values(result).reduce((acc: number, curr: any) => acc + (curr.streams?.length || 0), 0)
+        );
+        
+        // Return the result for the promise chain
+        return result;
       } else {
-        logger.log(`⚠️ [${logPrefix}:${sourceType}] No streams found`);
+        console.log(`⚠️ [processExternalSource:${sourceType}] No streams found after ${processingTime}ms`);
+        return {};
       }
-      return result;
     } catch (error) {
-      logger.error(`❌ [${logPrefix}:${sourceType}] Error:`, error);
+      console.error(`❌ [processExternalSource:${sourceType}] Error:`, error);
       return {};
     }
   };
@@ -356,7 +412,7 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
                   
                   if (writers.length > 0) {
                     (formattedMovie as any).creators = writers;
-                    (formattedMovie as StreamingContent & { writer: string }).writer = writers.join(', ');
+                    (formattedMovie as any).writer = writers;
                   }
                 }
               } catch (error) {
@@ -459,7 +515,7 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
         // Load content with timeout and retry
         withRetry(async () => {
           const result = await withTimeout(
-            catalogService.getContentDetails(type, actualId),
+          catalogService.getEnhancedContentDetails(type, actualId, addonId),
             API_TIMEOUT
           );
           // Store the actual ID used (could be IMDB)
@@ -485,8 +541,10 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
         cacheService.setMetadata(id, type, content.value);
 
         if (type === 'series') {
-          // Load series data in parallel with other data
+          // Load series data after the enhanced metadata is processed
+          setTimeout(() => {
           loadSeriesData().catch(console.error);
+          }, 100);
         }
       } else {
         throw new Error('Content not found');
@@ -509,6 +567,67 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
   const loadSeriesData = async () => {
     setLoadingSeasons(true);
     try {
+      // First check if we have episode data from the addon
+      const addonVideos = metadata?.videos;
+      if (addonVideos && Array.isArray(addonVideos) && addonVideos.length > 0) {
+        logger.log(`🎬 Found ${addonVideos.length} episodes from addon metadata for ${metadata?.name || id}`);
+        
+        // Group addon episodes by season
+        const groupedAddonEpisodes: GroupedEpisodes = {};
+        
+                 addonVideos.forEach((video: any) => {
+          const seasonNumber = video.season || 1;
+          const episodeNumber = video.episode || video.number || 1;
+          
+          if (!groupedAddonEpisodes[seasonNumber]) {
+            groupedAddonEpisodes[seasonNumber] = [];
+          }
+          
+          // Convert addon episode format to our Episode interface
+          const episode: Episode = {
+            id: video.id,
+            name: video.name || video.title || `Episode ${episodeNumber}`,
+            overview: video.overview || video.description || '',
+            season_number: seasonNumber,
+            episode_number: episodeNumber,
+            air_date: video.released ? video.released.split('T')[0] : video.firstAired ? video.firstAired.split('T')[0] : '',
+            still_path: video.thumbnail ? video.thumbnail.replace('https://image.tmdb.org/t/p/w500', '') : null,
+            vote_average: parseFloat(video.rating) || 0,
+            runtime: undefined,
+            episodeString: `S${seasonNumber.toString().padStart(2, '0')}E${episodeNumber.toString().padStart(2, '0')}`,
+            stremioId: video.id,
+            season_poster_path: null
+          };
+          
+          groupedAddonEpisodes[seasonNumber].push(episode);
+        });
+        
+        // Sort episodes within each season
+        Object.keys(groupedAddonEpisodes).forEach(season => {
+          groupedAddonEpisodes[parseInt(season)].sort((a, b) => a.episode_number - b.episode_number);
+        });
+        
+        logger.log(`📺 Processed addon episodes into ${Object.keys(groupedAddonEpisodes).length} seasons`);
+        setGroupedEpisodes(groupedAddonEpisodes);
+        
+                 // Set the first available season
+         const seasons = Object.keys(groupedAddonEpisodes).map(Number);
+         const firstSeason = Math.min(...seasons);
+         logger.log(`📺 Setting season ${firstSeason} as selected (${groupedAddonEpisodes[firstSeason]?.length || 0} episodes)`);
+         setSelectedSeason(firstSeason);
+         setEpisodes(groupedAddonEpisodes[firstSeason] || []);
+        
+        // Try to get TMDB ID for additional metadata (cast, etc.) but don't override episodes
+        const tmdbIdResult = await tmdbService.findTMDBIdByIMDB(id);
+        if (tmdbIdResult) {
+          setTmdbId(tmdbIdResult);
+        }
+        
+        return; // Use addon episodes, skip TMDB loading
+      }
+      
+      // Fallback to TMDB if no addon episodes
+      logger.log('📺 No addon episodes found, falling back to TMDB');
       const tmdbIdResult = await tmdbService.findTMDBIdByIMDB(id);
       if (tmdbIdResult) {
         setTmdbId(tmdbIdResult);
@@ -535,14 +654,61 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
         // Get the first available season as fallback
         const firstSeason = Math.min(...Object.keys(allEpisodes).map(Number));
         
-        // Get saved season from persistence, fallback to first season if not found
-        const persistedSeason = getSeason(id, firstSeason);
+        // Check for watch progress to auto-select season
+        let selectedSeasonNumber = firstSeason;
         
-        // Set the selected season from persistence
-        setSelectedSeason(persistedSeason);
+        try {
+          // Check watch progress for auto-season selection
+          const allProgress = await storageService.getAllWatchProgress();
+          
+          // Find the most recently watched episode for this series
+          let mostRecentEpisodeId = '';
+          let mostRecentTimestamp = 0;
+          
+          Object.entries(allProgress).forEach(([key, progress]) => {
+            if (key.includes(`series:${id}:`)) {
+              const episodeId = key.split(`series:${id}:`)[1];
+              if (progress.lastUpdated > mostRecentTimestamp && progress.currentTime > 0) {
+                mostRecentTimestamp = progress.lastUpdated;
+                mostRecentEpisodeId = episodeId;
+              }
+            }
+          });
+          
+          if (mostRecentEpisodeId) {
+            // Parse season number from episode ID
+            const parts = mostRecentEpisodeId.split(':');
+            if (parts.length === 3) {
+              const watchProgressSeason = parseInt(parts[1], 10);
+              if (transformedEpisodes[watchProgressSeason]) {
+                selectedSeasonNumber = watchProgressSeason;
+                logger.log(`[useMetadata] Auto-selected season ${selectedSeasonNumber} based on most recent watch progress for ${mostRecentEpisodeId}`);
+              }
+            } else {
+              // Try to find episode by stremioId to get season
+              const allEpisodesList = Object.values(transformedEpisodes).flat();
+              const episode = allEpisodesList.find(ep => ep.stremioId === mostRecentEpisodeId);
+              if (episode) {
+                selectedSeasonNumber = episode.season_number;
+                logger.log(`[useMetadata] Auto-selected season ${selectedSeasonNumber} based on most recent watch progress for episode with stremioId ${mostRecentEpisodeId}`);
+              }
+            }
+          } else {
+            // No watch progress found, use persistent storage as fallback
+            selectedSeasonNumber = getSeason(id, firstSeason);
+            logger.log(`[useMetadata] No watch progress found, using persistent season ${selectedSeasonNumber}`);
+          }
+        } catch (error) {
+          logger.error('[useMetadata] Error checking watch progress for season selection:', error);
+          // Fall back to persistent storage
+          selectedSeasonNumber = getSeason(id, firstSeason);
+        }
+        
+        // Set the selected season
+        setSelectedSeason(selectedSeasonNumber);
         
         // Set episodes for the selected season
-        setEpisodes(transformedEpisodes[persistedSeason] || []);
+        setEpisodes(transformedEpisodes[selectedSeasonNumber] || []);
       }
     } catch (error) {
       console.error('Failed to load episodes:', error);
@@ -575,39 +741,71 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
       console.log('🚀 [loadStreams] START - Loading streams for:', id);
       updateLoadingState();
 
-      // Always clear streams first to ensure we don't show stale data
-      setGroupedStreams({});
-
-      // Get TMDB ID for external sources first before starting parallel requests
+      // Get TMDB ID for external sources and determine the correct ID for Stremio addons
       console.log('🔍 [loadStreams] Getting TMDB ID for:', id);
       let tmdbId;
+      let stremioId = id; // Default to original ID
+      
       if (id.startsWith('tmdb:')) {
         tmdbId = id.split(':')[1];
         console.log('✅ [loadStreams] Using TMDB ID from ID:', tmdbId);
+        
+        // Try to get IMDb ID from metadata first, then convert if needed
+        if (metadata?.imdb_id) {
+          stremioId = metadata.imdb_id;
+          console.log('✅ [loadStreams] Using IMDb ID from metadata for Stremio:', stremioId);
+        } else if (imdbId) {
+          stremioId = imdbId;
+          console.log('✅ [loadStreams] Using stored IMDb ID for Stremio:', stremioId);
+        } else {
+          // Convert TMDB ID to IMDb ID for Stremio addons (they expect IMDb format)
+          try {
+            let externalIds = null;
+            if (type === 'movie') {
+              const movieDetails = await withTimeout(tmdbService.getMovieDetails(tmdbId), API_TIMEOUT);
+              externalIds = movieDetails?.external_ids;
+            } else if (type === 'series') {
+              externalIds = await withTimeout(tmdbService.getShowExternalIds(parseInt(tmdbId)), API_TIMEOUT);
+            }
+            
+            if (externalIds?.imdb_id) {
+              stremioId = externalIds.imdb_id;
+              console.log('✅ [loadStreams] Converted TMDB to IMDb ID for Stremio:', stremioId);
+            } else {
+              console.log('⚠️ [loadStreams] No IMDb ID found for TMDB ID, using original:', stremioId);
+            }
+          } catch (error) {
+            console.log('⚠️ [loadStreams] Failed to convert TMDB to IMDb, using original ID:', error);
+          }
+        }
       } else if (id.startsWith('tt')) {
-        // This is an IMDB ID
+        // This is already an IMDB ID, perfect for Stremio
+        stremioId = id;
         console.log('📝 [loadStreams] Converting IMDB ID to TMDB ID...');
         tmdbId = await withTimeout(tmdbService.findTMDBIdByIMDB(id), API_TIMEOUT);
         console.log('✅ [loadStreams] Converted to TMDB ID:', tmdbId);
       } else {
         tmdbId = id;
-        console.log('ℹ️ [loadStreams] Using ID as TMDB ID:', tmdbId);
+        stremioId = id;
+        console.log('ℹ️ [loadStreams] Using ID as both TMDB and Stremio ID:', tmdbId);
       }
-
-      console.log('🔄 [loadStreams] Starting stream requests');
       
-      // Start Stremio request using the callback method
-      processStremioSource(type, id, false);
+      // Start Stremio request using the converted ID format
+      console.log('🎬 [loadStreams] Using ID for Stremio addons:', stremioId);
+      processStremioSource(type, stremioId, false);
+      
+      // Add HDRezka source  
+      const hdrezkaPromise = processExternalSource('hdrezka', processHDRezkaSource(type, id), false);
+      
+      // Include HDRezka in fetchPromises array
+      const fetchPromises: Promise<any>[] = [hdrezkaPromise];
 
-      // No external sources are used anymore
-      const fetchPromises: Promise<any>[] = [];
-
-      // Wait only for external promises now (none in this case)
+      // Wait only for external promises now
       const results = await Promise.allSettled(fetchPromises);
       const totalTime = Date.now() - startTime;
       console.log(`✅ [loadStreams] External source requests completed in ${totalTime}ms (Stremio continues in background)`);
       
-      const sourceTypes: string[] = []; // No external sources
+      const sourceTypes: string[] = ['hdrezka'];
       results.forEach((result, index) => {
         const source = sourceTypes[Math.min(index, sourceTypes.length - 1)];
         console.log(`📊 [loadStreams:${source}] Status: ${result.status}`);
@@ -634,15 +832,15 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
         return prev;
       });
 
+      // Add a delay before marking loading as complete to give Stremio addons more time
+      setTimeout(() => {
+        setLoadingStreams(false);
+      }, 10000); // 10 second delay to allow streams to load
+
     } catch (error) {
       console.error('❌ [loadStreams] Failed to load streams:', error);
       setError('Failed to load streams');
-    } finally {
-      // Loading is now complete when external sources finish, Stremio updates happen independently.
-      // We need a better way to track overall completion if we want a final 'FINISHED' log.
-      const endTime = Date.now() - startTime;
-      console.log(`🏁 [loadStreams] External sources FINISHED in ${endTime}ms`);
-      setLoadingStreams(false); // Mark loading=false, but Stremio might still be working
+      setLoadingStreams(false);
     }
   };
 
@@ -652,42 +850,76 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
       console.log('🚀 [loadEpisodeStreams] START - Loading episode streams for:', episodeId);
       updateEpisodeLoadingState();
 
-      // Get TMDB ID for external sources first before starting parallel requests
+      // Get TMDB ID for external sources and determine the correct ID for Stremio addons
       console.log('🔍 [loadEpisodeStreams] Getting TMDB ID for:', id);
       let tmdbId;
+      let stremioEpisodeId = episodeId; // Default to original episode ID
+      
       if (id.startsWith('tmdb:')) {
         tmdbId = id.split(':')[1];
         console.log('✅ [loadEpisodeStreams] Using TMDB ID from ID:', tmdbId);
+        
+        // Try to get IMDb ID from metadata first, then convert if needed
+        if (metadata?.imdb_id) {
+          // Replace the series ID in episodeId with the IMDb ID
+          const [, season, episode] = episodeId.split(':');
+          stremioEpisodeId = `series:${metadata.imdb_id}:${season}:${episode}`;
+          console.log('✅ [loadEpisodeStreams] Using IMDb ID from metadata for Stremio episode:', stremioEpisodeId);
+        } else if (imdbId) {
+          const [, season, episode] = episodeId.split(':');
+          stremioEpisodeId = `series:${imdbId}:${season}:${episode}`;
+          console.log('✅ [loadEpisodeStreams] Using stored IMDb ID for Stremio episode:', stremioEpisodeId);
+        } else {
+          // Convert TMDB ID to IMDb ID for Stremio addons
+          try {
+            const externalIds = await withTimeout(tmdbService.getShowExternalIds(parseInt(tmdbId)), API_TIMEOUT);
+            
+            if (externalIds?.imdb_id) {
+              const [, season, episode] = episodeId.split(':');
+              stremioEpisodeId = `series:${externalIds.imdb_id}:${season}:${episode}`;
+              console.log('✅ [loadEpisodeStreams] Converted TMDB to IMDb ID for Stremio episode:', stremioEpisodeId);
+            } else {
+              console.log('⚠️ [loadEpisodeStreams] No IMDb ID found for TMDB ID, using original episode ID:', stremioEpisodeId);
+            }
+          } catch (error) {
+            console.log('⚠️ [loadEpisodeStreams] Failed to convert TMDB to IMDb, using original episode ID:', error);
+          }
+        }
       } else if (id.startsWith('tt')) {
-        // This is an IMDB ID
+        // This is already an IMDB ID, perfect for Stremio
         console.log('📝 [loadEpisodeStreams] Converting IMDB ID to TMDB ID...');
         tmdbId = await withTimeout(tmdbService.findTMDBIdByIMDB(id), API_TIMEOUT);
         console.log('✅ [loadEpisodeStreams] Converted to TMDB ID:', tmdbId);
       } else {
         tmdbId = id;
-        console.log('ℹ️ [loadEpisodeStreams] Using ID as TMDB ID:', tmdbId);
+        console.log('ℹ️ [loadEpisodeStreams] Using ID as both TMDB and Stremio ID:', tmdbId);
       }
 
-      // Extract episode info from the episodeId
+      // Extract episode info from the episodeId for logging
       const [, season, episode] = episodeId.split(':');
       const episodeQuery = `?s=${season}&e=${episode}`;
       console.log(`ℹ️ [loadEpisodeStreams] Episode query: ${episodeQuery}`);
 
       console.log('🔄 [loadEpisodeStreams] Starting stream requests');
       
-      const fetchPromises: Promise<any>[] = [];
+      // Start Stremio request using the converted episode ID format
+      console.log('🎬 [loadEpisodeStreams] Using episode ID for Stremio addons:', stremioEpisodeId);
+      processStremioSource('series', stremioEpisodeId, true);
       
-      // Start Stremio request using the callback method
-      processStremioSource('series', episodeId, true);
+      // Add HDRezka source for episodes
+      const hdrezkaEpisodePromise = processExternalSource('hdrezka',
+        processHDRezkaSource('series', id, parseInt(season), parseInt(episode), true),
+        true
+      );
+      
+      const fetchPromises: Promise<any>[] = [hdrezkaEpisodePromise];
 
-      // No external sources are used anymore
-
-      // Wait only for external promises now (none in this case)
+      // Wait only for external promises now
       const results = await Promise.allSettled(fetchPromises);
       const totalTime = Date.now() - startTime;
       console.log(`✅ [loadEpisodeStreams] External source requests completed in ${totalTime}ms (Stremio continues in background)`);
       
-      const sourceTypes: string[] = []; // No external sources
+      const sourceTypes: string[] = ['hdrezka'];
       results.forEach((result, index) => {
         const source = sourceTypes[Math.min(index, sourceTypes.length - 1)];
         console.log(`📊 [loadEpisodeStreams:${source}] Status: ${result.status}`);
@@ -699,31 +931,23 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
       console.log('🧮 [loadEpisodeStreams] Summary:');
       console.log('  Total time for external sources:', totalTime + 'ms');
       
-      // Log the final states - might not include all Stremio addons yet
-      console.log('📦 [loadEpisodeStreams] Current combined streams count:', 
-        Object.keys(episodeStreams).length > 0 ? 
-        Object.values(episodeStreams).reduce((acc, group: any) => acc + group.streams.length, 0) : 
-        0
-      );
-
-      // Cache the final streams state - Might be incomplete
-      setEpisodeStreams(prev => {
-        // Cache episode streams - maybe incrementally?
-        setPreloadedEpisodeStreams(currentPreloaded => ({ 
-          ...currentPreloaded, 
-          [episodeId]: prev 
+      // Update preloaded episode streams for future use
+      if (Object.keys(episodeStreams).length > 0) {
+        setPreloadedEpisodeStreams(prev => ({
+          ...prev,
+          [episodeId]: { ...episodeStreams }
         }));
-        return prev;
-      });
+      }
+
+      // Add a delay before marking loading as complete to give addons more time
+      setTimeout(() => {
+        setLoadingEpisodeStreams(false);
+      }, 10000); // 10 second delay to allow streams to load
 
     } catch (error) {
       console.error('❌ [loadEpisodeStreams] Failed to load episode streams:', error);
       setError('Failed to load episode streams');
-    } finally {
-      // Loading is now complete when external sources finish
-      const endTime = Date.now() - startTime;
-      console.log(`🏁 [loadEpisodeStreams] External sources FINISHED in ${endTime}ms`);
-      setLoadingEpisodeStreams(false); // Mark loading=false, but Stremio might still be working
+      setLoadingEpisodeStreams(false);
     }
   };
 
@@ -769,6 +993,14 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
   useEffect(() => {
     loadMetadata();
   }, [id, type]);
+
+  // Re-run series data loading when metadata updates with videos
+  useEffect(() => {
+    if (metadata && type === 'series' && metadata.videos && metadata.videos.length > 0) {
+      logger.log(`🎬 Metadata updated with ${metadata.videos.length} episodes, reloading series data`);
+      loadSeriesData().catch(console.error);
+    }
+  }, [metadata?.videos, type]);
 
   const loadRecommendations = useCallback(async () => {
     if (!tmdbId) return;

@@ -9,6 +9,7 @@ import {
   AppState,
   AppStateStatus
 } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
@@ -33,8 +34,39 @@ interface ContinueWatchingRef {
   refresh: () => Promise<boolean>;
 }
 
+// Dynamic poster calculation based on screen width for Continue Watching section
+const calculatePosterLayout = (screenWidth: number) => {
+  const MIN_POSTER_WIDTH = 120; // Slightly larger for continue watching items
+  const MAX_POSTER_WIDTH = 160; // Maximum poster width for this section
+  const HORIZONTAL_PADDING = 40; // Total horizontal padding/margins
+  
+  // Calculate how many posters can fit (fewer items for continue watching)
+  const availableWidth = screenWidth - HORIZONTAL_PADDING;
+  const maxColumns = Math.floor(availableWidth / MIN_POSTER_WIDTH);
+  
+  // Limit to reasonable number of columns (2-5 for continue watching)
+  const numColumns = Math.min(Math.max(maxColumns, 2), 5);
+  
+  // Calculate actual poster width
+  const posterWidth = Math.min(availableWidth / numColumns, MAX_POSTER_WIDTH);
+  
+  return {
+    numColumns,
+    posterWidth,
+    spacing: 12 // Space between posters
+  };
+};
+
 const { width } = Dimensions.get('window');
-const POSTER_WIDTH = (width - 40) / 2.7;
+const posterLayout = calculatePosterLayout(width);
+const POSTER_WIDTH = posterLayout.posterWidth;
+
+// Function to validate IMDB ID format
+const isValidImdbId = (id: string): boolean => {
+  // IMDB IDs should start with 'tt' followed by 7-10 digits
+  const imdbPattern = /^tt\d{7,10}$/;
+  return imdbPattern.test(id);
+};
 
 // Create a proper imperative handle with React.forwardRef and updated type
 const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, ref) => {
@@ -50,6 +82,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     try {
       setLoading(true);
       const allProgress = await storageService.getAllWatchProgress();
+      
       if (Object.keys(allProgress).length === 0) {
         setContinueWatchingItems([]);
         return;
@@ -62,19 +95,29 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       // Process each saved progress
       for (const key in allProgress) {
         // Parse the key to get type and id
-        const [type, id, episodeId] = key.split(':');
+        const keyParts = key.split(':');
+        const [type, id, ...episodeIdParts] = keyParts;
+        const episodeId = episodeIdParts.length > 0 ? episodeIdParts.join(':') : undefined;
         const progress = allProgress[key];
         
-        // Skip items that are more than 95% complete (effectively finished)
+        // Skip items that are more than 85% complete (effectively finished)
         const progressPercent = (progress.currentTime / progress.duration) * 100;
-        if (progressPercent >= 95) continue;
+        
+        if (progressPercent >= 85) {
+          continue;
+        }
         
         const contentPromise = (async () => {
           try {
+            // Validate IMDB ID format before attempting to fetch
+            if (!isValidImdbId(id)) {
+              return;
+            }
+            
             let content: StreamingContent | null = null;
             
-            // Get content details using catalogService
-            content = await catalogService.getContentDetails(type, id);
+            // Get basic content details using catalogService (no enhanced metadata needed for continue watching)
+            content = await catalogService.getBasicContentDetails(type, id);
             
             if (content) {
               // Extract season and episode info from episodeId if available
@@ -83,11 +126,28 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
               let episodeTitle: string | undefined;
               
               if (episodeId && type === 'series') {
-                const match = episodeId.match(/s(\d+)e(\d+)/i);
+                // Try different episode ID formats
+                let match = episodeId.match(/s(\d+)e(\d+)/i); // Format: s1e1
                 if (match) {
                   season = parseInt(match[1], 10);
                   episode = parseInt(match[2], 10);
                   episodeTitle = `Episode ${episode}`;
+                } else {
+                  // Try format: seriesId:season:episode (e.g., tt0108778:4:6)
+                  const parts = episodeId.split(':');
+                  if (parts.length >= 3) {
+                    const seasonPart = parts[parts.length - 2]; // Second to last part
+                    const episodePart = parts[parts.length - 1]; // Last part
+                    
+                    const seasonNum = parseInt(seasonPart, 10);
+                    const episodeNum = parseInt(episodePart, 10);
+                    
+                    if (!isNaN(seasonNum) && !isNaN(episodeNum)) {
+                      season = seasonNum;
+                      episode = episodeNum;
+                      episodeTitle = `Episode ${episode}`;
+                    }
+                  }
                 }
               }
               
@@ -128,7 +188,9 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       progressItems.sort((a, b) => b.lastUpdated - a.lastUpdated);
       
       // Limit to 10 items
-      setContinueWatchingItems(progressItems.slice(0, 10));
+      const finalItems = progressItems.slice(0, 10);
+      
+      setContinueWatchingItems(finalItems);
     } catch (error) {
       logger.error('Failed to load continue watching items:', error);
     } finally {
@@ -197,7 +259,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     refresh: async () => {
       await loadContinueWatching();
       // Return whether there are items to help parent determine visibility
-      return continueWatchingItems.length > 0;
+      const hasItems = continueWatchingItems.length > 0;
+      return hasItems;
     }
   }));
 
@@ -206,12 +269,12 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   }, [navigation]);
 
   // If no continue watching items, don't render anything
-  if (continueWatchingItems.length === 0 && !loading) {
+  if (continueWatchingItems.length === 0) {
     return null;
   }
 
   return (
-    <View style={styles.container}>
+    <Animated.View entering={FadeIn.duration(400).delay(250)} style={styles.container}>
       <View style={styles.header}>
         <View style={styles.titleContainer}>
           <Text style={[styles.title, { color: currentTheme.colors.highEmphasis }]}>Continue Watching</Text>
@@ -228,41 +291,82 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         data={continueWatchingItems}
         renderItem={({ item }) => (
           <TouchableOpacity
-            style={[styles.contentItem, {
+            style={[styles.wideContentItem, {
+              backgroundColor: currentTheme.colors.elevation1,
               borderColor: currentTheme.colors.border,
               shadowColor: currentTheme.colors.black
             }]}
-            activeOpacity={0.7}
+            activeOpacity={0.8}
             onPress={() => handleContentPress(item.id, item.type)}
           >
-            <View style={styles.contentItemContainer}>
+            {/* Poster Image */}
+            <View style={styles.posterContainer}>
               <ExpoImage
                 source={{ uri: item.poster }}
-                style={styles.poster}
+                style={styles.widePoster}
                 contentFit="cover"
                 transition={200}
                 cachePolicy="memory-disk"
               />
-              {item.type === 'series' && item.season && item.episode && (
-                <View style={[styles.episodeInfoContainer, { backgroundColor: 'rgba(0, 0, 0, 0.7)' }]}>
-                  <Text style={[styles.episodeInfo, { color: currentTheme.colors.white }]}>
-                    S{item.season.toString().padStart(2, '0')}E{item.episode.toString().padStart(2, '0')}
-                  </Text>
-                  {item.episodeTitle && (
-                    <Text style={[styles.episodeTitle, { color: currentTheme.colors.white, opacity: 0.9 }]} numberOfLines={1}>
-                      {item.episodeTitle}
-                    </Text>
-                  )}
+            </View>
+
+            {/* Content Details */}
+            <View style={styles.contentDetails}>
+              <View style={styles.titleRow}>
+                <Text 
+                  style={[styles.contentTitle, { color: currentTheme.colors.highEmphasis }]}
+                  numberOfLines={1}
+                >
+                  {item.name}
+                </Text>
+                <View style={[styles.progressBadge, { backgroundColor: currentTheme.colors.primary }]}>
+                  <Text style={styles.progressText}>{Math.round(item.progress)}%</Text>
                 </View>
-              )}
-              {/* Progress bar indicator */}
-              <View style={styles.progressBarContainer}>
+              </View>
+
+              {/* Episode Info or Year */}
+              {(() => {
+                if (item.type === 'series' && item.season && item.episode) {
+                  return (
+                    <View style={styles.episodeRow}>
+                      <Text style={[styles.episodeText, { color: currentTheme.colors.mediumEmphasis }]}>
+                        Season {item.season}
+                      </Text>
+                      {item.episodeTitle && (
+                        <Text 
+                          style={[styles.episodeTitle, { color: currentTheme.colors.mediumEmphasis }]}
+                          numberOfLines={1}
+                        >
+                          {item.episodeTitle}
+                        </Text>
+                      )}
+                    </View>
+                  );
+                } else {
+                  return (
+                    <Text style={[styles.yearText, { color: currentTheme.colors.mediumEmphasis }]}>
+                      {item.year} • {item.type === 'movie' ? 'Movie' : 'Series'}
+                    </Text>
+                  );
+                }
+              })()}
+
+              {/* Progress Bar */}
+              <View style={styles.wideProgressContainer}>
+                <View style={styles.wideProgressTrack}>
                 <View 
                   style={[
-                    styles.progressBar, 
-                    { width: `${item.progress}%`, backgroundColor: currentTheme.colors.primary }
+                      styles.wideProgressBar, 
+                      { 
+                        width: `${item.progress}%`, 
+                        backgroundColor: currentTheme.colors.primary 
+                      }
                   ]} 
                 />
+                </View>
+                <Text style={[styles.progressLabel, { color: currentTheme.colors.textMuted }]}>
+                  {Math.round(item.progress)}% watched
+                </Text>
               </View>
             </View>
           </TouchableOpacity>
@@ -270,13 +374,13 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         keyExtractor={(item) => `continue-${item.id}-${item.type}`}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.list}
-        snapToInterval={POSTER_WIDTH + 10}
+        contentContainerStyle={styles.wideList}
+        snapToInterval={280 + 16} // Card width + margin
         decelerationRate="fast"
         snapToAlignment="start"
-        ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
+        ItemSeparatorComponent={() => <View style={{ width: 16 }} />}
       />
-    </View>
+    </Animated.View>
   );
 });
 
@@ -291,26 +395,116 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   titleContainer: {
     position: 'relative',
   },
   title: {
-    fontSize: 18,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 6,
+    fontSize: 20,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+    marginBottom: 4,
   },
   titleUnderline: {
     position: 'absolute',
-    bottom: -4,
+    bottom: -2,
     left: 0,
-    width: 60,
-    height: 3,
-    borderRadius: 1.5,
+    width: 40,
+    height: 2,
+    borderRadius: 1,
+    opacity: 0.8,
   },
+  wideList: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    paddingTop: 4,
+  },
+  wideContentItem: {
+    width: 280,
+    height: 120,
+    flexDirection: 'row',
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 6,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    borderWidth: 1,
+  },
+  posterContainer: {
+    width: 80,
+    height: '100%',
+  },
+  widePoster: {
+    width: '100%',
+    height: '100%',
+    borderTopLeftRadius: 12,
+    borderBottomLeftRadius: 12,
+  },
+  contentDetails: {
+    flex: 1,
+    padding: 12,
+    justifyContent: 'space-between',
+  },
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 4,
+  },
+  contentTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    flex: 1,
+    marginRight: 8,
+  },
+  progressBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    minWidth: 44,
+    alignItems: 'center',
+  },
+  progressText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  episodeRow: {
+    marginBottom: 8,
+  },
+  episodeText: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  episodeTitle: {
+    fontSize: 12,
+  },
+  yearText: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  wideProgressContainer: {
+    marginTop: 'auto',
+  },
+  wideProgressTrack: {
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 2,
+    marginBottom: 4,
+  },
+  wideProgressBar: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  progressLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  // Keep old styles for backward compatibility
   list: {
     paddingHorizontal: 16,
     paddingBottom: 8,
@@ -320,7 +514,7 @@ const styles = StyleSheet.create({
     width: POSTER_WIDTH,
     aspectRatio: 2/3,
     margin: 0,
-    borderRadius: 12,
+    borderRadius: 8,
     overflow: 'hidden',
     position: 'relative',
     elevation: 8,
@@ -332,14 +526,14 @@ const styles = StyleSheet.create({
   contentItemContainer: {
     width: '100%',
     height: '100%',
-    borderRadius: 12,
+    borderRadius: 8,
     overflow: 'hidden',
     position: 'relative',
   },
   poster: {
     width: '100%',
     height: '100%',
-    borderRadius: 12,
+    borderRadius: 8,
   },
   episodeInfoContainer: {
     position: 'absolute',
@@ -352,9 +546,6 @@ const styles = StyleSheet.create({
   episodeInfo: {
     fontSize: 12,
     fontWeight: 'bold',
-  },
-  episodeTitle: {
-    fontSize: 10,
   },
   progressBarContainer: {
     position: 'absolute',

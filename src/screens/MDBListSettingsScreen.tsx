@@ -540,7 +540,7 @@ const MDBListSettingsScreen = () => {
 
   const openMDBListWebsite = () => {
     logger.log('[MDBListSettingsScreen] Opening MDBList website');
-    Linking.openURL('https://mdblist.com/settings').catch(error => {
+    Linking.openURL('https://mdblist.com/preferences').catch(error => {
       logger.error('[MDBListSettingsScreen] Error opening website:', error);
     });
   };

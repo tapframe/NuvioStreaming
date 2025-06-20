@@ -235,6 +235,11 @@ const SearchScreen = () => {
 
   useEffect(() => {
     loadRecentSearches();
+    
+    // Cleanup function to cancel pending searches on unmount
+    return () => {
+      debouncedSearch.cancel();
+    };
   }, []);
 
   const animatedSearchBarStyle = useAnimatedStyle(() => {
@@ -282,7 +287,14 @@ const SearchScreen = () => {
       setShowRecent(true);
       loadRecentSearches();
     } else {
-      navigation.goBack();
+      // Add a small delay to allow keyboard to dismiss smoothly before navigation
+      if (Platform.OS === 'android') {
+        setTimeout(() => {
+          navigation.goBack();
+        }, 100);
+      } else {
+        navigation.goBack();
+      }
     }
   };
 
@@ -299,13 +311,17 @@ const SearchScreen = () => {
 
   const saveRecentSearch = async (searchQuery: string) => {
     try {
+      setRecentSearches(prevSearches => {
       const newRecentSearches = [
         searchQuery,
-        ...recentSearches.filter(s => s !== searchQuery)
+          ...prevSearches.filter(s => s !== searchQuery)
       ].slice(0, MAX_RECENT_SEARCHES);
       
-      setRecentSearches(newRecentSearches);
-      await AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newRecentSearches));
+        // Save to AsyncStorage
+        AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newRecentSearches));
+        
+        return newRecentSearches;
+      });
     } catch (error) {
       logger.error('Failed to save recent search:', error);
     }
@@ -320,34 +336,50 @@ const SearchScreen = () => {
       }
 
       try {
+        logger.info('Performing search for:', searchQuery);
         const searchResults = await catalogService.searchContentCinemeta(searchQuery);
         setResults(searchResults);
         if (searchResults.length > 0) {
           await saveRecentSearch(searchQuery);
         }
+        logger.info('Search completed, found', searchResults.length, 'results');
       } catch (error) {
         logger.error('Search failed:', error);
         setResults([]);
       } finally {
         setSearching(false);
       }
-    }, 200),
-    [recentSearches]
+    }, 800),
+    []
   );
 
   useEffect(() => {
-    if (query.trim()) {
+    if (query.trim() && query.trim().length >= 2) {
       setSearching(true);
       setSearched(true);
       setShowRecent(false);
       debouncedSearch(query);
+    } else if (query.trim().length < 2 && query.trim().length > 0) {
+      // Show that we're waiting for more characters
+      setSearching(false);
+      setSearched(false);
+      setShowRecent(false);
+      setResults([]);
     } else {
+      // Cancel any pending search when query is cleared
+      debouncedSearch.cancel();
       setResults([]);
       setSearched(false);
+      setSearching(false);
       setShowRecent(true);
       loadRecentSearches();
     }
-  }, [query]);
+    
+    // Cleanup function to cancel pending searches
+    return () => {
+      debouncedSearch.cancel();
+    };
+  }, [query, debouncedSearch]);
 
   const handleClearSearch = () => {
     setQuery('');
@@ -472,7 +504,14 @@ const SearchScreen = () => {
   const headerHeight = headerBaseHeight + topSpacing + 60;
 
   return (
-    <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
+    <Animated.View 
+      style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}
+      entering={Platform.OS === 'android' ? SlideInRight.duration(250) : FadeIn.duration(350)}
+      exiting={Platform.OS === 'android' ? 
+        FadeOut.duration(200).withInitialValues({ opacity: 1 }) : 
+        FadeOut.duration(250)
+      }
+    >
       <StatusBar
         barStyle="light-content"
         backgroundColor="transparent"
@@ -544,6 +583,23 @@ const SearchScreen = () => {
         <View style={[styles.contentContainer, { backgroundColor: currentTheme.colors.darkBackground }]}>
           {searching ? (
             <SimpleSearchAnimation />
+          ) : query.trim().length === 1 ? (
+            <Animated.View 
+              style={styles.emptyContainer}
+              entering={FadeIn.duration(300)}
+            >
+              <MaterialIcons 
+                name="search" 
+                size={64} 
+                color={currentTheme.colors.lightGray}
+              />
+              <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>
+                Keep typing...
+              </Text>
+              <Text style={[styles.emptySubtext, { color: currentTheme.colors.lightGray }]}>
+                Type at least 2 characters to search
+              </Text>
+            </Animated.View>
           ) : searched && !hasResultsToShow ? (
             <Animated.View 
               style={styles.emptyContainer}
@@ -614,7 +670,7 @@ const SearchScreen = () => {
           )}
         </View>
       </View>
-    </View>
+    </Animated.View>
   );
 };
 
@@ -710,7 +766,7 @@ const styles = StyleSheet.create({
   horizontalItemPosterContainer: {
     width: HORIZONTAL_ITEM_WIDTH,
     height: HORIZONTAL_POSTER_HEIGHT,
-    borderRadius: 12,
+    borderRadius: 8,
     overflow: 'hidden',
     marginBottom: 8,
     borderWidth: 1,

@@ -10,7 +10,7 @@ interface MovieContentProps {
 export const MovieContent: React.FC<MovieContentProps> = ({ metadata }) => {
   const { currentTheme } = useTheme();
   const hasCast = Array.isArray(metadata.cast) && metadata.cast.length > 0;
-  const castDisplay = hasCast ? (metadata.cast as string[]).slice(0, 5).join(', ') : '';
+  const castDisplay = hasCast ? metadata.cast!.slice(0, 5).join(', ') : '';
   
   return (
     <View style={styles.container}>
@@ -23,12 +23,6 @@ export const MovieContent: React.FC<MovieContentProps> = ({ metadata }) => {
           </View>
         )}
         
-        {metadata.writer && (
-          <View style={styles.metadataRow}>
-            <Text style={[styles.metadataLabel, { color: currentTheme.colors.textMuted }]}>Writer:</Text>
-            <Text style={[styles.metadataValue, { color: currentTheme.colors.text }]}>{metadata.writer}</Text>
-          </View>
-        )}
         
         {hasCast && (
           <View style={styles.metadataRow}>

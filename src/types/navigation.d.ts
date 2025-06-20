@@ -6,6 +6,7 @@ export type RootStackParamList = {
   Metadata: {
     id: string;
     type: string;
+    addonId?: string;
   };
   Streams: {
     id: string;
@@ -27,6 +28,7 @@ export type RootStackParamList = {
       url: string;
       lang: string;
     }>;
+    imdbId?: string;
   };
   Catalog: {
     addonId?: string;

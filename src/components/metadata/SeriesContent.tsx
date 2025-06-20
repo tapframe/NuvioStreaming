@@ -2,7 +2,9 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, useWindowDimensions, useColorScheme } from 'react-native';
 import { Image } from 'expo-image';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useSettings } from '../../hooks/useSettings';
 import { Episode } from '../../types/metadata';
 import { tmdbService } from '../../services/tmdbService';
 import { storageService } from '../../services/storageService';
@@ -34,19 +36,21 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   metadata
 }) => {
   const { currentTheme } = useTheme();
+  const { settings } = useSettings();
   const { width } = useWindowDimensions();
   const isTablet = width > 768;
   const isDarkMode = useColorScheme() === 'dark';
-  const [episodeProgress, setEpisodeProgress] = useState<{ [key: string]: { currentTime: number; duration: number } }>({});
+  const [episodeProgress, setEpisodeProgress] = useState<{ [key: string]: { currentTime: number; duration: number; lastUpdated: number } }>({});
   
-  // Add ref for the season selector ScrollView
+  // Add refs for the scroll views
   const seasonScrollViewRef = useRef<ScrollView | null>(null);
+  const episodeScrollViewRef = useRef<ScrollView | null>(null);
 
   const loadEpisodesProgress = async () => {
     if (!metadata?.id) return;
     
     const allProgress = await storageService.getAllWatchProgress();
-    const progress: { [key: string]: { currentTime: number; duration: number } } = {};
+    const progress: { [key: string]: { currentTime: number; duration: number; lastUpdated: number } } = {};
     
     episodes.forEach(episode => {
       const episodeId = episode.stremioId || `${metadata.id}:${episode.season_number}:${episode.episode_number}`;
@@ -54,12 +58,74 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
       if (allProgress[key]) {
         progress[episodeId] = {
           currentTime: allProgress[key].currentTime,
-          duration: allProgress[key].duration
+          duration: allProgress[key].duration,
+          lastUpdated: allProgress[key].lastUpdated
         };
       }
     });
     
     setEpisodeProgress(progress);
+  };
+
+  // Function to find and scroll to the most recently watched episode
+  const scrollToMostRecentEpisode = () => {
+    if (!metadata?.id || !episodeScrollViewRef.current || settings.episodeLayoutStyle !== 'horizontal') {
+      console.log('[SeriesContent] Scroll conditions not met:', {
+        hasMetadataId: !!metadata?.id,
+        hasScrollRef: !!episodeScrollViewRef.current,
+        isHorizontal: settings.episodeLayoutStyle === 'horizontal'
+      });
+      return;
+    }
+    
+    const currentSeasonEpisodes = groupedEpisodes[selectedSeason] || [];
+    if (currentSeasonEpisodes.length === 0) {
+      console.log('[SeriesContent] No episodes in current season:', selectedSeason);
+      return;
+    }
+    
+    // Find the most recently watched episode in the current season
+    let mostRecentEpisodeIndex = -1;
+    let mostRecentTimestamp = 0;
+    let mostRecentEpisodeName = '';
+    
+    currentSeasonEpisodes.forEach((episode, index) => {
+      const episodeId = episode.stremioId || `${metadata.id}:${episode.season_number}:${episode.episode_number}`;
+      const progress = episodeProgress[episodeId];
+      
+      if (progress && progress.lastUpdated > mostRecentTimestamp && progress.currentTime > 0) {
+        mostRecentTimestamp = progress.lastUpdated;
+        mostRecentEpisodeIndex = index;
+        mostRecentEpisodeName = episode.name;
+      }
+    });
+    
+    console.log('[SeriesContent] Episode scroll analysis:', {
+      totalEpisodes: currentSeasonEpisodes.length,
+      mostRecentIndex: mostRecentEpisodeIndex,
+      mostRecentEpisode: mostRecentEpisodeName,
+      selectedSeason
+    });
+    
+    // Scroll to the most recently watched episode if found
+    if (mostRecentEpisodeIndex >= 0) {
+      const cardWidth = isTablet ? width * 0.4 + 16 : width * 0.85 + 16;
+      const scrollPosition = mostRecentEpisodeIndex * cardWidth;
+      
+      console.log('[SeriesContent] Scrolling to episode:', {
+        index: mostRecentEpisodeIndex,
+        cardWidth,
+        scrollPosition,
+        episodeName: mostRecentEpisodeName
+      });
+      
+      setTimeout(() => {
+        episodeScrollViewRef.current?.scrollTo({
+          x: scrollPosition,
+          animated: true
+        });
+      }, 500); // Delay to ensure the season has loaded
+    }
   };
 
   // Initial load of watch progress
@@ -92,6 +158,13 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
       }
     }
   }, [selectedSeason, groupedEpisodes]);
+
+  // Add effect to scroll to most recently watched episode when season changes or progress loads
+  useEffect(() => {
+    if (Object.keys(episodeProgress).length > 0 && selectedSeason) {
+      scrollToMostRecentEpisode();
+    }
+  }, [selectedSeason, episodeProgress, settings.episodeLayoutStyle, groupedEpisodes]);
 
   if (loadingSeasons) {
     return (
@@ -159,6 +232,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                 </View>
                 <Text 
                   style={[
+                    styles.seasonButtonText,
                     { color: currentTheme.colors.mediumEmphasis },
                     selectedSeason === season && [styles.selectedSeasonButtonText, { color: currentTheme.colors.primary }]
                   ]}
@@ -173,7 +247,8 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
     );
   };
 
-  const renderEpisodeCard = (episode: Episode) => {
+  // Vertical layout episode card (traditional)
+  const renderVerticalEpisodeCard = (episode: Episode) => {
     let episodeImage = EPISODE_PLACEHOLDER;
     if (episode.still_path) {
       const tmdbUrl = tmdbService.getImageUrl(episode.still_path, 'w500');
@@ -210,15 +285,15 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
     const progress = episodeProgress[episodeId];
     const progressPercent = progress ? (progress.currentTime / progress.duration) * 100 : 0;
     
-    // Don't show progress bar if episode is complete (>= 95%)
-    const showProgress = progress && progressPercent < 95;
+    // Don't show progress bar if episode is complete (>= 85%)
+    const showProgress = progress && progressPercent < 85;
 
     return (
       <TouchableOpacity
         key={episode.id}
         style={[
-          styles.episodeCard, 
-          isTablet && styles.episodeCardTablet, 
+          styles.episodeCardVertical, 
+          isTablet && styles.episodeCardVerticalTablet, 
           { backgroundColor: currentTheme.colors.elevation2 }
         ]}
         onPress={() => onSelectEpisode(episode)}
@@ -243,7 +318,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               />
             </View>
           )}
-          {progressPercent >= 95 && (
+          {progressPercent >= 85 && (
             <View style={[styles.completedBadge, { backgroundColor: currentTheme.colors.primary }]}>
               <MaterialIcons name="check" size={12} color={currentTheme.colors.white} />
             </View>
@@ -291,6 +366,170 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
     );
   };
 
+  // Horizontal layout episode card (Netflix-style)
+  const renderHorizontalEpisodeCard = (episode: Episode) => {
+    let episodeImage = EPISODE_PLACEHOLDER;
+    if (episode.still_path) {
+      const tmdbUrl = tmdbService.getImageUrl(episode.still_path, 'w500');
+      if (tmdbUrl) episodeImage = tmdbUrl;
+    } else if (metadata?.poster) {
+      episodeImage = metadata.poster;
+    }
+    
+    const episodeNumber = typeof episode.episode_number === 'number' ? episode.episode_number.toString() : '';
+    const seasonNumber = typeof episode.season_number === 'number' ? episode.season_number.toString() : '';
+    const episodeString = seasonNumber && episodeNumber ? `EPISODE ${episodeNumber}` : '';
+    
+    const formatRuntime = (runtime: number) => {
+      if (!runtime) return null;
+      const hours = Math.floor(runtime / 60);
+      const minutes = runtime % 60;
+      if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+      }
+      return `${minutes}m`;
+    };
+
+    // Get episode progress
+    const episodeId = episode.stremioId || `${metadata?.id}:${episode.season_number}:${episode.episode_number}`;
+    const progress = episodeProgress[episodeId];
+    const progressPercent = progress ? (progress.currentTime / progress.duration) * 100 : 0;
+    
+    // Don't show progress bar if episode is complete (>= 85%)
+    const showProgress = progress && progressPercent < 85;
+
+    return (
+      <TouchableOpacity
+        key={episode.id}
+        style={[
+          styles.episodeCardHorizontal,
+          isTablet && styles.episodeCardHorizontalTablet,
+          // Gradient border styling
+          { 
+            borderWidth: 1,
+            borderColor: 'transparent',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            elevation: 12,
+          }
+        ]}
+        onPress={() => onSelectEpisode(episode)}
+        activeOpacity={0.85}
+      >
+        {/* Gradient Border Container */}
+        <View style={{
+          position: 'absolute',
+          top: -1,
+          left: -1,
+          right: -1,
+          bottom: -1,
+          borderRadius: 17,
+          zIndex: -1,
+        }}>
+          <LinearGradient
+            colors={[
+              '#ffffff80', // White with 50% opacity
+              '#ffffff40', // White with 25% opacity  
+              '#ffffff20', // White with 12% opacity
+              '#ffffff40', // White with 25% opacity
+              '#ffffff80', // White with 50% opacity
+            ]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{
+              flex: 1,
+              borderRadius: 17,
+            }}
+          />
+        </View>
+
+        {/* Background Image */}
+        <Image
+          source={{ uri: episodeImage }}
+          style={styles.episodeBackgroundImage}
+          contentFit="cover"
+        />
+        
+        {/* Standard Gradient Overlay */}
+        <LinearGradient
+          colors={[
+            'rgba(0,0,0,0.05)',
+            'rgba(0,0,0,0.2)', 
+            'rgba(0,0,0,0.6)',
+            'rgba(0,0,0,0.85)',
+            'rgba(0,0,0,0.95)'
+          ]}
+          locations={[0, 0.2, 0.5, 0.8, 1]}
+          style={styles.episodeGradient}
+        >
+          {/* Content Container */}
+          <View style={styles.episodeContent}>
+            {/* Episode Number Badge */}
+            <View style={styles.episodeNumberBadgeHorizontal}>
+            <Text style={styles.episodeNumberHorizontal}>{episodeString}</Text>
+            </View>
+            
+            {/* Episode Title */}
+            <Text style={styles.episodeTitleHorizontal} numberOfLines={2}>
+              {episode.name}
+            </Text>
+            
+            {/* Episode Description */}
+            <Text style={styles.episodeDescriptionHorizontal} numberOfLines={3}>
+              {episode.overview || 'No description available'}
+            </Text>
+            
+            {/* Metadata Row */}
+            <View style={styles.episodeMetadataRowHorizontal}>
+              {episode.runtime && (
+                <View style={styles.runtimeContainerHorizontal}>
+                <Text style={styles.runtimeTextHorizontal}>
+                  {formatRuntime(episode.runtime)}
+                </Text>
+                </View>
+              )}
+              {episode.vote_average > 0 && (
+                <View style={styles.ratingContainerHorizontal}>
+                  <MaterialIcons name="star" size={14} color="#FFD700" />
+                  <Text style={styles.ratingTextHorizontal}>
+                    {episode.vote_average.toFixed(1)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+          
+          {/* Progress Bar */}
+          {showProgress && (
+            <View style={styles.progressBarContainerHorizontal}>
+              <View 
+                style={[
+                  styles.progressBarHorizontal,
+                  { 
+                    width: `${progressPercent}%`, 
+                    backgroundColor: currentTheme.colors.primary,
+                  }
+                ]} 
+              />
+            </View>
+          )}
+          
+          {/* Completed Badge */}
+          {progressPercent >= 85 && (
+            <View style={[styles.completedBadgeHorizontal, { 
+              backgroundColor: currentTheme.colors.primary,
+            }]}>
+              <MaterialIcons name="check" size={16} color="#fff" />
+            </View>
+          )}
+          
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  };
+
   const currentSeasonEpisodes = groupedEpisodes[selectedSeason] || [];
 
   return (
@@ -308,35 +547,63 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
           {episodes.length} {episodes.length === 1 ? 'Episode' : 'Episodes'}
         </Text>
         
-        <ScrollView 
-          style={styles.episodeList}
-          contentContainerStyle={[
-            styles.episodeListContent,
-            isTablet && styles.episodeListContentTablet
-          ]}
-        >
-          {isTablet ? (
-            <View style={styles.episodeGrid}>
-              {currentSeasonEpisodes.map((episode, index) => (
+        {settings.episodeLayoutStyle === 'horizontal' ? (
+          // Horizontal Layout (Netflix-style)
+          <ScrollView 
+            ref={episodeScrollViewRef}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.episodeList}
+            contentContainerStyle={styles.episodeListContentHorizontal}
+            decelerationRate="fast"
+            snapToInterval={isTablet ? width * 0.4 + 16 : width * 0.85 + 16}
+            snapToAlignment="start"
+          >
+            {currentSeasonEpisodes.map((episode, index) => (
+              <Animated.View 
+                key={episode.id}
+                entering={FadeIn.duration(400).delay(300 + index * 50)}
+                style={[
+                  styles.episodeCardWrapperHorizontal,
+                  isTablet && styles.episodeCardWrapperHorizontalTablet
+                ]}
+              >
+                {renderHorizontalEpisodeCard(episode)}
+              </Animated.View>
+            ))}
+          </ScrollView>
+        ) : (
+          // Vertical Layout (Traditional)
+          <ScrollView 
+            style={styles.episodeList}
+            contentContainerStyle={[
+              styles.episodeListContentVertical,
+              isTablet && styles.episodeListContentVerticalTablet
+            ]}
+          >
+            {isTablet ? (
+              <View style={styles.episodeGridVertical}>
+                {currentSeasonEpisodes.map((episode, index) => (
+                  <Animated.View 
+                    key={episode.id}
+                    entering={FadeIn.duration(400).delay(300 + index * 50)}
+                  >
+                    {renderVerticalEpisodeCard(episode)}
+                  </Animated.View>
+                ))}
+              </View>
+            ) : (
+              currentSeasonEpisodes.map((episode, index) => (
                 <Animated.View 
                   key={episode.id}
                   entering={FadeIn.duration(400).delay(300 + index * 50)}
                 >
-                  {renderEpisodeCard(episode)}
+                  {renderVerticalEpisodeCard(episode)}
                 </Animated.View>
-              ))}
-            </View>
-          ) : (
-            currentSeasonEpisodes.map((episode, index) => (
-              <Animated.View 
-                key={episode.id}
-                entering={FadeIn.duration(400).delay(300 + index * 50)}
-              >
-                {renderEpisodeCard(episode)}
-              </Animated.View>
-            ))
-          )}
-        </ScrollView>
+              ))
+            )}
+          </ScrollView>
+        )}
       </Animated.View>
     </View>
   );
@@ -345,7 +612,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    paddingVertical: 16,
   },
   centeredContainer: {
     flex: 1,
@@ -362,22 +629,26 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     marginBottom: 16,
+    paddingHorizontal: 16,
   },
   episodeList: {
     flex: 1,
   },
-  episodeListContent: {
+  
+  // Vertical Layout Styles
+  episodeListContentVertical: {
     paddingBottom: 20,
+    paddingHorizontal: 16,
   },
-  episodeListContentTablet: {
+  episodeListContentVerticalTablet: {
     paddingHorizontal: 8,
   },
-  episodeGrid: {
+  episodeGridVertical: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
-  episodeCard: {
+  episodeCardVertical: {
     flexDirection: 'row',
     borderRadius: 16,
     marginBottom: 16,
@@ -391,7 +662,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.1)',
     height: 120,
   },
-  episodeCardTablet: {
+  episodeCardVerticalTablet: {
     width: '48%',
     flexDirection: 'column',
     height: 120,
@@ -461,6 +732,19 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginLeft: 4,
   },
+  runtimeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  runtimeText: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
   airDateText: {
     fontSize: 12,
     opacity: 0.8,
@@ -469,8 +753,170 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
+  progressBarContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  progressBar: {
+    height: '100%',
+  },
+  completedBadge: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+
+  // Horizontal Layout Styles
+  episodeListContentHorizontal: {
+    paddingLeft: 16,
+    paddingRight: 16,
+  },
+  episodeCardWrapperHorizontal: {
+    width: Dimensions.get('window').width * 0.85,
+    marginRight: 16,
+  },
+  episodeCardWrapperHorizontalTablet: {
+    width: Dimensions.get('window').width * 0.4,
+  },
+  episodeCardHorizontal: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+    height: 200,
+    position: 'relative',
+    width: '100%',
+    backgroundColor: 'transparent',
+  },
+  episodeCardHorizontalTablet: {
+    height: 180,
+  },
+  episodeBackgroundImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 16,
+  },
+  episodeGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 16,
+    justifyContent: 'flex-end',
+  },
+  episodeContent: {
+    padding: 12,
+    paddingBottom: 16,
+  },
+  episodeNumberBadgeHorizontal: {
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+    marginBottom: 6,
+    alignSelf: 'flex-start',
+  },
+  episodeNumberHorizontal: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  episodeTitleHorizontal: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    marginBottom: 4,
+    lineHeight: 18,
+  },
+  episodeDescriptionHorizontal: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 12,
+    lineHeight: 16,
+    marginBottom: 8,
+    opacity: 0.9,
+  },
+  episodeMetadataRowHorizontal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  runtimeContainerHorizontal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 3,
+  },
+  runtimeTextHorizontal: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  ratingContainerHorizontal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 3,
+    gap: 2,
+  },
+  ratingTextHorizontal: {
+    color: '#FFD700',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  progressBarContainerHorizontal: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  progressBarHorizontal: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  completedBadgeHorizontal: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+
+  // Season Selector Styles
   seasonSelectorWrapper: {
     marginBottom: 20,
+    paddingHorizontal: 16,
   },
   seasonSelectorTitle: {
     fontSize: 18,
@@ -516,55 +962,5 @@ const styles = StyleSheet.create({
   },
   selectedSeasonButtonText: {
     fontWeight: '700',
-  },
-  progressBarContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 3,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  progressBar: {
-    height: '100%',
-  },
-  progressTextContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  progressText: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  completedBadge: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  runtimeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  runtimeText: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginLeft: 4,
   },
 }); 

@@ -37,6 +37,7 @@ const CatalogsList = ({ catalogs, selectedCategory }: CatalogsListProps) => {
 const styles = StyleSheet.create({
   container: {
     paddingVertical: 8,
+    paddingBottom: 90,
   },
 });
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, memo, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, memo, useState, useEffect, useRef, useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -13,9 +13,10 @@ import {
   StatusBar,
   Alert,
   Dimensions,
-  Linking
+  Linking,
 } from 'react-native';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import * as ScreenOrientation from 'expo-screen-orientation';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { RouteProp } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -32,6 +33,7 @@ import { useSettings } from '../hooks/useSettings';
 import QualityBadge from '../components/metadata/QualityBadge';
 import Animated, {
   FadeIn,
+  FadeOut,
   FadeInDown,
   SlideInDown,
   withSpring,
@@ -42,7 +44,8 @@ import Animated, {
   Extrapolate,
   runOnJS,
   cancelAnimation,
-  SharedValue
+  SharedValue,
+  Layout
 } from 'react-native-reanimated';
 import { logger } from '../utils/logger';
 
@@ -53,13 +56,14 @@ const DOLBY_ICON = 'https://upload.wikimedia.org/wikipedia/en/thumb/3/3f/Dolby_V
 const { width, height } = Dimensions.get('window');
 
 // Extracted Components
-const StreamCard = ({ stream, onPress, index, isLoading, statusMessage, theme }: { 
+const StreamCard = ({ stream, onPress, index, isLoading, statusMessage, theme, isExiting }: { 
   stream: Stream; 
   onPress: () => void; 
   index: number;
   isLoading?: boolean;
   statusMessage?: string;
   theme: any;
+  isExiting?: boolean;
 }) => {
   const styles = React.useMemo(() => createStyles(theme.colors), [theme.colors]);
   
@@ -68,75 +72,173 @@ const StreamCard = ({ stream, onPress, index, isLoading, statusMessage, theme }:
   const isDolby = stream.title?.toLowerCase().includes('dolby') || stream.title?.includes('DV');
   const size = stream.title?.match(/💾\s*([\d.]+\s*[GM]B)/)?.[1];
   const isDebrid = stream.behaviorHints?.cached;
+  
+  // Determine if this is a HDRezka stream
+  const isHDRezka = stream.name === 'HDRezka';
 
-  const displayTitle = stream.name || stream.title || 'Unnamed Stream';
-  const displayAddonName = stream.title || '';
+  // For HDRezka streams, the title contains the quality information
+  const displayTitle = isHDRezka ? `HDRezka ${stream.title}` : (stream.name || stream.title || 'Unnamed Stream');
+  const displayAddonName = isHDRezka ? '' : (stream.title || '');
+
+  // Animation delay based on index - stagger effect (only if not exiting)
+  const enterDelay = isExiting ? 0 : 100 + (index * 30);
+
+  // Use simple View when exiting to prevent animation conflicts
+  if (isExiting) {
+    return (
+      <View>
+        <TouchableOpacity 
+          style={[
+            styles.streamCard, 
+            isLoading && styles.streamCardLoading
+          ]} 
+          onPress={onPress}
+          disabled={isLoading}
+          activeOpacity={0.7}
+        >
+          <View style={styles.streamDetails}>
+            <View style={styles.streamNameRow}>
+              <View style={styles.streamTitleContainer}>
+                <Text style={[styles.streamName, { color: theme.colors.highEmphasis }]}>
+                  {displayTitle}
+                </Text>
+                {displayAddonName && displayAddonName !== displayTitle && (
+                  <Text style={[styles.streamAddonName, { color: theme.colors.mediumEmphasis }]}>
+                    {displayAddonName}
+                  </Text>
+                )}
+              </View>
+              
+              {/* Show loading indicator if stream is loading */}
+              {isLoading && (
+                <View style={styles.loadingIndicator}>
+                  <ActivityIndicator size="small" color={theme.colors.primary} />
+                  <Text style={[styles.loadingText, { color: theme.colors.primary }]}>
+                    {statusMessage || "Loading..."}
+                  </Text>
+                </View>
+              )}
+            </View>
+            
+            <View style={styles.streamMetaRow}>
+              {quality && quality >= "720" && (
+                <QualityBadge type="HD" />
+              )}
+              
+              {isDolby && (
+                <QualityBadge type="VISION" />
+              )}
+              
+              {size && (
+                <View style={[styles.chip, { backgroundColor: theme.colors.darkGray }]}>
+                  <Text style={[styles.chipText, { color: theme.colors.white }]}>{size}</Text>
+                </View>
+              )}
+              
+              {isDebrid && (
+                <View style={[styles.chip, { backgroundColor: theme.colors.success }]}>
+                  <Text style={[styles.chipText, { color: theme.colors.white }]}>DEBRID</Text>
+                </View>
+              )}
+              
+              {/* Special badge for HDRezka streams */}
+              {isHDRezka && (
+                <View style={[styles.chip, { backgroundColor: theme.colors.accent }]}>
+                  <Text style={[styles.chipText, { color: theme.colors.white }]}>HDREZKA</Text>
+                </View>
+              )}
+            </View>
+          </View>
+          
+          <View style={styles.streamAction}>
+            <MaterialIcons 
+              name="play-arrow" 
+              size={24} 
+              color={theme.colors.primary} 
+            />
+          </View>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
-    <TouchableOpacity 
-      style={[
-        styles.streamCard, 
-        isLoading && styles.streamCardLoading
-      ]} 
-      onPress={onPress}
-      disabled={isLoading}
-      activeOpacity={0.7}
+    <Animated.View
+      entering={FadeInDown.duration(200).delay(enterDelay)}
+      layout={Layout.duration(200)}
     >
-      <View style={styles.streamDetails}>
-        <View style={styles.streamNameRow}>
-          <View style={styles.streamTitleContainer}>
-            <Text style={[styles.streamName, { color: theme.colors.highEmphasis }]}>
-              {displayTitle}
-            </Text>
-            {displayAddonName && displayAddonName !== displayTitle && (
-              <Text style={[styles.streamAddonName, { color: theme.colors.mediumEmphasis }]}>
-                {displayAddonName}
+      <TouchableOpacity 
+        style={[
+          styles.streamCard, 
+          isLoading && styles.streamCardLoading
+        ]} 
+        onPress={onPress}
+        disabled={isLoading}
+        activeOpacity={0.7}
+      >
+        <View style={styles.streamDetails}>
+          <View style={styles.streamNameRow}>
+            <View style={styles.streamTitleContainer}>
+              <Text style={[styles.streamName, { color: theme.colors.highEmphasis }]}>
+                {displayTitle}
               </Text>
+              {displayAddonName && displayAddonName !== displayTitle && (
+                <Text style={[styles.streamAddonName, { color: theme.colors.mediumEmphasis }]}>
+                  {displayAddonName}
+                </Text>
+              )}
+            </View>
+            
+            {/* Show loading indicator if stream is loading */}
+            {isLoading && (
+              <View style={styles.loadingIndicator}>
+                <ActivityIndicator size="small" color={theme.colors.primary} />
+                <Text style={[styles.loadingText, { color: theme.colors.primary }]}>
+                  {statusMessage || "Loading..."}
+                </Text>
+              </View>
             )}
           </View>
           
-          {/* Show loading indicator if stream is loading */}
-          {isLoading && (
-            <View style={styles.loadingIndicator}>
-              <ActivityIndicator size="small" color={theme.colors.primary} />
-              <Text style={[styles.loadingText, { color: theme.colors.primary }]}>
-                {statusMessage || "Loading..."}
-              </Text>
-            </View>
-          )}
+          <View style={styles.streamMetaRow}>
+            {quality && quality >= "720" && (
+              <QualityBadge type="HD" />
+            )}
+            
+            {isDolby && (
+              <QualityBadge type="VISION" />
+            )}
+            
+            {size && (
+              <View style={[styles.chip, { backgroundColor: theme.colors.darkGray }]}>
+                <Text style={[styles.chipText, { color: theme.colors.white }]}>{size}</Text>
+              </View>
+            )}
+            
+            {isDebrid && (
+              <View style={[styles.chip, { backgroundColor: theme.colors.success }]}>
+                <Text style={[styles.chipText, { color: theme.colors.white }]}>DEBRID</Text>
+              </View>
+            )}
+            
+            {/* Special badge for HDRezka streams */}
+            {isHDRezka && (
+              <View style={[styles.chip, { backgroundColor: theme.colors.accent }]}>
+                <Text style={[styles.chipText, { color: theme.colors.white }]}>HDREZKA</Text>
+              </View>
+            )}
+          </View>
         </View>
         
-        <View style={styles.streamMetaRow}>
-          {quality && quality >= "720" && (
-            <QualityBadge type="HD" />
-          )}
-          
-          {isDolby && (
-            <QualityBadge type="VISION" />
-          )}
-          
-          {size && (
-            <View style={[styles.chip, { backgroundColor: theme.colors.darkGray }]}>
-              <Text style={[styles.chipText, { color: theme.colors.white }]}>{size}</Text>
-            </View>
-          )}
-          
-          {isDebrid && (
-            <View style={[styles.chip, { backgroundColor: theme.colors.success }]}>
-              <Text style={[styles.chipText, { color: theme.colors.white }]}>DEBRID</Text>
-            </View>
-          )}
+        <View style={styles.streamAction}>
+          <MaterialIcons 
+            name="play-arrow" 
+            size={24} 
+            color={theme.colors.primary} 
+          />
         </View>
-      </View>
-      
-      <View style={styles.streamAction}>
-        <MaterialIcons 
-          name="play-arrow" 
-          size={24} 
-          color={theme.colors.primary} 
-        />
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 
@@ -163,44 +265,53 @@ const ProviderFilter = memo(({
 }) => {
   const styles = React.useMemo(() => createStyles(theme.colors), [theme.colors]);
   
-  const renderItem = useCallback(({ item }: { item: { id: string; name: string } }) => (
-    <TouchableOpacity
-      key={item.id}
-      style={[
-        styles.filterChip,
-        selectedProvider === item.id && styles.filterChipSelected
-      ]}
-      onPress={() => onSelect(item.id)}
+  const renderItem = useCallback(({ item, index }: { item: { id: string; name: string }; index: number }) => (
+    <Animated.View
+      entering={FadeIn.duration(300).delay(100 + index * 40)}
+      layout={Layout.springify()}
     >
-      <Text style={[
-        styles.filterChipText,
-        selectedProvider === item.id && styles.filterChipTextSelected
-      ]}>
-        {item.name}
-      </Text>
-    </TouchableOpacity>
+      <TouchableOpacity
+        key={item.id}
+        style={[
+          styles.filterChip,
+          selectedProvider === item.id && styles.filterChipSelected
+        ]}
+        onPress={() => onSelect(item.id)}
+      >
+        <Text style={[
+          styles.filterChipText,
+          selectedProvider === item.id && styles.filterChipTextSelected
+        ]}>
+          {item.name}
+        </Text>
+      </TouchableOpacity>
+    </Animated.View>
   ), [selectedProvider, onSelect, styles]);
 
   return (
-    <FlatList
-      data={providers}
-      renderItem={renderItem}
-      keyExtractor={item => item.id}
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={styles.filterScroll}
-      bounces={true}
-      overScrollMode="never"
-      decelerationRate="fast"
-      initialNumToRender={5}
-      maxToRenderPerBatch={3}
-      windowSize={3}
-      getItemLayout={(data, index) => ({
-        length: 100, // Approximate width of each item
-        offset: 100 * index,
-        index,
-      })}
-    />
+    <Animated.View
+      entering={FadeIn.duration(300)}
+    >
+      <FlatList
+        data={providers}
+        renderItem={renderItem}
+        keyExtractor={item => item.id}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterScroll}
+        bounces={true}
+        overScrollMode="never"
+        decelerationRate="fast"
+        initialNumToRender={5}
+        maxToRenderPerBatch={3}
+        windowSize={3}
+        getItemLayout={(data, index) => ({
+          length: 100, // Approximate width of each item
+          offset: 100 * index,
+          index,
+        })}
+      />
+    </Animated.View>
   );
 });
 
@@ -212,10 +323,28 @@ export const StreamsScreen = () => {
   const { currentTheme } = useTheme();
   const { colors } = currentTheme;
 
+  // Add ref to prevent excessive updates
+  const isMounted = useRef(true);
+  const loadStartTimeRef = useRef(0);
+  const hasDoneInitialLoadRef = useRef(false);
+  
+  // Add state for handling orientation transition
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  
+  // Add state to prevent animation conflicts during exit
+  const [isExiting, setIsExiting] = useState(false);
+
   // Add timing logs
   const [loadStartTime, setLoadStartTime] = useState(0);
   const [providerLoadTimes, setProviderLoadTimes] = useState<{[key: string]: number}>({});
   
+  // Prevent excessive re-renders by using this guard
+  const guardedSetState = useCallback((setter: () => void) => {
+    if (isMounted.current) {
+      setter();
+    }
+  }, []);
+
   const {
     metadata,
     episodes,
@@ -228,6 +357,7 @@ export const StreamsScreen = () => {
     loadEpisodeStreams,
     setSelectedEpisode,
     groupedEpisodes,
+    imdbId,
   } = useMetadata({ id, type });
 
   // Create styles using current theme colors
@@ -256,55 +386,104 @@ export const StreamsScreen = () => {
     }
   }>({});
 
-  // Monitor streams loading start
+  // Add state for autoplay functionality
+  const [autoplayTriggered, setAutoplayTriggered] = useState(false);
+  const [isAutoplayWaiting, setIsAutoplayWaiting] = useState(false);
+
+  // Add check for available streaming sources
+  const [hasStreamProviders, setHasStreamProviders] = useState(true); // Assume true initially
+  const [hasStremioStreamProviders, setHasStremioStreamProviders] = useState(true); // For footer logic
+
+  // Add state for no sources error
+  const [showNoSourcesError, setShowNoSourcesError] = useState(false);
+
+  // Monitor streams loading and update available providers immediately
   useEffect(() => {
-    if (loadingStreams || loadingEpisodeStreams) {
-      logger.log("⏱️ Stream loading started");
-      const now = Date.now();
-      setLoadStartTime(now);
-      setProviderLoadTimes({});
-      
-      // Reset provider status - only for stremio addons
-      setProviderStatus({
-        'stremio': {
-          loading: true,
-          success: false,
-          error: false,
-          message: 'Loading...',
-          timeStarted: now,
-          timeCompleted: 0
-        }
-      });
-      
-      // Also update the simpler loading state - only for stremio
-      setLoadingProviders({
-        'stremio': true
-      });
+    // Skip processing if component is unmounting
+    if (!isMounted.current) return;
+    
+    const currentStreamsData = type === 'series' ? episodeStreams : groupedStreams;
+    
+    // Update available providers immediately when streams change
+    const providersWithStreams = Object.entries(currentStreamsData)
+      .filter(([_, data]) => data.streams && data.streams.length > 0)
+      .map(([providerId]) => providerId);
+    
+    if (providersWithStreams.length > 0) {
+      logger.log(`📊 Providers with streams: ${providersWithStreams.join(', ')}`);
+      const providersWithStreamsSet = new Set(providersWithStreams);
+      setAvailableProviders(providersWithStreamsSet);
     }
-  }, [loadingStreams, loadingEpisodeStreams]);
+    
+    // Update loading states for individual providers
+    const expectedProviders = ['stremio', 'hdrezka'];
+    const now = Date.now();
+    
+    setLoadingProviders(prevLoading => {
+      const newLoading = { ...prevLoading };
+      expectedProviders.forEach(providerId => {
+        // Provider is loading if overall loading is true OR if it doesn't have streams yet
+        const hasStreams = currentStreamsData[providerId] && 
+                          currentStreamsData[providerId].streams && 
+                          currentStreamsData[providerId].streams.length > 0;
+        newLoading[providerId] = (loadingStreams || loadingEpisodeStreams) && !hasStreams;
+      });
+      return newLoading;
+    });
+    
+  }, [loadingStreams, loadingEpisodeStreams, groupedStreams, episodeStreams, type]);
 
-  React.useEffect(() => {
-    if (type === 'series' && episodeId) {
-      logger.log(`🎬 Loading episode streams for: ${episodeId}`);
-      setLoadingProviders({
-        'stremio': true
-      });
-      setSelectedEpisode(episodeId);
-      loadEpisodeStreams(episodeId);
-    } else if (type === 'movie') {
-      logger.log(`🎬 Loading movie streams for: ${id}`);
-      setLoadingProviders({
-        'stremio': true
-      });
-      loadStreams();
+  // Reset the selected provider to 'all' if the current selection is no longer available
+  useEffect(() => {
+    if (selectedProvider !== 'all' && !availableProviders.has(selectedProvider)) {
+      setSelectedProvider('all');
     }
-  }, [type, episodeId]);
+  }, [selectedProvider, availableProviders]);
 
-  React.useEffect(() => {
-    const streams = type === 'series' ? episodeStreams : groupedStreams;
-    const providers = new Set(Object.keys(streams));
-    setAvailableProviders(providers);
-  }, [type, groupedStreams, episodeStreams]);
+  // Update useEffect to check for sources
+  useEffect(() => {
+    const checkProviders = async () => {
+      // Check for both Stremio addons and if the internal provider is enabled
+      const hasStremioProviders = await stremioService.hasStreamProviders();
+      const hasProviders = hasStremioProviders || settings.enableInternalProviders;
+
+      if (!isMounted.current) return;
+
+      setHasStreamProviders(hasProviders);
+      setHasStremioStreamProviders(hasStremioProviders);
+
+      if (!hasProviders) {
+        const timer = setTimeout(() => {
+          if (isMounted.current) setShowNoSourcesError(true);
+        }, 500);
+        return () => clearTimeout(timer);
+      } else {
+          if (type === 'series' && episodeId) {
+            logger.log(`🎬 Loading episode streams for: ${episodeId}`);
+            setLoadingProviders({
+              'stremio': true,
+              'hdrezka': true
+            });
+            setSelectedEpisode(episodeId);
+            loadEpisodeStreams(episodeId);
+          } else if (type === 'movie') {
+            logger.log(`🎬 Loading movie streams for: ${id}`);
+            loadStreams();
+          }
+  
+          // Reset autoplay state when content changes
+          setAutoplayTriggered(false);
+          if (settings.autoplayBestStream) {
+            setIsAutoplayWaiting(true);
+            logger.log('🔄 Autoplay enabled, waiting for best stream...');
+          } else {
+            setIsAutoplayWaiting(false);
+          }
+      }
+    };
+
+    checkProviders();
+  }, [type, id, episodeId, settings.autoplayBestStream, settings.enableInternalProviders]);
 
   React.useEffect(() => {
     // Trigger entrance animations
@@ -327,26 +506,126 @@ export const StreamsScreen = () => {
 
   // Memoize handlers
   const handleBack = useCallback(() => {
+    // Set exit state to prevent animation conflicts and hide content immediately
+    setIsExiting(true);
+    
     const cleanup = () => {
-      headerOpacity.value = withTiming(0, { duration: 200 });
-      heroScale.value = withTiming(0.95, { duration: 200 });
-      filterOpacity.value = withTiming(0, { duration: 200 });
+      headerOpacity.value = withTiming(0, { duration: 100 });
+      heroScale.value = withTiming(0.95, { duration: 100 });
+      filterOpacity.value = withTiming(0, { duration: 100 });
     };
     cleanup();
     
     // For series episodes, always replace current screen with metadata screen
     if (type === 'series') {
+      // Immediate navigation for series
       navigation.replace('Metadata', {
         id: id,
         type: type
       });
     } else {
+      // Immediate navigation for movies
       navigation.goBack();
     }
   }, [navigation, headerOpacity, heroScale, filterOpacity, type, id]);
 
   const handleProviderChange = useCallback((provider: string) => {
     setSelectedProvider(provider);
+  }, []);
+
+  // Function to determine the best stream based on quality, provider priority, and other factors
+  const getBestStream = useCallback((streamsData: typeof groupedStreams): Stream | null => {
+    if (!streamsData || Object.keys(streamsData).length === 0) {
+      return null;
+    }
+
+    // Helper function to extract quality as number
+    const getQualityNumeric = (title: string | undefined): number => {
+      if (!title) return 0;
+      const matchWithP = title.match(/(\d+)p/i);
+      if (matchWithP) return parseInt(matchWithP[1], 10);
+      
+      const qualityPatterns = [
+        /\b(240|360|480|720|1080|1440|2160|4320|8000)\b/i
+      ];
+      
+      for (const pattern of qualityPatterns) {
+        const match = title.match(pattern);
+        if (match) {
+          const quality = parseInt(match[1], 10);
+          if (quality >= 240 && quality <= 8000) return quality;
+        }
+      }
+      return 0;
+    };
+
+    // Provider priority (higher number = higher priority)
+    const getProviderPriority = (addonId: string): number => {
+      if (addonId === 'hdrezka') return 100; // HDRezka highest priority
+      
+      // Get Stremio addon installation order (earlier = higher priority)
+      const installedAddons = stremioService.getInstalledAddons();
+      const addonIndex = installedAddons.findIndex(addon => addon.id === addonId);
+      
+      if (addonIndex !== -1) {
+        // Higher priority for addons installed earlier (reverse index)
+        return 50 - addonIndex;
+      }
+      
+      return 0; // Unknown providers get lowest priority
+    };
+
+    // Collect all streams with metadata
+    const allStreams: Array<{
+      stream: Stream;
+      quality: number;
+      providerPriority: number;
+      isDebrid: boolean;
+      isCached: boolean;
+    }> = [];
+
+    Object.entries(streamsData).forEach(([addonId, { streams }]) => {
+      streams.forEach(stream => {
+        const quality = getQualityNumeric(stream.name || stream.title);
+        const providerPriority = getProviderPriority(addonId);
+        const isDebrid = stream.behaviorHints?.cached || false;
+        const isCached = isDebrid;
+
+        allStreams.push({
+          stream,
+          quality,
+          providerPriority,
+          isDebrid,
+          isCached,
+        });
+      });
+    });
+
+    if (allStreams.length === 0) return null;
+
+    // Sort streams by multiple criteria (best first)
+    allStreams.sort((a, b) => {
+      // 1. Prioritize cached/debrid streams
+      if (a.isCached !== b.isCached) {
+        return a.isCached ? -1 : 1;
+      }
+
+      // 2. Prioritize higher quality
+      if (a.quality !== b.quality) {
+        return b.quality - a.quality;
+      }
+
+      // 3. Prioritize better providers
+      if (a.providerPriority !== b.providerPriority) {
+        return b.providerPriority - a.providerPriority;
+      }
+
+      return 0;
+    });
+
+    logger.log(`🎯 Best stream selected: ${allStreams[0].stream.name || allStreams[0].stream.title} (Quality: ${allStreams[0].quality}p, Provider Priority: ${allStreams[0].providerPriority}, Cached: ${allStreams[0].isCached})`);
+    
+    return allStreams[0].stream;
   }, []);
 
   const currentEpisode = useMemo(() => {
@@ -360,21 +639,59 @@ export const StreamsScreen = () => {
     );
   }, [selectedEpisode, groupedEpisodes, id]);
 
-  const navigateToPlayer = useCallback((stream: Stream) => {
-    navigation.navigate('Player', {
-      uri: stream.url,
-      title: metadata?.name || '',
-      episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
-      season: type === 'series' ? currentEpisode?.season_number : undefined,
-      episode: type === 'series' ? currentEpisode?.episode_number : undefined,
-      quality: stream.title?.match(/(\d+)p/)?.[1] || undefined,
-      year: metadata?.year,
-      streamProvider: stream.name,
-      id,
-      type,
-      episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined
-    });
-  }, [metadata, type, currentEpisode, navigation, id, selectedEpisode]);
+  const navigateToPlayer = useCallback(async (stream: Stream) => {
+    try {
+      // Lock orientation to landscape before navigation to prevent glitches
+      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+      
+      // Small delay to ensure orientation is set before navigation
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Prepare available streams for the change source feature
+      const streamsToPass = type === 'series' ? episodeStreams : groupedStreams;
+      
+      // Determine the stream name using the same logic as StreamCard
+      const isHDRezka = stream.name === 'HDRezka';
+      const streamName = isHDRezka ? `HDRezka ${stream.title}` : (stream.name || stream.title || 'Unnamed Stream');
+      
+      navigation.navigate('Player', {
+        uri: stream.url,
+        title: metadata?.name || '',
+        episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
+        season: type === 'series' ? currentEpisode?.season_number : undefined,
+        episode: type === 'series' ? currentEpisode?.episode_number : undefined,
+        quality: stream.title?.match(/(\d+)p/)?.[1] || undefined,
+        year: metadata?.year,
+        streamProvider: stream.name,
+        streamName: streamName,
+        id,
+        type,
+        episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined,
+        imdbId: imdbId || undefined,
+        availableStreams: streamsToPass,
+      });
+    } catch (error) {
+      logger.error('[StreamsScreen] Error locking orientation before navigation:', error);
+      // Fallback: navigate anyway
+      const streamsToPass = type === 'series' ? episodeStreams : groupedStreams;
+      
+      navigation.navigate('Player', {
+        uri: stream.url,
+        title: metadata?.name || '',
+        episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
+        season: type === 'series' ? currentEpisode?.season_number : undefined,
+        episode: type === 'series' ? currentEpisode?.episode_number : undefined,
+        quality: stream.title?.match(/(\d+)p/)?.[1] || undefined,
+        year: metadata?.year,
+        streamProvider: stream.name,
+        id,
+        type,
+        episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined,
+        imdbId: imdbId || undefined,
+        availableStreams: streamsToPass,
+      });
+    }
+  }, [metadata, type, currentEpisode, navigation, id, selectedEpisode, imdbId, episodeStreams, groupedStreams]);
 
   // Update handleStreamPress
   const handleStreamPress = useCallback(async (stream: Stream) => {
@@ -490,39 +807,18 @@ export const StreamsScreen = () => {
                   navigateToPlayer(stream);
                 });
             } else {
-              // For direct video URLs, use the S.Browser.ACTION_VIEW approach
-              // This is a more reliable way to force Android to show all video apps
+              // For direct video URLs, use the VideoPlayerService to show the Android app chooser
+              const success = await VideoPlayerService.playVideo(stream.url, {
+                useExternalPlayer: true,
+                title: metadata?.name || 'Video',
+                episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
+                episodeNumber: type === 'series' && currentEpisode ? `S${currentEpisode.season_number}E${currentEpisode.episode_number}` : undefined,
+              });
               
-              // Strip query parameters if they exist as they can cause issues with some apps
-              let cleanUrl = stream.url;
-              if (cleanUrl.includes('?')) {
-                cleanUrl = cleanUrl.split('?')[0];
-              }
-              
-              // Create an Android intent URL that forces the chooser
-              // Set component=null to ensure chooser is shown
-              // Set action=android.intent.action.VIEW to open the content
-              const intentUrl = `intent:${cleanUrl}#Intent;action=android.intent.action.VIEW;category=android.intent.category.DEFAULT;component=;type=video/*;launchFlags=0x10000000;end`;
-              
-              console.log(`Using intent URL: ${intentUrl}`);
-              
-              Linking.openURL(intentUrl)
-                .then(() => console.log('Successfully opened with intent URL'))
-                .catch(err => {
-                  console.error('Failed to open with intent URL:', err);
-                  
-                  // First fallback: Try direct URL with regular Linking API
-                  console.log('Trying plain URL as fallback');
-                  Linking.openURL(stream.url)
-                    .then(() => console.log('Opened with direct URL'))
-                    .catch(directErr => {
-                      console.error('Failed to open direct URL:', directErr);
-                      
-                      // Final fallback: Use built-in player
-                      console.log('All external player attempts failed, using built-in player');
+              if (!success) {
+                console.log('VideoPlayerService failed, falling back to built-in player');
                       navigateToPlayer(stream);
-                    });
-                });
+              }
             }
           } catch (error) {
             console.error('Error with external player:', error);
@@ -542,14 +838,65 @@ export const StreamsScreen = () => {
     }
   }, [settings.preferredPlayer, settings.useExternalPlayer, navigateToPlayer]);
 
+  // Autoplay effect - triggers immediately when streams are available and autoplay is enabled
+  useEffect(() => {
+    if (
+      settings.autoplayBestStream && 
+      !autoplayTriggered && 
+      isAutoplayWaiting
+    ) {
+      const streams = type === 'series' ? episodeStreams : groupedStreams;
+      
+      if (Object.keys(streams).length > 0) {
+        const bestStream = getBestStream(streams);
+        
+        if (bestStream) {
+          logger.log('🚀 Autoplay: Best stream found, starting playback immediately...');
+          setAutoplayTriggered(true);
+          setIsAutoplayWaiting(false);
+          
+          // Start playback immediately - no delay needed
+          handleStreamPress(bestStream);
+        } else {
+          logger.log('⚠️ Autoplay: No suitable stream found');
+          setIsAutoplayWaiting(false);
+        }
+      }
+    }
+  }, [
+    settings.autoplayBestStream,
+    autoplayTriggered,
+    isAutoplayWaiting,
+    type,
+    episodeStreams,
+    groupedStreams,
+    getBestStream,
+    handleStreamPress
+  ]);
+
   const filterItems = useMemo(() => {
     const installedAddons = stremioService.getInstalledAddons();
     const streams = type === 'series' ? episodeStreams : groupedStreams;
+    
+    // Make sure we include all providers with streams, not just those in availableProviders
+    const allProviders = new Set([
+      ...availableProviders,
+      ...Object.keys(streams).filter(key => 
+        streams[key] && 
+        streams[key].streams && 
+        streams[key].streams.length > 0
+      )
+    ]);
 
     return [
       { id: 'all', name: 'All Providers' },
-      ...Array.from(availableProviders)
+      ...Array.from(allProviders)
         .sort((a, b) => {
+          // Put HDRezka first
+          if (a === 'hdrezka') return -1;
+          if (b === 'hdrezka') return 1;
+          
+          // Then sort by Stremio addon installation order
           const indexA = installedAddons.findIndex(addon => addon.id === a);
           const indexB = installedAddons.findIndex(addon => addon.id === b);
           
@@ -560,6 +907,13 @@ export const StreamsScreen = () => {
         })
         .map(provider => {
           const addonInfo = streams[provider];
+          
+          // Special handling for HDRezka
+          if (provider === 'hdrezka') {
+            return { id: provider, name: 'HDRezka' };
+          }
+          
+          // Standard handling for Stremio addons
           const installedAddon = installedAddons.find(addon => addon.id === provider);
           
           let displayName = provider;
@@ -575,6 +929,48 @@ export const StreamsScreen = () => {
     const streams = type === 'series' ? episodeStreams : groupedStreams;
     const installedAddons = stremioService.getInstalledAddons();
 
+    // Helper function to extract quality as a number for sorting
+    const getQualityNumeric = (title: string | undefined): number => {
+      if (!title) return 0;
+      
+      // First try to match quality with "p" (e.g., "1080p", "720p")
+      const matchWithP = title.match(/(\d+)p/i);
+      if (matchWithP) {
+        return parseInt(matchWithP[1], 10);
+      }
+      
+      // Then try to match standalone quality numbers at the end of the title
+      const matchAtEnd = title.match(/\b(\d{3,4})\s*$/);
+      if (matchAtEnd) {
+        const quality = parseInt(matchAtEnd[1], 10);
+        // Only return if it looks like a video quality (between 240 and 8000)
+        if (quality >= 240 && quality <= 8000) {
+          return quality;
+        }
+      }
+      
+      // Try to match quality patterns anywhere in the title with common formats
+      const qualityPatterns = [
+        /\b(\d{3,4})p\b/i,  // 1080p, 720p, etc.
+        /\b(\d{3,4})\s*$/,   // 1080, 720 at end
+        /\s(\d{3,4})\s/,     // 720 surrounded by spaces
+        /-\s*(\d{3,4})\s*$/,  // -720 at end
+        /\b(240|360|480|720|1080|1440|2160|4320|8000)\b/i // specific quality values
+      ];
+      
+      for (const pattern of qualityPatterns) {
+        const match = title.match(pattern);
+        if (match) {
+          const quality = parseInt(match[1], 10);
+          if (quality >= 240 && quality <= 8000) {
+            return quality;
+          }
+        }
+      }
+      
+      return 0;
+    };
+
     // Filter streams by selected provider - only if not "all"
     const filteredEntries = Object.entries(streams)
       .filter(([addonId]) => {
@@ -586,6 +982,11 @@ export const StreamsScreen = () => {
         return addonId === selectedProvider;
       })
       .sort(([addonIdA], [addonIdB]) => {
+        // Put HDRezka first
+        if (addonIdA === 'hdrezka') return -1;
+        if (addonIdB === 'hdrezka') return 1;
+        
+        // Then sort by Stremio addon installation order
         const indexA = installedAddons.findIndex(addon => addon.id === addonIdA);
         const indexB = installedAddons.findIndex(addon => addon.id === addonIdB);
         
@@ -594,11 +995,28 @@ export const StreamsScreen = () => {
         if (indexB !== -1) return 1;
         return 0;
       })
-      .map(([addonId, { addonName, streams }]) => ({
-        title: addonName,
-        addonId,
-        data: streams
-      }));
+      .map(([addonId, { addonName, streams: providerStreams }]) => {
+        let sortedProviderStreams = providerStreams;
+        if (addonId === 'hdrezka') {
+          sortedProviderStreams = [...providerStreams].sort((a, b) => {
+            const qualityA = getQualityNumeric(a.title);
+            const qualityB = getQualityNumeric(b.title);
+            return qualityB - qualityA; // Sort descending (e.g., 1080p before 720p)
+          });
+        } else {
+          // Sort other streams by quality if possible
+          sortedProviderStreams = [...providerStreams].sort((a, b) => {
+            const qualityA = getQualityNumeric(a.name || a.title);
+            const qualityB = getQualityNumeric(b.name || b.title);
+            return qualityB - qualityA; // Sort descending
+          });
+        }
+        return {
+          title: addonName,
+          addonId,
+          data: sortedProviderStreams
+        };
+      });
       
     return filteredEntries;
   }, [selectedProvider, type, episodeStreams, groupedStreams]);
@@ -635,7 +1053,8 @@ export const StreamsScreen = () => {
 
   const renderItem = useCallback(({ item, index, section }: { item: Stream; index: number; section: any }) => {
     const stream = item;
-    const isLoading = loadingProviders[section.addonId];
+    // Don't show loading for individual streams that are already available and displayed
+    const isLoading = false; // If streams are being rendered, they're available and shouldn't be loading
     
     return (
       <StreamCard 
@@ -644,19 +1063,81 @@ export const StreamsScreen = () => {
         onPress={() => handleStreamPress(stream)} 
         index={index}
         isLoading={isLoading}
-        statusMessage={providerStatus[section.addonId]?.message}
+        statusMessage={undefined}
         theme={currentTheme}
+        isExiting={isExiting}
       />
     );
-  }, [handleStreamPress, loadingProviders, providerStatus, currentTheme]);
+  }, [handleStreamPress, currentTheme, isExiting]);
 
-  const renderSectionHeader = useCallback(({ section }: { section: { title: string } }) => (
-    <Animated.View
-      entering={FadeIn.duration(300)}
-    >
-      <Text style={styles.streamGroupTitle}>{section.title}</Text>
-    </Animated.View>
-  ), []);
+  const renderSectionHeader = useCallback(({ section }: { section: { title: string; addonId: string } }) => {
+    const isProviderLoading = loadingProviders[section.addonId];
+    
+    return (
+      <Animated.View
+        entering={FadeIn.duration(400)}
+        layout={Layout.springify()}
+        style={styles.sectionHeaderContainer}
+      >
+        <View style={styles.sectionHeaderContent}>
+          <Text style={styles.streamGroupTitle}>{section.title}</Text>
+          {isProviderLoading && (
+            <View style={styles.sectionLoadingIndicator}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={[styles.sectionLoadingText, { color: colors.primary }]}>
+                Loading...
+              </Text>
+            </View>
+          )}
+        </View>
+      </Animated.View>
+    );
+  }, [styles.streamGroupTitle, styles.sectionHeaderContainer, styles.sectionHeaderContent, styles.sectionLoadingIndicator, styles.sectionLoadingText, loadingProviders, colors.primary]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  // Add orientation handling when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      // Set transitioning state to mask any visual glitches
+      setIsTransitioning(true);
+      
+      // Immediately lock to portrait when returning to this screen
+      const lockToPortrait = async () => {
+        try {
+          await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+          // Small delay then unlock to allow natural portrait orientation
+          setTimeout(async () => {
+            try {
+              await ScreenOrientation.unlockAsync();
+              // Clear transition state after orientation is handled
+              setTimeout(() => {
+                setIsTransitioning(false);
+              }, 100);
+            } catch (error) {
+              logger.error('[StreamsScreen] Error unlocking orientation:', error);
+              setIsTransitioning(false);
+            }
+          }, 200);
+        } catch (error) {
+          logger.error('[StreamsScreen] Error locking to portrait:', error);
+          setIsTransitioning(false);
+        }
+      };
+
+      lockToPortrait();
+
+      return () => {
+        // Cleanup when screen loses focus
+        setIsTransitioning(false);
+      };
+    }, [])
+  );
 
   return (
     <View style={styles.container}>
@@ -665,6 +1146,18 @@ export const StreamsScreen = () => {
         backgroundColor="transparent"
         barStyle="light-content"
       />
+      
+      {/* Instant overlay when exiting to prevent glitches */}
+      {isExiting && (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.darkBackground, zIndex: 100 }]} />
+      )}
+      
+      {/* Transition overlay to mask orientation changes */}
+      {isTransitioning && (
+        <View style={styles.transitionOverlay}>
+          <ActivityIndicator size="small" color={colors.primary} />
+        </View>
+      )}
       
       <Animated.View
         entering={FadeIn.duration(300)}
@@ -684,36 +1177,19 @@ export const StreamsScreen = () => {
 
       {type === 'movie' && metadata && (
         <Animated.View style={[styles.movieTitleContainer, heroStyle]}>
-          <ImageBackground
-            source={{ uri: metadata.banner || metadata.poster }}
-            style={styles.movieTitleBackground}
-            resizeMode="cover"
-          >
-            <LinearGradient
-              colors={[
-                'rgba(0,0,0,0.4)',
-                'rgba(0,0,0,0.6)',
-                'rgba(0,0,0,0.8)',
-                colors.darkBackground
-              ]}
-              locations={[0, 0.3, 0.7, 1]}
-              style={styles.movieTitleGradient}
-            >
-              <View style={styles.movieTitleContent}>
-                {metadata.logo ? (
-                  <Image
-                    source={{ uri: metadata.logo }}
-                    style={styles.movieLogo}
-                    contentFit="contain"
-                  />
-                ) : (
-                  <Text style={styles.movieTitle} numberOfLines={2}>
-                    {metadata.name}
-                  </Text>
-                )}
-              </View>
-            </LinearGradient>
-          </ImageBackground>
+          <View style={styles.movieTitleContent}>
+            {metadata.logo ? (
+              <Image
+                source={{ uri: metadata.logo }}
+                style={styles.movieLogo}
+                contentFit="contain"
+              />
+            ) : (
+              <Text style={styles.movieTitle} numberOfLines={2}>
+                {metadata.name}
+              </Text>
+            )}
+          </View>
         </Animated.View>
       )}
 
@@ -738,12 +1214,12 @@ export const StreamsScreen = () => {
                 <LinearGradient
                   colors={[
                     'rgba(0,0,0,0)',
-                    'rgba(0,0,0,0.4)',
-                    'rgba(0,0,0,0.6)',
-                    'rgba(0,0,0,0.8)',
+                    'rgba(0,0,0,0.3)',
+                    'rgba(0,0,0,0.5)',
+                    'rgba(0,0,0,0.7)',
                     colors.darkBackground
                   ]}
-                  locations={[0, 0.3, 0.5, 0.7, 1]}
+                  locations={[0, 0.4, 0.6, 0.8, 1]}
                   style={styles.streamsHeroGradient}
                 >
                   <View style={styles.streamsHeroContent}>
@@ -810,24 +1286,61 @@ export const StreamsScreen = () => {
           )}
         </Animated.View>
 
-        {isLoading && Object.keys(streams).length === 0 ? (
-          <Animated.View 
-            entering={FadeIn.duration(300)}
-            style={styles.loadingContainer}
-          >
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>Finding available streams...</Text>
-          </Animated.View>
+        {/* Update the streams/loading state display logic */}
+        { showNoSourcesError ? (
+            <Animated.View 
+              entering={FadeIn.duration(300)}
+              style={styles.noStreams}
+            >
+              <MaterialIcons name="error-outline" size={48} color={colors.textMuted} />
+              <Text style={styles.noStreamsText}>No streaming sources available</Text>
+              <Text style={styles.noStreamsSubText}>
+                Please add streaming sources in settings
+              </Text>
+              <TouchableOpacity
+                style={styles.addSourcesButton}
+                onPress={() => navigation.navigate('Settings')}
+              >
+                <Text style={styles.addSourcesButtonText}>Add Sources</Text>
+              </TouchableOpacity>
+            </Animated.View>
         ) : Object.keys(streams).length === 0 ? (
-          <Animated.View 
-            entering={FadeIn.duration(300)}
-            style={styles.noStreams}
-          >
-            <MaterialIcons name="error-outline" size={48} color={colors.textMuted} />
-            <Text style={styles.noStreamsText}>No streams available</Text>
-          </Animated.View>
+          (loadingStreams || loadingEpisodeStreams) ? (
+            <Animated.View 
+              entering={FadeIn.duration(300)}
+              style={styles.loadingContainer}
+            >
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={styles.loadingText}>
+                {isAutoplayWaiting ? 'Finding best stream for autoplay...' : 'Finding available streams...'}
+              </Text>
+            </Animated.View>
+          ) : (
+            // No streams and not loading = no streams available
+            <Animated.View 
+              entering={FadeIn.duration(300)}
+              style={styles.noStreams}
+            >
+              <MaterialIcons name="error-outline" size={48} color={colors.textMuted} />
+              <Text style={styles.noStreamsText}>No streams available</Text>
+            </Animated.View>
+          )
         ) : (
+          // Show streams immediately when available, even if still loading others
           <View collapsable={false} style={{ flex: 1 }}>
+            {/* Show autoplay loading overlay if waiting for autoplay */}
+            {isAutoplayWaiting && !autoplayTriggered && (
+              <Animated.View 
+                entering={FadeIn.duration(300)}
+                style={styles.autoplayOverlay}
+              >
+                <View style={styles.autoplayIndicator}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={styles.autoplayText}>Starting best stream...</Text>
+                </View>
+              </Animated.View>
+            )}
+            
             <SectionList
               sections={sections}
               keyExtractor={(item) => item.url || `${item.name}-${item.title}`}
@@ -844,7 +1357,7 @@ export const StreamsScreen = () => {
               bounces={true}
               overScrollMode="never"
               ListFooterComponent={
-                isLoading ? (
+                (loadingStreams || loadingEpisodeStreams) && hasStremioStreamProviders ? (
                   <View style={styles.footerLoading}>
                     <ActivityIndicator size="small" color={colors.primary} />
                     <Text style={styles.footerLoadingText}>Loading more sources...</Text>
@@ -878,7 +1391,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     padding: 14,
-    paddingTop: Platform.OS === 'android' ? 35 : 45,
+    paddingTop: Platform.OS === 'android' ? 45 : 15,
   },
   backButtonText: {
     color: colors.highEmphasis,
@@ -892,7 +1405,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     zIndex: 1,
   },
   streamsMainContentMovie: {
-    paddingTop: Platform.OS === 'android' ? 90 : 100,
+    paddingTop: Platform.OS === 'android' ? 10 : 15,
   },
   filterContainer: {
     paddingHorizontal: 16,
@@ -902,25 +1415,25 @@ const createStyles = (colors: any) => StyleSheet.create({
     flexGrow: 0,
   },
   filterChip: {
-    backgroundColor: colors.transparentLight,
+    backgroundColor: 'transparent',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
     marginRight: 8,
     borderWidth: 1,
-    borderColor: colors.transparent,
+    borderColor: colors.border,
   },
   filterChipSelected: {
-    backgroundColor: colors.transparentLight,
+    backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
   filterChipText: {
-    color: colors.text,
+    color: colors.mediumEmphasis,
     fontWeight: '500',
   },
   filterChipTextSelected: {
-    color: colors.primary,
-    fontWeight: 'bold',
+    color: colors.white,
+    fontWeight: '600',
   },
   streamsContent: {
     flex: 1,
@@ -937,23 +1450,23 @@ const createStyles = (colors: any) => StyleSheet.create({
     width: '100%',
   },
   streamGroupTitle: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
+    color: colors.highEmphasis,
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 8,
     marginTop: 0,
     backgroundColor: 'transparent',
   },
   streamCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 8,
+    padding: 16,
+    borderRadius: 10,
+    marginBottom: 12,
     minHeight: 70,
-    backgroundColor: colors.elevation1,
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: colors.cardHighlight,
     width: '100%',
     zIndex: 1,
   },
@@ -995,11 +1508,12 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
   },
   chip: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 4,
     marginRight: 4,
     marginBottom: 4,
+    backgroundColor: colors.surfaceVariant,
   },
   chipText: {
     color: colors.highEmphasis,
@@ -1024,10 +1538,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginLeft: 8,
   },
   streamAction: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.elevation2,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.card,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1074,7 +1588,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   streamsHeroContainer: {
     width: '100%',
-    height: 300,
+    height: 220,
     marginBottom: 0,
     position: 'relative',
     backgroundColor: colors.black,
@@ -1203,39 +1717,30 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   movieTitleContainer: {
     width: '100%',
-    height: 180,
-    backgroundColor: colors.black,
+    height: 140,
+    backgroundColor: colors.darkBackground,
     pointerEvents: 'box-none',
-  },
-  movieTitleBackground: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: colors.black,
-  },
-  movieTitleGradient: {
-    flex: 1,
     justifyContent: 'center',
-    padding: 16,
+    paddingTop: Platform.OS === 'android' ? 65 : 35,
   },
   movieTitleContent: {
     width: '100%',
+    height: '100%',
     alignItems: 'center',
-    marginTop: Platform.OS === 'android' ? 35 : 45,
+    justifyContent: 'center',
   },
   movieLogo: {
-    width: width * 0.6,
-    height: 70,
-    marginBottom: 8,
+    width: '100%',
+    height: '100%',
+    maxWidth: width * 0.85,
   },
   movieTitle: {
     color: colors.highEmphasis,
     fontSize: 28,
     fontWeight: '900',
     textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.75)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
     letterSpacing: -0.5,
+    paddingHorizontal: 20,
   },
   streamsHeroRuntime: {
     flexDirection: 'row',
@@ -1249,6 +1754,74 @@ const createStyles = (colors: any) => StyleSheet.create({
   streamsHeroRuntimeText: {
     color: colors.mediumEmphasis,
     fontSize: 13,
+    fontWeight: '600',
+  },
+  transitionOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.darkBackground,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  sectionHeaderContainer: {
+    padding: 16,
+  },
+  sectionHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  sectionLoadingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sectionLoadingText: {
+    marginLeft: 8,
+  },
+  autoplayOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    padding: 16,
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  autoplayIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.elevation2,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  autoplayText: {
+    color: colors.primary,
+    fontSize: 14,
+    marginLeft: 8,
+    fontWeight: '600',
+  },
+  noStreamsSubText: {
+    color: colors.mediumEmphasis,
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  addSourcesButton: {
+    marginTop: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+  },
+  addSourcesButtonText: {
+    color: colors.white,
+    fontSize: 14,
     fontWeight: '600',
   },
 });

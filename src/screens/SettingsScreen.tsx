@@ -367,6 +367,51 @@ const SettingsScreen: React.FC = () => {
                 icon="palette"
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('ThemeSettings')}
+              />
+              <SettingItem
+                title="Episode Layout"
+                description={settings.episodeLayoutStyle === 'horizontal' ? 'Horizontal Cards' : 'Vertical List'}
+                icon="view-module"
+                renderControl={() => (
+                  <View style={styles.selectorContainer}>
+                    <TouchableOpacity
+                      style={[
+                        styles.selectorButton,
+                        settings.episodeLayoutStyle === 'vertical' && {
+                          backgroundColor: currentTheme.colors.primary
+                        }
+                      ]}
+                      onPress={() => updateSetting('episodeLayoutStyle', 'vertical')}
+                    >
+                      <Text style={[
+                        styles.selectorText,
+                        { color: currentTheme.colors.mediumEmphasis },
+                        settings.episodeLayoutStyle === 'vertical' && {
+                          color: currentTheme.colors.white,
+                          fontWeight: '600'
+                        }
+                      ]}>Vertical</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.selectorButton,
+                        settings.episodeLayoutStyle === 'horizontal' && {
+                          backgroundColor: currentTheme.colors.primary
+                        }
+                      ]}
+                      onPress={() => updateSetting('episodeLayoutStyle', 'horizontal')}
+                    >
+                      <Text style={[
+                        styles.selectorText,
+                        { color: currentTheme.colors.mediumEmphasis },
+                        settings.episodeLayoutStyle === 'horizontal' && {
+                          color: currentTheme.colors.white,
+                          fontWeight: '600'
+                        }
+                      ]}>Horizontal</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
                 isLast={true}
               />
             </SettingsCard>
@@ -405,6 +450,13 @@ const SettingsScreen: React.FC = () => {
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('CatalogSettings')}
                 badge={catalogCount}
+              />
+              <SettingItem
+                title="Internal Providers"
+                description="Enable or disable built-in providers like HDRezka"
+                icon="source"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('InternalProvidersSettings')}
               />
               <SettingItem
                 title="Home Screen"
@@ -545,7 +597,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     width: '100%',
-    paddingBottom: 32,
+    paddingBottom: 90,
   },
   cardContainer: {
     width: '100%',
@@ -645,19 +697,20 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     height: 36,
-    width: 160,
+    width: 180,
     marginRight: 8,
   },
   selectorButton: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
   selectorText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
+    textAlign: 'center',
   },
   profileLockContainer: {
     padding: 16,

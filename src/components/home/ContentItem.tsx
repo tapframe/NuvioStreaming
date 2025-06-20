@@ -12,7 +12,46 @@ interface ContentItemProps {
 }
 
 const { width } = Dimensions.get('window');
-const POSTER_WIDTH = (width - 50) / 3;
+
+// Dynamic poster calculation based on screen width - show 1/4 of next poster
+const calculatePosterLayout = (screenWidth: number) => {
+  const MIN_POSTER_WIDTH = 100; // Reduced minimum for more posters
+  const MAX_POSTER_WIDTH = 130; // Reduced maximum for more posters
+  const LEFT_PADDING = 16; // Left padding
+  const SPACING = 8; // Space between posters
+  
+  // Calculate available width for posters (reserve space for left padding)
+  const availableWidth = screenWidth - LEFT_PADDING;
+  
+  // Try different numbers of full posters to find the best fit
+  let bestLayout = { numFullPosters: 3, posterWidth: 120 };
+  
+  for (let n = 3; n <= 6; n++) {
+    // Calculate poster width needed for N full posters + 0.25 partial poster
+    // Formula: N * posterWidth + (N-1) * spacing + 0.25 * posterWidth = availableWidth - rightPadding
+    // Simplified: posterWidth * (N + 0.25) + (N-1) * spacing = availableWidth - rightPadding
+    // We'll use minimal right padding (8px) to maximize space
+    const usableWidth = availableWidth - 8;
+    const posterWidth = (usableWidth - (n - 1) * SPACING) / (n + 0.25);
+    
+    console.log(`[ContentItem] Testing ${n} posters: width=${posterWidth.toFixed(1)}px, screen=${screenWidth}px`);
+    
+    if (posterWidth >= MIN_POSTER_WIDTH && posterWidth <= MAX_POSTER_WIDTH) {
+      bestLayout = { numFullPosters: n, posterWidth };
+      console.log(`[ContentItem] Selected layout: ${n} full posters at ${posterWidth.toFixed(1)}px each`);
+    }
+  }
+  
+  return {
+    numFullPosters: bestLayout.numFullPosters,
+    posterWidth: bestLayout.posterWidth,
+    spacing: SPACING,
+    partialPosterWidth: bestLayout.posterWidth * 0.25 // 1/4 of next poster
+  };
+};
+
+const posterLayout = calculatePosterLayout(width);
+const POSTER_WIDTH = posterLayout.posterWidth;
 
 const ContentItem = ({ item: initialItem, onPress }: ContentItemProps) => {
   const [menuVisible, setMenuVisible] = useState(false);
@@ -132,28 +171,28 @@ const styles = StyleSheet.create({
     width: POSTER_WIDTH,
     aspectRatio: 2/3,
     margin: 0,
-    borderRadius: 16,
+    borderRadius: 4,
     overflow: 'hidden',
     position: 'relative',
-    elevation: 8,
+    elevation: 6,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   contentItemContainer: {
     width: '100%',
     height: '100%',
-    borderRadius: 16,
+    borderRadius: 4,
     overflow: 'hidden',
     position: 'relative',
   },
   poster: {
     width: '100%',
     height: '100%',
-    borderRadius: 16,
+    borderRadius: 4,
   },
   loadingOverlay: {
     position: 'absolute',
@@ -163,7 +202,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 16,
+    borderRadius: 8,
   },
   watchedIndicator: {
     position: 'absolute',

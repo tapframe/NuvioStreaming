@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  RefreshControl,
   SafeAreaView,
   StatusBar,
   useColorScheme,
@@ -16,12 +15,14 @@ import {
   Platform,
   Image,
   Modal,
-  Pressable
+  Pressable,
+  Alert
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { StreamingContent, CatalogContent, catalogService } from '../services/catalogService';
+import { stremioService } from '../services/stremioService';
 import { Stream } from '../types/metadata';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -60,6 +61,7 @@ import { SkeletonFeatured } from '../components/home/SkeletonLoaders';
 import homeStyles, { sharedStyles } from '../styles/homeStyles';
 import { useTheme } from '../contexts/ThemeContext';
 import type { Theme } from '../contexts/ThemeContext';
+import * as ScreenOrientation from 'expo-screen-orientation';
 
 // Define interfaces for our data
 interface Category {
@@ -83,7 +85,7 @@ interface ContinueWatchingRef {
   refresh: () => Promise<boolean>;
 }
 
-const DropUpMenu = ({ visible, onClose, item, onOptionSelect }: DropUpMenuProps) => {
+const DropUpMenu = React.memo(({ visible, onClose, item, onOptionSelect }: DropUpMenuProps) => {
   const translateY = useSharedValue(300);
   const opacity = useSharedValue(0);
   const isDarkMode = useColorScheme() === 'dark';
@@ -98,9 +100,15 @@ const DropUpMenu = ({ visible, onClose, item, onOptionSelect }: DropUpMenuProps)
       opacity.value = withTiming(0, { duration: 200 });
       translateY.value = withTiming(300, { duration: 300 });
     }
+    
+    // Cleanup animations when component unmounts
+    return () => {
+      opacity.value = 0;
+      translateY.value = 300;
+    };
   }, [visible]);
 
-  const gesture = Gesture.Pan()
+  const gesture = useMemo(() => Gesture.Pan()
     .onStart(() => {
       // Store initial position if needed
     })
@@ -124,7 +132,7 @@ const DropUpMenu = ({ visible, onClose, item, onOptionSelect }: DropUpMenuProps)
         translateY.value = withTiming(0, { duration: 300 });
         opacity.value = withTiming(1, { duration: 200 });
       }
-    });
+    }), [onClose]);
 
   const overlayStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -138,7 +146,7 @@ const DropUpMenu = ({ visible, onClose, item, onOptionSelect }: DropUpMenuProps)
     backgroundColor: isDarkMode ? currentTheme.colors.elevation2 : currentTheme.colors.white,
   }));
 
-  const menuOptions = [
+  const menuOptions = useMemo(() => [
     {
       icon: item.inLibrary ? 'bookmark' : 'bookmark-border',
       label: item.inLibrary ? 'Remove from Library' : 'Add to Library',
@@ -159,7 +167,12 @@ const DropUpMenu = ({ visible, onClose, item, onOptionSelect }: DropUpMenuProps)
       label: 'Share',
       action: 'share'
     }
-  ];
+  ], [item.inLibrary]);
+
+  const handleOptionSelect = useCallback((action: string) => {
+    onOptionSelect(action);
+    onClose();
+  }, [onOptionSelect, onClose]);
 
   return (
     <Modal
@@ -200,10 +213,7 @@ const DropUpMenu = ({ visible, onClose, item, onOptionSelect }: DropUpMenuProps)
                       { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' },
                       index === menuOptions.length - 1 && styles.lastMenuOption
                     ]}
-                    onPress={() => {
-                      onOptionSelect(option.action);
-                      onClose();
-                    }}
+                    onPress={() => handleOptionSelect(option.action)}
                   >
                     <MaterialIcons
                       name={option.icon as "bookmark" | "check-circle" | "playlist-add" | "share" | "bookmark-border"}
@@ -225,9 +235,9 @@ const DropUpMenu = ({ visible, onClose, item, onOptionSelect }: DropUpMenuProps)
       </GestureHandlerRootView>
     </Modal>
   );
-};
+});
 
-const ContentItem = ({ item: initialItem, onPress }: ContentItemProps) => {
+const ContentItem = React.memo(({ item: initialItem, onPress }: ContentItemProps) => {
   const [menuVisible, setMenuVisible] = useState(false);
   const [localItem, setLocalItem] = useState(initialItem);
   const [isWatched, setIsWatched] = useState(false);
@@ -256,8 +266,8 @@ const ContentItem = ({ item: initialItem, onPress }: ContentItemProps) => {
         setIsWatched(prev => !prev);
         break;
       case 'playlist':
-        break;
       case 'share':
+        // These options don't have implementations yet
         break;
     }
   }, [localItem]);
@@ -266,16 +276,20 @@ const ContentItem = ({ item: initialItem, onPress }: ContentItemProps) => {
     setMenuVisible(false);
   }, []);
 
+  // Only update localItem when initialItem changes
   useEffect(() => {
     setLocalItem(initialItem);
   }, [initialItem]);
 
+  // Subscribe to library updates
   useEffect(() => {
     const unsubscribe = catalogService.subscribeToLibraryUpdates((libraryItems) => {
       const isInLibrary = libraryItems.some(
         libraryItem => libraryItem.id === localItem.id && libraryItem.type === localItem.type
       );
-      setLocalItem(prev => ({ ...prev, inLibrary: isInLibrary }));
+      if (isInLibrary !== localItem.inLibrary) {
+        setLocalItem(prev => ({ ...prev, inLibrary: isInLibrary }));
+      }
     });
 
     return () => unsubscribe();
@@ -330,15 +344,24 @@ const ContentItem = ({ item: initialItem, onPress }: ContentItemProps) => {
         </View>
       </TouchableOpacity>
       
-      <DropUpMenu
-        visible={menuVisible}
-        onClose={handleMenuClose}
-        item={localItem}
-        onOptionSelect={handleOptionSelect}
-      />
+      {menuVisible && (
+        <DropUpMenu
+          visible={menuVisible}
+          onClose={handleMenuClose}
+          item={localItem}
+          onOptionSelect={handleOptionSelect}
+        />
+      )}
     </>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison function to prevent unnecessary re-renders
+  return (
+    prevProps.item.id === nextProps.item.id &&
+    prevProps.item.inLibrary === nextProps.item.inLibrary &&
+    prevProps.onPress === nextProps.onPress
+  );
+});
 
 // Sample categories (real app would get these from API)
 const SAMPLE_CATEGORIES: Category[] = [
@@ -347,7 +370,7 @@ const SAMPLE_CATEGORIES: Category[] = [
   { id: 'channel', name: 'Channels' },
 ];
 
-const SkeletonCatalog = () => {
+const SkeletonCatalog = React.memo(() => {
   const { currentTheme } = useTheme();
   return (
     <View style={styles.catalogContainer}>
@@ -356,7 +379,7 @@ const SkeletonCatalog = () => {
       </View>
     </View>
   );
-};
+});
 
 const HomeScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
@@ -364,17 +387,16 @@ const HomeScreen = () => {
   const { currentTheme } = useTheme();
   const continueWatchingRef = useRef<ContinueWatchingRef>(null);
   const { settings } = useSettings();
+  const { lastUpdate } = useCatalogContext(); // Add catalog context to listen for addon changes
   const [showHeroSection, setShowHeroSection] = useState(settings.showHeroSection);
   const [featuredContentSource, setFeaturedContentSource] = useState(settings.featuredContentSource);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [hasContinueWatching, setHasContinueWatching] = useState(false);
 
-  const { 
-    catalogs, 
-    loading: catalogsLoading, 
-    refreshing: catalogsRefreshing, 
-    refreshCatalogs 
-  } = useHomeCatalogs();
+  const [catalogs, setCatalogs] = useState<CatalogContent[]>([]);
+  const [catalogsLoading, setCatalogsLoading] = useState(true);
+  const [loadedCatalogCount, setLoadedCatalogCount] = useState(0);
+  const totalCatalogsRef = useRef(0);
   
   const { 
     featuredContent, 
@@ -384,9 +406,119 @@ const HomeScreen = () => {
     refreshFeatured 
   } = useFeaturedContent();
 
+    // Progressive catalog loading function
+  const loadCatalogsProgressively = useCallback(async () => {
+    setCatalogsLoading(true);
+    setCatalogs([]);
+    setLoadedCatalogCount(0);
+    
+    try {
+      const addons = await catalogService.getAllAddons();
+      
+      // Create placeholder array with proper order and track indices
+      const catalogPlaceholders: (CatalogContent | null)[] = [];
+      const catalogPromises: Promise<void>[] = [];
+      let catalogIndex = 0;
+      
+      for (const addon of addons) {
+        if (addon.catalogs) {
+          for (const catalog of addon.catalogs) {
+            const currentIndex = catalogIndex;
+            catalogPlaceholders.push(null); // Reserve position
+            
+            const catalogPromise = (async () => {
+              try {
+                const addonManifest = await stremioService.getInstalledAddonsAsync();
+                const manifest = addonManifest.find((a: any) => a.id === addon.id);
+                if (!manifest) return;
+
+                const metas = await stremioService.getCatalog(manifest, catalog.type, catalog.id, 1);
+                if (metas && metas.length > 0) {
+                  const items = metas.map((meta: any) => ({
+                    id: meta.id,
+                    type: meta.type,
+                    name: meta.name,
+                    poster: meta.poster,
+                    posterShape: meta.posterShape,
+                    banner: meta.background,
+                    logo: meta.logo,
+                    imdbRating: meta.imdbRating,
+                    year: meta.year,
+                    genres: meta.genres,
+                    description: meta.description,
+                    runtime: meta.runtime,
+                    released: meta.released,
+                    trailerStreams: meta.trailerStreams,
+                    videos: meta.videos,
+                    directors: meta.director,
+                    creators: meta.creator,
+                    certification: meta.certification
+                  }));
+                  
+                  let displayName = catalog.name;
+                  const contentType = catalog.type === 'movie' ? 'Movies' : 'TV Shows';
+                  if (!displayName.toLowerCase().includes(contentType.toLowerCase())) {
+                    displayName = `${displayName} ${contentType}`;
+                  }
+                  
+                  const catalogContent = {
+                    addon: addon.id,
+                    type: catalog.type,
+                    id: catalog.id,
+                    name: displayName,
+                    items
+                  };
+                  
+                  console.log(`[HomeScreen] Loaded catalog: ${displayName} at position ${currentIndex} (${items.length} items)`);
+                  
+                  // Update the catalog at its specific position
+                  setCatalogs(prevCatalogs => {
+                    const newCatalogs = [...prevCatalogs];
+                    newCatalogs[currentIndex] = catalogContent;
+                    return newCatalogs;
+                  });
+                }
+              } catch (error) {
+                console.error(`[HomeScreen] Failed to load ${catalog.name} from ${addon.name}:`, error);
+              } finally {
+                setLoadedCatalogCount(prev => prev + 1);
+              }
+            })();
+            
+            catalogPromises.push(catalogPromise);
+            catalogIndex++;
+          }
+        }
+      }
+      
+      totalCatalogsRef.current = catalogIndex;
+      console.log(`[HomeScreen] Starting to load ${catalogIndex} catalogs progressively...`);
+      
+      // Initialize catalogs array with proper length
+      setCatalogs(new Array(catalogIndex).fill(null));
+      
+      // Start all catalog loading promises but don't wait for them
+      // They will update the state progressively as they complete
+      Promise.allSettled(catalogPromises).then(() => {
+      console.log('[HomeScreen] All catalogs processed');
+      
+        // Final cleanup: Filter out null values to get only successfully loaded catalogs
+      setCatalogs(prevCatalogs => prevCatalogs.filter(catalog => catalog !== null));
+      });
+      
+    } catch (error) {
+      console.error('[HomeScreen] Error in progressive catalog loading:', error);
+    } finally {
+      setCatalogsLoading(false);
+    }
+  }, []);
+
   // Only count feature section as loading if it's enabled in settings
-  const isLoading = (showHeroSection ? featuredLoading : false) || catalogsLoading;
-  const isRefreshing = catalogsRefreshing;
+  // For catalogs, we show them progressively, so only show loading if no catalogs are loaded yet
+  const isLoading = useMemo(() => 
+    (showHeroSection ? featuredLoading : false) || (catalogsLoading && catalogs.length === 0),
+    [showHeroSection, featuredLoading, catalogsLoading, catalogs.length]
+  );
 
   // React to settings changes
   useEffect(() => {
@@ -394,14 +526,26 @@ const HomeScreen = () => {
     setFeaturedContentSource(settings.featuredContentSource);
   }, [settings]);
 
+  // Load catalogs progressively on mount and when settings change
+  useEffect(() => {
+    loadCatalogsProgressively();
+  }, [loadCatalogsProgressively]);
+
+  // Listen for catalog changes (addon additions/removals) and reload catalogs
+  useEffect(() => {
+    loadCatalogsProgressively();
+  }, [lastUpdate, loadCatalogsProgressively]);
+
+  // Create a refresh function for catalogs
+  const refreshCatalogs = useCallback(() => {
+    return loadCatalogsProgressively();
+  }, [loadCatalogsProgressively]);
+
   // Subscribe directly to settings emitter for immediate updates
   useEffect(() => {
     const handleSettingsChange = () => {
       setShowHeroSection(settings.showHeroSection);
       setFeaturedContentSource(settings.featuredContentSource);
-      
-      // The featured content refresh is now handled by the useFeaturedContent hook
-      // No need to call refreshFeatured() here to avoid duplicate refreshes
     };
     
     // Subscribe to settings changes
@@ -409,18 +553,6 @@ const HomeScreen = () => {
     
     return unsubscribe;
   }, [settings]);
-
-  // Update the featured content refresh logic to handle persistence
-  useEffect(() => {
-    // This effect was causing duplicate refreshes - it's now handled in useFeaturedContent
-    // We'll keep it just to sync the local state with settings
-    if (showHeroSection && featuredContentSource !== settings.featuredContentSource) {
-      // Just update the local state
-      setFeaturedContentSource(settings.featuredContentSource);
-    }
-    
-    // No timeout needed since we're not refreshing here
-  }, [settings.featuredContentSource, showHeroSection]);
 
   useFocusEffect(
     useCallback(() => {
@@ -451,16 +583,15 @@ const HomeScreen = () => {
         StatusBar.setTranslucent(false);
         StatusBar.setBackgroundColor(currentTheme.colors.darkBackground);
       }
+      
+      // Clean up any lingering timeouts
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
     };
   }, [currentTheme.colors.darkBackground]);
 
-  useEffect(() => {
-    navigation.addListener('beforeRemove', () => {});
-    return () => {
-      navigation.removeListener('beforeRemove', () => {});
-    };
-  }, [navigation]);
-
+  // Preload images function - memoized to avoid recreating on every render
   const preloadImages = useCallback(async (content: StreamingContent[]) => {
     if (!content.length) return;
     
@@ -481,69 +612,120 @@ const HomeScreen = () => {
 
       await Promise.all(imagePromises);
     } catch (error) {
-      console.error('Error preloading images:', error);
+      // Silently handle preload errors
     }
   }, []);
-
-  const handleRefresh = useCallback(async () => {
-    try {
-      const refreshTasks = [
-        refreshCatalogs(),
-        continueWatchingRef.current?.refresh(),
-      ];
-      
-      // Only refresh featured content if hero section is enabled,
-      // and force refresh to bypass the cache
-      if (showHeroSection) {
-        refreshTasks.push(refreshFeatured());
-      }
-      
-      await Promise.all(refreshTasks);
-    } catch (error) {
-      logger.error('Error during refresh:', error);
-    }
-  }, [refreshFeatured, refreshCatalogs, showHeroSection]);
 
   const handleContentPress = useCallback((id: string, type: string) => {
     navigation.navigate('Metadata', { id, type });
   }, [navigation]);
 
-  const handlePlayStream = useCallback((stream: Stream) => {
+  const handlePlayStream = useCallback(async (stream: Stream) => {
     if (!featuredContent) return;
     
-    navigation.navigate('Player', {
-      uri: stream.url,
-      title: featuredContent.name,
-      year: featuredContent.year,
-      quality: stream.title?.match(/(\d+)p/)?.[1] || undefined,
-      streamProvider: stream.name,
-      id: featuredContent.id,
-      type: featuredContent.type
-    });
+    try {
+      // Lock orientation to landscape before navigation to prevent glitches
+      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+      
+      // Small delay to ensure orientation is set before navigation
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      navigation.navigate('Player', {
+        uri: stream.url,
+        title: featuredContent.name,
+        year: featuredContent.year,
+        quality: stream.title?.match(/(\d+)p/)?.[1] || undefined,
+        streamProvider: stream.name,
+        id: featuredContent.id,
+        type: featuredContent.type
+      });
+    } catch (error) {
+      // Fallback: navigate anyway
+      navigation.navigate('Player', {
+        uri: stream.url,
+        title: featuredContent.name,
+        year: featuredContent.year,
+        quality: stream.title?.match(/(\d+)p/)?.[1] || undefined,
+        streamProvider: stream.name,
+        id: featuredContent.id,
+        type: featuredContent.type
+      });
+    }
   }, [featuredContent, navigation]);
 
   const refreshContinueWatching = useCallback(async () => {
+    console.log('[HomeScreen] Refreshing continue watching...');
     if (continueWatchingRef.current) {
+      try {
       const hasContent = await continueWatchingRef.current.refresh();
+        console.log(`[HomeScreen] Continue watching has content: ${hasContent}`);
       setHasContinueWatching(hasContent);
+        
+        // Debug: Let's check what's in storage
+        const allProgress = await storageService.getAllWatchProgress();
+        console.log('[HomeScreen] All watch progress in storage:', Object.keys(allProgress).length, 'items');
+        console.log('[HomeScreen] Watch progress items:', allProgress);
+        
+        // Check if any items are being filtered out due to >85% progress
+        let filteredCount = 0;
+        for (const [key, progress] of Object.entries(allProgress)) {
+          const progressPercent = (progress.currentTime / progress.duration) * 100;
+          if (progressPercent >= 85) {
+            filteredCount++;
+            console.log(`[HomeScreen] Filtered out ${key}: ${progressPercent.toFixed(1)}% complete`);
+          } else {
+            console.log(`[HomeScreen] Valid progress ${key}: ${progressPercent.toFixed(1)}% complete`);
+          }
+        }
+        console.log(`[HomeScreen] Filtered out ${filteredCount} completed items`);
+        
+      } catch (error) {
+        console.error('[HomeScreen] Error refreshing continue watching:', error);
+        setHasContinueWatching(false);
+      }
+    } else {
+      console.log('[HomeScreen] Continue watching ref is null');
     }
   }, []);
 
   useEffect(() => {
-    const handlePlaybackComplete = () => {
-      refreshContinueWatching();
-    };
-
     const unsubscribe = navigation.addListener('focus', () => {
+      // Only refresh continue watching section on focus
       refreshContinueWatching();
+      // Don't reload catalogs unless they haven't been loaded yet
+      // Catalogs will be refreshed through context updates when addons change
+      if (catalogs.length === 0 && !catalogsLoading) {
+        loadCatalogsProgressively();
+      }
     });
 
-    return () => {
-      unsubscribe();
-    };
-  }, [navigation, refreshContinueWatching]);
+    return unsubscribe;
+  }, [navigation, refreshContinueWatching, loadCatalogsProgressively, catalogs.length, catalogsLoading]);
 
-  if (isLoading && !isRefreshing) {
+  // Memoize the loading screen to prevent unnecessary re-renders
+  const renderLoadingScreen = useMemo(() => {
+    if (isLoading) {
+      return (
+        <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
+          <StatusBar
+            barStyle="light-content"
+            backgroundColor="transparent"
+            translucent
+          />
+          <View style={styles.loadingMainContainer}>
+            <ActivityIndicator size="large" color={currentTheme.colors.primary} />
+            <Text style={[styles.loadingText, { color: currentTheme.colors.textMuted }]}>Loading your content...</Text>
+          </View>
+        </View>
+      );
+    }
+    return null;
+  }, [isLoading, currentTheme.colors]);
+
+  // Memoize the main content section
+  const renderMainContent = useMemo(() => {
+    if (isLoading) return null;
+    
     return (
       <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
         <StatusBar
@@ -551,63 +733,73 @@ const HomeScreen = () => {
           backgroundColor="transparent"
           translucent
         />
-        <View style={styles.loadingMainContainer}>
-          <ActivityIndicator size="large" color={currentTheme.colors.primary} />
-          <Text style={[styles.loadingText, { color: currentTheme.colors.textMuted }]}>Loading your content...</Text>
-        </View>
-      </View>
-    );
-  }
+        <ScrollView
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingTop: Platform.OS === 'ios' ? 100 : 90 }
+          ]}
+          showsVerticalScrollIndicator={false}
+          removeClippedSubviews={true}
+        >
+          {showHeroSection && (
+            <FeaturedContent 
+              key={`featured-${showHeroSection}-${featuredContentSource}`}
+              featuredContent={featuredContent}
+              isSaved={isSaved}
+              handleSaveToLibrary={handleSaveToLibrary}
+            />
+          )}
 
-  return (
-    <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor="transparent"
-        translucent
-      />
-      <ScrollView
-        refreshControl={
-          <RefreshControl 
-            refreshing={isRefreshing} 
-            onRefresh={handleRefresh} 
-            tintColor={currentTheme.colors.primary} 
-            colors={[currentTheme.colors.primary, currentTheme.colors.secondary]}
-          />
-        }
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingTop: Platform.OS === 'ios' ? 100 : 90 }
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        {showHeroSection && (
-          <FeaturedContent 
-            key={`featured-${showHeroSection}`}
-            featuredContent={featuredContent}
-            isSaved={isSaved}
-            handleSaveToLibrary={handleSaveToLibrary}
-          />
-        )}
+          <Animated.View entering={FadeIn.duration(400).delay(150)}>
+            <ThisWeekSection />
+          </Animated.View>
 
-        <Animated.View entering={FadeIn.duration(400).delay(150)}>
-          <ThisWeekSection />
-        </Animated.View>
+            <ContinueWatchingSection ref={continueWatchingRef} />
 
-        {hasContinueWatching && (
-        <Animated.View entering={FadeIn.duration(400).delay(250)}>
-          <ContinueWatchingSection ref={continueWatchingRef} />
-        </Animated.View>
-        )}
+          {/* Show catalogs as they load */}
+          {catalogs.map((catalog, index) => {
+            if (!catalog) {
+              // Show placeholder for loading catalog
+              return (
+                <View key={`placeholder-${index}`} style={styles.catalogPlaceholder}>
+                  <View style={styles.placeholderHeader}>
+                    <View style={[styles.placeholderTitle, { backgroundColor: currentTheme.colors.elevation1 }]} />
+                    <ActivityIndicator size="small" color={currentTheme.colors.primary} />
+                  </View>
+                  <View style={styles.placeholderPosters}>
+                    {[...Array(4)].map((_, posterIndex) => (
+                      <View 
+                        key={posterIndex} 
+                        style={[styles.placeholderPoster, { backgroundColor: currentTheme.colors.elevation1 }]} 
+                      />
+                    ))}
+                  </View>
+                </View>
+              );
+            }
+            
+            return (
+              <Animated.View 
+                key={`${catalog.addon}-${catalog.id}-${index}`}
+                entering={FadeIn.duration(300)}
+              >
+                <CatalogSection catalog={catalog} />
+              </Animated.View>
+            );
+          })}
 
-        {catalogs.length > 0 ? (
-          catalogs.map((catalog, index) => (
-            <View key={`${catalog.addon}-${catalog.id}-${index}`}>
-              <CatalogSection catalog={catalog} />
+          {/* Show loading indicator for remaining catalogs */}
+          {catalogsLoading && catalogs.length < totalCatalogsRef.current && (
+            <View style={styles.loadingMoreCatalogs}>
+              <ActivityIndicator size="small" color={currentTheme.colors.primary} />
+              <Text style={[styles.loadingMoreText, { color: currentTheme.colors.textMuted }]}>
+                Loading more content... ({loadedCatalogCount}/{totalCatalogsRef.current})
+              </Text>
             </View>
-          ))
-        ) : (
-          !catalogsLoading && (
+          )}
+
+          {/* Show empty state only if all catalogs are loaded and none are available */}
+          {!catalogsLoading && catalogs.length === 0 && (
             <View style={[styles.emptyCatalog, { backgroundColor: currentTheme.colors.elevation1 }]}>
               <MaterialIcons name="movie-filter" size={40} color={currentTheme.colors.textDark} />
               <Text style={{ color: currentTheme.colors.textDark, marginTop: 8, fontSize: 16, textAlign: 'center' }}>
@@ -621,32 +813,121 @@ const HomeScreen = () => {
                 <Text style={[styles.addCatalogButtonText, { color: currentTheme.colors.white }]}>Add Catalogs</Text>
               </TouchableOpacity>
             </View>
-          )
-        )}
-      </ScrollView>
-    </View>
-  );
+          )}
+        </ScrollView>
+      </View>
+    );
+  }, [
+    isLoading, 
+    currentTheme.colors, 
+    showHeroSection, 
+    featuredContent, 
+    isSaved, 
+    handleSaveToLibrary, 
+    hasContinueWatching, 
+    catalogs, 
+    catalogsLoading, 
+    navigation,
+    featuredContentSource
+  ]);
+
+  return isLoading ? renderLoadingScreen : renderMainContent;
 };
 
 const { width, height } = Dimensions.get('window');
-const POSTER_WIDTH = (width - 50) / 3;
+
+// Dynamic poster calculation based on screen width - show 1/4 of next poster
+const calculatePosterLayout = (screenWidth: number) => {
+  const MIN_POSTER_WIDTH = 100; // Reduced minimum for more posters
+  const MAX_POSTER_WIDTH = 130; // Reduced maximum for more posters
+  const LEFT_PADDING = 16; // Left padding
+  const SPACING = 8; // Space between posters
+  
+  // Calculate available width for posters (reserve space for left padding)
+  const availableWidth = screenWidth - LEFT_PADDING;
+  
+  // Try different numbers of full posters to find the best fit
+  let bestLayout = { numFullPosters: 3, posterWidth: 120 };
+  
+  for (let n = 3; n <= 6; n++) {
+    // Calculate poster width needed for N full posters + 0.25 partial poster
+    // Formula: N * posterWidth + (N-1) * spacing + 0.25 * posterWidth = availableWidth - rightPadding
+    // Simplified: posterWidth * (N + 0.25) + (N-1) * spacing = availableWidth - rightPadding
+    // We'll use minimal right padding (8px) to maximize space
+    const usableWidth = availableWidth - 8;
+    const posterWidth = (usableWidth - (n - 1) * SPACING) / (n + 0.25);
+    
+    console.log(`[HomeScreen] Testing ${n} posters: width=${posterWidth.toFixed(1)}px, screen=${screenWidth}px`);
+    
+    if (posterWidth >= MIN_POSTER_WIDTH && posterWidth <= MAX_POSTER_WIDTH) {
+      bestLayout = { numFullPosters: n, posterWidth };
+      console.log(`[HomeScreen] Selected layout: ${n} full posters at ${posterWidth.toFixed(1)}px each`);
+    }
+  }
+  
+  return {
+    numFullPosters: bestLayout.numFullPosters,
+    posterWidth: bestLayout.posterWidth,
+    spacing: SPACING,
+    partialPosterWidth: bestLayout.posterWidth * 0.25 // 1/4 of next poster
+  };
+};
+
+const posterLayout = calculatePosterLayout(width);
+const POSTER_WIDTH = posterLayout.posterWidth;
 
 const styles = StyleSheet.create<any>({
   container: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: 90,
   },
   loadingMainContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingBottom: 40,
+    paddingBottom: 90,
   },
   loadingText: {
     marginTop: 12,
     fontSize: 14,
+  },
+  loadingMoreCatalogs: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  loadingMoreText: {
+    marginLeft: 12,
+    fontSize: 14,
+  },
+  catalogPlaceholder: {
+    marginBottom: 24,
+    paddingHorizontal: 16,
+  },
+  placeholderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  placeholderTitle: {
+    width: 150,
+    height: 20,
+    borderRadius: 4,
+  },
+  placeholderPosters: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  placeholderPoster: {
+    width: POSTER_WIDTH,
+    aspectRatio: 2/3,
+    borderRadius: 4,
   },
   emptyCatalog: {
     padding: 32,
@@ -810,19 +1091,19 @@ const styles = StyleSheet.create<any>({
     position: 'relative',
   },
   catalogTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 6,
+    fontSize: 19,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+    marginBottom: 4,
   },
   titleUnderline: {
     position: 'absolute',
-    bottom: -4,
+    bottom: -2,
     left: 0,
-    width: 60,
-    height: 3,
-    borderRadius: 1.5,
+    width: 35,
+    height: 2,
+    borderRadius: 1,
+    opacity: 0.8,
   },
   seeAllButton: {
     flexDirection: 'row',
@@ -837,7 +1118,8 @@ const styles = StyleSheet.create<any>({
     marginRight: 4,
   },
   catalogList: {
-    paddingHorizontal: 16,
+    paddingLeft: 16,
+    paddingRight: 16 - posterLayout.partialPosterWidth,
     paddingBottom: 12,
     paddingTop: 6,
   },
@@ -845,21 +1127,21 @@ const styles = StyleSheet.create<any>({
     width: POSTER_WIDTH,
     aspectRatio: 2/3,
     margin: 0,
-    borderRadius: 16,
+    borderRadius: 4,
     overflow: 'hidden',
     position: 'relative',
-    elevation: 8,
+    elevation: 6,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   poster: {
     width: '100%',
     height: '100%',
-    borderRadius: 16,
+    borderRadius: 4,
   },
   imdbLogo: {
     width: 35,
@@ -898,7 +1180,7 @@ const styles = StyleSheet.create<any>({
   contentItemContainer: {
     width: '100%',
     height: '100%',
-    borderRadius: 16,
+    borderRadius: 4,
     overflow: 'hidden',
     position: 'relative',
   },
@@ -1009,7 +1291,7 @@ const styles = StyleSheet.create<any>({
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 16,
+    borderRadius: 8,
   },
   featuredImage: {
     width: '100%',
@@ -1045,4 +1327,4 @@ const styles = StyleSheet.create<any>({
   },
 });
 
-export default HomeScreen; 
+export default React.memo(HomeScreen); 

@@ -6,242 +6,156 @@ import {
   withSpring,
   Easing,
   useAnimatedScrollHandler,
-  interpolate,
-  Extrapolate,
+  runOnUI,
 } from 'react-native-reanimated';
 
 const { width, height } = Dimensions.get('window');
 
-// Animation constants
-const springConfig = {
-  damping: 20,
-  mass: 1,
-  stiffness: 100
+// Highly optimized animation configurations
+const fastSpring = {
+  damping: 15,
+  mass: 0.8,
+  stiffness: 150,
 };
 
-// Animation timing constants for staggered appearance
-const ANIMATION_DELAY_CONSTANTS = {
-  HERO: 100,
-  LOGO: 250,
-  PROGRESS: 350,
-  GENRES: 400,
-  BUTTONS: 450,
-  CONTENT: 500
+const ultraFastSpring = {
+  damping: 12,
+  mass: 0.6,
+  stiffness: 200,
+};
+
+// Ultra-optimized easing functions
+const easings = {
+  fast: Easing.out(Easing.quad),
+  ultraFast: Easing.out(Easing.linear),
+  natural: Easing.bezier(0.2, 0, 0.2, 1),
 };
 
 export const useMetadataAnimations = (safeAreaTop: number, watchProgress: any) => {
-  // Animation values for screen entrance
-  const screenScale = useSharedValue(0.92);
-  const screenOpacity = useSharedValue(0);
+  // Consolidated entrance animations - start with visible values for Android compatibility
+  const screenOpacity = useSharedValue(1);
+  const contentOpacity = useSharedValue(1);
   
-  // Animation values for hero section
-  const heroHeight = useSharedValue(height * 0.5);
-  const heroScale = useSharedValue(1.05);
-  const heroOpacity = useSharedValue(0);
-
-  // Animation values for content
-  const contentTranslateY = useSharedValue(60);
+  // Combined hero animations 
+  const heroOpacity = useSharedValue(1);
+  const heroScale = useSharedValue(1); // Start at 1 for Android compatibility
+  const heroHeightValue = useSharedValue(height * 0.5);
   
-  // Animation values for logo
-  const logoOpacity = useSharedValue(0);
-  const logoScale = useSharedValue(0.9);
+  // Combined UI element animations
+  const uiElementsOpacity = useSharedValue(1);
+  const uiElementsTranslateY = useSharedValue(0);
   
-  // Animation values for progress
-  const watchProgressOpacity = useSharedValue(0);
-  const watchProgressScaleY = useSharedValue(0);
+  // Progress animation - simplified to single value
+  const progressOpacity = useSharedValue(0);
   
-  // Animation values for genres
-  const genresOpacity = useSharedValue(0);
-  const genresTranslateY = useSharedValue(20);
-  
-  // Animation values for buttons
-  const buttonsOpacity = useSharedValue(0);
-  const buttonsTranslateY = useSharedValue(30);
-  
-  // Scroll values for parallax effect
+  // Scroll values - minimal
   const scrollY = useSharedValue(0);
-  const dampedScrollY = useSharedValue(0);
+  const headerProgress = useSharedValue(0); // Single value for all header animations
   
-  // Header animation values
-  const headerOpacity = useSharedValue(0);
-  const headerElementsY = useSharedValue(-10);
-  const headerElementsOpacity = useSharedValue(0);
-
-  // Start entrance animation
+  // Static header elements Y for performance
+  const staticHeaderElementsY = useSharedValue(0);
+  
+  // Ultra-fast entrance sequence - batch animations for better performance
   useEffect(() => {
-    // Use a timeout to ensure the animations starts after the component is mounted
-    const animationTimeout = setTimeout(() => {
-      // 1. First animate the container
-      screenScale.value = withSpring(1, springConfig);
-      screenOpacity.value = withSpring(1, springConfig);
+    // Batch all entrance animations to run simultaneously
+    const enterAnimations = () => {
+      'worklet';
       
-      // 2. Then animate the hero section with a slight delay
-      setTimeout(() => {
-        heroOpacity.value = withSpring(1, {
-          damping: 14,
-          stiffness: 80
-        });
-        heroScale.value = withSpring(1, {
-          damping: 18,
-          stiffness: 100
-        });
-      }, ANIMATION_DELAY_CONSTANTS.HERO);
+      // Start with slightly reduced values and animate to full visibility
+      screenOpacity.value = withTiming(1, { 
+        duration: 250, 
+        easing: easings.fast 
+      });
       
-      // 3. Then animate the logo
-      setTimeout(() => {
-        logoOpacity.value = withSpring(1, {
-          damping: 12,
-          stiffness: 100
-        });
-        logoScale.value = withSpring(1, {
-          damping: 14,
-          stiffness: 90
-        });
-      }, ANIMATION_DELAY_CONSTANTS.LOGO);
+      heroOpacity.value = withTiming(1, { 
+        duration: 300, 
+        easing: easings.fast 
+      });
       
-      // 4. Then animate the watch progress if applicable
-      setTimeout(() => {
-        if (watchProgress && watchProgress.duration > 0) {
-          watchProgressOpacity.value = withSpring(1, {
-            damping: 14,
-            stiffness: 100
-          });
-          watchProgressScaleY.value = withSpring(1, {
-            damping: 18,
-            stiffness: 120
-          });
-        }
-      }, ANIMATION_DELAY_CONSTANTS.PROGRESS);
+      heroScale.value = withSpring(1, ultraFastSpring);
       
-      // 5. Then animate the genres
-      setTimeout(() => {
-        genresOpacity.value = withSpring(1, {
-          damping: 14,
-          stiffness: 100
-        });
-        genresTranslateY.value = withSpring(0, {
-          damping: 18,
-          stiffness: 120
-        });
-      }, ANIMATION_DELAY_CONSTANTS.GENRES);
+      uiElementsOpacity.value = withTiming(1, { 
+        duration: 400, 
+        easing: easings.natural 
+      });
       
-      // 6. Then animate the buttons
-      setTimeout(() => {
-        buttonsOpacity.value = withSpring(1, {
-          damping: 14,
-          stiffness: 100
-        });
-        buttonsTranslateY.value = withSpring(0, {
-          damping: 18,
-          stiffness: 120
-        });
-      }, ANIMATION_DELAY_CONSTANTS.BUTTONS);
+      uiElementsTranslateY.value = withSpring(0, fastSpring);
       
-      // 7. Finally animate the content section
-      setTimeout(() => {
-        contentTranslateY.value = withSpring(0, {
-          damping: 25,
-          mass: 1,
-          stiffness: 100
-        });
-      }, ANIMATION_DELAY_CONSTANTS.CONTENT);
-    }, 50); // Small timeout to ensure component is fully mounted
-    
-    return () => clearTimeout(animationTimeout);
+      contentOpacity.value = withTiming(1, { 
+        duration: 350, 
+        easing: easings.fast 
+      });
+    };
+
+    // Use runOnUI for better performance
+    runOnUI(enterAnimations)();
   }, []);
   
-  // Effect to animate watch progress when it changes
+  // Optimized watch progress animation
   useEffect(() => {
-    if (watchProgress && watchProgress.duration > 0) {
-      watchProgressOpacity.value = withSpring(1, {
-        mass: 0.2,
-        stiffness: 100,
-        damping: 14
-      });
-      watchProgressScaleY.value = withSpring(1, {
-        mass: 0.3,
-        stiffness: 120,
-        damping: 18
-      });
-    } else {
-      watchProgressOpacity.value = withSpring(0, {
-        mass: 0.2,
-        stiffness: 100,
-        damping: 14
-      });
-      watchProgressScaleY.value = withSpring(0, {
-        mass: 0.3,
-        stiffness: 120,
-        damping: 18
-      });
-    }
-  }, [watchProgress, watchProgressOpacity, watchProgressScaleY]);
+    const hasProgress = watchProgress && watchProgress.duration > 0;
+    
+    const updateProgress = () => {
+      'worklet';
+    progressOpacity.value = withTiming(hasProgress ? 1 : 0, {
+      duration: hasProgress ? 200 : 150,
+      easing: easings.fast
+    });
+    };
+    
+    runOnUI(updateProgress)();
+  }, [watchProgress]);
   
-  // Effect to animate logo when it's available
-  const animateLogo = (hasLogo: boolean) => {
-    if (hasLogo) {
-      logoOpacity.value = withTiming(1, {
-        duration: 500,
-        easing: Easing.out(Easing.ease)
-      });
-    } else {
-      logoOpacity.value = withTiming(0, {
-        duration: 200,
-        easing: Easing.in(Easing.ease)
-      });
-    }
-  };
-  
-  // Scroll handler
+  // Ultra-optimized scroll handler with minimal calculations
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
+      'worklet';
+      
       const rawScrollY = event.contentOffset.y;
       scrollY.value = rawScrollY;
-      
-      // Apply spring-like damping for smoother transitions
-      dampedScrollY.value = withTiming(rawScrollY, {
-        duration: 300,
-        easing: Easing.bezier(0.16, 1, 0.3, 1), // Custom spring-like curve
-      });
 
-      // Update header opacity based on scroll position
-      const headerThreshold = height * 0.5 - safeAreaTop - 70; // Hero height - inset - buffer
-      if (rawScrollY > headerThreshold) {
-        headerOpacity.value = withTiming(1, { duration: 200 });
-        headerElementsY.value = withTiming(0, { duration: 300 });
-        headerElementsOpacity.value = withTiming(1, { duration: 450 });
-      } else {
-        headerOpacity.value = withTiming(0, { duration: 150 });
-        headerElementsY.value = withTiming(-10, { duration: 200 });
-        headerElementsOpacity.value = withTiming(0, { duration: 200 });
+      // Single calculation for header threshold
+      const threshold = height * 0.4 - safeAreaTop;
+      const progress = rawScrollY > threshold ? 1 : 0;
+      
+      // Use single progress value for all header animations
+      if (headerProgress.value !== progress) {
+        headerProgress.value = withTiming(progress, { 
+          duration: progress ? 200 : 150, 
+          easing: easings.ultraFast 
+        });
       }
     },
   });
 
   return {
-    // Animated values
-    screenScale,
+    // Optimized shared values - reduced count
     screenOpacity,
-    heroHeight,
-    heroScale,
+    contentOpacity,
     heroOpacity,
-    contentTranslateY,
-    logoOpacity,
-    logoScale,
-    watchProgressOpacity,
-    watchProgressScaleY,
-    genresOpacity,
-    genresTranslateY,
-    buttonsOpacity,
-    buttonsTranslateY,
+    heroScale,
+    uiElementsOpacity,
+    uiElementsTranslateY,
+    progressOpacity,
     scrollY,
-    dampedScrollY,
-    headerOpacity,
-    headerElementsY,
-    headerElementsOpacity,
+    headerProgress,
+    
+    // Computed values for compatibility (derived from optimized values)
+    get heroHeight() { return heroHeightValue; },
+    get logoOpacity() { return uiElementsOpacity; },
+    get buttonsOpacity() { return uiElementsOpacity; },
+    get buttonsTranslateY() { return uiElementsTranslateY; },
+    get contentTranslateY() { return uiElementsTranslateY; },
+    get watchProgressOpacity() { return progressOpacity; },
+    get watchProgressWidth() { return progressOpacity; }, // Reuse for width animation
+    get headerOpacity() { return headerProgress; },
+    get headerElementsY() { 
+      return staticHeaderElementsY; // Use pre-created shared value
+    },
+    get headerElementsOpacity() { return headerProgress; },
     
     // Functions
     scrollHandler,
-    animateLogo,
+    animateLogo: () => {}, // Simplified - no separate logo animation
   };
 }; 
