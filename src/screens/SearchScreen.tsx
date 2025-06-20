@@ -287,7 +287,14 @@ const SearchScreen = () => {
       setShowRecent(true);
       loadRecentSearches();
     } else {
-      navigation.goBack();
+      // Add a small delay to allow keyboard to dismiss smoothly before navigation
+      if (Platform.OS === 'android') {
+        setTimeout(() => {
+          navigation.goBack();
+        }, 100);
+      } else {
+        navigation.goBack();
+      }
     }
   };
 
@@ -497,7 +504,14 @@ const SearchScreen = () => {
   const headerHeight = headerBaseHeight + topSpacing + 60;
 
   return (
-    <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
+    <Animated.View 
+      style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}
+      entering={Platform.OS === 'android' ? SlideInRight.duration(250) : FadeIn.duration(350)}
+      exiting={Platform.OS === 'android' ? 
+        FadeOut.duration(200).withInitialValues({ opacity: 1 }) : 
+        FadeOut.duration(250)
+      }
+    >
       <StatusBar
         barStyle="light-content"
         backgroundColor="transparent"
@@ -656,7 +670,7 @@ const SearchScreen = () => {
           )}
         </View>
       </View>
-    </View>
+    </Animated.View>
   );
 };
 

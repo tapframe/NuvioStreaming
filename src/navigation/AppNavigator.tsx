@@ -780,8 +780,10 @@ const AppNavigator = () => {
               component={StreamsScreen as any} 
               options={{
                 headerShown: false,
-                animation: Platform.OS === 'ios' ? 'slide_from_bottom' : 'fade_from_bottom',
-                animationDuration: Platform.OS === 'android' ? 200 : 300,
+                animation: Platform.OS === 'ios' ? 'slide_from_bottom' : 'none',
+                animationDuration: Platform.OS === 'android' ? 0 : 300,
+                gestureEnabled: true,
+                gestureDirection: Platform.OS === 'ios' ? 'vertical' : 'horizontal',
                 ...(Platform.OS === 'ios' && { presentation: 'modal' }),
                 contentStyle: {
                   backgroundColor: currentTheme.colors.darkBackground,
@@ -825,8 +827,30 @@ const AppNavigator = () => {
               name="Search" 
               component={SearchScreen as any} 
               options={{ 
-                animation: 'fade',
-                animationDuration: Platform.OS === 'android' ? 300 : 350,
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 250 : 350,
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                ...(Platform.OS === 'android' && {
+                  cardStyleInterpolator: ({ current, layouts }: any) => {
+                    return {
+                      cardStyle: {
+                        transform: [
+                          {
+                            translateX: current.progress.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [layouts.screen.width, 0],
+                            }),
+                          },
+                        ],
+                        opacity: current.progress.interpolate({
+                          inputRange: [0, 0.3, 1],
+                          outputRange: [0, 0.85, 1],
+                        }),
+                      },
+                    };
+                  },
+                }),
                 contentStyle: {
                   backgroundColor: currentTheme.colors.darkBackground,
                 },
