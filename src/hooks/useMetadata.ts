@@ -741,24 +741,58 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       console.log('🚀 [loadStreams] START - Loading streams for:', id);
       updateLoadingState();
 
-      // Get TMDB ID for external sources first before starting parallel requests
+      // Get TMDB ID for external sources and determine the correct ID for Stremio addons
       console.log('🔍 [loadStreams] Getting TMDB ID for:', id);
       let tmdbId;
+      let stremioId = id; // Default to original ID
+      
       if (id.startsWith('tmdb:')) {
         tmdbId = id.split(':')[1];
         console.log('✅ [loadStreams] Using TMDB ID from ID:', tmdbId);
+        
+        // Try to get IMDb ID from metadata first, then convert if needed
+        if (metadata?.imdb_id) {
+          stremioId = metadata.imdb_id;
+          console.log('✅ [loadStreams] Using IMDb ID from metadata for Stremio:', stremioId);
+        } else if (imdbId) {
+          stremioId = imdbId;
+          console.log('✅ [loadStreams] Using stored IMDb ID for Stremio:', stremioId);
+        } else {
+          // Convert TMDB ID to IMDb ID for Stremio addons (they expect IMDb format)
+          try {
+            let externalIds = null;
+            if (type === 'movie') {
+              const movieDetails = await withTimeout(tmdbService.getMovieDetails(tmdbId), API_TIMEOUT);
+              externalIds = movieDetails?.external_ids;
+            } else if (type === 'series') {
+              externalIds = await withTimeout(tmdbService.getShowExternalIds(parseInt(tmdbId)), API_TIMEOUT);
+            }
+            
+            if (externalIds?.imdb_id) {
+              stremioId = externalIds.imdb_id;
+              console.log('✅ [loadStreams] Converted TMDB to IMDb ID for Stremio:', stremioId);
+            } else {
+              console.log('⚠️ [loadStreams] No IMDb ID found for TMDB ID, using original:', stremioId);
+            }
+          } catch (error) {
+            console.log('⚠️ [loadStreams] Failed to convert TMDB to IMDb, using original ID:', error);
+          }
+        }
       } else if (id.startsWith('tt')) {
-        // This is an IMDB ID
+        // This is already an IMDB ID, perfect for Stremio
+        stremioId = id;
         console.log('📝 [loadStreams] Converting IMDB ID to TMDB ID...');
         tmdbId = await withTimeout(tmdbService.findTMDBIdByIMDB(id), API_TIMEOUT);
         console.log('✅ [loadStreams] Converted to TMDB ID:', tmdbId);
       } else {
         tmdbId = id;
-        console.log('ℹ️ [loadStreams] Using ID as TMDB ID:', tmdbId);
+        stremioId = id;
+        console.log('ℹ️ [loadStreams] Using ID as both TMDB and Stremio ID:', tmdbId);
       }
       
-      // Start Stremio request using the callback method
-      processStremioSource(type, id, false);
+      // Start Stremio request using the converted ID format
+      console.log('🎬 [loadStreams] Using ID for Stremio addons:', stremioId);
+      processStremioSource(type, stremioId, false);
       
       // Add HDRezka source  
       const hdrezkaPromise = processExternalSource('hdrezka', processHDRezkaSource(type, id), false);
@@ -816,31 +850,61 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       console.log('🚀 [loadEpisodeStreams] START - Loading episode streams for:', episodeId);
       updateEpisodeLoadingState();
 
-      // Get TMDB ID for external sources first before starting parallel requests
+      // Get TMDB ID for external sources and determine the correct ID for Stremio addons
       console.log('🔍 [loadEpisodeStreams] Getting TMDB ID for:', id);
       let tmdbId;
+      let stremioEpisodeId = episodeId; // Default to original episode ID
+      
       if (id.startsWith('tmdb:')) {
         tmdbId = id.split(':')[1];
         console.log('✅ [loadEpisodeStreams] Using TMDB ID from ID:', tmdbId);
+        
+        // Try to get IMDb ID from metadata first, then convert if needed
+        if (metadata?.imdb_id) {
+          // Replace the series ID in episodeId with the IMDb ID
+          const [, season, episode] = episodeId.split(':');
+          stremioEpisodeId = `series:${metadata.imdb_id}:${season}:${episode}`;
+          console.log('✅ [loadEpisodeStreams] Using IMDb ID from metadata for Stremio episode:', stremioEpisodeId);
+        } else if (imdbId) {
+          const [, season, episode] = episodeId.split(':');
+          stremioEpisodeId = `series:${imdbId}:${season}:${episode}`;
+          console.log('✅ [loadEpisodeStreams] Using stored IMDb ID for Stremio episode:', stremioEpisodeId);
+        } else {
+          // Convert TMDB ID to IMDb ID for Stremio addons
+          try {
+            const externalIds = await withTimeout(tmdbService.getShowExternalIds(parseInt(tmdbId)), API_TIMEOUT);
+            
+            if (externalIds?.imdb_id) {
+              const [, season, episode] = episodeId.split(':');
+              stremioEpisodeId = `series:${externalIds.imdb_id}:${season}:${episode}`;
+              console.log('✅ [loadEpisodeStreams] Converted TMDB to IMDb ID for Stremio episode:', stremioEpisodeId);
+            } else {
+              console.log('⚠️ [loadEpisodeStreams] No IMDb ID found for TMDB ID, using original episode ID:', stremioEpisodeId);
+            }
+          } catch (error) {
+            console.log('⚠️ [loadEpisodeStreams] Failed to convert TMDB to IMDb, using original episode ID:', error);
+          }
+        }
       } else if (id.startsWith('tt')) {
-        // This is an IMDB ID
+        // This is already an IMDB ID, perfect for Stremio
         console.log('📝 [loadEpisodeStreams] Converting IMDB ID to TMDB ID...');
         tmdbId = await withTimeout(tmdbService.findTMDBIdByIMDB(id), API_TIMEOUT);
         console.log('✅ [loadEpisodeStreams] Converted to TMDB ID:', tmdbId);
       } else {
         tmdbId = id;
-        console.log('ℹ️ [loadEpisodeStreams] Using ID as TMDB ID:', tmdbId);
+        console.log('ℹ️ [loadEpisodeStreams] Using ID as both TMDB and Stremio ID:', tmdbId);
       }
 
-      // Extract episode info from the episodeId
+      // Extract episode info from the episodeId for logging
       const [, season, episode] = episodeId.split(':');
       const episodeQuery = `?s=${season}&e=${episode}`;
       console.log(`ℹ️ [loadEpisodeStreams] Episode query: ${episodeQuery}`);
 
       console.log('🔄 [loadEpisodeStreams] Starting stream requests');
       
-      // Start Stremio request using the callback method
-      processStremioSource('series', episodeId, true);
+      // Start Stremio request using the converted episode ID format
+      console.log('🎬 [loadEpisodeStreams] Using episode ID for Stremio addons:', stremioEpisodeId);
+      processStremioSource('series', stremioEpisodeId, true);
       
       // Add HDRezka source for episodes
       const hdrezkaEpisodePromise = processExternalSource('hdrezka',
