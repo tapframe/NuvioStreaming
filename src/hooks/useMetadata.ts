@@ -514,10 +514,10 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       const [content, castData] = await Promise.allSettled([
         // Load content with timeout and retry
         withRetry(async () => {
-                  const result = await withTimeout(
+          const result = await withTimeout(
           catalogService.getEnhancedContentDetails(type, actualId, addonId),
-          API_TIMEOUT
-        );
+            API_TIMEOUT
+          );
           // Store the actual ID used (could be IMDB)
           if (actualId.startsWith('tt')) {
             setImdbId(actualId);
@@ -543,7 +543,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         if (type === 'series') {
           // Load series data after the enhanced metadata is processed
           setTimeout(() => {
-            loadSeriesData().catch(console.error);
+          loadSeriesData().catch(console.error);
           }, 100);
         }
       } else {

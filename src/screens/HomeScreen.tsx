@@ -500,10 +500,10 @@ const HomeScreen = () => {
       // Start all catalog loading promises but don't wait for them
       // They will update the state progressively as they complete
       Promise.allSettled(catalogPromises).then(() => {
-        console.log('[HomeScreen] All catalogs processed');
-        
+      console.log('[HomeScreen] All catalogs processed');
+      
         // Final cleanup: Filter out null values to get only successfully loaded catalogs
-        setCatalogs(prevCatalogs => prevCatalogs.filter(catalog => catalog !== null));
+      setCatalogs(prevCatalogs => prevCatalogs.filter(catalog => catalog !== null));
       });
       
     } catch (error) {

@@ -23,7 +23,7 @@ export const MovieContent: React.FC<MovieContentProps> = ({ metadata }) => {
           </View>
         )}
         
-
+        
         {hasCast && (
           <View style={styles.metadataRow}>
             <Text style={[styles.metadataLabel, { color: currentTheme.colors.textMuted }]}>Cast:</Text>
