@@ -214,9 +214,19 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
     }
 
     // ENHANCED DEDUPLICATION: Check if we've already stopped this session
+    // However, allow updates if the new progress is significantly higher (>5% improvement)
     if (hasStopped.current) {
-      logger.log(`[TraktAutosync] Already stopped this session, skipping duplicate call (reason: ${reason})`);
-      return;
+      const currentProgressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+      const progressImprovement = currentProgressPercent - lastSyncProgress.current;
+      
+      if (progressImprovement > 5) {
+        logger.log(`[TraktAutosync] Session already stopped, but progress improved significantly by ${progressImprovement.toFixed(1)}% (${lastSyncProgress.current.toFixed(1)}% → ${currentProgressPercent.toFixed(1)}%), allowing update`);
+        // Reset stopped flag to allow this significant update
+        hasStopped.current = false;
+      } else {
+        logger.log(`[TraktAutosync] Already stopped this session, skipping duplicate call (reason: ${reason})`);
+        return;
+      }
     }
 
     // ENHANCED DEDUPLICATION: Prevent rapid successive calls (within 5 seconds)
@@ -235,11 +245,40 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
       let progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
       logger.log(`[TraktAutosync] Initial progress calculation: ${progressPercent.toFixed(1)}%`);
       
-      // If progress is 0 during unmount, use the last synced progress instead
-      // This happens when video player state is reset before component unmount
-      if (reason === 'unmount' && progressPercent < 1 && lastSyncProgress.current > 0) {
-        progressPercent = lastSyncProgress.current;
-        logger.log(`[TraktAutosync] Using last synced progress for unmount: ${progressPercent.toFixed(1)}%`);
+      // For unmount calls, always use the highest available progress
+      // Check current progress, last synced progress, and local storage progress
+      if (reason === 'unmount') {
+        let maxProgress = progressPercent;
+        
+        // Check last synced progress
+        if (lastSyncProgress.current > maxProgress) {
+          maxProgress = lastSyncProgress.current;
+        }
+        
+                 // Also check local storage for the highest recorded progress
+         try {
+           const savedProgress = await storageService.getWatchProgress(
+             options.id, 
+             options.type, 
+             options.episodeId
+           );
+          
+          if (savedProgress && savedProgress.duration > 0) {
+            const savedProgressPercent = (savedProgress.currentTime / savedProgress.duration) * 100;
+            if (savedProgressPercent > maxProgress) {
+              maxProgress = savedProgressPercent;
+            }
+          }
+        } catch (error) {
+          logger.error('[TraktAutosync] Error checking saved progress:', error);
+        }
+        
+        if (maxProgress !== progressPercent) {
+          logger.log(`[TraktAutosync] Using highest available progress for unmount: ${maxProgress.toFixed(1)}% (current: ${progressPercent.toFixed(1)}%, last synced: ${lastSyncProgress.current.toFixed(1)}%)`);
+          progressPercent = maxProgress;
+        } else {
+          logger.log(`[TraktAutosync] Current progress is already highest: ${progressPercent.toFixed(1)}%`);
+        }
       }
 
       // If we have valid progress but no started session, force start one first
