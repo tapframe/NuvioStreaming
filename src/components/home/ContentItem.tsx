@@ -4,7 +4,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { catalogService, StreamingContent } from '../../services/catalogService';
-import DropUpMenu from './DropUpMenu';
+import { DropUpMenu } from './DropUpMenu';
 
 interface ContentItemProps {
   item: StreamingContent;
@@ -53,9 +53,8 @@ const calculatePosterLayout = (screenWidth: number) => {
 const posterLayout = calculatePosterLayout(width);
 const POSTER_WIDTH = posterLayout.posterWidth;
 
-const ContentItem = ({ item: initialItem, onPress }: ContentItemProps) => {
+const ContentItem = React.memo(({ item, onPress }: ContentItemProps) => {
   const [menuVisible, setMenuVisible] = useState(false);
-  const [localItem, setLocalItem] = useState(initialItem);
   const [isWatched, setIsWatched] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -66,16 +65,16 @@ const ContentItem = ({ item: initialItem, onPress }: ContentItemProps) => {
   }, []);
 
   const handlePress = useCallback(() => {
-    onPress(localItem.id, localItem.type);
-  }, [localItem.id, localItem.type, onPress]);
+    onPress(item.id, item.type);
+  }, [item.id, item.type, onPress]);
 
   const handleOptionSelect = useCallback((option: string) => {
     switch (option) {
       case 'library':
-        if (localItem.inLibrary) {
-          catalogService.removeFromLibrary(localItem.type, localItem.id);
+        if (item.inLibrary) {
+          catalogService.removeFromLibrary(item.type, item.id);
         } else {
-          catalogService.addToLibrary(localItem);
+          catalogService.addToLibrary(item);
         }
         break;
       case 'watched':
@@ -86,26 +85,11 @@ const ContentItem = ({ item: initialItem, onPress }: ContentItemProps) => {
       case 'share':
         break;
     }
-  }, [localItem]);
+  }, [item]);
 
   const handleMenuClose = useCallback(() => {
     setMenuVisible(false);
   }, []);
-
-  useEffect(() => {
-    setLocalItem(initialItem);
-  }, [initialItem]);
-
-  useEffect(() => {
-    const unsubscribe = catalogService.subscribeToLibraryUpdates((libraryItems) => {
-      const isInLibrary = libraryItems.some(
-        libraryItem => libraryItem.id === localItem.id && libraryItem.type === localItem.type
-      );
-      setLocalItem(prev => ({ ...prev, inLibrary: isInLibrary }));
-    });
-
-    return () => unsubscribe();
-  }, [localItem.id, localItem.type]);
 
   return (
     <>
@@ -118,12 +102,12 @@ const ContentItem = ({ item: initialItem, onPress }: ContentItemProps) => {
       >
         <View style={styles.contentItemContainer}>
           <ExpoImage
-            source={{ uri: localItem.poster }}
+            source={{ uri: item.poster }}
             style={styles.poster}
             contentFit="cover"
             transition={300}
             cachePolicy="memory-disk"
-            recyclingKey={`poster-${localItem.id}`}
+            recyclingKey={`poster-${item.id}`}
             onLoadStart={() => {
               setImageLoaded(false);
               setImageError(false);
@@ -148,7 +132,7 @@ const ContentItem = ({ item: initialItem, onPress }: ContentItemProps) => {
               <MaterialIcons name="check-circle" size={22} color={currentTheme.colors.success} />
             </View>
           )}
-          {localItem.inLibrary && (
+          {item.inLibrary && (
             <View style={styles.libraryBadge}>
               <MaterialIcons name="bookmark" size={16} color={currentTheme.colors.white} />
             </View>
@@ -159,12 +143,12 @@ const ContentItem = ({ item: initialItem, onPress }: ContentItemProps) => {
       <DropUpMenu
         visible={menuVisible}
         onClose={handleMenuClose}
-        item={localItem}
+        item={item}
         onOptionSelect={handleOptionSelect}
       />
     </>
   );
-};
+});
 
 const styles = StyleSheet.create({
   contentItem: {
