@@ -1039,6 +1039,29 @@ class StremioService {
     }
     return false;
   }
+
+  // Check if any installed addons can provide streams
+  async hasStreamProviders(): Promise<boolean> {
+    await this.ensureInitialized();
+    const addons = Array.from(this.installedAddons.values());
+
+    for (const addon of addons) {
+      if (addon.resources && Array.isArray(addon.resources)) {
+        // Check for 'stream' resource in the modern format
+        const hasStreamResource = addon.resources.some(resource => 
+          typeof resource === 'string' 
+            ? resource === 'stream' 
+            : resource.name === 'stream'
+        );
+
+        if (hasStreamResource) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
 }
 
 export const stremioService = StremioService.getInstance();

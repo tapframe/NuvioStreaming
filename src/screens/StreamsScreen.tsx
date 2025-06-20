@@ -390,6 +390,13 @@ export const StreamsScreen = () => {
   const [autoplayTriggered, setAutoplayTriggered] = useState(false);
   const [isAutoplayWaiting, setIsAutoplayWaiting] = useState(false);
 
+  // Add check for available streaming sources
+  const [hasStreamProviders, setHasStreamProviders] = useState(true); // Assume true initially
+  const [hasStremioStreamProviders, setHasStremioStreamProviders] = useState(true); // For footer logic
+
+  // Add state for no sources error
+  const [showNoSourcesError, setShowNoSourcesError] = useState(false);
+
   // Monitor streams loading and update available providers immediately
   useEffect(() => {
     // Skip processing if component is unmounting
@@ -433,35 +440,50 @@ export const StreamsScreen = () => {
     }
   }, [selectedProvider, availableProviders]);
 
+  // Update useEffect to check for sources
+  useEffect(() => {
+    const checkProviders = async () => {
+      // Check for both Stremio addons and if the internal provider is enabled
+      const hasStremioProviders = await stremioService.hasStreamProviders();
+      const hasProviders = hasStremioProviders || settings.enableInternalProviders;
 
+      if (!isMounted.current) return;
 
-  React.useEffect(() => {
-    if (type === 'series' && episodeId) {
-      logger.log(`🎬 Loading episode streams for: ${episodeId}`);
-      setLoadingProviders({
-        'stremio': true,
-        'hdrezka': true
-      });
-      setSelectedEpisode(episodeId);
-      loadEpisodeStreams(episodeId);
-    } else if (type === 'movie') {
-      logger.log(`🎬 Loading movie streams for: ${id}`);
-      // setLoadingProviders({ // This is now handled by the main effect
-      //   'stremio': true, 
-      //   'hdrezka': true
-      // });
-      loadStreams();
-    }
+      setHasStreamProviders(hasProviders);
+      setHasStremioStreamProviders(hasStremioProviders);
 
-    // Reset autoplay state when content changes
-    setAutoplayTriggered(false);
-    if (settings.autoplayBestStream) {
-      setIsAutoplayWaiting(true);
-      logger.log('🔄 Autoplay enabled, waiting for best stream...');
-    } else {
-      setIsAutoplayWaiting(false);
-    }
-  }, [type, episodeId, settings.autoplayBestStream]);
+      if (!hasProviders) {
+        const timer = setTimeout(() => {
+          if (isMounted.current) setShowNoSourcesError(true);
+        }, 500);
+        return () => clearTimeout(timer);
+      } else {
+          if (type === 'series' && episodeId) {
+            logger.log(`🎬 Loading episode streams for: ${episodeId}`);
+            setLoadingProviders({
+              'stremio': true,
+              'hdrezka': true
+            });
+            setSelectedEpisode(episodeId);
+            loadEpisodeStreams(episodeId);
+          } else if (type === 'movie') {
+            logger.log(`🎬 Loading movie streams for: ${id}`);
+            loadStreams();
+          }
+  
+          // Reset autoplay state when content changes
+          setAutoplayTriggered(false);
+          if (settings.autoplayBestStream) {
+            setIsAutoplayWaiting(true);
+            logger.log('🔄 Autoplay enabled, waiting for best stream...');
+          } else {
+            setIsAutoplayWaiting(false);
+          }
+      }
+    };
+
+    checkProviders();
+  }, [type, id, episodeId, settings.autoplayBestStream, settings.enableInternalProviders]);
 
   React.useEffect(() => {
     // Trigger entrance animations
@@ -1281,9 +1303,25 @@ export const StreamsScreen = () => {
           )}
         </Animated.View>
 
-        {/* Show streams immediately as they become available */}
-        {Object.keys(streams).length === 0 ? (
-          // Only show initial loading if no streams are available yet
+        {/* Update the streams/loading state display logic */}
+        { showNoSourcesError ? (
+            <Animated.View 
+              entering={FadeIn.duration(300)}
+              style={styles.noStreams}
+            >
+              <MaterialIcons name="error-outline" size={48} color={colors.textMuted} />
+              <Text style={styles.noStreamsText}>No streaming sources available</Text>
+              <Text style={styles.noStreamsSubText}>
+                Please add streaming sources in settings
+              </Text>
+              <TouchableOpacity
+                style={styles.addSourcesButton}
+                onPress={() => navigation.navigate('Settings')}
+              >
+                <Text style={styles.addSourcesButtonText}>Add Sources</Text>
+              </TouchableOpacity>
+            </Animated.View>
+        ) : Object.keys(streams).length === 0 ? (
           (loadingStreams || loadingEpisodeStreams) ? (
             <Animated.View 
               entering={FadeIn.duration(300)}
@@ -1336,7 +1374,7 @@ export const StreamsScreen = () => {
               bounces={true}
               overScrollMode="never"
               ListFooterComponent={
-                (loadingStreams || loadingEpisodeStreams) ? (
+                (loadingStreams || loadingEpisodeStreams) && hasStremioStreamProviders ? (
                   <View style={styles.footerLoading}>
                     <ActivityIndicator size="small" color={colors.primary} />
                     <Text style={styles.footerLoadingText}>Loading more sources...</Text>
@@ -1394,25 +1432,25 @@ const createStyles = (colors: any) => StyleSheet.create({
     flexGrow: 0,
   },
   filterChip: {
-    backgroundColor: colors.transparentLight,
+    backgroundColor: 'transparent',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
     marginRight: 8,
     borderWidth: 1,
-    borderColor: colors.transparent,
+    borderColor: colors.border,
   },
   filterChipSelected: {
-    backgroundColor: colors.transparentLight,
+    backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
   filterChipText: {
-    color: colors.text,
+    color: colors.mediumEmphasis,
     fontWeight: '500',
   },
   filterChipTextSelected: {
-    color: colors.primary,
-    fontWeight: 'bold',
+    color: colors.white,
+    fontWeight: '600',
   },
   streamsContent: {
     flex: 1,
@@ -1429,23 +1467,23 @@ const createStyles = (colors: any) => StyleSheet.create({
     width: '100%',
   },
   streamGroupTitle: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
+    color: colors.highEmphasis,
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 8,
     marginTop: 0,
     backgroundColor: 'transparent',
   },
   streamCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 8,
+    padding: 16,
+    borderRadius: 10,
+    marginBottom: 12,
     minHeight: 70,
-    backgroundColor: colors.elevation1,
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: colors.cardHighlight,
     width: '100%',
     zIndex: 1,
   },
@@ -1487,11 +1525,12 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
   },
   chip: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 4,
     marginRight: 4,
     marginBottom: 4,
+    backgroundColor: colors.surfaceVariant,
   },
   chipText: {
     color: colors.highEmphasis,
@@ -1516,10 +1555,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginLeft: 8,
   },
   streamAction: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.elevation2,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.card,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1791,6 +1830,24 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.primary,
     fontSize: 14,
     marginLeft: 8,
+    fontWeight: '600',
+  },
+  noStreamsSubText: {
+    color: colors.mediumEmphasis,
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  addSourcesButton: {
+    marginTop: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+  },
+  addSourcesButtonText: {
+    color: colors.white,
+    fontSize: 14,
     fontWeight: '600',
   },
 });
