@@ -1717,11 +1717,11 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   movieTitleContainer: {
     width: '100%',
-    height: 120,
+    height: 140,
     backgroundColor: colors.darkBackground,
     pointerEvents: 'box-none',
     justifyContent: 'center',
-    paddingTop: Platform.OS === 'android' ? 45 : 35,
+    paddingTop: Platform.OS === 'android' ? 65 : 35,
   },
   movieTitleContent: {
     width: '100%',
