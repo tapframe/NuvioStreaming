@@ -36,6 +36,7 @@ export interface AppSettings {
   tmdbLanguagePreference: string; // Preferred language for TMDB logos (ISO 639-1 code)
   enableInternalProviders: boolean; // Toggle for internal providers like HDRezka
   episodeLayoutStyle: 'vertical' | 'horizontal'; // Layout style for episode cards
+  autoplayBestStream: boolean; // Automatically play the best available stream
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -54,6 +55,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   tmdbLanguagePreference: 'en', // Default to English
   enableInternalProviders: true, // Enable internal providers by default
   episodeLayoutStyle: 'horizontal', // Default to the new horizontal layout
+  autoplayBestStream: false, // Disabled by default for user choice
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';

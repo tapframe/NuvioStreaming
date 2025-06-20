@@ -302,6 +302,10 @@ export const StreamsScreen = () => {
     }
   }>({});
 
+  // Add state for autoplay functionality
+  const [autoplayTriggered, setAutoplayTriggered] = useState(false);
+  const [isAutoplayWaiting, setIsAutoplayWaiting] = useState(false);
+
   // Monitor streams loading start and completion - FIXED to prevent loops
   useEffect(() => {
     // Skip processing if component is unmounting
@@ -438,6 +442,8 @@ export const StreamsScreen = () => {
     }
   }, [type, groupedStreams, episodeStreams, loadingStreams, loadingEpisodeStreams, selectedProvider]);
 
+
+
   React.useEffect(() => {
     if (type === 'series' && episodeId) {
       logger.log(`🎬 Loading episode streams for: ${episodeId}`);
@@ -455,7 +461,16 @@ export const StreamsScreen = () => {
       // });
       loadStreams();
     }
-  }, [type, episodeId]);
+
+    // Reset autoplay state when content changes
+    setAutoplayTriggered(false);
+    if (settings.autoplayBestStream) {
+      setIsAutoplayWaiting(true);
+      logger.log('🔄 Autoplay enabled, waiting for best stream...');
+    } else {
+      setIsAutoplayWaiting(false);
+    }
+  }, [type, episodeId, settings.autoplayBestStream]);
 
   React.useEffect(() => {
     // Trigger entrance animations
@@ -498,6 +513,101 @@ export const StreamsScreen = () => {
 
   const handleProviderChange = useCallback((provider: string) => {
     setSelectedProvider(provider);
+  }, []);
+
+  // Function to determine the best stream based on quality, provider priority, and other factors
+  const getBestStream = useCallback((streamsData: typeof groupedStreams): Stream | null => {
+    if (!streamsData || Object.keys(streamsData).length === 0) {
+      return null;
+    }
+
+    // Helper function to extract quality as number
+    const getQualityNumeric = (title: string | undefined): number => {
+      if (!title) return 0;
+      const matchWithP = title.match(/(\d+)p/i);
+      if (matchWithP) return parseInt(matchWithP[1], 10);
+      
+      const qualityPatterns = [
+        /\b(240|360|480|720|1080|1440|2160|4320|8000)\b/i
+      ];
+      
+      for (const pattern of qualityPatterns) {
+        const match = title.match(pattern);
+        if (match) {
+          const quality = parseInt(match[1], 10);
+          if (quality >= 240 && quality <= 8000) return quality;
+        }
+      }
+      return 0;
+    };
+
+    // Provider priority (higher number = higher priority)
+    const getProviderPriority = (addonId: string): number => {
+      if (addonId === 'hdrezka') return 100; // HDRezka highest priority
+      
+      // Get Stremio addon installation order (earlier = higher priority)
+      const installedAddons = stremioService.getInstalledAddons();
+      const addonIndex = installedAddons.findIndex(addon => addon.id === addonId);
+      
+      if (addonIndex !== -1) {
+        // Higher priority for addons installed earlier (reverse index)
+        return 50 - addonIndex;
+      }
+      
+      return 0; // Unknown providers get lowest priority
+    };
+
+    // Collect all streams with metadata
+    const allStreams: Array<{
+      stream: Stream;
+      quality: number;
+      providerPriority: number;
+      isDebrid: boolean;
+      isCached: boolean;
+    }> = [];
+
+    Object.entries(streamsData).forEach(([addonId, { streams }]) => {
+      streams.forEach(stream => {
+        const quality = getQualityNumeric(stream.name || stream.title);
+        const providerPriority = getProviderPriority(addonId);
+        const isDebrid = stream.behaviorHints?.cached || false;
+        const isCached = isDebrid;
+
+        allStreams.push({
+          stream,
+          quality,
+          providerPriority,
+          isDebrid,
+          isCached,
+        });
+      });
+    });
+
+    if (allStreams.length === 0) return null;
+
+    // Sort streams by multiple criteria (best first)
+    allStreams.sort((a, b) => {
+      // 1. Prioritize cached/debrid streams
+      if (a.isCached !== b.isCached) {
+        return a.isCached ? -1 : 1;
+      }
+
+      // 2. Prioritize higher quality
+      if (a.quality !== b.quality) {
+        return b.quality - a.quality;
+      }
+
+      // 3. Prioritize better providers
+      if (a.providerPriority !== b.providerPriority) {
+        return b.providerPriority - a.providerPriority;
+      }
+
+      return 0;
+    });
+
+    logger.log(`🎯 Best stream selected: ${allStreams[0].stream.name || allStreams[0].stream.title} (Quality: ${allStreams[0].quality}p, Provider Priority: ${allStreams[0].providerPriority}, Cached: ${allStreams[0].isCached})`);
+    
+    return allStreams[0].stream;
   }, []);
 
   const currentEpisode = useMemo(() => {
@@ -709,6 +819,48 @@ export const StreamsScreen = () => {
       navigateToPlayer(stream);
     }
   }, [settings.preferredPlayer, settings.useExternalPlayer, navigateToPlayer]);
+
+  // Autoplay effect - triggers when streams are available and autoplay is enabled
+  useEffect(() => {
+    if (
+      settings.autoplayBestStream && 
+      !autoplayTriggered && 
+      !loadingStreams && 
+      !loadingEpisodeStreams &&
+      isAutoplayWaiting
+    ) {
+      const streams = type === 'series' ? episodeStreams : groupedStreams;
+      
+      if (Object.keys(streams).length > 0) {
+        const bestStream = getBestStream(streams);
+        
+        if (bestStream) {
+          logger.log('🚀 Autoplay: Best stream found, starting playback...');
+          setAutoplayTriggered(true);
+          setIsAutoplayWaiting(false);
+          
+          // Add a small delay to let the UI settle
+          setTimeout(() => {
+            handleStreamPress(bestStream);
+          }, 500);
+        } else {
+          logger.log('⚠️ Autoplay: No suitable stream found');
+          setIsAutoplayWaiting(false);
+        }
+      }
+    }
+  }, [
+    settings.autoplayBestStream,
+    autoplayTriggered,
+    loadingStreams,
+    loadingEpisodeStreams,
+    isAutoplayWaiting,
+    type,
+    episodeStreams,
+    groupedStreams,
+    getBestStream,
+    handleStreamPress
+  ]);
 
   const filterItems = useMemo(() => {
     const installedAddons = stremioService.getInstalledAddons();
@@ -1140,7 +1292,17 @@ export const StreamsScreen = () => {
             style={styles.loadingContainer}
           >
             <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>Finding available streams...</Text>
+            <Text style={styles.loadingText}>
+              {isAutoplayWaiting ? 'Finding best stream for autoplay...' : 'Finding available streams...'}
+            </Text>
+          </Animated.View>
+        ) : isAutoplayWaiting && !autoplayTriggered ? (
+          <Animated.View 
+            entering={FadeIn.duration(300)}
+            style={styles.loadingContainer}
+          >
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Starting best stream...</Text>
           </Animated.View>
         ) : Object.keys(streams).length === 0 && !loadingStreams && !loadingEpisodeStreams ? (
           <Animated.View 
