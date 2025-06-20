@@ -6,6 +6,7 @@ export type RootStackParamList = {
   Metadata: {
     id: string;
     type: string;
+    addonId?: string;
   };
   Streams: {
     id: string;

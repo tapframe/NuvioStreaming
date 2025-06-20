@@ -54,6 +54,7 @@ export type RootStackParamList = {
     id: string; 
     type: string;
     episodeId?: string;
+    addonId?: string;
   };
   Streams: { 
     id: string; 

@@ -116,8 +116,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
             
             let content: StreamingContent | null = null;
             
-            // Get content details using catalogService
-            content = await catalogService.getContentDetails(type, id);
+            // Get basic content details using catalogService (no enhanced metadata needed for continue watching)
+            content = await catalogService.getBasicContentDetails(type, id);
             
             if (content) {
               // Extract season and episode info from episodeId if available

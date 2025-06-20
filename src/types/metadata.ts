@@ -81,6 +81,7 @@ export interface StreamingContent {
   name: string;
   description?: string;
   poster?: string;
+  posterShape?: string;
   banner?: string;
   logo?: string;
   year?: string | number;
@@ -88,12 +89,30 @@ export interface StreamingContent {
   imdbRating?: string;
   genres?: string[];
   director?: string;
-  writer?: string;
+  writer?: string[];
   cast?: string[];
   releaseInfo?: string;
   directors?: string[];
   creators?: string[];
   certification?: string;
+  released?: string;
+  trailerStreams?: any[];
+  videos?: any[];
+  inLibrary?: boolean;
+  // Enhanced metadata from addons
+  country?: string;
+  links?: Array<{
+    name: string;
+    category: string;
+    url: string;
+  }>;
+  behaviorHints?: {
+    defaultVideoId?: string;
+    hasScheduledVideos?: boolean;
+    [key: string]: any;
+  };
+  imdb_id?: string;
+  slug?: string;
 }
 
 // Navigation types

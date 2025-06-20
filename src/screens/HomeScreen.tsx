@@ -497,12 +497,14 @@ const HomeScreen = () => {
       // Initialize catalogs array with proper length
       setCatalogs(new Array(catalogIndex).fill(null));
       
-      // Wait for all catalogs to finish loading (success or failure)
-      await Promise.allSettled(catalogPromises);
-      console.log('[HomeScreen] All catalogs processed');
-      
-      // Filter out null values to get only successfully loaded catalogs
-      setCatalogs(prevCatalogs => prevCatalogs.filter(catalog => catalog !== null));
+      // Start all catalog loading promises but don't wait for them
+      // They will update the state progressively as they complete
+      Promise.allSettled(catalogPromises).then(() => {
+        console.log('[HomeScreen] All catalogs processed');
+        
+        // Final cleanup: Filter out null values to get only successfully loaded catalogs
+        setCatalogs(prevCatalogs => prevCatalogs.filter(catalog => catalog !== null));
+      });
       
     } catch (error) {
       console.error('[HomeScreen] Error in progressive catalog loading:', error);

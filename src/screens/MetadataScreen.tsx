@@ -45,9 +45,9 @@ import { TraktService, TraktPlaybackItem } from '../services/traktService';
 const { height } = Dimensions.get('window');
 
 const MetadataScreen: React.FC = () => {
-  const route = useRoute<RouteProp<Record<string, RouteParams & { episodeId?: string }>, string>>();
+  const route = useRoute<RouteProp<Record<string, RouteParams & { episodeId?: string; addonId?: string }>, string>>();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
-  const { id, type, episodeId } = route.params;
+  const { id, type, episodeId, addonId } = route.params;
   
   // Consolidated hooks for better performance
   const { settings } = useSettings();
@@ -78,7 +78,7 @@ const MetadataScreen: React.FC = () => {
     loadingRecommendations,
     setMetadata,
     imdbId,
-  } = useMetadata({ id, type });
+  } = useMetadata({ id, type, addonId });
 
   // Optimized hooks with memoization
   const watchProgressData = useWatchProgress(id, type as 'movie' | 'series', episodeId, episodes);

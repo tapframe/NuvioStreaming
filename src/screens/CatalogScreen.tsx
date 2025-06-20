@@ -503,7 +503,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
             width: NUM_COLUMNS === 2 ? ITEM_WIDTH : ITEM_WIDTH
           }
         ]}
-        onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type })}
+        onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type, addonId })}
         activeOpacity={0.7}
       >
         <Image

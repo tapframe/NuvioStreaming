@@ -60,7 +60,7 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
   const { currentTheme } = useTheme();
 
   const handleContentPress = (id: string, type: string) => {
-    navigation.navigate('Metadata', { id, type });
+    navigation.navigate('Metadata', { id, type, addonId: catalog.addon });
   };
 
   const renderContentItem = ({ item, index }: { item: StreamingContent, index: number }) => {

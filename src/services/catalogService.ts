@@ -54,6 +54,22 @@ export interface StreamingContent {
   directors?: string[];
   creators?: string[];
   certification?: string;
+  // Enhanced metadata from addons
+  country?: string;
+  writer?: string[];
+  links?: Array<{
+    name: string;
+    category: string;
+    url: string;
+  }>;
+  behaviorHints?: {
+    defaultVideoId?: string;
+    hasScheduledVideos?: boolean;
+    [key: string]: any;
+  };
+  imdb_id?: string;
+  slug?: string;
+  releaseInfo?: string;
 }
 
 export interface CatalogContent {
@@ -442,7 +458,7 @@ class CatalogService {
     }
   }
 
-  async getContentDetails(type: string, id: string): Promise<StreamingContent | null> {
+  async getContentDetails(type: string, id: string, preferredAddonId?: string): Promise<StreamingContent | null> {
     try {
       // Try up to 3 times with increasing delays
       let meta = null;
@@ -450,7 +466,7 @@ class CatalogService {
       
       for (let i = 0; i < 3; i++) {
         try {
-          meta = await stremioService.getMetaDetails(type, id);
+          meta = await stremioService.getMetaDetails(type, id, preferredAddonId);
           if (meta) break;
           await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));
         } catch (error) {
@@ -461,8 +477,8 @@ class CatalogService {
       }
 
       if (meta) {
-        // Add to recent content
-        const content = this.convertMetaToStreamingContent(meta);
+        // Add to recent content using enhanced conversion for full metadata
+        const content = this.convertMetaToStreamingContentEnhanced(meta);
         this.addToRecentContent(content);
         
         // Check if it's in the library
@@ -482,7 +498,54 @@ class CatalogService {
     }
   }
 
+  // Public method for getting enhanced metadata details (used by MetadataScreen)
+  async getEnhancedContentDetails(type: string, id: string, preferredAddonId?: string): Promise<StreamingContent | null> {
+    logger.log(`🔍 [MetadataScreen] Fetching enhanced metadata for ${type}:${id} ${preferredAddonId ? `from addon ${preferredAddonId}` : ''}`);
+    return this.getContentDetails(type, id, preferredAddonId);
+  }
+
+  // Public method for getting basic content details without enhanced processing (used by ContinueWatching, etc.)
+  async getBasicContentDetails(type: string, id: string, preferredAddonId?: string): Promise<StreamingContent | null> {
+    try {
+      // Try up to 3 times with increasing delays
+      let meta = null;
+      let lastError = null;
+      
+      for (let i = 0; i < 3; i++) {
+        try {
+          meta = await stremioService.getMetaDetails(type, id, preferredAddonId);
+          if (meta) break;
+          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));
+        } catch (error) {
+          lastError = error;
+          logger.error(`Attempt ${i + 1} failed to get basic content details for ${type}:${id}:`, error);
+          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));
+        }
+      }
+
+      if (meta) {
+        // Use basic conversion without enhanced metadata processing
+        const content = this.convertMetaToStreamingContent(meta);
+        
+        // Check if it's in the library
+        content.inLibrary = this.library[`${type}:${id}`] !== undefined;
+        
+        return content;
+      }
+
+      if (lastError) {
+        throw lastError;
+      }
+      
+      return null;
+    } catch (error) {
+      logger.error(`Failed to get basic content details for ${type}:${id}:`, error);
+      return null;
+    }
+  }
+
   private convertMetaToStreamingContent(meta: Meta): StreamingContent {
+    // Basic conversion for catalog display - no enhanced metadata processing
     return {
       id: meta.id,
       type: meta.type,
@@ -490,15 +553,68 @@ class CatalogService {
       poster: meta.poster || 'https://via.placeholder.com/300x450/cccccc/666666?text=No+Image',
       posterShape: 'poster',
       banner: meta.background,
-      logo: `https://images.metahub.space/logo/medium/${meta.id}/img`,
+      logo: `https://images.metahub.space/logo/medium/${meta.id}/img`, // Use metahub for catalog display
       imdbRating: meta.imdbRating,
       year: meta.year,
       genres: meta.genres,
       description: meta.description,
       runtime: meta.runtime,
       inLibrary: this.library[`${meta.type}:${meta.id}`] !== undefined,
-      certification: meta.certification
+      certification: meta.certification,
+      releaseInfo: meta.releaseInfo,
     };
+  }
+
+  // Enhanced conversion for detailed metadata (used only when fetching individual content details)
+  private convertMetaToStreamingContentEnhanced(meta: Meta): StreamingContent {
+    // Enhanced conversion to utilize all available metadata from addons
+    const converted: StreamingContent = {
+      id: meta.id,
+      type: meta.type,
+      name: meta.name,
+      poster: meta.poster || 'https://via.placeholder.com/300x450/cccccc/666666?text=No+Image',
+      posterShape: 'poster',
+      banner: meta.background,
+      // Use addon's logo if available, fallback to metahub
+      logo: (meta as any).logo || `https://images.metahub.space/logo/medium/${meta.id}/img`,
+      imdbRating: meta.imdbRating,
+      year: meta.year,
+      genres: meta.genres,
+      description: meta.description,
+      runtime: meta.runtime,
+      inLibrary: this.library[`${meta.type}:${meta.id}`] !== undefined,
+      certification: meta.certification,
+      // Enhanced fields from addon metadata
+      directors: (meta as any).director ? 
+        (Array.isArray((meta as any).director) ? (meta as any).director : [(meta as any).director]) 
+        : undefined,
+      writer: (meta as any).writer || undefined,
+      country: (meta as any).country || undefined,
+      imdb_id: (meta as any).imdb_id || undefined,
+      slug: (meta as any).slug || undefined,
+      releaseInfo: meta.releaseInfo || (meta as any).releaseInfo || undefined,
+      trailerStreams: (meta as any).trailerStreams || undefined,
+      links: (meta as any).links || undefined,
+      behaviorHints: (meta as any).behaviorHints || undefined,
+    };
+
+    // Cast is handled separately by the dedicated CastSection component via TMDB
+
+    // Log if rich metadata is found
+    if ((meta as any).trailerStreams?.length > 0) {
+      logger.log(`🎬 Enhanced metadata: Found ${(meta as any).trailerStreams.length} trailers for ${meta.name}`);
+    }
+
+    if ((meta as any).links?.length > 0) {
+      logger.log(`🔗 Enhanced metadata: Found ${(meta as any).links.length} links for ${meta.name}`);
+    }
+
+    // Handle videos/episodes if available
+    if ((meta as any).videos) {
+      converted.videos = (meta as any).videos;
+    }
+
+    return converted;
   }
 
   private notifyLibrarySubscribers(): void {

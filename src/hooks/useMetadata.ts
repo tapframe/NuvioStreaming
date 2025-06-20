@@ -60,6 +60,7 @@ const withRetry = async <T>(
 interface UseMetadataProps {
   id: string;
   type: string;
+  addonId?: string;
 }
 
 interface UseMetadataReturn {
@@ -94,7 +95,7 @@ interface UseMetadataReturn {
   imdbId: string | null;
 }
 
-export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn => {
+export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadataReturn => {
   const [metadata, setMetadata] = useState<StreamingContent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -411,7 +412,7 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
                   
                   if (writers.length > 0) {
                     (formattedMovie as any).creators = writers;
-                    (formattedMovie as StreamingContent & { writer: string }).writer = writers.join(', ');
+                    (formattedMovie as any).writer = writers;
                   }
                 }
               } catch (error) {
@@ -513,10 +514,10 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
       const [content, castData] = await Promise.allSettled([
         // Load content with timeout and retry
         withRetry(async () => {
-          const result = await withTimeout(
-            catalogService.getContentDetails(type, actualId),
-            API_TIMEOUT
-          );
+                  const result = await withTimeout(
+          catalogService.getEnhancedContentDetails(type, actualId, addonId),
+          API_TIMEOUT
+        );
           // Store the actual ID used (could be IMDB)
           if (actualId.startsWith('tt')) {
             setImdbId(actualId);
@@ -540,8 +541,10 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
         cacheService.setMetadata(id, type, content.value);
 
         if (type === 'series') {
-          // Load series data in parallel with other data
-          loadSeriesData().catch(console.error);
+          // Load series data after the enhanced metadata is processed
+          setTimeout(() => {
+            loadSeriesData().catch(console.error);
+          }, 100);
         }
       } else {
         throw new Error('Content not found');
@@ -564,6 +567,67 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
   const loadSeriesData = async () => {
     setLoadingSeasons(true);
     try {
+      // First check if we have episode data from the addon
+      const addonVideos = metadata?.videos;
+      if (addonVideos && Array.isArray(addonVideos) && addonVideos.length > 0) {
+        logger.log(`🎬 Found ${addonVideos.length} episodes from addon metadata for ${metadata?.name || id}`);
+        
+        // Group addon episodes by season
+        const groupedAddonEpisodes: GroupedEpisodes = {};
+        
+                 addonVideos.forEach((video: any) => {
+          const seasonNumber = video.season || 1;
+          const episodeNumber = video.episode || video.number || 1;
+          
+          if (!groupedAddonEpisodes[seasonNumber]) {
+            groupedAddonEpisodes[seasonNumber] = [];
+          }
+          
+          // Convert addon episode format to our Episode interface
+          const episode: Episode = {
+            id: video.id,
+            name: video.name || video.title || `Episode ${episodeNumber}`,
+            overview: video.overview || video.description || '',
+            season_number: seasonNumber,
+            episode_number: episodeNumber,
+            air_date: video.released ? video.released.split('T')[0] : video.firstAired ? video.firstAired.split('T')[0] : '',
+            still_path: video.thumbnail ? video.thumbnail.replace('https://image.tmdb.org/t/p/w500', '') : null,
+            vote_average: parseFloat(video.rating) || 0,
+            runtime: undefined,
+            episodeString: `S${seasonNumber.toString().padStart(2, '0')}E${episodeNumber.toString().padStart(2, '0')}`,
+            stremioId: video.id,
+            season_poster_path: null
+          };
+          
+          groupedAddonEpisodes[seasonNumber].push(episode);
+        });
+        
+        // Sort episodes within each season
+        Object.keys(groupedAddonEpisodes).forEach(season => {
+          groupedAddonEpisodes[parseInt(season)].sort((a, b) => a.episode_number - b.episode_number);
+        });
+        
+        logger.log(`📺 Processed addon episodes into ${Object.keys(groupedAddonEpisodes).length} seasons`);
+        setGroupedEpisodes(groupedAddonEpisodes);
+        
+                 // Set the first available season
+         const seasons = Object.keys(groupedAddonEpisodes).map(Number);
+         const firstSeason = Math.min(...seasons);
+         logger.log(`📺 Setting season ${firstSeason} as selected (${groupedAddonEpisodes[firstSeason]?.length || 0} episodes)`);
+         setSelectedSeason(firstSeason);
+         setEpisodes(groupedAddonEpisodes[firstSeason] || []);
+        
+        // Try to get TMDB ID for additional metadata (cast, etc.) but don't override episodes
+        const tmdbIdResult = await tmdbService.findTMDBIdByIMDB(id);
+        if (tmdbIdResult) {
+          setTmdbId(tmdbIdResult);
+        }
+        
+        return; // Use addon episodes, skip TMDB loading
+      }
+      
+      // Fallback to TMDB if no addon episodes
+      logger.log('📺 No addon episodes found, falling back to TMDB');
       const tmdbIdResult = await tmdbService.findTMDBIdByIMDB(id);
       if (tmdbIdResult) {
         setTmdbId(tmdbIdResult);
@@ -865,6 +929,14 @@ export const useMetadata = ({ id, type }: UseMetadataProps): UseMetadataReturn =
   useEffect(() => {
     loadMetadata();
   }, [id, type]);
+
+  // Re-run series data loading when metadata updates with videos
+  useEffect(() => {
+    if (metadata && type === 'series' && metadata.videos && metadata.videos.length > 0) {
+      logger.log(`🎬 Metadata updated with ${metadata.videos.length} episodes, reloading series data`);
+      loadSeriesData().catch(console.error);
+    }
+  }, [metadata?.videos, type]);
 
   const loadRecommendations = useCallback(async () => {
     if (!tmdbId) return;

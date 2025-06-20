@@ -26,9 +26,35 @@ export interface Meta {
   genres?: string[];
   runtime?: string;
   cast?: string[];
-  director?: string;
-  writer?: string;
+  director?: string | string[];
+  writer?: string | string[];
   certification?: string;
+  // Extended fields available from some addons
+  country?: string;
+  imdb_id?: string;
+  slug?: string;
+  released?: string;
+  trailerStreams?: Array<{
+    title: string;
+    ytId: string;
+  }>;
+  links?: Array<{
+    name: string;
+    category: string;
+    url: string;
+  }>;
+  behaviorHints?: {
+    defaultVideoId?: string;
+    hasScheduledVideos?: boolean;
+    [key: string]: any;
+  };
+  app_extras?: {
+    cast?: Array<{
+      name: string;
+      character?: string;
+      photo?: string;
+    }>;
+  };
 }
 
 export interface Subtitle {
@@ -464,8 +490,71 @@ class StremioService {
     }
   }
 
-  async getMetaDetails(type: string, id: string): Promise<MetaDetails | null> {
+  async getMetaDetails(type: string, id: string, preferredAddonId?: string): Promise<MetaDetails | null> {
     try {
+      const addons = this.getInstalledAddons();
+      
+      // If a preferred addon is specified, try it first
+      if (preferredAddonId) {
+        logger.log(`🎯 Trying preferred addon first: ${preferredAddonId}`);
+        const preferredAddon = addons.find(addon => addon.id === preferredAddonId);
+        
+        if (preferredAddon && preferredAddon.resources) {
+          // Log what URL would be used for debugging
+          const { baseUrl, queryParams } = this.getAddonBaseURL(preferredAddon.url || '');
+          const wouldBeUrl = queryParams ? `${baseUrl}/meta/${type}/${id}.json?${queryParams}` : `${baseUrl}/meta/${type}/${id}.json`;
+          logger.log(`🔍 Would check URL: ${wouldBeUrl} (addon: ${preferredAddon.name})`);
+          
+          // Log addon resources for debugging
+          logger.log(`🔍 Addon resources:`, JSON.stringify(preferredAddon.resources, null, 2));
+          
+          // Check if addon supports meta resource for this type
+          let hasMetaSupport = false;
+          
+          for (const resource of preferredAddon.resources) {
+            // Check if the current element is a ResourceObject
+            if (typeof resource === 'object' && resource !== null && 'name' in resource) {
+              const typedResource = resource as ResourceObject;
+              if (typedResource.name === 'meta' && 
+                  Array.isArray(typedResource.types) && 
+                  typedResource.types.includes(type)) {
+                hasMetaSupport = true;
+                break;
+              }
+            } 
+            // Check if the element is the simple string "meta" AND the addon has a top-level types array
+            else if (typeof resource === 'string' && resource === 'meta' && preferredAddon.types) {
+              if (Array.isArray(preferredAddon.types) && preferredAddon.types.includes(type)) {
+                hasMetaSupport = true;
+                break;
+              }
+            }
+          }
+          
+          logger.log(`🔍 Meta support check: ${hasMetaSupport} (addon types: ${JSON.stringify(preferredAddon.types)})`);
+          
+                    if (hasMetaSupport) {
+            try {
+              logger.log(`HTTP GET: ${wouldBeUrl} (preferred addon: ${preferredAddon.name})`);
+              const response = await this.retryRequest(async () => {
+                return await axios.get(wouldBeUrl, { timeout: 10000 });
+              });
+              
+              if (response.data && response.data.meta) {
+                logger.log(`✅ Metadata fetched successfully from preferred addon: ${wouldBeUrl}`);
+                return response.data.meta;
+              }
+            } catch (error) {
+              logger.warn(`❌ Failed to fetch meta from preferred addon ${preferredAddon.name}:`, error);
+            }
+          } else {
+            logger.warn(`⚠️ Preferred addon ${preferredAddonId} does not support meta for type ${type}`);
+          }
+        } else {
+          logger.warn(`⚠️ Preferred addon ${preferredAddonId} not found or has no resources`);
+        }
+      }
+      
       // Try Cinemeta with different base URLs
       const cinemetaUrls = [
         'https://v3-cinemeta.strem.io',
@@ -475,44 +564,66 @@ class StremioService {
       for (const baseUrl of cinemetaUrls) {
         try {
           const url = `${baseUrl}/meta/${type}/${id}.json`;
+          logger.log(`HTTP GET: ${url}`);
           const response = await this.retryRequest(async () => {
             return await axios.get(url, { timeout: 10000 });
           });
           
           if (response.data && response.data.meta) {
+            logger.log(`✅ Metadata fetched successfully from: ${url}`);
             return response.data.meta;
           }
         } catch (error) {
-          logger.warn(`Failed to fetch meta from ${baseUrl}:`, error);
+          logger.warn(`❌ Failed to fetch meta from ${baseUrl}:`, error);
           continue; // Try next URL
         }
       }
 
-      // If Cinemeta fails, try other addons
-      const addons = this.getInstalledAddons();
+      // If Cinemeta fails, try other addons (excluding the preferred one already tried)
       
       for (const addon of addons) {
-        if (!addon.resources || addon.id === 'com.linvo.cinemeta') continue;
+        if (!addon.resources || addon.id === 'com.linvo.cinemeta' || addon.id === preferredAddonId) continue;
         
-        const metaResource = addon.resources.find(
-          resource => resource.name === 'meta' && resource.types.includes(type)
-        );
+        // Check if addon supports meta resource for this type (handles both string and object formats)
+        let hasMetaSupport = false;
         
-        if (!metaResource) continue;
+        for (const resource of addon.resources) {
+          // Check if the current element is a ResourceObject
+          if (typeof resource === 'object' && resource !== null && 'name' in resource) {
+            const typedResource = resource as ResourceObject;
+            if (typedResource.name === 'meta' && 
+                Array.isArray(typedResource.types) && 
+                typedResource.types.includes(type)) {
+              hasMetaSupport = true;
+              break;
+            }
+          } 
+          // Check if the element is the simple string "meta" AND the addon has a top-level types array
+          else if (typeof resource === 'string' && resource === 'meta' && addon.types) {
+            if (Array.isArray(addon.types) && addon.types.includes(type)) {
+              hasMetaSupport = true;
+              break;
+            }
+          }
+        }
+        
+        if (!hasMetaSupport) continue;
         
         try {
           const { baseUrl, queryParams } = this.getAddonBaseURL(addon.url || '');
           const url = queryParams ? `${baseUrl}/meta/${type}/${id}.json?${queryParams}` : `${baseUrl}/meta/${type}/${id}.json`;
           
+          logger.log(`HTTP GET: ${url}`);
           const response = await this.retryRequest(async () => {
             return await axios.get(url, { timeout: 10000 });
           });
           
           if (response.data && response.data.meta) {
+            logger.log(`✅ Metadata fetched successfully from: ${url}`);
             return response.data.meta;
           }
         } catch (error) {
-          logger.warn(`Failed to fetch meta from ${addon.name}:`, error);
+          logger.warn(`❌ Failed to fetch meta from ${addon.name} (${addon.id}):`, error);
           continue; // Try next addon
         }
       }
