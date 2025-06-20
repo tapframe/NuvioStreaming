@@ -152,6 +152,15 @@ const AndroidVideoPlayer: React.FC = () => {
   const [currentStreamProvider, setCurrentStreamProvider] = useState<string | undefined>(streamProvider);
   const [currentStreamName, setCurrentStreamName] = useState<string | undefined>(streamName);
   const isMounted = useRef(true);
+  const controlsTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  const hideControls = () => {
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => setShowControls(false));
+  };
 
   const calculateVideoStyles = (videoWidth: number, videoHeight: number, screenWidth: number, screenHeight: number) => {
     return {
@@ -489,6 +498,7 @@ const AndroidVideoPlayer: React.FC = () => {
         }, 1000);
       }
       completeOpeningAnimation();
+      controlsTimeout.current = setTimeout(hideControls, 3000);
     }
   };
 
@@ -624,35 +634,41 @@ const AndroidVideoPlayer: React.FC = () => {
   };
 
   const handleStartFromBeginning = async () => {
-    if (rememberChoice) {
-      try {
-        await AsyncStorage.setItem(RESUME_PREF_KEY, RESUME_PREF.ALWAYS_START_OVER);
-      } catch (error) {
-        logger.error('[AndroidVideoPlayer] Error saving resume preference:', error);
-      }
-    }
+    if (DEBUG_MODE) logger.log("[AndroidVideoPlayer] Starting from beginning.");
     setShowResumeOverlay(false);
-    setInitialPosition(0);
     if (videoRef.current) {
-      seekToTime(0);
-      setCurrentTime(0);
+        seekToTime(0);
+    }
+    await resetResumePreference();
+    setPaused(false);
+    // Start playback
+    if (isMounted.current) {
+        setIsInitialSeekComplete(true);
     }
   };
 
   const toggleControls = () => {
-    setShowControls(previousState => !previousState);
+    if (controlsTimeout.current) {
+      clearTimeout(controlsTimeout.current);
+      controlsTimeout.current = null;
+    }
+    
+    setShowControls(prevShowControls => {
+      const newShowControls = !prevShowControls;
+      Animated.timing(fadeAnim, {
+        toValue: newShowControls ? 1 : 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+      if (newShowControls) {
+        controlsTimeout.current = setTimeout(hideControls, 3000);
+      }
+      return newShowControls;
+    });
   };
 
-  useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: showControls ? 1 : 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  }, [showControls]);
-
   const handleError = (error: any) => {
-    logger.error('[AndroidVideoPlayer] Playback Error:', error);
+    logger.error('AndroidVideoPlayer error: ', error);
   };
 
   const onBuffer = (data: any) => {
