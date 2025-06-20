@@ -306,141 +306,48 @@ export const StreamsScreen = () => {
   const [autoplayTriggered, setAutoplayTriggered] = useState(false);
   const [isAutoplayWaiting, setIsAutoplayWaiting] = useState(false);
 
-  // Monitor streams loading start and completion - FIXED to prevent loops
+  // Monitor streams loading and update available providers immediately
   useEffect(() => {
     // Skip processing if component is unmounting
     if (!isMounted.current) return;
     
-    const now = Date.now();
-    // Define all providers you expect to load. This could be dynamic.
-    const expectedProviders = ['stremio', 'hdrezka'];
-
-    // Prevent infinite rerendering by using refs
-    if (loadingStreams || loadingEpisodeStreams) {
-      // --- Stream Loading has STARTED or is IN PROGRESS ---
-      // Only log once when loading starts
-      if (loadStartTimeRef.current === 0) {
-        logger.log("⏱️ Stream loading started or in progress...");
-        // Update ref directly to avoid render cycle
-        loadStartTimeRef.current = now;
-        // Also update state for components that need it
-        setLoadStartTime(now);
-      }
-      
-      // Only update these once per loading cycle
-      if (!hasDoneInitialLoadRef.current) {
-        hasDoneInitialLoadRef.current = true;
-        
-        // Use the guarded setState to prevent issues after unmount
-        guardedSetState(() => setProviderLoadTimes({}));
-
-        // Update provider status to loading for all expected providers
-        guardedSetState(() => setProviderStatus(prevStatus => {
-          const newStatus = { ...prevStatus };
-          expectedProviders.forEach(providerId => {
-            // If not already marked as loading, or if it's a fresh cycle, set to loading
-            if (!newStatus[providerId] || !newStatus[providerId].loading) {
-              newStatus[providerId] = {
-                loading: true,
-                success: false,
-                error: false,
-                message: 'Loading...',
-                timeStarted: (newStatus[providerId]?.loading && newStatus[providerId]?.timeStarted) ? newStatus[providerId].timeStarted : now,
-                timeCompleted: 0,
-              };
-            }
-          });
-          return newStatus;
-        }));
-
-        // Update simple loading flag for all expected providers
-        guardedSetState(() => setLoadingProviders(prevLoading => {
-          const newLoading = { ...prevLoading };
-          expectedProviders.forEach(providerId => {
-            newLoading[providerId] = true;
-          });
-          return newLoading;
-        }));
-      }
-    } else if (loadStartTimeRef.current > 0) { 
-      // --- Stream Loading has FINISHED ---
-      logger.log("🏁 Stream loading finished. Processing results.");
-      
-      const currentStreamsData = type === 'series' ? episodeStreams : groupedStreams;
-      
-      // Find all providers that returned streams
-      const providersWithStreams = Object.entries(currentStreamsData)
-        .filter(([_, data]) => data.streams && data.streams.length > 0)
-        .map(([providerId]) => providerId);
-      
+    const currentStreamsData = type === 'series' ? episodeStreams : groupedStreams;
+    
+    // Update available providers immediately when streams change
+    const providersWithStreams = Object.entries(currentStreamsData)
+      .filter(([_, data]) => data.streams && data.streams.length > 0)
+      .map(([providerId]) => providerId);
+    
+    if (providersWithStreams.length > 0) {
       logger.log(`📊 Providers with streams: ${providersWithStreams.join(', ')}`);
-
-      // Reset refs for next load cycle
-      loadStartTimeRef.current = 0;
-      hasDoneInitialLoadRef.current = false;
-      
-      // Update states only if component is still mounted
-      if (isMounted.current) {
-        // Update simple loading flag: all expected providers are no longer loading
-        guardedSetState(() => setLoadingProviders(prevLoading => {
-          const newLoading = { ...prevLoading };
-          expectedProviders.forEach(providerId => {
-            newLoading[providerId] = false;
-          });
-          return newLoading;
-        }));
-
-        // Update detailed provider status based on results
-        guardedSetState(() => setProviderStatus(prevStatus => {
-          const newStatus = { ...prevStatus };
-          expectedProviders.forEach(providerId => {
-            if (newStatus[providerId]) { // Ensure the provider entry exists
-              const providerHasStreams = currentStreamsData[providerId] && 
-                                        currentStreamsData[providerId].streams && 
-                                        currentStreamsData[providerId].streams.length > 0;
-              
-              newStatus[providerId] = {
-                ...newStatus[providerId], // Preserve timeStarted
-                loading: false,
-                success: providerHasStreams,
-                // Mark error if it was loading and now no streams, and wasn't already successful
-                error: !providerHasStreams && newStatus[providerId].loading && !newStatus[providerId].success, 
-                message: providerHasStreams ? 'Loaded successfully' : (newStatus[providerId].error ? 'Error or no streams' : 'No streams found'),
-                timeCompleted: now,
-              };
-            }
-          });
-          return newStatus;
-        }));
-
-        // Update the set of available providers based on what actually loaded streams
-        const providersWithStreamsSet = new Set(providersWithStreams);
-        guardedSetState(() => setAvailableProviders(providersWithStreamsSet));
-
-        // Reset loadStartTime to signify the end of this loading cycle
-        guardedSetState(() => setLoadStartTime(0));
-      }
+      const providersWithStreamsSet = new Set(providersWithStreams);
+      setAvailableProviders(providersWithStreamsSet);
     }
-  }, [loadingStreams, loadingEpisodeStreams, groupedStreams, episodeStreams, type, guardedSetState]);
+    
+    // Update loading states for individual providers
+    const expectedProviders = ['stremio', 'hdrezka'];
+    const now = Date.now();
+    
+    setLoadingProviders(prevLoading => {
+      const newLoading = { ...prevLoading };
+      expectedProviders.forEach(providerId => {
+        // Provider is loading if overall loading is true OR if it doesn't have streams yet
+        const hasStreams = currentStreamsData[providerId] && 
+                          currentStreamsData[providerId].streams && 
+                          currentStreamsData[providerId].streams.length > 0;
+        newLoading[providerId] = (loadingStreams || loadingEpisodeStreams) && !hasStreams;
+      });
+      return newLoading;
+    });
+    
+  }, [loadingStreams, loadingEpisodeStreams, groupedStreams, episodeStreams, type]);
 
-  // Add useEffect to update availableProviders whenever streams change
+  // Reset the selected provider to 'all' if the current selection is no longer available
   useEffect(() => {
-    if (!loadingStreams && !loadingEpisodeStreams) {
-      const streams = type === 'series' ? episodeStreams : groupedStreams;
-      // Only include providers that actually have streams
-      const providers = new Set(
-        Object.entries(streams)
-          .filter(([_, data]) => data.streams && data.streams.length > 0)
-          .map(([providerId]) => providerId)
-      );
-      setAvailableProviders(providers);
-      
-      // Also reset the selected provider to 'all' if the current selection is no longer available
-      if (selectedProvider !== 'all' && !providers.has(selectedProvider)) {
-        setSelectedProvider('all');
-      }
+    if (selectedProvider !== 'all' && !availableProviders.has(selectedProvider)) {
+      setSelectedProvider('all');
     }
-  }, [type, groupedStreams, episodeStreams, loadingStreams, loadingEpisodeStreams, selectedProvider]);
+  }, [selectedProvider, availableProviders]);
 
 
 
@@ -820,13 +727,11 @@ export const StreamsScreen = () => {
     }
   }, [settings.preferredPlayer, settings.useExternalPlayer, navigateToPlayer]);
 
-  // Autoplay effect - triggers when streams are available and autoplay is enabled
+  // Autoplay effect - triggers immediately when streams are available and autoplay is enabled
   useEffect(() => {
     if (
       settings.autoplayBestStream && 
       !autoplayTriggered && 
-      !loadingStreams && 
-      !loadingEpisodeStreams &&
       isAutoplayWaiting
     ) {
       const streams = type === 'series' ? episodeStreams : groupedStreams;
@@ -835,14 +740,12 @@ export const StreamsScreen = () => {
         const bestStream = getBestStream(streams);
         
         if (bestStream) {
-          logger.log('🚀 Autoplay: Best stream found, starting playback...');
+          logger.log('🚀 Autoplay: Best stream found, starting playback immediately...');
           setAutoplayTriggered(true);
           setIsAutoplayWaiting(false);
           
-          // Add a small delay to let the UI settle
-          setTimeout(() => {
-            handleStreamPress(bestStream);
-          }, 500);
+          // Start playback immediately - no delay needed
+          handleStreamPress(bestStream);
         } else {
           logger.log('⚠️ Autoplay: No suitable stream found');
           setIsAutoplayWaiting(false);
@@ -852,8 +755,6 @@ export const StreamsScreen = () => {
   }, [
     settings.autoplayBestStream,
     autoplayTriggered,
-    loadingStreams,
-    loadingEpisodeStreams,
     isAutoplayWaiting,
     type,
     episodeStreams,
@@ -1285,35 +1186,45 @@ export const StreamsScreen = () => {
           )}
         </Animated.View>
 
-        {/* Show streams immediately as they become available, with loading indicators for pending providers */}
-        {Object.keys(streams).length === 0 && (loadingStreams || loadingEpisodeStreams) ? (
-          <Animated.View 
-            entering={FadeIn.duration(300)}
-            style={styles.loadingContainer}
-          >
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>
-              {isAutoplayWaiting ? 'Finding best stream for autoplay...' : 'Finding available streams...'}
-            </Text>
-          </Animated.View>
-        ) : isAutoplayWaiting && !autoplayTriggered ? (
-          <Animated.View 
-            entering={FadeIn.duration(300)}
-            style={styles.loadingContainer}
-          >
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>Starting best stream...</Text>
-          </Animated.View>
-        ) : Object.keys(streams).length === 0 && !loadingStreams && !loadingEpisodeStreams ? (
-          <Animated.View 
-            entering={FadeIn.duration(300)}
-            style={styles.noStreams}
-          >
-            <MaterialIcons name="error-outline" size={48} color={colors.textMuted} />
-            <Text style={styles.noStreamsText}>No streams available</Text>
-          </Animated.View>
+        {/* Show streams immediately as they become available */}
+        {Object.keys(streams).length === 0 ? (
+          // Only show initial loading if no streams are available yet
+          (loadingStreams || loadingEpisodeStreams) ? (
+            <Animated.View 
+              entering={FadeIn.duration(300)}
+              style={styles.loadingContainer}
+            >
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={styles.loadingText}>
+                {isAutoplayWaiting ? 'Finding best stream for autoplay...' : 'Finding available streams...'}
+              </Text>
+            </Animated.View>
+          ) : (
+            // No streams and not loading = no streams available
+            <Animated.View 
+              entering={FadeIn.duration(300)}
+              style={styles.noStreams}
+            >
+              <MaterialIcons name="error-outline" size={48} color={colors.textMuted} />
+              <Text style={styles.noStreamsText}>No streams available</Text>
+            </Animated.View>
+          )
         ) : (
+          // Show streams immediately when available, even if still loading others
           <View collapsable={false} style={{ flex: 1 }}>
+            {/* Show autoplay loading overlay if waiting for autoplay */}
+            {isAutoplayWaiting && !autoplayTriggered && (
+              <Animated.View 
+                entering={FadeIn.duration(300)}
+                style={styles.autoplayOverlay}
+              >
+                <View style={styles.autoplayIndicator}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={styles.autoplayText}>Starting best stream...</Text>
+                </View>
+              </Animated.View>
+            )}
+            
             <SectionList
               sections={sections}
               keyExtractor={(item) => item.url || `${item.name}-${item.title}`}
@@ -1762,6 +1673,30 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   sectionLoadingText: {
     marginLeft: 8,
+  },
+  autoplayOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    padding: 16,
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  autoplayIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.elevation2,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  autoplayText: {
+    color: colors.primary,
+    fontSize: 14,
+    marginLeft: 8,
+    fontWeight: '600',
   },
 });
 
