@@ -62,6 +62,10 @@ import homeStyles, { sharedStyles } from '../styles/homeStyles';
 import { useTheme } from '../contexts/ThemeContext';
 import type { Theme } from '../contexts/ThemeContext';
 import * as ScreenOrientation from 'expo-screen-orientation';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Constants
+const CATALOG_SETTINGS_KEY = 'catalog_settings';
 
 // Define interfaces for our data
 interface Category {
@@ -415,6 +419,10 @@ const HomeScreen = () => {
     try {
       const addons = await catalogService.getAllAddons();
       
+      // Load catalog settings to check which catalogs are enabled
+      const catalogSettingsJson = await AsyncStorage.getItem(CATALOG_SETTINGS_KEY);
+      const catalogSettings = catalogSettingsJson ? JSON.parse(catalogSettingsJson) : {};
+      
       // Create placeholder array with proper order and track indices
       const catalogPlaceholders: (CatalogContent | null)[] = [];
       const catalogPromises: Promise<void>[] = [];
@@ -423,76 +431,83 @@ const HomeScreen = () => {
       for (const addon of addons) {
         if (addon.catalogs) {
           for (const catalog of addon.catalogs) {
-            const currentIndex = catalogIndex;
-            catalogPlaceholders.push(null); // Reserve position
+            // Check if this catalog is enabled (default to true if no setting exists)
+            const settingKey = `${addon.id}:${catalog.type}:${catalog.id}`;
+            const isEnabled = catalogSettings[settingKey] ?? true;
             
-            const catalogPromise = (async () => {
-              try {
-                const addonManifest = await stremioService.getInstalledAddonsAsync();
-                const manifest = addonManifest.find((a: any) => a.id === addon.id);
-                if (!manifest) return;
+            // Only load enabled catalogs
+            if (isEnabled) {
+              const currentIndex = catalogIndex;
+              catalogPlaceholders.push(null); // Reserve position
+              
+              const catalogPromise = (async () => {
+                try {
+                  const addonManifest = await stremioService.getInstalledAddonsAsync();
+                  const manifest = addonManifest.find((a: any) => a.id === addon.id);
+                  if (!manifest) return;
 
-                const metas = await stremioService.getCatalog(manifest, catalog.type, catalog.id, 1);
-                if (metas && metas.length > 0) {
-                  const items = metas.map((meta: any) => ({
-                    id: meta.id,
-                    type: meta.type,
-                    name: meta.name,
-                    poster: meta.poster,
-                    posterShape: meta.posterShape,
-                    banner: meta.background,
-                    logo: meta.logo,
-                    imdbRating: meta.imdbRating,
-                    year: meta.year,
-                    genres: meta.genres,
-                    description: meta.description,
-                    runtime: meta.runtime,
-                    released: meta.released,
-                    trailerStreams: meta.trailerStreams,
-                    videos: meta.videos,
-                    directors: meta.director,
-                    creators: meta.creator,
-                    certification: meta.certification
-                  }));
-                  
-                  let displayName = catalog.name;
-                  const contentType = catalog.type === 'movie' ? 'Movies' : 'TV Shows';
-                  if (!displayName.toLowerCase().includes(contentType.toLowerCase())) {
-                    displayName = `${displayName} ${contentType}`;
+                  const metas = await stremioService.getCatalog(manifest, catalog.type, catalog.id, 1);
+                  if (metas && metas.length > 0) {
+                    const items = metas.map((meta: any) => ({
+                      id: meta.id,
+                      type: meta.type,
+                      name: meta.name,
+                      poster: meta.poster,
+                      posterShape: meta.posterShape,
+                      banner: meta.background,
+                      logo: meta.logo,
+                      imdbRating: meta.imdbRating,
+                      year: meta.year,
+                      genres: meta.genres,
+                      description: meta.description,
+                      runtime: meta.runtime,
+                      released: meta.released,
+                      trailerStreams: meta.trailerStreams,
+                      videos: meta.videos,
+                      directors: meta.director,
+                      creators: meta.creator,
+                      certification: meta.certification
+                    }));
+                    
+                    let displayName = catalog.name;
+                    const contentType = catalog.type === 'movie' ? 'Movies' : 'TV Shows';
+                    if (!displayName.toLowerCase().includes(contentType.toLowerCase())) {
+                      displayName = `${displayName} ${contentType}`;
+                    }
+                    
+                    const catalogContent = {
+                      addon: addon.id,
+                      type: catalog.type,
+                      id: catalog.id,
+                      name: displayName,
+                      items
+                    };
+                    
+                    console.log(`[HomeScreen] Loaded catalog: ${displayName} at position ${currentIndex} (${items.length} items)`);
+                    
+                    // Update the catalog at its specific position
+                    setCatalogs(prevCatalogs => {
+                      const newCatalogs = [...prevCatalogs];
+                      newCatalogs[currentIndex] = catalogContent;
+                      return newCatalogs;
+                    });
                   }
-                  
-                  const catalogContent = {
-                    addon: addon.id,
-                    type: catalog.type,
-                    id: catalog.id,
-                    name: displayName,
-                    items
-                  };
-                  
-                  console.log(`[HomeScreen] Loaded catalog: ${displayName} at position ${currentIndex} (${items.length} items)`);
-                  
-                  // Update the catalog at its specific position
-                  setCatalogs(prevCatalogs => {
-                    const newCatalogs = [...prevCatalogs];
-                    newCatalogs[currentIndex] = catalogContent;
-                    return newCatalogs;
-                  });
+                } catch (error) {
+                  console.error(`[HomeScreen] Failed to load ${catalog.name} from ${addon.name}:`, error);
+                } finally {
+                  setLoadedCatalogCount(prev => prev + 1);
                 }
-              } catch (error) {
-                console.error(`[HomeScreen] Failed to load ${catalog.name} from ${addon.name}:`, error);
-              } finally {
-                setLoadedCatalogCount(prev => prev + 1);
-              }
-            })();
-            
-            catalogPromises.push(catalogPromise);
-            catalogIndex++;
+              })();
+              
+              catalogPromises.push(catalogPromise);
+              catalogIndex++;
+            }
           }
         }
       }
       
       totalCatalogsRef.current = catalogIndex;
-      console.log(`[HomeScreen] Starting to load ${catalogIndex} catalogs progressively...`);
+      console.log(`[HomeScreen] Starting to load ${catalogIndex} enabled catalogs progressively...`);
       
       // Initialize catalogs array with proper length
       setCatalogs(new Array(catalogIndex).fill(null));
