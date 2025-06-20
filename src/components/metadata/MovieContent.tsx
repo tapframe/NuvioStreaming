@@ -23,13 +23,7 @@ export const MovieContent: React.FC<MovieContentProps> = ({ metadata }) => {
           </View>
         )}
         
-        {metadata.writer && metadata.writer.length > 0 && (
-          <View style={styles.metadataRow}>
-            <Text style={[styles.metadataLabel, { color: currentTheme.colors.textMuted }]}>Writer:</Text>
-            <Text style={[styles.metadataValue, { color: currentTheme.colors.text }]}>{Array.isArray(metadata.writer) ? metadata.writer.join(', ') : metadata.writer}</Text>
-          </View>
-        )}
-        
+
         {hasCast && (
           <View style={styles.metadataRow}>
             <Text style={[styles.metadataLabel, { color: currentTheme.colors.textMuted }]}>Cast:</Text>

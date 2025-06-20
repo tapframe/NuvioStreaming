@@ -305,7 +305,7 @@ const MetadataScreen: React.FC = () => {
       {showSkeleton && (
         <Animated.View 
           style={[StyleSheet.absoluteFill, skeletonStyle]}
-          pointerEvents={isContentReady ? 'none' : 'auto'}
+          pointerEvents={metadata ? 'none' : 'auto'}
         >
           <MetadataLoadingScreen type={metadata?.type === 'movie' ? 'movie' : 'series'} />
         </Animated.View>
@@ -315,7 +315,7 @@ const MetadataScreen: React.FC = () => {
       {metadata && (
         <Animated.View 
           style={[StyleSheet.absoluteFill, transitionStyle]}
-          pointerEvents={isContentReady ? 'auto' : 'none'}
+          pointerEvents={metadata ? 'auto' : 'none'}
         >
           <SafeAreaView 
             style={[containerStyle, styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}
