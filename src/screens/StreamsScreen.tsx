@@ -1177,36 +1177,19 @@ export const StreamsScreen = () => {
 
       {type === 'movie' && metadata && (
         <Animated.View style={[styles.movieTitleContainer, heroStyle]}>
-          <ImageBackground
-            source={{ uri: metadata.banner || metadata.poster }}
-            style={styles.movieTitleBackground}
-            resizeMode="cover"
-          >
-            <LinearGradient
-              colors={[
-                'rgba(0,0,0,0.2)',
-                'rgba(0,0,0,0.4)',
-                'rgba(0,0,0,0.6)',
-                colors.darkBackground
-              ]}
-              locations={[0, 0.4, 0.7, 1]}
-              style={styles.movieTitleGradient}
-            >
-              <View style={styles.movieTitleContent}>
-                {metadata.logo ? (
-                  <Image
-                    source={{ uri: metadata.logo }}
-                    style={styles.movieLogo}
-                    contentFit="contain"
-                  />
-                ) : (
-                  <Text style={styles.movieTitle} numberOfLines={2}>
-                    {metadata.name}
-                  </Text>
-                )}
-              </View>
-            </LinearGradient>
-          </ImageBackground>
+          <View style={styles.movieTitleContent}>
+            {metadata.logo ? (
+              <Image
+                source={{ uri: metadata.logo }}
+                style={styles.movieLogo}
+                contentFit="contain"
+              />
+            ) : (
+              <Text style={styles.movieTitle} numberOfLines={2}>
+                {metadata.name}
+              </Text>
+            )}
+          </View>
         </Animated.View>
       )}
 
@@ -1734,39 +1717,30 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   movieTitleContainer: {
     width: '100%',
-    height: 200,
-    backgroundColor: colors.black,
+    height: 120,
+    backgroundColor: colors.darkBackground,
     pointerEvents: 'box-none',
-  },
-  movieTitleBackground: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: colors.black,
-  },
-  movieTitleGradient: {
-    flex: 1,
     justifyContent: 'center',
-    padding: 16,
+    paddingTop: Platform.OS === 'android' ? 45 : 35,
   },
   movieTitleContent: {
     width: '100%',
+    height: '100%',
     alignItems: 'center',
-    marginTop: Platform.OS === 'android' ? 35 : 45,
+    justifyContent: 'center',
   },
   movieLogo: {
-    width: width * 0.6,
-    height: 70,
-    marginBottom: 8,
+    width: '100%',
+    height: '100%',
+    maxWidth: width * 0.85,
   },
   movieTitle: {
     color: colors.highEmphasis,
     fontSize: 28,
     fontWeight: '900',
     textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.75)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
     letterSpacing: -0.5,
+    paddingHorizontal: 20,
   },
   streamsHeroRuntime: {
     flexDirection: 'row',
