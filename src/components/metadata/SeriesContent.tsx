@@ -285,8 +285,8 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
     const progress = episodeProgress[episodeId];
     const progressPercent = progress ? (progress.currentTime / progress.duration) * 100 : 0;
     
-    // Don't show progress bar if episode is complete (>= 95%)
-    const showProgress = progress && progressPercent < 95;
+    // Don't show progress bar if episode is complete (>= 85%)
+    const showProgress = progress && progressPercent < 85;
 
     return (
       <TouchableOpacity
@@ -318,7 +318,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               />
             </View>
           )}
-          {progressPercent >= 95 && (
+          {progressPercent >= 85 && (
             <View style={[styles.completedBadge, { backgroundColor: currentTheme.colors.primary }]}>
               <MaterialIcons name="check" size={12} color={currentTheme.colors.white} />
             </View>
@@ -395,8 +395,8 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
     const progress = episodeProgress[episodeId];
     const progressPercent = progress ? (progress.currentTime / progress.duration) * 100 : 0;
     
-    // Don't show progress bar if episode is complete (>= 95%)
-    const showProgress = progress && progressPercent < 95;
+    // Don't show progress bar if episode is complete (>= 85%)
+    const showProgress = progress && progressPercent < 85;
 
     return (
       <TouchableOpacity
@@ -517,7 +517,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
           )}
           
           {/* Completed Badge */}
-          {progressPercent >= 95 && (
+          {progressPercent >= 85 && (
             <View style={[styles.completedBadgeHorizontal, { 
               backgroundColor: currentTheme.colors.primary,
             }]}>

@@ -332,7 +332,7 @@ const WatchProgressDisplay = React.memo(({
     }
 
     // Enhanced display text with Trakt integration
-    let displayText = progressPercent >= 95 ? 'Watched' : `${Math.round(progressPercent)}% watched`;
+    let displayText = progressPercent >= 85 ? 'Watched' : `${Math.round(progressPercent)}% watched`;
     let syncStatus = '';
     
     // Show Trakt sync status if user is authenticated
@@ -373,7 +373,7 @@ const WatchProgressDisplay = React.memo(({
       progressBoxScale.value = withTiming(1, { duration: 400 });
       progressBoxTranslateY.value = withTiming(0, { duration: 400 });
       
-      if (progressData.isWatched || (progressData.progressPercent && progressData.progressPercent >= 95)) {
+      if (progressData.isWatched || (progressData.progressPercent && progressData.progressPercent >= 85)) {
         // Celebration animation sequence
         celebrationScale.value = withRepeat(
           withTiming(1.05, { duration: 200 }),
@@ -426,7 +426,7 @@ const WatchProgressDisplay = React.memo(({
 
   if (!progressData) return null;
 
-  const isCompleted = progressData.isWatched || progressData.progressPercent >= 95;
+  const isCompleted = progressData.isWatched || progressData.progressPercent >= 85;
 
   return (
     <Animated.View style={[styles.watchProgressContainer, animatedStyle]}>
@@ -704,7 +704,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
   // Memoized play button text
   const playButtonText = useMemo(() => getPlayButtonText(), [getPlayButtonText]);
 
-  // Calculate if content is watched (>=95% progress) - check both local and Trakt progress
+  // Calculate if content is watched (>=85% progress) - check both local and Trakt progress
   const isWatched = useMemo(() => {
     if (!watchProgress) return false;
     
@@ -718,7 +718,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
     // Fall back to local progress
     if (watchProgress.duration === 0) return false;
     const progressPercent = (watchProgress.currentTime / watchProgress.duration) * 100;
-    const localWatched = progressPercent >= 95;
+    const localWatched = progressPercent >= 85;
     logger.log(`[HeroSection] Local progress: ${progressPercent.toFixed(1)}%, Watched: ${localWatched}`);
     return localWatched;
   }, [watchProgress, isTraktAuthenticated]);

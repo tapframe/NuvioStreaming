@@ -666,11 +666,11 @@ const HomeScreen = () => {
         console.log('[HomeScreen] All watch progress in storage:', Object.keys(allProgress).length, 'items');
         console.log('[HomeScreen] Watch progress items:', allProgress);
         
-        // Check if any items are being filtered out due to >95% progress
+        // Check if any items are being filtered out due to >85% progress
         let filteredCount = 0;
         for (const [key, progress] of Object.entries(allProgress)) {
           const progressPercent = (progress.currentTime / progress.duration) * 100;
-          if (progressPercent >= 95) {
+          if (progressPercent >= 85) {
             filteredCount++;
             console.log(`[HomeScreen] Filtered out ${key}: ${progressPercent.toFixed(1)}% complete`);
           } else {

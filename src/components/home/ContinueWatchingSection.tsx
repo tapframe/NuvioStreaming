@@ -100,10 +100,10 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         const episodeId = episodeIdParts.length > 0 ? episodeIdParts.join(':') : undefined;
         const progress = allProgress[key];
         
-        // Skip items that are more than 95% complete (effectively finished)
+        // Skip items that are more than 85% complete (effectively finished)
         const progressPercent = (progress.currentTime / progress.duration) * 100;
         
-        if (progressPercent >= 95) {
+        if (progressPercent >= 85) {
           continue;
         }
         

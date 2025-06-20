@@ -268,7 +268,7 @@ const AndroidVideoPlayer: React.FC = () => {
             const progressPercent = (savedProgress.currentTime / savedProgress.duration) * 100;
             logger.log(`[AndroidVideoPlayer] Progress: ${progressPercent.toFixed(1)}% (${savedProgress.currentTime}/${savedProgress.duration})`);
             
-            if (progressPercent < 95) {
+            if (progressPercent < 85) {
               setResumePosition(savedProgress.currentTime);
               logger.log(`[AndroidVideoPlayer] Set resume position to: ${savedProgress.currentTime}`);
               

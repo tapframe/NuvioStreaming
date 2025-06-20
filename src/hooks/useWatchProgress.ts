@@ -156,9 +156,9 @@ export const useWatchProgress = (
       return 'Play';
     }
 
-    // Consider episode complete if progress is >= 95%
+    // Consider episode complete if progress is >= 85%
     const progressPercent = (watchProgress.currentTime / watchProgress.duration) * 100;
-    if (progressPercent >= 95) {
+    if (progressPercent >= 85) {
       return 'Play';
     }
 
