@@ -202,8 +202,6 @@ const HomeScreen = () => {
                       items
                     };
                     
-                    console.log(`[HomeScreen] Loaded catalog: ${displayName} at position ${currentIndex} (${items.length} items)`);
-                    
                     // Update the catalog at its specific position
                     setCatalogs(prevCatalogs => {
                       const newCatalogs = [...prevCatalogs];
@@ -226,7 +224,6 @@ const HomeScreen = () => {
       }
       
       totalCatalogsRef.current = catalogIndex;
-      console.log(`[HomeScreen] Starting to load ${catalogIndex} enabled catalogs progressively...`);
       
       // Initialize catalogs array with proper length
       setCatalogs(new Array(catalogIndex).fill(null));
@@ -234,10 +231,8 @@ const HomeScreen = () => {
       // Start all catalog loading promises but don't wait for them
       // They will update the state progressively as they complete
       Promise.allSettled(catalogPromises).then(() => {
-      console.log('[HomeScreen] All catalogs processed');
-      
         // Final cleanup: Filter out null values to get only successfully loaded catalogs
-      setCatalogs(prevCatalogs => prevCatalogs.filter(catalog => catalog !== null));
+        setCatalogs(prevCatalogs => prevCatalogs.filter(catalog => catalog !== null));
       });
       
     } catch (error) {
@@ -388,37 +383,15 @@ const HomeScreen = () => {
   }, [featuredContent, navigation]);
 
   const refreshContinueWatching = useCallback(async () => {
-    console.log('[HomeScreen] Refreshing continue watching...');
     if (continueWatchingRef.current) {
       try {
       const hasContent = await continueWatchingRef.current.refresh();
-        console.log(`[HomeScreen] Continue watching has content: ${hasContent}`);
       setHasContinueWatching(hasContent);
-        
-        // Debug: Let's check what's in storage
-        const allProgress = await storageService.getAllWatchProgress();
-        console.log('[HomeScreen] All watch progress in storage:', Object.keys(allProgress).length, 'items');
-        console.log('[HomeScreen] Watch progress items:', allProgress);
-        
-        // Check if any items are being filtered out due to >85% progress
-        let filteredCount = 0;
-        for (const [key, progress] of Object.entries(allProgress)) {
-          const progressPercent = (progress.currentTime / progress.duration) * 100;
-          if (progressPercent >= 85) {
-            filteredCount++;
-            console.log(`[HomeScreen] Filtered out ${key}: ${progressPercent.toFixed(1)}% complete`);
-          } else {
-            console.log(`[HomeScreen] Valid progress ${key}: ${progressPercent.toFixed(1)}% complete`);
-          }
-        }
-        console.log(`[HomeScreen] Filtered out ${filteredCount} completed items`);
         
       } catch (error) {
         console.error('[HomeScreen] Error refreshing continue watching:', error);
         setHasContinueWatching(false);
       }
-    } else {
-      console.log('[HomeScreen] Continue watching ref is null');
     }
   }, []);
 
@@ -617,11 +590,8 @@ const calculatePosterLayout = (screenWidth: number) => {
     const usableWidth = availableWidth - 8;
     const posterWidth = (usableWidth - (n - 1) * SPACING) / (n + 0.25);
     
-    console.log(`[HomeScreen] Testing ${n} posters: width=${posterWidth.toFixed(1)}px, screen=${screenWidth}px`);
-    
     if (posterWidth >= MIN_POSTER_WIDTH && posterWidth <= MAX_POSTER_WIDTH) {
       bestLayout = { numFullPosters: n, posterWidth };
-      console.log(`[HomeScreen] Selected layout: ${n} full posters at ${posterWidth.toFixed(1)}px each`);
     }
   }
   

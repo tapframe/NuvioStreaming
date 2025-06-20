@@ -215,6 +215,7 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
 
     // ENHANCED DEDUPLICATION: Check if we've already stopped this session
     // However, allow updates if the new progress is significantly higher (>5% improvement)
+    let isSignificantUpdate = false;
     if (hasStopped.current) {
       const currentProgressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
       const progressImprovement = currentProgressPercent - lastSyncProgress.current;
@@ -223,6 +224,7 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
         logger.log(`[TraktAutosync] Session already stopped, but progress improved significantly by ${progressImprovement.toFixed(1)}% (${lastSyncProgress.current.toFixed(1)}% → ${currentProgressPercent.toFixed(1)}%), allowing update`);
         // Reset stopped flag to allow this significant update
         hasStopped.current = false;
+        isSignificantUpdate = true;
       } else {
         logger.log(`[TraktAutosync] Already stopped this session, skipping duplicate call (reason: ${reason})`);
         return;
@@ -230,7 +232,8 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
     }
 
     // ENHANCED DEDUPLICATION: Prevent rapid successive calls (within 5 seconds)
-    if (now - lastStopCall.current < 5000) {
+    // Bypass for significant updates
+    if (!isSignificantUpdate && now - lastStopCall.current < 5000) {
       logger.log(`[TraktAutosync] Ignoring rapid successive stop call within 5 seconds (reason: ${reason})`);
       return;
     }

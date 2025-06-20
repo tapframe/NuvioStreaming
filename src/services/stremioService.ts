@@ -535,13 +535,12 @@ class StremioService {
           
                     if (hasMetaSupport) {
             try {
-              logger.log(`HTTP GET: ${wouldBeUrl} (preferred addon: ${preferredAddon.name})`);
+             
               const response = await this.retryRequest(async () => {
                 return await axios.get(wouldBeUrl, { timeout: 10000 });
               });
               
               if (response.data && response.data.meta) {
-                logger.log(`✅ Metadata fetched successfully from preferred addon: ${wouldBeUrl}`);
                 return response.data.meta;
               }
             } catch (error) {
@@ -564,13 +563,12 @@ class StremioService {
       for (const baseUrl of cinemetaUrls) {
         try {
           const url = `${baseUrl}/meta/${type}/${id}.json`;
-          logger.log(`HTTP GET: ${url}`);
+          
           const response = await this.retryRequest(async () => {
             return await axios.get(url, { timeout: 10000 });
           });
           
           if (response.data && response.data.meta) {
-            logger.log(`✅ Metadata fetched successfully from: ${url}`);
             return response.data.meta;
           }
         } catch (error) {
@@ -619,7 +617,6 @@ class StremioService {
           });
           
           if (response.data && response.data.meta) {
-            logger.log(`✅ Metadata fetched successfully from: ${url}`);
             return response.data.meta;
           }
         } catch (error) {

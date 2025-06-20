@@ -355,13 +355,26 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
           }));
         } else {
           setLogoLoadError(true);
-          console.warn(`[FeaturedContent] Logo prefetch failed, falling back to text: ${logoUrl}`);
         }
       }
     };
     
     loadImages();
   }, [featuredContent?.id, logoUrl]);
+
+  const onLogoLoadError = () => {
+    setLogoLoaded(true); // Treat error as "loaded" to stop spinner
+    setLogoError(true);
+  };
+
+  const handleInfoPress = () => {
+    if (featuredContent) {
+      navigation.navigate('Metadata', {
+        id: featuredContent.id,
+        type: featuredContent.type
+      });
+    }
+  };
 
   if (!featuredContent) {
     return <SkeletonFeatured />;
@@ -412,10 +425,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
                       contentFit="contain"
                       cachePolicy="memory-disk"
                       transition={400}
-                      onError={() => {
-                        console.warn(`[FeaturedContent] Logo failed to load: ${logoUrl}`);
-                        setLogoLoadError(true);
-                      }}
+                      onError={onLogoLoadError}
                     />
                   </Animated.View>
                 ) : (
@@ -473,14 +483,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
 
                 <TouchableOpacity 
                   style={styles.infoButton as ViewStyle}
-                  onPress={() => {
-                    if (featuredContent) {
-                      navigation.navigate('Metadata', {
-                        id: featuredContent.id,
-                        type: featuredContent.type
-                      });
-                    }
-                  }}
+                  onPress={handleInfoPress}
                   activeOpacity={0.7}
                 >
                   <MaterialIcons name="info-outline" size={24} color={currentTheme.colors.white} />

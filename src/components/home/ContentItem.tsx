@@ -34,11 +34,8 @@ const calculatePosterLayout = (screenWidth: number) => {
     const usableWidth = availableWidth - 8;
     const posterWidth = (usableWidth - (n - 1) * SPACING) / (n + 0.25);
     
-    console.log(`[ContentItem] Testing ${n} posters: width=${posterWidth.toFixed(1)}px, screen=${screenWidth}px`);
-    
     if (posterWidth >= MIN_POSTER_WIDTH && posterWidth <= MAX_POSTER_WIDTH) {
       bestLayout = { numFullPosters: n, posterWidth };
-      console.log(`[ContentItem] Selected layout: ${n} full posters at ${posterWidth.toFixed(1)}px each`);
     }
   }
   
