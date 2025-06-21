@@ -165,7 +165,7 @@ const StreamCard = ({ stream, onPress, index, isLoading, statusMessage, theme, i
   return (
     <Animated.View
       entering={FadeInDown.duration(200).delay(enterDelay)}
-      layout={Layout.duration(200)}
+      exiting={FadeOut.duration(150)}
     >
       <TouchableOpacity 
         style={[
@@ -268,7 +268,7 @@ const ProviderFilter = memo(({
   const renderItem = useCallback(({ item, index }: { item: { id: string; name: string }; index: number }) => (
     <Animated.View
       entering={FadeIn.duration(300).delay(100 + index * 40)}
-      layout={Layout.springify()}
+      exiting={FadeOut.duration(150)}
     >
       <TouchableOpacity
         key={item.id}
@@ -1076,7 +1076,7 @@ export const StreamsScreen = () => {
     return (
       <Animated.View
         entering={FadeIn.duration(400)}
-        layout={Layout.springify()}
+        exiting={FadeOut.duration(150)}
         style={styles.sectionHeaderContainer}
       >
         <View style={styles.sectionHeaderContent}>
@@ -1196,11 +1196,11 @@ export const StreamsScreen = () => {
       {type === 'series' && currentEpisode && (
         <Animated.View style={[styles.streamsHeroContainer, heroStyle]}>
           <Animated.View
-            entering={FadeIn.duration(600).springify()}
+            entering={FadeIn.duration(300)}
             style={StyleSheet.absoluteFill}
           >
             <Animated.View 
-              entering={FadeIn.duration(800).delay(100).springify().withInitialValues({
+              entering={FadeIn.duration(400).delay(100).withInitialValues({
                 transform: [{ scale: 1.05 }]
               })}
               style={StyleSheet.absoluteFill}

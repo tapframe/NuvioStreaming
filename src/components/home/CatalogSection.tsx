@@ -76,7 +76,7 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
   return (
     <Animated.View 
       style={styles.catalogContainer}
-      entering={FadeIn.duration(400).delay(50)}
+      entering={FadeIn.duration(300).delay(50)}
     >
       <View style={styles.catalogHeader}>
         <View style={styles.titleContainer}>

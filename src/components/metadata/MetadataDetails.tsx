@@ -60,7 +60,7 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
 
       {/* Creator/Director Info */}
       <Animated.View
-        entering={FadeIn.duration(500).delay(200)}
+        entering={FadeIn.duration(300).delay(100)}
         style={styles.creatorContainer}
       >
         {metadata.directors && metadata.directors.length > 0 && (
@@ -81,7 +81,7 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
       {metadata.description && (
         <Animated.View 
           style={styles.descriptionContainer}
-          layout={Layout.duration(300).easing(Easing.inOut(Easing.ease))}
+          entering={FadeIn.duration(300)}
         >
           <TouchableOpacity 
             onPress={() => setIsFullDescriptionOpen(!isFullDescriptionOpen)}

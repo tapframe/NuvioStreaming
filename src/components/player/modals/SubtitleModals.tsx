@@ -19,8 +19,6 @@ import Animated, {
   withDelay,
   withSequence,
   runOnJS,
-  BounceIn,
-  ZoomIn
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { styles } from '../utils/playerStyles';
@@ -281,7 +279,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                 </Text>
               </Animated.View>
               
-              <Animated.View entering={BounceIn.duration(400).delay(200)}>
+              <Animated.View entering={FadeIn.duration(300).delay(200)}>
                 <TouchableOpacity 
                   style={{
                     width: 44,
@@ -321,8 +319,8 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                 
                 {/* External Subtitles Section */}
                 <Animated.View 
-                  entering={FadeInDown.duration(400).delay(150)}
-                  layout={Layout.springify()}
+                  entering={FadeIn.duration(200).delay(150)}
+                  exiting={FadeOut.duration(150)}
                   style={{
                     marginBottom: 32,
                   }}
@@ -372,8 +370,8 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                   {/* Custom subtitles option */}
                   {customSubtitles.length > 0 && (
                     <Animated.View
-                      entering={FadeInDown.duration(300).delay(200)}
-                      layout={Layout.springify()}
+                      entering={FadeIn.duration(200).delay(200)}
+                      exiting={FadeOut.duration(150)}
                       style={{ marginBottom: 16 }}
                     >
                       <TouchableOpacity
@@ -423,7 +421,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                               
                               {useCustomSubtitles && (
                                 <Animated.View 
-                                  entering={BounceIn.duration(300)}
+                                  entering={FadeIn.duration(300)}
                                   style={{
                                     flexDirection: 'row',
                                     alignItems: 'center',
@@ -486,7 +484,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                               : 'rgba(255, 255, 255, 0.1)',
                           }}>
                             {useCustomSubtitles ? (
-                              <Animated.View entering={ZoomIn.duration(200)}>
+                              <Animated.View entering={FadeIn.duration(300)}>
                                 <MaterialIcons name="check-circle" size={24} color="#4CAF50" />
                               </Animated.View>
                             ) : (
@@ -500,8 +498,8 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
 
                   {/* Search for external subtitles */}
                   <Animated.View
-                    entering={FadeInDown.duration(300).delay(250)}
-                    layout={Layout.springify()}
+                    entering={FadeIn.duration(200).delay(250)}
+                    exiting={FadeOut.duration(150)}
                   >
                     <TouchableOpacity
                       style={{
@@ -549,8 +547,8 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                 {/* Subtitle Size Controls */}
                 {useCustomSubtitles && (
                   <Animated.View 
-                    entering={FadeInDown.duration(400).delay(200)}
-                    layout={Layout.springify()}
+                    entering={FadeIn.duration(200).delay(200)}
+                    exiting={FadeOut.duration(150)}
                     style={{
                       marginBottom: 32,
                     }}
@@ -598,7 +596,8 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                     </View>
 
                     <Animated.View
-                      entering={FadeInDown.duration(300).delay(300)}
+                      entering={FadeIn.duration(200).delay(300)}
+                      exiting={FadeOut.duration(150)}
                       style={{
                         backgroundColor: 'rgba(255, 255, 255, 0.03)',
                         borderRadius: 20,
@@ -698,8 +697,8 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                 {vlcTextTracks.length > 0 ? vlcTextTracks.map((track, index) => (
                   <Animated.View
                     key={track.id}
-                    entering={FadeInDown.duration(300).delay(400 + (index * 50))}
-                    layout={Layout.springify()}
+                    entering={FadeIn.duration(200).delay(50 + index * 30)}
+                    exiting={FadeOut.duration(150)}
                     style={{ marginBottom: 16 }}
                   >
                     <TouchableOpacity
@@ -749,7 +748,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                             
                             {(selectedTextTrack === track.id && !useCustomSubtitles) && (
                               <Animated.View 
-                                entering={BounceIn.duration(300)}
+                                entering={FadeIn.duration(300)}
                                 style={{
                                   flexDirection: 'row',
                                   alignItems: 'center',
@@ -812,7 +811,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                             : 'rgba(255, 255, 255, 0.1)',
                         }}>
                           {(selectedTextTrack === track.id && !useCustomSubtitles) ? (
-                            <Animated.View entering={ZoomIn.duration(200)}>
+                            <Animated.View entering={FadeIn.duration(300)}>
                               <MaterialIcons name="check-circle" size={24} color="#FF9800" />
                             </Animated.View>
                           ) : (
@@ -824,7 +823,8 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                   </Animated.View>
                 )) : (
                   <Animated.View 
-                    entering={FadeInDown.duration(300).delay(400)}
+                    entering={FadeIn.duration(200).delay(400)}
+                    exiting={FadeOut.duration(150)}
                     style={{
                       backgroundColor: 'rgba(255, 255, 255, 0.02)',
                       borderRadius: 16,
@@ -972,7 +972,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                 </Text>
               </Animated.View>
               
-              <Animated.View entering={BounceIn.duration(400).delay(200)}>
+              <Animated.View entering={FadeIn.duration(300).delay(200)}>
                 <TouchableOpacity 
                   style={{
                     width: 44,
@@ -1011,8 +1011,8 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
               {availableSubtitles.length > 0 ? availableSubtitles.map((subtitle, index) => (
                 <Animated.View
                   key={subtitle.id}
-                  entering={FadeInDown.duration(300).delay(150 + (index * 50))}
-                  layout={Layout.springify()}
+                  entering={FadeIn.duration(200).delay(100 + index * 50)}
+                  exiting={FadeOut.duration(150)}
                   style={{ marginBottom: 16 }}
                 >
                   <TouchableOpacity
@@ -1098,7 +1098,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                 </Animated.View>
               )) : (
                 <Animated.View 
-                  entering={FadeInDown.duration(300).delay(150)}
+                  entering={FadeIn.duration(200).delay(150)}
                   style={{
                     backgroundColor: 'rgba(255, 255, 255, 0.02)',
                     borderRadius: 20,

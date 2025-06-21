@@ -19,8 +19,6 @@ import Animated, {
   withDelay,
   withSequence,
   runOnJS,
-  BounceIn,
-  ZoomIn
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { styles } from '../utils/playerStyles';
@@ -62,7 +60,7 @@ const QualityIndicator = ({ quality }: { quality: string | null }) => {
   
   return (
     <Animated.View 
-      entering={ZoomIn.duration(200).delay(100)}
+      entering={FadeIn.duration(200).delay(100)}
       style={{
         backgroundColor: `${color}20`,
         borderColor: `${color}60`,
@@ -107,7 +105,7 @@ const StreamMetaBadge = ({
   delay?: number;
 }) => (
   <Animated.View 
-    entering={FadeInUp.duration(200).delay(delay)}
+    entering={FadeIn.duration(200).delay(delay)}
     style={{
       backgroundColor: bgColor,
       borderColor: `${color}40`,
@@ -279,7 +277,7 @@ const SourcesModal: React.FC<SourcesModalProps> = ({
             }}
           >
             <Animated.View 
-              entering={FadeInDown.duration(300).delay(100)}
+              entering={FadeIn.duration(300).delay(100)}
               style={{ flex: 1 }}
             >
               <Text style={{
@@ -304,7 +302,7 @@ const SourcesModal: React.FC<SourcesModalProps> = ({
               </Text>
             </Animated.View>
             
-            <Animated.View entering={BounceIn.duration(400).delay(200)}>
+            <Animated.View entering={FadeIn.duration(300).delay(200)}>
               <TouchableOpacity 
                 style={{
                   width: 44,
@@ -343,8 +341,8 @@ const SourcesModal: React.FC<SourcesModalProps> = ({
             {sortedProviders.map(([providerId, { streams, addonName }], providerIndex) => (
               <Animated.View 
                 key={providerId}
-                entering={FadeInDown.duration(400).delay(150 + (providerIndex * 80))}
-                layout={Layout.springify()}
+                entering={FadeIn.duration(200).delay(50 + providerIndex * 30)}
+                exiting={FadeOut.duration(150)}
                 style={{
                   marginBottom: streams.length > 0 ? 32 : 0,
                   width: '100%',
@@ -426,8 +424,8 @@ const SourcesModal: React.FC<SourcesModalProps> = ({
                     return (
                       <Animated.View
                         key={`${stream.url}-${index}`}
-                        entering={FadeInDown.duration(300).delay((providerIndex * 80) + (index * 40))}
-                        layout={Layout.springify()}
+                        entering={FadeIn.duration(200).delay(100 + index * 50)}
+                        exiting={FadeOut.duration(150)}
                         style={{ width: '100%' }}
                       >
                         <TouchableOpacity
@@ -482,7 +480,7 @@ const SourcesModal: React.FC<SourcesModalProps> = ({
                                 
                                 {isSelected && (
                                   <Animated.View 
-                                    entering={BounceIn.duration(300)}
+                                    entering={FadeIn.duration(300)}
                                     style={{
                                       flexDirection: 'row',
                                       alignItems: 'center',
@@ -632,7 +630,7 @@ const SourcesModal: React.FC<SourcesModalProps> = ({
                               shadowRadius: 4,
                             }}>
                               {isSelected ? (
-                                <Animated.View entering={ZoomIn.duration(200)}>
+                                <Animated.View entering={FadeIn.duration(200)}>
                                   <MaterialIcons name="check-circle" size={24} color="#E50914" />
                                 </Animated.View>
                               ) : (

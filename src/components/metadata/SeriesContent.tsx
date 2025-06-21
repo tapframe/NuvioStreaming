@@ -535,13 +535,13 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   return (
     <View style={styles.container}>
       <Animated.View 
-        entering={FadeIn.duration(500).delay(100)}
+        entering={FadeIn.duration(300).delay(50)}
       >
         {renderSeasonSelector()}
       </Animated.View>
       
       <Animated.View 
-        entering={FadeIn.duration(500).delay(200)}
+        entering={FadeIn.duration(300).delay(100)}
       >
         <Text style={[styles.sectionTitle, { color: currentTheme.colors.highEmphasis }]}>
           {episodes.length} {episodes.length === 1 ? 'Episode' : 'Episodes'}
@@ -562,7 +562,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
             {currentSeasonEpisodes.map((episode, index) => (
               <Animated.View 
                 key={episode.id}
-                entering={FadeIn.duration(400).delay(300 + index * 50)}
+                entering={FadeIn.duration(300).delay(100 + index * 30)}
                 style={[
                   styles.episodeCardWrapperHorizontal,
                   isTablet && styles.episodeCardWrapperHorizontalTablet
@@ -586,7 +586,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                 {currentSeasonEpisodes.map((episode, index) => (
                   <Animated.View 
                     key={episode.id}
-                    entering={FadeIn.duration(400).delay(300 + index * 50)}
+                    entering={FadeIn.duration(300).delay(100 + index * 30)}
                   >
                     {renderVerticalEpisodeCard(episode)}
                   </Animated.View>
@@ -596,7 +596,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               currentSeasonEpisodes.map((episode, index) => (
                 <Animated.View 
                   key={episode.id}
-                  entering={FadeIn.duration(400).delay(300 + index * 50)}
+                  entering={FadeIn.duration(300).delay(100 + index * 30)}
                 >
                   {renderVerticalEpisodeCard(episode)}
                 </Animated.View>

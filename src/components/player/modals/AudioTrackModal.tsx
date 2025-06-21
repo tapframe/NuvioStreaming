@@ -19,8 +19,6 @@ import Animated, {
   withDelay,
   withSequence,
   runOnJS,
-  BounceIn,
-  ZoomIn
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { styles } from '../utils/playerStyles';
@@ -227,7 +225,7 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
               </Text>
             </Animated.View>
             
-            <Animated.View entering={BounceIn.duration(400).delay(200)}>
+            <Animated.View entering={FadeIn.duration(300).delay(200)}>
               <TouchableOpacity 
                 style={{
                   width: 44,
@@ -267,8 +265,8 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
               {vlcAudioTracks.length > 0 ? vlcAudioTracks.map((track, index) => (
                 <Animated.View
                   key={track.id}
-                  entering={FadeInDown.duration(300).delay(150 + (index * 50))}
-                  layout={Layout.springify()}
+                  entering={FadeIn.duration(200).delay(50 + index * 30)}
+                  exiting={FadeOut.duration(150)}
                   style={{ 
                     marginBottom: 16,
                     width: '100%',
@@ -323,7 +321,7 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
                           
                           {selectedAudioTrack === track.id && (
                             <Animated.View 
-                              entering={BounceIn.duration(300)}
+                              entering={FadeIn.duration(300)}
                               style={{
                                 flexDirection: 'row',
                                 alignItems: 'center',
@@ -388,7 +386,7 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
                           : 'rgba(255, 255, 255, 0.1)',
                       }}>
                         {selectedAudioTrack === track.id ? (
-                          <Animated.View entering={ZoomIn.duration(200)}>
+                          <Animated.View entering={FadeIn.duration(200)}>
                             <MaterialIcons name="check-circle" size={24} color="#F97316" />
                           </Animated.View>
                         ) : (
@@ -400,7 +398,7 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
                 </Animated.View>
               )) : (
                 <Animated.View 
-                  entering={FadeInDown.duration(300).delay(150)}
+                  entering={FadeIn.duration(300).delay(150)}
                   style={{
                     backgroundColor: 'rgba(255, 255, 255, 0.02)',
                     borderRadius: 20,

@@ -382,7 +382,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
 
   return (
     <Animated.View
-      entering={FadeIn.duration(800).easing(Easing.out(Easing.cubic))}
+      entering={FadeIn.duration(400).easing(Easing.out(Easing.cubic))}
     >
       <TouchableOpacity 
         activeOpacity={0.95}

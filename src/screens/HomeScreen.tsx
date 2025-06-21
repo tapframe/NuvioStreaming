@@ -463,7 +463,7 @@ const HomeScreen = () => {
           />
         );
       case 'thisWeek':
-        return <Animated.View entering={FadeIn.duration(400).delay(150)}><ThisWeekSection /></Animated.View>;
+        return <Animated.View entering={FadeIn.duration(300).delay(100)}><ThisWeekSection /></Animated.View>;
       case 'continueWatching':
         return <ContinueWatchingSection ref={continueWatchingRef} />;
       case 'catalog':

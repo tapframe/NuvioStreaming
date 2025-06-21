@@ -189,7 +189,7 @@ export const ThisWeekSection = () => {
     
     return (
       <Animated.View 
-        entering={FadeInRight.delay(index * 150).duration(600)}
+        entering={FadeInRight.delay(index * 50).duration(300)}
         style={styles.episodeItemContainer}
       >
         <TouchableOpacity
@@ -261,7 +261,7 @@ export const ThisWeekSection = () => {
   };
   
   return (
-    <Animated.View entering={FadeIn.duration(400)} style={styles.container}>
+    <Animated.View entering={FadeIn.duration(300)} style={styles.container}>
       <View style={styles.header}>
         <View style={styles.titleContainer}>
         <Text style={[styles.title, { color: currentTheme.colors.text }]}>This Week</Text>

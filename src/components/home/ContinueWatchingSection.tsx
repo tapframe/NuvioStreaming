@@ -272,7 +272,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   }
 
   return (
-    <Animated.View entering={FadeIn.duration(400).delay(250)} style={styles.container}>
+    <Animated.View entering={FadeIn.duration(300).delay(150)} style={styles.container}>
       <View style={styles.header}>
         <View style={styles.titleContainer}>
           <Text style={[styles.title, { color: currentTheme.colors.text }]}>Continue Watching</Text>
