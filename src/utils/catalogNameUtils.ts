@@ -6,7 +6,8 @@ const CATALOG_CUSTOM_NAMES_KEY = 'catalog_custom_names';
 // Initialize cache as an empty object
 let customNamesCache: { [key: string]: string } = {};
 let cacheTimestamp: number = 0; // 0 indicates cache is invalid/empty initially
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+let isLoading: boolean = false; // Prevent multiple concurrent loads
+const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes (longer cache for less frequent loads)
 
 async function loadCustomNamesIfNeeded(): Promise<{ [key: string]: string }> {
     const now = Date.now();
@@ -15,6 +16,13 @@ async function loadCustomNamesIfNeeded(): Promise<{ [key: string]: string }> {
         return customNamesCache; // Cache is valid and guaranteed to be an object
     }
 
+    // Prevent multiple concurrent loads
+    if (isLoading) {
+        // Wait for current load to complete by returning existing cache or empty object
+        return customNamesCache || {};
+    }
+
+    isLoading = true;
     try {
         logger.info('Loading custom catalog names from storage...');
         const savedCustomNamesJson = await AsyncStorage.getItem(CATALOG_CUSTOM_NAMES_KEY);
@@ -28,6 +36,8 @@ async function loadCustomNamesIfNeeded(): Promise<{ [key: string]: string }> {
         cacheTimestamp = 0;
         // Return the last known cache (which might be empty {}), or a fresh empty object
         return customNamesCache || {}; // Return cache (could be outdated but non-null) or empty {}
+    } finally {
+        isLoading = false;
     }
 }
 

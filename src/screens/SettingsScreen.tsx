@@ -97,22 +97,22 @@ const SettingItem: React.FC<SettingItemProps> = ({
         styles.settingIconContainer,
         { backgroundColor: 'rgba(255,255,255,0.1)' }
       ]}>
-        <MaterialIcons name={icon} size={20} color={currentTheme.colors.primary} />
+        <MaterialIcons name={icon} size={Math.min(20, width * 0.05)} color={currentTheme.colors.primary} />
       </View>
       <View style={styles.settingContent}>
         <View style={styles.settingTextContainer}>
-          <Text style={[styles.settingTitle, { color: currentTheme.colors.highEmphasis }]}>
+          <Text style={[styles.settingTitle, { color: currentTheme.colors.highEmphasis }]} numberOfLines={1} adjustsFontSizeToFit>
             {title}
           </Text>
           {description && (
-            <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+            <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]} numberOfLines={2} adjustsFontSizeToFit>
               {description}
             </Text>
           )}
         </View>
         {badge && (
           <View style={[styles.badge, { backgroundColor: currentTheme.colors.primary }]}>
-            <Text style={styles.badgeText}>{badge}</Text>
+            <Text style={styles.badgeText} numberOfLines={1} adjustsFontSizeToFit>{String(badge)}</Text>
           </View>
         )}
       </View>
@@ -395,14 +395,14 @@ const SettingsScreen: React.FC = () => {
               />
               <SettingItem
                 title="Episode Layout"
-                description={settings.episodeLayoutStyle === 'horizontal' ? 'Horizontal Cards' : 'Vertical List'}
+                description={settings?.episodeLayoutStyle === 'horizontal' ? 'Horizontal Cards' : 'Vertical List'}
                 icon="view-module"
                 renderControl={() => (
                   <View style={styles.selectorContainer}>
                     <TouchableOpacity
                       style={[
                         styles.selectorButton,
-                        settings.episodeLayoutStyle === 'vertical' && {
+                        settings?.episodeLayoutStyle === 'vertical' && {
                           backgroundColor: currentTheme.colors.primary
                         }
                       ]}
@@ -411,7 +411,7 @@ const SettingsScreen: React.FC = () => {
                       <Text style={[
                         styles.selectorText,
                         { color: currentTheme.colors.mediumEmphasis },
-                        settings.episodeLayoutStyle === 'vertical' && {
+                        settings?.episodeLayoutStyle === 'vertical' && {
                           color: currentTheme.colors.white,
                           fontWeight: '600'
                         }
@@ -420,7 +420,7 @@ const SettingsScreen: React.FC = () => {
                     <TouchableOpacity
                       style={[
                         styles.selectorButton,
-                        settings.episodeLayoutStyle === 'horizontal' && {
+                        settings?.episodeLayoutStyle === 'horizontal' && {
                           backgroundColor: currentTheme.colors.primary
                         }
                       ]}
@@ -429,7 +429,7 @@ const SettingsScreen: React.FC = () => {
                       <Text style={[
                         styles.selectorText,
                         { color: currentTheme.colors.mediumEmphasis },
-                        settings.episodeLayoutStyle === 'horizontal' && {
+                        settings?.episodeLayoutStyle === 'horizontal' && {
                           color: currentTheme.colors.white,
                           fontWeight: '600'
                         }
@@ -518,12 +518,12 @@ const SettingsScreen: React.FC = () => {
               <SettingItem
                 title="Video Player"
                 description={Platform.OS === 'ios' 
-                  ? (settings.preferredPlayer === 'internal' 
+                  ? (settings?.preferredPlayer === 'internal' 
                     ? 'Built-in Player' 
-                    : settings.preferredPlayer 
+                    : settings?.preferredPlayer 
                       ? settings.preferredPlayer.toUpperCase()
                       : 'Built-in Player')
-                  : (settings.useExternalPlayer ? 'External Player' : 'Built-in Player')
+                  : (settings?.useExternalPlayer ? 'External Player' : 'Built-in Player')
                 }
                 icon="play-arrow"
                 renderControl={ChevronRight}
@@ -619,7 +619,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: 20,
+    paddingHorizontal: Math.max(16, width * 0.05),
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
@@ -628,7 +628,7 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: Math.min(32, width * 0.08),
     fontWeight: '800',
     letterSpacing: 0.3,
   },
@@ -654,11 +654,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     letterSpacing: 0.8,
-    marginLeft: 16,
+    marginLeft: Math.max(12, width * 0.04),
     marginBottom: 8,
   },
   card: {
-    marginHorizontal: 16,
+    marginHorizontal: Math.max(12, width * 0.04),
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -672,9 +672,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: Math.max(12, width * 0.04),
     borderBottomWidth: 0.5,
-    minHeight: 58,
+    minHeight: Math.max(54, width * 0.14),
     width: '100%',
   },
   settingItemBorder: {
@@ -697,12 +697,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   settingTitle: {
-    fontSize: 16,
+    fontSize: Math.min(16, width * 0.042),
     fontWeight: '500',
     marginBottom: 3,
   },
   settingDescription: {
-    fontSize: 14,
+    fontSize: Math.min(14, width * 0.037),
     opacity: 0.8,
   },
   settingControl: {
@@ -744,8 +744,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     height: 36,
-    width: 180,
+    minWidth: 140,
+    maxWidth: 180,
     marginRight: 8,
+    alignSelf: 'flex-end',
   },
   selectorButton: {
     flex: 1,
@@ -755,7 +757,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
   selectorText: {
-    fontSize: 13,
+    fontSize: Math.min(13, width * 0.034),
     fontWeight: '500',
     textAlign: 'center',
   },

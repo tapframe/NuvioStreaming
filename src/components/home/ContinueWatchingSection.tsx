@@ -309,11 +309,12 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                 source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
                 style={styles.continueWatchingPoster}
                 contentFit="cover"
-                cachePolicy="memory"
-                transition={200}
+                cachePolicy="memory-disk"
+                transition={150}
                 placeholder={{ uri: 'https://via.placeholder.com/300x450' }}
                 placeholderContentFit="cover"
                 recyclingKey={item.id}
+                priority="high"
               />
             </View>
 

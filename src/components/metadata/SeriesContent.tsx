@@ -71,7 +71,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
 
   // Function to find and scroll to the most recently watched episode
   const scrollToMostRecentEpisode = () => {
-    if (!metadata?.id || !episodeScrollViewRef.current || settings.episodeLayoutStyle !== 'horizontal') {
+    if (!metadata?.id || !episodeScrollViewRef.current || !settings?.episodeLayoutStyle || settings.episodeLayoutStyle !== 'horizontal') {
       return;
     }
     
@@ -147,10 +147,10 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
 
   // Add effect to scroll to most recently watched episode when season changes or progress loads
   useEffect(() => {
-    if (Object.keys(episodeProgress).length > 0 && selectedSeason) {
+    if (Object.keys(episodeProgress).length > 0 && selectedSeason && settings?.episodeLayoutStyle) {
       scrollToMostRecentEpisode();
     }
-  }, [selectedSeason, episodeProgress, settings.episodeLayoutStyle, groupedEpisodes]);
+  }, [selectedSeason, episodeProgress, settings?.episodeLayoutStyle, groupedEpisodes]);
 
 
 
@@ -561,7 +561,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
         
         {/* Only render episode list if there are episodes */}
         {currentSeasonEpisodes.length > 0 && (
-          settings.episodeLayoutStyle === 'horizontal' ? (
+          (settings?.episodeLayoutStyle === 'horizontal') ? (
             // Horizontal Layout (Netflix-style)
             <FlatList
               ref={episodeScrollViewRef as React.RefObject<FlatList<any>>}

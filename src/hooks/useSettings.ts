@@ -78,10 +78,14 @@ export const useSettings = () => {
     try {
       const storedSettings = await AsyncStorage.getItem(SETTINGS_STORAGE_KEY);
       if (storedSettings) {
-        setSettings(JSON.parse(storedSettings));
+        const parsedSettings = JSON.parse(storedSettings);
+        // Merge with defaults to ensure all properties exist
+        setSettings({ ...DEFAULT_SETTINGS, ...parsedSettings });
       }
     } catch (error) {
       console.error('Failed to load settings:', error);
+      // Fallback to default settings on error
+      setSettings(DEFAULT_SETTINGS);
     }
   };
 

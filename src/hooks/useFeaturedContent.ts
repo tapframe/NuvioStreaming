@@ -242,16 +242,37 @@ export function useFeaturedContent() {
 
   // Load featured content initially and when content source changes
   useEffect(() => {
-    // Force refresh when switching to catalogs or when catalog selection changes
-    if (contentSource === 'catalogs') {
-      // Clear cache when switching to catalogs mode
-      setAllFeaturedContent([]);
+    if (!settings.showHeroSection) {
       setFeaturedContent(null);
-      persistentStore.allFeaturedContent = [];
-      persistentStore.featuredContent = null;
-      loadFeaturedContent(true);
-    } else if (contentSource === 'tmdb' && contentSource !== persistentStore.featuredContent?.type) {
-      // Clear cache when switching to TMDB mode from catalogs
+      setAllFeaturedContent([]);
+      setLoading(false);
+      return;
+    }
+
+    // Only load if we don't have cached data or if settings actually changed
+    const now = Date.now();
+    const cacheAge = now - persistentStore.lastFetchTime;
+    const hasValidCache = persistentStore.featuredContent && 
+                         persistentStore.allFeaturedContent.length > 0 && 
+                         cacheAge < CACHE_TIMEOUT;
+
+    // Check if this is truly a settings change or just a re-render
+    const sourceChanged = persistentStore.lastSettings.featuredContentSource !== contentSource;
+    const catalogsChanged = JSON.stringify(persistentStore.lastSettings.selectedHeroCatalogs) !== JSON.stringify(selectedCatalogs);
+
+    if (hasValidCache && !sourceChanged && !catalogsChanged) {
+      // Use existing cache without reloading
+      console.log('Using existing cached featured content, no reload needed');
+      setFeaturedContent(persistentStore.featuredContent);
+      setAllFeaturedContent(persistentStore.allFeaturedContent);
+      setLoading(false);
+      return;
+    }
+
+    // Force refresh when switching modes or when selection changes
+    if (sourceChanged || catalogsChanged) {
+      console.log('Settings changed, refreshing featured content');
+      // Clear cache when switching modes
       setAllFeaturedContent([]);
       setFeaturedContent(null);
       persistentStore.allFeaturedContent = [];
@@ -261,7 +282,7 @@ export function useFeaturedContent() {
       // Normal load (might use cache if available)
       loadFeaturedContent(false);
     }
-  }, [loadFeaturedContent, contentSource, selectedCatalogs]);
+  }, [loadFeaturedContent, contentSource, selectedCatalogs, settings.showHeroSection]);
 
   useEffect(() => {
     if (featuredContent) {
