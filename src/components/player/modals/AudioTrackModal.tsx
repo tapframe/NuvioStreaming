@@ -1,24 +1,13 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import Animated, { 
   FadeIn, 
-  FadeOut, 
-  SlideInDown, 
-  SlideOutDown,
-  FadeInDown,
-  FadeInUp,
-  Layout,
-  withSpring,
-  withTiming,
+  FadeOut,
   useAnimatedStyle,
   useSharedValue,
-  interpolate,
-  Easing,
-  withDelay,
-  withSequence,
-  runOnJS,
+  withTiming,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { styles } from '../utils/playerStyles';
@@ -34,7 +23,6 @@ interface AudioTrackModalProps {
 
 const { width, height } = Dimensions.get('window');
 
-// Fixed dimensions for the modal
 const MODAL_WIDTH = Math.min(width - 32, 520);
 const MODAL_MAX_HEIGHT = height * 0.85;
 
@@ -42,17 +30,14 @@ const AudioBadge = ({
   text, 
   color, 
   bgColor, 
-  icon,
-  delay = 0 
+  icon
 }: { 
   text: string; 
   color: string; 
   bgColor: string; 
   icon?: string;
-  delay?: number;
 }) => (
-  <Animated.View 
-    entering={FadeInUp.duration(200).delay(delay)}
+  <View 
     style={{
       backgroundColor: bgColor,
       borderColor: `${color}40`,
@@ -80,7 +65,7 @@ const AudioBadge = ({
     }}>
       {text}
     </Text>
-  </Animated.View>
+  </View>
 );
 
 export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
@@ -90,30 +75,19 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
   selectedAudioTrack,
   selectAudioTrack,
 }) => {
-  const modalScale = useSharedValue(0.9);
   const modalOpacity = useSharedValue(0);
   
   React.useEffect(() => {
     if (showAudioModal) {
-      modalScale.value = withSpring(1, {
-        damping: 20,
-        stiffness: 300,
-        mass: 0.8,
-      });
-      modalOpacity.value = withTiming(1, {
-        duration: 200,
-        easing: Easing.out(Easing.quad),
-      });
+      modalOpacity.value = withTiming(1, { duration: 200 });
     }
   }, [showAudioModal]);
 
   const modalStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: modalScale.value }],
     opacity: modalOpacity.value,
   }));
 
   const handleClose = () => {
-    modalScale.value = withTiming(0.9, { duration: 150 });
     modalOpacity.value = withTiming(0, { duration: 150 });
     setTimeout(() => setShowAudioModal(false), 150);
   };
@@ -122,8 +96,8 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
   
   return (
     <Animated.View 
-      entering={FadeIn.duration(250)}
-      exiting={FadeOut.duration(200)}
+      entering={FadeIn.duration(200)}
+      exiting={FadeOut.duration(150)}
       style={{
         position: 'absolute',
         top: 0,
@@ -137,7 +111,6 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
         padding: 16,
       }}
     >
-      {/* Backdrop */}
       <TouchableOpacity 
         style={{
           position: 'absolute',
@@ -150,7 +123,6 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
         activeOpacity={1}
       />
 
-      {/* Modal Content */}
       <Animated.View
         style={[
           {
@@ -168,7 +140,6 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
           modalStyle,
         ]}
       >
-        {/* Glassmorphism Background */}
         <BlurView 
           intensity={100} 
           tint="dark"
@@ -180,7 +151,6 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
             height: '100%',
           }}
         >
-          {/* Header */}
           <LinearGradient
             colors={[
               'rgba(249, 115, 22, 0.95)',
@@ -199,10 +169,7 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
               width: '100%',
             }}
           >
-            <Animated.View 
-              entering={FadeInDown.duration(300).delay(100)}
-              style={{ flex: 1 }}
-            >
+            <View style={{ flex: 1 }}>
               <Text style={{
                 color: '#fff',
                 fontSize: 24,
@@ -223,33 +190,30 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
               }}>
                 Choose from {vlcAudioTracks.length} available track{vlcAudioTracks.length !== 1 ? 's' : ''}
               </Text>
-            </Animated.View>
+            </View>
             
-            <Animated.View entering={FadeIn.duration(300).delay(200)}>
-              <TouchableOpacity 
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  marginLeft: 16,
-                  borderWidth: 1,
-                  borderColor: 'rgba(255, 255, 255, 0.2)',
-                }}
-                onPress={handleClose}
-                activeOpacity={0.7}
-              >
-                <MaterialIcons name="close" size={20} color="#fff" />
-              </TouchableOpacity>
-            </Animated.View>
+            <TouchableOpacity 
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginLeft: 16,
+                borderWidth: 1,
+                borderColor: 'rgba(255, 255, 255, 0.2)',
+              }}
+              onPress={handleClose}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons name="close" size={20} color="#fff" />
+            </TouchableOpacity>
           </LinearGradient>
 
-          {/* Content */}
           <ScrollView 
             style={{ 
-              maxHeight: MODAL_MAX_HEIGHT - 100, // Account for header height
+              maxHeight: MODAL_MAX_HEIGHT - 100,
               backgroundColor: 'transparent',
               width: '100%',
             }}
@@ -262,11 +226,9 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
             bounces={false}
           >
             <View style={styles.modernTrackListContainer}>
-              {vlcAudioTracks.length > 0 ? vlcAudioTracks.map((track, index) => (
-                <Animated.View
+              {vlcAudioTracks.length > 0 ? vlcAudioTracks.map((track) => (
+                <View
                   key={track.id}
-                  entering={FadeIn.duration(200).delay(50 + index * 30)}
-                  exiting={FadeOut.duration(150)}
                   style={{ 
                     marginBottom: 16,
                     width: '100%',
@@ -320,8 +282,7 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
                           </Text>
                           
                           {selectedAudioTrack === track.id && (
-                            <Animated.View 
-                              entering={FadeIn.duration(300)}
+                            <View 
                               style={{
                                 flexDirection: 'row',
                                 alignItems: 'center',
@@ -343,7 +304,7 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
                               }}>
                                 ACTIVE
                               </Text>
-                            </Animated.View>
+                            </View>
                           )}
                         </View>
                         
@@ -365,7 +326,6 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
                               color="#6B7280" 
                               bgColor="rgba(107, 114, 128, 0.15)"
                               icon="language"
-                              delay={50}
                             />
                           )}
                         </View>
@@ -385,20 +345,17 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
                           ? 'rgba(249, 115, 22, 0.3)' 
                           : 'rgba(255, 255, 255, 0.1)',
                       }}>
-                        {selectedAudioTrack === track.id ? (
-                          <Animated.View entering={FadeIn.duration(200)}>
-                            <MaterialIcons name="check-circle" size={24} color="#F97316" />
-                          </Animated.View>
-                        ) : (
-                          <MaterialIcons name="volume-up" size={24} color="rgba(255,255,255,0.6)" />
-                        )}
+                        <MaterialIcons 
+                          name={selectedAudioTrack === track.id ? "check-circle" : "volume-up"} 
+                          size={24} 
+                          color={selectedAudioTrack === track.id ? "#F97316" : "rgba(255,255,255,0.6)"} 
+                        />
                       </View>
                     </View>
                   </TouchableOpacity>
-                </Animated.View>
+                </View>
               )) : (
-                <Animated.View 
-                  entering={FadeIn.duration(300).delay(150)}
+                <View 
                   style={{
                     backgroundColor: 'rgba(255, 255, 255, 0.02)',
                     borderRadius: 20,
@@ -429,7 +386,7 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
                   }}>
                     No audio tracks are available for this content.{'\n'}Try a different source or check your connection.
                   </Text>
-                </Animated.View>
+                </View>
               )}
             </View>
           </ScrollView>
