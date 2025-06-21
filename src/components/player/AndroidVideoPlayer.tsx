@@ -455,6 +455,17 @@ const AndroidVideoPlayer: React.FC = () => {
       const videoDuration = data.duration;
       if (data.duration > 0) {
         setDuration(videoDuration);
+        
+        // Store the actual duration for future reference and update existing progress
+        if (id && type) {
+          storageService.setContentDuration(id, type, videoDuration, episodeId);
+          storageService.updateProgressDuration(id, type, videoDuration, episodeId);
+          
+          // Update the saved duration for resume overlay if it was using an estimate
+          if (savedDuration && Math.abs(savedDuration - videoDuration) > 60) {
+            setSavedDuration(videoDuration);
+          }
+        }
       }
       
       // Set aspect ratio from video dimensions
@@ -621,8 +632,6 @@ const AndroidVideoPlayer: React.FC = () => {
 
   const handleResume = async () => {
     if (resumePosition !== null) {
-      logger.log(`[AndroidVideoPlayer] Resume requested to position: ${resumePosition}s, duration: ${duration}, isPlayerReady: ${isPlayerReady}`);
-      
       if (rememberChoice) {
         try {
           await AsyncStorage.setItem(RESUME_PREF_KEY, RESUME_PREF.ALWAYS_RESUME);
@@ -635,11 +644,9 @@ const AndroidVideoPlayer: React.FC = () => {
       
       // If video is already loaded and ready, seek immediately
       if (isPlayerReady && duration > 0 && videoRef.current) {
-        logger.log(`[AndroidVideoPlayer] Video ready, seeking immediately to: ${resumePosition}s`);
         seekToTime(resumePosition);
       } else {
         // Otherwise, set initial position for when video loads
-        logger.log(`[AndroidVideoPlayer] Video not ready, setting initial position: ${resumePosition}s`);
         setInitialPosition(resumePosition);
       }
     }

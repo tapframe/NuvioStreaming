@@ -186,7 +186,8 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
           options.type,
           true,
           progressPercent,
-          options.episodeId
+          options.episodeId,
+          currentTime
         );
         
         logger.log(`[TraktAutosync] Synced progress ${progressPercent.toFixed(1)}%: ${contentData.title}`);
@@ -318,7 +319,8 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
           options.type,
           true,
           progressPercent,
-          options.episodeId
+          options.episodeId,
+          currentTime
         );
         
         // Mark session as complete if high progress (scrobbled)

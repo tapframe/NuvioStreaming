@@ -324,22 +324,21 @@ export function useTraktIntegration() {
 
   // Fetch and merge Trakt progress with local progress
   const fetchAndMergeTraktProgress = useCallback(async (): Promise<boolean> => {
-    logger.log(`[useTraktIntegration] fetchAndMergeTraktProgress called - isAuthenticated: ${isAuthenticated}`);
-    
     if (!isAuthenticated) {
-      logger.log('[useTraktIntegration] Not authenticated, skipping Trakt progress fetch');
       return false;
     }
     
     try {
       // Fetch both playback progress and recently watched movies
-      logger.log('[useTraktIntegration] Fetching Trakt playback progress and watched movies...');
       const [traktProgress, watchedMovies] = await Promise.all([
         getTraktPlaybackProgress(),
         traktService.getWatchedMovies()
       ]);
       
-      logger.log(`[useTraktIntegration] Retrieved ${traktProgress.length} Trakt progress items, ${watchedMovies.length} watched movies`);
+      logger.log(`[useTraktIntegration] Retrieved ${traktProgress.length} progress items, ${watchedMovies.length} watched movies`);
+      
+      // Batch process all updates to reduce storage notifications
+      const updatePromises: Promise<void>[] = [];
       
       // Process playback progress (in-progress items)
       for (const item of traktProgress) {
@@ -351,27 +350,35 @@ export function useTraktIntegration() {
           if (item.type === 'movie' && item.movie) {
             id = item.movie.ids.imdb;
             type = 'movie';
-            logger.log(`[useTraktIntegration] Processing Trakt movie progress: ${item.movie.title} (${id}) - ${item.progress}%`);
           } else if (item.type === 'episode' && item.show && item.episode) {
             id = item.show.ids.imdb;
             type = 'series';
             episodeId = `${id}:${item.episode.season}:${item.episode.number}`;
-            logger.log(`[useTraktIntegration] Processing Trakt episode progress: ${item.show.title} S${item.episode.season}E${item.episode.number} (${id}) - ${item.progress}%`);
           } else {
-            logger.warn(`[useTraktIntegration] Skipping invalid Trakt progress item:`, item);
             continue;
           }
           
-          logger.log(`[useTraktIntegration] Merging progress for ${type} ${id}: ${item.progress}% from ${item.paused_at}`);
-          await storageService.mergeWithTraktProgress(
-            id,
-            type,
-            item.progress,
-            item.paused_at,
-            episodeId
+          // Try to calculate exact time if we have stored duration
+          const exactTime = await (async () => {
+            const storedDuration = await storageService.getContentDuration(id, type, episodeId);
+            if (storedDuration && storedDuration > 0) {
+              return (item.progress / 100) * storedDuration;
+            }
+            return undefined;
+          })();
+          
+          updatePromises.push(
+            storageService.mergeWithTraktProgress(
+              id,
+              type,
+              item.progress,
+              item.paused_at,
+              episodeId,
+              exactTime
+            )
           );
         } catch (error) {
-          logger.error('[useTraktIntegration] Error merging individual Trakt progress:', error);
+          logger.error('[useTraktIntegration] Error preparing Trakt progress update:', error);
         }
       }
       
@@ -381,21 +388,25 @@ export function useTraktIntegration() {
           if (movie.movie?.ids?.imdb) {
             const id = movie.movie.ids.imdb;
             const watchedAt = movie.last_watched_at;
-            logger.log(`[useTraktIntegration] Processing watched movie: ${movie.movie.title} (${id}) - 100% watched on ${watchedAt}`);
             
-            await storageService.mergeWithTraktProgress(
-              id,
-              'movie',
-              100, // 100% progress for watched items
-              watchedAt
+            updatePromises.push(
+              storageService.mergeWithTraktProgress(
+                id,
+                'movie',
+                100, // 100% progress for watched items
+                watchedAt
+              )
             );
           }
         } catch (error) {
-          logger.error('[useTraktIntegration] Error merging watched movie:', error);
+          logger.error('[useTraktIntegration] Error preparing watched movie update:', error);
         }
       }
       
-      logger.log(`[useTraktIntegration] Successfully merged ${traktProgress.length} progress items + ${watchedMovies.length} watched movies`);
+      // Execute all updates in parallel
+      await Promise.all(updatePromises);
+      
+      logger.log(`[useTraktIntegration] Successfully merged ${updatePromises.length} items from Trakt`);
       return true;
     } catch (error) {
       logger.error('[useTraktIntegration] Error fetching and merging Trakt progress:', error);
@@ -419,17 +430,10 @@ export function useTraktIntegration() {
   useEffect(() => {
     if (isAuthenticated) {
       // Fetch Trakt progress and merge with local
-      logger.log('[useTraktIntegration] User authenticated, fetching Trakt progress to replace local data');
       fetchAndMergeTraktProgress().then((success) => {
         if (success) {
-          logger.log('[useTraktIntegration] Trakt progress merged successfully - local data replaced with Trakt data');
-        } else {
-          logger.warn('[useTraktIntegration] Failed to merge Trakt progress');
+          logger.log('[useTraktIntegration] Trakt progress merged successfully');
         }
-        // Small delay to ensure storage subscribers are notified
-        setTimeout(() => {
-          logger.log('[useTraktIntegration] Trakt progress merge completed, UI should refresh');
-        }, 100);
       });
     }
   }, [isAuthenticated, fetchAndMergeTraktProgress]);
@@ -440,12 +444,7 @@ export function useTraktIntegration() {
 
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
-        logger.log('[useTraktIntegration] App became active, syncing Trakt data');
-        fetchAndMergeTraktProgress().then((success) => {
-          if (success) {
-            logger.log('[useTraktIntegration] App focus sync completed successfully');
-          }
-        }).catch(error => {
+        fetchAndMergeTraktProgress().catch(error => {
           logger.error('[useTraktIntegration] App focus sync failed:', error);
         });
       }
@@ -461,12 +460,7 @@ export function useTraktIntegration() {
   // Trigger sync when auth status is manually refreshed (for login scenarios)
   useEffect(() => {
     if (isAuthenticated) {
-      logger.log('[useTraktIntegration] Auth status refresh detected, triggering Trakt progress merge');
-      fetchAndMergeTraktProgress().then((success) => {
-        if (success) {
-          logger.log('[useTraktIntegration] Trakt progress merged after manual auth refresh');
-        }
-      });
+      fetchAndMergeTraktProgress();
     }
   }, [lastAuthCheck, isAuthenticated, fetchAndMergeTraktProgress]);
 

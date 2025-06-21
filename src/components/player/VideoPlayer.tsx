@@ -479,6 +479,17 @@ const VideoPlayer: React.FC = () => {
       const videoDuration = data.duration / 1000;
       if (data.duration > 0) {
         setDuration(videoDuration);
+        
+        // Store the actual duration for future reference and update existing progress
+        if (id && type) {
+          storageService.setContentDuration(id, type, videoDuration, episodeId);
+          storageService.updateProgressDuration(id, type, videoDuration, episodeId);
+          
+          // Update the saved duration for resume overlay if it was using an estimate
+          if (savedDuration && Math.abs(savedDuration - videoDuration) > 60) {
+            setSavedDuration(videoDuration);
+          }
+        }
       }
       setVideoAspectRatio(data.videoSize.width / data.videoSize.height);
 
@@ -636,8 +647,6 @@ const VideoPlayer: React.FC = () => {
 
   const handleResume = async () => {
     if (resumePosition !== null) {
-      logger.log(`[VideoPlayer] Resume requested to position: ${resumePosition}s, duration: ${duration}, isPlayerReady: ${isPlayerReady}`);
-      
       if (rememberChoice) {
         try {
           await AsyncStorage.setItem(RESUME_PREF_KEY, RESUME_PREF.ALWAYS_RESUME);
@@ -650,11 +659,9 @@ const VideoPlayer: React.FC = () => {
       
       // If video is already loaded and ready, seek immediately
       if (isPlayerReady && duration > 0 && vlcRef.current) {
-        logger.log(`[VideoPlayer] Video ready, seeking immediately to: ${resumePosition}s`);
         seekToTime(resumePosition);
       } else {
         // Otherwise, set initial position for when video loads
-        logger.log(`[VideoPlayer] Video not ready, setting initial position: ${resumePosition}s`);
         setInitialPosition(resumePosition);
       }
     }
