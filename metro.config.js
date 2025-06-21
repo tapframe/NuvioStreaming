@@ -1,6 +1,8 @@
-const { getDefaultConfig } = require('expo/metro-config');
+const {
+  getSentryExpoConfig
+} = require("@sentry/react-native/metro");
 
-const config = getDefaultConfig(__dirname);
+const config = getSentryExpoConfig(__dirname);
 
 // Enable tree shaking and better minification
 config.transformer = {
@@ -28,4 +30,4 @@ config.resolver = {
   resolverMainFields: ['react-native', 'browser', 'main'],
 };
 
-module.exports = config; 
+module.exports = config;

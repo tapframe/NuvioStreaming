@@ -11,7 +11,8 @@ import {
   Alert,
   Platform,
   Dimensions,
-  Image
+  Image,
+  Button
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
@@ -26,6 +27,7 @@ import { useTraktContext } from '../contexts/TraktContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { catalogService, DataSource } from '../services/catalogService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Sentry from '@sentry/react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -225,6 +227,29 @@ const SettingsScreen: React.FC = () => {
       ]
     );
   }, [updateSetting]);
+
+  const handleClearMDBListCache = () => {
+    Alert.alert(
+      "Clear MDBList Cache",
+      "Are you sure you want to clear all cached MDBList data? This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await AsyncStorage.removeItem('mdblist_cache');
+              Alert.alert("Success", "MDBList cache has been cleared.");
+            } catch (error) {
+              Alert.alert("Error", "Could not clear MDBList cache.");
+              console.error('Error clearing MDBList cache:', error);
+            }
+          }
+        }
+      ]
+    );
+  };
 
   const CustomSwitch = ({ value, onValueChange }: { value: boolean, onValueChange: (value: boolean) => void }) => (
     <Switch
@@ -554,6 +579,28 @@ const SettingsScreen: React.FC = () => {
                 )}
               />
             </SettingsCard>
+
+            <SettingsCard title="Debugging">
+              <View style={{padding: 10}}>
+                <Button
+                  title="Report a Bug or Suggestion"
+                  onPress={() => Sentry.showFeedbackWidget()}
+                />
+              </View>
+            </SettingsCard>
+
+            {/* MDBList Cache Management */}
+            {mdblistKeySet && (
+              <SettingsCard title="MDBList Cache">
+                <View style={{padding: 10}}>
+                  <Button
+                    title="Clear MDBList Cache"
+                    onPress={handleClearMDBListCache}
+                    color={currentTheme.colors.error}
+                  />
+                </View>
+              </SettingsCard>
+            )}
 
             <View style={styles.versionContainer}>
               <Text style={[styles.versionText, {color: currentTheme.colors.mediumEmphasis}]}>

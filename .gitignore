@@ -40,3 +40,4 @@ plan.md
 release_announcement.md
 ALPHA_BUILD_2_ANNOUNCEMENT.md
 CHANGELOG.md
+.env.local
