@@ -187,10 +187,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       // Sort by last updated time (most recent first)
       progressItems.sort((a, b) => b.lastUpdated - a.lastUpdated);
       
-      // Limit to 10 items
-      const finalItems = progressItems.slice(0, 10);
-      
-      setContinueWatchingItems(finalItems);
+      // Show all continue watching items (no limit)
+      setContinueWatchingItems(progressItems);
     } catch (error) {
       logger.error('Failed to load continue watching items:', error);
     } finally {
