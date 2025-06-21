@@ -106,6 +106,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const [isInitialSeekComplete, setIsInitialSeekComplete] = useState(false);
   const [showResumeOverlay, setShowResumeOverlay] = useState(false);
   const [resumePosition, setResumePosition] = useState<number | null>(null);
+  const [savedDuration, setSavedDuration] = useState<number | null>(null);
   const [rememberChoice, setRememberChoice] = useState(false);
   const [resumePreference, setResumePreference] = useState<string | null>(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -279,7 +280,8 @@ const AndroidVideoPlayer: React.FC = () => {
             
             if (progressPercent < 85) {
               setResumePosition(savedProgress.currentTime);
-              logger.log(`[AndroidVideoPlayer] Set resume position to: ${savedProgress.currentTime}`);
+              setSavedDuration(savedProgress.duration);
+              logger.log(`[AndroidVideoPlayer] Set resume position to: ${savedProgress.currentTime} of ${savedProgress.duration}`);
               
               const pref = await AsyncStorage.getItem(RESUME_PREF_KEY);
               logger.log(`[AndroidVideoPlayer] Resume preference: ${pref}`);
@@ -357,22 +359,25 @@ const AndroidVideoPlayer: React.FC = () => {
   const seekToTime = (timeInSeconds: number) => {
     if (videoRef.current && duration > 0 && !isSeeking.current) {
       if (DEBUG_MODE) {
-        logger.log(`[AndroidVideoPlayer] Seeking to ${timeInSeconds.toFixed(2)}s`);
+        logger.log(`[AndroidVideoPlayer] Seeking to ${timeInSeconds.toFixed(2)}s out of ${duration.toFixed(2)}s`);
       }
       
       isSeeking.current = true;
       setSeekTime(timeInSeconds);
       
-      // Clear seek state after seek
+      // Clear seek state after seek with longer timeout
       setTimeout(() => {
         if (isMounted.current) {
           setSeekTime(null);
           isSeeking.current = false;
+          if (DEBUG_MODE) {
+            logger.log(`[AndroidVideoPlayer] Seek completed to ${timeInSeconds.toFixed(2)}s`);
+          }
         }
-      }, 100);
+      }, 500);
     } else {
       if (DEBUG_MODE) {
-        logger.error('[AndroidVideoPlayer] Seek failed: Player not ready, duration is zero, or already seeking.');
+        logger.error(`[AndroidVideoPlayer] Seek failed: videoRef=${!!videoRef.current}, duration=${duration}, seeking=${isSeeking.current}`);
       }
     }
   };
@@ -615,7 +620,9 @@ const AndroidVideoPlayer: React.FC = () => {
   };
 
   const handleResume = async () => {
-    if (resumePosition !== null && videoRef.current) {
+    if (resumePosition !== null) {
+      logger.log(`[AndroidVideoPlayer] Resume requested to position: ${resumePosition}s, duration: ${duration}, isPlayerReady: ${isPlayerReady}`);
+      
       if (rememberChoice) {
         try {
           await AsyncStorage.setItem(RESUME_PREF_KEY, RESUME_PREF.ALWAYS_RESUME);
@@ -623,13 +630,18 @@ const AndroidVideoPlayer: React.FC = () => {
           logger.error('[AndroidVideoPlayer] Error saving resume preference:', error);
         }
       }
-      setInitialPosition(resumePosition);
+      
       setShowResumeOverlay(false);
-      setTimeout(() => {
-        if (videoRef.current) {
-          seekToTime(resumePosition);
-        }
-      }, 500);
+      
+      // If video is already loaded and ready, seek immediately
+      if (isPlayerReady && duration > 0 && videoRef.current) {
+        logger.log(`[AndroidVideoPlayer] Video ready, seeking immediately to: ${resumePosition}s`);
+        seekToTime(resumePosition);
+      } else {
+        // Otherwise, set initial position for when video loads
+        logger.log(`[AndroidVideoPlayer] Video not ready, setting initial position: ${resumePosition}s`);
+        setInitialPosition(resumePosition);
+      }
     }
   };
 
@@ -1091,7 +1103,7 @@ const AndroidVideoPlayer: React.FC = () => {
           <ResumeOverlay
             showResumeOverlay={showResumeOverlay}
             resumePosition={resumePosition}
-            duration={duration}
+            duration={savedDuration || duration}
             title={title}
             season={season}
             episode={episode}
