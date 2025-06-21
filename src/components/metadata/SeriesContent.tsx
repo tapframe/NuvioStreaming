@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, useWindowDimensions, useColorScheme } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, useWindowDimensions, useColorScheme, FlatList } from 'react-native';
 import { Image } from 'expo-image';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -72,17 +72,11 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   // Function to find and scroll to the most recently watched episode
   const scrollToMostRecentEpisode = () => {
     if (!metadata?.id || !episodeScrollViewRef.current || settings.episodeLayoutStyle !== 'horizontal') {
-      console.log('[SeriesContent] Scroll conditions not met:', {
-        hasMetadataId: !!metadata?.id,
-        hasScrollRef: !!episodeScrollViewRef.current,
-        isHorizontal: settings.episodeLayoutStyle === 'horizontal'
-      });
       return;
     }
     
     const currentSeasonEpisodes = groupedEpisodes[selectedSeason] || [];
     if (currentSeasonEpisodes.length === 0) {
-      console.log('[SeriesContent] No episodes in current season:', selectedSeason);
       return;
     }
     
@@ -102,30 +96,18 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
       }
     });
     
-    console.log('[SeriesContent] Episode scroll analysis:', {
-      totalEpisodes: currentSeasonEpisodes.length,
-      mostRecentIndex: mostRecentEpisodeIndex,
-      mostRecentEpisode: mostRecentEpisodeName,
-      selectedSeason
-    });
-    
     // Scroll to the most recently watched episode if found
     if (mostRecentEpisodeIndex >= 0) {
       const cardWidth = isTablet ? width * 0.4 + 16 : width * 0.85 + 16;
       const scrollPosition = mostRecentEpisodeIndex * cardWidth;
       
-      console.log('[SeriesContent] Scrolling to episode:', {
-        index: mostRecentEpisodeIndex,
-        cardWidth,
-        scrollPosition,
-        episodeName: mostRecentEpisodeName
-      });
-      
       setTimeout(() => {
-        episodeScrollViewRef.current?.scrollTo({
-          x: scrollPosition,
-          animated: true
-        });
+        if (episodeScrollViewRef.current && typeof (episodeScrollViewRef.current as any).scrollToOffset === 'function') {
+          (episodeScrollViewRef.current as any).scrollToOffset({
+            offset: scrollPosition,
+            animated: true
+          });
+        }
       }, 500); // Delay to ensure the season has loaded
     }
   };
@@ -575,18 +557,11 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
         {currentSeasonEpisodes.length > 0 && (
           settings.episodeLayoutStyle === 'horizontal' ? (
             // Horizontal Layout (Netflix-style)
-            <ScrollView 
-              ref={episodeScrollViewRef}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.episodeList}
-              contentContainerStyle={styles.episodeListContentHorizontal}
-              decelerationRate="fast"
-              snapToInterval={isTablet ? width * 0.4 + 16 : width * 0.85 + 16}
-              snapToAlignment="start"
-            >
-              {currentSeasonEpisodes.map((episode, index) => (
-                <Animated.View 
+            <FlatList
+              ref={episodeScrollViewRef as React.RefObject<FlatList<any>>}
+              data={currentSeasonEpisodes}
+              renderItem={({ item: episode, index }) => (
+                <Animated.View
                   key={episode.id}
                   entering={FadeIn.duration(300).delay(100 + index * 30)}
                   style={[
@@ -596,40 +571,58 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                 >
                   {renderHorizontalEpisodeCard(episode)}
                 </Animated.View>
-              ))}
-            </ScrollView>
-          ) : (
+              )}
+              keyExtractor={episode => episode.id.toString()}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.episodeListContentHorizontal}
+              decelerationRate="fast"
+              snapToInterval={isTablet ? width * 0.4 + 16 : width * 0.85 + 16}
+              snapToAlignment="start"
+              initialNumToRender={3}
+              maxToRenderPerBatch={3}
+              windowSize={5}
+            />
+          ) :
             // Vertical Layout (Traditional)
-            <ScrollView 
-              style={styles.episodeList}
-              contentContainerStyle={[
-                styles.episodeListContentVertical,
-                isTablet && styles.episodeListContentVerticalTablet
-              ]}
-            >
-              {isTablet ? (
-                <View style={styles.episodeGridVertical}>
-                  {currentSeasonEpisodes.map((episode, index) => (
-                    <Animated.View 
-                      key={episode.id}
-                      entering={FadeIn.duration(300).delay(100 + index * 30)}
-                    >
-                      {renderVerticalEpisodeCard(episode)}
-                    </Animated.View>
-                  ))}
-                </View>
-              ) : (
-                currentSeasonEpisodes.map((episode, index) => (
-                  <Animated.View 
+            isTablet ? (
+              <FlatList
+                data={currentSeasonEpisodes}
+                renderItem={({ item: episode, index }) => (
+                  <Animated.View
                     key={episode.id}
                     entering={FadeIn.duration(300).delay(100 + index * 30)}
                   >
                     {renderVerticalEpisodeCard(episode)}
                   </Animated.View>
-                ))
-              )}
-            </ScrollView>
-          )
+                )}
+                keyExtractor={episode => episode.id.toString()}
+                numColumns={2}
+                style={styles.episodeList}
+                contentContainerStyle={styles.episodeListContentVerticalTablet}
+                initialNumToRender={10}
+                maxToRenderPerBatch={10}
+                windowSize={10}
+              />
+            ) : (
+              <FlatList
+                data={currentSeasonEpisodes}
+                renderItem={({ item: episode, index }) => (
+                  <Animated.View
+                    key={episode.id}
+                    entering={FadeIn.duration(300).delay(100 + index * 30)}
+                  >
+                    {renderVerticalEpisodeCard(episode)}
+                  </Animated.View>
+                )}
+                keyExtractor={episode => episode.id.toString()}
+                style={styles.episodeList}
+                contentContainerStyle={styles.episodeListContentVertical}
+                initialNumToRender={10}
+                maxToRenderPerBatch={10}
+                windowSize={10}
+              />
+            )
         )}
       </Animated.View>
     </View>
