@@ -399,7 +399,7 @@ const MetadataScreen: React.FC = () => {
 
                 {type === 'series' ? (
                   <SeriesContent
-                    episodes={episodes}
+                    episodes={Object.values(groupedEpisodes).flat()}
                     selectedSeason={selectedSeason}
                     loadingSeasons={loadingSeasons}
                     onSeasonChange={handleSeasonChangeWithHaptics}

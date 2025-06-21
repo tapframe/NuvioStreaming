@@ -45,6 +45,8 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   // Add refs for the scroll views
   const seasonScrollViewRef = useRef<ScrollView | null>(null);
   const episodeScrollViewRef = useRef<ScrollView | null>(null);
+  
+
 
   const loadEpisodesProgress = async () => {
     if (!metadata?.id) return;
@@ -166,6 +168,8 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
     }
   }, [selectedSeason, episodeProgress, settings.episodeLayoutStyle, groupedEpisodes]);
 
+
+
   if (loadingSeasons) {
     return (
       <View style={styles.centeredContainer}>
@@ -185,10 +189,11 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   }
 
   const renderSeasonSelector = () => {
+    // Show selector if we have grouped episodes data or can derive from episodes
     if (!groupedEpisodes || Object.keys(groupedEpisodes).length <= 1) {
       return null;
     }
-
+    
     const seasons = Object.keys(groupedEpisodes).map(Number).sort((a, b) => a - b);
     
     return (
@@ -229,6 +234,12 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                   {selectedSeason === season && (
                     <View style={[styles.selectedSeasonIndicator, { backgroundColor: currentTheme.colors.primary }]} />
                   )}
+                  {/* Show episode count badge, including when there are no episodes */}
+                  <View style={[styles.episodeCountBadge, { backgroundColor: currentTheme.colors.elevation2 }]}>
+                    <Text style={[styles.episodeCountText, { color: currentTheme.colors.textMuted }]}>
+                      {seasonEpisodes.length} ep{seasonEpisodes.length !== 1 ? 's' : ''}
+                    </Text>
+                  </View>
                 </View>
                 <Text 
                   style={[
@@ -544,65 +555,81 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
         entering={FadeIn.duration(300).delay(100)}
       >
         <Text style={[styles.sectionTitle, { color: currentTheme.colors.highEmphasis }]}>
-          {episodes.length} {episodes.length === 1 ? 'Episode' : 'Episodes'}
+          {currentSeasonEpisodes.length} {currentSeasonEpisodes.length === 1 ? 'Episode' : 'Episodes'}
         </Text>
         
-        {settings.episodeLayoutStyle === 'horizontal' ? (
-          // Horizontal Layout (Netflix-style)
-          <ScrollView 
-            ref={episodeScrollViewRef}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.episodeList}
-            contentContainerStyle={styles.episodeListContentHorizontal}
-            decelerationRate="fast"
-            snapToInterval={isTablet ? width * 0.4 + 16 : width * 0.85 + 16}
-            snapToAlignment="start"
-          >
-            {currentSeasonEpisodes.map((episode, index) => (
-              <Animated.View 
-                key={episode.id}
-                entering={FadeIn.duration(300).delay(100 + index * 30)}
-                style={[
-                  styles.episodeCardWrapperHorizontal,
-                  isTablet && styles.episodeCardWrapperHorizontalTablet
-                ]}
-              >
-                {renderHorizontalEpisodeCard(episode)}
-              </Animated.View>
-            ))}
-          </ScrollView>
-        ) : (
-          // Vertical Layout (Traditional)
-          <ScrollView 
-            style={styles.episodeList}
-            contentContainerStyle={[
-              styles.episodeListContentVertical,
-              isTablet && styles.episodeListContentVerticalTablet
-            ]}
-          >
-            {isTablet ? (
-              <View style={styles.episodeGridVertical}>
-                {currentSeasonEpisodes.map((episode, index) => (
+        {/* Show message when no episodes are available for selected season */}
+        {currentSeasonEpisodes.length === 0 && (
+          <View style={styles.centeredContainer}>
+            <MaterialIcons name="schedule" size={48} color={currentTheme.colors.textMuted} />
+            <Text style={[styles.centeredText, { color: currentTheme.colors.text }]}>
+              No episodes available for Season {selectedSeason}
+            </Text>
+            <Text style={[styles.centeredSubText, { color: currentTheme.colors.textMuted }]}>
+              Episodes may not be released yet
+            </Text>
+          </View>
+        )}
+        
+        {/* Only render episode list if there are episodes */}
+        {currentSeasonEpisodes.length > 0 && (
+          settings.episodeLayoutStyle === 'horizontal' ? (
+            // Horizontal Layout (Netflix-style)
+            <ScrollView 
+              ref={episodeScrollViewRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.episodeList}
+              contentContainerStyle={styles.episodeListContentHorizontal}
+              decelerationRate="fast"
+              snapToInterval={isTablet ? width * 0.4 + 16 : width * 0.85 + 16}
+              snapToAlignment="start"
+            >
+              {currentSeasonEpisodes.map((episode, index) => (
+                <Animated.View 
+                  key={episode.id}
+                  entering={FadeIn.duration(300).delay(100 + index * 30)}
+                  style={[
+                    styles.episodeCardWrapperHorizontal,
+                    isTablet && styles.episodeCardWrapperHorizontalTablet
+                  ]}
+                >
+                  {renderHorizontalEpisodeCard(episode)}
+                </Animated.View>
+              ))}
+            </ScrollView>
+          ) : (
+            // Vertical Layout (Traditional)
+            <ScrollView 
+              style={styles.episodeList}
+              contentContainerStyle={[
+                styles.episodeListContentVertical,
+                isTablet && styles.episodeListContentVerticalTablet
+              ]}
+            >
+              {isTablet ? (
+                <View style={styles.episodeGridVertical}>
+                  {currentSeasonEpisodes.map((episode, index) => (
+                    <Animated.View 
+                      key={episode.id}
+                      entering={FadeIn.duration(300).delay(100 + index * 30)}
+                    >
+                      {renderVerticalEpisodeCard(episode)}
+                    </Animated.View>
+                  ))}
+                </View>
+              ) : (
+                currentSeasonEpisodes.map((episode, index) => (
                   <Animated.View 
                     key={episode.id}
                     entering={FadeIn.duration(300).delay(100 + index * 30)}
                   >
                     {renderVerticalEpisodeCard(episode)}
                   </Animated.View>
-                ))}
-              </View>
-            ) : (
-              currentSeasonEpisodes.map((episode, index) => (
-                <Animated.View 
-                  key={episode.id}
-                  entering={FadeIn.duration(300).delay(100 + index * 30)}
-                >
-                  {renderVerticalEpisodeCard(episode)}
-                </Animated.View>
-              ))
-            )}
-          </ScrollView>
+                ))
+              )}
+            </ScrollView>
+          )
         )}
       </Animated.View>
     </View>
@@ -624,6 +651,12 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 16,
     textAlign: 'center',
+  },
+  centeredSubText: {
+    marginTop: 8,
+    fontSize: 14,
+    textAlign: 'center',
+    opacity: 0.8,
   },
   sectionTitle: {
     fontSize: 20,
@@ -962,5 +995,19 @@ const styles = StyleSheet.create({
   },
   selectedSeasonButtonText: {
     fontWeight: '700',
+  },
+  episodeCountBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  episodeCountText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
 }); 
