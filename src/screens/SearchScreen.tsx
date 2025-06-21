@@ -35,7 +35,6 @@ import Animated, {
   interpolate,
   withSpring,
   withDelay,
-  ZoomIn
 } from 'react-native-reanimated';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { logger } from '../utils/logger';
@@ -445,7 +444,7 @@ const SearchScreen = () => {
         onPress={() => {
           navigation.navigate('Metadata', { id: item.id, type: item.type });
         }}
-        entering={FadeIn.duration(500).delay(index * 100)}
+        entering={FadeIn.duration(300).delay(index * 50)}
         activeOpacity={0.7}
       >
         <View style={[styles.horizontalItemPosterContainer, { 
@@ -650,7 +649,7 @@ const SearchScreen = () => {
               {seriesResults.length > 0 && (
                 <Animated.View 
                   style={styles.carouselContainer}
-                  entering={FadeIn.duration(300).delay(100)}
+                  entering={FadeIn.duration(300).delay(50)}
                 >
                   <Text style={[styles.carouselTitle, { color: currentTheme.colors.white }]}>
                     TV Shows ({seriesResults.length})

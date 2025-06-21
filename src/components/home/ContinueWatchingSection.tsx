@@ -77,10 +77,20 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   const appState = useRef(AppState.currentState);
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Use a state to track if a background refresh is in progress
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   // Modified loadContinueWatching to be more efficient
-  const loadContinueWatching = useCallback(async () => {
-    try {
+  const loadContinueWatching = useCallback(async (isBackgroundRefresh = false) => {
+    // Prevent multiple concurrent refreshes
+    if (isRefreshing) return;
+
+    if (!isBackgroundRefresh) {
       setLoading(true);
+    }
+    setIsRefreshing(true);
+
+    try {
       const allProgress = await storageService.getAllWatchProgress();
       
       if (Object.keys(allProgress).length === 0) {
@@ -187,16 +197,15 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       // Sort by last updated time (most recent first)
       progressItems.sort((a, b) => b.lastUpdated - a.lastUpdated);
       
-      // Limit to 10 items
-      const finalItems = progressItems.slice(0, 10);
-      
-      setContinueWatchingItems(finalItems);
+      // Show all continue watching items (no limit)
+      setContinueWatchingItems(progressItems);
     } catch (error) {
       logger.error('Failed to load continue watching items:', error);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
-  }, []);
+  }, [isRefreshing]);
 
   // Function to handle app state changes
   const handleAppStateChange = useCallback((nextAppState: AppStateStatus) => {
@@ -204,8 +213,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       appState.current.match(/inactive|background/) &&
       nextAppState === 'active'
     ) {
-      // App has come to the foreground - refresh data
-      loadContinueWatching();
+      // App has come to the foreground - trigger a background refresh
+      loadContinueWatching(true);
     }
     appState.current = nextAppState;
   }, [loadContinueWatching]);
@@ -222,8 +231,9 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         clearTimeout(refreshTimerRef.current);
       }
       refreshTimerRef.current = setTimeout(() => {
-        loadContinueWatching();
-      }, 300);
+        // Trigger a background refresh
+        loadContinueWatching(true);
+      }, 500); // Increased debounce time slightly
     };
 
     // Try to set up a custom event listener or use a timer as fallback
@@ -238,7 +248,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       };
     } else {
       // Fallback: poll for updates every 30 seconds
-      const intervalId = setInterval(loadContinueWatching, 30000);
+      const intervalId = setInterval(() => loadContinueWatching(true), 30000);
       return () => {
         subscription.remove();
         clearInterval(intervalId);
@@ -254,13 +264,12 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     loadContinueWatching();
   }, [loadContinueWatching]);
 
-  // Properly expose the refresh method
+  // Expose the refresh function via the ref
   React.useImperativeHandle(ref, () => ({
     refresh: async () => {
-      await loadContinueWatching();
-      // Return whether there are items to help parent determine visibility
-      const hasItems = continueWatchingItems.length > 0;
-      return hasItems;
+      // Allow manual refresh to show loading indicator
+      await loadContinueWatching(false);
+      return true;
     }
   }));
 
@@ -274,16 +283,11 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   }
 
   return (
-    <Animated.View entering={FadeIn.duration(400).delay(250)} style={styles.container}>
+    <Animated.View entering={FadeIn.duration(300).delay(150)} style={styles.container}>
       <View style={styles.header}>
         <View style={styles.titleContainer}>
-          <Text style={[styles.title, { color: currentTheme.colors.highEmphasis }]}>Continue Watching</Text>
-          <LinearGradient
-            colors={[currentTheme.colors.primary, currentTheme.colors.secondary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.titleUnderline}
-          />
+          <Text style={[styles.title, { color: currentTheme.colors.text }]}>Continue Watching</Text>
+          <View style={[styles.titleUnderline, { backgroundColor: currentTheme.colors.primary }]} />
         </View>
       </View>
       
@@ -302,11 +306,14 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
             {/* Poster Image */}
             <View style={styles.posterContainer}>
               <ExpoImage
-                source={{ uri: item.poster }}
-                style={styles.widePoster}
+                source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
+                style={styles.continueWatchingPoster}
                 contentFit="cover"
+                cachePolicy="memory"
                 transition={200}
-                cachePolicy="memory-disk"
+                placeholder={{ uri: 'https://via.placeholder.com/300x450' }}
+                placeholderContentFit="cover"
+                recyclingKey={item.id}
               />
             </View>
 
@@ -386,7 +393,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 24,
+    marginBottom: 28,
     paddingTop: 0,
     marginTop: 12,
   },
@@ -395,15 +402,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   titleContainer: {
     position: 'relative',
   },
   title: {
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: 0.3,
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: 0.5,
     marginBottom: 4,
   },
   titleUnderline: {
@@ -411,8 +418,8 @@ const styles = StyleSheet.create({
     bottom: -2,
     left: 0,
     width: 40,
-    height: 2,
-    borderRadius: 1,
+    height: 3,
+    borderRadius: 2,
     opacity: 0.8,
   },
   wideList: {
@@ -436,7 +443,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: '100%',
   },
-  widePoster: {
+  continueWatchingPoster: {
     width: '100%',
     height: '100%',
     borderTopLeftRadius: 12,

@@ -95,7 +95,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const [selectedAudioTrack, setSelectedAudioTrack] = useState<number | null>(null);
   const [textTracks, setTextTracks] = useState<TextTrack[]>([]);
   const [selectedTextTrack, setSelectedTextTrack] = useState<number>(-1);
-  const [resizeMode, setResizeMode] = useState<ResizeModeType>('stretch');
+  const [resizeMode, setResizeMode] = useState<ResizeModeType>('contain');
   const [buffered, setBuffered] = useState(0);
   const [seekTime, setSeekTime] = useState<number | null>(null);
   const videoRef = useRef<VideoRef>(null);
@@ -106,8 +106,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const [isInitialSeekComplete, setIsInitialSeekComplete] = useState(false);
   const [showResumeOverlay, setShowResumeOverlay] = useState(false);
   const [resumePosition, setResumePosition] = useState<number | null>(null);
-  const [rememberChoice, setRememberChoice] = useState(false);
-  const [resumePreference, setResumePreference] = useState<string | null>(null);
+  const [savedDuration, setSavedDuration] = useState<number | null>(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const [isOpeningAnimationComplete, setIsOpeningAnimationComplete] = useState(false);
   const openingFadeAnim = useRef(new Animated.Value(0)).current;
@@ -152,6 +151,15 @@ const AndroidVideoPlayer: React.FC = () => {
   const [currentStreamProvider, setCurrentStreamProvider] = useState<string | undefined>(streamProvider);
   const [currentStreamName, setCurrentStreamName] = useState<string | undefined>(streamName);
   const isMounted = useRef(true);
+  const controlsTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  const hideControls = () => {
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => setShowControls(false));
+  };
 
   const calculateVideoStyles = (videoWidth: number, videoHeight: number, screenWidth: number, screenHeight: number) => {
     return {
@@ -270,21 +278,10 @@ const AndroidVideoPlayer: React.FC = () => {
             
             if (progressPercent < 85) {
               setResumePosition(savedProgress.currentTime);
-              logger.log(`[AndroidVideoPlayer] Set resume position to: ${savedProgress.currentTime}`);
-              
-              const pref = await AsyncStorage.getItem(RESUME_PREF_KEY);
-              logger.log(`[AndroidVideoPlayer] Resume preference: ${pref}`);
-              
-              if (pref === RESUME_PREF.ALWAYS_RESUME) {
-                setInitialPosition(savedProgress.currentTime);
-                logger.log(`[AndroidVideoPlayer] Auto-resuming due to preference`);
-              } else if (pref === RESUME_PREF.ALWAYS_START_OVER) {
-                setInitialPosition(0);
-                logger.log(`[AndroidVideoPlayer] Auto-starting over due to preference`);
-              } else {
-                setShowResumeOverlay(true);
-                logger.log(`[AndroidVideoPlayer] Showing resume overlay`);
-              }
+              setSavedDuration(savedProgress.duration);
+              logger.log(`[AndroidVideoPlayer] Set resume position to: ${savedProgress.currentTime} of ${savedProgress.duration}`);
+              setShowResumeOverlay(true);
+              logger.log(`[AndroidVideoPlayer] Showing resume overlay`);
             } else {
               logger.log(`[AndroidVideoPlayer] Progress too high (${progressPercent.toFixed(1)}%), not showing resume overlay`);
             }
@@ -348,22 +345,25 @@ const AndroidVideoPlayer: React.FC = () => {
   const seekToTime = (timeInSeconds: number) => {
     if (videoRef.current && duration > 0 && !isSeeking.current) {
       if (DEBUG_MODE) {
-        logger.log(`[AndroidVideoPlayer] Seeking to ${timeInSeconds.toFixed(2)}s`);
+        logger.log(`[AndroidVideoPlayer] Seeking to ${timeInSeconds.toFixed(2)}s out of ${duration.toFixed(2)}s`);
       }
       
       isSeeking.current = true;
       setSeekTime(timeInSeconds);
       
-      // Clear seek state after seek
+      // Clear seek state after seek with longer timeout
       setTimeout(() => {
         if (isMounted.current) {
           setSeekTime(null);
           isSeeking.current = false;
+          if (DEBUG_MODE) {
+            logger.log(`[AndroidVideoPlayer] Seek completed to ${timeInSeconds.toFixed(2)}s`);
         }
-      }, 100);
+        }
+      }, 500);
     } else {
       if (DEBUG_MODE) {
-        logger.error('[AndroidVideoPlayer] Seek failed: Player not ready, duration is zero, or already seeking.');
+        logger.error(`[AndroidVideoPlayer] Seek failed: videoRef=${!!videoRef.current}, duration=${duration}, seeking=${isSeeking.current}`);
       }
     }
   };
@@ -441,6 +441,17 @@ const AndroidVideoPlayer: React.FC = () => {
       const videoDuration = data.duration;
       if (data.duration > 0) {
         setDuration(videoDuration);
+        
+        // Store the actual duration for future reference and update existing progress
+        if (id && type) {
+          storageService.setContentDuration(id, type, videoDuration, episodeId);
+          storageService.updateProgressDuration(id, type, videoDuration, episodeId);
+          
+          // Update the saved duration for resume overlay if it was using an estimate
+          if (savedDuration && Math.abs(savedDuration - videoDuration) > 60) {
+            setSavedDuration(videoDuration);
+          }
+        }
       }
       
       // Set aspect ratio from video dimensions
@@ -489,6 +500,7 @@ const AndroidVideoPlayer: React.FC = () => {
         }, 1000);
       }
       completeOpeningAnimation();
+      controlsTimeout.current = setTimeout(hideControls, 5000);
     }
   };
 
@@ -500,13 +512,14 @@ const AndroidVideoPlayer: React.FC = () => {
   };
 
   const cycleAspectRatio = () => {
-    const newZoom = zoomScale === 1.1 ? 1 : 1.1;
-    setZoomScale(newZoom);
-    setZoomTranslateX(0);
-    setZoomTranslateY(0);
-    setLastZoomScale(newZoom);
-    setLastTranslateX(0);
-    setLastTranslateY(0);
+    // Android: cycle through native resize modes
+    const resizeModes: ResizeModeType[] = ['contain', 'cover', 'stretch', 'none'];
+    const currentIndex = resizeModes.indexOf(resizeMode);
+    const nextIndex = (currentIndex + 1) % resizeModes.length;
+    setResizeMode(resizeModes[nextIndex]);
+    if (DEBUG_MODE) {
+      logger.log(`[AndroidVideoPlayer] Resize mode changed to: ${resizeModes[nextIndex]}`);
+    }
   };
 
   const enableImmersiveMode = () => {
@@ -565,94 +578,41 @@ const AndroidVideoPlayer: React.FC = () => {
       });
     }, 100);
   };
-    
-  useEffect(() => {
-    const loadResumePreference = async () => {
-      try {
-        logger.log(`[AndroidVideoPlayer] Loading resume preference, resumePosition=${resumePosition}`);
-        const pref = await AsyncStorage.getItem(RESUME_PREF_KEY);
-        logger.log(`[AndroidVideoPlayer] Resume preference loaded: ${pref}`);
-        
-        if (pref) {
-          setResumePreference(pref);
-          if (pref === RESUME_PREF.ALWAYS_RESUME && resumePosition !== null) {
-            logger.log(`[AndroidVideoPlayer] Auto-resuming due to preference`);
-            setShowResumeOverlay(false);
-            setInitialPosition(resumePosition);
-          } else if (pref === RESUME_PREF.ALWAYS_START_OVER) {
-            logger.log(`[AndroidVideoPlayer] Auto-starting over due to preference`);
-            setShowResumeOverlay(false);
-            setInitialPosition(0);
-          }
-          // Don't override overlay if no specific preference or preference doesn't match
-        } else {
-          logger.log(`[AndroidVideoPlayer] No resume preference found, keeping overlay state`);
-        }
-      } catch (error) {
-        logger.error('[AndroidVideoPlayer] Error loading resume preference:', error);
-      }
-    };
-    loadResumePreference();
-  }, [resumePosition]);
-
-  const resetResumePreference = async () => {
-    try {
-      await AsyncStorage.removeItem(RESUME_PREF_KEY);
-      setResumePreference(null);
-    } catch (error) {
-      logger.error('[AndroidVideoPlayer] Error resetting resume preference:', error);
-    }
-  };
 
   const handleResume = async () => {
-    if (resumePosition !== null && videoRef.current) {
-      if (rememberChoice) {
-        try {
-          await AsyncStorage.setItem(RESUME_PREF_KEY, RESUME_PREF.ALWAYS_RESUME);
-        } catch (error) {
-          logger.error('[AndroidVideoPlayer] Error saving resume preference:', error);
-        }
-      }
-      setInitialPosition(resumePosition);
-      setShowResumeOverlay(false);
-      setTimeout(() => {
-        if (videoRef.current) {
-          seekToTime(resumePosition);
-        }
-      }, 500);
+    if (resumePosition) {
+      seekToTime(resumePosition);
     }
+    setShowResumeOverlay(false);
   };
 
   const handleStartFromBeginning = async () => {
-    if (rememberChoice) {
-      try {
-        await AsyncStorage.setItem(RESUME_PREF_KEY, RESUME_PREF.ALWAYS_START_OVER);
-      } catch (error) {
-        logger.error('[AndroidVideoPlayer] Error saving resume preference:', error);
-      }
-    }
+    seekToTime(0);
     setShowResumeOverlay(false);
-    setInitialPosition(0);
-    if (videoRef.current) {
-      seekToTime(0);
-      setCurrentTime(0);
-    }
   };
 
   const toggleControls = () => {
-    setShowControls(previousState => !previousState);
+    if (controlsTimeout.current) {
+      clearTimeout(controlsTimeout.current);
+      controlsTimeout.current = null;
+    }
+    
+    setShowControls(prevShowControls => {
+      const newShowControls = !prevShowControls;
+      Animated.timing(fadeAnim, {
+        toValue: newShowControls ? 1 : 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+      if (newShowControls) {
+        controlsTimeout.current = setTimeout(hideControls, 5000);
+      }
+      return newShowControls;
+    });
   };
 
-  useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: showControls ? 1 : 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  }, [showControls]);
-
   const handleError = (error: any) => {
-    logger.error('[AndroidVideoPlayer] Playback Error:', error);
+    logger.error('AndroidVideoPlayer error: ', error);
   };
 
   const onBuffer = (data: any) => {
@@ -1046,6 +1006,7 @@ const AndroidVideoPlayer: React.FC = () => {
             currentTime={currentTime}
             duration={duration}
             zoomScale={zoomScale}
+            currentResizeMode={resizeMode}
             vlcAudioTracks={rnVideoAudioTracks}
             selectedAudioTrack={selectedAudioTrack}
             availableStreams={availableStreams}
@@ -1075,14 +1036,10 @@ const AndroidVideoPlayer: React.FC = () => {
           <ResumeOverlay
             showResumeOverlay={showResumeOverlay}
             resumePosition={resumePosition}
-            duration={duration}
-            title={title}
+            duration={savedDuration || duration}
+            title={episodeTitle || title}
             season={season}
             episode={episode}
-            rememberChoice={rememberChoice}
-            setRememberChoice={setRememberChoice}
-            resumePreference={resumePreference}
-            resetResumePreference={resetResumePreference}
             handleResume={handleResume}
             handleStartFromBeginning={handleStartFromBeginning}
           />

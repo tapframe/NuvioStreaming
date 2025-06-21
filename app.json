@@ -24,7 +24,9 @@
         ],
         "NSLocalNetworkUsageDescription": "App uses the local network to discover and connect to devices.",
         "NSMicrophoneUsageDescription": "This app does not require microphone access.",
-        "UIBackgroundModes": ["audio"],
+        "UIBackgroundModes": [
+          "audio"
+        ],
         "LSSupportsOpeningDocumentsInPlace": true,
         "UIFileSharingEnabled": true
       },
@@ -34,8 +36,12 @@
         {
           "name": "Matroska Video",
           "role": "viewer",
-          "utis": ["org.matroska.mkv"],
-          "extensions": ["mkv"]
+          "utis": [
+            "org.matroska.mkv"
+          ],
+          "extensions": [
+            "mkv"
+          ]
         }
       ]
     },
@@ -65,6 +71,16 @@
         "projectId": "909107b8-fe61-45ce-b02f-b02510d306a6"
       }
     },
-    "owner": "nayifleo"
+    "owner": "nayifleo",
+    "plugins": [
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "react-native",
+          "organization": "tapframe"
+        }
+      ]
+    ]
   }
 }

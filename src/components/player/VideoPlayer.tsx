@@ -101,8 +101,7 @@ const VideoPlayer: React.FC = () => {
   const [isInitialSeekComplete, setIsInitialSeekComplete] = useState(false);
   const [showResumeOverlay, setShowResumeOverlay] = useState(false);
   const [resumePosition, setResumePosition] = useState<number | null>(null);
-  const [rememberChoice, setRememberChoice] = useState(false);
-  const [resumePreference, setResumePreference] = useState<string | null>(null);
+  const [savedDuration, setSavedDuration] = useState<number | null>(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const [isOpeningAnimationComplete, setIsOpeningAnimationComplete] = useState(false);
   const openingFadeAnim = useRef(new Animated.Value(0)).current;
@@ -147,6 +146,15 @@ const VideoPlayer: React.FC = () => {
   const [currentStreamProvider, setCurrentStreamProvider] = useState<string | undefined>(streamProvider);
   const [currentStreamName, setCurrentStreamName] = useState<string | undefined>(streamName);
   const isMounted = useRef(true);
+  const controlsTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  const hideControls = () => {
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => setShowControls(false));
+  };
 
   const calculateVideoStyles = (videoWidth: number, videoHeight: number, screenWidth: number, screenHeight: number) => {
     return {
@@ -265,27 +273,10 @@ const VideoPlayer: React.FC = () => {
             
             if (progressPercent < 85) {
               setResumePosition(savedProgress.currentTime);
-              logger.log(`[VideoPlayer] Set resume position to: ${savedProgress.currentTime}`);
-              
-              const pref = await AsyncStorage.getItem(RESUME_PREF_KEY);
-              logger.log(`[VideoPlayer] Resume preference: ${pref}`);
-              
-              // TEMPORARY: Clear the preference to test overlay
-              if (pref) {
-                await AsyncStorage.removeItem(RESUME_PREF_KEY);
-                logger.log(`[VideoPlayer] CLEARED resume preference for testing`);
-                setShowResumeOverlay(true);
-                logger.log(`[VideoPlayer] Showing resume overlay after clearing preference`);
-              } else if (pref === RESUME_PREF.ALWAYS_RESUME) {
-                setInitialPosition(savedProgress.currentTime);
-                logger.log(`[VideoPlayer] Auto-resuming due to preference`);
-              } else if (pref === RESUME_PREF.ALWAYS_START_OVER) {
-                setInitialPosition(0);
-                logger.log(`[VideoPlayer] Auto-starting over due to preference`);
-              } else {
-                setShowResumeOverlay(true);
-                logger.log(`[VideoPlayer] Showing resume overlay`);
-              }
+              setSavedDuration(savedProgress.duration);
+              logger.log(`[VideoPlayer] Set resume position to: ${savedProgress.currentTime} of ${savedProgress.duration}`);
+              setShowResumeOverlay(true);
+              logger.log(`[VideoPlayer] Showing resume overlay`);
             } else {
               logger.log(`[VideoPlayer] Progress too high (${progressPercent.toFixed(1)}%), not showing resume overlay`);
             }
@@ -366,7 +357,7 @@ const VideoPlayer: React.FC = () => {
   const seekToTime = (timeInSeconds: number) => {
     if (vlcRef.current && duration > 0 && !isSeeking.current) {
       if (DEBUG_MODE) {
-        logger.log(`[VideoPlayer] Seeking to ${timeInSeconds.toFixed(2)}s`);
+        logger.log(`[VideoPlayer] Seeking to ${timeInSeconds.toFixed(2)}s out of ${duration.toFixed(2)}s`);
       }
       
       isSeeking.current = true;
@@ -381,8 +372,11 @@ const VideoPlayer: React.FC = () => {
         setTimeout(() => {
           if (isMounted.current) {
             isSeeking.current = false;
+            if (DEBUG_MODE) {
+              logger.log(`[VideoPlayer] Android seek completed to ${timeInSeconds.toFixed(2)}s`);
           }
-        }, 300);
+          }
+        }, 500);
       } else {
         // iOS fallback - use seek prop
         const position = timeInSeconds / duration;
@@ -392,12 +386,15 @@ const VideoPlayer: React.FC = () => {
           if (isMounted.current) {
             setSeekPosition(null);
             isSeeking.current = false;
+            if (DEBUG_MODE) {
+              logger.log(`[VideoPlayer] iOS seek completed to ${timeInSeconds.toFixed(2)}s`);
+            }
           }
         }, 500);
       }
     } else {
       if (DEBUG_MODE) {
-        logger.error('[VideoPlayer] Seek failed: Player not ready, duration is zero, or already seeking.');
+        logger.error(`[VideoPlayer] Seek failed: vlcRef=${!!vlcRef.current}, duration=${duration}, seeking=${isSeeking.current}`);
       }
     }
   };
@@ -468,6 +465,17 @@ const VideoPlayer: React.FC = () => {
       const videoDuration = data.duration / 1000;
       if (data.duration > 0) {
         setDuration(videoDuration);
+        
+        // Store the actual duration for future reference and update existing progress
+        if (id && type) {
+          storageService.setContentDuration(id, type, videoDuration, episodeId);
+          storageService.updateProgressDuration(id, type, videoDuration, episodeId);
+          
+          // Update the saved duration for resume overlay if it was using an estimate
+          if (savedDuration && Math.abs(savedDuration - videoDuration) > 60) {
+            setSavedDuration(videoDuration);
+          }
+        }
       }
       setVideoAspectRatio(data.videoSize.width / data.videoSize.height);
 
@@ -499,6 +507,7 @@ const VideoPlayer: React.FC = () => {
         }, 1000);
       }
       completeOpeningAnimation();
+      controlsTimeout.current = setTimeout(hideControls, 5000);
     }
   };
 
@@ -583,91 +592,38 @@ const VideoPlayer: React.FC = () => {
       });
     }, 100);
   };
-    
-  useEffect(() => {
-    const loadResumePreference = async () => {
-      try {
-        logger.log(`[VideoPlayer] Loading resume preference, resumePosition=${resumePosition}`);
-        const pref = await AsyncStorage.getItem(RESUME_PREF_KEY);
-        logger.log(`[VideoPlayer] Resume preference loaded: ${pref}`);
-        
-        if (pref) {
-          setResumePreference(pref);
-          if (pref === RESUME_PREF.ALWAYS_RESUME && resumePosition !== null) {
-            logger.log(`[VideoPlayer] Auto-resuming due to preference`);
-            setShowResumeOverlay(false);
-            setInitialPosition(resumePosition);
-          } else if (pref === RESUME_PREF.ALWAYS_START_OVER) {
-            logger.log(`[VideoPlayer] Auto-starting over due to preference`);
-            setShowResumeOverlay(false);
-            setInitialPosition(0);
-          }
-          // Don't override overlay if no specific preference or preference doesn't match
-        } else {
-          logger.log(`[VideoPlayer] No resume preference found, keeping overlay state`);
-        }
-      } catch (error) {
-        logger.error('[VideoPlayer] Error loading resume preference:', error);
-      }
-    };
-    loadResumePreference();
-  }, [resumePosition]);
-
-  const resetResumePreference = async () => {
-    try {
-      await AsyncStorage.removeItem(RESUME_PREF_KEY);
-      setResumePreference(null);
-    } catch (error) {
-      logger.error('[VideoPlayer] Error resetting resume preference:', error);
-    }
-  };
 
   const handleResume = async () => {
-    if (resumePosition !== null && vlcRef.current) {
-      if (rememberChoice) {
-        try {
-          await AsyncStorage.setItem(RESUME_PREF_KEY, RESUME_PREF.ALWAYS_RESUME);
-        } catch (error) {
-          logger.error('[VideoPlayer] Error saving resume preference:', error);
-        }
-      }
-      setInitialPosition(resumePosition);
-      setShowResumeOverlay(false);
-      setTimeout(() => {
-        if (vlcRef.current) {
-          seekToTime(resumePosition);
-        }
-      }, 500);
+    if (resumePosition) {
+      seekToTime(resumePosition);
     }
+    setShowResumeOverlay(false);
   };
 
   const handleStartFromBeginning = async () => {
-    if (rememberChoice) {
-      try {
-        await AsyncStorage.setItem(RESUME_PREF_KEY, RESUME_PREF.ALWAYS_START_OVER);
-      } catch (error) {
-        logger.error('[VideoPlayer] Error saving resume preference:', error);
-      }
-    }
+    seekToTime(0);
     setShowResumeOverlay(false);
-    setInitialPosition(0);
-    if (vlcRef.current) {
-      seekToTime(0);
-      setCurrentTime(0);
-    }
   };
 
   const toggleControls = () => {
-    setShowControls(previousState => !previousState);
+    if (controlsTimeout.current) {
+      clearTimeout(controlsTimeout.current);
+      controlsTimeout.current = null;
+    }
+    
+    setShowControls(prevShowControls => {
+      const newShowControls = !prevShowControls;
+      Animated.timing(fadeAnim, {
+        toValue: newShowControls ? 1 : 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+      if (newShowControls) {
+        controlsTimeout.current = setTimeout(hideControls, 5000);
+      }
+      return newShowControls;
+    });
   };
-
-  useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: showControls ? 1 : 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  }, [showControls]);
 
   const handleError = (error: any) => {
     logger.error('[VideoPlayer] Playback Error:', error);
@@ -1092,14 +1048,10 @@ const VideoPlayer: React.FC = () => {
           <ResumeOverlay
             showResumeOverlay={showResumeOverlay}
             resumePosition={resumePosition}
-            duration={duration}
-            title={title}
+            duration={savedDuration || duration}
+            title={episodeTitle || title}
             season={season}
             episode={episode}
-            rememberChoice={rememberChoice}
-            setRememberChoice={setRememberChoice}
-            resumePreference={resumePreference}
-            resetResumePreference={resetResumePreference}
             handleResume={handleResume}
             handleStartFromBeginning={handleStartFromBeginning}
           />

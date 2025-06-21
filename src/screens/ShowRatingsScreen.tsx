@@ -481,7 +481,7 @@ const ShowRatingsScreen = ({ route }: Props) => {
                             <Animated.View 
                               key={`s${season.season_number}`} 
                               style={styles.ratingColumn}
-                              entering={SlideInRight.delay(season.season_number * 50).duration(200)}
+                              entering={FadeIn.delay(season.season_number * 20).duration(200)}
                             >
                               <Text style={[styles.headerText, { color: colors.white }]}>S{season.season_number}</Text>
                             </Animated.View>
@@ -507,7 +507,7 @@ const ShowRatingsScreen = ({ route }: Props) => {
                               <Animated.View 
                                 key={`s${season.season_number}e${episodeIndex + 1}`} 
                                 style={styles.ratingColumn}
-                                entering={SlideInRight.delay((season.season_number + episodeIndex) * 10).duration(200)}
+                                entering={FadeIn.delay((season.season_number + episodeIndex) * 5).duration(200)}
                               >
                                 {season.episodes[episodeIndex] && 
                                   <RatingCell

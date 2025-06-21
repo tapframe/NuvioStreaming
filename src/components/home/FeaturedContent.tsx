@@ -99,16 +99,35 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
 
   // Preload the image
   const preloadImage = async (url: string): Promise<boolean> => {
-    if (!url) return false;
+    // Skip if already cached to prevent redundant prefetch
     if (imageCache[url]) return true;
     
     try {
-      // For Metahub logos, only do validation if enabled
-      // Note: Temporarily disable metahub validation until fixed
-      if (false && url.includes('metahub.space')) {
+      // Basic URL validation
+      if (!url || typeof url !== 'string') return false;
+      
+      // Check if URL appears to be a valid image URL
+      const urlLower = url.toLowerCase();
+      const hasImageExtension = /\.(jpg|jpeg|png|webp|svg)(\?.*)?$/i.test(url);
+      const isImageService = urlLower.includes('image') || urlLower.includes('poster') || urlLower.includes('banner') || urlLower.includes('logo');
+      
+      if (!hasImageExtension && !isImageService) {
         try {
-          const isValid = await isValidMetahubLogo(url);
-          if (!isValid) {
+          // For URLs without clear image extensions, do a quick HEAD request
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3000);
+          
+          const response = await fetch(url, { 
+            method: 'HEAD',
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
+          
+          if (!response.ok) return false;
+          
+          const contentType = response.headers.get('content-type');
+          if (!contentType || !contentType.startsWith('image/')) {
             return false;
           }
         } catch (validationError) {
@@ -117,10 +136,22 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
       }
       
       // Always attempt to prefetch the image regardless of format validation
-      await ExpoImage.prefetch(url);
+      // Add timeout and retry logic for prefetch
+      const prefetchWithTimeout = () => {
+        return Promise.race([
+          ExpoImage.prefetch(url),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Prefetch timeout')), 5000)
+          )
+        ]);
+      };
+      
+      await prefetchWithTimeout();
       imageCache[url] = true;
       return true;
     } catch (error) {
+      // Clear any partial cache entry on error
+      delete imageCache[url];
       return false;
     }
   };
@@ -355,7 +386,6 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
           }));
         } else {
           setLogoLoadError(true);
-          console.warn(`[FeaturedContent] Logo prefetch failed, falling back to text: ${logoUrl}`);
         }
       }
     };
@@ -363,13 +393,27 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
     loadImages();
   }, [featuredContent?.id, logoUrl]);
 
+  const onLogoLoadError = () => {
+    setLogoLoaded(true); // Treat error as "loaded" to stop spinner
+    setLogoError(true);
+  };
+
+  const handleInfoPress = () => {
+    if (featuredContent) {
+      navigation.navigate('Metadata', {
+        id: featuredContent.id,
+        type: featuredContent.type
+      });
+    }
+  };
+
   if (!featuredContent) {
     return <SkeletonFeatured />;
   }
 
   return (
     <Animated.View
-      entering={FadeIn.duration(800).easing(Easing.out(Easing.cubic))}
+      entering={FadeIn.duration(400).easing(Easing.out(Easing.cubic))}
     >
       <TouchableOpacity 
         activeOpacity={0.95}
@@ -410,12 +454,10 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
                       source={{ uri: logoUrl }} 
                       style={styles.featuredLogo as ImageStyle}
                       contentFit="contain"
-                      cachePolicy="memory-disk"
-                      transition={400}
-                      onError={() => {
-                        console.warn(`[FeaturedContent] Logo failed to load: ${logoUrl}`);
-                        setLogoLoadError(true);
-                      }}
+                      cachePolicy="memory"
+                      transition={300}
+                      recyclingKey={`logo-${featuredContent.id}`}
+                      onError={onLogoLoadError}
                     />
                   </Animated.View>
                 ) : (
@@ -473,14 +515,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
 
                 <TouchableOpacity 
                   style={styles.infoButton as ViewStyle}
-                  onPress={() => {
-                    if (featuredContent) {
-                      navigation.navigate('Metadata', {
-                        id: featuredContent.id,
-                        type: featuredContent.type
-                      });
-                    }
-                  }}
+                  onPress={handleInfoPress}
                   activeOpacity={0.7}
                 >
                   <MaterialIcons name="info-outline" size={24} color={currentTheme.colors.white} />
