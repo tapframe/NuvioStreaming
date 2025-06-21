@@ -10,7 +10,8 @@ import {
   SafeAreaView,
   StatusBar,
   Dimensions,
-  SectionList
+  SectionList,
+  Platform
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -28,6 +29,7 @@ import { tmdbService } from '../services/tmdbService';
 import { logger } from '../utils/logger';
 
 const { width } = Dimensions.get('window');
+const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
 interface CalendarEpisode {
   id: string;
@@ -663,6 +665,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
+    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 12 : 12,
+    borderBottomWidth: 1,
   },
   backButton: {
     padding: 8,

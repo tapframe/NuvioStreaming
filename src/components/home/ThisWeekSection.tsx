@@ -204,15 +204,15 @@ export const ThisWeekSection = () => {
           activeOpacity={0.8}
         >
           <View style={styles.imageContainer}>
-            <Image
-              source={{ uri: imageUrl }}
-              style={styles.poster}
-              contentFit="cover"
+          <Image
+            source={{ uri: imageUrl }}
+            style={styles.poster}
+            contentFit="cover"
               transition={400}
-            />
-            
+          />
+          
                         {/* Enhanced gradient overlay */}
-            <LinearGradient
+          <LinearGradient
               colors={[
                 'transparent', 
                 'transparent',
@@ -220,7 +220,7 @@ export const ThisWeekSection = () => {
                 'rgba(0,0,0,0.8)',
                 'rgba(0,0,0,0.95)'
               ]}
-              style={styles.gradient}
+            style={styles.gradient}
               locations={[0, 0.4, 0.6, 0.8, 1]}
             >
               {/* Content area */}
@@ -232,7 +232,7 @@ export const ThisWeekSection = () => {
                 <Text style={[styles.episodeTitle, { color: 'rgba(255,255,255,0.9)' }]} numberOfLines={2}>
                   {item.title}
                 </Text>
-                
+              
                 {item.overview && (
                   <Text style={[styles.overview, { color: 'rgba(255,255,255,0.8)' }]} numberOfLines={2}>
                     {item.overview}
@@ -243,17 +243,17 @@ export const ThisWeekSection = () => {
                   <Text style={[styles.episodeInfo, { color: 'rgba(255,255,255,0.7)' }]}>
                     S{item.season}:E{item.episode} • 
                   </Text>
-                  <MaterialIcons 
+                  <MaterialIcons
                     name="event" 
                     size={14} 
-                    color={currentTheme.colors.primary} 
+                    color={currentTheme.colors.primary}
                   />
                   <Text style={[styles.releaseDate, { color: currentTheme.colors.primary }]}>
                     {formattedDate}
                   </Text>
                 </View>
-              </View>
-            </LinearGradient>
+            </View>
+          </LinearGradient>
           </View>
         </TouchableOpacity>
       </Animated.View>
@@ -264,7 +264,7 @@ export const ThisWeekSection = () => {
     <Animated.View entering={FadeIn.duration(400)} style={styles.container}>
       <View style={styles.header}>
         <View style={styles.titleContainer}>
-          <Text style={[styles.title, { color: currentTheme.colors.text }]}>This Week</Text>
+        <Text style={[styles.title, { color: currentTheme.colors.text }]}>This Week</Text>
           <View style={[styles.titleUnderline, { backgroundColor: currentTheme.colors.primary }]} />
         </View>
         <TouchableOpacity onPress={handleViewAll} style={styles.viewAllButton}>
