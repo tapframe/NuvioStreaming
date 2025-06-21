@@ -372,7 +372,7 @@ const AndroidVideoPlayer: React.FC = () => {
           isSeeking.current = false;
           if (DEBUG_MODE) {
             logger.log(`[AndroidVideoPlayer] Seek completed to ${timeInSeconds.toFixed(2)}s`);
-          }
+        }
         }
       }, 500);
     } else {
@@ -645,11 +645,11 @@ const AndroidVideoPlayer: React.FC = () => {
       
       // If video is already loaded and ready, seek immediately
       if (isPlayerReady && duration > 0 && videoRef.current) {
-        seekToTime(resumePosition);
+          seekToTime(resumePosition);
       } else {
         // Otherwise, set initial position for when video loads
         setInitialPosition(resumePosition);
-      }
+        }
     }
   };
 
