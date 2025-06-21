@@ -134,10 +134,12 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
       if (selectedIndex !== -1) {
         // Wait a small amount of time for layout to be ready
         setTimeout(() => {
-          seasonScrollViewRef.current?.scrollTo({
-            x: selectedIndex * 116, // 100px width + 16px margin
-            animated: true
-          });
+          if (seasonScrollViewRef.current && typeof (seasonScrollViewRef.current as any).scrollToOffset === 'function') {
+            (seasonScrollViewRef.current as any).scrollToOffset({
+              offset: selectedIndex * 116, // 100px width + 16px margin
+              animated: true
+            });
+          }
         }, 300);
       }
     }
@@ -181,14 +183,17 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
     return (
       <View style={styles.seasonSelectorWrapper}>
         <Text style={[styles.seasonSelectorTitle, { color: currentTheme.colors.highEmphasis }]}>Seasons</Text>
-        <ScrollView 
-          ref={seasonScrollViewRef}
-          horizontal 
+        <FlatList
+          ref={seasonScrollViewRef as React.RefObject<FlatList<any>>}
+          data={seasons}
+          horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.seasonSelectorContainer}
           contentContainerStyle={styles.seasonSelectorContent}
-        >
-          {seasons.map(season => {
+          initialNumToRender={5}
+          maxToRenderPerBatch={5}
+          windowSize={3}
+          renderItem={({ item: season }) => {
             const seasonEpisodes = groupedEpisodes[season] || [];
             let seasonPoster = DEFAULT_PLACEHOLDER;
             if (seasonEpisodes[0]?.season_poster_path) {
@@ -234,8 +239,9 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                 </Text>
               </TouchableOpacity>
             );
-          })}
-        </ScrollView>
+          }}
+          keyExtractor={season => season.toString()}
+        />
       </View>
     );
   };
@@ -583,46 +589,37 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               maxToRenderPerBatch={3}
               windowSize={5}
             />
-          ) :
+          ) : (
             // Vertical Layout (Traditional)
-            isTablet ? (
-              <FlatList
-                data={currentSeasonEpisodes}
-                renderItem={({ item: episode, index }) => (
-                  <Animated.View
+            <View 
+              style={[
+                styles.episodeList,
+                isTablet ? styles.episodeListContentVerticalTablet : styles.episodeListContentVertical
+              ]}
+            >
+              {isTablet ? (
+                <View style={styles.episodeGridVertical}>
+                  {currentSeasonEpisodes.map((episode, index) => (
+                    <Animated.View 
+                      key={episode.id}
+                      entering={FadeIn.duration(300).delay(100 + index * 30)}
+                    >
+                      {renderVerticalEpisodeCard(episode)}
+                    </Animated.View>
+                  ))}
+                </View>
+              ) : (
+                currentSeasonEpisodes.map((episode, index) => (
+                  <Animated.View 
                     key={episode.id}
                     entering={FadeIn.duration(300).delay(100 + index * 30)}
                   >
                     {renderVerticalEpisodeCard(episode)}
                   </Animated.View>
-                )}
-                keyExtractor={episode => episode.id.toString()}
-                numColumns={2}
-                style={styles.episodeList}
-                contentContainerStyle={styles.episodeListContentVerticalTablet}
-                initialNumToRender={10}
-                maxToRenderPerBatch={10}
-                windowSize={10}
-              />
-            ) : (
-              <FlatList
-                data={currentSeasonEpisodes}
-                renderItem={({ item: episode, index }) => (
-                  <Animated.View
-                    key={episode.id}
-                    entering={FadeIn.duration(300).delay(100 + index * 30)}
-                  >
-                    {renderVerticalEpisodeCard(episode)}
-                  </Animated.View>
-                )}
-                keyExtractor={episode => episode.id.toString()}
-                style={styles.episodeList}
-                contentContainerStyle={styles.episodeListContentVertical}
-                initialNumToRender={10}
-                maxToRenderPerBatch={10}
-                windowSize={10}
-              />
-            )
+                ))
+              )}
+            </View>
+          )
         )}
       </Animated.View>
     </View>
