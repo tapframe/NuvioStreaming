@@ -102,8 +102,6 @@ const VideoPlayer: React.FC = () => {
   const [showResumeOverlay, setShowResumeOverlay] = useState(false);
   const [resumePosition, setResumePosition] = useState<number | null>(null);
   const [savedDuration, setSavedDuration] = useState<number | null>(null);
-  const [rememberChoice, setRememberChoice] = useState(false);
-  const [resumePreference, setResumePreference] = useState<string | null>(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const [isOpeningAnimationComplete, setIsOpeningAnimationComplete] = useState(false);
   const openingFadeAnim = useRef(new Animated.Value(0)).current;
@@ -277,20 +275,8 @@ const VideoPlayer: React.FC = () => {
               setResumePosition(savedProgress.currentTime);
               setSavedDuration(savedProgress.duration);
               logger.log(`[VideoPlayer] Set resume position to: ${savedProgress.currentTime} of ${savedProgress.duration}`);
-              
-              const pref = await AsyncStorage.getItem(RESUME_PREF_KEY);
-              logger.log(`[VideoPlayer] Resume preference: ${pref}`);
-              
-              if (pref === RESUME_PREF.ALWAYS_RESUME) {
-                setInitialPosition(savedProgress.currentTime);
-                logger.log(`[VideoPlayer] Auto-resuming due to preference`);
-              } else if (pref === RESUME_PREF.ALWAYS_START_OVER) {
-                setInitialPosition(0);
-                logger.log(`[VideoPlayer] Auto-starting over due to preference`);
-              } else {
-                setShowResumeOverlay(true);
-                logger.log(`[VideoPlayer] Showing resume overlay`);
-              }
+              setShowResumeOverlay(true);
+              logger.log(`[VideoPlayer] Showing resume overlay`);
             } else {
               logger.log(`[VideoPlayer] Progress too high (${progressPercent.toFixed(1)}%), not showing resume overlay`);
             }
@@ -606,81 +592,17 @@ const VideoPlayer: React.FC = () => {
       });
     }, 100);
   };
-    
-  useEffect(() => {
-    const loadResumePreference = async () => {
-      try {
-        logger.log(`[VideoPlayer] Loading resume preference, resumePosition=${resumePosition}`);
-        const pref = await AsyncStorage.getItem(RESUME_PREF_KEY);
-        logger.log(`[VideoPlayer] Resume preference loaded: ${pref}`);
-        
-        if (pref) {
-          setResumePreference(pref);
-          if (pref === RESUME_PREF.ALWAYS_RESUME && resumePosition !== null) {
-            logger.log(`[VideoPlayer] Auto-resuming due to preference`);
-            setShowResumeOverlay(false);
-            setInitialPosition(resumePosition);
-          } else if (pref === RESUME_PREF.ALWAYS_START_OVER) {
-            logger.log(`[VideoPlayer] Auto-starting over due to preference`);
-            setShowResumeOverlay(false);
-            setInitialPosition(0);
-          }
-          // Don't override overlay if no specific preference or preference doesn't match
-        } else {
-          logger.log(`[VideoPlayer] No resume preference found, keeping overlay state`);
-        }
-      } catch (error) {
-        logger.error('[VideoPlayer] Error loading resume preference:', error);
-      }
-    };
-    loadResumePreference();
-  }, [resumePosition]);
-
-  const resetResumePreference = async () => {
-    try {
-      await AsyncStorage.removeItem(RESUME_PREF_KEY);
-      setResumePreference(null);
-    } catch (error) {
-      logger.error('[VideoPlayer] Error resetting resume preference:', error);
-    }
-  };
 
   const handleResume = async () => {
-    if (resumePosition !== null) {
-      if (rememberChoice) {
-        try {
-          await AsyncStorage.setItem(RESUME_PREF_KEY, RESUME_PREF.ALWAYS_RESUME);
-        } catch (error) {
-          logger.error('[VideoPlayer] Error saving resume preference:', error);
-        }
-      }
-      
-      setShowResumeOverlay(false);
-      
-      // If video is already loaded and ready, seek immediately
-      if (isPlayerReady && duration > 0 && vlcRef.current) {
-          seekToTime(resumePosition);
-      } else {
-        // Otherwise, set initial position for when video loads
-        setInitialPosition(resumePosition);
-        }
+    if (resumePosition) {
+      seekToTime(resumePosition);
     }
+    setShowResumeOverlay(false);
   };
 
   const handleStartFromBeginning = async () => {
-    if (rememberChoice) {
-      try {
-        await AsyncStorage.setItem(RESUME_PREF_KEY, RESUME_PREF.ALWAYS_START_OVER);
-      } catch (error) {
-        logger.error('[VideoPlayer] Error saving resume preference:', error);
-      }
-    }
+    seekToTime(0);
     setShowResumeOverlay(false);
-    setInitialPosition(0);
-    if (vlcRef.current) {
-      seekToTime(0);
-      setCurrentTime(0);
-    }
   };
 
   const toggleControls = () => {
@@ -1127,13 +1049,9 @@ const VideoPlayer: React.FC = () => {
             showResumeOverlay={showResumeOverlay}
             resumePosition={resumePosition}
             duration={savedDuration || duration}
-            title={title}
+            title={episodeTitle || title}
             season={season}
             episode={episode}
-            rememberChoice={rememberChoice}
-            setRememberChoice={setRememberChoice}
-            resumePreference={resumePreference}
-            resetResumePreference={resetResumePreference}
             handleResume={handleResume}
             handleStartFromBeginning={handleStartFromBeginning}
           />

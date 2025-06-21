@@ -333,7 +333,7 @@ const HomeScreen = () => {
         .map(item => [item.poster, item.banner, item.logo])
         .flat()
         .filter(Boolean) as string[];
-      
+
       // Process in small batches to prevent memory pressure
       for (let i = 0; i < allImages.length; i += BATCH_SIZE) {
         const batch = allImages.slice(i, i + BATCH_SIZE);
@@ -383,15 +383,15 @@ const HomeScreen = () => {
       
       // Lock orientation to landscape before navigation to prevent glitches
       try {
-        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-        
+      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+      
         // Longer delay to ensure orientation is fully set before navigation
         await new Promise(resolve => setTimeout(resolve, 200));
       } catch (orientationError) {
         // If orientation lock fails, continue anyway but log it
         logger.warn('[HomeScreen] Orientation lock failed:', orientationError);
         // Still add a small delay
-        await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 100));
       }
       
       navigation.navigate('Player', {

@@ -248,7 +248,7 @@ export const StreamsScreen = () => {
   const loadStartTimeRef = useRef(0);
   const hasDoneInitialLoadRef = useRef(false);
   
-
+  
 
   // Add timing logs
   const [loadStartTime, setLoadStartTime] = useState(0);
@@ -1022,7 +1022,7 @@ export const StreamsScreen = () => {
         backgroundColor="transparent"
         barStyle="light-content"
       />
-
+      
       
       <Animated.View
         entering={FadeIn.duration(300)}
