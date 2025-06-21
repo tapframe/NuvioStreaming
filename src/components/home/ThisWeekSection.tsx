@@ -20,7 +20,6 @@ import { useLibrary } from '../../hooks/useLibrary';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { parseISO, isThisWeek, format, isAfter, isBefore } from 'date-fns';
 import Animated, { FadeIn, FadeInRight } from 'react-native-reanimated';
-import { catalogService } from '../../services/catalogService';
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = width * 0.85;
@@ -128,22 +127,13 @@ export const ThisWeekSection = () => {
     }
   }, [libraryItems]);
   
-  // Subscribe to library updates
-  useEffect(() => {
-    const unsubscribe = catalogService.subscribeToLibraryUpdates(() => {
-      console.log('[ThisWeekSection] Library updated, refreshing episodes');
-      fetchThisWeekEpisodes();
-    });
-
-    return () => unsubscribe();
-  }, [fetchThisWeekEpisodes]);
-
-  // Initial load
+  // Load episodes when library items change
   useEffect(() => {
     if (!libraryLoading) {
+      console.log('[ThisWeekSection] Library items changed, refreshing episodes. Items count:', libraryItems.length);
       fetchThisWeekEpisodes();
     }
-  }, [libraryLoading, fetchThisWeekEpisodes]);
+  }, [libraryLoading, libraryItems, fetchThisWeekEpisodes]);
   
   const handleEpisodePress = (episode: ThisWeekEpisode) => {
     // For upcoming episodes, go to the metadata screen
