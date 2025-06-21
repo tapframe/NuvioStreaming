@@ -325,21 +325,40 @@ const HomeScreen = () => {
     if (!content.length) return;
     
     try {
-      const imagePromises = content.map(item => {
-        const imagesToLoad = [
-          item.poster,
-          item.banner,
-          item.logo
-        ].filter(Boolean) as string[];
-
-        return Promise.all(
-          imagesToLoad.map(imageUrl =>
-            ExpoImage.prefetch(imageUrl)
-          )
-        );
-      });
-
-      await Promise.all(imagePromises);
+      // Limit concurrent prefetching to prevent memory pressure
+      const MAX_CONCURRENT_PREFETCH = 5;
+      const BATCH_SIZE = 3;
+      
+      const allImages = content.slice(0, 10) // Limit total images to prefetch
+        .map(item => [item.poster, item.banner, item.logo])
+        .flat()
+        .filter(Boolean) as string[];
+      
+      // Process in small batches to prevent memory pressure
+      for (let i = 0; i < allImages.length; i += BATCH_SIZE) {
+        const batch = allImages.slice(i, i + BATCH_SIZE);
+        
+        try {
+          await Promise.all(
+            batch.map(async (imageUrl) => {
+              try {
+                await ExpoImage.prefetch(imageUrl);
+                // Small delay between prefetches to reduce memory pressure
+                await new Promise(resolve => setTimeout(resolve, 10));
+              } catch (error) {
+                // Silently handle individual prefetch errors
+              }
+            })
+          );
+          
+          // Delay between batches to allow GC
+          if (i + BATCH_SIZE < allImages.length) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+          }
+        } catch (error) {
+          // Continue with next batch if current batch fails
+        }
+      }
     } catch (error) {
       // Silently handle preload errors
     }
@@ -353,11 +372,27 @@ const HomeScreen = () => {
     if (!featuredContent) return;
     
     try {
-      // Lock orientation to landscape before navigation to prevent glitches
-      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+      // Clear image cache to reduce memory pressure before orientation change
+      if (typeof (global as any)?.ExpoImage?.clearMemoryCache === 'function') {
+        try {
+          (global as any).ExpoImage.clearMemoryCache();
+        } catch (e) {
+          // Ignore cache clear errors
+        }
+      }
       
-      // Small delay to ensure orientation is set before navigation
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Lock orientation to landscape before navigation to prevent glitches
+      try {
+        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+        
+        // Longer delay to ensure orientation is fully set before navigation
+        await new Promise(resolve => setTimeout(resolve, 200));
+      } catch (orientationError) {
+        // If orientation lock fails, continue anyway but log it
+        logger.warn('[HomeScreen] Orientation lock failed:', orientationError);
+        // Still add a small delay
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
       
       navigation.navigate('Player', {
         uri: stream.url,
@@ -369,6 +404,8 @@ const HomeScreen = () => {
         type: featuredContent.type
       });
     } catch (error) {
+      logger.error('[HomeScreen] Error in handlePlayStream:', error);
+      
       // Fallback: navigate anyway
       navigation.navigate('Player', {
         uri: stream.url,

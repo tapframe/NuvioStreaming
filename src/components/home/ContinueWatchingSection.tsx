@@ -295,11 +295,14 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
             {/* Poster Image */}
             <View style={styles.posterContainer}>
               <ExpoImage
-                source={{ uri: item.poster }}
-                style={styles.widePoster}
+                source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
+                style={styles.continueWatchingPoster}
                 contentFit="cover"
+                cachePolicy="memory"
                 transition={200}
-                cachePolicy="memory-disk"
+                placeholder={{ uri: 'https://via.placeholder.com/300x450' }}
+                placeholderContentFit="cover"
+                recyclingKey={item.id}
               />
             </View>
 
@@ -429,7 +432,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: '100%',
   },
-  widePoster: {
+  continueWatchingPoster: {
     width: '100%',
     height: '100%',
     borderTopLeftRadius: 12,

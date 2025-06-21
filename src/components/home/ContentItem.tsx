@@ -99,12 +99,14 @@ const ContentItem = React.memo(({ item, onPress }: ContentItemProps) => {
       >
         <View style={styles.contentItemContainer}>
           <ExpoImage
-            source={{ uri: item.poster }}
+            source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
             style={styles.poster}
             contentFit="cover"
-            transition={300}
-            cachePolicy="memory-disk"
-            recyclingKey={`poster-${item.id}`}
+            cachePolicy="memory"
+            transition={200}
+            placeholder={{ uri: 'https://via.placeholder.com/300x450' }}
+            placeholderContentFit="cover"
+            recyclingKey={item.id}
             onLoadStart={() => {
               setImageLoaded(false);
               setImageError(false);

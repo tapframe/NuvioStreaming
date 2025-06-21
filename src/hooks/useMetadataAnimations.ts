@@ -63,30 +63,30 @@ export const useMetadataAnimations = (safeAreaTop: number, watchProgress: any) =
       'worklet';
       
       try {
-        // Start with slightly reduced values and animate to full visibility
-        screenOpacity.value = withTiming(1, { 
-          duration: 250, 
-          easing: easings.fast 
-        });
-        
-        heroOpacity.value = withTiming(1, { 
-          duration: 300, 
-          easing: easings.fast 
-        });
-        
-        heroScale.value = withSpring(1, ultraFastSpring);
-        
-        uiElementsOpacity.value = withTiming(1, { 
-          duration: 400, 
-          easing: easings.natural 
-        });
-        
-        uiElementsTranslateY.value = withSpring(0, fastSpring);
-        
-        contentOpacity.value = withTiming(1, { 
-          duration: 350, 
-          easing: easings.fast 
-        });
+      // Start with slightly reduced values and animate to full visibility
+      screenOpacity.value = withTiming(1, { 
+        duration: 250, 
+        easing: easings.fast 
+      });
+      
+      heroOpacity.value = withTiming(1, { 
+        duration: 300, 
+        easing: easings.fast 
+      });
+      
+      heroScale.value = withSpring(1, ultraFastSpring);
+      
+      uiElementsOpacity.value = withTiming(1, { 
+        duration: 400, 
+        easing: easings.natural 
+      });
+      
+      uiElementsTranslateY.value = withSpring(0, fastSpring);
+      
+      contentOpacity.value = withTiming(1, { 
+        duration: 350, 
+        easing: easings.fast 
+      });
       } catch (error) {
         // Silently handle any animation errors
         console.warn('Animation error in enterAnimations:', error);
@@ -95,7 +95,7 @@ export const useMetadataAnimations = (safeAreaTop: number, watchProgress: any) =
 
     // Use runOnUI for better performance with error handling
     try {
-      runOnUI(enterAnimations)();
+    runOnUI(enterAnimations)();
     } catch (error) {
       console.warn('Failed to run enter animations:', error);
     }
@@ -109,17 +109,17 @@ export const useMetadataAnimations = (safeAreaTop: number, watchProgress: any) =
       'worklet';
       
       try {
-        progressOpacity.value = withTiming(hasProgress ? 1 : 0, {
-          duration: hasProgress ? 200 : 150,
-          easing: easings.fast
-        });
+    progressOpacity.value = withTiming(hasProgress ? 1 : 0, {
+      duration: hasProgress ? 200 : 150,
+      easing: easings.fast
+    });
       } catch (error) {
         console.warn('Animation error in updateProgress:', error);
       }
     };
     
     try {
-      runOnUI(updateProgress)();
+    runOnUI(updateProgress)();
     } catch (error) {
       console.warn('Failed to run progress animation:', error);
     }
@@ -151,19 +151,19 @@ export const useMetadataAnimations = (safeAreaTop: number, watchProgress: any) =
       'worklet';
       
       try {
-        const rawScrollY = event.contentOffset.y;
-        scrollY.value = rawScrollY;
+      const rawScrollY = event.contentOffset.y;
+      scrollY.value = rawScrollY;
 
-        // Single calculation for header threshold
-        const threshold = height * 0.4 - safeAreaTop;
-        const progress = rawScrollY > threshold ? 1 : 0;
-        
-        // Use single progress value for all header animations
-        if (headerProgress.value !== progress) {
-          headerProgress.value = withTiming(progress, { 
-            duration: progress ? 200 : 150, 
-            easing: easings.ultraFast 
-          });
+      // Single calculation for header threshold
+      const threshold = height * 0.4 - safeAreaTop;
+      const progress = rawScrollY > threshold ? 1 : 0;
+      
+      // Use single progress value for all header animations
+      if (headerProgress.value !== progress) {
+        headerProgress.value = withTiming(progress, { 
+          duration: progress ? 200 : 150, 
+          easing: easings.ultraFast 
+        });
         }
       } catch (error) {
         console.warn('Animation error in scroll handler:', error);
