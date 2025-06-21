@@ -277,13 +277,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     <Animated.View entering={FadeIn.duration(400).delay(250)} style={styles.container}>
       <View style={styles.header}>
         <View style={styles.titleContainer}>
-          <Text style={[styles.title, { color: currentTheme.colors.highEmphasis }]}>Continue Watching</Text>
-          <LinearGradient
-            colors={[currentTheme.colors.primary, currentTheme.colors.secondary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.titleUnderline}
-          />
+          <Text style={[styles.title, { color: currentTheme.colors.text }]}>Continue Watching</Text>
+          <View style={[styles.titleUnderline, { backgroundColor: currentTheme.colors.primary }]} />
         </View>
       </View>
       
@@ -386,7 +381,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 24,
+    marginBottom: 28,
     paddingTop: 0,
     marginTop: 12,
   },
@@ -395,15 +390,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   titleContainer: {
     position: 'relative',
   },
   title: {
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: 0.3,
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: 0.5,
     marginBottom: 4,
   },
   titleUnderline: {
@@ -411,8 +406,8 @@ const styles = StyleSheet.create({
     bottom: -2,
     left: 0,
     width: 40,
-    height: 2,
-    borderRadius: 1,
+    height: 3,
+    borderRadius: 2,
     opacity: 0.8,
   },
   wideList: {

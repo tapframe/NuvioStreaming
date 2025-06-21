@@ -80,13 +80,8 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
     >
       <View style={styles.catalogHeader}>
         <View style={styles.titleContainer}>
-          <Text style={[styles.catalogTitle, { color: currentTheme.colors.highEmphasis }]}>{catalog.name}</Text>
-          <LinearGradient
-            colors={[currentTheme.colors.primary, currentTheme.colors.secondary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.titleUnderline}
-          />
+          <Text style={[styles.catalogTitle, { color: currentTheme.colors.text }]}>{catalog.name}</Text>
+          <View style={[styles.titleUnderline, { backgroundColor: currentTheme.colors.primary }]} />
         </View>
         <TouchableOpacity
           onPress={() => 
@@ -96,10 +91,10 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
               addonId: catalog.addon
             })
           }
-          style={styles.seeAllButton}
+          style={styles.viewAllButton}
         >
-          <Text style={[styles.seeAllText, { color: currentTheme.colors.primary }]}>See More</Text>
-          <MaterialIcons name="arrow-forward" color={currentTheme.colors.primary} size={16} />
+          <Text style={[styles.viewAllText, { color: currentTheme.colors.textMuted }]}>View All</Text>
+          <MaterialIcons name="chevron-right" size={20} color={currentTheme.colors.textMuted} />
         </TouchableOpacity>
       </View>
       
@@ -130,41 +125,45 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
 
 const styles = StyleSheet.create({
   catalogContainer: {
-    marginBottom: 24,
+    marginBottom: 28,
   },
   catalogHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   titleContainer: {
     position: 'relative',
   },
   catalogTitle: {
-    fontSize: 19,
-    fontWeight: '700',
-    letterSpacing: 0.2,
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: 0.5,
     marginBottom: 4,
   },
   titleUnderline: {
     position: 'absolute',
     bottom: -2,
     left: 0,
-    width: 35,
-    height: 2,
-    borderRadius: 1,
+    width: 40,
+    height: 3,
+    borderRadius: 2,
     opacity: 0.8,
   },
-  seeAllButton: {
+  viewAllButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
-  seeAllText: {
+  viewAllText: {
     fontSize: 14,
     fontWeight: '600',
+    marginRight: 4,
   },
   catalogList: {
     paddingHorizontal: 16,

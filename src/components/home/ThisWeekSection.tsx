@@ -22,8 +22,8 @@ import { parseISO, isThisWeek, format, isAfter, isBefore } from 'date-fns';
 import Animated, { FadeIn, FadeInRight } from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
-const ITEM_WIDTH = width * 0.85;
-const ITEM_HEIGHT = 180;
+const ITEM_WIDTH = width * 0.75; // Reduced width for better spacing
+const ITEM_HEIGHT = 220; // Increased height for better proportions
 
 interface ThisWeekEpisode {
   id: string;
@@ -163,7 +163,10 @@ export const ThisWeekSection = () => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="small" color={currentTheme.colors.primary} />
+        <ActivityIndicator size="large" color={currentTheme.colors.primary} />
+        <Text style={[styles.loadingText, { color: currentTheme.colors.textMuted }]}>
+          Loading this week's episodes...
+        </Text>
       </View>
     );
   }
@@ -186,84 +189,134 @@ export const ThisWeekSection = () => {
     
     return (
       <Animated.View 
-        entering={FadeInRight.delay(index * 100).duration(400)}
+        entering={FadeInRight.delay(index * 150).duration(600)}
         style={styles.episodeItemContainer}
       >
         <TouchableOpacity
-          style={styles.episodeItem}
+          style={[
+            styles.episodeItem,
+            { 
+              shadowColor: currentTheme.colors.black,
+              backgroundColor: currentTheme.colors.background,
+            }
+          ]}
           onPress={() => handleEpisodePress(item)}
-          activeOpacity={0.7}
+          activeOpacity={0.8}
         >
-          <Image
-            source={{ uri: imageUrl }}
-            style={styles.poster}
-            contentFit="cover"
-            transition={300}
-          />
-          
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,0.9)']}
-            style={styles.gradient}
-          >
-            <View style={styles.badgeContainer}>
-              <View style={[
-                styles.badge, 
-                isReleased ? styles.releasedBadge : styles.upcomingBadge,
-                { backgroundColor: isReleased ? currentTheme.colors.success + 'CC' : currentTheme.colors.primary + 'CC' }
-              ]}>
-                <MaterialIcons
-                  name={isReleased ? "check-circle" : "event"}
-                  size={12}
-                  color={currentTheme.colors.white}
-                />
-                <Text style={[styles.badgeText, { color: currentTheme.colors.white }]}>
-                  {isReleased ? 'Released' : 'Coming Soon'}
-                </Text>
-              </View>
-              
-              {item.vote_average > 0 && (
-                <View style={[styles.ratingBadge, { backgroundColor: 'rgba(0,0,0,0.8)' }]}>
+          <View style={styles.imageContainer}>
+            <Image
+              source={{ uri: imageUrl }}
+              style={styles.poster}
+              contentFit="cover"
+              transition={400}
+            />
+            
+            {/* Enhanced gradient overlay */}
+            <LinearGradient
+              colors={[
+                'transparent', 
+                'rgba(0,0,0,0.3)', 
+                'rgba(0,0,0,0.7)', 
+                'rgba(0,0,0,0.9)'
+              ]}
+              style={styles.gradient}
+              locations={[0, 0.3, 0.7, 1]}
+            >
+              {/* Top badges */}
+              <View style={styles.topBadgeContainer}>
+                <View style={[
+                  styles.statusBadge, 
+                  isReleased ? styles.releasedBadge : styles.upcomingBadge,
+                  { 
+                    backgroundColor: isReleased 
+                      ? currentTheme.colors.success + 'E6' 
+                      : currentTheme.colors.primary + 'E6',
+                    borderColor: isReleased 
+                      ? currentTheme.colors.success 
+                      : currentTheme.colors.primary,
+                  }
+                ]}>
                   <MaterialIcons
-                    name="star"
-                    size={12}
-                    color={currentTheme.colors.primary}
+                    name={isReleased ? "check-circle" : "schedule"}
+                    size={14}
+                    color={currentTheme.colors.white}
                   />
-                  <Text style={[styles.ratingText, { color: currentTheme.colors.primary }]}>
-                    {item.vote_average.toFixed(1)}
+                  <Text style={styles.statusBadgeText}>
+                    {isReleased ? 'Available' : 'Upcoming'}
                   </Text>
                 </View>
-              )}
-            </View>
-            
-            <View style={styles.content}>
-              <Text style={[styles.seriesName, { color: currentTheme.colors.text }]} numberOfLines={1}>
-                {item.seriesName}
-              </Text>
-              <Text style={[styles.episodeTitle, { color: currentTheme.colors.lightGray }]} numberOfLines={2}>
-                S{item.season}:E{item.episode} - {item.title}
-              </Text>
-              {item.overview ? (
-                <Text style={[styles.overview, { color: currentTheme.colors.lightGray, opacity: 0.8 }]} numberOfLines={2}>
-                  {item.overview}
+                
+                {item.vote_average > 0 && (
+                  <View style={[
+                    styles.ratingBadge, 
+                    { 
+                      backgroundColor: 'rgba(255,193,7,0.9)',
+                      borderColor: '#FFD700',
+                    }
+                  ]}>
+                    <MaterialIcons
+                      name="star"
+                      size={14}
+                      color="#FFF"
+                    />
+                    <Text style={styles.ratingText}>
+                      {item.vote_average.toFixed(1)}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              
+              {/* Content area */}
+              <View style={styles.contentArea}>
+                <View style={styles.seriesHeader}>
+                  <Text style={[styles.seriesName, { color: currentTheme.colors.white }]} numberOfLines={1}>
+                    {item.seriesName}
+                  </Text>
+                  <View style={[styles.episodeNumber, { backgroundColor: currentTheme.colors.primary + '40' }]}>
+                    <Text style={[styles.episodeNumberText, { color: currentTheme.colors.primary }]}>
+                      S{item.season}:E{item.episode}
+                    </Text>
+                  </View>
+                </View>
+                
+                <Text style={[styles.episodeTitle, { color: currentTheme.colors.lightGray }]} numberOfLines={2}>
+                  {item.title}
                 </Text>
-              ) : null}
-              <Text style={[styles.releaseDate, { color: currentTheme.colors.primary }]}>
-                {formattedDate}
-              </Text>
-            </View>
-          </LinearGradient>
+                
+                {item.overview && (
+                  <Text style={[styles.overview, { color: currentTheme.colors.lightGray }]} numberOfLines={2}>
+                    {item.overview}
+                  </Text>
+                )}
+                
+                <View style={styles.dateContainer}>
+                  <MaterialIcons 
+                    name="event" 
+                    size={14} 
+                    color={currentTheme.colors.primary} 
+                  />
+                  <Text style={[styles.releaseDate, { color: currentTheme.colors.primary }]}>
+                    {formattedDate}
+                  </Text>
+                </View>
+              </View>
+            </LinearGradient>
+          </View>
         </TouchableOpacity>
       </Animated.View>
     );
   };
   
   return (
-    <Animated.View entering={FadeIn.duration(300)} style={styles.container}>
+    <Animated.View entering={FadeIn.duration(400)} style={styles.container}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: currentTheme.colors.text }]}>This Week</Text>
+        <View style={styles.titleContainer}>
+          <Text style={[styles.title, { color: currentTheme.colors.text }]}>This Week</Text>
+          <View style={[styles.titleUnderline, { backgroundColor: currentTheme.colors.primary }]} />
+        </View>
         <TouchableOpacity onPress={handleViewAll} style={styles.viewAllButton}>
-          <Text style={[styles.viewAllText, { color: currentTheme.colors.lightGray }]}>View All</Text>
-          <MaterialIcons name="chevron-right" size={18} color={currentTheme.colors.lightGray} />
+          <Text style={[styles.viewAllText, { color: currentTheme.colors.textMuted }]}>View All</Text>
+          <MaterialIcons name="chevron-right" size={20} color={currentTheme.colors.textMuted} />
         </TouchableOpacity>
       </View>
       
@@ -274,8 +327,10 @@ export const ThisWeekSection = () => {
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
-        snapToInterval={ITEM_WIDTH + 12}
+        snapToInterval={ITEM_WIDTH + 16}
         decelerationRate="fast"
+        snapToAlignment="start"
+        ItemSeparatorComponent={() => <View style={{ width: 16 }} />}
       />
     </Animated.View>
   );
@@ -283,109 +338,180 @@ export const ThisWeekSection = () => {
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 16,
+    marginVertical: 20,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 16,
+  },
+  titleContainer: {
+    position: 'relative',
   },
   title: {
-    fontSize: 19,
-    fontWeight: '700',
-    letterSpacing: 0.2,
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  titleUnderline: {
+    position: 'absolute',
+    bottom: -2,
+    left: 0,
+    width: 40,
+    height: 3,
+    borderRadius: 2,
+    opacity: 0.8,
   },
   viewAllButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   viewAllText: {
     fontSize: 14,
+    fontWeight: '600',
     marginRight: 4,
   },
   listContent: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 20,
+    paddingBottom: 8,
   },
   loadingContainer: {
-    padding: 20,
+    padding: 32,
     alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    fontWeight: '500',
   },
   episodeItemContainer: {
     width: ITEM_WIDTH,
     height: ITEM_HEIGHT,
-    marginHorizontal: 6,
   },
   episodeItem: {
     width: '100%',
     height: '100%',
-    borderRadius: 8,
+    borderRadius: 16,
     overflow: 'hidden',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 12,
+  },
+  imageContainer: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
   },
   poster: {
     width: '100%',
     height: '100%',
+    borderRadius: 16,
   },
   gradient: {
     position: 'absolute',
     left: 0,
     right: 0,
+    top: 0,
     bottom: 0,
-    height: '80%',
-    justifyContent: 'flex-end',
-    padding: 16,
-  },
-  badgeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    padding: 16,
+    borderRadius: 16,
   },
-  badge: {
+  topBadgeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
   },
   releasedBadge: {},
   upcomingBadge: {},
-  badgeText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    marginLeft: 4,
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginLeft: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   ratingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 4,
+    borderRadius: 16,
+    borderWidth: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
   },
   ratingText: {
-    fontSize: 10,
-    fontWeight: 'bold',
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
     marginLeft: 4,
   },
-  content: {
-    width: '100%',
+  contentArea: {
+    justifyContent: 'flex-end',
+  },
+  seriesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   seriesName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
+    fontSize: 18,
+    fontWeight: '700',
+    flex: 1,
+    marginRight: 8,
+  },
+  episodeNumber: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  episodeNumberText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   episodeTitle: {
-    fontSize: 14,
-    marginBottom: 4,
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 6,
+    lineHeight: 20,
   },
   overview: {
-    fontSize: 12,
-    marginBottom: 4,
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 8,
+    opacity: 0.9,
+  },
+  dateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
   },
   releaseDate: {
-    fontSize: 12,
-    fontWeight: 'bold',
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 6,
+    letterSpacing: 0.3,
   },
 }); 
