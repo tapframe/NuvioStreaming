@@ -95,7 +95,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const [selectedAudioTrack, setSelectedAudioTrack] = useState<number | null>(null);
   const [textTracks, setTextTracks] = useState<TextTrack[]>([]);
   const [selectedTextTrack, setSelectedTextTrack] = useState<number>(-1);
-  const [resizeMode, setResizeMode] = useState<ResizeModeType>('stretch');
+  const [resizeMode, setResizeMode] = useState<ResizeModeType>('contain');
   const [buffered, setBuffered] = useState(0);
   const [seekTime, setSeekTime] = useState<number | null>(null);
   const videoRef = useRef<VideoRef>(null);
@@ -526,13 +526,14 @@ const AndroidVideoPlayer: React.FC = () => {
   };
 
   const cycleAspectRatio = () => {
-    const newZoom = zoomScale === 1.1 ? 1 : 1.1;
-    setZoomScale(newZoom);
-    setZoomTranslateX(0);
-    setZoomTranslateY(0);
-    setLastZoomScale(newZoom);
-    setLastTranslateX(0);
-    setLastTranslateY(0);
+    // Android: cycle through native resize modes
+    const resizeModes: ResizeModeType[] = ['contain', 'cover', 'stretch', 'none'];
+    const currentIndex = resizeModes.indexOf(resizeMode);
+    const nextIndex = (currentIndex + 1) % resizeModes.length;
+    setResizeMode(resizeModes[nextIndex]);
+    if (DEBUG_MODE) {
+      logger.log(`[AndroidVideoPlayer] Resize mode changed to: ${resizeModes[nextIndex]}`);
+    }
   };
 
   const enableImmersiveMode = () => {
@@ -1081,6 +1082,7 @@ const AndroidVideoPlayer: React.FC = () => {
             currentTime={currentTime}
             duration={duration}
             zoomScale={zoomScale}
+            currentResizeMode={resizeMode}
             vlcAudioTracks={rnVideoAudioTracks}
             selectedAudioTrack={selectedAudioTrack}
             availableStreams={availableStreams}

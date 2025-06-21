@@ -147,7 +147,7 @@ class StorageService {
     
     // Only notify if we have subscribers
     if (this.watchProgressSubscribers.length > 0) {
-      this.watchProgressSubscribers.forEach(callback => callback());
+    this.watchProgressSubscribers.forEach(callback => callback());
     }
   }
 
@@ -394,16 +394,16 @@ class StorageService {
           }
         }
         
-        const updatedProgress: WatchProgress = {
+          const updatedProgress: WatchProgress = {
           ...localProgress,
           currentTime,
           duration,
-          lastUpdated: traktTimestamp,
-          traktSynced: true,
-          traktLastSynced: Date.now(),
-          traktProgress
-        };
-        await this.setWatchProgress(id, type, updatedProgress, episodeId);
+            lastUpdated: traktTimestamp,
+            traktSynced: true,
+            traktLastSynced: Date.now(),
+            traktProgress
+          };
+          await this.setWatchProgress(id, type, updatedProgress, episodeId);
         
         // Only log significant changes
         if (progressDiff > 10 || traktProgress === 100) {

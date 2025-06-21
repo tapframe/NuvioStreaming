@@ -369,10 +369,10 @@ export function useTraktIntegration() {
           
           updatePromises.push(
             storageService.mergeWithTraktProgress(
-              id,
-              type,
-              item.progress,
-              item.paused_at,
+            id,
+            type,
+            item.progress,
+            item.paused_at,
               episodeId,
               exactTime
             )
@@ -391,10 +391,10 @@ export function useTraktIntegration() {
             
             updatePromises.push(
               storageService.mergeWithTraktProgress(
-                id,
-                'movie',
-                100, // 100% progress for watched items
-                watchedAt
+              id,
+              'movie',
+              100, // 100% progress for watched items
+              watchedAt
               )
             );
           }
