@@ -77,10 +77,20 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   const appState = useRef(AppState.currentState);
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Use a state to track if a background refresh is in progress
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   // Modified loadContinueWatching to be more efficient
-  const loadContinueWatching = useCallback(async () => {
-    try {
+  const loadContinueWatching = useCallback(async (isBackgroundRefresh = false) => {
+    // Prevent multiple concurrent refreshes
+    if (isRefreshing) return;
+
+    if (!isBackgroundRefresh) {
       setLoading(true);
+    }
+    setIsRefreshing(true);
+
+    try {
       const allProgress = await storageService.getAllWatchProgress();
       
       if (Object.keys(allProgress).length === 0) {
@@ -193,8 +203,9 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       logger.error('Failed to load continue watching items:', error);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
-  }, []);
+  }, [isRefreshing]);
 
   // Function to handle app state changes
   const handleAppStateChange = useCallback((nextAppState: AppStateStatus) => {
@@ -202,8 +213,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       appState.current.match(/inactive|background/) &&
       nextAppState === 'active'
     ) {
-      // App has come to the foreground - refresh data
-      loadContinueWatching();
+      // App has come to the foreground - trigger a background refresh
+      loadContinueWatching(true);
     }
     appState.current = nextAppState;
   }, [loadContinueWatching]);
@@ -220,8 +231,9 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         clearTimeout(refreshTimerRef.current);
       }
       refreshTimerRef.current = setTimeout(() => {
-        loadContinueWatching();
-      }, 300);
+        // Trigger a background refresh
+        loadContinueWatching(true);
+      }, 500); // Increased debounce time slightly
     };
 
     // Try to set up a custom event listener or use a timer as fallback
@@ -236,7 +248,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       };
     } else {
       // Fallback: poll for updates every 30 seconds
-      const intervalId = setInterval(loadContinueWatching, 30000);
+      const intervalId = setInterval(() => loadContinueWatching(true), 30000);
       return () => {
         subscription.remove();
         clearInterval(intervalId);
@@ -252,13 +264,12 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     loadContinueWatching();
   }, [loadContinueWatching]);
 
-  // Properly expose the refresh method
+  // Expose the refresh function via the ref
   React.useImperativeHandle(ref, () => ({
     refresh: async () => {
-      await loadContinueWatching();
-      // Return whether there are items to help parent determine visibility
-      const hasItems = continueWatchingItems.length > 0;
-      return hasItems;
+      // Allow manual refresh to show loading indicator
+      await loadContinueWatching(false);
+      return true;
     }
   }));
 

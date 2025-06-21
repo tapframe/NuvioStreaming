@@ -10,7 +10,6 @@ import {
 import { Image } from 'expo-image';
 import Animated, {
   FadeIn,
-  Layout,
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -43,7 +42,6 @@ export const CastSection: React.FC<CastSectionProps> = ({
     <Animated.View 
       style={styles.castSection}
       entering={FadeIn.duration(300).delay(150)}
-      layout={Layout}
     >
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: currentTheme.colors.highEmphasis }]}>Cast</Text>
@@ -57,7 +55,6 @@ export const CastSection: React.FC<CastSectionProps> = ({
         renderItem={({ item, index }) => (
           <Animated.View 
             entering={FadeIn.duration(300).delay(50 + index * 30)} 
-            layout={Layout}
           >
             <TouchableOpacity 
               style={styles.castCard}
