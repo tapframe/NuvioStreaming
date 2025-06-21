@@ -130,15 +130,10 @@ export const ThisWeekSection = () => {
   // Load episodes when library items change
   useEffect(() => {
     if (!libraryLoading) {
-      // Only fetch if we have library items or if this is the first load
-      if (libraryItems.length > 0 || episodes.length === 0) {
-        console.log('[ThisWeekSection] Library items changed, refreshing episodes. Items count:', libraryItems.length);
-        fetchThisWeekEpisodes();
-      } else {
-        console.log('[ThisWeekSection] Skipping refresh - no library items and episodes already loaded');
-      }
+      console.log('[ThisWeekSection] Library items changed, refreshing episodes. Items count:', libraryItems.length);
+      fetchThisWeekEpisodes();
     }
-  }, [libraryLoading, libraryItems, fetchThisWeekEpisodes, episodes.length]);
+  }, [libraryLoading, libraryItems, fetchThisWeekEpisodes]);
   
   const handleEpisodePress = (episode: ThisWeekEpisode) => {
     // For upcoming episodes, go to the metadata screen

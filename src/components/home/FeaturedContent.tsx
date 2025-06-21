@@ -426,111 +426,106 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
         style={styles.featuredContainer as ViewStyle}
       >
         <Animated.View style={[styles.imageContainer, posterAnimatedStyle]}>
-          <ExpoImage
+          <ImageBackground
             source={{ uri: bannerUrl || featuredContent.poster }}
-            style={styles.featuredImage}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-            transition={300}
-            priority="high"
-            placeholder={{ uri: 'https://via.placeholder.com/1080x1920' }}
-            placeholderContentFit="cover"
-            recyclingKey={featuredContent.id}
-          />
-          {/* Subtle content overlay for better readability */}
-          <Animated.View style={[styles.contentOverlay, overlayAnimatedStyle]} />
-          
-          <LinearGradient
-            colors={[
-              'rgba(0,0,0,0.1)',
-              'rgba(0,0,0,0.2)',
-              'rgba(0,0,0,0.4)',
-              'rgba(0,0,0,0.8)',
-              currentTheme.colors.darkBackground,
-            ]}
-            locations={[0, 0.2, 0.5, 0.8, 1]}
-            style={styles.featuredGradient as ViewStyle}
+            style={styles.featuredImage as ViewStyle}
+            resizeMode="cover"
           >
-            <Animated.View 
-              style={[styles.featuredContentContainer as ViewStyle, contentAnimatedStyle]}
+            {/* Subtle content overlay for better readability */}
+            <Animated.View style={[styles.contentOverlay, overlayAnimatedStyle]} />
+            
+            <LinearGradient
+              colors={[
+                'rgba(0,0,0,0.1)',
+                'rgba(0,0,0,0.2)',
+                'rgba(0,0,0,0.4)',
+                'rgba(0,0,0,0.8)',
+                currentTheme.colors.darkBackground,
+              ]}
+              locations={[0, 0.2, 0.5, 0.8, 1]}
+              style={styles.featuredGradient as ViewStyle}
             >
-              {logoUrl && !logoLoadError ? (
-                <Animated.View style={logoAnimatedStyle}>
-                  <ExpoImage 
-                    source={{ uri: logoUrl }} 
-                    style={styles.featuredLogo as ImageStyle}
-                    contentFit="contain"
-                    cachePolicy="memory"
-                    transition={300}
-                    recyclingKey={`logo-${featuredContent.id}`}
-                    onError={onLogoLoadError}
+              <Animated.View 
+                style={[styles.featuredContentContainer as ViewStyle, contentAnimatedStyle]}
+              >
+                {logoUrl && !logoLoadError ? (
+                  <Animated.View style={logoAnimatedStyle}>
+                    <ExpoImage 
+                      source={{ uri: logoUrl }} 
+                      style={styles.featuredLogo as ImageStyle}
+                      contentFit="contain"
+                      cachePolicy="memory"
+                      transition={300}
+                      recyclingKey={`logo-${featuredContent.id}`}
+                      onError={onLogoLoadError}
+                    />
+                  </Animated.View>
+                ) : (
+                  <Text style={[styles.featuredTitleText as TextStyle, { color: currentTheme.colors.highEmphasis }]}>
+                    {featuredContent.name}
+                  </Text>
+                )}
+                <View style={styles.genreContainer as ViewStyle}>
+                  {featuredContent.genres?.slice(0, 3).map((genre, index, array) => (
+                    <React.Fragment key={index}>
+                      <Text style={[styles.genreText as TextStyle, { color: currentTheme.colors.white }]}>
+                        {genre}
+                      </Text>
+                      {index < array.length - 1 && (
+                        <Text style={[styles.genreDot as TextStyle, { color: currentTheme.colors.white }]}>•</Text>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </View>
+              </Animated.View>
+
+              <Animated.View style={[styles.featuredButtons as ViewStyle, buttonsAnimatedStyle]}>
+                <TouchableOpacity 
+                  style={styles.myListButton as ViewStyle}
+                  onPress={handleSaveToLibrary}
+                  activeOpacity={0.7}
+                >
+                  <MaterialIcons 
+                    name={isSaved ? "bookmark" : "bookmark-border"} 
+                    size={24} 
+                    color={currentTheme.colors.white} 
                   />
-                </Animated.View>
-              ) : (
-                <Text style={[styles.featuredTitleText as TextStyle, { color: currentTheme.colors.highEmphasis }]}>
-                  {featuredContent.name}
-                </Text>
-              )}
-              <View style={styles.genreContainer as ViewStyle}>
-                {featuredContent.genres?.slice(0, 3).map((genre, index, array) => (
-                  <React.Fragment key={index}>
-                    <Text style={[styles.genreText as TextStyle, { color: currentTheme.colors.white }]}>
-                      {genre}
-                    </Text>
-                    {index < array.length - 1 && (
-                      <Text style={[styles.genreDot as TextStyle, { color: currentTheme.colors.white }]}>•</Text>
-                    )}
-                  </React.Fragment>
-                ))}
-              </View>
-            </Animated.View>
+                  <Text style={[styles.myListButtonText as TextStyle, { color: currentTheme.colors.white }]}>
+                    {isSaved ? "Saved" : "Save"}
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.playButton as ViewStyle, { backgroundColor: currentTheme.colors.white }]}
+                  onPress={() => {
+                    if (featuredContent) {
+                      navigation.navigate('Streams', { 
+                        id: featuredContent.id, 
+                        type: featuredContent.type
+                      });
+                    }
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <MaterialIcons name="play-arrow" size={24} color={currentTheme.colors.black} />
+                  <Text style={[styles.playButtonText as TextStyle, { color: currentTheme.colors.black }]}>
+                    Play
+                  </Text>
+                </TouchableOpacity>
 
-            <Animated.View style={[styles.featuredButtons as ViewStyle, buttonsAnimatedStyle]}>
-              <TouchableOpacity 
-                style={styles.myListButton as ViewStyle}
-                onPress={handleSaveToLibrary}
-                activeOpacity={0.7}
-              >
-                <MaterialIcons 
-                  name={isSaved ? "bookmark" : "bookmark-border"} 
-                  size={24} 
-                  color={currentTheme.colors.white} 
-                />
-                <Text style={[styles.myListButtonText as TextStyle, { color: currentTheme.colors.white }]}>
-                  {isSaved ? "Saved" : "Save"}
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.playButton as ViewStyle, { backgroundColor: currentTheme.colors.white }]}
-                onPress={() => {
-                  if (featuredContent) {
-                    navigation.navigate('Streams', { 
-                      id: featuredContent.id, 
-                      type: featuredContent.type
-                    });
-                  }
-                }}
-                activeOpacity={0.8}
-              >
-                <MaterialIcons name="play-arrow" size={24} color={currentTheme.colors.black} />
-                <Text style={[styles.playButtonText as TextStyle, { color: currentTheme.colors.black }]}>
-                  Play
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.infoButton as ViewStyle}
-                onPress={handleInfoPress}
-                activeOpacity={0.7}
-              >
-                <MaterialIcons name="info-outline" size={24} color={currentTheme.colors.white} />
-                <Text style={[styles.infoButtonText as TextStyle, { color: currentTheme.colors.white }]}>
-                  Info
-                </Text>
-              </TouchableOpacity>
-            </Animated.View>
-          </LinearGradient>
+                <TouchableOpacity 
+                  style={styles.infoButton as ViewStyle}
+                  onPress={handleInfoPress}
+                  activeOpacity={0.7}
+                >
+                  <MaterialIcons name="info-outline" size={24} color={currentTheme.colors.white} />
+                  <Text style={[styles.infoButtonText as TextStyle, { color: currentTheme.colors.white }]}>
+                    Info
+                  </Text>
+                </TouchableOpacity>
+              </Animated.View>
+            </LinearGradient>
+          </ImageBackground>
         </Animated.View>
       </TouchableOpacity>
     </Animated.View>

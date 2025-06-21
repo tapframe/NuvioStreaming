@@ -102,12 +102,11 @@ const ContentItem = React.memo(({ item, onPress }: ContentItemProps) => {
             source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
             style={styles.poster}
             contentFit="cover"
-            cachePolicy="memory-disk"
-            transition={150}
+            cachePolicy="memory"
+            transition={200}
             placeholder={{ uri: 'https://via.placeholder.com/300x450' }}
             placeholderContentFit="cover"
             recyclingKey={item.id}
-            priority="high"
             onLoadStart={() => {
               setImageLoaded(false);
               setImageError(false);

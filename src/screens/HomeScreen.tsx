@@ -325,34 +325,35 @@ const HomeScreen = () => {
     if (!content.length) return;
     
     try {
-      // More conservative prefetching to prevent memory issues
-      const BATCH_SIZE = 2;
+      // Limit concurrent prefetching to prevent memory pressure
+      const MAX_CONCURRENT_PREFETCH = 5;
+      const BATCH_SIZE = 3;
       
-      // Only prefetch poster images (most important) and limit to 6 items
-      const posterImages = content.slice(0, 6)
-        .map(item => item.poster)
+      const allImages = content.slice(0, 10) // Limit total images to prefetch
+        .map(item => [item.poster, item.banner, item.logo])
+        .flat()
         .filter(Boolean) as string[];
 
-      // Process in small batches with longer delays
-      for (let i = 0; i < posterImages.length; i += BATCH_SIZE) {
-        const batch = posterImages.slice(i, i + BATCH_SIZE);
+      // Process in small batches to prevent memory pressure
+      for (let i = 0; i < allImages.length; i += BATCH_SIZE) {
+        const batch = allImages.slice(i, i + BATCH_SIZE);
         
         try {
           await Promise.all(
             batch.map(async (imageUrl) => {
               try {
                 await ExpoImage.prefetch(imageUrl);
-                // Longer delay between prefetches
-                await new Promise(resolve => setTimeout(resolve, 50));
+                // Small delay between prefetches to reduce memory pressure
+                await new Promise(resolve => setTimeout(resolve, 10));
               } catch (error) {
                 // Silently handle individual prefetch errors
               }
             })
           );
           
-          // Longer delay between batches to allow GC
-          if (i + BATCH_SIZE < posterImages.length) {
-            await new Promise(resolve => setTimeout(resolve, 200));
+          // Delay between batches to allow GC
+          if (i + BATCH_SIZE < allImages.length) {
+            await new Promise(resolve => setTimeout(resolve, 50));
           }
         } catch (error) {
           // Continue with next batch if current batch fails
@@ -371,18 +372,26 @@ const HomeScreen = () => {
     if (!featuredContent) return;
     
     try {
+      // Clear image cache to reduce memory pressure before orientation change
+      if (typeof (global as any)?.ExpoImage?.clearMemoryCache === 'function') {
+        try {
+          (global as any).ExpoImage.clearMemoryCache();
+        } catch (e) {
+          // Ignore cache clear errors
+        }
+      }
+      
       // Lock orientation to landscape before navigation to prevent glitches
-      // Don't clear image cache - let ExpoImage manage memory efficiently
       try {
-        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-        
+      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+      
         // Longer delay to ensure orientation is fully set before navigation
         await new Promise(resolve => setTimeout(resolve, 200));
       } catch (orientationError) {
         // If orientation lock fails, continue anyway but log it
         logger.warn('[HomeScreen] Orientation lock failed:', orientationError);
         // Still add a small delay
-        await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 100));
       }
       
       navigation.navigate('Player', {
@@ -425,23 +434,17 @@ const HomeScreen = () => {
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      // Only refresh continue watching section if it's empty (first load or error state)
-      if (continueWatchingRef.current) {
-        // Check if continue watching is empty before refreshing
-        // This prevents unnecessary reloads when just switching tabs
-        console.log('[HomeScreen] Screen focused - checking if continue watching needs refresh');
-      }
-      
+      // Only refresh continue watching section on focus
+      refreshContinueWatching();
       // Don't reload catalogs unless they haven't been loaded yet
       // Catalogs will be refreshed through context updates when addons change
       if (catalogs.length === 0 && !catalogsLoading) {
-        console.log('[HomeScreen] Loading catalogs for first time');
         loadCatalogsProgressively();
       }
     });
 
     return unsubscribe;
-  }, [navigation, loadCatalogsProgressively, catalogs.length, catalogsLoading]);
+  }, [navigation, refreshContinueWatching, loadCatalogsProgressively, catalogs.length, catalogsLoading]);
 
   // Memoize the loading screen to prevent unnecessary re-renders
   const renderLoadingScreen = useMemo(() => {
