@@ -10,7 +10,6 @@ import {
 import { Image } from 'expo-image';
 import Animated, {
   FadeIn,
-  Layout,
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -42,8 +41,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
   return (
     <Animated.View 
       style={styles.castSection}
-      entering={FadeIn.duration(500).delay(300)}
-      layout={Layout}
+      entering={FadeIn.duration(300).delay(150)}
     >
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: currentTheme.colors.highEmphasis }]}>Cast</Text>
@@ -56,8 +54,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
         keyExtractor={(item) => item.id.toString()}
         renderItem={({ item, index }) => (
           <Animated.View 
-            entering={FadeIn.duration(500).delay(100 + index * 50)} 
-            layout={Layout}
+            entering={FadeIn.duration(300).delay(50 + index * 30)} 
           >
             <TouchableOpacity 
               style={styles.castCard}
@@ -75,7 +72,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
                     transition={200}
                   />
                 ) : (
-                  <View style={[styles.castImagePlaceholder, { backgroundColor: currentTheme.colors.cardBackground }]}>
+                  <View style={[styles.castImagePlaceholder, { backgroundColor: currentTheme.colors.darkBackground }]}>
                     <Text style={[styles.placeholderText, { color: currentTheme.colors.textMuted }]}>
                       {item.name.split(' ').reduce((prev: string, current: string) => prev + current[0], '').substring(0, 2)}
                     </Text>

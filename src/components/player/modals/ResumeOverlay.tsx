@@ -13,10 +13,6 @@ interface ResumeOverlayProps {
   title: string;
   season?: number;
   episode?: number;
-  rememberChoice: boolean;
-  setRememberChoice: (remember: boolean) => void;
-  resumePreference: string | null;
-  resetResumePreference: () => void;
   handleResume: () => void;
   handleStartFromBeginning: () => void;
 }
@@ -28,10 +24,6 @@ export const ResumeOverlay: React.FC<ResumeOverlayProps> = ({
   title,
   season,
   episode,
-  rememberChoice,
-  setRememberChoice,
-  resumePreference,
-  resetResumePreference,
   handleResume,
   handleStartFromBeginning,
 }) => {
@@ -77,29 +69,6 @@ export const ResumeOverlay: React.FC<ResumeOverlayProps> = ({
             </View>
           </View>
         </View>
-
-        {/* Remember choice checkbox */}
-        <TouchableOpacity 
-          style={styles.rememberChoiceContainer}
-          onPress={() => setRememberChoice(!rememberChoice)}
-          activeOpacity={0.7}
-        >
-          <View style={styles.checkboxContainer}>
-            <View style={[styles.checkbox, rememberChoice && styles.checkboxChecked]}>
-              {rememberChoice && <Ionicons name="checkmark" size={12} color="white" />}
-            </View>
-            <Text style={styles.rememberChoiceText}>Remember my choice</Text>
-          </View>
-          
-          {resumePreference && (
-            <TouchableOpacity 
-              onPress={resetResumePreference}
-              style={styles.resetPreferenceButton}
-            >
-              <Text style={styles.resetPreferenceText}>Reset</Text>
-            </TouchableOpacity>
-          )}
-        </TouchableOpacity>
 
         <View style={styles.resumeButtons}>
           <TouchableOpacity 

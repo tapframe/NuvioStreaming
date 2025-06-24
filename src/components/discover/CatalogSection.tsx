@@ -64,11 +64,11 @@ const CatalogSection = ({ catalog, selectedCategory }: CatalogSectionProps) => {
         </View>
         <TouchableOpacity
           onPress={handleSeeMorePress}
-          style={styles.seeAllButton}
+          style={[styles.seeAllButton, { backgroundColor: 'rgba(255,255,255,0.1)' }]}
           activeOpacity={0.6}
         >
-          <Text style={[styles.seeAllText, { color: currentTheme.colors.primary }]}>See All</Text>
-          <MaterialIcons name="arrow-forward-ios" color={currentTheme.colors.primary} size={14} />
+          <Text style={[styles.seeAllText, { color: currentTheme.colors.textMuted }]}>View All</Text>
+          <MaterialIcons name="chevron-right" size={20} color={currentTheme.colors.textMuted} />
         </TouchableOpacity>
       </View>
       
@@ -119,13 +119,15 @@ const styles = StyleSheet.create({
   seeAllButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+    marginRight: -10,
   },
   seeAllText: {
-    fontWeight: '600',
     fontSize: 14,
+    fontWeight: '600',
+    marginRight: 4,
   },
 });
 

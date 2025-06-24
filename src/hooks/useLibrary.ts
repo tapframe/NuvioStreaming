@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StreamingContent } from '../types/metadata';
+import { catalogService } from '../services/catalogService';
 
 const LIBRARY_STORAGE_KEY = 'stremio-library';
 
@@ -82,6 +83,17 @@ export const useLibrary = () => {
   useEffect(() => {
     loadLibraryItems();
   }, [loadLibraryItems]);
+
+  // Subscribe to catalogService library updates
+  useEffect(() => {
+    const unsubscribe = catalogService.subscribeToLibraryUpdates((items) => {
+      console.log('[useLibrary] Received library update from catalogService:', items.length, 'items');
+      setLibraryItems(items);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   return {
     libraryItems,

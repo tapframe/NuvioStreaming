@@ -21,6 +21,7 @@ import Animated, {
   withTiming,
   runOnJS,
   withRepeat,
+  FadeIn,
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useTraktContext } from '../../contexts/TraktContext';
@@ -684,20 +685,24 @@ const HeroSection: React.FC<HeroSectionProps> = ({
     }]
   }), []);
 
-  // Ultra-optimized genre rendering
+  // Ultra-optimized genre rendering with smooth animation
   const genreElements = useMemo(() => {
     if (!metadata?.genres?.length) return null;
 
     const genresToDisplay = metadata.genres.slice(0, 3); // Reduced to 3 for performance
     return genresToDisplay.map((genreName: string, index: number, array: string[]) => (
-      <React.Fragment key={`${genreName}-${index}`}>
+      <Animated.View
+        key={`${genreName}-${index}`}
+        entering={FadeIn.duration(400).delay(200 + index * 100)}
+        style={{ flexDirection: 'row', alignItems: 'center' }}
+      >
         <Text style={[styles.genreText, { color: currentTheme.colors.text }]}>
           {genreName}
         </Text>
         {index < array.length - 1 && (
           <Text style={[styles.genreDot, { color: currentTheme.colors.text }]}>•</Text>
         )}
-      </React.Fragment>
+      </Animated.View>
     ));
   }, [metadata.genres, currentTheme.colors.text]);
 

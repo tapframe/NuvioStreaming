@@ -27,8 +27,11 @@ const ContentItem = ({ item, onPress, width }: ContentItemProps) => {
           source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
           style={styles.poster}
           contentFit="cover"
-          cachePolicy="memory-disk"
-          transition={300}
+          cachePolicy="memory"
+          transition={200}
+          placeholder={{ uri: 'https://via.placeholder.com/300x450' }}
+          placeholderContentFit="cover"
+          recyclingKey={item.id}
         />
         <LinearGradient
           colors={['transparent', 'rgba(0,0,0,0.85)']}

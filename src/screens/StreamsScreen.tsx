@@ -16,7 +16,7 @@ import {
   Linking,
 } from 'react-native';
 import * as ScreenOrientation from 'expo-screen-orientation';
-import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useRoute, useNavigation } from '@react-navigation/native';
 import { RouteProp } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -56,14 +56,13 @@ const DOLBY_ICON = 'https://upload.wikimedia.org/wikipedia/en/thumb/3/3f/Dolby_V
 const { width, height } = Dimensions.get('window');
 
 // Extracted Components
-const StreamCard = ({ stream, onPress, index, isLoading, statusMessage, theme, isExiting }: { 
+const StreamCard = ({ stream, onPress, index, isLoading, statusMessage, theme }: { 
   stream: Stream; 
   onPress: () => void; 
   index: number;
   isLoading?: boolean;
   statusMessage?: string;
   theme: any;
-  isExiting?: boolean;
 }) => {
   const styles = React.useMemo(() => createStyles(theme.colors), [theme.colors]);
   
@@ -80,92 +79,13 @@ const StreamCard = ({ stream, onPress, index, isLoading, statusMessage, theme, i
   const displayTitle = isHDRezka ? `HDRezka ${stream.title}` : (stream.name || stream.title || 'Unnamed Stream');
   const displayAddonName = isHDRezka ? '' : (stream.title || '');
 
-  // Animation delay based on index - stagger effect (only if not exiting)
-  const enterDelay = isExiting ? 0 : 100 + (index * 30);
-
-  // Use simple View when exiting to prevent animation conflicts
-  if (isExiting) {
-    return (
-      <View>
-        <TouchableOpacity 
-          style={[
-            styles.streamCard, 
-            isLoading && styles.streamCardLoading
-          ]} 
-          onPress={onPress}
-          disabled={isLoading}
-          activeOpacity={0.7}
-        >
-          <View style={styles.streamDetails}>
-            <View style={styles.streamNameRow}>
-              <View style={styles.streamTitleContainer}>
-                <Text style={[styles.streamName, { color: theme.colors.highEmphasis }]}>
-                  {displayTitle}
-                </Text>
-                {displayAddonName && displayAddonName !== displayTitle && (
-                  <Text style={[styles.streamAddonName, { color: theme.colors.mediumEmphasis }]}>
-                    {displayAddonName}
-                  </Text>
-                )}
-              </View>
-              
-              {/* Show loading indicator if stream is loading */}
-              {isLoading && (
-                <View style={styles.loadingIndicator}>
-                  <ActivityIndicator size="small" color={theme.colors.primary} />
-                  <Text style={[styles.loadingText, { color: theme.colors.primary }]}>
-                    {statusMessage || "Loading..."}
-                  </Text>
-                </View>
-              )}
-            </View>
-            
-            <View style={styles.streamMetaRow}>
-              {quality && quality >= "720" && (
-                <QualityBadge type="HD" />
-              )}
-              
-              {isDolby && (
-                <QualityBadge type="VISION" />
-              )}
-              
-              {size && (
-                <View style={[styles.chip, { backgroundColor: theme.colors.darkGray }]}>
-                  <Text style={[styles.chipText, { color: theme.colors.white }]}>{size}</Text>
-                </View>
-              )}
-              
-              {isDebrid && (
-                <View style={[styles.chip, { backgroundColor: theme.colors.success }]}>
-                  <Text style={[styles.chipText, { color: theme.colors.white }]}>DEBRID</Text>
-                </View>
-              )}
-              
-              {/* Special badge for HDRezka streams */}
-              {isHDRezka && (
-                <View style={[styles.chip, { backgroundColor: theme.colors.accent }]}>
-                  <Text style={[styles.chipText, { color: theme.colors.white }]}>HDREZKA</Text>
-                </View>
-              )}
-            </View>
-          </View>
-          
-          <View style={styles.streamAction}>
-            <MaterialIcons 
-              name="play-arrow" 
-              size={24} 
-              color={theme.colors.primary} 
-            />
-          </View>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  // Animation delay based on index - stagger effect
+  const enterDelay = 100 + (index * 30);
 
   return (
     <Animated.View
       entering={FadeInDown.duration(200).delay(enterDelay)}
-      layout={Layout.duration(200)}
+      exiting={FadeOut.duration(150)}
     >
       <TouchableOpacity 
         style={[
@@ -268,7 +188,7 @@ const ProviderFilter = memo(({
   const renderItem = useCallback(({ item, index }: { item: { id: string; name: string }; index: number }) => (
     <Animated.View
       entering={FadeIn.duration(300).delay(100 + index * 40)}
-      layout={Layout.springify()}
+      exiting={FadeOut.duration(150)}
     >
       <TouchableOpacity
         key={item.id}
@@ -328,11 +248,7 @@ export const StreamsScreen = () => {
   const loadStartTimeRef = useRef(0);
   const hasDoneInitialLoadRef = useRef(false);
   
-  // Add state for handling orientation transition
-  const [isTransitioning, setIsTransitioning] = useState(false);
   
-  // Add state to prevent animation conflicts during exit
-  const [isExiting, setIsExiting] = useState(false);
 
   // Add timing logs
   const [loadStartTime, setLoadStartTime] = useState(0);
@@ -506,9 +422,6 @@ export const StreamsScreen = () => {
 
   // Memoize handlers
   const handleBack = useCallback(() => {
-    // Set exit state to prevent animation conflicts and hide content immediately
-    setIsExiting(true);
-    
     const cleanup = () => {
       headerOpacity.value = withTiming(0, { duration: 100 });
       heroScale.value = withTiming(0.95, { duration: 100 });
@@ -1065,10 +978,9 @@ export const StreamsScreen = () => {
         isLoading={isLoading}
         statusMessage={undefined}
         theme={currentTheme}
-        isExiting={isExiting}
       />
     );
-  }, [handleStreamPress, currentTheme, isExiting]);
+  }, [handleStreamPress, currentTheme]);
 
   const renderSectionHeader = useCallback(({ section }: { section: { title: string; addonId: string } }) => {
     const isProviderLoading = loadingProviders[section.addonId];
@@ -1076,7 +988,7 @@ export const StreamsScreen = () => {
     return (
       <Animated.View
         entering={FadeIn.duration(400)}
-        layout={Layout.springify()}
+        exiting={FadeOut.duration(150)}
         style={styles.sectionHeaderContainer}
       >
         <View style={styles.sectionHeaderContent}>
@@ -1101,43 +1013,7 @@ export const StreamsScreen = () => {
     };
   }, []);
 
-  // Add orientation handling when screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      // Set transitioning state to mask any visual glitches
-      setIsTransitioning(true);
-      
-      // Immediately lock to portrait when returning to this screen
-      const lockToPortrait = async () => {
-        try {
-          await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-          // Small delay then unlock to allow natural portrait orientation
-          setTimeout(async () => {
-            try {
-              await ScreenOrientation.unlockAsync();
-              // Clear transition state after orientation is handled
-              setTimeout(() => {
-                setIsTransitioning(false);
-              }, 100);
-            } catch (error) {
-              logger.error('[StreamsScreen] Error unlocking orientation:', error);
-              setIsTransitioning(false);
-            }
-          }, 200);
-        } catch (error) {
-          logger.error('[StreamsScreen] Error locking to portrait:', error);
-          setIsTransitioning(false);
-        }
-      };
 
-      lockToPortrait();
-
-      return () => {
-        // Cleanup when screen loses focus
-        setIsTransitioning(false);
-      };
-    }, [])
-  );
 
   return (
     <View style={styles.container}>
@@ -1147,17 +1023,6 @@ export const StreamsScreen = () => {
         barStyle="light-content"
       />
       
-      {/* Instant overlay when exiting to prevent glitches */}
-      {isExiting && (
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.darkBackground, zIndex: 100 }]} />
-      )}
-      
-      {/* Transition overlay to mask orientation changes */}
-      {isTransitioning && (
-        <View style={styles.transitionOverlay}>
-          <ActivityIndicator size="small" color={colors.primary} />
-        </View>
-      )}
       
       <Animated.View
         entering={FadeIn.duration(300)}
@@ -1196,11 +1061,11 @@ export const StreamsScreen = () => {
       {type === 'series' && currentEpisode && (
         <Animated.View style={[styles.streamsHeroContainer, heroStyle]}>
           <Animated.View
-            entering={FadeIn.duration(600).springify()}
+            entering={FadeIn.duration(300)}
             style={StyleSheet.absoluteFill}
           >
             <Animated.View 
-              entering={FadeIn.duration(800).delay(100).springify().withInitialValues({
+              entering={FadeIn.duration(400).delay(100).withInitialValues({
                 transform: [{ scale: 1.05 }]
               })}
               style={StyleSheet.absoluteFill}

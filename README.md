@@ -1,52 +1,134 @@
+# Nuvio Streaming App
+
 <p align="center">
   <img src="assets/titlelogo.png" alt="Nuvio Logo" width="300"/>
 </p>
 
-# Nuvio
+<p align="center">
+  A modern streaming app built with React Native and Expo, featuring Stremio addon integration, Trakt synchronization, and a beautiful user interface.
+</p>
 
-An app I built with React Native/Expo for browsing and watching movies & shows. It uses Stremio-compatible addons to find streaming sources.
+## ⚠️ Alpha Testing
+This app is currently in alpha testing. Please report any bugs or issues you encounter.
 
-Built for iOS and Android.
+[Download Latest Release](https://github.com/tapframe/NuvioStreaming/releases/latest)
 
-## Key Features 
+## ✨ Key Features 
 
-*   **Home Screen:** Highlights new content, your watch history, and content categories.
-*   **Discover:** Browse trending and popular movies & TV shows.
-*   **Details:** Displays detailed info (descriptions, cast, ratings).
-*   **Video Player:** Integrated player(still broken on IOS,supports External PLayer for now).
-*   **Stream Finding:** Finds available streams using Stremio addons.
-*   **Search:** Quickly find specific movies or shows.
-*   **Trakt Sync:** Planned integration (coming soon).
-*   **Addon Management:** Add and manage your Stremio addons.
-*   **UI:** Focuses on a clean, interactive user experience.
+### Content & Discovery
+- **Smart Home Screen:** Personalized content recommendations and continue watching
+- **Discover Section:** Browse trending and popular movies & TV shows
+- **Rich Metadata:** Detailed information, cast, ratings, and similar content
+- **Powerful Search:** Find content quickly with instant results
+
+### Streaming & Playback
+- **Advanced Video Player:** 
+  - Built-in player with gesture controls
+  - External player support
+  - Auto-quality selection
+  - Subtitle customization
+- **Smart Stream Selection:** Automatically finds the best available streams
+- **Auto-Play:** Seamless playback of next episodes
+- **Continue Watching:** Resume from where you left off
+
+### Integration & Sync
+- **Trakt Integration:**
+  - Account synchronization
+  - Watch history tracking
+  - Library management
+  - Progress syncing
+- **Stremio Addons:**
+  - Compatible with Stremio addon system
+  - Easy addon management
+  - Multiple source support
+
+### User Experience
+- **Modern UI/UX:** Clean, intuitive interface with smooth animations
+- **Performance:** Optimized for smooth scrolling and quick loading
+- **Customization:** Theme options and display preferences
+- **Cross-Platform:** Works on both iOS and Android
 
 ## 📸 Screenshots
 
-| Home                                       | Discover                                   | Search                                   |
-| :----------------------------------------- | :----------------------------------------- | :--------------------------------------- |
-| ![Home](src/assets/home.jpg)               | ![Discover](src/assets/discover.jpg)       | ![Search](src/assets/search.jpg)         |
-| **Metadata**                               | **Seasons & Episodes**                     | **Rating**                               |
-| ![Metadata](src/assets/metadascreen.jpg)   | ![Seasons](src/assets/seasonandepisode.jpg)| ![Rating](src/assets/ratingscreen.jpg)   |
+| Home & Continue Watching | Discover & Browse | Search & Details |
+|:-----------------------:|:-----------------:|:----------------:|
+| ![Home](src/assets/home.jpg) | ![Discover](src/assets/discover.jpg) | ![Search](src/assets/search.jpg) |
+| **Content Details** | **Episodes & Seasons** | **Ratings & Info** |
+| ![Metadata](src/assets/metadascreen.jpg) | ![Seasons](src/assets/seasonandepisode.jpg) | ![Rating](src/assets/ratingscreen.jpg) |
 
-## Development
+## 🚀 Getting Started
 
-1.  You'll need Node.js, npm/yarn, and the Expo Go app (or native build tools like Android Studio/Xcode).
-2.  `git clone https://github.com/nayifleo1/NuvioExpo.git`
-3.  `cd NuvioExpo`
-4.  `npm install` or `yarn install`
-5.  `npx expo start` (Easiest way: Scan QR code with Expo Go app)
-    *   Or `npx expo run:android` / `npx expo run:ios` for native builds.
+### Prerequisites
+- Node.js 18 or newer
+- npm or yarn
+- Expo Go app (for development)
+- Android Studio (for Android builds)
+- Xcode (for iOS builds)
 
-## Found a bug or have an idea? 
+### Development Setup
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/tapframe/NuvioStreaming.git
+   cd NuvioStreaming
+   ```
 
-Great! Please open an [Issue on GitHub](https://github.com/nayifleo1/NuvioExpo/issues). Describe the problem or your suggestion.
+2. Install dependencies:
+   ```bash
+   npm install
+   # or
+   yarn install
+   ```
 
-## Contribution
+3. Start the development server:
+   ```bash
+   npx expo start
+   ```
 
-Contributions are welcome! Fork the repository, make your changes, and submit a Pull Request.
+4. Run on device/simulator:
+   - Scan QR code with Expo Go app
+   - Or run native builds:
+     ```bash
+     npx expo run:android
+     # or
+     npx expo run:ios
+     ```
+
+## 🤝 Contributing
+
+We welcome contributions! Here's how you can help:
+
+1. Fork the repository
+2. Create your feature branch 
+3. Commit your changes 
+4. Push to the branch 
+5. Open a Pull Request
+
+## 🐛 Bug Reports & Feature Requests
+
+Found a bug or have an idea? Please open an [issue](https://github.com/tapframe/NuvioStreaming/issues) with:
+- Clear description of the problem/suggestion
+- Steps to reproduce (for bugs)
+- Expected behavior
+- Screenshots if applicable
+
+## 📝 Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release history and changes.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+Built with help from the amazing communities behind:
+- React Native & Expo
+- TMDB API
+- Trakt.tv
+- Stremio
 
 ---
 
-Built with help from the communities and tools behind React Native, Expo, TMDB, Trakt, and the Stremio addon system.
-
-*Happy Streaming!* 
+<p align="center">
+  <em>Happy Streaming! 🎬</em>
+</p> 

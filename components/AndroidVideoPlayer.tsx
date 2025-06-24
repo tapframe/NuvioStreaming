@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
-import Video, { VideoRef, SelectedTrack, BufferingStrategyType } from 'react-native-video';
+import Video, { VideoRef, SelectedTrack, BufferingStrategyType, ResizeMode } from 'react-native-video';
 
 interface VideoPlayerProps {
   src: string;
@@ -9,6 +9,7 @@ interface VideoPlayerProps {
   currentTime: number;
   selectedAudioTrack?: SelectedTrack;
   selectedTextTrack?: SelectedTrack;
+  resizeMode?: ResizeMode;
   onProgress?: (data: { currentTime: number; playableDuration: number }) => void;
   onLoad?: (data: { duration: number }) => void;
   onError?: (error: any) => void;
@@ -24,6 +25,7 @@ export const AndroidVideoPlayer: React.FC<VideoPlayerProps> = ({
   currentTime,
   selectedAudioTrack,
   selectedTextTrack,
+  resizeMode = 'contain' as ResizeMode,
   onProgress,
   onLoad,
   onError,
@@ -93,7 +95,7 @@ export const AndroidVideoPlayer: React.FC<VideoPlayerProps> = ({
       onBuffer={handleBuffer}
       onError={handleError}
       onEnd={handleEnd}
-      resizeMode="contain"
+      resizeMode={resizeMode}
       controls={false}
       playInBackground={false}
       playWhenInactive={false}
