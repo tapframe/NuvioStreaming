@@ -189,7 +189,7 @@ const MetadataScreen: React.FC = () => {
   useEffect(() => {
     if (isReady) {
       setIsContentReady(true);
-      transitionOpacity.value = withTiming(1, { duration: 200 });
+      transitionOpacity.value = withTiming(1, { duration: 50 });
     } else if (!isReady && isContentReady) {
       setIsContentReady(false);
       transitionOpacity.value = 0;
