@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect, useMemo } from 'react';
+import React, { useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -56,9 +56,7 @@ const MetadataScreen: React.FC = () => {
 
   // Optimized state management - reduced state variables
   const [isContentReady, setIsContentReady] = useState(false);
-  const [showSkeleton, setShowSkeleton] = useState(true);
-  const transitionOpacity = useSharedValue(0);
-  const skeletonOpacity = useSharedValue(1);
+  const transitionOpacity = useSharedValue(1);
 
   const {
     metadata,
@@ -187,26 +185,14 @@ const MetadataScreen: React.FC = () => {
   // Memoized derived values for performance
   const isReady = useMemo(() => !loading && metadata && !metadataError, [loading, metadata, metadataError]);
   
-  // Smooth skeleton to content transition
+  // Simple content ready state management
   useEffect(() => {
-    if (isReady && !isContentReady) {
-      // Small delay to ensure skeleton is rendered before starting transition
-      setTimeout(() => {
-        // Start fade out skeleton and fade in content simultaneously
-        skeletonOpacity.value = withTiming(0, { duration: 300 });
-        transitionOpacity.value = withTiming(1, { duration: 400 });
-        
-        // Hide skeleton after fade out completes
-        setTimeout(() => {
-          setShowSkeleton(false);
-          setIsContentReady(true);
-        }, 300);
-      }, 100);
+    if (isReady) {
+      setIsContentReady(true);
+      transitionOpacity.value = withTiming(1, { duration: 200 });
     } else if (!isReady && isContentReady) {
       setIsContentReady(false);
-      setShowSkeleton(true);
       transitionOpacity.value = 0;
-      skeletonOpacity.value = 1;
     }
   }, [isReady, isContentReady]);
 
@@ -257,10 +243,6 @@ const MetadataScreen: React.FC = () => {
     opacity: transitionOpacity.value,
   }), []);
 
-  const skeletonStyle = useAnimatedStyle(() => ({
-    opacity: skeletonOpacity.value,
-  }), []);
-
   // Memoized error component for performance
   const ErrorComponent = useMemo(() => {
     if (!metadataError) return null;
@@ -300,104 +282,124 @@ const MetadataScreen: React.FC = () => {
   }
 
   return (
-    <View style={StyleSheet.absoluteFill}>
-      {/* Skeleton Loading Screen - with fade out transition */}
-      {showSkeleton && (
-        <Animated.View 
-          style={[StyleSheet.absoluteFill, skeletonStyle]}
-          pointerEvents={metadata ? 'none' : 'auto'}
-        >
-          <MetadataLoadingScreen type={metadata?.type === 'movie' ? 'movie' : 'series'} />
-        </Animated.View>
-      )}
-
-      {/* Main Content - with fade in transition */}
+    <SafeAreaView 
+      style={[containerStyle, styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}
+      edges={['bottom']}
+    >
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" animated />
+      
       {metadata && (
-        <Animated.View 
-          style={[StyleSheet.absoluteFill, transitionStyle]}
-          pointerEvents={metadata ? 'auto' : 'none'}
-        >
-          <SafeAreaView 
-            style={[containerStyle, styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}
-            edges={['bottom']}
+        <>
+          {/* Floating Header - Optimized */}
+          <FloatingHeader 
+            metadata={metadata}
+            logoLoadError={assetData.logoLoadError}
+            handleBack={handleBack}
+            handleToggleLibrary={handleToggleLibrary}
+            headerElementsY={animations.headerElementsY}
+            inLibrary={inLibrary}
+            headerOpacity={animations.headerOpacity}
+            headerElementsOpacity={animations.headerElementsOpacity}
+            safeAreaTop={safeAreaTop}
+            setLogoLoadError={assetData.setLogoLoadError}
+          />
+
+          <Animated.ScrollView
+            style={styles.scrollView}
+            showsVerticalScrollIndicator={false}
+            onScroll={animations.scrollHandler}
+            scrollEventThrottle={16}
+            bounces={false}
+            overScrollMode="never"
+            contentContainerStyle={styles.scrollContent}
           >
-            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" animated />
-            
-            {/* Floating Header - Optimized */}
-            <FloatingHeader 
+            {/* Hero Section - Optimized */}
+            <HeroSection 
               metadata={metadata}
+              bannerImage={assetData.bannerImage}
+              loadingBanner={assetData.loadingBanner}
               logoLoadError={assetData.logoLoadError}
-              handleBack={handleBack}
+              scrollY={animations.scrollY}
+              heroHeight={animations.heroHeight}
+              heroOpacity={animations.heroOpacity}
+              logoOpacity={animations.logoOpacity}
+              buttonsOpacity={animations.buttonsOpacity}
+              buttonsTranslateY={animations.buttonsTranslateY}
+              watchProgressOpacity={animations.watchProgressOpacity}
+              watchProgressWidth={animations.watchProgressWidth}
+              watchProgress={watchProgressData.watchProgress}
+              type={type as 'movie' | 'series'}
+              getEpisodeDetails={watchProgressData.getEpisodeDetails}
+              handleShowStreams={handleShowStreams}
               handleToggleLibrary={handleToggleLibrary}
-              headerElementsY={animations.headerElementsY}
               inLibrary={inLibrary}
-              headerOpacity={animations.headerOpacity}
-              headerElementsOpacity={animations.headerElementsOpacity}
-              safeAreaTop={safeAreaTop}
+              id={id}
+              navigation={navigation}
+              getPlayButtonText={watchProgressData.getPlayButtonText}
+              setBannerImage={assetData.setBannerImage}
               setLogoLoadError={assetData.setLogoLoadError}
             />
 
-            <Animated.ScrollView
-              style={styles.scrollView}
-              showsVerticalScrollIndicator={false}
-              onScroll={animations.scrollHandler}
-              scrollEventThrottle={16}
-              bounces={false}
-              overScrollMode="never"
-              contentContainerStyle={styles.scrollContent}
-            >
-              {/* Hero Section - Optimized */}
-              <HeroSection 
+            {/* Main Content - Optimized */}
+            <Animated.View style={contentStyle}>
+              <MetadataDetails 
                 metadata={metadata}
-                bannerImage={assetData.bannerImage}
-                loadingBanner={assetData.loadingBanner}
-                logoLoadError={assetData.logoLoadError}
-                scrollY={animations.scrollY}
-                heroHeight={animations.heroHeight}
-                heroOpacity={animations.heroOpacity}
-                logoOpacity={animations.logoOpacity}
-                buttonsOpacity={animations.buttonsOpacity}
-                buttonsTranslateY={animations.buttonsTranslateY}
-                watchProgressOpacity={animations.watchProgressOpacity}
-                watchProgressWidth={animations.watchProgressWidth}
-                watchProgress={watchProgressData.watchProgress}
+                imdbId={imdbId}
                 type={type as 'movie' | 'series'}
-                getEpisodeDetails={watchProgressData.getEpisodeDetails}
-                handleShowStreams={handleShowStreams}
-                handleToggleLibrary={handleToggleLibrary}
-                inLibrary={inLibrary}
-                id={id}
-                navigation={navigation}
-                getPlayButtonText={watchProgressData.getPlayButtonText}
-                setBannerImage={assetData.setBannerImage}
-                setLogoLoadError={assetData.setLogoLoadError}
+                renderRatings={() => imdbId ? (
+                  <RatingsSection imdbId={imdbId} type={type === 'series' ? 'show' : 'movie'} />
+                ) : null}
               />
 
-              {/* Main Content - Optimized */}
-              <Animated.View style={contentStyle}>
-                <MetadataDetails 
-                  metadata={metadata}
-                  imdbId={imdbId}
-                  type={type as 'movie' | 'series'}
-                  renderRatings={() => imdbId ? (
-                    <RatingsSection imdbId={imdbId} type={type === 'series' ? 'show' : 'movie'} />
-                  ) : null}
-                />
-
+              {/* Cast Section with skeleton when loading */}
+              {loadingCast ? (
+                <View style={styles.skeletonSection}>
+                  <View style={[styles.skeletonTitle, { backgroundColor: currentTheme.colors.elevation1 }]} />
+                  <View style={styles.skeletonCastRow}>
+                    {[...Array(4)].map((_, index) => (
+                      <View key={index} style={[styles.skeletonCastItem, { backgroundColor: currentTheme.colors.elevation1 }]} />
+                    ))}
+                  </View>
+                </View>
+              ) : (
                 <CastSection
                   cast={cast}
                   loadingCast={loadingCast}
                   onSelectCastMember={handleSelectCastMember}
                 />
+              )}
 
-                {type === 'movie' && (
+              {/* Recommendations Section with skeleton when loading */}
+              {type === 'movie' && (
+                loadingRecommendations ? (
+                  <View style={styles.skeletonSection}>
+                    <View style={[styles.skeletonTitle, { backgroundColor: currentTheme.colors.elevation1 }]} />
+                    <View style={styles.skeletonRecommendationsRow}>
+                      {[...Array(3)].map((_, index) => (
+                        <View key={index} style={[styles.skeletonRecommendationItem, { backgroundColor: currentTheme.colors.elevation1 }]} />
+                      ))}
+                    </View>
+                  </View>
+                ) : (
                   <MoreLikeThisSection 
                     recommendations={recommendations}
                     loadingRecommendations={loadingRecommendations}
                   />
-                )}
+                )
+              )}
 
-                {type === 'series' ? (
+              {/* Series/Movie Content with episode skeleton when loading */}
+              {type === 'series' ? (
+                (loadingSeasons || Object.keys(groupedEpisodes).length === 0) ? (
+                  <View style={styles.skeletonSection}>
+                    <View style={[styles.skeletonTitle, { backgroundColor: currentTheme.colors.elevation1 }]} />
+                    <View style={styles.skeletonEpisodesContainer}>
+                      {[...Array(6)].map((_, index) => (
+                        <View key={index} style={[styles.skeletonEpisodeItem, { backgroundColor: currentTheme.colors.elevation1 }]} />
+                      ))}
+                    </View>
+                  </View>
+                ) : (
                   <SeriesContent
                     episodes={Object.values(groupedEpisodes).flat()}
                     selectedSeason={selectedSeason}
@@ -407,15 +409,15 @@ const MetadataScreen: React.FC = () => {
                     groupedEpisodes={groupedEpisodes}
                     metadata={metadata || undefined}
                   />
-                ) : (
-                  metadata && <MovieContent metadata={metadata} />
-                )}
-              </Animated.View>
-            </Animated.ScrollView>
-          </SafeAreaView>
-        </Animated.View>
+                )
+              ) : (
+                metadata && <MovieContent metadata={metadata} />
+              )}
+            </Animated.View>
+          </Animated.ScrollView>
+        </>
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -465,6 +467,44 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Skeleton loading styles
+  skeletonSection: {
+    padding: 16,
+    marginBottom: 24,
+  },
+  skeletonTitle: {
+    width: 150,
+    height: 20,
+    borderRadius: 4,
+    marginBottom: 16,
+  },
+  skeletonCastRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  skeletonCastItem: {
+    width: 80,
+    height: 120,
+    borderRadius: 8,
+  },
+  skeletonRecommendationsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  skeletonRecommendationItem: {
+    width: 120,
+    height: 180,
+    borderRadius: 8,
+  },
+  skeletonEpisodesContainer: {
+    gap: 12,
+  },
+  skeletonEpisodeItem: {
+    width: '100%',
+    height: 80,
+    borderRadius: 8,
+    marginBottom: 8,
   },
 });
 
