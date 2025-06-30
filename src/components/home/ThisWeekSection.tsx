@@ -41,7 +41,7 @@ interface ThisWeekEpisode {
   season_poster_path: string | null;
 }
 
-export const ThisWeekSection = () => {
+export const ThisWeekSection = React.memo(() => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { libraryItems, loading: libraryLoading } = useLibrary();
   const [episodes, setEpisodes] = useState<ThisWeekEpisode[]>([]);
@@ -287,7 +287,7 @@ export const ThisWeekSection = () => {
       />
     </Animated.View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

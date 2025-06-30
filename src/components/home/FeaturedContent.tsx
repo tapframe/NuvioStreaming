@@ -764,4 +764,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default FeaturedContent; 
+export default React.memo(FeaturedContent); 

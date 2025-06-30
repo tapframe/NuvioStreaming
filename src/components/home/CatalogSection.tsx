@@ -176,4 +176,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CatalogSection; 
+export default React.memo(CatalogSection); 

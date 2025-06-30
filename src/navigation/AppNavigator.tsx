@@ -17,7 +17,6 @@ import { useTheme } from '../contexts/ThemeContext';
 
 // Import screens with their proper types
 import HomeScreen from '../screens/HomeScreen';
-import DiscoverScreen from '../screens/DiscoverScreen';
 import LibraryScreen from '../screens/LibraryScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import MetadataScreen from '../screens/MetadataScreen';
@@ -46,7 +45,6 @@ export type RootStackParamList = {
   Onboarding: undefined;
   MainTabs: undefined;
   Home: undefined;
-  Discover: undefined;
   Library: undefined;
   Settings: undefined;
   Search: undefined;
@@ -110,8 +108,8 @@ export type RootStackNavigationProp = NativeStackNavigationProp<RootStackParamLi
 // Tab navigator types
 export type MainTabParamList = {
   Home: undefined;
-  Discover: undefined;
   Library: undefined;
+  Search: undefined;
   Settings: undefined;
 };
 
@@ -298,7 +296,7 @@ export const CustomNavigationDarkTheme: Theme = {
 type IconNameType = 'home' | 'home-outline' | 'compass' | 'compass-outline' | 
                    'play-box-multiple' | 'play-box-multiple-outline' | 
                    'puzzle' | 'puzzle-outline' | 
-                   'cog' | 'cog-outline';
+                   'cog' | 'cog-outline' | 'feature-search' | 'feature-search-outline';
 
 // Add TabIcon component
 const TabIcon = React.memo(({ focused, color, iconName }: { 
@@ -479,11 +477,11 @@ const MainTabs = () => {
                 case 'Home':
                   iconName = 'home';
                   break;
-                case 'Discover':
-                  iconName = 'compass';
-                  break;
                 case 'Library':
                   iconName = 'play-box-multiple';
+                  break;
+                case 'Search':
+                  iconName = 'feature-search';
                   break;
                 case 'Settings':
                   iconName = 'cog';
@@ -546,11 +544,11 @@ const MainTabs = () => {
               case 'Home':
                 iconName = 'home';
                 break;
-              case 'Discover':
-                iconName = 'compass';
-                break;
               case 'Library':
                 iconName = 'play-box-multiple';
+                break;
+              case 'Search':
+                iconName = 'feature-search';
                 break;
               case 'Settings':
                 iconName = 'cog';
@@ -635,18 +633,18 @@ const MainTabs = () => {
           }}
         />
         <Tab.Screen 
-          name="Discover"
-          component={DiscoverScreen}
-          options={{ 
-            tabBarLabel: 'Discover',
-            headerShown: false
-          }}
-        />
-        <Tab.Screen 
           name="Library" 
           component={LibraryScreen}
           options={{ 
             tabBarLabel: 'Library',
+            headerShown: false
+          }}
+        />
+        <Tab.Screen 
+          name="Search" 
+          component={SearchScreen}
+          options={{ 
+            tabBarLabel: 'Search',
             headerShown: false
           }}
         />

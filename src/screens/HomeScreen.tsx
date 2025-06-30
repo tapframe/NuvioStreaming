@@ -602,11 +602,10 @@ const HomeScreen = () => {
           ]}
           showsVerticalScrollIndicator={false}
           ListFooterComponent={ListFooterComponent}
-          initialNumToRender={3}
-          maxToRenderPerBatch={2}
-          windowSize={5}
-          removeClippedSubviews={Platform.OS === 'android'}
-          updateCellsBatchingPeriod={50}
+          initialNumToRender={5}
+          maxToRenderPerBatch={5}
+          windowSize={11}
+          removeClippedSubviews={false}
           onEndReachedThreshold={0.5}
           maintainVisibleContentPosition={{
             minIndexForVisible: 0,
