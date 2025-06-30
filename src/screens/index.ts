@@ -1,6 +1,5 @@
 // Export all screens from a single file
 export { default as HomeScreen } from './HomeScreen';
-export { default as PlayerScreen } from './PlayerScreen';
 export { default as SearchScreen } from './SearchScreen';
 export { default as AddonsScreen } from './AddonsScreen';
 export { default as SettingsScreen } from './SettingsScreen';
@@ -10,4 +9,5 @@ export { default as DiscoverScreen } from './DiscoverScreen';
 export { default as LibraryScreen } from './LibraryScreen';
 export { default as ShowRatingsScreen } from './ShowRatingsScreen';
 export { default as CatalogSettingsScreen } from './CatalogSettingsScreen';
-export { default as StreamsScreen } from './StreamsScreen'; 
+export { default as StreamsScreen } from './StreamsScreen';
+export { default as OnboardingScreen } from './OnboardingScreen'; 

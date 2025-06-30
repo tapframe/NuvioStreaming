@@ -39,9 +39,11 @@ import PlayerSettingsScreen from '../screens/PlayerSettingsScreen';
 import LogoSourceSettings from '../screens/LogoSourceSettings';
 import ThemeScreen from '../screens/ThemeScreen';
 import ProfilesScreen from '../screens/ProfilesScreen';
+import OnboardingScreen from '../screens/OnboardingScreen';
 
 // Stack navigator types
 export type RootStackParamList = {
+  Onboarding: undefined;
   MainTabs: undefined;
   Home: undefined;
   Discover: undefined;
@@ -688,7 +690,7 @@ const customFadeInterpolator = ({ current, layouts }: any) => {
 };
 
 // Stack Navigator
-const AppNavigator = () => {
+const AppNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootStackParamList }) => {
   const { currentTheme } = useTheme();
   
   // Handle Android-specific optimizations
@@ -717,6 +719,7 @@ const AppNavigator = () => {
           })
         }}>
           <Stack.Navigator
+            initialRouteName={initialRouteName || 'MainTabs'}
             screenOptions={{
               headerShown: false,
               // Use slide_from_right for consistency and smooth transitions
@@ -746,6 +749,18 @@ const AppNavigator = () => {
               }),
             }}
           >
+            <Stack.Screen 
+              name="Onboarding" 
+              component={OnboardingScreen}
+              options={{
+                headerShown: false,
+                animation: 'fade',
+                animationDuration: 300,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
             <Stack.Screen 
               name="MainTabs" 
               component={MainTabs as any} 

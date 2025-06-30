@@ -607,10 +607,28 @@ const SettingsScreen: React.FC = () => {
               <SettingItem
                 title="Privacy Policy"
                 description="Information about data collection and usage"
-                icon="policy"
-                renderControl={ChevronRight}
-                onPress={() => Linking.openURL('https://github.com/Stremio/stremio-expo/blob/main/PRIVACY_POLICY.md').catch(err => console.error("Couldn't load page", err))}
-                isLast={true}
+                icon="privacy-tip"
+                onPress={() => Linking.openURL('https://your-privacy-policy-url.com')}
+                renderControl={() => <ChevronRight />}
+              />
+              <SettingItem
+                title="Test Onboarding"
+                icon="play-circle-outline"
+                onPress={() => navigation.navigate('Onboarding')}
+                renderControl={() => <ChevronRight />}
+              />
+              <SettingItem
+                title="Reset Onboarding"
+                icon="refresh"
+                onPress={async () => {
+                  try {
+                    await AsyncStorage.removeItem('hasCompletedOnboarding');
+                    Alert.alert('Success', 'Onboarding has been reset. Restart the app to see the onboarding flow.');
+                  } catch (error) {
+                    Alert.alert('Error', 'Failed to reset onboarding.');
+                  }
+                }}
+                renderControl={() => <ChevronRight />}
               />
             </SettingsCard>
 

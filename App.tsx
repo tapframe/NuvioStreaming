@@ -5,7 +5,7 @@
  * @format
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet
@@ -25,6 +25,7 @@ import { GenreProvider } from './src/contexts/GenreContext';
 import { TraktProvider } from './src/contexts/TraktContext';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import SplashScreen from './src/components/SplashScreen';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Sentry from '@sentry/react-native';
 
 Sentry.init({
@@ -50,6 +51,23 @@ enableScreens(true);
 const ThemedApp = () => {
   const { currentTheme } = useTheme();
   const [isAppReady, setIsAppReady] = useState(false);
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
+  
+  // Check onboarding status
+  useEffect(() => {
+    const checkOnboardingStatus = async () => {
+      try {
+        const onboardingCompleted = await AsyncStorage.getItem('hasCompletedOnboarding');
+        setHasCompletedOnboarding(onboardingCompleted === 'true');
+      } catch (error) {
+        console.error('Error checking onboarding status:', error);
+        // Default to showing onboarding if we can't check
+        setHasCompletedOnboarding(false);
+      }
+    };
+    
+    checkOnboardingStatus();
+  }, []);
   
   // Create custom themes based on current theme
   const customDarkTheme = {
@@ -75,6 +93,10 @@ const ThemedApp = () => {
     setIsAppReady(true);
   };
   
+  // Don't render anything until we know the onboarding status
+  const shouldShowApp = isAppReady && hasCompletedOnboarding !== null;
+  const initialRouteName = hasCompletedOnboarding ? 'MainTabs' : 'Onboarding';
+  
   return (
     <PaperProvider theme={customDarkTheme}>
       <NavigationContainer 
@@ -87,7 +109,7 @@ const ThemedApp = () => {
             style="light"
           />
           {!isAppReady && <SplashScreen onFinish={handleSplashComplete} />}
-          {isAppReady && <AppNavigator />}
+          {shouldShowApp && <AppNavigator initialRouteName={initialRouteName} />}
         </View>
       </NavigationContainer>
     </PaperProvider>

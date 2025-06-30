@@ -63,6 +63,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import type { Theme } from '../contexts/ThemeContext';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import FirstTimeWelcome from '../components/FirstTimeWelcome';
 
 // Constants
 const CATALOG_SETTINGS_KEY = 'catalog_settings';
@@ -82,7 +83,8 @@ type HomeScreenListItem =
   | { type: 'thisWeek'; key: string }
   | { type: 'continueWatching'; key: string }
   | { type: 'catalog'; catalog: CatalogContent; key: string }
-  | { type: 'placeholder'; key: string };
+  | { type: 'placeholder'; key: string }
+  | { type: 'welcome'; key: string };
 
 // Sample categories (real app would get these from API)
 const SAMPLE_CATEGORIES: Category[] = [
@@ -117,6 +119,7 @@ const HomeScreen = () => {
   const [catalogs, setCatalogs] = useState<(CatalogContent | null)[]>([]);
   const [catalogsLoading, setCatalogsLoading] = useState(true);
   const [loadedCatalogCount, setLoadedCatalogCount] = useState(0);
+  const [hasAddons, setHasAddons] = useState<boolean | null>(null);
   const totalCatalogsRef = useRef(0);
   
   const { 
@@ -135,6 +138,9 @@ const HomeScreen = () => {
     
     try {
       const addons = await catalogService.getAllAddons();
+      
+      // Set hasAddons state based on whether we have any addons
+      setHasAddons(addons.length > 0);
       
       // Load catalog settings to check which catalogs are enabled
       const catalogSettingsJson = await AsyncStorage.getItem(CATALOG_SETTINGS_KEY);
@@ -469,6 +475,13 @@ const HomeScreen = () => {
   const listData: HomeScreenListItem[] = useMemo(() => {
     const data: HomeScreenListItem[] = [];
 
+    // If no addons are installed, just show the welcome component
+    if (hasAddons === false) {
+      data.push({ type: 'welcome', key: 'welcome' });
+      return data;
+    }
+
+    // Normal flow when addons are present
     if (showHeroSection) {
       data.push({ type: 'featured', key: 'featured' });
     }
@@ -486,7 +499,7 @@ const HomeScreen = () => {
     });
 
     return data;
-  }, [showHeroSection, catalogs]);
+  }, [hasAddons, showHeroSection, catalogs]);
 
   const renderListItem = useCallback(({ item }: { item: HomeScreenListItem }) => {
     switch (item.type) {
@@ -526,6 +539,8 @@ const HomeScreen = () => {
             </View>
           </View>
         );
+      case 'welcome':
+        return <FirstTimeWelcome />;
       default:
         return null;
     }
