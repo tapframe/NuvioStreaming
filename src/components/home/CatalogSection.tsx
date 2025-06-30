@@ -109,15 +109,20 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
         decelerationRate="fast"
         snapToAlignment="start"
         ItemSeparatorComponent={() => <View style={{ width: 8 }} />}
-        initialNumToRender={4}
-        maxToRenderPerBatch={4}
-        windowSize={5}
+        initialNumToRender={3}
+        maxToRenderPerBatch={2}
+        windowSize={3}
         removeClippedSubviews={Platform.OS === 'android'}
+        updateCellsBatchingPeriod={50}
         getItemLayout={(data, index) => ({
           length: POSTER_WIDTH + 8,
           offset: (POSTER_WIDTH + 8) * index,
           index,
         })}
+        maintainVisibleContentPosition={{
+          minIndexForVisible: 0
+        }}
+        onEndReachedThreshold={1}
       />
     </Animated.View>
   );

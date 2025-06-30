@@ -602,9 +602,21 @@ const HomeScreen = () => {
           ]}
           showsVerticalScrollIndicator={false}
           ListFooterComponent={ListFooterComponent}
-          initialNumToRender={5}
-          maxToRenderPerBatch={5}
-          windowSize={10}
+          initialNumToRender={3}
+          maxToRenderPerBatch={2}
+          windowSize={5}
+          removeClippedSubviews={Platform.OS === 'android'}
+          updateCellsBatchingPeriod={50}
+          onEndReachedThreshold={0.5}
+          maintainVisibleContentPosition={{
+            minIndexForVisible: 0,
+            autoscrollToTopThreshold: 10
+          }}
+          getItemLayout={(data, index) => ({
+            length: index === 0 ? 400 : 280, // Approximate heights for different item types
+            offset: index === 0 ? 0 : 400 + (index - 1) * 280,
+            index,
+          })}
         />
       </View>
     );
