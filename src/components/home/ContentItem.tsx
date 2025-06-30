@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Platform } from 'react-native';
+import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Platform, Text } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -90,54 +90,59 @@ const ContentItem = React.memo(({ item, onPress }: ContentItemProps) => {
 
   return (
     <>
-      <TouchableOpacity
-        style={styles.contentItem}
-        activeOpacity={0.7}
-        onPress={handlePress}
-        onLongPress={handleLongPress}
-        delayLongPress={300}
-      >
-        <View style={styles.contentItemContainer}>
-          <ExpoImage
-            source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
-            style={styles.poster}
-            contentFit="cover"
-            cachePolicy="memory"
-            transition={200}
-            placeholder={{ uri: 'https://via.placeholder.com/300x450' }}
-            placeholderContentFit="cover"
-            recyclingKey={item.id}
-            onLoadStart={() => {
-              setImageLoaded(false);
-              setImageError(false);
-            }}
-            onLoadEnd={() => setImageLoaded(true)}
-            onError={() => {
-              setImageError(true);
-              setImageLoaded(true);
-            }}
-          />
-          {(!imageLoaded || imageError) && (
-            <View style={[styles.loadingOverlay, { backgroundColor: currentTheme.colors.elevation2 }]}>
-              {!imageError ? (
-                <ActivityIndicator color={currentTheme.colors.primary} size="small" />
-              ) : (
-                <MaterialIcons name="broken-image" size={24} color={currentTheme.colors.lightGray} />
-              )}
-            </View>
-          )}
-          {isWatched && (
-            <View style={styles.watchedIndicator}>
-              <MaterialIcons name="check-circle" size={22} color={currentTheme.colors.success} />
-            </View>
-          )}
-          {item.inLibrary && (
-            <View style={styles.libraryBadge}>
-              <MaterialIcons name="bookmark" size={16} color={currentTheme.colors.white} />
-            </View>
-          )}
-        </View>
-      </TouchableOpacity>
+      <View style={styles.itemContainer}>
+        <TouchableOpacity
+          style={styles.contentItem}
+          activeOpacity={0.7}
+          onPress={handlePress}
+          onLongPress={handleLongPress}
+          delayLongPress={300}
+        >
+          <View style={styles.contentItemContainer}>
+            <ExpoImage
+              source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
+              style={styles.poster}
+              contentFit="cover"
+              cachePolicy="memory"
+              transition={200}
+              placeholder={{ uri: 'https://via.placeholder.com/300x450' }}
+              placeholderContentFit="cover"
+              recyclingKey={item.id}
+              onLoadStart={() => {
+                setImageLoaded(false);
+                setImageError(false);
+              }}
+              onLoadEnd={() => setImageLoaded(true)}
+              onError={() => {
+                setImageError(true);
+                setImageLoaded(true);
+              }}
+            />
+            {(!imageLoaded || imageError) && (
+              <View style={[styles.loadingOverlay, { backgroundColor: currentTheme.colors.elevation2 }]}>
+                {!imageError ? (
+                  <ActivityIndicator color={currentTheme.colors.primary} size="small" />
+                ) : (
+                  <MaterialIcons name="broken-image" size={24} color={currentTheme.colors.lightGray} />
+                )}
+              </View>
+            )}
+            {isWatched && (
+              <View style={styles.watchedIndicator}>
+                <MaterialIcons name="check-circle" size={22} color={currentTheme.colors.success} />
+              </View>
+            )}
+            {item.inLibrary && (
+              <View style={styles.libraryBadge}>
+                <MaterialIcons name="bookmark" size={16} color={currentTheme.colors.white} />
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+        <Text style={[styles.title, { color: currentTheme.colors.text }]} numberOfLines={2}>
+          {item.name}
+        </Text>
+      </View>
       
       <DropUpMenu
         visible={menuVisible}
@@ -150,6 +155,9 @@ const ContentItem = React.memo(({ item, onPress }: ContentItemProps) => {
 });
 
 const styles = StyleSheet.create({
+  itemContainer: {
+    width: POSTER_WIDTH,
+  },
   contentItem: {
     width: POSTER_WIDTH,
     aspectRatio: 2/3,
@@ -164,6 +172,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     borderWidth: 0.5,
     borderColor: 'rgba(255,255,255,0.12)',
+    marginBottom: 8,
   },
   contentItemContainer: {
     width: '100%',
@@ -201,6 +210,13 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 4,
   },
+  title: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: 4,
+    textAlign: 'center',
+    fontFamily: 'SpaceMono-Regular',
+  }
 });
 
 export default ContentItem; 

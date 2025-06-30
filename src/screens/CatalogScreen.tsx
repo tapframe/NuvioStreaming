@@ -188,6 +188,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   const { addonId, type, id, name: originalName, genreFilter } = route.params;
   const [items, setItems] = useState<Meta[]>([]);
   const [loading, setLoading] = useState(true);
+  const [paginating, setPaginating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -198,6 +199,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   const colors = currentTheme.colors;
   const styles = createStyles(colors);
   const isDarkMode = true;
+  const isInitialRender = React.useRef(true);
 
   const { getCustomName, isLoadingCustomNames } = useCustomCatalogNames();
   
@@ -262,7 +264,10 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
     try {
       if (shouldRefresh) {
         setRefreshing(true);
-      } else if (pageNum === 1) {
+        setHasMore(true); // Reset hasMore on refresh
+      } else if (pageNum > 1) {
+        setPaginating(true);
+      } else {
         setLoading(true);
       }
 
@@ -360,6 +365,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           setHasMore(false);
         } else {
           foundItems = true;
+          setHasMore(true); // Ensure hasMore is true if we found items
         }
         
         if (shouldRefresh || pageNum === 1) {
@@ -442,8 +448,11 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           index === self.findIndex((t) => t.id === item.id)
         );
         
-        if (uniqueItems.length === 0) {
+        if (uniqueItems.length === 0 && allItems.length === 0) {
           setHasMore(false);
+        } else {
+          foundItems = true;
+          setHasMore(true); // Ensure hasMore is true if we found items
         }
         
         if (shouldRefresh || pageNum === 1) {
@@ -467,25 +476,31 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setPaginating(false);
     }
   }, [addonId, type, id, genreFilter, dataSource]);
 
   useEffect(() => {
-    loadItems(1);
+    loadItems(1, true);
   }, [loadItems]);
 
   const handleRefresh = useCallback(() => {
     setPage(1);
+    setItems([]); // Clear items on refresh
     loadItems(1, true);
   }, [loadItems]);
 
   const handleLoadMore = useCallback(() => {
-    if (!loading && hasMore) {
+    if (isInitialRender.current) {
+      isInitialRender.current = false;
+      return;
+    }
+    if (!loading && !paginating && hasMore && !refreshing) {
       const nextPage = page + 1;
       setPage(nextPage);
       loadItems(nextPage);
     }
-  }, [loading, hasMore, page, loadItems]);
+  }, [loading, paginating, hasMore, page, loadItems, refreshing]);
 
   const renderItem = useCallback(({ item, index }: { item: Meta; index: number }) => {
     // Calculate if this is the last item in a row
@@ -638,7 +653,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.5}
           ListFooterComponent={
-            loading && items.length > 0 ? (
+            paginating ? (
               <View style={styles.footer}>
                 <ActivityIndicator size="small" color={colors.primary} />
               </View>
