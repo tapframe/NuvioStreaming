@@ -281,6 +281,11 @@ const MetadataScreen: React.FC = () => {
     return ErrorComponent;
   }
 
+  // Show loading screen if metadata is not yet available
+  if (loading || !isContentReady) {
+    return <MetadataLoadingScreen type={type as 'movie' | 'series'} />;
+  }
+
   return (
     <SafeAreaView 
       style={[containerStyle, styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}
@@ -352,64 +357,31 @@ const MetadataScreen: React.FC = () => {
               />
 
               {/* Cast Section with skeleton when loading */}
-              {loadingCast ? (
-                <View style={styles.skeletonSection}>
-                  <View style={[styles.skeletonTitle, { backgroundColor: currentTheme.colors.elevation1 }]} />
-                  <View style={styles.skeletonCastRow}>
-                    {[...Array(4)].map((_, index) => (
-                      <View key={index} style={[styles.skeletonCastItem, { backgroundColor: currentTheme.colors.elevation1 }]} />
-                    ))}
-                  </View>
-                </View>
-              ) : (
-                <CastSection
-                  cast={cast}
-                  loadingCast={loadingCast}
-                  onSelectCastMember={handleSelectCastMember}
-                />
-              )}
+              <CastSection
+                cast={cast}
+                loadingCast={loadingCast}
+                onSelectCastMember={handleSelectCastMember}
+              />
 
               {/* Recommendations Section with skeleton when loading */}
               {type === 'movie' && (
-                loadingRecommendations ? (
-                  <View style={styles.skeletonSection}>
-                    <View style={[styles.skeletonTitle, { backgroundColor: currentTheme.colors.elevation1 }]} />
-                    <View style={styles.skeletonRecommendationsRow}>
-                      {[...Array(3)].map((_, index) => (
-                        <View key={index} style={[styles.skeletonRecommendationItem, { backgroundColor: currentTheme.colors.elevation1 }]} />
-                      ))}
-                    </View>
-                  </View>
-                ) : (
-                  <MoreLikeThisSection 
-                    recommendations={recommendations}
-                    loadingRecommendations={loadingRecommendations}
-                  />
-                )
+                <MoreLikeThisSection 
+                  recommendations={recommendations}
+                  loadingRecommendations={loadingRecommendations}
+                />
               )}
 
               {/* Series/Movie Content with episode skeleton when loading */}
               {type === 'series' ? (
-                (loadingSeasons || Object.keys(groupedEpisodes).length === 0) ? (
-                  <View style={styles.skeletonSection}>
-                    <View style={[styles.skeletonTitle, { backgroundColor: currentTheme.colors.elevation1 }]} />
-                    <View style={styles.skeletonEpisodesContainer}>
-                      {[...Array(6)].map((_, index) => (
-                        <View key={index} style={[styles.skeletonEpisodeItem, { backgroundColor: currentTheme.colors.elevation1 }]} />
-                      ))}
-                    </View>
-                  </View>
-                ) : (
-                  <SeriesContent
-                    episodes={Object.values(groupedEpisodes).flat()}
-                    selectedSeason={selectedSeason}
-                    loadingSeasons={loadingSeasons}
-                    onSeasonChange={handleSeasonChangeWithHaptics}
-                    onSelectEpisode={handleEpisodeSelect}
-                    groupedEpisodes={groupedEpisodes}
-                    metadata={metadata || undefined}
-                  />
-                )
+                <SeriesContent
+                  episodes={Object.values(groupedEpisodes).flat()}
+                  selectedSeason={selectedSeason}
+                  loadingSeasons={loadingSeasons}
+                  onSeasonChange={handleSeasonChangeWithHaptics}
+                  onSelectEpisode={handleEpisodeSelect}
+                  groupedEpisodes={groupedEpisodes}
+                  metadata={metadata || undefined}
+                />
               ) : (
                 metadata && <MovieContent metadata={metadata} />
               )}

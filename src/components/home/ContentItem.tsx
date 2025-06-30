@@ -53,8 +53,6 @@ const POSTER_WIDTH = posterLayout.posterWidth;
 const ContentItem = React.memo(({ item, onPress }: ContentItemProps) => {
   const [menuVisible, setMenuVisible] = useState(false);
   const [isWatched, setIsWatched] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [imageError, setImageError] = useState(false);
   const { currentTheme } = useTheme();
 
   const handleLongPress = useCallback(() => {
@@ -108,25 +106,7 @@ const ContentItem = React.memo(({ item, onPress }: ContentItemProps) => {
               placeholder={{ uri: 'https://via.placeholder.com/300x450' }}
               placeholderContentFit="cover"
               recyclingKey={item.id}
-              onLoadStart={() => {
-                setImageLoaded(false);
-                setImageError(false);
-              }}
-              onLoadEnd={() => setImageLoaded(true)}
-              onError={() => {
-                setImageError(true);
-                setImageLoaded(true);
-              }}
             />
-            {(!imageLoaded || imageError) && (
-              <View style={[styles.loadingOverlay, { backgroundColor: currentTheme.colors.elevation2 }]}>
-                {!imageError ? (
-                  <ActivityIndicator color={currentTheme.colors.primary} size="small" />
-                ) : (
-                  <MaterialIcons name="broken-image" size={24} color={currentTheme.colors.lightGray} />
-                )}
-              </View>
-            )}
             {isWatched && (
               <View style={styles.watchedIndicator}>
                 <MaterialIcons name="check-circle" size={22} color={currentTheme.colors.success} />
