@@ -586,6 +586,22 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
 });
 
+// Cinemeta addon details
+const cinemetaAddon: CommunityAddon = {
+  transportUrl: 'https://v3-cinemeta.strem.io/manifest.json',
+  manifest: {
+    id: 'com.linvo.cinemeta',
+    version: '3.0.13',
+    name: 'Cinemeta',
+    description: 'Provides metadata for movies and series from TheTVDB, TheMovieDB, etc.',
+    logo: 'https://static.strem.io/addons/cinemeta.png',
+    types: ['movie', 'series'],
+    behaviorHints: {
+      configurable: false
+    }
+  } as ExtendedManifest,
+};
+
 const AddonsScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const [addons, setAddons] = useState<ExtendedManifest[]>([]);
@@ -653,11 +669,18 @@ const AddonsScreen = () => {
     try {
       const response = await axios.get<CommunityAddon[]>('https://stremio-addons.com/catalog.json');
       // Filter out addons without a manifest or transportUrl (basic validation)
-      const validAddons = response.data.filter(addon => addon.manifest && addon.transportUrl);
-      setCommunityAddons(validAddons);
+      let validAddons = response.data.filter(addon => addon.manifest && addon.transportUrl);
+
+      // Filter out Cinemeta if it's already in the community list to avoid duplication
+      validAddons = validAddons.filter(addon => addon.manifest.id !== 'com.linvo.cinemeta');
+
+      // Add Cinemeta to the beginning of the list
+      setCommunityAddons([cinemetaAddon, ...validAddons]);
     } catch (error) {
       logger.error('Failed to load community addons:', error);
       setCommunityError('Failed to load community addons. Please try again later.');
+      // Still show Cinemeta if the community list fails to load
+      setCommunityAddons([cinemetaAddon]);
     } finally {
       setCommunityLoading(false);
     }
