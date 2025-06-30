@@ -44,6 +44,80 @@ const imageCache: Record<string, boolean> = {};
 
 const { width, height } = Dimensions.get('window');
 
+const NoFeaturedContent = () => {
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const { currentTheme } = useTheme();
+
+  const styles = StyleSheet.create({
+    noContentContainer: {
+      height: height * 0.55,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 40,
+      backgroundColor: currentTheme.colors.elevation1,
+      borderRadius: 12,
+      marginBottom: 12,
+    },
+    noContentTitle: {
+      fontSize: 22,
+      fontWeight: 'bold',
+      color: currentTheme.colors.highEmphasis,
+      marginTop: 16,
+      marginBottom: 8,
+      textAlign: 'center',
+    },
+    noContentText: {
+      fontSize: 16,
+      color: currentTheme.colors.mediumEmphasis,
+      textAlign: 'center',
+      marginBottom: 24,
+    },
+    noContentButtons: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: 16,
+      width: '100%',
+    },
+    noContentButton: {
+      paddingVertical: 12,
+      paddingHorizontal: 20,
+      borderRadius: 30,
+      backgroundColor: currentTheme.colors.elevation3,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    noContentButtonText: {
+      color: currentTheme.colors.highEmphasis,
+      fontWeight: '600',
+      fontSize: 14,
+    }
+  });
+
+  return (
+    <View style={styles.noContentContainer}>
+      <MaterialIcons name="theaters" size={48} color={currentTheme.colors.mediumEmphasis} />
+      <Text style={styles.noContentTitle}>No Featured Content</Text>
+      <Text style={styles.noContentText}>
+        Install addons with catalogs or change the content source in your settings.
+      </Text>
+      <View style={styles.noContentButtons}>
+        <TouchableOpacity
+          style={[styles.noContentButton, { backgroundColor: currentTheme.colors.primary }]}
+          onPress={() => navigation.navigate('Addons')}
+        >
+          <Text style={[styles.noContentButtonText, { color: currentTheme.colors.white }]}>Install Addons</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.noContentButton}
+          onPress={() => navigation.navigate('HomeScreenSettings')}
+        >
+          <Text style={styles.noContentButtonText}>Settings</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
 const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: FeaturedContentProps) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
@@ -408,7 +482,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
   };
 
   if (!featuredContent) {
-    return <SkeletonFeatured />;
+    return <NoFeaturedContent />;
   }
 
   return (

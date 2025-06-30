@@ -3,7 +3,6 @@ import { StreamingContent } from '../services/catalogService';
 import { catalogService } from '../services/catalogService';
 import { stremioService } from '../services/stremioService';
 import { tmdbService } from '../services/tmdbService';
-import { hdrezkaService } from '../services/hdrezkaService';
 import { cacheService } from '../services/cacheService';
 import { Cast, Episode, GroupedEpisodes, GroupedStreams } from '../types/metadata';
 import { TMDBService } from '../services/tmdbService';
@@ -184,85 +183,9 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     // Loading indicators should probably be managed based on callbacks completing.
   };
 
-  const processHDRezkaSource = async (type: string, id: string, season?: number, episode?: number, isEpisode = false) => {
-    const sourceStartTime = Date.now();
-    const logPrefix = isEpisode ? 'loadEpisodeStreams' : 'loadStreams';
-    const sourceName = 'hdrezka';
-    
-    logger.log(`🔍 [${logPrefix}:${sourceName}] Starting fetch`);
-
-    try {
-      const streams = await hdrezkaService.getStreams(
-        id,
-        type,
-        season,
-        episode
-      );
-      
-      const processTime = Date.now() - sourceStartTime;
-      
-      if (streams && streams.length > 0) {
-        logger.log(`✅ [${logPrefix}:${sourceName}] Received ${streams.length} streams after ${processTime}ms`);
-        
-        // Format response similar to Stremio format for the UI
-        return {
-          'hdrezka': {
-            addonName: 'HDRezka',
-            streams
-          }
-        };
-      } else {
-        logger.log(`⚠️ [${logPrefix}:${sourceName}] No streams found after ${processTime}ms`);
-        return {};
-      }
-    } catch (error) {
-      logger.error(`❌ [${logPrefix}:${sourceName}] Error:`, error);
-      return {};
-    }
-  };
-
-  const processExternalSource = async (sourceType: string, promise: Promise<any>, isEpisode = false) => {
-    try {
-      const startTime = Date.now();
-      const result = await promise;
-      const processingTime = Date.now() - startTime;
-      
-      if (result && Object.keys(result).length > 0) {
-        // Update the appropriate state based on whether this is for an episode or not
-        const updateState = (prevState: GroupedStreams) => {
-          const newState = { ...prevState };
-          
-          // Merge in the new streams
-          Object.entries(result).forEach(([provider, data]: [string, any]) => {
-            newState[provider] = data;
-          });
-          
-          return newState;
-        };
-        
-        if (isEpisode) {
-          setEpisodeStreams(updateState);
-        } else {
-          setGroupedStreams(updateState);
-        }
-        
-        console.log(`✅ [processExternalSource:${sourceType}] Processed in ${processingTime}ms, found streams:`, 
-          Object.values(result).reduce((acc: number, curr: any) => acc + (curr.streams?.length || 0), 0)
-        );
-        
-        // Return the result for the promise chain
-        return result;
-      } else {
-        console.log(`⚠️ [processExternalSource:${sourceType}] No streams found after ${processingTime}ms`);
-        return {};
-      }
-    } catch (error) {
-      console.error(`❌ [processExternalSource:${sourceType}] Error:`, error);
-      return {};
-    }
-  };
-
   const loadCast = async () => {
+    if (!metadata || !metadata.id) return;
+
     setLoadingCast(true);
     try {
       // Handle TMDB IDs
@@ -794,44 +717,6 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       console.log('🎬 [loadStreams] Using ID for Stremio addons:', stremioId);
       processStremioSource(type, stremioId, false);
       
-      // Add HDRezka source  
-      const hdrezkaPromise = processExternalSource('hdrezka', processHDRezkaSource(type, id), false);
-      
-      // Include HDRezka in fetchPromises array
-      const fetchPromises: Promise<any>[] = [hdrezkaPromise];
-
-      // Wait only for external promises now
-      const results = await Promise.allSettled(fetchPromises);
-      const totalTime = Date.now() - startTime;
-      console.log(`✅ [loadStreams] External source requests completed in ${totalTime}ms (Stremio continues in background)`);
-      
-      const sourceTypes: string[] = ['hdrezka'];
-      results.forEach((result, index) => {
-        const source = sourceTypes[Math.min(index, sourceTypes.length - 1)];
-        console.log(`📊 [loadStreams:${source}] Status: ${result.status}`);
-        if (result.status === 'rejected') {
-          console.error(`❌ [loadStreams:${source}] Error:`, result.reason);
-        }
-      });
-
-      console.log('🧮 [loadStreams] Summary:');
-      console.log('  Total time for external sources:', totalTime + 'ms');
-      
-      // Log the final states - this might not include all Stremio addons yet
-      console.log('📦 [loadStreams] Current combined streams count:', 
-        Object.keys(groupedStreams).length > 0 ? 
-        Object.values(groupedStreams).reduce((acc, group: any) => acc + group.streams.length, 0) :
-        0
-      );
-
-      // Cache the final streams state - Note: This might be incomplete if Stremio addons are slow
-      setGroupedStreams(prev => {
-        // We might want to reconsider when exactly to cache or mark loading as fully complete
-        // cacheService.setStreams(id, type, prev); // Maybe cache incrementally in callback?
-        setPreloadedStreams(prev);
-        return prev;
-      });
-
       // Add a delay before marking loading as complete to give Stremio addons more time
       setTimeout(() => {
         setLoadingStreams(false);
@@ -906,40 +791,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       console.log('🎬 [loadEpisodeStreams] Using episode ID for Stremio addons:', stremioEpisodeId);
       processStremioSource('series', stremioEpisodeId, true);
       
-      // Add HDRezka source for episodes
-      const hdrezkaEpisodePromise = processExternalSource('hdrezka',
-        processHDRezkaSource('series', id, parseInt(season), parseInt(episode), true),
-        true
-      );
-      
-      const fetchPromises: Promise<any>[] = [hdrezkaEpisodePromise];
-
-      // Wait only for external promises now
-      const results = await Promise.allSettled(fetchPromises);
-      const totalTime = Date.now() - startTime;
-      console.log(`✅ [loadEpisodeStreams] External source requests completed in ${totalTime}ms (Stremio continues in background)`);
-      
-      const sourceTypes: string[] = ['hdrezka'];
-      results.forEach((result, index) => {
-        const source = sourceTypes[Math.min(index, sourceTypes.length - 1)];
-        console.log(`📊 [loadEpisodeStreams:${source}] Status: ${result.status}`);
-        if (result.status === 'rejected') {
-          console.error(`❌ [loadEpisodeStreams:${source}] Error:`, result.reason);
-        }
-      });
-
-      console.log('🧮 [loadEpisodeStreams] Summary:');
-      console.log('  Total time for external sources:', totalTime + 'ms');
-      
-      // Update preloaded episode streams for future use
-      if (Object.keys(episodeStreams).length > 0) {
-        setPreloadedEpisodeStreams(prev => ({
-          ...prev,
-          [episodeId]: { ...episodeStreams }
-        }));
-      }
-
-      // Add a delay before marking loading as complete to give addons more time
+      // Add a delay before marking loading as complete to give Stremio addons more time
       setTimeout(() => {
         setLoadingEpisodeStreams(false);
       }, 10000); // 10 second delay to allow streams to load

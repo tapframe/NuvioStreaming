@@ -175,10 +175,6 @@ class StremioService {
   private addonOrder: string[] = [];
   private readonly STORAGE_KEY = 'stremio-addons';
   private readonly ADDON_ORDER_KEY = 'stremio-addon-order';
-  private readonly DEFAULT_ADDONS = [
-    'https://v3-cinemeta.strem.io/manifest.json',
-    'https://opensubtitles-v3.strem.io/manifest.json'
-  ];
   private readonly MAX_CONCURRENT_REQUESTS = 3;
   private readonly DEFAULT_PAGE_SIZE = 50;
   private initialized: boolean = false;
@@ -227,19 +223,15 @@ class StremioService {
       const missingIds = installedIds.filter(id => !this.addonOrder.includes(id));
       this.addonOrder = [...this.addonOrder, ...missingIds];
       
-      // If no addons, install defaults
-      if (this.installedAddons.size === 0) {
-        await this.installDefaultAddons();
-      }
-      
       // Ensure order is saved
       await this.saveAddonOrder();
       
       this.initialized = true;
     } catch (error) {
       logger.error('Failed to initialize addons:', error);
-      // Install defaults as fallback
-      await this.installDefaultAddons();
+      // Initialize with empty state on error
+      this.installedAddons = new Map();
+      this.addonOrder = [];
       this.initialized = true;
     }
   }
@@ -273,20 +265,6 @@ class StremioService {
       }
     }
     throw lastError;
-  }
-
-  private async installDefaultAddons(): Promise<void> {
-    try {
-      for (const url of this.DEFAULT_ADDONS) {
-        const manifest = await this.getManifest(url);
-        if (manifest) {
-          this.installedAddons.set(manifest.id, manifest);
-        }
-      }
-      await this.saveInstalledAddons();
-    } catch (error) {
-      logger.error('Failed to install default addons:', error);
-    }
   }
 
   private async saveInstalledAddons(): Promise<void> {

@@ -12,7 +12,8 @@ import {
   Platform,
   Dimensions,
   Image,
-  Button
+  Button,
+  Linking
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
@@ -477,11 +478,11 @@ const SettingsScreen: React.FC = () => {
                 badge={catalogCount}
               />
               <SettingItem
-                title="Internal Providers"
-                description="Enable or disable built-in providers like HDRezka"
-                icon="source"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('InternalProvidersSettings')}
+                title="Trakt"
+                icon="sync"
+                onPress={() => navigation.navigate('TraktSettings')}
+                renderControl={() => <ChevronRight />}
+                badge={isAuthenticated ? `Logged in as ${userProfile?.username}`: "Not Logged In"}
               />
               <SettingItem
                 title="Home Screen"
@@ -601,6 +602,17 @@ const SettingsScreen: React.FC = () => {
                 </View>
               </SettingsCard>
             )}
+
+            <SettingsCard title="About">
+              <SettingItem
+                title="Privacy Policy"
+                description="Information about data collection and usage"
+                icon="policy"
+                renderControl={ChevronRight}
+                onPress={() => Linking.openURL('https://github.com/Stremio/stremio-expo/blob/main/PRIVACY_POLICY.md').catch(err => console.error("Couldn't load page", err))}
+                isLast={true}
+              />
+            </SettingsCard>
 
             <View style={styles.versionContainer}>
               <Text style={[styles.versionText, {color: currentTheme.colors.mediumEmphasis}]}>

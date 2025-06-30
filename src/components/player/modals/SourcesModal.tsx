@@ -155,11 +155,7 @@ const SourcesModal: React.FC<SourcesModalProps> = ({
 
   if (!showSourcesModal) return null;
 
-  const sortedProviders = Object.entries(availableStreams).sort(([a], [b]) => {
-    if (a === 'hdrezka') return -1;
-    if (b === 'hdrezka') return 1;
-    return 0;
-  });
+  const sortedProviders = Object.entries(availableStreams);
 
   const handleStreamSelect = (stream: Stream) => {
     if (stream.url !== currentStreamUrl && !isChangingSource) {

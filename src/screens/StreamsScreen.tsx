@@ -72,13 +72,6 @@ const StreamCard = ({ stream, onPress, index, isLoading, statusMessage, theme }:
   const size = stream.title?.match(/💾\s*([\d.]+\s*[GM]B)/)?.[1];
   const isDebrid = stream.behaviorHints?.cached;
   
-  // Determine if this is a HDRezka stream
-  const isHDRezka = stream.name === 'HDRezka';
-
-  // For HDRezka streams, the title contains the quality information
-  const displayTitle = isHDRezka ? `HDRezka ${stream.title}` : (stream.name || stream.title || 'Unnamed Stream');
-  const displayAddonName = isHDRezka ? '' : (stream.title || '');
-
   // Animation delay based on index - stagger effect
   const enterDelay = 100 + (index * 30);
 
@@ -100,11 +93,11 @@ const StreamCard = ({ stream, onPress, index, isLoading, statusMessage, theme }:
           <View style={styles.streamNameRow}>
             <View style={styles.streamTitleContainer}>
               <Text style={[styles.streamName, { color: theme.colors.highEmphasis }]}>
-                {displayTitle}
+                {stream.name || stream.title || 'Unnamed Stream'}
               </Text>
-              {displayAddonName && displayAddonName !== displayTitle && (
+              {stream.title && stream.title !== stream.name && (
                 <Text style={[styles.streamAddonName, { color: theme.colors.mediumEmphasis }]}>
-                  {displayAddonName}
+                  {stream.title}
                 </Text>
               )}
             </View>
@@ -138,13 +131,6 @@ const StreamCard = ({ stream, onPress, index, isLoading, statusMessage, theme }:
             {isDebrid && (
               <View style={[styles.chip, { backgroundColor: theme.colors.success }]}>
                 <Text style={[styles.chipText, { color: theme.colors.white }]}>DEBRID</Text>
-              </View>
-            )}
-            
-            {/* Special badge for HDRezka streams */}
-            {isHDRezka && (
-              <View style={[styles.chip, { backgroundColor: theme.colors.accent }]}>
-                <Text style={[styles.chipText, { color: theme.colors.white }]}>HDREZKA</Text>
               </View>
             )}
           </View>
@@ -332,7 +318,7 @@ export const StreamsScreen = () => {
     }
     
     // Update loading states for individual providers
-    const expectedProviders = ['stremio', 'hdrezka'];
+    const expectedProviders = ['stremio'];
     const now = Date.now();
     
     setLoadingProviders(prevLoading => {
@@ -359,9 +345,9 @@ export const StreamsScreen = () => {
   // Update useEffect to check for sources
   useEffect(() => {
     const checkProviders = async () => {
-      // Check for both Stremio addons and if the internal provider is enabled
+      // Check for Stremio addons
       const hasStremioProviders = await stremioService.hasStreamProviders();
-      const hasProviders = hasStremioProviders || settings.enableInternalProviders;
+      const hasProviders = hasStremioProviders;
 
       if (!isMounted.current) return;
 
@@ -377,8 +363,7 @@ export const StreamsScreen = () => {
           if (type === 'series' && episodeId) {
             logger.log(`🎬 Loading episode streams for: ${episodeId}`);
             setLoadingProviders({
-              'stremio': true,
-              'hdrezka': true
+              'stremio': true
             });
             setSelectedEpisode(episodeId);
             loadEpisodeStreams(episodeId);
@@ -399,7 +384,7 @@ export const StreamsScreen = () => {
     };
 
     checkProviders();
-  }, [type, id, episodeId, settings.autoplayBestStream, settings.enableInternalProviders]);
+  }, [type, id, episodeId, settings.autoplayBestStream]);
 
   React.useEffect(() => {
     // Trigger entrance animations
@@ -474,8 +459,6 @@ export const StreamsScreen = () => {
 
     // Provider priority (higher number = higher priority)
     const getProviderPriority = (addonId: string): number => {
-      if (addonId === 'hdrezka') return 100; // HDRezka highest priority
-      
       // Get Stremio addon installation order (earlier = higher priority)
       const installedAddons = stremioService.getInstalledAddons();
       const addonIndex = installedAddons.findIndex(addon => addon.id === addonId);
@@ -564,8 +547,7 @@ export const StreamsScreen = () => {
       const streamsToPass = type === 'series' ? episodeStreams : groupedStreams;
       
       // Determine the stream name using the same logic as StreamCard
-      const isHDRezka = stream.name === 'HDRezka';
-      const streamName = isHDRezka ? `HDRezka ${stream.title}` : (stream.name || stream.title || 'Unnamed Stream');
+      const streamName = stream.name || stream.title || 'Unnamed Stream';
       
       navigation.navigate('Player', {
         uri: stream.url,
@@ -805,11 +787,7 @@ export const StreamsScreen = () => {
       { id: 'all', name: 'All Providers' },
       ...Array.from(allProviders)
         .sort((a, b) => {
-          // Put HDRezka first
-          if (a === 'hdrezka') return -1;
-          if (b === 'hdrezka') return 1;
-          
-          // Then sort by Stremio addon installation order
+          // Sort by Stremio addon installation order
           const indexA = installedAddons.findIndex(addon => addon.id === a);
           const indexB = installedAddons.findIndex(addon => addon.id === b);
           
@@ -820,11 +798,6 @@ export const StreamsScreen = () => {
         })
         .map(provider => {
           const addonInfo = streams[provider];
-          
-          // Special handling for HDRezka
-          if (provider === 'hdrezka') {
-            return { id: provider, name: 'HDRezka' };
-          }
           
           // Standard handling for Stremio addons
           const installedAddon = installedAddons.find(addon => addon.id === provider);
@@ -895,11 +868,7 @@ export const StreamsScreen = () => {
         return addonId === selectedProvider;
       })
       .sort(([addonIdA], [addonIdB]) => {
-        // Put HDRezka first
-        if (addonIdA === 'hdrezka') return -1;
-        if (addonIdB === 'hdrezka') return 1;
-        
-        // Then sort by Stremio addon installation order
+        // Sort by Stremio addon installation order
         const indexA = installedAddons.findIndex(addon => addon.id === addonIdA);
         const indexB = installedAddons.findIndex(addon => addon.id === addonIdB);
         
@@ -909,21 +878,13 @@ export const StreamsScreen = () => {
         return 0;
       })
       .map(([addonId, { addonName, streams: providerStreams }]) => {
-        let sortedProviderStreams = providerStreams;
-        if (addonId === 'hdrezka') {
-          sortedProviderStreams = [...providerStreams].sort((a, b) => {
-            const qualityA = getQualityNumeric(a.title);
-            const qualityB = getQualityNumeric(b.title);
-            return qualityB - qualityA; // Sort descending (e.g., 1080p before 720p)
-          });
-        } else {
-          // Sort other streams by quality if possible
-          sortedProviderStreams = [...providerStreams].sort((a, b) => {
-            const qualityA = getQualityNumeric(a.name || a.title);
-            const qualityB = getQualityNumeric(b.name || b.title);
-            return qualityB - qualityA; // Sort descending
-          });
-        }
+        // Sort streams by quality if possible
+        const sortedProviderStreams = [...providerStreams].sort((a, b) => {
+          const qualityA = getQualityNumeric(a.name || a.title);
+          const qualityB = getQualityNumeric(b.name || b.title);
+          return qualityB - qualityA; // Sort descending
+        });
+        
         return {
           title: addonName,
           addonId,

@@ -34,7 +34,6 @@ export interface AppSettings {
   selectedHeroCatalogs: string[]; // Array of catalog IDs to display in hero section
   logoSourcePreference: 'metahub' | 'tmdb'; // Preferred source for title logos
   tmdbLanguagePreference: string; // Preferred language for TMDB logos (ISO 639-1 code)
-  enableInternalProviders: boolean; // Toggle for internal providers like HDRezka
   episodeLayoutStyle: 'vertical' | 'horizontal'; // Layout style for episode cards
   autoplayBestStream: boolean; // Automatically play the best available stream
 }
@@ -49,11 +48,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   useExternalPlayer: false,
   preferredPlayer: 'internal',
   showHeroSection: true,
-  featuredContentSource: 'tmdb',
+  featuredContentSource: 'catalogs',
   selectedHeroCatalogs: [], // Empty array means all catalogs are selected
   logoSourcePreference: 'metahub', // Default to Metahub as first source
   tmdbLanguagePreference: 'en', // Default to English
-  enableInternalProviders: true, // Enable internal providers by default
   episodeLayoutStyle: 'horizontal', // Default to the new horizontal layout
   autoplayBestStream: false, // Disabled by default for user choice
 };

@@ -140,24 +140,29 @@ export function useFeaturedContent() {
         
         if (signal.aborted) return;
 
-        // Filter catalogs based on user selection if any catalogs are selected
-        const filteredCatalogs = selectedCatalogs && selectedCatalogs.length > 0 
-          ? catalogs.filter(catalog => {
-              const catalogId = `${catalog.addon}:${catalog.type}:${catalog.id}`;
-              return selectedCatalogs.includes(catalogId);
-            })
-          : catalogs; // Use all catalogs if none specifically selected
+        // If no catalogs are installed, stop loading and return.
+        if (catalogs.length === 0) {
+          formattedContent = [];
+        } else {
+          // Filter catalogs based on user selection if any catalogs are selected
+          const filteredCatalogs = selectedCatalogs && selectedCatalogs.length > 0
+            ? catalogs.filter(catalog => {
+                const catalogId = `${catalog.addon}:${catalog.type}:${catalog.id}`;
+                return selectedCatalogs.includes(catalogId);
+              })
+            : catalogs; // Use all catalogs if none specifically selected
 
-        // Flatten all catalog items into a single array, filter out items without posters
-        const allItems = filteredCatalogs.flatMap(catalog => catalog.items)
-          .filter(item => item.poster)
-          .filter((item, index, self) => 
-            // Remove duplicates based on ID
-            index === self.findIndex(t => t.id === item.id)
-          );
+          // Flatten all catalog items into a single array, filter out items without posters
+          const allItems = filteredCatalogs.flatMap(catalog => catalog.items)
+            .filter(item => item.poster)
+            .filter((item, index, self) =>
+              // Remove duplicates based on ID
+              index === self.findIndex(t => t.id === item.id)
+            );
 
-        // Sort by popular, newest, etc. (possibly enhanced later)
-        formattedContent = allItems.sort(() => Math.random() - 0.5).slice(0, 10);
+          // Sort by popular, newest, etc. (possibly enhanced later)
+          formattedContent = allItems.sort(() => Math.random() - 0.5).slice(0, 10);
+        }
       }
 
       if (signal.aborted) return;
