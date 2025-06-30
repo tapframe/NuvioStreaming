@@ -250,8 +250,13 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   const renderVerticalEpisodeCard = (episode: Episode) => {
     let episodeImage = EPISODE_PLACEHOLDER;
     if (episode.still_path) {
-      const tmdbUrl = tmdbService.getImageUrl(episode.still_path, 'w500');
-      if (tmdbUrl) episodeImage = tmdbUrl;
+      // Check if still_path is already a full URL
+      if (episode.still_path.startsWith('http')) {
+        episodeImage = episode.still_path;
+      } else {
+        const tmdbUrl = tmdbService.getImageUrl(episode.still_path, 'w500');
+        if (tmdbUrl) episodeImage = tmdbUrl;
+      }
     } else if (metadata?.poster) {
       episodeImage = metadata.poster;
     }
@@ -369,8 +374,13 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   const renderHorizontalEpisodeCard = (episode: Episode) => {
     let episodeImage = EPISODE_PLACEHOLDER;
     if (episode.still_path) {
-      const tmdbUrl = tmdbService.getImageUrl(episode.still_path, 'w500');
-      if (tmdbUrl) episodeImage = tmdbUrl;
+      // Check if still_path is already a full URL
+      if (episode.still_path.startsWith('http')) {
+        episodeImage = episode.still_path;
+      } else {
+        const tmdbUrl = tmdbService.getImageUrl(episode.still_path, 'w500');
+        if (tmdbUrl) episodeImage = tmdbUrl;
+      }
     } else if (metadata?.poster) {
       episodeImage = metadata.poster;
     }

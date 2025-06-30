@@ -184,20 +184,23 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
   };
 
   const loadCast = async () => {
-    if (!metadata || !metadata.id) return;
-
+    logger.log('[loadCast] Starting cast fetch for:', id);
     setLoadingCast(true);
     try {
+      // Check cache first
+      const cachedCast = cacheService.getCast(id, type);
+      if (cachedCast) {
+        logger.log('[loadCast] Using cached cast data');
+        setCast(cachedCast);
+        setLoadingCast(false);
+        return;
+      }
+
       // Handle TMDB IDs
-      let metadataId = id;
-      let metadataType = type;
-      
       if (id.startsWith('tmdb:')) {
-        const extractedTmdbId = id.split(':')[1];
-        logger.log('[loadCast] Using extracted TMDB ID:', extractedTmdbId);
-        
-        // For TMDB IDs, we'll use the TMDB API directly
-        const castData = await tmdbService.getCredits(parseInt(extractedTmdbId), type);
+        const tmdbId = id.split(':')[1];
+        logger.log('[loadCast] Using TMDB ID directly:', tmdbId);
+        const castData = await tmdbService.getCredits(parseInt(tmdbId), type);
         if (castData && castData.cast) {
           const formattedCast = castData.cast.map((actor: any) => ({
             id: actor.id,
@@ -205,49 +208,41 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             character: actor.character,
             profile_path: actor.profile_path
           }));
+          logger.log(`[loadCast] Found ${formattedCast.length} cast members from TMDB`);
           setCast(formattedCast);
+          cacheService.setCast(id, type, formattedCast);
           setLoadingCast(false);
-          return formattedCast;
+          return;
         }
-        setLoadingCast(false);
-        return [];
-      }
-      
-      // Continue with the existing logic for non-TMDB IDs
-      const cachedCast = cacheService.getCast(id, type);
-      if (cachedCast) {
-        setCast(cachedCast);
-        setLoadingCast(false);
-        return;
       }
 
-      // Load cast in parallel with a fallback to empty array
-      const castLoadingPromise = loadWithFallback(async () => {
-        const tmdbId = await withTimeout(
-          tmdbService.findTMDBIdByIMDB(id),
-          API_TIMEOUT
-        );
-        
-        if (tmdbId) {
-          const castData = await withTimeout(
-            tmdbService.getCredits(tmdbId, type),
-            API_TIMEOUT,
-            { cast: [], crew: [] }
-          );
-          
-          if (castData.cast && castData.cast.length > 0) {
-            setCast(castData.cast);
-            cacheService.setCast(id, type, castData.cast);
-            return castData.cast;
-          }
-        }
-        return [];
-      }, []);
+      // Handle IMDb IDs or convert to TMDB ID
+      let tmdbId;
+      if (id.startsWith('tt')) {
+        logger.log('[loadCast] Converting IMDb ID to TMDB ID');
+        tmdbId = await tmdbService.findTMDBIdByIMDB(id);
+      }
 
-      await castLoadingPromise;
+      if (tmdbId) {
+        logger.log('[loadCast] Fetching cast using TMDB ID:', tmdbId);
+        const castData = await tmdbService.getCredits(tmdbId, type);
+        if (castData && castData.cast) {
+          const formattedCast = castData.cast.map((actor: any) => ({
+            id: actor.id,
+            name: actor.name,
+            character: actor.character,
+            profile_path: actor.profile_path
+          }));
+          logger.log(`[loadCast] Found ${formattedCast.length} cast members`);
+          setCast(formattedCast);
+          cacheService.setCast(id, type, formattedCast);
+        }
+      } else {
+        logger.warn('[loadCast] Could not find TMDB ID for cast fetch');
+      }
     } catch (error) {
-      console.error('Failed to load cast:', error);
-      setCast([]);
+      logger.error('[loadCast] Failed to load cast:', error);
+      // Don't clear existing cast data on error
     } finally {
       setLoadingCast(false);
     }
@@ -462,13 +457,6 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         setMetadata(content.value);
         // Update cache
         cacheService.setMetadata(id, type, content.value);
-
-        if (type === 'series') {
-          // Load series data after the enhanced metadata is processed
-          setTimeout(() => {
-          loadSeriesData().catch(console.error);
-          }, 100);
-        }
       } else {
         throw new Error('Content not found');
       }
@@ -499,7 +487,10 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         const groupedAddonEpisodes: GroupedEpisodes = {};
         
                  addonVideos.forEach((video: any) => {
-          const seasonNumber = video.season || 1;
+          const seasonNumber = video.season;
+          if (!seasonNumber || seasonNumber < 1) {
+            return; // Skip season 0, which often contains extras
+          }
           const episodeNumber = video.episode || video.number || 1;
           
           if (!groupedAddonEpisodes[seasonNumber]) {
@@ -514,7 +505,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             season_number: seasonNumber,
             episode_number: episodeNumber,
             air_date: video.released ? video.released.split('T')[0] : video.firstAired ? video.firstAired.split('T')[0] : '',
-            still_path: video.thumbnail ? video.thumbnail.replace('https://image.tmdb.org/t/p/w500', '') : null,
+            still_path: video.thumbnail,
             vote_average: parseFloat(video.rating) || 0,
             runtime: undefined,
             episodeString: `S${seasonNumber.toString().padStart(2, '0')}E${episodeNumber.toString().padStart(2, '0')}`,
@@ -531,6 +522,32 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         });
         
         logger.log(`📺 Processed addon episodes into ${Object.keys(groupedAddonEpisodes).length} seasons`);
+        
+        // Fetch season posters from TMDB
+        try {
+          const tmdbIdToUse = tmdbId || (id.startsWith('tt') ? await tmdbService.findTMDBIdByIMDB(id) : null);
+          if (tmdbIdToUse) {
+            if (!tmdbId) setTmdbId(tmdbIdToUse);
+            const showDetails = await tmdbService.getTVShowDetails(tmdbIdToUse);
+            if (showDetails?.seasons) {
+              Object.keys(groupedAddonEpisodes).forEach(seasonStr => {
+                const seasonNum = parseInt(seasonStr, 10);
+                const seasonInfo = showDetails.seasons.find(s => s.season_number === seasonNum);
+                const seasonPosterPath = seasonInfo?.poster_path;
+                if (seasonPosterPath) {
+                  groupedAddonEpisodes[seasonNum] = groupedAddonEpisodes[seasonNum].map(ep => ({
+                    ...ep,
+                    season_poster_path: seasonPosterPath,
+                  }));
+                }
+              });
+              logger.log('🖼️ Successfully fetched and attached TMDB season posters to addon episodes.');
+            }
+          }
+        } catch (error) {
+          logger.error('Failed to fetch TMDB season posters for addon episodes:', error);
+        }
+        
         setGroupedEpisodes(groupedAddonEpisodes);
         
                  // Set the first available season
@@ -561,11 +578,16 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         ]);
         
         const transformedEpisodes: GroupedEpisodes = {};
-        Object.entries(allEpisodes).forEach(([season, episodes]) => {
-          const seasonInfo = showDetails?.seasons?.find(s => s.season_number === parseInt(season));
+        Object.entries(allEpisodes).forEach(([seasonStr, episodes]) => {
+          const seasonNum = parseInt(seasonStr, 10);
+          if (seasonNum < 1) {
+            return; // Skip season 0, which often contains extras
+          }
+          
+          const seasonInfo = showDetails?.seasons?.find(s => s.season_number === seasonNum);
           const seasonPosterPath = seasonInfo?.poster_path;
           
-          transformedEpisodes[parseInt(season)] = episodes.map(episode => ({
+          transformedEpisodes[seasonNum] = episodes.map(episode => ({
             ...episode,
             episodeString: `S${episode.season_number.toString().padStart(2, '0')}E${episode.episode_number.toString().padStart(2, '0')}`,
             season_poster_path: seasonPosterPath || null
