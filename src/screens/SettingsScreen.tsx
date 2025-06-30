@@ -26,7 +26,7 @@ import { stremioService } from '../services/stremioService';
 import { useCatalogContext } from '../contexts/CatalogContext';
 import { useTraktContext } from '../contexts/TraktContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { catalogService, DataSource } from '../services/catalogService';
+import { catalogService } from '../services/catalogService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -160,7 +160,6 @@ const SettingsScreen: React.FC = () => {
   const [addonCount, setAddonCount] = useState<number>(0);
   const [catalogCount, setCatalogCount] = useState<number>(0);
   const [mdblistKeySet, setMdblistKeySet] = useState<boolean>(false);
-  const [discoverDataSource, setDiscoverDataSource] = useState<DataSource>(DataSource.STREMIO_ADDONS);
 
   const loadData = useCallback(async () => {
     try {
@@ -195,9 +194,6 @@ const SettingsScreen: React.FC = () => {
       const mdblistKey = await AsyncStorage.getItem('mdblist_api_key');
       setMdblistKeySet(!!mdblistKey);
       
-      // Get discover data source preference
-      const dataSource = await catalogService.getDataSourcePreference();
-      setDiscoverDataSource(dataSource);
     } catch (error) {
       console.error('Error loading settings data:', error);
     }
@@ -277,13 +273,6 @@ const SettingsScreen: React.FC = () => {
     />
   );
 
-  // Handle data source change
-  const handleDiscoverDataSourceChange = useCallback(async (value: string) => {
-    const dataSource = value as DataSource;
-    setDiscoverDataSource(dataSource);
-    await catalogService.setDataSourcePreference(dataSource);
-  }, []);
-
   const headerBaseHeight = Platform.OS === 'android' ? 80 : 60;
   const topSpacing = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top;
   const headerHeight = headerBaseHeight + topSpacing;
@@ -350,40 +339,6 @@ const SettingsScreen: React.FC = () => {
                 icon="home"
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('HomeScreenSettings')}
-              />
-              <SettingItem
-                title="Discover Source"
-                icon="explore"
-                renderControl={() => (
-                  <View style={styles.segmentedControl}>
-                    <TouchableOpacity
-                      style={[
-                        styles.segment,
-                        discoverDataSource === DataSource.STREMIO_ADDONS && styles.segmentActive
-                      ]}
-                      onPress={() => handleDiscoverDataSourceChange(DataSource.STREMIO_ADDONS)}
-                    >
-                      <Text style={[
-                        styles.segmentText,
-                        discoverDataSource === DataSource.STREMIO_ADDONS && styles.segmentTextActive,
-                        { color: currentTheme.colors.mediumEmphasis }
-                      ]}>Addons</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.segment,
-                        discoverDataSource === DataSource.TMDB && styles.segmentActive
-                      ]}
-                      onPress={() => handleDiscoverDataSourceChange(DataSource.TMDB)}
-                    >
-                      <Text style={[
-                        styles.segmentText,
-                        discoverDataSource === DataSource.TMDB && styles.segmentTextActive,
-                        { color: currentTheme.colors.mediumEmphasis }
-                      ]}>TMDB</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
                 isLast={true}
               />
             </SettingsCard>

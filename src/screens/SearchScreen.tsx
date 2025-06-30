@@ -557,7 +557,6 @@ const SearchScreen = () => {
                   onChangeText={setQuery}
                   returnKeyType="search"
                   keyboardAppearance="dark"
-                  autoFocus
                   ref={inputRef}
                 />
                 {query.length > 0 && (
