@@ -56,7 +56,7 @@ const DOLBY_ICON = 'https://upload.wikimedia.org/wikipedia/en/thumb/3/3f/Dolby_V
 const { width, height } = Dimensions.get('window');
 
 // Extracted Components
-const StreamCard = ({ stream, onPress, index, isLoading, statusMessage, theme }: { 
+const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, theme }: { 
   stream: Stream; 
   onPress: () => void; 
   index: number;
@@ -66,11 +66,19 @@ const StreamCard = ({ stream, onPress, index, isLoading, statusMessage, theme }:
 }) => {
   const styles = React.useMemo(() => createStyles(theme.colors), [theme.colors]);
   
-  const quality = stream.title?.match(/(\d+)p/)?.[1] || null;
-  const isHDR = stream.title?.toLowerCase().includes('hdr');
-  const isDolby = stream.title?.toLowerCase().includes('dolby') || stream.title?.includes('DV');
-  const size = stream.title?.match(/💾\s*([\d.]+\s*[GM]B)/)?.[1];
-  const isDebrid = stream.behaviorHints?.cached;
+  const streamInfo = useMemo(() => {
+    const title = stream.title || '';
+    const name = stream.name || '';
+    return {
+      quality: title.match(/(\d+)p/)?.[1] || null,
+      isHDR: title.toLowerCase().includes('hdr'),
+      isDolby: title.toLowerCase().includes('dolby') || title.includes('DV'),
+      size: title.match(/💾\s*([\d.]+\s*[GM]B)/)?.[1],
+      isDebrid: stream.behaviorHints?.cached,
+      displayName: name || title || 'Unnamed Stream',
+      subTitle: title && title !== name ? title : null
+    };
+  }, [stream.name, stream.title, stream.behaviorHints]);
   
   // Animation delay based on index - stagger effect
   const enterDelay = 100 + (index * 30);
@@ -93,11 +101,11 @@ const StreamCard = ({ stream, onPress, index, isLoading, statusMessage, theme }:
           <View style={styles.streamNameRow}>
             <View style={styles.streamTitleContainer}>
               <Text style={[styles.streamName, { color: theme.colors.highEmphasis }]}>
-                {stream.name || stream.title || 'Unnamed Stream'}
+                {streamInfo.displayName}
               </Text>
-              {stream.title && stream.title !== stream.name && (
+              {streamInfo.subTitle && (
                 <Text style={[styles.streamAddonName, { color: theme.colors.mediumEmphasis }]}>
-                  {stream.title}
+                  {streamInfo.subTitle}
                 </Text>
               )}
             </View>
@@ -114,21 +122,21 @@ const StreamCard = ({ stream, onPress, index, isLoading, statusMessage, theme }:
           </View>
           
           <View style={styles.streamMetaRow}>
-            {quality && quality >= "720" && (
+            {streamInfo.quality && streamInfo.quality >= "720" && (
               <QualityBadge type="HD" />
             )}
             
-            {isDolby && (
+            {streamInfo.isDolby && (
               <QualityBadge type="VISION" />
             )}
             
-            {size && (
+            {streamInfo.size && (
               <View style={[styles.chip, { backgroundColor: theme.colors.darkGray }]}>
-                <Text style={[styles.chipText, { color: theme.colors.white }]}>{size}</Text>
+                <Text style={[styles.chipText, { color: theme.colors.white }]}>{streamInfo.size}</Text>
               </View>
             )}
             
-            {isDebrid && (
+            {streamInfo.isDebrid && (
               <View style={[styles.chip, { backgroundColor: theme.colors.success }]}>
                 <Text style={[styles.chipText, { color: theme.colors.white }]}>DEBRID</Text>
               </View>
@@ -146,7 +154,7 @@ const StreamCard = ({ stream, onPress, index, isLoading, statusMessage, theme }:
       </TouchableOpacity>
     </Animated.View>
   );
-};
+});
 
 const QualityTag = React.memo(({ text, color, theme }: { text: string; color: string; theme: any }) => {
   const styles = React.useMemo(() => createStyles(theme.colors), [theme.colors]);
@@ -1173,9 +1181,9 @@ export const StreamsScreen = () => {
               renderItem={renderItem}
               renderSectionHeader={renderSectionHeader}
               stickySectionHeadersEnabled={false}
-              initialNumToRender={8}
-              maxToRenderPerBatch={4}
-              windowSize={5}
+              initialNumToRender={6}
+              maxToRenderPerBatch={3}
+              windowSize={4}
               removeClippedSubviews={false}
               contentContainerStyle={styles.streamsContainer}
               style={styles.streamsContent}

@@ -80,7 +80,7 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
     >
       <View style={styles.catalogHeader}>
         <View style={styles.titleContainer}>
-          <Text style={[styles.catalogTitle, { color: currentTheme.colors.text }]}>{catalog.name}</Text>
+          <Text style={[styles.catalogTitle, { color: currentTheme.colors.text }]} numberOfLines={1}>{catalog.name}</Text>
           <View style={[styles.titleUnderline, { backgroundColor: currentTheme.colors.primary }]} />
         </View>
         <TouchableOpacity
@@ -141,6 +141,8 @@ const styles = StyleSheet.create({
   },
   titleContainer: {
     position: 'relative',
+    flex: 1,
+    marginRight: 16,
   },
   catalogTitle: {
     fontSize: 24,
@@ -164,7 +166,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.1)',
-    marginRight: -10,
   },
   viewAllText: {
     fontSize: 14,

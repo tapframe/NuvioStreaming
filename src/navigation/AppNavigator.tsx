@@ -393,8 +393,6 @@ const WrappedScreen: React.FC<{Screen: React.ComponentType<any>}> = ({ Screen })
 
 // Tab Navigator
 const MainTabs = () => {
-  // Always use dark mode
-  const isDarkMode = true;
   const { currentTheme } = useTheme();
   
   const renderTabBar = (props: BottomTabBarProps) => {
@@ -536,124 +534,57 @@ const MainTabs = () => {
       
       <Tab.Navigator
         tabBar={renderTabBar}
-        screenOptions={({ route }) => ({
-          tabBarIcon: ({ focused, color, size }) => {
-            let iconName: IconNameType = 'home';
-            
-            switch (route.name) {
-              case 'Home':
-                iconName = 'home';
-                break;
-              case 'Library':
-                iconName = 'play-box-multiple';
-                break;
-              case 'Search':
-                iconName = 'feature-search';
-                break;
-              case 'Settings':
-                iconName = 'cog';
-                break;
-            }
-            
-            return <TabIcon focused={focused} color={color} iconName={iconName} />;
-          },
-          tabBarActiveTintColor: currentTheme.colors.primary,
-          tabBarInactiveTintColor: currentTheme.colors.white,
+        screenOptions={({ route, navigation, theme }) => ({
+          header: () => (route.name === 'Home' ? <NuvioHeader /> : null),
+          headerShown: route.name === 'Home',
+          tabBarShowLabel: false,
           tabBarStyle: {
             position: 'absolute',
-            backgroundColor: 'transparent',
             borderTopWidth: 0,
             elevation: 0,
-            height: 85,
-            paddingBottom: 20,
-            paddingTop: 12,
-          },
-          tabBarLabelStyle: {
-            fontSize: 12,
-            fontWeight: '600',
-            marginTop: 0,
-          },
-          // Completely disable animations between tabs for better performance
-          animationEnabled: false,
-          // Keep all screens mounted and active
-          lazy: false,
-          freezeOnBlur: false,
-          detachPreviousScreen: false,
-          // Configure how the screen renders
-          detachInactiveScreens: false,
-          tabBarBackground: () => (
-            Platform.OS === 'ios' ? (
-              <BlurView
-                tint="dark"
-                intensity={75}
-                style={{
-                  position: 'absolute',
-                  height: '100%',
-                  width: '100%',
-                  borderTopColor: currentTheme.colors.border,
-                  borderTopWidth: 0.5,
-                  shadowColor: currentTheme.colors.black,
-                  shadowOffset: { width: 0, height: -2 },
-                  shadowOpacity: 0.1,
-                  shadowRadius: 3,
-                }}
-              />
-            ) : (
-              <LinearGradient
-                colors={[
-                  'rgba(0, 0, 0, 0)',
-                  'rgba(0, 0, 0, 0.65)',
-                  'rgba(0, 0, 0, 0.85)',
-                  'rgba(0, 0, 0, 0.98)',
-                ]}
-                locations={[0, 0.2, 0.4, 0.8]}
-                style={{
-                  position: 'absolute',
-                  height: '100%',
-                  width: '100%',
-                }}
-              />
-            )
-          ),
-          header: () => route.name === 'Home' ? <NuvioHeader /> : null,
-          headerShown: route.name === 'Home',
-          // Add fixed screen styling to help with consistency
-          contentStyle: {
             backgroundColor: currentTheme.colors.darkBackground,
           },
+          detachInactiveScreens: false,
         })}
-        // Global configuration for the tab navigator
-        detachInactiveScreens={false}
       >
-        <Tab.Screen 
-          name="Home" 
+        <Tab.Screen
+          name="Home"
           component={HomeScreen}
-          options={{ 
+          options={{
             tabBarLabel: 'Home',
+            tabBarIcon: ({ color, size, focused }) => (
+              <MaterialCommunityIcons name={focused ? 'home' : 'home-outline'} size={size} color={color} />
+            ),
           }}
         />
-        <Tab.Screen 
-          name="Library" 
+        <Tab.Screen
+          name="Library"
           component={LibraryScreen}
-          options={{ 
+          options={{
             tabBarLabel: 'Library',
-            headerShown: false
+            tabBarIcon: ({ color, size, focused }) => (
+              <MaterialCommunityIcons name={focused ? 'play-box-multiple' : 'play-box-multiple-outline'} size={size} color={color} />
+            ),
           }}
         />
-        <Tab.Screen 
-          name="Search" 
+        <Tab.Screen
+          name="Search"
           component={SearchScreen}
-          options={{ 
+          options={{
             tabBarLabel: 'Search',
-            headerShown: false
+            tabBarIcon: ({ color, size, focused }) => (
+              <MaterialCommunityIcons name={focused ? 'feature-search' : 'feature-search-outline'} size={size} color={color} />
+            ),
           }}
         />
-        <Tab.Screen 
-          name="Settings" 
+        <Tab.Screen
+          name="Settings"
           component={SettingsScreen}
-          options={{ 
+          options={{
             tabBarLabel: 'Settings',
-            headerShown: false
+            tabBarIcon: ({ color, size, focused }) => (
+              <MaterialCommunityIcons name={focused ? 'cog' : 'cog-outline'} size={size} color={color} />
+            ),
           }}
         />
       </Tab.Navigator>
