@@ -4,7 +4,7 @@
     "slug": "nuvio",
     "version": "1.0.0",
     "orientation": "default",
-    "icon": "./assets/splash-icon.png",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "scheme": "stremioexpo",
     "newArchEnabled": true,
