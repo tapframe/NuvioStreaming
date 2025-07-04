@@ -12,6 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import AndroidVideoPlayer from './AndroidVideoPlayer';
 import { useTraktAutosync } from '../../hooks/useTraktAutosync';
+import { useTraktAutosyncSettings } from '../../hooks/useTraktAutosyncSettings';
 
 import { 
   DEFAULT_SUBTITLE_SIZE, 
@@ -73,6 +74,9 @@ const VideoPlayer: React.FC = () => {
     showImdbId: imdbId,
     episodeId: episodeId
   });
+
+  // Get the Trakt autosync settings to use the user-configured sync frequency
+  const { settings: traktSettings } = useTraktAutosyncSettings();
 
   safeDebugLog("Component mounted with props", {
     uri, title, season, episode, episodeTitle, quality, year,
@@ -316,16 +320,24 @@ const VideoPlayer: React.FC = () => {
       if (progressSaveInterval) {
         clearInterval(progressSaveInterval);
       }
+      
+      // Use the user's configured sync frequency instead of hard-coded 5000ms
+      // But ensure we have a minimum interval of 5 seconds
+      const syncInterval = Math.max(5000, traktSettings.syncFrequency);
+      
       const interval = setInterval(() => {
         saveWatchProgress();
-      }, 5000);
+      }, syncInterval);
+      
+      logger.log(`[VideoPlayer] Watch progress save interval set to ${syncInterval}ms`);
+      
       setProgressSaveInterval(interval);
       return () => {
         clearInterval(interval);
         setProgressSaveInterval(null);
       };
     }
-  }, [id, type, paused, currentTime, duration]);
+  }, [id, type, paused, currentTime, duration, traktSettings.syncFrequency]);
 
   useEffect(() => {
     return () => {
@@ -341,16 +353,20 @@ const VideoPlayer: React.FC = () => {
     if (isMounted.current && !isSeeking.current) {
       setPaused(false);
       
-      // Start Trakt watching session only if duration is loaded
-      if (duration > 0) {
-        traktAutosync.handlePlaybackStart(currentTime, duration);
-      }
+      // Note: handlePlaybackStart is already called in onLoad
+      // We don't need to call it again here to avoid duplicate calls
     }
   };
 
   const onPaused = () => {
     if (isMounted.current) {
       setPaused(true);
+      
+      // Send a forced pause update to Trakt immediately when user pauses
+      if (duration > 0) {
+        traktAutosync.handleProgressUpdate(currentTime, duration, true);
+        logger.log('[VideoPlayer] Sent forced pause update to Trakt');
+      }
     }
   };
 

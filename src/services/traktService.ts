@@ -64,7 +64,7 @@ export interface TraktWatchlistItem {
   };
   show?: {
     title: string;
-    year: number;
+    year: number
     ids: {
       trakt: number;
       slug: string;
@@ -271,37 +271,93 @@ export class TraktService {
 
   // Track currently watching sessions to avoid duplicate starts
   private currentlyWatching: Set<string> = new Set();
-  private lastSyncTime: number = 0;
+  private lastSyncTimes: Map<string, number> = new Map();
   private readonly SYNC_DEBOUNCE_MS = 60000; // 60 seconds
   
-  // Enhanced deduplication for stop calls
+  // Debounce for stop calls
   private lastStopCalls: Map<string, number> = new Map();
   private readonly STOP_DEBOUNCE_MS = 10000; // 10 seconds debounce for stop calls
+  
+  // Default completion threshold (overridden by user settings)
+  private readonly DEFAULT_COMPLETION_THRESHOLD = 80; // 80%
 
   private constructor() {
-    // Initialization happens in initialize method
+    // Initialize the cleanup interval for old stop calls
+    setInterval(() => this.cleanupOldStopCalls(), 5 * 60 * 1000); // Clean up every 5 minutes
     
-    // Cleanup old stop call records every 5 minutes
-    setInterval(() => {
-      this.cleanupOldStopCalls();
-    }, 5 * 60 * 1000);
+    // Load user settings
+    this.loadCompletionThreshold();
   }
 
   /**
-   * Cleanup old stop call records to prevent memory leaks
+   * Load user-configured completion threshold from AsyncStorage
+   */
+  private async loadCompletionThreshold(): Promise<void> {
+    try {
+      const thresholdStr = await AsyncStorage.getItem('@trakt_completion_threshold');
+      if (thresholdStr) {
+        const threshold = parseInt(thresholdStr, 10);
+        if (!isNaN(threshold) && threshold >= 50 && threshold <= 100) {
+          logger.log(`[TraktService] Loaded user completion threshold: ${threshold}%`);
+          this.completionThreshold = threshold;
+        }
+      }
+    } catch (error) {
+      logger.error('[TraktService] Error loading completion threshold:', error);
+    }
+  }
+  
+  /**
+   * Get the current completion threshold (user-configured or default)
+   */
+  private get completionThreshold(): number {
+    return this._completionThreshold || this.DEFAULT_COMPLETION_THRESHOLD;
+  }
+  
+  /**
+   * Set the completion threshold
+   */
+  private set completionThreshold(value: number) {
+    this._completionThreshold = value;
+  }
+  
+  // Backing field for completion threshold
+  private _completionThreshold: number | null = null;
+
+  /**
+   * Clean up old stop call records to prevent memory leaks
    */
   private cleanupOldStopCalls(): void {
     const now = Date.now();
-    const cutoff = now - (this.STOP_DEBOUNCE_MS * 2); // Keep records for 2x the debounce time
+    let cleanupCount = 0;
     
+    // Remove stop calls older than the debounce window
     for (const [key, timestamp] of this.lastStopCalls.entries()) {
-      if (timestamp < cutoff) {
+      if (now - timestamp > this.STOP_DEBOUNCE_MS) {
         this.lastStopCalls.delete(key);
+        cleanupCount++;
       }
     }
     
-    if (this.lastStopCalls.size > 0) {
-      logger.log(`[TraktService] Cleaned up old stop call records. Remaining: ${this.lastStopCalls.size}`);
+    // Also clean up old scrobbled timestamps
+    for (const [key, timestamp] of this.scrobbledTimestamps.entries()) {
+      if (now - timestamp > this.SCROBBLE_EXPIRY_MS) {
+        this.scrobbledTimestamps.delete(key);
+        this.scrobbledItems.delete(key);
+        cleanupCount++;
+      }
+    }
+    
+    // Clean up old sync times that haven't been updated in a while
+    for (const [key, timestamp] of this.lastSyncTimes.entries()) {
+      if (now - timestamp > 24 * 60 * 60 * 1000) { // 24 hours
+        this.lastSyncTimes.delete(key);
+        cleanupCount++;
+      }
+    }
+    
+    if (cleanupCount > 0) {
+      logger.log(`[TraktService] Cleaned up ${cleanupCount} old tracking entries`);
     }
   }
 
@@ -1109,6 +1165,19 @@ export class TraktService {
           payload.show.ids.imdb = cleanShowImdbId;
         }
 
+        // Add episode IMDB ID if available (for specific episode IDs)
+        if (contentData.imdbId && contentData.imdbId !== contentData.showImdbId) {
+          const cleanEpisodeImdbId = contentData.imdbId.startsWith('tt') 
+            ? contentData.imdbId.substring(2) 
+            : contentData.imdbId;
+          
+          if (!payload.episode.ids) {
+            payload.episode.ids = {};
+          }
+          
+          payload.episode.ids.imdb = cleanEpisodeImdbId;
+        }
+
         logger.log('[TraktService] DEBUG episode payload:', JSON.stringify(payload, null, 2));
         return payload;
       }
@@ -1250,12 +1319,15 @@ export class TraktService {
 
       const now = Date.now();
       
+      const watchingKey = this.getWatchingKey(contentData);
+      const lastSync = this.lastSyncTimes.get(watchingKey) || 0;
+      
       // Debounce API calls unless forced
-      if (!force && (now - this.lastSyncTime) < this.SYNC_DEBOUNCE_MS) {
+      if (!force && (now - lastSync) < this.SYNC_DEBOUNCE_MS) {
         return true; // Skip this sync, but return success
       }
 
-      this.lastSyncTime = now;
+      this.lastSyncTimes.set(watchingKey, now);
 
       const result = await this.queueRequest(async () => {
         return await this.pauseWatching(contentData, progress);
@@ -1309,7 +1381,7 @@ export class TraktService {
         this.currentlyWatching.delete(watchingKey);
         
         // Mark as scrobbled if >= 80% to prevent future duplicates and restarts
-        if (progress >= 80) {
+        if (progress >= this.completionThreshold) {
           this.scrobbledItems.add(watchingKey);
           this.scrobbledTimestamps.set(watchingKey, Date.now());
           logger.log(`[TraktService] Marked as scrobbled to prevent restarts: ${watchingKey}`);
@@ -1317,7 +1389,7 @@ export class TraktService {
         
         // The stop endpoint automatically handles the 80%+ completion logic
         // and will mark as scrobbled if >= 80%, or pause if < 80%
-        const action = progress >= 80 ? 'scrobbled' : 'paused';
+        const action = progress >= this.completionThreshold ? 'scrobbled' : 'paused';
         logger.log(`[TraktService] Stopped watching ${contentData.type}: ${contentData.title} (${progress.toFixed(1)}% - ${action})`);
         
         return true;

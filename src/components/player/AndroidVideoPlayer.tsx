@@ -11,6 +11,7 @@ import { logger } from '../../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTraktAutosync } from '../../hooks/useTraktAutosync';
+import { useTraktAutosyncSettings } from '../../hooks/useTraktAutosyncSettings';
 
 import { 
   DEFAULT_SUBTITLE_SIZE, 
@@ -78,6 +79,9 @@ const AndroidVideoPlayer: React.FC = () => {
     showImdbId: imdbId,
     episodeId: episodeId
   });
+
+  // Get the Trakt autosync settings to use the user-configured sync frequency
+  const { settings: traktSettings } = useTraktAutosyncSettings();
 
   safeDebugLog("Android Component mounted with props", {
     uri, title, season, episode, episodeTitle, quality, year,
@@ -321,16 +325,24 @@ const AndroidVideoPlayer: React.FC = () => {
       if (progressSaveInterval) {
         clearInterval(progressSaveInterval);
       }
+      
+      // Use the user's configured sync frequency instead of hard-coded 5000ms
+      // But ensure we have a minimum interval of 5 seconds
+      const syncInterval = Math.max(5000, traktSettings.syncFrequency);
+      
       const interval = setInterval(() => {
         saveWatchProgress();
-      }, 5000);
+      }, syncInterval);
+      
+      logger.log(`[AndroidVideoPlayer] Watch progress save interval set to ${syncInterval}ms`);
+      
       setProgressSaveInterval(interval);
       return () => {
         clearInterval(interval);
         setProgressSaveInterval(null);
       };
     }
-  }, [id, type, paused, currentTime, duration]);
+  }, [id, type, paused, currentTime, duration, traktSettings.syncFrequency]);
 
   useEffect(() => {
     return () => {
@@ -721,7 +733,14 @@ const AndroidVideoPlayer: React.FC = () => {
     
   const togglePlayback = () => {
     if (videoRef.current) {
-        setPaused(!paused);
+      const newPausedState = !paused;
+      setPaused(newPausedState);
+      
+      // Send a forced pause update to Trakt immediately when user pauses
+      if (newPausedState && duration > 0) {
+        traktAutosync.handleProgressUpdate(currentTime, duration, true);
+        logger.log('[AndroidVideoPlayer] Sent forced pause update to Trakt');
+      }
     }
   };
 
