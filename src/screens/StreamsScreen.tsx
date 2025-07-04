@@ -1146,7 +1146,7 @@ export const StreamsScreen = () => {
               </Text>
               <TouchableOpacity
                 style={styles.addSourcesButton}
-                onPress={() => navigation.navigate('Settings')}
+                onPress={() => navigation.navigate('Addons')}
               >
                 <Text style={styles.addSourcesButtonText}>Add Sources</Text>
               </TouchableOpacity>
