@@ -222,8 +222,14 @@ const MetadataScreen: React.FC = () => {
   }, [navigation, id, type, episodes, episodeId, watchProgressData.watchProgress]);
 
   const handleEpisodeSelect = useCallback((episode: Episode) => {
+    console.log('[MetadataScreen] Selected Episode:', JSON.stringify(episode, null, 2));
     const episodeId = episode.stremioId || `${id}:${episode.season_number}:${episode.episode_number}`;
-    navigation.navigate('Streams', { id, type, episodeId });
+    navigation.navigate('Streams', { 
+      id, 
+      type, 
+      episodeId,
+      episodeThumbnail: episode.still_path || undefined
+    });
   }, [navigation, id, type]);
 
   const handleBack = useCallback(() => navigation.goBack(), [navigation]);

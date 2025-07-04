@@ -232,7 +232,7 @@ const ProviderFilter = memo(({
 export const StreamsScreen = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'Streams'>>();
   const navigation = useNavigation<RootStackNavigationProp>();
-  const { id, type, episodeId } = route.params;
+  const { id, type, episodeId, episodeThumbnail } = route.params;
   const { settings } = useSettings();
   const { currentTheme } = useTheme();
   const { colors } = currentTheme;
@@ -254,6 +254,10 @@ export const StreamsScreen = () => {
       setter();
     }
   }, []);
+
+  useEffect(() => {
+    console.log('[StreamsScreen] Received thumbnail from params:', episodeThumbnail);
+  }, [episodeThumbnail]);
 
   const {
     metadata,
@@ -904,12 +908,21 @@ export const StreamsScreen = () => {
   }, [selectedProvider, type, episodeStreams, groupedStreams]);
 
   const episodeImage = useMemo(() => {
+    if (episodeThumbnail) {
+      if (episodeThumbnail.startsWith('http')) {
+        return episodeThumbnail;
+      }
+      return tmdbService.getImageUrl(episodeThumbnail, 'original');
+    }
     if (!currentEpisode) return null;
     if (currentEpisode.still_path) {
+      if (currentEpisode.still_path.startsWith('http')) {
+        return currentEpisode.still_path;
+      }
       return tmdbService.getImageUrl(currentEpisode.still_path, 'original');
     }
     return metadata?.poster || null;
-  }, [currentEpisode, metadata]);
+  }, [currentEpisode, metadata, episodeThumbnail]);
 
   const isLoading = type === 'series' ? loadingEpisodeStreams : loadingStreams;
   const streams = type === 'series' ? episodeStreams : groupedStreams;
