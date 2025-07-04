@@ -7,9 +7,11 @@ import {
   TouchableOpacity, 
   Dimensions,
   AppState,
-  AppStateStatus
+  AppStateStatus,
+  Alert,
+  ActivityIndicator
 } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
@@ -19,6 +21,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { useTheme } from '../../contexts/ThemeContext';
 import { storageService } from '../../services/storageService';
 import { logger } from '../../utils/logger';
+import * as Haptics from 'expo-haptics';
 
 // Define interface for continue watching items
 interface ContinueWatchingItem extends StreamingContent {
@@ -76,6 +79,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   const [loading, setLoading] = useState(true);
   const appState = useRef(AppState.currentState);
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
+  const longPressTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Use a state to track if a background refresh is in progress
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -245,6 +250,9 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         if (refreshTimerRef.current) {
           clearTimeout(refreshTimerRef.current);
         }
+        if (longPressTimeoutRef.current) {
+          clearTimeout(longPressTimeoutRef.current);
+        }
       };
     } else {
       // Fallback: poll for updates every 30 seconds
@@ -254,6 +262,9 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         clearInterval(intervalId);
         if (refreshTimerRef.current) {
           clearTimeout(refreshTimerRef.current);
+        }
+        if (longPressTimeoutRef.current) {
+          clearTimeout(longPressTimeoutRef.current);
         }
       };
     }
@@ -276,6 +287,60 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   const handleContentPress = useCallback((id: string, type: string) => {
     navigation.navigate('Metadata', { id, type });
   }, [navigation]);
+
+  // Handle long press to delete
+  const handleLongPress = useCallback((item: ContinueWatchingItem) => {
+    try {
+      // Trigger haptic feedback
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch (error) {
+      // Ignore haptic errors
+    }
+
+    // Show confirmation alert
+    Alert.alert(
+      "Remove from Continue Watching",
+      `Remove "${item.name}" from your continue watching list?`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        { 
+          text: "Remove", 
+          style: "destructive",
+          onPress: async () => {
+            setDeletingItemId(item.id);
+            try {
+              // Trigger haptic feedback for confirmation
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              
+              // Remove the watch progress
+              await storageService.removeWatchProgress(
+                item.id, 
+                item.type, 
+                item.type === 'series' && item.season && item.episode 
+                  ? `${item.season}:${item.episode}` 
+                  : undefined
+              );
+              
+              // Update the list by filtering out the deleted item
+              setContinueWatchingItems(prev => 
+                prev.filter(i => i.id !== item.id || 
+                  (i.type === 'series' && item.type === 'series' && 
+                   (i.season !== item.season || i.episode !== item.episode))
+                )
+              );
+            } catch (error) {
+              logger.error('Failed to remove watch progress:', error);
+            } finally {
+              setDeletingItemId(null);
+            }
+          }
+        }
+      ]
+    );
+  }, []);
 
   // If no continue watching items, don't render anything
   if (continueWatchingItems.length === 0) {
@@ -302,6 +367,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
             }]}
             activeOpacity={0.8}
             onPress={() => handleContentPress(item.id, item.type)}
+            onLongPress={() => handleLongPress(item)}
+            delayLongPress={800}
           >
             {/* Poster Image */}
             <View style={styles.posterContainer}>
@@ -315,6 +382,17 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                 placeholderContentFit="cover"
                 recyclingKey={item.id}
               />
+              
+              {/* Delete Indicator Overlay */}
+              {deletingItemId === item.id && (
+                <Animated.View 
+                  entering={FadeIn.duration(200)}
+                  exiting={FadeOut.duration(200)}
+                  style={styles.deletingOverlay}
+                >
+                  <ActivityIndicator size="large" color="#FFFFFF" />
+                </Animated.View>
+              )}
             </View>
 
             {/* Content Details */}
@@ -442,10 +520,23 @@ const styles = StyleSheet.create({
   posterContainer: {
     width: 80,
     height: '100%',
+    position: 'relative',
   },
   continueWatchingPoster: {
     width: '100%',
     height: '100%',
+    borderTopLeftRadius: 12,
+    borderBottomLeftRadius: 12,
+  },
+  deletingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
     borderTopLeftRadius: 12,
     borderBottomLeftRadius: 12,
   },

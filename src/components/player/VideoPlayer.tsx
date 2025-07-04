@@ -151,6 +151,7 @@ const VideoPlayer: React.FC = () => {
   const [currentStreamName, setCurrentStreamName] = useState<string | undefined>(streamName);
   const isMounted = useRef(true);
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null);
+  const [isSyncingBeforeClose, setIsSyncingBeforeClose] = useState(false);
 
   const hideControls = () => {
     Animated.timing(fadeAnim, {
@@ -575,38 +576,56 @@ const VideoPlayer: React.FC = () => {
     }
   };
 
-  const handleClose = () => {
+  const handleClose = async () => {
     logger.log('[VideoPlayer] Close button pressed - syncing to Trakt before closing');
-    logger.log(`[VideoPlayer] Current progress: ${currentTime}/${duration} (${duration > 0 ? ((currentTime / duration) * 100).toFixed(1) : 0}%)`);
     
-    // Sync progress to Trakt before closing
-    traktAutosync.handlePlaybackEnd(currentTime, duration, 'unmount');
+    // Set syncing state to prevent multiple close attempts
+    setIsSyncingBeforeClose(true);
     
-    // Start exit animation
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-      Animated.timing(openingFadeAnim, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    // Small delay to allow animation to start, then unlock orientation and navigate
-    setTimeout(() => {
-      ScreenOrientation.unlockAsync().then(() => {
-        disableImmersiveMode();
-        navigation.goBack();
-      }).catch(() => {
-        // Fallback: navigate even if orientation unlock fails
-        disableImmersiveMode();
-        navigation.goBack();
-      });
-    }, 100);
+    // Make sure we have the most accurate current time
+    const actualCurrentTime = currentTime;
+    const progressPercent = duration > 0 ? (actualCurrentTime / duration) * 100 : 0;
+    
+    logger.log(`[VideoPlayer] Current progress: ${actualCurrentTime}/${duration} (${progressPercent.toFixed(1)}%)`);
+    
+    try {
+      // Force one last progress update (scrobble/pause) with the exact time
+      await traktAutosync.handleProgressUpdate(actualCurrentTime, duration, true);
+      
+      // Sync progress to Trakt before closing
+      await traktAutosync.handlePlaybackEnd(actualCurrentTime, duration, 'unmount');
+      
+      // Start exit animation
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(openingFadeAnim, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
+  
+      // Longer delay to ensure Trakt sync completes
+      setTimeout(() => {
+        ScreenOrientation.unlockAsync().then(() => {
+          disableImmersiveMode();
+          navigation.goBack();
+        }).catch(() => {
+          // Fallback: navigate even if orientation unlock fails
+          disableImmersiveMode();
+          navigation.goBack();
+        });
+      }, 500); // Increased from 100ms to 500ms
+    } catch (error) {
+      logger.error('[VideoPlayer] Error syncing to Trakt before closing:', error);
+      // Navigate anyway even if sync fails
+      disableImmersiveMode();
+      navigation.goBack();
+    }
   };
 
   const handleResume = async () => {
@@ -649,9 +668,22 @@ const VideoPlayer: React.FC = () => {
     setIsBuffering(event.isBuffering);
   };
 
-  const onEnd = () => {
-    // Sync final progress to Trakt
-    traktAutosync.handlePlaybackEnd(currentTime, duration, 'ended');
+  const onEnd = async () => {
+    // Make sure we report 100% progress to Trakt
+    const finalTime = duration;
+    setCurrentTime(finalTime);
+
+    try {
+      // Force one last progress update (scrobble/pause) just in case
+      await traktAutosync.handleProgressUpdate(finalTime, duration, true);
+      logger.log('[VideoPlayer] Sent final progress update on video end');
+
+      // Now send the stop call
+      await traktAutosync.handlePlaybackEnd(finalTime, duration, 'ended');
+      logger.log('[VideoPlayer] Completed video end sync to Trakt');
+    } catch (error) {
+      logger.error('[VideoPlayer] Error syncing to Trakt on video end:', error);
+    }
   };
 
   const selectAudioTrack = (trackId: number) => {

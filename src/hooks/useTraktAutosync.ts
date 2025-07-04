@@ -259,13 +259,13 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
           maxProgress = lastSyncProgress.current;
         }
         
-                 // Also check local storage for the highest recorded progress
-         try {
-           const savedProgress = await storageService.getWatchProgress(
-             options.id, 
-             options.type, 
-             options.episodeId
-           );
+        // Also check local storage for the highest recorded progress
+        try {
+          const savedProgress = await storageService.getWatchProgress(
+            options.id, 
+            options.type, 
+            options.episodeId
+          );
           
           if (savedProgress && savedProgress.duration > 0) {
             const savedProgressPercent = (savedProgress.currentTime / savedProgress.duration) * 100;
@@ -296,11 +296,17 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
         }
       }
       
-      // Only stop if we have meaningful progress (>= 1%) or it's a natural video end
-      // Skip unmount calls with very low progress unless video actually ended
-      if (reason === 'unmount' && progressPercent < 1) {
+      // Only stop if we have meaningful progress (>= 0.5%) or it's a natural video end
+      // Lower threshold for unmount calls to catch more edge cases
+      if (reason === 'unmount' && progressPercent < 0.5) {
         logger.log(`[TraktAutosync] Skipping unmount stop for ${options.title} - too early (${progressPercent.toFixed(1)}%)`);
         return;
+      }
+      
+      // For natural end events, always set progress to at least 90%
+      if (reason === 'ended' && progressPercent < 90) {
+        logger.log(`[TraktAutosync] Natural end detected but progress is low (${progressPercent.toFixed(1)}%), boosting to 90%`);
+        progressPercent = 90;
       }
       
       // Mark stop attempt and update timestamp
@@ -349,7 +355,7 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
       // Reset stop flag on error so we can try again
       hasStopped.current = false;
     }
-  }, [isAuthenticated, autosyncSettings.enabled, stopWatching, buildContentData, options]);
+  }, [isAuthenticated, autosyncSettings.enabled, stopWatching, startWatching, buildContentData, options]);
 
   // Reset state (useful when switching content)
   const resetState = useCallback(() => {
