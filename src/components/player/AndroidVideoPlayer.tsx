@@ -656,12 +656,17 @@ const AndroidVideoPlayer: React.FC = () => {
     setCurrentTime(finalTime);
 
     try {
-      // Force one last progress update (scrobble/pause) just in case
+      // Force one last progress update (scrobble/pause) with the exact final time
+      logger.log('[AndroidVideoPlayer] Video ended naturally, sending final progress update with 100%');
       await traktAutosync.handleProgressUpdate(finalTime, duration, true);
-      logger.log('[AndroidVideoPlayer] Sent final progress update on video end');
-
+      
+      // Small delay to ensure the progress update is processed
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       // Now send the stop call
+      logger.log('[AndroidVideoPlayer] Sending final stop call after natural end');
       await traktAutosync.handlePlaybackEnd(finalTime, duration, 'ended');
+      
       logger.log('[AndroidVideoPlayer] Completed video end sync to Trakt');
     } catch (error) {
       logger.error('[AndroidVideoPlayer] Error syncing to Trakt on video end:', error);

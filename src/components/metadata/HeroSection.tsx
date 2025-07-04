@@ -257,6 +257,10 @@ const WatchProgressDisplay = React.memo(({
   const { currentTheme } = useTheme();
   const { isAuthenticated: isTraktAuthenticated, forceSyncTraktProgress } = useTraktContext();
   
+  // State to trigger refresh after manual sync
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
+  
   // Animated values for enhanced effects
   const completionGlow = useSharedValue(0);
   const celebrationScale = useSharedValue(1);
@@ -264,19 +268,50 @@ const WatchProgressDisplay = React.memo(({
   const progressBoxOpacity = useSharedValue(0);
   const progressBoxScale = useSharedValue(0.8);
   const progressBoxTranslateY = useSharedValue(20);
+  const syncRotation = useSharedValue(0);
+  
+  // Animate the sync icon when syncing
+  useEffect(() => {
+    if (isSyncing) {
+      syncRotation.value = withRepeat(
+        withTiming(360, { duration: 1000 }),
+        -1, // Infinite repeats
+        false // No reverse
+      );
+    } else {
+      syncRotation.value = 0;
+    }
+  }, [isSyncing, syncRotation]);
   
   // Handle manual Trakt sync
   const handleTraktSync = useMemo(() => async () => {
     if (isTraktAuthenticated && forceSyncTraktProgress) {
       logger.log('[HeroSection] Manual Trakt sync requested');
+      setIsSyncing(true);
       try {
         const success = await forceSyncTraktProgress();
         logger.log(`[HeroSection] Manual Trakt sync ${success ? 'successful' : 'failed'}`);
+        
+        // Force component to re-render after a short delay to update sync status
+        if (success) {
+          setTimeout(() => {
+            setRefreshTrigger(prev => prev + 1);
+            setIsSyncing(false);
+          }, 500);
+        } else {
+          setIsSyncing(false);
+        }
       } catch (error) {
         logger.error('[HeroSection] Manual Trakt sync error:', error);
+        setIsSyncing(false);
       }
     }
-  }, [isTraktAuthenticated, forceSyncTraktProgress]);
+  }, [isTraktAuthenticated, forceSyncTraktProgress, setRefreshTrigger]);
+
+  // Sync rotation animation style
+  const syncIconStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${syncRotation.value}deg` }],
+  }));
   
   // Memoized progress calculation with Trakt integration
   const progressData = useMemo(() => {
@@ -351,7 +386,9 @@ const WatchProgressDisplay = React.memo(({
           displayText = `${Math.round(progressPercent)}% watched (${Math.round(watchProgress.traktProgress)}% on Trakt)`;
         }
       } else {
-        syncStatus = ' • Sync pending';
+        // Only show "Sync pending" if the content hasn't been synced AND the local progress is significant
+        const hasSignificantProgress = progressPercent > 1;
+        syncStatus = hasSignificantProgress ? ' • Sync pending' : '';
       }
     }
 
@@ -364,7 +401,7 @@ const WatchProgressDisplay = React.memo(({
       isTraktSynced: watchProgress.traktSynced && isTraktAuthenticated,
       isWatched: false
     };
-  }, [watchProgress, type, getEpisodeDetails, isTraktAuthenticated, isWatched]);
+  }, [watchProgress, type, getEpisodeDetails, isTraktAuthenticated, isWatched, refreshTrigger]);
 
   // Trigger appearance and completion animations
   useEffect(() => {
@@ -520,16 +557,19 @@ const WatchProgressDisplay = React.memo(({
                   style={styles.traktSyncButtonInline}
             onPress={handleTraktSync}
             activeOpacity={0.7}
+            disabled={isSyncing}
                 >
                   <LinearGradient
                     colors={['#E50914', '#B8070F']}
                     style={styles.syncButtonGradientInline}
           >
-            <MaterialIcons 
-              name="refresh" 
+            <Animated.View style={syncIconStyle}>
+              <MaterialIcons 
+                name={isSyncing ? "sync" : "refresh"} 
                       size={12} 
                       color="#fff" 
-            />
+              />
+            </Animated.View>
                   </LinearGradient>
           </TouchableOpacity>
               )}
