@@ -24,6 +24,7 @@
     "@react-navigation/stack": "^7.2.10",
     "@sentry/react-native": "^6.15.1",
     "@shopify/flash-list": "1.7.3",
+    "@shopify/react-native-skia": "^2.1.1",
     "@types/lodash": "^4.17.16",
     "@types/react-native-video": "^5.0.20",
     "axios": "^1.10.0",
