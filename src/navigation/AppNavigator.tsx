@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { NavigationContainer, DefaultTheme as NavigationDefaultTheme, DarkTheme as NavigationDarkTheme, Theme, NavigationProp } from '@react-navigation/native';
 import { createNativeStackNavigator, NativeStackNavigationOptions, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createBottomTabNavigator, BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { useColorScheme, Platform, Animated, StatusBar, TouchableOpacity, View, Text, AppState } from 'react-native';
+import { useColorScheme, Platform, Animated, StatusBar, TouchableOpacity, View, Text, AppState, Easing } from 'react-native';
 import { PaperProvider, MD3DarkTheme, MD3LightTheme, adaptNavigationTheme } from 'react-native-paper';
 import type { MD3Theme } from 'react-native-paper';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
@@ -536,6 +536,35 @@ const MainTabs = () => {
       <Tab.Navigator
         tabBar={renderTabBar}
         screenOptions={({ route, navigation, theme }) => ({
+          transitionSpec: {
+            animation: 'timing',
+            config: {
+              duration: 200,
+              easing: Easing.inOut(Easing.ease),
+            },
+          },
+          sceneStyleInterpolator: ({ current }) => ({
+            sceneStyle: {
+              opacity: current.progress.interpolate({
+                inputRange: [-1, 0, 1],
+                outputRange: [0, 1, 0],
+              }),
+              transform: [
+                {
+                  scale: current.progress.interpolate({
+                    inputRange: [-1, 0, 1],
+                    outputRange: [0.95, 1, 0.95],
+                  }),
+                },
+                {
+                  translateY: current.progress.interpolate({
+                    inputRange: [-1, 0, 1],
+                    outputRange: [8, 0, 8],
+                  }),
+                },
+              ],
+            },
+          }),
           header: () => (route.name === 'Home' ? <NuvioHeader /> : null),
           headerShown: route.name === 'Home',
           tabBarShowLabel: false,
