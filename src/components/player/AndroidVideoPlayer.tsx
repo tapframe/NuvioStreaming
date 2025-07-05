@@ -157,6 +157,8 @@ const AndroidVideoPlayer: React.FC = () => {
   const isMounted = useRef(true);
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null);
   const [isSyncingBeforeClose, setIsSyncingBeforeClose] = useState(false);
+  // Offset in seconds to avoid seeking to the exact end, which fires onEnd and resets.
+  const END_EPSILON = 0.3;
 
   const hideControls = () => {
     Animated.timing(fadeAnim, {
@@ -355,7 +357,9 @@ const AndroidVideoPlayer: React.FC = () => {
     };
   }, [id, type, currentTime, duration]);
 
-  const seekToTime = (timeInSeconds: number) => {
+  const seekToTime = (rawSeconds: number) => {
+    // Clamp to just before the end of the media.
+    const timeInSeconds = Math.max(0, Math.min(rawSeconds, duration > 0 ? duration - END_EPSILON : rawSeconds));
     if (videoRef.current && duration > 0 && !isSeeking.current) {
       if (DEBUG_MODE) {
         logger.log(`[AndroidVideoPlayer] Seeking to ${timeInSeconds.toFixed(2)}s out of ${duration.toFixed(2)}s`);
@@ -415,8 +419,8 @@ const AndroidVideoPlayer: React.FC = () => {
   
   const processProgressTouch = (locationX: number, isDragging = false) => {
     progressBarRef.current?.measure((x, y, width, height, pageX, pageY) => {
-      const percentage = Math.max(0, Math.min(locationX / width, 1));
-      const seekTime = percentage * duration;
+      const percentage = Math.max(0, Math.min(locationX / width, 0.999));
+      const seekTime = Math.min(percentage * duration, duration - END_EPSILON);
       progressAnim.setValue(percentage);
       if (isDragging) {
         pendingSeekValue.current = seekTime;
@@ -519,7 +523,7 @@ const AndroidVideoPlayer: React.FC = () => {
 
   const skip = (seconds: number) => {
     if (videoRef.current) {
-      const newTime = Math.max(0, Math.min(currentTime + seconds, duration));
+      const newTime = Math.max(0, Math.min(currentTime + seconds, duration - END_EPSILON));
       seekToTime(newTime);
     }
   };

@@ -179,17 +179,7 @@ const ActionButtons = React.memo(({
         {Platform.OS === 'ios' ? (
           <ExpoBlurView intensity={80} style={styles.blurBackground} tint="dark" />
         ) : (
-          Constants.executionEnvironment === ExecutionEnvironment.StoreClient ? (
-            <View style={styles.androidFallbackBlur} />
-          ) : (
-            <CommunityBlurView
-              style={styles.blurBackground}
-              blurType="dark"
-              blurAmount={8}
-              overlayColor="rgba(255,255,255,0.1)"
-              reducedTransparencyFallbackColor="rgba(255,255,255,0.15)"
-            />
-          )
+          <View style={styles.androidFallbackBlur} />
         )}
         <MaterialIcons
           name={inLibrary ? 'bookmark' : 'bookmark-border'}
@@ -210,17 +200,7 @@ const ActionButtons = React.memo(({
           {Platform.OS === 'ios' ? (
             <ExpoBlurView intensity={80} style={styles.blurBackgroundRound} tint="dark" />
           ) : (
-            Constants.executionEnvironment === ExecutionEnvironment.StoreClient ? (
-              <View style={styles.androidFallbackBlurRound} />
-            ) : (
-              <CommunityBlurView
-                style={styles.blurBackgroundRound}
-                blurType="dark"
-                blurAmount={8}
-                overlayColor="rgba(255,255,255,0.1)"
-                reducedTransparencyFallbackColor="rgba(255,255,255,0.15)"
-              />
-            )
+            <View style={styles.androidFallbackBlurRound} />
           )}
           <MaterialIcons 
             name="assessment" 

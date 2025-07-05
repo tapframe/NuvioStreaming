@@ -29,7 +29,6 @@ import { useTheme } from '../contexts/ThemeContext';
 import { catalogService } from '../services/catalogService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
 
@@ -39,15 +38,13 @@ const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 interface SettingsCardProps {
   children: React.ReactNode;
   title?: string;
-  delay?: number;
 }
 
-const SettingsCard: React.FC<SettingsCardProps> = ({ children, title, delay = 0 }) => {
+const SettingsCard: React.FC<SettingsCardProps> = ({ children, title }) => {
   const { currentTheme } = useTheme();
   
   return (
-    <Animated.View 
-      entering={FadeInDown.delay(delay).duration(400)}
+    <View 
       style={[styles.cardContainer]}
     >
       {title && (
@@ -64,7 +61,7 @@ const SettingsCard: React.FC<SettingsCardProps> = ({ children, title, delay = 0 
       ]}>
         {children}
       </View>
-    </Animated.View>
+    </View>
   );
 };
 
@@ -297,7 +294,7 @@ const SettingsScreen: React.FC = () => {
             contentContainerStyle={styles.scrollContent}
           >
             {/* Account Section */}
-            <SettingsCard title="ACCOUNT" delay={0}>
+            <SettingsCard title="ACCOUNT">
               <SettingItem
                 title="Trakt"
                 description={isAuthenticated ? `@${userProfile?.username || 'User'}` : "Sign in to sync"}
@@ -318,7 +315,7 @@ const SettingsScreen: React.FC = () => {
             </SettingsCard>
 
             {/* Content & Discovery */}
-            <SettingsCard title="CONTENT & DISCOVERY" delay={100}>
+            <SettingsCard title="CONTENT & DISCOVERY">
               <SettingItem
                 title="Addons"
                 description={`${addonCount} installed`}
@@ -344,7 +341,7 @@ const SettingsScreen: React.FC = () => {
             </SettingsCard>
 
             {/* Appearance & Interface */}
-            <SettingsCard title="APPEARANCE" delay={200}>
+            <SettingsCard title="APPEARANCE">
               <SettingItem
                 title="Theme"
                 description={currentTheme.name}
@@ -367,7 +364,7 @@ const SettingsScreen: React.FC = () => {
             </SettingsCard>
 
             {/* Integrations */}
-            <SettingsCard title="INTEGRATIONS" delay={300}>
+            <SettingsCard title="INTEGRATIONS">
               <SettingItem
                 title="MDBList"
                 description={mdblistKeySet ? "Connected" : "Enable to add ratings & reviews"}
@@ -393,7 +390,7 @@ const SettingsScreen: React.FC = () => {
             </SettingsCard>
 
             {/* Playback & Experience */}
-            <SettingsCard title="PLAYBACK" delay={400}>
+            <SettingsCard title="PLAYBACK">
               <SettingItem
                 title="Video Player"
                 description={Platform.OS === 'ios' 
@@ -422,7 +419,7 @@ const SettingsScreen: React.FC = () => {
             </SettingsCard>
 
             {/* About & Support */}
-            <SettingsCard title="ABOUT" delay={500}>
+            <SettingsCard title="ABOUT">
               <SettingItem
                 title="Privacy Policy"
                 icon="lock"
@@ -445,7 +442,7 @@ const SettingsScreen: React.FC = () => {
 
             {/* Developer Options - Only show in development */}
             {__DEV__ && (
-              <SettingsCard title="DEVELOPER" delay={600}>
+              <SettingsCard title="DEVELOPER">
                 <SettingItem
                   title="Test Onboarding"
                   icon="play-circle-outline"
@@ -496,7 +493,7 @@ const SettingsScreen: React.FC = () => {
 
             {/* Cache Management - Only show if MDBList is connected */}
             {mdblistKeySet && (
-              <SettingsCard title="CACHE MANAGEMENT" delay={600}>
+              <SettingsCard title="CACHE MANAGEMENT">
                 <SettingItem
                   title="Clear MDBList Cache"
                   icon="cached"

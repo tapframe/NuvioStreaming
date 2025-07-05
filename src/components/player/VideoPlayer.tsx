@@ -152,6 +152,9 @@ const VideoPlayer: React.FC = () => {
   const isMounted = useRef(true);
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null);
   const [isSyncingBeforeClose, setIsSyncingBeforeClose] = useState(false);
+  // Small offset (in seconds) used to avoid seeking to the *exact* end of the
+  // file which triggers the `onEnd` callback and causes playback to restart.
+  const END_EPSILON = 0.3;
 
   const hideControls = () => {
     Animated.timing(fadeAnim, {
@@ -371,7 +374,9 @@ const VideoPlayer: React.FC = () => {
     }
   };
 
-  const seekToTime = (timeInSeconds: number) => {
+  const seekToTime = (rawSeconds: number) => {
+    // Clamp to just before the end to avoid triggering onEnd.
+    const timeInSeconds = Math.max(0, Math.min(rawSeconds, duration > 0 ? duration - END_EPSILON : rawSeconds));
     if (vlcRef.current && duration > 0 && !isSeeking.current) {
       if (DEBUG_MODE) {
         logger.log(`[VideoPlayer] Seeking to ${timeInSeconds.toFixed(2)}s out of ${duration.toFixed(2)}s`);
@@ -443,8 +448,8 @@ const VideoPlayer: React.FC = () => {
   
   const processProgressTouch = (locationX: number, isDragging = false) => {
     progressBarRef.current?.measure((x, y, width, height, pageX, pageY) => {
-      const percentage = Math.max(0, Math.min(locationX / width, 1));
-      const seekTime = percentage * duration;
+      const percentage = Math.max(0, Math.min(locationX / width, 0.999));
+      const seekTime = Math.min(percentage * duration, duration - END_EPSILON);
       progressAnim.setValue(percentage);
       if (isDragging) {
         pendingSeekValue.current = seekTime;
@@ -530,7 +535,7 @@ const VideoPlayer: React.FC = () => {
 
   const skip = (seconds: number) => {
     if (vlcRef.current) {
-      const newTime = Math.max(0, Math.min(currentTime + seconds, duration));
+      const newTime = Math.max(0, Math.min(currentTime + seconds, duration - END_EPSILON));
       seekToTime(newTime);
     }
   };
