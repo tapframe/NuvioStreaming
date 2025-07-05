@@ -530,7 +530,7 @@ const AndroidVideoPlayer: React.FC = () => {
 
   const cycleAspectRatio = () => {
     // Android: cycle through native resize modes
-    const resizeModes: ResizeModeType[] = ['contain', 'cover', 'stretch', 'none'];
+    const resizeModes: ResizeModeType[] = ['contain', 'cover', 'fill', 'none'];
     const currentIndex = resizeModes.indexOf(resizeMode);
     const nextIndex = (currentIndex + 1) % resizeModes.length;
     setResizeMode(resizeModes[nextIndex]);
@@ -1091,6 +1091,7 @@ const AndroidVideoPlayer: React.FC = () => {
             useCustomSubtitles={useCustomSubtitles}
             currentSubtitle={currentSubtitle}
             subtitleSize={subtitleSize}
+            zoomScale={zoomScale}
           />
 
           <ResumeOverlay

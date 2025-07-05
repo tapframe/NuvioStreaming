@@ -694,6 +694,71 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                     </TouchableOpacity>
                   </View>
                 ))}
+
+                {/* Online subtitles section */}
+                {isLoadingSubtitleList && (
+                  <View style={{ alignItems: 'center', marginTop: 24 }}>
+                    <ActivityIndicator size="large" color="#22C55E" />
+                  </View>
+                )}
+
+                {availableSubtitles.length > 0 && (
+                  <>
+                    <View style={{ marginVertical: 24 }}>
+                      <Text style={{
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        fontSize: 14,
+                        fontWeight: '600',
+                        letterSpacing: 0.3,
+                        textTransform: 'uppercase',
+                      }}>
+                        Online Subtitles
+                      </Text>
+                    </View>
+
+                    {availableSubtitles.map((sub) => (
+                      <View key={sub.id} style={{ marginBottom: 12, width: '100%' }}>
+                        <TouchableOpacity
+                          style={{
+                            backgroundColor: 'rgba(34, 197, 94, 0.08)',
+                            borderRadius: 20,
+                            padding: 20,
+                            borderWidth: 2,
+                            borderColor: 'rgba(34, 197, 94, 0.4)',
+                            width: '100%',
+                          }}
+                          onPress={() => {
+                            loadWyzieSubtitle(sub);
+                            handleLanguageClose();
+                          }}
+                          activeOpacity={0.85}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                            <View style={{ flex: 1, marginRight: 16 }}>
+                              <Text style={{
+                                color: '#fff',
+                                fontSize: 16,
+                                fontWeight: '700',
+                                letterSpacing: -0.2,
+                                marginBottom: 4,
+                              }}>
+                                {sub.display}
+                              </Text>
+                              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                                <SubtitleBadge 
+                                  text={formatLanguage(sub.language)} 
+                                  color="#22C55E" 
+                                  bgColor="rgba(34, 197, 94, 0.15)"
+                                />
+                              </View>
+                            </View>
+                            <MaterialIcons name="cloud-download" size={24} color="#22C55E" />
+                          </View>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </>
+                )}
               </View>
             </ScrollView>
           </BlurView>

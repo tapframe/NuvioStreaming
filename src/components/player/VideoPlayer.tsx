@@ -1101,6 +1101,7 @@ const VideoPlayer: React.FC = () => {
             useCustomSubtitles={useCustomSubtitles}
             currentSubtitle={currentSubtitle}
             subtitleSize={subtitleSize}
+            zoomScale={zoomScale}
           />
 
           <ResumeOverlay
