@@ -249,11 +249,15 @@ const HomeScreen = () => {
   }, []);
 
   // Only count feature section as loading if it's enabled in settings
-  // For catalogs, we show them progressively, so only show loading if no catalogs are loaded yet
-  const isLoading = useMemo(() => 
-    (showHeroSection ? featuredLoading : false) || (catalogsLoading && catalogs.length === 0),
-    [showHeroSection, featuredLoading, catalogsLoading, catalogs.length]
-  );
+  // Render the screen immediately and let placeholders/skeletons handle progressive loading
+  const isLoading = useMemo(() => {
+    // Show a full-screen loader only if we literally have no data to display yet
+    const noHeroSection = !showHeroSection;
+    const noFeaturedData = !featuredContent && featuredLoading;
+    const noCatalogsReady = catalogs.length === 0 && catalogsLoading;
+
+    return noHeroSection && noCatalogsReady && noFeaturedData;
+  }, [showHeroSection, featuredContent, featuredLoading, catalogsLoading, catalogs.length]);
 
   // React to settings changes
   useEffect(() => {
