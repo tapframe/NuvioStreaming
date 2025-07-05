@@ -520,7 +520,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: Math.max(16, width * 0.05),
+    paddingHorizontal: Math.max(1, width * 0.05),
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',

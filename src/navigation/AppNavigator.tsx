@@ -540,7 +540,7 @@ const MainTabs = () => {
             animation: 'timing',
             config: {
               duration: 200,
-              easing: Easing.inOut(Easing.ease),
+              easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
             },
           },
           sceneStyleInterpolator: ({ current }) => ({

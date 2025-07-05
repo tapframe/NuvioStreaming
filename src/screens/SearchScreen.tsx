@@ -688,9 +688,9 @@ const styles = StyleSheet.create({
     paddingTop: 0,
   },
   header: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 15,
     justifyContent: 'flex-end',
-    paddingBottom: 8,
+    paddingBottom: 0,
     backgroundColor: 'transparent',
     zIndex: 2,
   },
