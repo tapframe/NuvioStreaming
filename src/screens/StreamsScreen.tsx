@@ -244,8 +244,8 @@ export const StreamsScreen = () => {
   
   
 
-  // Add timing logs
-  const [loadStartTime, setLoadStartTime] = useState(0);
+  // Track when we started fetching streams so we can show an extended loading state
+  const [streamsLoadStart, setStreamsLoadStart] = useState<number | null>(null);
   const [providerLoadTimes, setProviderLoadTimes] = useState<{[key: string]: number}>({});
   
   // Prevent excessive re-renders by using this guard
@@ -378,9 +378,11 @@ export const StreamsScreen = () => {
               'stremio': true
             });
             setSelectedEpisode(episodeId);
+            setStreamsLoadStart(Date.now());
             loadEpisodeStreams(episodeId);
           } else if (type === 'movie') {
             logger.log(`🎬 Loading movie streams for: ${id}`);
+            setStreamsLoadStart(Date.now());
             loadStreams();
           }
   
@@ -927,6 +929,12 @@ export const StreamsScreen = () => {
   const isLoading = type === 'series' ? loadingEpisodeStreams : loadingStreams;
   const streams = type === 'series' ? episodeStreams : groupedStreams;
 
+  // Determine extended loading phases
+  const streamsEmpty = Object.keys(streams).length === 0;
+  const loadElapsed = streamsLoadStart ? Date.now() - streamsLoadStart : 0;
+  const showInitialLoading = streamsEmpty && (streamsLoadStart === null || loadElapsed < 10000);
+  const showStillFetching = streamsEmpty && loadElapsed >= 10000;
+
   const heroStyle = useAnimatedStyle(() => ({
     transform: [{ scale: heroScale.value }],
     opacity: headerOpacity.value
@@ -1151,8 +1159,8 @@ export const StreamsScreen = () => {
                 <Text style={styles.addSourcesButtonText}>Add Sources</Text>
               </TouchableOpacity>
             </Animated.View>
-        ) : Object.keys(streams).length === 0 ? (
-          (loadingStreams || loadingEpisodeStreams) ? (
+        ) : streamsEmpty ? (
+          showInitialLoading ? (
             <Animated.View 
               entering={FadeIn.duration(300)}
               style={styles.loadingContainer}
@@ -1161,6 +1169,14 @@ export const StreamsScreen = () => {
               <Text style={styles.loadingText}>
                 {isAutoplayWaiting ? 'Finding best stream for autoplay...' : 'Finding available streams...'}
               </Text>
+            </Animated.View>
+          ) : showStillFetching ? (
+            <Animated.View 
+              entering={FadeIn.duration(300)}
+              style={styles.loadingContainer}
+            >
+              <MaterialIcons name="hourglass-bottom" size={32} color={colors.primary} />
+              <Text style={styles.loadingText}>Still fetching streams…</Text>
             </Animated.View>
           ) : (
             // No streams and not loading = no streams available

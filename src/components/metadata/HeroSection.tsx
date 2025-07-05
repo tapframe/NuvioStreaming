@@ -366,9 +366,8 @@ const WatchProgressDisplay = React.memo(({
           displayText = `${Math.round(progressPercent)}% watched (${Math.round(watchProgress.traktProgress)}% on Trakt)`;
         }
       } else {
-        // Only show "Sync pending" if the content hasn't been synced AND the local progress is significant
-        const hasSignificantProgress = progressPercent > 1;
-        syncStatus = hasSignificantProgress ? ' • Sync pending' : '';
+        // Do not show "Sync pending" label anymore; leave status empty.
+        syncStatus = '';
       }
     }
 
