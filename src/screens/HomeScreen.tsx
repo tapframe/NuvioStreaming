@@ -236,28 +236,22 @@ const HomeScreen = () => {
       
       // Start all catalog loading promises but don't wait for them
       // They will update the state progressively as they complete
-      Promise.allSettled(catalogPromises).then(() => {
-        // Final cleanup: Filter out null values to get only successfully loaded catalogs
-        setCatalogs(prevCatalogs => prevCatalogs.filter(catalog => catalog !== null));
-      });
+      await Promise.allSettled(catalogPromises);
       
+      // Only set catalogsLoading to false after all promises have settled
+      setCatalogsLoading(false);
     } catch (error) {
       console.error('[HomeScreen] Error in progressive catalog loading:', error);
-    } finally {
       setCatalogsLoading(false);
     }
   }, []);
 
   // Only count feature section as loading if it's enabled in settings
-  // Render the screen immediately and let placeholders/skeletons handle progressive loading
-  const isLoading = useMemo(() => {
-    // Show a full-screen loader only if we literally have no data to display yet
-    const noHeroSection = !showHeroSection;
-    const noFeaturedData = !featuredContent && featuredLoading;
-    const noCatalogsReady = catalogs.length === 0 && catalogsLoading;
-
-    return noHeroSection && noCatalogsReady && noFeaturedData;
-  }, [showHeroSection, featuredContent, featuredLoading, catalogsLoading, catalogs.length]);
+  // For catalogs, we show them progressively, so loading should be false as soon as we have any content
+  const isLoading = useMemo(() => 
+    (showHeroSection ? featuredLoading : false) || (catalogsLoading && loadedCatalogCount === 0),
+    [showHeroSection, featuredLoading, catalogsLoading, loadedCatalogCount]
+  );
 
   // React to settings changes
   useEffect(() => {
@@ -528,20 +522,25 @@ const HomeScreen = () => {
         );
       case 'placeholder':
         return (
-          <View style={styles.catalogPlaceholder}>
-            <View style={styles.placeholderHeader}>
-              <View style={[styles.placeholderTitle, { backgroundColor: currentTheme.colors.elevation1 }]} />
-              <ActivityIndicator size="small" color={currentTheme.colors.primary} />
+          <Animated.View entering={FadeIn.duration(300)}>
+            <View style={styles.catalogPlaceholder}>
+              <View style={styles.placeholderHeader}>
+                <View style={[styles.placeholderTitle, { backgroundColor: currentTheme.colors.elevation1 }]} />
+                <ActivityIndicator size="small" color={currentTheme.colors.primary} />
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.placeholderPosters}>
+                {[...Array(5)].map((_, posterIndex) => (
+                  <View
+                    key={posterIndex}
+                    style={[styles.placeholderPoster, { backgroundColor: currentTheme.colors.elevation1 }]}
+                  />
+                ))}
+              </ScrollView>
             </View>
-            <View style={styles.placeholderPosters}>
-              {[...Array(4)].map((_, posterIndex) => (
-                <View
-                  key={posterIndex}
-                  style={[styles.placeholderPoster, { backgroundColor: currentTheme.colors.elevation1 }]}
-                />
-              ))}
-            </View>
-          </View>
+          </Animated.View>
         );
       case 'welcome':
         return <FirstTimeWelcome />;
@@ -559,11 +558,11 @@ const HomeScreen = () => {
 
   const ListFooterComponent = useMemo(() => (
     <>
-      {catalogsLoading && catalogs.length < totalCatalogsRef.current && (
+      {catalogsLoading && loadedCatalogCount > 0 && loadedCatalogCount < totalCatalogsRef.current && (
         <View style={styles.loadingMoreCatalogs}>
           <ActivityIndicator size="small" color={currentTheme.colors.primary} />
           <Text style={[styles.loadingMoreText, { color: currentTheme.colors.textMuted }]}>
-            Loading more content... ({loadedCatalogCount}/{totalCatalogsRef.current})
+            Loading catalogs... ({loadedCatalogCount}/{totalCatalogsRef.current})
           </Text>
         </View>
       )}
@@ -609,8 +608,9 @@ const HomeScreen = () => {
           initialNumToRender={5}
           maxToRenderPerBatch={5}
           windowSize={11}
-          removeClippedSubviews={false}
+          removeClippedSubviews={Platform.OS === 'android'}
           onEndReachedThreshold={0.5}
+          updateCellsBatchingPeriod={50}
           maintainVisibleContentPosition={{
             minIndexForVisible: 0,
             autoscrollToTopThreshold: 10
@@ -697,6 +697,8 @@ const styles = StyleSheet.create<any>({
     padding: 16,
     marginHorizontal: 16,
     marginBottom: 16,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: 8,
   },
   loadingMoreText: {
     marginLeft: 12,
@@ -719,12 +721,14 @@ const styles = StyleSheet.create<any>({
   },
   placeholderPosters: {
     flexDirection: 'row',
+    paddingVertical: 8,
     gap: 8,
   },
   placeholderPoster: {
     width: POSTER_WIDTH,
     aspectRatio: 2/3,
     borderRadius: 4,
+    marginRight: 2,
   },
   emptyCatalog: {
     padding: 32,
