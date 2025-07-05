@@ -675,8 +675,22 @@ export class TraktService {
       throw new Error(`API request failed: ${response.status}`);
     }
 
-    const responseData = await response.json() as T;
-    
+    // Handle "No Content" responses (204/205) which have no JSON body
+    if (response.status === 204 || response.status === 205) {
+      // Return null casted to expected type to satisfy caller's generic
+      return null as unknown as T;
+    }
+
+    // Some endpoints (e.g., DELETE) may also return empty body with 200. Attempt safe parse.
+    let responseData: T;
+    try {
+      responseData = await response.json() as T;
+    } catch (parseError) {
+      // If body is empty, return null instead of throwing
+      logger.warn(`[TraktService] Empty JSON body for ${endpoint}, returning null`);
+      return null as unknown as T;
+    }
+
     // Debug log successful scrobble responses
     if (endpoint.includes('/scrobble/')) {
       logger.log(`[TraktService] DEBUG API Success for ${endpoint}:`, responseData);
@@ -1502,6 +1516,50 @@ export class TraktService {
       imageCacheService.logCacheStatus();
     } catch (error) {
       logger.error('[TraktService] Debug image cache failed:', error);
+    }
+  }
+
+  /**
+   * Delete a playback progress entry on Trakt by its playback `id`.
+   * Returns true if the request succeeded (204).
+   */
+  public async deletePlaybackItem(playbackId: number): Promise<boolean> {
+    try {
+      if (!this.accessToken) return false;
+      await this.apiRequest<null>(`/sync/playback/${playbackId}`, 'DELETE');
+      return true; // trakt returns 204 no-content on success
+    } catch (error) {
+      logger.error('[TraktService] Failed to delete playback item:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Convenience helper: find a playback entry matching imdb id (and optional season/episode) and delete it.
+   */
+  public async deletePlaybackForContent(imdbId: string, type: 'movie' | 'series', season?: number, episode?: number): Promise<boolean> {
+    try {
+      if (!this.accessToken) return false;
+      const progressItems = await this.getPlaybackProgress();
+      const target = progressItems.find(item => {
+        if (type === 'movie' && item.type === 'movie' && item.movie?.ids.imdb === imdbId) {
+          return true;
+        }
+        if (type === 'series' && item.type === 'episode' && item.show?.ids.imdb === imdbId) {
+          if (season !== undefined && episode !== undefined) {
+            return item.episode?.season === season && item.episode?.number === episode;
+          }
+          return true; // match any episode of the show if specific not provided
+        }
+        return false;
+      });
+      if (target) {
+        return await this.deletePlaybackItem(target.id);
+      }
+      return false;
+    } catch (error) {
+      logger.error('[TraktService] Error deleting playback for content:', error);
+      return false;
     }
   }
 }

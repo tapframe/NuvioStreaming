@@ -22,6 +22,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { storageService } from '../../services/storageService';
 import { logger } from '../../utils/logger';
 import * as Haptics from 'expo-haptics';
+import { TraktService } from '../../services/traktService';
 
 // Define interface for continue watching items
 interface ContinueWatchingItem extends StreamingContent {
@@ -323,6 +324,18 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                   ? `${item.season}:${item.episode}` 
                   : undefined
               );
+              
+              // Also remove from Trakt playback queue if authenticated
+              const traktService = TraktService.getInstance();
+              const isAuthed = await traktService.isAuthenticated();
+              if (isAuthed) {
+                await traktService.deletePlaybackForContent(
+                  item.id,
+                  item.type as 'movie' | 'series',
+                  item.season,
+                  item.episode
+                );
+              }
               
               // Update the list by filtering out the deleted item
               setContinueWatchingItems(prev => 
