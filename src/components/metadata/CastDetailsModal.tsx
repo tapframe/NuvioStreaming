@@ -17,6 +17,7 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withTiming,
+  withSpring,
   runOnJS,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -31,8 +32,8 @@ interface CastDetailsModalProps {
 }
 
 const { width, height } = Dimensions.get('window');
-const MODAL_WIDTH = Math.min(width - 32, 520);
-const MODAL_MAX_HEIGHT = height * 0.85;
+const MODAL_WIDTH = Math.min(width - 40, 400);
+const MODAL_HEIGHT = height * 0.7;
 
 interface PersonDetails {
   id: number;
@@ -45,57 +46,6 @@ interface PersonDetails {
   also_known_as: string[];
 }
 
-const InfoBadge = ({ 
-  label, 
-  value, 
-  icon,
-  color = '#6B7280',
-  bgColor = 'rgba(107, 114, 128, 0.15)'
-}: { 
-  label: string;
-  value: string;
-  icon?: string;
-  color?: string;
-  bgColor?: string;
-}) => (
-  <View style={{
-    backgroundColor: bgColor,
-    borderColor: `${color}40`,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    marginRight: 8,
-  }}>
-    {icon && (
-      <MaterialIcons name={icon as any} size={14} color={color} style={{ marginRight: 6 }} />
-    )}
-    <View>
-      <Text style={{
-        color: color,
-        fontSize: 10,
-        fontWeight: '600',
-        letterSpacing: 0.3,
-        textTransform: 'uppercase',
-        marginBottom: 2,
-      }}>
-        {label}
-      </Text>
-      <Text style={{
-        color: '#fff',
-        fontSize: 12,
-        fontWeight: '700',
-        letterSpacing: -0.1,
-      }}>
-        {value}
-      </Text>
-    </View>
-  </View>
-);
-
 export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
   visible,
   onClose,
@@ -104,24 +54,37 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
   const { currentTheme } = useTheme();
   const [personDetails, setPersonDetails] = useState<PersonDetails | null>(null);
   const [loading, setLoading] = useState(false);
+  const [hasFetched, setHasFetched] = useState(false);
   const modalOpacity = useSharedValue(0);
+  const modalScale = useSharedValue(0.9);
 
   useEffect(() => {
     if (visible && castMember) {
-      modalOpacity.value = withTiming(1, { duration: 200 });
-      fetchPersonDetails();
+      modalOpacity.value = withTiming(1, { duration: 250 });
+      modalScale.value = withSpring(1, { damping: 20, stiffness: 200 });
+      
+      if (!hasFetched || personDetails?.id !== castMember.id) {
+        fetchPersonDetails();
+      }
     } else {
-      modalOpacity.value = withTiming(0, { duration: 150 });
+      modalOpacity.value = withTiming(0, { duration: 200 });
+      modalScale.value = withTiming(0.9, { duration: 200 });
+      
+      if (!visible) {
+        setHasFetched(false);
+        setPersonDetails(null);
+      }
     }
   }, [visible, castMember]);
 
   const fetchPersonDetails = async () => {
-    if (!castMember) return;
+    if (!castMember || loading) return;
     
     setLoading(true);
     try {
       const details = await tmdbService.getPersonDetails(castMember.id);
       setPersonDetails(details);
+      setHasFetched(true);
     } catch (error) {
       console.error('Error fetching person details:', error);
     } finally {
@@ -131,10 +94,12 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
 
   const modalStyle = useAnimatedStyle(() => ({
     opacity: modalOpacity.value,
+    transform: [{ scale: modalScale.value }],
   }));
 
   const handleClose = () => {
-    modalOpacity.value = withTiming(0, { duration: 150 }, () => {
+    modalOpacity.value = withTiming(0, { duration: 200 });
+    modalScale.value = withTiming(0.9, { duration: 200 }, () => {
       runOnJS(onClose)();
     });
   };
@@ -144,7 +109,7 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
-      month: 'long',
+      month: 'short',
       day: 'numeric',
     });
   };
@@ -167,19 +132,19 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
 
   return (
     <Animated.View
-      entering={FadeIn.duration(200)}
-      exiting={FadeOut.duration(150)}
+      entering={FadeIn.duration(250)}
+      exiting={FadeOut.duration(200)}
       style={{
         position: 'absolute',
         top: 0,
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.9)',
+        backgroundColor: 'rgba(0, 0, 0, 0.85)',
         justifyContent: 'center',
         alignItems: 'center',
         zIndex: 9999,
-        padding: 16,
+        padding: 20,
       }}
     >
       <TouchableOpacity
@@ -198,351 +163,310 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
         style={[
           {
             width: MODAL_WIDTH,
-            maxHeight: MODAL_MAX_HEIGHT,
-            minHeight: height * 0.4,
+            height: MODAL_HEIGHT,
             overflow: 'hidden',
-            elevation: 25,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 12 },
-            shadowOpacity: 0.4,
-            shadowRadius: 25,
-            alignSelf: 'center',
+            borderRadius: 24,
+            backgroundColor: Platform.OS === 'android' 
+              ? 'rgba(20, 20, 20, 0.95)' 
+              : 'transparent',
           },
           modalStyle,
         ]}
       >
-        <BlurView
-          intensity={100}
-          tint="dark"
-          style={{
-            borderRadius: 28,
-            overflow: 'hidden',
-            backgroundColor: 'rgba(26, 26, 26, 0.8)',
-            width: '100%',
-            height: '100%',
-          }}
-        >
-          <LinearGradient
-            colors={[
-              currentTheme.colors.primary + '95',
-              currentTheme.colors.primaryVariant + '95',
-              currentTheme.colors.primaryVariant + '90',
-            ]}
-            locations={[0, 0.6, 1]}
+        {Platform.OS === 'ios' ? (
+          <BlurView
+            intensity={100}
+            tint="dark"
             style={{
-              paddingHorizontal: 28,
-              paddingVertical: 24,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              borderBottomWidth: 1,
-              borderBottomColor: 'rgba(255, 255, 255, 0.1)',
               width: '100%',
+              height: '100%',
+              backgroundColor: 'rgba(20, 20, 20, 0.8)',
             }}
           >
-            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-              <View style={{
-                width: 60,
-                height: 60,
-                borderRadius: 30,
-                overflow: 'hidden',
-                marginRight: 16,
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              }}>
-                {castMember.profile_path ? (
-                  <Image
-                    source={{
-                      uri: `https://image.tmdb.org/t/p/w185${castMember.profile_path}`,
-                    }}
-                    style={{ width: '100%', height: '100%' }}
-                    contentFit="cover"
-                  />
-                ) : (
-                  <View style={{
-                    width: '100%',
-                    height: '100%',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                  }}>
-                    <Text style={{
-                      color: '#fff',
-                      fontSize: 18,
-                      fontWeight: '700',
-                    }}>
-                      {castMember.name.split(' ').reduce((prev: string, current: string) => prev + current[0], '').substring(0, 2)}
-                    </Text>
-                  </View>
-                )}
-              </View>
-              
-              <View style={{ flex: 1 }}>
-                <Text style={{
-                  color: '#fff',
-                  fontSize: 20,
-                  fontWeight: '800',
-                  letterSpacing: -0.6,
-                  textShadowColor: 'rgba(0, 0, 0, 0.3)',
-                  textShadowOffset: { width: 0, height: 1 },
-                  textShadowRadius: 2,
-                }} numberOfLines={1}>
-                  {castMember.name}
-                </Text>
-                {castMember.character && (
+            {renderContent()}
+          </BlurView>
+        ) : (
+          renderContent()
+        )}
+      </Animated.View>
+    </Animated.View>
+  );
+
+  function renderContent() {
+    return (
+      <>
+        {/* Header */}
+        <LinearGradient
+          colors={[
+            currentTheme.colors.primary + 'DD',
+            currentTheme.colors.primaryVariant + 'CC',
+          ]}
+          style={{
+            padding: 20,
+            paddingTop: 24,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={{
+              width: 60,
+              height: 60,
+              borderRadius: 30,
+              overflow: 'hidden',
+              marginRight: 16,
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            }}>
+              {castMember.profile_path ? (
+                <Image
+                  source={{
+                    uri: `https://image.tmdb.org/t/p/w185${castMember.profile_path}`,
+                  }}
+                  style={{ width: '100%', height: '100%' }}
+                  contentFit="cover"
+                />
+              ) : (
+                <View style={{
+                  width: '100%',
+                  height: '100%',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
                   <Text style={{
-                    color: 'rgba(255, 255, 255, 0.85)',
-                    fontSize: 14,
-                    marginTop: 4,
-                    fontWeight: '500',
-                    letterSpacing: 0.2,
-                  }} numberOfLines={1}>
-                    as {castMember.character}
+                    color: '#fff',
+                    fontSize: 18,
+                    fontWeight: '700',
+                  }}>
+                    {castMember.name.split(' ').reduce((prev: string, current: string) => prev + current[0], '').substring(0, 2)}
                   </Text>
-                )}
-              </View>
+                </View>
+              )}
+            </View>
+            
+            <View style={{ flex: 1 }}>
+              <Text style={{
+                color: '#fff',
+                fontSize: 18,
+                fontWeight: '800',
+                marginBottom: 4,
+              }} numberOfLines={2}>
+                {castMember.name}
+              </Text>
+              {castMember.character && (
+                <Text style={{
+                  color: 'rgba(255, 255, 255, 0.8)',
+                  fontSize: 14,
+                  fontWeight: '500',
+                }} numberOfLines={2}>
+                  as {castMember.character}
+                </Text>
+              )}
             </View>
 
             <TouchableOpacity
               style={{
-                width: 44,
-                height: 44,
-                borderRadius: 22,
-                backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
                 justifyContent: 'center',
                 alignItems: 'center',
-                marginLeft: 16,
-                borderWidth: 1,
-                borderColor: 'rgba(255, 255, 255, 0.2)',
               }}
               onPress={handleClose}
               activeOpacity={0.7}
             >
               <MaterialIcons name="close" size={20} color="#fff" />
             </TouchableOpacity>
-          </LinearGradient>
+          </View>
+        </LinearGradient>
 
-          <ScrollView
-            style={{
-              maxHeight: MODAL_MAX_HEIGHT - 120,
-              backgroundColor: 'transparent',
-              width: '100%',
-            }}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{
-              padding: 24,
-              paddingBottom: 32,
-              width: '100%',
-            }}
-            bounces={false}
-          >
-            {loading ? (
-              <View style={{
-                alignItems: 'center',
-                justifyContent: 'center',
-                paddingVertical: 40,
+        {/* Content */}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 20 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {loading ? (
+            <View style={{
+              alignItems: 'center',
+              justifyContent: 'center',
+              paddingVertical: 40,
+            }}>
+              <ActivityIndicator size="large" color={currentTheme.colors.primary} />
+              <Text style={{
+                color: 'rgba(255, 255, 255, 0.7)',
+                fontSize: 14,
+                marginTop: 12,
               }}>
-                <ActivityIndicator size="large" color={currentTheme.colors.primary} />
-                <Text style={{
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  fontSize: 16,
-                  marginTop: 16,
-                  fontWeight: '500',
+                Loading details...
+              </Text>
+            </View>
+          ) : (
+            <View>
+              {/* Quick Info */}
+              {(personDetails?.known_for_department || personDetails?.birthday || personDetails?.place_of_birth) && (
+                <View style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: 16,
+                  padding: 16,
+                  marginBottom: 20,
                 }}>
-                  Loading details...
-                </Text>
-              </View>
-            ) : (
-              <View style={{ width: '100%' }}>
-                {/* Personal Information */}
-                <View style={{ marginBottom: 24 }}>
-                  <Text style={{
-                    color: 'rgba(255, 255, 255, 0.7)',
-                    fontSize: 14,
-                    fontWeight: '600',
-                    letterSpacing: 0.3,
-                    marginBottom: 16,
-                    textTransform: 'uppercase',
-                  }}>
-                    Personal Information
-                  </Text>
+                  {personDetails?.known_for_department && (
+                    <View style={{ 
+                      flexDirection: 'row', 
+                      alignItems: 'center',
+                      marginBottom: personDetails?.birthday || personDetails?.place_of_birth ? 12 : 0
+                    }}>
+                      <MaterialIcons name="work" size={16} color={currentTheme.colors.primary} />
+                      <Text style={{
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        fontSize: 12,
+                        marginLeft: 8,
+                        marginRight: 12,
+                      }}>
+                        Department
+                      </Text>
+                      <Text style={{
+                        color: '#fff',
+                        fontSize: 14,
+                        fontWeight: '600',
+                      }}>
+                        {personDetails.known_for_department}
+                      </Text>
+                    </View>
+                  )}
 
-                  <View style={{
-                    flexDirection: 'row',
-                    flexWrap: 'wrap',
-                    marginBottom: 16,
-                  }}>
-                    {personDetails?.known_for_department && (
-                      <InfoBadge
-                        label="Department"
-                        value={personDetails.known_for_department}
-                        icon="work"
-                        color={currentTheme.colors.primary}
-                        bgColor={currentTheme.colors.primary + '15'}
-                      />
-                    )}
-                    
-                    {personDetails?.birthday && (
-                      <InfoBadge
-                        label="Age"
-                        value={`${calculateAge(personDetails.birthday)} years old`}
-                        icon="cake"
-                        color="#22C55E"
-                        bgColor="rgba(34, 197, 94, 0.15)"
-                      />
-                    )}
-                    
-                    {personDetails?.place_of_birth && (
-                      <InfoBadge
-                        label="Birth Place"
-                        value={personDetails.place_of_birth}
-                        icon="place"
-                        color="#F59E0B"
-                        bgColor="rgba(245, 158, 11, 0.15)"
-                      />
-                    )}
-                  </View>
+                  {personDetails?.birthday && (
+                    <View style={{ 
+                      flexDirection: 'row', 
+                      alignItems: 'center',
+                      marginBottom: personDetails?.place_of_birth ? 12 : 0
+                    }}>
+                      <MaterialIcons name="cake" size={16} color="#22C55E" />
+                      <Text style={{
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        fontSize: 12,
+                        marginLeft: 8,
+                        marginRight: 12,
+                      }}>
+                        Age
+                      </Text>
+                      <Text style={{
+                        color: '#fff',
+                        fontSize: 14,
+                        fontWeight: '600',
+                      }}>
+                        {calculateAge(personDetails.birthday)} years old
+                      </Text>
+                    </View>
+                  )}
+
+                  {personDetails?.place_of_birth && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <MaterialIcons name="place" size={16} color="#F59E0B" />
+                      <Text style={{
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        fontSize: 12,
+                        marginLeft: 8,
+                        marginRight: 12,
+                      }}>
+                        Born in
+                      </Text>
+                      <Text style={{
+                        color: '#fff',
+                        fontSize: 14,
+                        fontWeight: '600',
+                        flex: 1,
+                      }}>
+                        {personDetails.place_of_birth}
+                      </Text>
+                    </View>
+                  )}
 
                   {personDetails?.birthday && (
                     <View style={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                      borderRadius: 16,
-                      padding: 16,
-                      borderWidth: 1,
-                      borderColor: 'rgba(255, 255, 255, 0.08)',
-                      marginBottom: 16,
+                      marginTop: 12,
+                      paddingTop: 12,
+                      borderTopWidth: 1,
+                      borderTopColor: 'rgba(255, 255, 255, 0.1)',
                     }}>
-                      <View style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        marginBottom: 8,
-                      }}>
-                        <MaterialIcons name="event" size={16} color="rgba(255, 255, 255, 0.7)" />
-                        <Text style={{
-                          color: 'rgba(255, 255, 255, 0.7)',
-                          fontSize: 12,
-                          fontWeight: '600',
-                          marginLeft: 6,
-                          textTransform: 'uppercase',
-                          letterSpacing: 0.3,
-                        }}>
-                          Born
-                        </Text>
-                      </View>
                       <Text style={{
-                        color: '#fff',
-                        fontSize: 16,
-                        fontWeight: '600',
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        fontSize: 12,
+                        marginBottom: 4,
                       }}>
-                        {formatDate(personDetails.birthday)}
+                        Born on {formatDate(personDetails.birthday)}
                       </Text>
                     </View>
                   )}
                 </View>
+              )}
 
-                {/* Biography */}
-                {personDetails?.biography && (
-                  <View style={{ marginBottom: 24 }}>
-                    <Text style={{
-                      color: 'rgba(255, 255, 255, 0.7)',
-                      fontSize: 14,
-                      fontWeight: '600',
-                      letterSpacing: 0.3,
-                      marginBottom: 16,
-                      textTransform: 'uppercase',
-                    }}>
-                      Biography
-                    </Text>
-                    
-                    <View style={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                      borderRadius: 20,
-                      padding: 20,
-                      borderWidth: 1,
-                      borderColor: 'rgba(255, 255, 255, 0.08)',
-                    }}>
-                      <Text style={{
-                        color: 'rgba(255, 255, 255, 0.9)',
-                        fontSize: 14,
-                        lineHeight: 22,
-                        fontWeight: '400',
-                        letterSpacing: 0.1,
-                      }}>
-                        {personDetails.biography}
-                      </Text>
-                    </View>
-                  </View>
-                )}
-
-                {/* Also Known As */}
-                {personDetails?.also_known_as && personDetails.also_known_as.length > 0 && (
-                  <View style={{ marginBottom: 24 }}>
-                    <Text style={{
-                      color: 'rgba(255, 255, 255, 0.7)',
-                      fontSize: 14,
-                      fontWeight: '600',
-                      letterSpacing: 0.3,
-                      marginBottom: 16,
-                      textTransform: 'uppercase',
-                    }}>
-                      Also Known As
-                    </Text>
-                    
-                    <View style={{
-                      flexDirection: 'row',
-                      flexWrap: 'wrap',
-                      gap: 8,
-                    }}>
-                      {personDetails.also_known_as.slice(0, 6).map((alias, index) => (
-                        <View
-                          key={index}
-                          style={{
-                            backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                            borderRadius: 12,
-                            paddingHorizontal: 12,
-                            paddingVertical: 8,
-                            borderWidth: 1,
-                            borderColor: 'rgba(255, 255, 255, 0.1)',
-                          }}
-                        >
-                          <Text style={{
-                            color: 'rgba(255, 255, 255, 0.8)',
-                            fontSize: 12,
-                            fontWeight: '500',
-                          }}>
-                            {alias}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                )}
-
-                {/* No details available */}
-                {!loading && !personDetails?.biography && !personDetails?.birthday && !personDetails?.place_of_birth && (
-                  <View style={{
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    paddingVertical: 40,
+              {/* Biography */}
+              {personDetails?.biography && (
+                <View style={{ marginBottom: 20 }}>
+                  <Text style={{
+                    color: '#fff',
+                    fontSize: 16,
+                    fontWeight: '700',
+                    marginBottom: 12,
                   }}>
-                    <MaterialIcons name="info" size={48} color="rgba(255, 255, 255, 0.3)" />
-                    <Text style={{
-                      color: 'rgba(255, 255, 255, 0.7)',
-                      fontSize: 16,
-                      marginTop: 16,
-                      fontWeight: '500',
-                      textAlign: 'center',
-                    }}>
-                      No additional details available
-                    </Text>
-                  </View>
-                )}
-              </View>
-            )}
-          </ScrollView>
-        </BlurView>
-      </Animated.View>
-    </Animated.View>
-  );
+                    Biography
+                  </Text>
+                  <Text style={{
+                    color: 'rgba(255, 255, 255, 0.9)',
+                    fontSize: 14,
+                    lineHeight: 20,
+                    fontWeight: '400',
+                  }}>
+                    {personDetails.biography}
+                  </Text>
+                </View>
+              )}
+
+              {/* Also Known As - Compact */}
+              {personDetails?.also_known_as && personDetails.also_known_as.length > 0 && (
+                <View>
+                  <Text style={{
+                    color: '#fff',
+                    fontSize: 16,
+                    fontWeight: '700',
+                    marginBottom: 12,
+                  }}>
+                    Also Known As
+                  </Text>
+                  <Text style={{
+                    color: 'rgba(255, 255, 255, 0.8)',
+                    fontSize: 14,
+                    lineHeight: 20,
+                  }}>
+                    {personDetails.also_known_as.slice(0, 4).join(' • ')}
+                  </Text>
+                </View>
+              )}
+
+              {/* No details available */}
+              {!loading && !personDetails?.biography && !personDetails?.birthday && !personDetails?.place_of_birth && (
+                <View style={{
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingVertical: 40,
+                }}>
+                  <MaterialIcons name="info" size={32} color="rgba(255, 255, 255, 0.3)" />
+                  <Text style={{
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    fontSize: 14,
+                    marginTop: 12,
+                    textAlign: 'center',
+                  }}>
+                    No additional details available
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+        </ScrollView>
+      </>
+    );
+  }
 };
 
 export default CastDetailsModal;
