@@ -39,6 +39,7 @@ import LogoSourceSettings from '../screens/LogoSourceSettings';
 import ThemeScreen from '../screens/ThemeScreen';
 import ProfilesScreen from '../screens/ProfilesScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
+import PluginsScreen from '../screens/PluginsScreen';
 
 // Stack navigator types
 export type RootStackParamList = {
@@ -104,6 +105,7 @@ export type RootStackParamList = {
   LogoSourceSettings: undefined;
   ThemeSettings: undefined;
   ProfilesSettings: undefined;
+  Plugins: undefined;
 };
 
 export type RootStackNavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -1001,6 +1003,21 @@ const AppNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootStack
             <Stack.Screen 
               name="ProfilesSettings" 
               component={ProfilesScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="Plugins" 
+              component={PluginsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,

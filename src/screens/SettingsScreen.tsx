@@ -38,12 +38,12 @@ const { width } = Dimensions.get('window');
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
 // Card component with minimalistic style
-interface SettingsCardProps {
+export interface SettingsCardProps {
   children: React.ReactNode;
   title?: string;
 }
 
-const SettingsCard: React.FC<SettingsCardProps> = ({ children, title }) => {
+export const SettingsCard: React.FC<SettingsCardProps> = ({ children, title }) => {
   const { currentTheme } = useTheme();
   
   return (
@@ -68,7 +68,7 @@ const SettingsCard: React.FC<SettingsCardProps> = ({ children, title }) => {
   );
 };
 
-interface SettingItemProps {
+export interface SettingItemProps {
   title: string;
   description?: string;
   icon: string;
@@ -78,7 +78,7 @@ interface SettingItemProps {
   badge?: string | number;
 }
 
-const SettingItem: React.FC<SettingItemProps> = ({
+export const SettingItem: React.FC<SettingItemProps> = ({
   title,
   description,
   icon,
@@ -131,6 +131,12 @@ const SettingItem: React.FC<SettingItemProps> = ({
   );
 };
 
+interface LoadedPlugin {
+  name: string;
+  version: string;
+  sourceUrl?: string;
+}
+
 const SettingsScreen: React.FC = () => {
   const { settings, updateSetting } = useSettings();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
@@ -160,31 +166,13 @@ const SettingsScreen: React.FC = () => {
   const [addonCount, setAddonCount] = useState<number>(0);
   const [catalogCount, setCatalogCount] = useState<number>(0);
   const [mdblistKeySet, setMdblistKeySet] = useState<boolean>(false);
-  const [pluginUrl, setPluginUrl] = useState('');
+  
   const [loadedPlugins, setLoadedPlugins] = useState<string[]>([]);
-  const [isLoadingPlugin, setIsLoadingPlugin] = useState(false);
 
   const refreshPluginsList = useCallback(() => {
     const plugins = pluginManager.getScraperPlugins();
     setLoadedPlugins(plugins.map(p => `${p.name} v${p.version}`));
   }, []);
-
-  const handleLoadPlugin = useCallback(async () => {
-    if (!pluginUrl.trim() || !pluginUrl.startsWith('http')) {
-        Alert.alert('Invalid URL', 'Please enter a valid plugin URL.');
-        return;
-    }
-    setIsLoadingPlugin(true);
-    const success = await pluginManager.loadPluginFromUrl(pluginUrl.trim());
-    setIsLoadingPlugin(false);
-    if (success) {
-        Alert.alert('Success', 'Plugin loaded successfully.');
-        setPluginUrl('');
-        refreshPluginsList();
-    } else {
-        Alert.alert('Error', 'Failed to load the plugin. Check the URL and console for errors.');
-    }
-  }, [pluginUrl, refreshPluginsList]);
 
   const loadData = useCallback(async () => {
     try {
@@ -418,6 +406,17 @@ const SettingsScreen: React.FC = () => {
                 isLast={true}
               />
             </SettingsCard>
+            
+            <SettingsCard title="Plugins">
+                <SettingItem
+                    title="Manage Plugins"
+                    description="Add or remove external plugins"
+                    icon="extension"
+                    onPress={() => navigation.navigate('Plugins')}
+                    renderControl={ChevronRight}
+                    isLast={true}
+                />
+            </SettingsCard>
 
             {/* Playback & Experience */}
             <SettingsCard title="PLAYBACK">
@@ -525,40 +524,6 @@ const SettingsScreen: React.FC = () => {
                 />
               </SettingsCard>
             )}
-
-            <SettingsCard title="Plugins">
-              <View style={[styles.pluginInputContainer, { borderBottomColor: currentTheme.colors.elevation2 }]}>
-                <TextInput
-                  style={[styles.pluginInput, { color: currentTheme.colors.highEmphasis }]}
-                  placeholder="Enter plugin URL..."
-                  placeholderTextColor={currentTheme.colors.mediumEmphasis}
-                  value={pluginUrl}
-                  onChangeText={setPluginUrl}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="url"
-                  returnKeyType="done"
-                  onSubmitEditing={handleLoadPlugin}
-                />
-                <TouchableOpacity
-                  style={[styles.loadButton, { backgroundColor: isLoadingPlugin ? currentTheme.colors.mediumGray : currentTheme.colors.primary }]}
-                  onPress={handleLoadPlugin}
-                  disabled={isLoadingPlugin}
-                >
-                  {isLoadingPlugin ? (
-                    <ActivityIndicator size="small" color={currentTheme.colors.white} />
-                  ) : (
-                    <Text style={[styles.loadButtonText, { color: currentTheme.colors.white }]}>Load</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-              <SettingItem
-                icon="extension"
-                title="Loaded Scrapers"
-                description={loadedPlugins.length > 0 ? loadedPlugins.join(', ') : 'No custom plugins loaded'}
-                isLast={true}
-              />
-            </SettingsCard>
 
             <View style={styles.footer}>
               <Text style={[styles.footerText, { color: currentTheme.colors.mediumEmphasis }]}>
@@ -740,6 +705,11 @@ const styles = StyleSheet.create({
   loadButtonText: {
       fontSize: 15,
       fontWeight: '600',
+  },
+  removeButton: {
+    padding: 8,
+    borderRadius: 20,
+    marginLeft: 8,
   },
 });
 

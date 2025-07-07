@@ -1,8 +1,11 @@
 import { logger } from '../utils/logger';
 import * as cheerio from 'cheerio';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore – no types for Babel standalone
 const Babel = require('@babel/standalone');
+
+const PLUGIN_URLS_STORAGE_KEY = '@plugin_urls';
 
 // --- Type Definitions ---
 
@@ -13,6 +16,7 @@ interface Plugin {
   description: string;
   type: 'scraper' | 'other';
   getStreams: (options: GetStreamsOptions) => Promise<Stream[]>;
+  sourceUrl?: string; // To track the origin of the plugin
 }
 
 interface Stream {
@@ -104,6 +108,9 @@ class PluginManager {
 
   private constructor() {
     this.loadBuiltInPlugins();
+    this.loadPersistedPlugins().catch(err => {
+        logger.error('[PluginManager] Error during async initialization', err);
+    });
   }
 
   public static getInstance(): PluginManager {
@@ -113,20 +120,89 @@ class PluginManager {
     return PluginManager.instance;
   }
 
-  public async loadPluginFromUrl(url: string): Promise<boolean> {
+  private async loadPersistedPlugins() {
+    try {
+        const storedUrlsJson = await AsyncStorage.getItem(PLUGIN_URLS_STORAGE_KEY);
+        if (storedUrlsJson) {
+            const urls = JSON.parse(storedUrlsJson);
+            if (Array.isArray(urls)) {
+                logger.log('[PluginManager] Loading persisted plugins...', urls);
+                for (const url of urls) {
+                    await this.loadPluginFromUrl(url, false);
+                }
+            }
+        }
+    } catch (error) {
+        logger.error('[PluginManager] Failed to load persisted plugins:', error);
+    }
+  }
+
+  private async persistPluginUrl(url: string) {
+    try {
+        const storedUrlsJson = await AsyncStorage.getItem(PLUGIN_URLS_STORAGE_KEY);
+        let urls: string[] = [];
+        if (storedUrlsJson) {
+            urls = JSON.parse(storedUrlsJson);
+        }
+        if (!urls.includes(url)) {
+            urls.push(url);
+            await AsyncStorage.setItem(PLUGIN_URLS_STORAGE_KEY, JSON.stringify(urls));
+            logger.log(`[PluginManager] Persisted plugin URL: ${url}`);
+        }
+    } catch (error) {
+        logger.error('[PluginManager] Failed to persist plugin URL:', error);
+    }
+  }
+
+  private async removePersistedPluginUrl(url: string) {
+      try {
+          const storedUrlsJson = await AsyncStorage.getItem(PLUGIN_URLS_STORAGE_KEY);
+          if (storedUrlsJson) {
+              let urls: string[] = JSON.parse(storedUrlsJson);
+              const index = urls.indexOf(url);
+              if (index > -1) {
+                  urls.splice(index, 1);
+                  await AsyncStorage.setItem(PLUGIN_URLS_STORAGE_KEY, JSON.stringify(urls));
+                  logger.log(`[PluginManager] Removed persisted plugin URL: ${url}`);
+              }
+          }
+      } catch (error) {
+          logger.error('[PluginManager] Failed to remove persisted plugin URL:', error);
+      }
+  }
+
+  public async loadPluginFromUrl(url: string, persist = true): Promise<boolean> {
     logger.log(`[PluginManager] Attempting to load plugin from URL: ${url}`);
+
+    if (this.plugins.some(p => p.sourceUrl === url)) {
+        logger.log(`[PluginManager] Plugin from URL ${url} is already loaded.`);
+        return true;
+    }
+
     try {
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`Failed to fetch plugin from URL: ${response.statusText}`);
       }
       const pluginCode = await response.text();
-      this.runPlugin(pluginCode);
-      // Assuming runPlugin is synchronous for registration purposes.
-      // A more robust system might have runPlugin return success/failure.
-      return true;
+      const newPlugin = this.runPlugin(pluginCode, url);
+
+      if (newPlugin) {
+        if (persist) {
+            await this.persistPluginUrl(url);
+        }
+        return true;
+      }
+      
+      logger.error(`[PluginManager] Plugin from ${url} executed but failed to register.`);
+      return false;
+
     } catch (error) {
       logger.error(`[PluginManager] Failed to load plugin from URL ${url}:`, error);
+      if (persist === false) {
+        logger.log(`[PluginManager] Removing failed persisted plugin URL: ${url}`);
+        await this.removePersistedPluginUrl(url);
+      }
       return false;
     }
   }
@@ -144,7 +220,7 @@ class PluginManager {
       };
 
       // Require and execute the built-in MoviesMod plugin module (IIFE)
-      require('./plugins/moviesmod.plugin.js');
+      //require('./plugins/moviesmod.plugin.js');
 
       delete (global as any).registerPlugin;
     } catch (error) {
@@ -152,7 +228,22 @@ class PluginManager {
     }
   }
 
-  private runPlugin(pluginCode: string) {
+  public removePlugin(sourceUrl: string) {
+    const pluginIndex = this.plugins.findIndex(p => p.sourceUrl === sourceUrl);
+    if (pluginIndex > -1) {
+        const plugin = this.plugins[pluginIndex];
+        this.plugins.splice(pluginIndex, 1);
+        logger.log(`[PluginManager] Removed plugin: ${plugin.name}`);
+        if (plugin.sourceUrl) {
+            this.removePersistedPluginUrl(plugin.sourceUrl).catch(err => {
+                logger.error(`[PluginManager] Failed to remove persisted URL: ${plugin.sourceUrl}`, err);
+            });
+        }
+    }
+  }
+
+  private runPlugin(pluginCode: string, sourceUrl?: string): Plugin | null {
+    let registeredPlugin: Plugin | null = null;
     const pluginsBefore = this.plugins.length;
 
     // Attempt to strip the JSDoc-style header comment which may cause parsing issues in some JS engines.
@@ -164,7 +255,9 @@ class PluginManager {
       // This is simpler and more reliable than using `with` or the Function constructor's scope.
       (global as any).registerPlugin = (plugin: Plugin) => {
         if (plugin && typeof plugin.getStreams === 'function') {
+          if (sourceUrl) plugin.sourceUrl = sourceUrl;
           this.plugins.push(plugin);
+          registeredPlugin = plugin;
           logger.log(`[PluginManager] Successfully registered plugin: ${plugin.name} v${plugin.version}`);
         } else {
           logger.error('[PluginManager] An invalid plugin was passed to registerPlugin.');
@@ -192,6 +285,7 @@ class PluginManager {
       // Clean up the global scope to prevent pollution
       delete (global as any).registerPlugin;
     }
+    return registeredPlugin;
   }
 
   public getScraperPlugins(): Plugin[] {
