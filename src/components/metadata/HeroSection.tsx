@@ -129,18 +129,22 @@ const ActionButtons = React.memo(({
 
   // Determine play button style and text based on watched status
   const playButtonStyle = useMemo(() => {
-    if (isWatched) {
+    if (isWatched && type === 'movie') {
+      // Only movies get the dark watched style for "Watch Again"
       return [styles.actionButton, styles.playButton, styles.watchedPlayButton];
     }
+    // All other buttons (Resume, Play SxxEyy, regular Play) get white background
     return [styles.actionButton, styles.playButton];
-  }, [isWatched]);
+  }, [isWatched, type]);
 
   const playButtonTextStyle = useMemo(() => {
-    if (isWatched) {
+    if (isWatched && type === 'movie') {
+      // Only movies get white text for "Watch Again"
       return [styles.playButtonText, styles.watchedPlayButtonText];
     }
+    // All other buttons get black text
     return styles.playButtonText;
-  }, [isWatched]);
+  }, [isWatched, type]);
 
   const finalPlayButtonText = useMemo(() => {
     if (!isWatched) {
@@ -207,7 +211,7 @@ const ActionButtons = React.memo(({
             return playButtonText === 'Resume' ? 'play-circle-outline' : 'play-arrow';
           })()} 
           size={24} 
-          color={isWatched ? "#fff" : "#000"} 
+          color={isWatched && type === 'movie' ? "#fff" : "#000"} 
         />
         <Text style={playButtonTextStyle}>{finalPlayButtonText}</Text>
       </TouchableOpacity>
@@ -541,14 +545,6 @@ const WatchProgressDisplay = React.memo(({
               {progressData.displayText}
             </Text>
             
-            {/* Progress percentage badge */}
-            {!isCompleted && (
-              <View style={styles.percentageBadge}>
-                <Text style={styles.percentageText}>
-                  {Math.round(progressData.progressPercent)}%
-                </Text>
-          </View>
-        )}
       </View>
           
           <Text style={[styles.watchProgressSubText, { 
@@ -1222,18 +1218,6 @@ const styles = StyleSheet.create({
       fontSize: 11,
       fontWeight: '600',
       textAlign: 'center',
-    },
-    percentageBadge: {
-      backgroundColor: 'rgba(255,255,255,0.2)',
-      borderRadius: 8,
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-      marginLeft: 8,
-    },
-    percentageText: {
-      fontSize: 10,
-      fontWeight: '600',
-      color: '#fff',
     },
     watchProgressSubText: {
       fontSize: 9,
