@@ -15,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 import { useTheme } from '../contexts/ThemeContext';
 import { useMetadata } from '../hooks/useMetadata';
 import { CastSection } from '../components/metadata/CastSection';
+import { CastDetailsModal } from '../components/metadata/CastDetailsModal';
 import { SeriesContent } from '../components/metadata/SeriesContent';
 import { MovieContent } from '../components/metadata/MovieContent';
 import { MoreLikeThisSection } from '../components/metadata/MoreLikeThisSection';
@@ -56,6 +57,8 @@ const MetadataScreen: React.FC = () => {
 
   // Optimized state management - reduced state variables
   const [isContentReady, setIsContentReady] = useState(false);
+  const [showCastModal, setShowCastModal] = useState(false);
+  const [selectedCastMember, setSelectedCastMember] = useState<any>(null);
   const transitionOpacity = useSharedValue(1);
 
   const {
@@ -310,7 +313,10 @@ const MetadataScreen: React.FC = () => {
   }, [navigation, id, type]);
 
   const handleBack = useCallback(() => navigation.goBack(), [navigation]);
-  const handleSelectCastMember = useCallback(() => {}, []); // Simplified for performance
+  const handleSelectCastMember = useCallback((castMember: any) => {
+    setSelectedCastMember(castMember);
+    setShowCastModal(true);
+  }, []);
 
   // Ultra-optimized animated styles - minimal calculations
   const containerStyle = useAnimatedStyle(() => ({
@@ -472,6 +478,13 @@ const MetadataScreen: React.FC = () => {
           </Animated.ScrollView>
         </>
       )}
+      
+      {/* Cast Details Modal */}
+      <CastDetailsModal
+        visible={showCastModal}
+        onClose={() => setShowCastModal(false)}
+        castMember={selectedCastMember}
+      />
     </SafeAreaView>
   );
 };

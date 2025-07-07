@@ -210,13 +210,6 @@ const ActionButtons = React.memo(({
           color={isWatched ? "#fff" : "#000"} 
         />
         <Text style={playButtonTextStyle}>{finalPlayButtonText}</Text>
-        
-        {/* Subtle watched indicator in play button */}
-        {isWatched && (
-          <View style={styles.watchedIndicator}>
-            <MaterialIcons name="check" size={12} color="#fff" />
-          </View>
-        )}
       </TouchableOpacity>
 
       <TouchableOpacity
