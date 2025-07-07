@@ -1,5 +1,8 @@
 import { logger } from '../utils/logger';
 import * as cheerio from 'cheerio';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore – no types for Babel standalone
+const Babel = require('@babel/standalone');
 
 // --- Type Definitions ---
 
@@ -9,6 +12,8 @@ interface Plugin {
   author: string;
   description: string;
   type: 'scraper' | 'other';
+  isBuiltIn?: boolean;
+  isEnabled?: boolean;
   getStreams: (options: GetStreamsOptions) => Promise<Stream[]>;
 }
 
@@ -98,6 +103,7 @@ class CookieJar {
 class PluginManager {
   private plugins: Plugin[] = [];
   private static instance: PluginManager;
+  private disabledPlugins: Set<string> = new Set();
 
   private constructor() {
     this.loadBuiltInPlugins();
@@ -133,6 +139,8 @@ class PluginManager {
       // Provide registerPlugin globally for built-in modules
       (global as any).registerPlugin = (plugin: Plugin) => {
         if (plugin && typeof plugin.getStreams === 'function') {
+          plugin.isBuiltIn = true;
+          plugin.isEnabled = !this.disabledPlugins.has(plugin.name);
           this.plugins.push(plugin);
           logger.log(`[PluginManager] Successfully registered plugin: ${plugin.name} v${plugin.version}`);
         } else {
@@ -152,35 +160,44 @@ class PluginManager {
   private runPlugin(pluginCode: string) {
     const pluginsBefore = this.plugins.length;
 
-    const sandbox = {
-      registerPlugin: (plugin: Plugin) => {
+    // Attempt to strip the JSDoc-style header comment which may cause parsing issues in some JS engines.
+    const strippedCode = pluginCode.replace(/^\s*\/\*\*[\s\S]*?\*\/\s*/, '');
+    logger.log('[PluginManager] Executing plugin code...');
+
+    try {
+      // Temporarily expose registerPlugin on the global object for the sandboxed code to use.
+      // This is simpler and more reliable than using `with` or the Function constructor's scope.
+      (global as any).registerPlugin = (plugin: Plugin) => {
         if (plugin && typeof plugin.getStreams === 'function') {
+          plugin.isBuiltIn = false;
+          plugin.isEnabled = !this.disabledPlugins.has(plugin.name);
           this.plugins.push(plugin);
           logger.log(`[PluginManager] Successfully registered plugin: ${plugin.name} v${plugin.version}`);
         } else {
           logger.error('[PluginManager] An invalid plugin was passed to registerPlugin.');
         }
-      },
-      console: logger, // For security, plugins use our logger, not the raw console
-    };
+      };
 
-    // Use Function constructor for a slightly safer execution scope than direct eval
-    try {
-      const pluginExecutor = new Function('sandbox', `
-        with (sandbox) {
-          (function() {
-            // The plugin code is an IIFE, so it executes immediately
-            ${pluginCode}
-          })();
-        }
-      `);
-      pluginExecutor(sandbox);
+      // The plugin IIFE will execute immediately.
+      // Using eval is a trade-off for simplicity and to avoid potential Function constructor issues.
+      // The code is user-provided, so this is a calculated risk.
+
+      // Transpile the code first to support modern JS features like async/await in the runtime.
+      const transformedCode = (Babel as any).transform(strippedCode, {
+        presets: ['env'],
+        sourceType: 'script',
+      }).code;
+
+      eval(transformedCode);
 
       if (this.plugins.length === pluginsBefore) {
         logger.warn('[PluginManager] Plugin code executed, but no plugin was registered.');
       }
     } catch (error) {
       logger.error('[PluginManager] Error executing plugin code:', error);
+    } finally {
+      // Clean up the global scope to prevent pollution
+      delete (global as any).registerPlugin;
     }
   }
 
@@ -188,8 +205,44 @@ class PluginManager {
     return this.plugins.filter(p => p.type === 'scraper');
   }
 
+  public getAllPlugins(): Plugin[] {
+    return this.plugins;
+  }
+
+  public togglePlugin(pluginName: string): boolean {
+    const plugin = this.plugins.find(p => p.name === pluginName);
+    if (!plugin) return false;
+
+    if (plugin.isEnabled) {
+      this.disabledPlugins.add(pluginName);
+      plugin.isEnabled = false;
+    } else {
+      this.disabledPlugins.delete(pluginName);
+      plugin.isEnabled = true;
+    }
+
+    logger.log(`[PluginManager] Plugin ${pluginName} ${plugin.isEnabled ? 'enabled' : 'disabled'}`);
+    return true;
+  }
+
+  public removePlugin(pluginName: string): boolean {
+    const pluginIndex = this.plugins.findIndex(p => p.name === pluginName);
+    if (pluginIndex === -1) return false;
+
+    const plugin = this.plugins[pluginIndex];
+    if (plugin.isBuiltIn) {
+      logger.warn(`[PluginManager] Cannot remove built-in plugin: ${pluginName}`);
+      return false;
+    }
+
+    this.plugins.splice(pluginIndex, 1);
+    this.disabledPlugins.delete(pluginName);
+    logger.log(`[PluginManager] Plugin ${pluginName} removed`);
+    return true;
+  }
+
   public async getAllStreams(options: Omit<GetStreamsOptions, 'logger' | 'cache' | 'fetch' | 'fetchWithCookies' | 'setCookie' | 'parseHTML' | 'URL' | 'URLSearchParams' | 'FormData'>): Promise<Stream[]> {
-    const scrapers = this.getScraperPlugins();
+    const scrapers = this.getScraperPlugins().filter(p => p.isEnabled);
     if (scrapers.length === 0) {
       logger.log('[PluginManager] No scraper plugins loaded.');
       return [];
