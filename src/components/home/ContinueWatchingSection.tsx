@@ -278,10 +278,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
             }
           }
 
-          // Create placeholders for each show if not already present
+          // Create placeholders (or update) for each show based on Trakt history
           for (const [showId, info] of Object.entries(latestWatchedByShow)) {
-            if (latestEpisodes[showId]) continue; // already handled via progress
-
             const nextEpisode = info.episode + 1;
             const nextEpisodeId = `${showId}:${info.season}:${nextEpisode}`;
 
@@ -300,7 +298,30 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                 episodeTitle: `Episode ${nextEpisode}`,
               } as ContinueWatchingItem;
 
-              latestEpisodes[showId] = placeholder;
+              const existing = latestEpisodes[showId];
+              if (!existing || existing.lastUpdated < info.watchedAt) {
+                latestEpisodes[showId] = placeholder;
+              }
+
+              // Persist "watched" progress for the episode that Trakt reported
+              const watchedEpisodeId = `${showId}:${info.season}:${info.episode}`;
+              const existingProgress = allProgress[`series:${showId}:${watchedEpisodeId}`];
+              const existingPercent = existingProgress ? (existingProgress.currentTime / existingProgress.duration) * 100 : 0;
+
+              if (!existingProgress || existingPercent < 85) {
+                await storageService.setWatchProgress(
+                  showId,
+                  'series',
+                  {
+                    currentTime: 1,
+                    duration: 1,
+                    lastUpdated: info.watchedAt,
+                    traktSynced: true,
+                    traktProgress: 100,
+                  } as any,
+                  `${info.season}:${info.episode}`
+                );
+              }
             } catch (err) {
               logger.error('Failed to build placeholder from history:', err);
             }

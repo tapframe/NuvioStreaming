@@ -154,18 +154,36 @@ const ActionButtons = React.memo(({
 
     // For series, attempt to show the next episode label (e.g., "Play S02E05")
     if (type === 'series' && watchProgress?.episodeId) {
+      let seasonNum: number | null = null;
+      let episodeNum: number | null = null;
+
       const parts = watchProgress.episodeId.split(':');
-      if (parts.length >= 3) {
-        const seasonNum = parseInt(parts[parts.length - 2], 10);
-        const episodeNum = parseInt(parts[parts.length - 1], 10);
-        if (!isNaN(seasonNum) && !isNaN(episodeNum)) {
-          const nextSeason = seasonNum;
-          const nextEpisode = episodeNum + 1;
-          const seasonStr = nextSeason.toString().padStart(2, '0');
-          const episodeStr = nextEpisode.toString().padStart(2, '0');
-          return `Play S${seasonStr}E${episodeStr}`;
+
+      if (parts.length === 3) {
+        // Format: showId:season:episode
+        seasonNum = parseInt(parts[1], 10);
+        episodeNum = parseInt(parts[2], 10);
+      } else if (parts.length === 2) {
+        // Format: season:episode (no show id)
+        seasonNum = parseInt(parts[0], 10);
+        episodeNum = parseInt(parts[1], 10);
+      } else {
+        // Try pattern s1e2
+        const match = watchProgress.episodeId.match(/s(\d+)e(\d+)/i);
+        if (match) {
+          seasonNum = parseInt(match[1], 10);
+          episodeNum = parseInt(match[2], 10);
         }
       }
+
+      if (seasonNum !== null && episodeNum !== null && !isNaN(seasonNum) && !isNaN(episodeNum)) {
+        // For watched episodes, show the NEXT episode number
+        const nextEpisode = episodeNum + 1;
+        const seasonStr = seasonNum.toString().padStart(2, '0');
+        const episodeStr = nextEpisode.toString().padStart(2, '0');
+        return `Play S${seasonStr}E${episodeStr}`;
+      }
+
       // Fallback label if parsing fails
       return 'Play Next Episode';
     }

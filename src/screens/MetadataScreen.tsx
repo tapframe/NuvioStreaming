@@ -225,42 +225,77 @@ const MetadataScreen: React.FC = () => {
       let targetEpisodeId: string | undefined;
 
       if (progressPercent >= 85 && watchProgress?.episodeId) {
-        // Try to navigate to next episode
+        // Try to navigate to next episode – support multiple episodeId formats
+        let currentSeason: number | null = null;
+        let currentEpisode: number | null = null;
+
         const parts = watchProgress.episodeId.split(':');
-        if (parts.length >= 3) {
-          const currentSeason = parseInt(parts[parts.length - 2], 10);
-          const currentEpisode = parseInt(parts[parts.length - 1], 10);
 
-          // Find next episode in episodes array
-          const sortedEpisodes = [...episodes].sort((a, b) => {
-            if (a.season_number === b.season_number) {
-              return a.episode_number - b.episode_number;
-            }
-            return a.season_number - b.season_number;
-          });
-
-          const currentIndex = sortedEpisodes.findIndex(ep => ep.season_number === currentSeason && ep.episode_number === currentEpisode);
-
-          if (currentIndex !== -1 && currentIndex + 1 < sortedEpisodes.length) {
-            const nextEp = sortedEpisodes[currentIndex + 1];
-            targetEpisodeId = buildEpisodeId(nextEp);
+        if (parts.length === 3) {
+          // showId:season:episode
+          currentSeason = parseInt(parts[1], 10);
+          currentEpisode = parseInt(parts[2], 10);
+        } else if (parts.length === 2) {
+          // season:episode
+          currentSeason = parseInt(parts[0], 10);
+          currentEpisode = parseInt(parts[1], 10);
+        } else {
+          // pattern like s5e01
+          const match = watchProgress.episodeId.match(/s(\d+)e(\d+)/i);
+          if (match) {
+            currentSeason = parseInt(match[1], 10);
+            currentEpisode = parseInt(match[2], 10);
           }
+        }
+
+        if (currentSeason !== null && currentEpisode !== null) {
+          // DIRECT APPROACH: Just create the next episode ID directly
+          // This ensures we navigate to the next episode even if it's not yet in our episodes array
+          const nextEpisodeId = `${id}:${currentSeason}:${currentEpisode + 1}`;
+          console.log(`[MetadataScreen] Created next episode ID directly: ${nextEpisodeId}`);
+          
+          // Still try to find the episode in our list to verify it exists
+          const nextEpisodeExists = episodes.some(ep => 
+            ep.season_number === currentSeason && ep.episode_number === (currentEpisode + 1)
+          );
+          
+          if (nextEpisodeExists) {
+            console.log(`[MetadataScreen] Verified next episode S${currentSeason}E${currentEpisode + 1} exists in episodes list`);
+          } else {
+            console.log(`[MetadataScreen] Warning: Next episode S${currentSeason}E${currentEpisode + 1} not found in episodes list, but proceeding anyway`);
+          }
+          
+          targetEpisodeId = nextEpisodeId;
         }
       }
 
       // Fallback logic: if not finished or nextEp not found
       if (!targetEpisodeId) {
         targetEpisodeId = watchProgress?.episodeId || episodeId || (episodes.length > 0 ? buildEpisodeId(episodes[0]) : undefined);
+        console.log(`[MetadataScreen] Using fallback episode ID: ${targetEpisodeId}`);
       }
 
       if (targetEpisodeId) {
-        navigation.navigate('Streams', { id, type, episodeId: targetEpisodeId });
+        // Ensure the episodeId has showId prefix (id:season:episode)
+        const epParts = targetEpisodeId.split(':');
+        let normalizedEpisodeId = targetEpisodeId;
+        if (epParts.length === 2) {
+          normalizedEpisodeId = `${id}:${epParts[0]}:${epParts[1]}`;
+        }
+        console.log(`[MetadataScreen] Navigating to streams with episodeId: ${normalizedEpisodeId}`);
+        navigation.navigate('Streams', { id, type, episodeId: normalizedEpisodeId });
         return;
       }
     }
 
-    // Default movie or unknown flow
-    navigation.navigate('Streams', { id, type, episodeId });
+    // Normalize fallback episodeId too
+    let fallbackEpisodeId = episodeId;
+    if (episodeId && episodeId.split(':').length === 2) {
+      const p = episodeId.split(':');
+      fallbackEpisodeId = `${id}:${p[0]}:${p[1]}`;
+    }
+    console.log(`[MetadataScreen] Navigating with fallback episodeId: ${fallbackEpisodeId}`);
+    navigation.navigate('Streams', { id, type, episodeId: fallbackEpisodeId });
   }, [navigation, id, type, episodes, episodeId, watchProgressData.watchProgress]);
 
   const handleEpisodeSelect = useCallback((episode: Episode) => {
