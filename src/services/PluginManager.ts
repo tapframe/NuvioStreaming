@@ -12,8 +12,6 @@ interface Plugin {
   author: string;
   description: string;
   type: 'scraper' | 'other';
-  isBuiltIn?: boolean;
-  isEnabled?: boolean;
   getStreams: (options: GetStreamsOptions) => Promise<Stream[]>;
 }
 
@@ -103,7 +101,6 @@ class CookieJar {
 class PluginManager {
   private plugins: Plugin[] = [];
   private static instance: PluginManager;
-  private disabledPlugins: Set<string> = new Set();
 
   private constructor() {
     this.loadBuiltInPlugins();
@@ -139,8 +136,6 @@ class PluginManager {
       // Provide registerPlugin globally for built-in modules
       (global as any).registerPlugin = (plugin: Plugin) => {
         if (plugin && typeof plugin.getStreams === 'function') {
-          plugin.isBuiltIn = true;
-          plugin.isEnabled = !this.disabledPlugins.has(plugin.name);
           this.plugins.push(plugin);
           logger.log(`[PluginManager] Successfully registered plugin: ${plugin.name} v${plugin.version}`);
         } else {
@@ -169,8 +164,6 @@ class PluginManager {
       // This is simpler and more reliable than using `with` or the Function constructor's scope.
       (global as any).registerPlugin = (plugin: Plugin) => {
         if (plugin && typeof plugin.getStreams === 'function') {
-          plugin.isBuiltIn = false;
-          plugin.isEnabled = !this.disabledPlugins.has(plugin.name);
           this.plugins.push(plugin);
           logger.log(`[PluginManager] Successfully registered plugin: ${plugin.name} v${plugin.version}`);
         } else {
@@ -205,44 +198,8 @@ class PluginManager {
     return this.plugins.filter(p => p.type === 'scraper');
   }
 
-  public getAllPlugins(): Plugin[] {
-    return this.plugins;
-  }
-
-  public togglePlugin(pluginName: string): boolean {
-    const plugin = this.plugins.find(p => p.name === pluginName);
-    if (!plugin) return false;
-
-    if (plugin.isEnabled) {
-      this.disabledPlugins.add(pluginName);
-      plugin.isEnabled = false;
-    } else {
-      this.disabledPlugins.delete(pluginName);
-      plugin.isEnabled = true;
-    }
-
-    logger.log(`[PluginManager] Plugin ${pluginName} ${plugin.isEnabled ? 'enabled' : 'disabled'}`);
-    return true;
-  }
-
-  public removePlugin(pluginName: string): boolean {
-    const pluginIndex = this.plugins.findIndex(p => p.name === pluginName);
-    if (pluginIndex === -1) return false;
-
-    const plugin = this.plugins[pluginIndex];
-    if (plugin.isBuiltIn) {
-      logger.warn(`[PluginManager] Cannot remove built-in plugin: ${pluginName}`);
-      return false;
-    }
-
-    this.plugins.splice(pluginIndex, 1);
-    this.disabledPlugins.delete(pluginName);
-    logger.log(`[PluginManager] Plugin ${pluginName} removed`);
-    return true;
-  }
-
   public async getAllStreams(options: Omit<GetStreamsOptions, 'logger' | 'cache' | 'fetch' | 'fetchWithCookies' | 'setCookie' | 'parseHTML' | 'URL' | 'URLSearchParams' | 'FormData'>): Promise<Stream[]> {
-    const scrapers = this.getScraperPlugins().filter(p => p.isEnabled);
+    const scrapers = this.getScraperPlugins();
     if (scrapers.length === 0) {
       logger.log('[PluginManager] No scraper plugins loaded.');
       return [];
