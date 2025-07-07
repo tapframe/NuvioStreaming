@@ -360,11 +360,17 @@ export const StreamsScreen = () => {
     }
   }, [selectedProvider, availableProviders]);
 
-  // Update useEffect to check for sources
+  // This effect will run when metadata is available or when other dependencies change.
   useEffect(() => {
-    const checkProviders = async () => {
+    // We need metadata to proceed to load streams.
+    if (!metadata) {
+      return;
+    }
+
+    const checkProvidersAndLoad = async () => {
       // Check for Stremio addons
       const hasStremioProviders = await stremioService.hasStreamProviders();
+      // NOTE: This will be expanded to check for plugins later
       const hasProviders = hasStremioProviders;
 
       if (!isMounted.current) return;
@@ -378,33 +384,34 @@ export const StreamsScreen = () => {
         }, 500);
         return () => clearTimeout(timer);
       } else {
-          if (type === 'series' && episodeId) {
-            logger.log(`🎬 Loading episode streams for: ${episodeId}`);
-            setLoadingProviders({
-              'stremio': true
-            });
-            setSelectedEpisode(episodeId);
-            setStreamsLoadStart(Date.now());
-            loadEpisodeStreams(episodeId);
-          } else if (type === 'movie') {
-            logger.log(`🎬 Loading movie streams for: ${id}`);
-            setStreamsLoadStart(Date.now());
-            loadStreams();
-          }
-  
-          // Reset autoplay state when content changes
-          setAutoplayTriggered(false);
-          if (settings.autoplayBestStream) {
-            setIsAutoplayWaiting(true);
-            logger.log('🔄 Autoplay enabled, waiting for best stream...');
-          } else {
-            setIsAutoplayWaiting(false);
-          }
+        if (type === 'series' && episodeId) {
+          logger.log(`🎬 Loading episode streams for: ${episodeId}`);
+          setLoadingProviders({
+            'stremio': true
+          });
+          setSelectedEpisode(episodeId);
+          setStreamsLoadStart(Date.now());
+          loadEpisodeStreams(episodeId);
+        } else if (type === 'movie') {
+          logger.log(`🎬 Loading movie streams for: ${id}`);
+          setStreamsLoadStart(Date.now());
+          loadStreams();
+        }
+
+        // Reset autoplay state when content changes
+        setAutoplayTriggered(false);
+        if (settings.autoplayBestStream) {
+          setIsAutoplayWaiting(true);
+          logger.log('🔄 Autoplay enabled, waiting for best stream...');
+        } else {
+          setIsAutoplayWaiting(false);
+        }
       }
     };
 
-    checkProviders();
-  }, [type, id, episodeId, settings.autoplayBestStream]);
+    checkProvidersAndLoad();
+    // Adding metadata to the dependency array ensures this runs after metadata is fetched.
+  }, [metadata, type, id, episodeId, settings.autoplayBestStream]);
 
   React.useEffect(() => {
     // Trigger entrance animations

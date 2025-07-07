@@ -908,7 +908,7 @@ const LibraryScreen = () => {
                       ? traktFolders.find(f => f.id === selectedTraktFolder)?.name || 'Collection'
                       : 'Trakt Collection'
                     }
-                </Text>
+                  </Text>
               </>
             ) : (
               <>

@@ -70,7 +70,7 @@ const CalendarScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [filteredEpisodes, setFilteredEpisodes] = useState<CalendarEpisode[]>([]);
-
+  
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     refresh(true);

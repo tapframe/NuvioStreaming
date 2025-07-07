@@ -1,0 +1,248 @@
+import { logger } from '../utils/logger';
+import * as cheerio from 'cheerio';
+
+// --- Type Definitions ---
+
+interface Plugin {
+  name: string;
+  version: string;
+  author: string;
+  description: string;
+  type: 'scraper' | 'other';
+  getStreams: (options: GetStreamsOptions) => Promise<Stream[]>;
+}
+
+interface Stream {
+  name: string;
+  title: string;
+  url: string;
+  quality: string;
+}
+
+interface GetStreamsOptions {
+  tmdbId: string;
+  mediaType: 'movie' | 'tv';
+  seasonNum?: number;
+  episodeNum?: number;
+  tmdbApiKey: string;
+  // Injected properties
+  logger: typeof logger;
+  cache: Cache;
+  fetch: typeof fetch;
+  fetchWithCookies: (url: string, options?: RequestInit) => Promise<Response>;
+  setCookie: (key: string, value: string) => void;
+  parseHTML: (html: string) => cheerio.CheerioAPI;
+  URL: typeof URL;
+  URLSearchParams: typeof URLSearchParams;
+  FormData: typeof FormData;
+}
+
+interface Cache {
+  get: <T>(key: string) => Promise<T | null>;
+  set: (key: string, value: any, ttlInSeconds: number) => Promise<void>;
+}
+
+// --- Simple In-Memory Cache with TTL ---
+
+const cacheStore = new Map<string, { value: any; expiry: number }>();
+const simpleCache: Cache = {
+  async get<T>(key: string): Promise<T | null> {
+    const item = cacheStore.get(key);
+    if (!item) return null;
+    if (Date.now() > item.expiry) {
+      cacheStore.delete(key);
+      return null;
+    }
+    return item.value as T;
+  },
+  async set(key: string, value: any, ttlInSeconds: number): Promise<void> {
+    const expiry = Date.now() + ttlInSeconds * 1000;
+    cacheStore.set(key, { value, expiry });
+  },
+};
+
+// --- Cookie-enabled Fetch ---
+
+class CookieJar {
+    private cookies: Map<string, string> = new Map();
+
+    set(setCookieHeader: string | undefined) {
+        if (!setCookieHeader) return;
+        // Simple parsing, doesn't handle all attributes like Path, Expires, etc.
+        setCookieHeader.split(';').forEach(cookiePart => {
+            const [key, ...valueParts] = cookiePart.split('=');
+            if (key && valueParts.length > 0) {
+                this.cookies.set(key.trim(), valueParts.join('=').trim());
+            }
+        });
+    }
+    
+    // Add a method to set a cookie directly by key/value
+    setCookie(key: string, value: string) {
+        if (key && value) {
+            this.cookies.set(key.trim(), value);
+        }
+    }
+
+    get(): string {
+        // Return all cookies as a single string
+        return Array.from(this.cookies.entries())
+            .map(([key, value]) => `${key}=${value}`)
+            .join('; ');
+    }
+}
+
+
+// --- Plugin Manager ---
+
+class PluginManager {
+  private plugins: Plugin[] = [];
+  private static instance: PluginManager;
+
+  private constructor() {
+    this.loadBuiltInPlugins();
+  }
+
+  public static getInstance(): PluginManager {
+    if (!PluginManager.instance) {
+      PluginManager.instance = new PluginManager();
+    }
+    return PluginManager.instance;
+  }
+
+  public async loadPluginFromUrl(url: string): Promise<boolean> {
+    logger.log(`[PluginManager] Attempting to load plugin from URL: ${url}`);
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch plugin from URL: ${response.statusText}`);
+      }
+      const pluginCode = await response.text();
+      this.runPlugin(pluginCode);
+      // Assuming runPlugin is synchronous for registration purposes.
+      // A more robust system might have runPlugin return success/failure.
+      return true;
+    } catch (error) {
+      logger.error(`[PluginManager] Failed to load plugin from URL ${url}:`, error);
+      return false;
+    }
+  }
+
+  private async loadBuiltInPlugins() {
+    try {
+      // Provide registerPlugin globally for built-in modules
+      (global as any).registerPlugin = (plugin: Plugin) => {
+        if (plugin && typeof plugin.getStreams === 'function') {
+          this.plugins.push(plugin);
+          logger.log(`[PluginManager] Successfully registered plugin: ${plugin.name} v${plugin.version}`);
+        } else {
+          logger.error('[PluginManager] An invalid plugin was passed to registerPlugin.');
+        }
+      };
+
+      // Require and execute the built-in MoviesMod plugin module (IIFE)
+      require('./plugins/moviesmod.plugin.js');
+
+      delete (global as any).registerPlugin;
+    } catch (error) {
+      logger.error('[PluginManager] Failed to load built-in MoviesMod plugin:', error);
+    }
+  }
+
+  private runPlugin(pluginCode: string) {
+    const pluginsBefore = this.plugins.length;
+
+    const sandbox = {
+      registerPlugin: (plugin: Plugin) => {
+        if (plugin && typeof plugin.getStreams === 'function') {
+          this.plugins.push(plugin);
+          logger.log(`[PluginManager] Successfully registered plugin: ${plugin.name} v${plugin.version}`);
+        } else {
+          logger.error('[PluginManager] An invalid plugin was passed to registerPlugin.');
+        }
+      },
+      console: logger, // For security, plugins use our logger, not the raw console
+    };
+
+    // Use Function constructor for a slightly safer execution scope than direct eval
+    try {
+      const pluginExecutor = new Function('sandbox', `
+        with (sandbox) {
+          (function() {
+            // The plugin code is an IIFE, so it executes immediately
+            ${pluginCode}
+          })();
+        }
+      `);
+      pluginExecutor(sandbox);
+
+      if (this.plugins.length === pluginsBefore) {
+        logger.warn('[PluginManager] Plugin code executed, but no plugin was registered.');
+      }
+    } catch (error) {
+      logger.error('[PluginManager] Error executing plugin code:', error);
+    }
+  }
+
+  public getScraperPlugins(): Plugin[] {
+    return this.plugins.filter(p => p.type === 'scraper');
+  }
+
+  public async getAllStreams(options: Omit<GetStreamsOptions, 'logger' | 'cache' | 'fetch' | 'fetchWithCookies' | 'setCookie' | 'parseHTML' | 'URL' | 'URLSearchParams' | 'FormData'>): Promise<Stream[]> {
+    const scrapers = this.getScraperPlugins();
+    if (scrapers.length === 0) {
+      logger.log('[PluginManager] No scraper plugins loaded.');
+      return [];
+    }
+
+    const allStreams: Stream[] = [];
+
+    const cookieJar = new CookieJar();
+    const fetchWithCookies = async (url: string, opts: RequestInit = {}): Promise<Response> => {
+        const domain = new URL(url).hostname;
+        opts.headers = { ...opts.headers, 'Cookie': cookieJar.get() };
+        
+        const response = await fetch(url, opts);
+        
+        const setCookieHeader = response.headers.get('Set-Cookie');
+        if (setCookieHeader) {
+            cookieJar.set(setCookieHeader);
+        }
+        
+        return response;
+    };
+
+
+    const streamPromises = scrapers.map(scraper => {
+      const injectedOptions: GetStreamsOptions = {
+        ...options,
+        logger: logger,
+        cache: simpleCache,
+        fetch: fetch,
+        fetchWithCookies: fetchWithCookies,
+        // Expose a function to set a cookie in the jar
+        setCookie: (key: string, value: string) => {
+            cookieJar.setCookie(key, value);
+        },
+        parseHTML: cheerio.load,
+        URL: URL,
+        URLSearchParams: URLSearchParams,
+        FormData: FormData,
+      };
+      
+      return scraper.getStreams(injectedOptions)
+        .catch(error => {
+          logger.error(`[PluginManager] Scraper '${scraper.name}' failed:`, error);
+          return []; // Return empty array on failure
+        });
+    });
+
+    const results = await Promise.all(streamPromises);
+    results.forEach(streams => allStreams.push(...streams));
+
+    logger.log(`[PluginManager] Found a total of ${allStreams.length} streams from ${scrapers.length} scrapers.`);
+    return allStreams;
+  }
+}
+
+export const pluginManager = PluginManager.getInstance(); 

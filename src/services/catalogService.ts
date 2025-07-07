@@ -68,6 +68,7 @@ export interface StreamingContent {
     [key: string]: any;
   };
   imdb_id?: string;
+  tmdbId?: number;
   slug?: string;
   releaseInfo?: string;
   traktSource?: 'watchlist' | 'continue-watching' | 'watched';
@@ -592,6 +593,7 @@ class CatalogService {
       writer: (meta as any).writer || undefined,
       country: (meta as any).country || undefined,
       imdb_id: (meta as any).imdb_id || undefined,
+      tmdbId: (meta as any).tmdbId || undefined,
       slug: (meta as any).slug || undefined,
       releaseInfo: meta.releaseInfo || (meta as any).releaseInfo || undefined,
       trailerStreams: (meta as any).trailerStreams || undefined,
