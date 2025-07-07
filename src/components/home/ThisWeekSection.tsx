@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import { useLibrary } from '../../hooks/useLibrary';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { parseISO, isThisWeek, format, isAfter, isBefore } from 'date-fns';
 import Animated, { FadeIn, FadeInRight } from 'react-native-reanimated';
+import { useCalendarData } from '../../hooks/useCalendarData';
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = width * 0.75; // Reduced width for better spacing
@@ -53,148 +54,18 @@ export const ThisWeekSection = React.memo(() => {
     continueWatching,
     loadAllCollections
   } = useTraktContext();
-  const [episodes, setEpisodes] = useState<ThisWeekEpisode[]>([]);
-  const [loading, setLoading] = useState(true);
   const { currentTheme } = useTheme();
+  const { calendarData, loading } = useCalendarData();
 
-  const fetchThisWeekEpisodes = useCallback(async () => {
-    setLoading(true);
-    
-    try {
-      // Combine library series with Trakt series
-      const librarySeries = libraryItems.filter(item => item.type === 'series');
-      let allSeries = [...librarySeries];
-      
-      // Add Trakt watchlist and continue watching shows if authenticated
-      if (traktAuthenticated) {
-        const traktSeriesIds = new Set();
-        
-        // Add watchlist shows
-        if (watchlistShows) {
-          for (const item of watchlistShows) {
-            if (item.show && item.show.ids.imdb) {
-              const imdbId = item.show.ids.imdb;
-              if (!librarySeries.some(s => s.id === imdbId)) {
-                traktSeriesIds.add(imdbId);
-                allSeries.push({
-                  id: imdbId,
-                  name: item.show.title,
-                  type: 'series',
-                  poster: '', // Will try to fetch from TMDB
-                  year: item.show.year,
-                  traktSource: 'watchlist'
-                });
-              }
-            }
-          }
-        }
-        
-        // Add continue watching shows
-        if (continueWatching) {
-          for (const item of continueWatching) {
-            if (item.type === 'episode' && item.show && item.show.ids.imdb) {
-              const imdbId = item.show.ids.imdb;
-              if (!librarySeries.some(s => s.id === imdbId) && !traktSeriesIds.has(imdbId)) {
-                traktSeriesIds.add(imdbId);
-                allSeries.push({
-                  id: imdbId,
-                  name: item.show.title,
-                  type: 'series',
-                  poster: '', // Will try to fetch from TMDB
-                  year: item.show.year,
-                  traktSource: 'continue-watching'
-                });
-              }
-            }
-          }
-        }
-      }
-      
-      console.log(`[ThisWeekSection] Checking ${allSeries.length} series (Library: ${librarySeries.length}, Trakt: ${allSeries.length - librarySeries.length})`);
-      let allEpisodes: ThisWeekEpisode[] = [];
-      
-      for (const series of allSeries) {
-        try {
-          const metadata = await stremioService.getMetaDetails(series.type, series.id);
-          
-          if (metadata?.videos) {
-            // Get TMDB ID for additional metadata
-            const tmdbId = await tmdbService.findTMDBIdByIMDB(series.id);
-            let tmdbEpisodes: { [key: string]: any } = {};
-            
-            if (tmdbId) {
-              const allTMDBEpisodes = await tmdbService.getAllEpisodes(tmdbId);
-              // Flatten episodes into a map for easy lookup
-              Object.values(allTMDBEpisodes).forEach(seasonEpisodes => {
-                seasonEpisodes.forEach(episode => {
-                  const key = `${episode.season_number}:${episode.episode_number}`;
-                  tmdbEpisodes[key] = episode;
-                });
-              });
-            }
-            
-            const thisWeekEpisodes = metadata.videos
-              .filter(video => {
-                if (!video.released) return false;
-                const releaseDate = parseISO(video.released);
-                return isThisWeek(releaseDate);
-              })
-              .map(video => {
-                const releaseDate = parseISO(video.released);
-                const tmdbEpisode = tmdbEpisodes[`${video.season}:${video.episode}`] || {};
-                
-                return {
-                  id: video.id,
-                  seriesId: series.id,
-                  seriesName: series.name || metadata.name,
-                  title: tmdbEpisode.name || video.title || `Episode ${video.episode}`,
-                  poster: series.poster || metadata.poster || '',
-                  releaseDate: video.released,
-                  season: video.season || 0,
-                  episode: video.episode || 0,
-                  isReleased: isBefore(releaseDate, new Date()),
-                  overview: tmdbEpisode.overview || '',
-                  vote_average: tmdbEpisode.vote_average || 0,
-                  still_path: tmdbEpisode.still_path || null,
-                  season_poster_path: tmdbEpisode.season_poster_path || null
-                };
-              });
-            
-            allEpisodes = [...allEpisodes, ...thisWeekEpisodes];
-          }
-        } catch (error) {
-          console.error(`Error fetching episodes for ${series.name}:`, error);
-        }
-      }
-      
-      // Sort episodes by release date
-      allEpisodes.sort((a, b) => {
-        return new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime();
-      });
-      
-      setEpisodes(allEpisodes);
-    } catch (error) {
-      console.error('Error fetching this week episodes:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [libraryItems, traktAuthenticated, watchlistShows, continueWatching]);
-  
-  // Load episodes when library items or Trakt data changes
-  useEffect(() => {
-    if (!libraryLoading && !traktLoading) {
-      if (traktAuthenticated && (!watchlistShows || !continueWatching)) {
-        console.log('[ThisWeekSection] Loading Trakt collections for this week data');
-        loadAllCollections();
-      } else {
-        console.log('[ThisWeekSection] Data ready, refreshing episodes. Library items:', libraryItems.length);
-        fetchThisWeekEpisodes();
-      }
-    } else if (!libraryLoading && !traktAuthenticated) {
-      console.log('[ThisWeekSection] Not authenticated with Trakt, using library only. Items count:', libraryItems.length);
-      fetchThisWeekEpisodes();
-    }
-  }, [libraryLoading, traktLoading, traktAuthenticated, libraryItems, watchlistShows, continueWatching, fetchThisWeekEpisodes, loadAllCollections]);
+  const thisWeekEpisodes = useMemo(() => {
+    const thisWeekSection = calendarData.find(section => section.title === 'This Week');
+    if (!thisWeekSection) return [];
+
+    return thisWeekSection.data.map(episode => ({
+      ...episode,
+      isReleased: isBefore(parseISO(episode.releaseDate), new Date()),
+    }));
+  }, [calendarData]);
   
   const handleEpisodePress = (episode: ThisWeekEpisode) => {
     // For upcoming episodes, go to the metadata screen
@@ -221,18 +92,7 @@ export const ThisWeekSection = React.memo(() => {
     navigation.navigate('Calendar' as any);
   };
   
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={currentTheme.colors.primary} />
-        <Text style={[styles.loadingText, { color: currentTheme.colors.textMuted }]}>
-          Loading this week's episodes...
-        </Text>
-      </View>
-    );
-  }
-  
-  if (episodes.length === 0) {
+  if (thisWeekEpisodes.length === 0) {
     return null;
   }
   
@@ -335,7 +195,7 @@ export const ThisWeekSection = React.memo(() => {
       </View>
       
       <FlatList
-        data={episodes}
+        data={thisWeekEpisodes}
         keyExtractor={(item) => item.id}
         renderItem={renderEpisodeItem}
         horizontal

@@ -1,4 +1,5 @@
 import { TMDBEpisode } from '../services/tmdbService';
+import { StreamingContent } from '../services/catalogService';
 
 // Types for route params
 export type RouteParams = {
@@ -74,46 +75,7 @@ export interface Cast {
   known_for_department?: string;
 }
 
-// Streaming content type
-export interface StreamingContent {
-  id: string;
-  type: string;
-  name: string;
-  description?: string;
-  poster?: string;
-  posterShape?: string;
-  banner?: string;
-  logo?: string;
-  year?: string | number;
-  runtime?: string;
-  imdbRating?: string;
-  genres?: string[];
-  director?: string;
-  writer?: string[];
-  cast?: string[];
-  releaseInfo?: string;
-  directors?: string[];
-  creators?: string[];
-  certification?: string;
-  released?: string;
-  trailerStreams?: any[];
-  videos?: any[];
-  inLibrary?: boolean;
-  // Enhanced metadata from addons
-  country?: string;
-  links?: Array<{
-    name: string;
-    category: string;
-    url: string;
-  }>;
-  behaviorHints?: {
-    defaultVideoId?: string;
-    hasScheduledVideos?: boolean;
-    [key: string]: any;
-  };
-  imdb_id?: string;
-  slug?: string;
-}
+// Streaming content type - REMOVED AND IMPORTED FROM catalogService.ts
 
 // Navigation types
 export type RootStackParamList = {

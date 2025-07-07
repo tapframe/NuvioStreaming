@@ -20,14 +20,14 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../contexts/ThemeContext';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { stremioService } from '../services/stremioService';
 import { useLibrary } from '../hooks/useLibrary';
 import { useTraktContext } from '../contexts/TraktContext';
 import { format, parseISO, isThisWeek, isAfter, startOfToday, addWeeks, isBefore, isSameDay } from 'date-fns';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import { CalendarSection } from '../components/calendar/CalendarSection';
+import { CalendarSection as CalendarSectionComponent } from '../components/calendar/CalendarSection';
 import { tmdbService } from '../services/tmdbService';
 import { logger } from '../utils/logger';
+import { useCalendarData } from '../hooks/useCalendarData';
 
 const { width } = Dimensions.get('window');
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
@@ -56,6 +56,7 @@ const CalendarScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { libraryItems, loading: libraryLoading } = useLibrary();
   const { currentTheme } = useTheme();
+  const { calendarData, loading, refresh } = useCalendarData();
   const {
     isAuthenticated: traktAuthenticated,
     isLoading: traktLoading,
@@ -66,254 +67,15 @@ const CalendarScreen = () => {
   } = useTraktContext();
   
   logger.log(`[Calendar] Initial load - Library has ${libraryItems?.length || 0} items, loading: ${libraryLoading}`);
-  const [calendarData, setCalendarData] = useState<CalendarSection[]>([]);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [filteredEpisodes, setFilteredEpisodes] = useState<CalendarEpisode[]>([]);
 
-  const fetchCalendarData = useCallback(async () => {
-    logger.log("[Calendar] Starting to fetch calendar data");
-    setLoading(true);
-    
-    try {
-      // Combine library series with Trakt series
-      const librarySeries = libraryItems.filter(item => item.type === 'series');
-      let allSeries = [...librarySeries];
-      
-      // Add Trakt watchlist and watched shows if authenticated
-      if (traktAuthenticated) {
-        const traktSeriesIds = new Set();
-        
-        // Add watchlist shows
-        if (watchlistShows) {
-          for (const item of watchlistShows) {
-            if (item.show && item.show.ids.imdb) {
-              const imdbId = item.show.ids.imdb;
-              if (!librarySeries.some(s => s.id === imdbId)) {
-                traktSeriesIds.add(imdbId);
-                allSeries.push({
-                  id: imdbId,
-                  name: item.show.title,
-                  type: 'series',
-                  poster: '', // Will try to fetch from TMDB
-                  year: item.show.year,
-                  traktSource: 'watchlist'
-                });
-              }
-            }
-          }
-        }
-        
-        // Add continue watching shows
-        if (continueWatching) {
-          for (const item of continueWatching) {
-            if (item.type === 'episode' && item.show && item.show.ids.imdb) {
-              const imdbId = item.show.ids.imdb;
-              if (!librarySeries.some(s => s.id === imdbId) && !traktSeriesIds.has(imdbId)) {
-                traktSeriesIds.add(imdbId);
-                allSeries.push({
-                  id: imdbId,
-                  name: item.show.title,
-                  type: 'series',
-                  poster: '', // Will try to fetch from TMDB
-                  year: item.show.year,
-                  traktSource: 'continue-watching'
-                });
-              }
-            }
-          }
-        }
-        
-        // Add watched shows (only recent ones to avoid too much data)
-        if (watchedShows) {
-          const recentWatched = watchedShows.slice(0, 20); // Limit to recent 20
-          for (const item of recentWatched) {
-            if (item.show && item.show.ids.imdb) {
-              const imdbId = item.show.ids.imdb;
-              if (!librarySeries.some(s => s.id === imdbId) && !traktSeriesIds.has(imdbId)) {
-                traktSeriesIds.add(imdbId);
-                allSeries.push({
-                  id: imdbId,
-                  name: item.show.title,
-                  type: 'series',
-                  poster: '', // Will try to fetch from TMDB
-                  year: item.show.year,
-                  traktSource: 'watched'
-                });
-              }
-            }
-          }
-        }
-      }
-      
-      logger.log(`[Calendar] Total series to check: ${allSeries.length} (Library: ${librarySeries.length}, Trakt: ${allSeries.length - librarySeries.length})`);
-      
-      let allEpisodes: CalendarEpisode[] = [];
-      let seriesWithoutEpisodes: CalendarEpisode[] = [];
-      
-      // For each series, fetch upcoming episodes
-      for (const series of allSeries) {
-        try {
-          logger.log(`[Calendar] Fetching episodes for series: ${series.name} (${series.id})`);
-          const metadata = await stremioService.getMetaDetails(series.type, series.id);
-          logger.log(`[Calendar] Metadata fetched:`, metadata ? 'success' : 'null');
-          
-          if (metadata?.videos && metadata.videos.length > 0) {
-            logger.log(`[Calendar] Series ${series.name} has ${metadata.videos.length} videos`);
-            // Filter for upcoming episodes or recently released
-            const today = startOfToday();
-            const fourWeeksLater = addWeeks(today, 4);
-            const twoWeeksAgo = addWeeks(today, -2);
-            
-            // Get TMDB ID for additional metadata
-            const tmdbId = await tmdbService.findTMDBIdByIMDB(series.id);
-            let tmdbEpisodes: { [key: string]: any } = {};
-            
-            if (tmdbId) {
-              const allTMDBEpisodes = await tmdbService.getAllEpisodes(tmdbId);
-              // Flatten episodes into a map for easy lookup
-              Object.values(allTMDBEpisodes).forEach(seasonEpisodes => {
-                seasonEpisodes.forEach(episode => {
-                  const key = `${episode.season_number}:${episode.episode_number}`;
-                  tmdbEpisodes[key] = episode;
-                });
-              });
-            }
-            
-            const upcomingEpisodes = metadata.videos
-              .filter(video => {
-                if (!video.released) return false;
-                const releaseDate = parseISO(video.released);
-                return isBefore(releaseDate, fourWeeksLater) && isAfter(releaseDate, twoWeeksAgo);
-              })
-              .map(video => {
-                const tmdbEpisode = tmdbEpisodes[`${video.season}:${video.episode}`] || {};
-                return {
-                  id: video.id,
-                  seriesId: series.id,
-                  title: tmdbEpisode.name || video.title || `Episode ${video.episode}`,
-                  seriesName: series.name || metadata.name,
-                  poster: series.poster || metadata.poster || '',
-                  releaseDate: video.released,
-                  season: video.season || 0,
-                  episode: video.episode || 0,
-                  overview: tmdbEpisode.overview || '',
-                  vote_average: tmdbEpisode.vote_average || 0,
-                  still_path: tmdbEpisode.still_path || null,
-                  season_poster_path: tmdbEpisode.season_poster_path || null
-                };
-              });
-            
-            if (upcomingEpisodes.length > 0) {
-              allEpisodes = [...allEpisodes, ...upcomingEpisodes];
-            } else {
-              // Add to series without episode dates
-              seriesWithoutEpisodes.push({
-                id: series.id,
-                seriesId: series.id,
-                title: 'No upcoming episodes',
-                seriesName: series.name || (metadata?.name || ''),
-                poster: series.poster || (metadata?.poster || ''),
-                releaseDate: '',
-                season: 0,
-                episode: 0,
-                overview: '',
-                vote_average: 0,
-                still_path: null,
-                season_poster_path: null
-              });
-            }
-          } else {
-            // Add to series without episode dates
-            seriesWithoutEpisodes.push({
-              id: series.id,
-              seriesId: series.id,
-              title: 'No upcoming episodes',
-              seriesName: series.name || (metadata?.name || ''),
-              poster: series.poster || (metadata?.poster || ''),
-              releaseDate: '',
-              season: 0,
-              episode: 0,
-              overview: '',
-              vote_average: 0,
-              still_path: null,
-              season_poster_path: null
-            });
-          }
-        } catch (error) {
-          logger.error(`Error fetching episodes for ${series.name}:`, error);
-        }
-      }
-      
-      // Sort episodes by release date
-      allEpisodes.sort((a, b) => {
-        return new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime();
-      });
-      
-      // Group episodes into sections
-      const thisWeekEpisodes = allEpisodes.filter(
-        episode => isThisWeek(parseISO(episode.releaseDate))
-      );
-      
-      const upcomingEpisodes = allEpisodes.filter(
-        episode => isAfter(parseISO(episode.releaseDate), new Date()) && 
-          !isThisWeek(parseISO(episode.releaseDate))
-      );
-      
-      const recentEpisodes = allEpisodes.filter(
-        episode => isBefore(parseISO(episode.releaseDate), new Date()) && 
-          !isThisWeek(parseISO(episode.releaseDate))
-      );
-      
-      logger.log(`[Calendar] Episodes summary: All episodes: ${allEpisodes.length}, This Week: ${thisWeekEpisodes.length}, Upcoming: ${upcomingEpisodes.length}, Recent: ${recentEpisodes.length}, No Schedule: ${seriesWithoutEpisodes.length}`);
-      
-      const sections: CalendarSection[] = [];
-      
-      if (thisWeekEpisodes.length > 0) {
-        sections.push({ title: 'This Week', data: thisWeekEpisodes });
-      }
-      
-      if (upcomingEpisodes.length > 0) {
-        sections.push({ title: 'Upcoming', data: upcomingEpisodes });
-      }
-      
-      if (recentEpisodes.length > 0) {
-        sections.push({ title: 'Recently Released', data: recentEpisodes });
-      }
-      
-      if (seriesWithoutEpisodes.length > 0) {
-        sections.push({ title: 'Series with No Scheduled Episodes', data: seriesWithoutEpisodes });
-      }
-      
-      setCalendarData(sections);
-    } catch (error) {
-      logger.error('Error fetching calendar data:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [libraryItems, traktAuthenticated, watchlistShows, continueWatching, watchedShows]);
-  
-  useEffect(() => {
-    if (!libraryLoading && !traktLoading) {
-      if (traktAuthenticated && (!watchlistShows || !continueWatching || !watchedShows)) {
-        logger.log(`[Calendar] Loading Trakt collections for calendar data`);
-        loadAllCollections();
-      } else {
-        logger.log(`[Calendar] Data ready, fetching calendar data - Library: ${libraryItems.length} items`);
-        fetchCalendarData();
-      }
-    } else if (!libraryLoading && !traktAuthenticated) {
-      logger.log(`[Calendar] Not authenticated with Trakt, using library only (${libraryItems.length} items)`);
-      fetchCalendarData();
-    }
-  }, [libraryItems, libraryLoading, traktLoading, traktAuthenticated, watchlistShows, continueWatching, watchedShows, fetchCalendarData, loadAllCollections]);
-  
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchCalendarData();
-  }, [fetchCalendarData]);
+    refresh(true);
+    setRefreshing(false);
+  }, [refresh]);
   
   const handleSeriesPress = useCallback((seriesId: string, episode?: CalendarEpisode) => {
     navigation.navigate('Metadata', {
@@ -445,7 +207,7 @@ const CalendarScreen = () => {
   );
   
   // Process all episodes once data is loaded
-  const allEpisodes = calendarData.reduce((acc, section) => 
+  const allEpisodes = calendarData.reduce((acc: CalendarEpisode[], section: CalendarSection) => 
     [...acc, ...section.data], [] as CalendarEpisode[]);
   
   // Log when rendering with relevant state info
@@ -549,7 +311,7 @@ const CalendarScreen = () => {
         </View>
       )}
       
-      <CalendarSection 
+      <CalendarSectionComponent 
         episodes={allEpisodes}
         onSelectDate={handleDateSelect}
       />

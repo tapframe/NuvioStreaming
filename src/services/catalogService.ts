@@ -70,6 +70,7 @@ export interface StreamingContent {
   imdb_id?: string;
   slug?: string;
   releaseInfo?: string;
+  traktSource?: 'watchlist' | 'continue-watching' | 'watched';
 }
 
 export interface CatalogContent {
