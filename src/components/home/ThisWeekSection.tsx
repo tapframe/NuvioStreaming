@@ -14,6 +14,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useTraktContext } from '../../contexts/TraktContext';
 import { stremioService } from '../../services/stremioService';
 import { tmdbService } from '../../services/tmdbService';
 import { useLibrary } from '../../hooks/useLibrary';
@@ -44,23 +45,75 @@ interface ThisWeekEpisode {
 export const ThisWeekSection = React.memo(() => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { libraryItems, loading: libraryLoading } = useLibrary();
+  const {
+    isAuthenticated: traktAuthenticated,
+    isLoading: traktLoading,
+    watchedShows,
+    watchlistShows,
+    continueWatching,
+    loadAllCollections
+  } = useTraktContext();
   const [episodes, setEpisodes] = useState<ThisWeekEpisode[]>([]);
   const [loading, setLoading] = useState(true);
   const { currentTheme } = useTheme();
 
   const fetchThisWeekEpisodes = useCallback(async () => {
-    if (libraryItems.length === 0) {
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     
     try {
-      const seriesItems = libraryItems.filter(item => item.type === 'series');
+      // Combine library series with Trakt series
+      const librarySeries = libraryItems.filter(item => item.type === 'series');
+      let allSeries = [...librarySeries];
+      
+      // Add Trakt watchlist and continue watching shows if authenticated
+      if (traktAuthenticated) {
+        const traktSeriesIds = new Set();
+        
+        // Add watchlist shows
+        if (watchlistShows) {
+          for (const item of watchlistShows) {
+            if (item.show && item.show.ids.imdb) {
+              const imdbId = item.show.ids.imdb;
+              if (!librarySeries.some(s => s.id === imdbId)) {
+                traktSeriesIds.add(imdbId);
+                allSeries.push({
+                  id: imdbId,
+                  name: item.show.title,
+                  type: 'series',
+                  poster: '', // Will try to fetch from TMDB
+                  year: item.show.year,
+                  traktSource: 'watchlist'
+                });
+              }
+            }
+          }
+        }
+        
+        // Add continue watching shows
+        if (continueWatching) {
+          for (const item of continueWatching) {
+            if (item.type === 'episode' && item.show && item.show.ids.imdb) {
+              const imdbId = item.show.ids.imdb;
+              if (!librarySeries.some(s => s.id === imdbId) && !traktSeriesIds.has(imdbId)) {
+                traktSeriesIds.add(imdbId);
+                allSeries.push({
+                  id: imdbId,
+                  name: item.show.title,
+                  type: 'series',
+                  poster: '', // Will try to fetch from TMDB
+                  year: item.show.year,
+                  traktSource: 'continue-watching'
+                });
+              }
+            }
+          }
+        }
+      }
+      
+      console.log(`[ThisWeekSection] Checking ${allSeries.length} series (Library: ${librarySeries.length}, Trakt: ${allSeries.length - librarySeries.length})`);
       let allEpisodes: ThisWeekEpisode[] = [];
       
-      for (const series of seriesItems) {
+      for (const series of allSeries) {
         try {
           const metadata = await stremioService.getMetaDetails(series.type, series.id);
           
@@ -125,15 +178,23 @@ export const ThisWeekSection = React.memo(() => {
     } finally {
       setLoading(false);
     }
-  }, [libraryItems]);
+  }, [libraryItems, traktAuthenticated, watchlistShows, continueWatching]);
   
-  // Load episodes when library items change
+  // Load episodes when library items or Trakt data changes
   useEffect(() => {
-    if (!libraryLoading) {
-      console.log('[ThisWeekSection] Library items changed, refreshing episodes. Items count:', libraryItems.length);
+    if (!libraryLoading && !traktLoading) {
+      if (traktAuthenticated && (!watchlistShows || !continueWatching)) {
+        console.log('[ThisWeekSection] Loading Trakt collections for this week data');
+        loadAllCollections();
+      } else {
+        console.log('[ThisWeekSection] Data ready, refreshing episodes. Library items:', libraryItems.length);
+        fetchThisWeekEpisodes();
+      }
+    } else if (!libraryLoading && !traktAuthenticated) {
+      console.log('[ThisWeekSection] Not authenticated with Trakt, using library only. Items count:', libraryItems.length);
       fetchThisWeekEpisodes();
     }
-  }, [libraryLoading, libraryItems, fetchThisWeekEpisodes]);
+  }, [libraryLoading, traktLoading, traktAuthenticated, libraryItems, watchlistShows, continueWatching, fetchThisWeekEpisodes, loadAllCollections]);
   
   const handleEpisodePress = (episode: ThisWeekEpisode) => {
     // For upcoming episodes, go to the metadata screen

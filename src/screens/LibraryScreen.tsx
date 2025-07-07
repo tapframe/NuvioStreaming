@@ -913,7 +913,20 @@ const LibraryScreen = () => {
                 <View style={styles.headerSpacer} />
               </>
             ) : (
-              <Text style={[styles.headerTitle, { color: currentTheme.colors.white }]}>Library</Text>
+              <>
+                <Text style={[styles.headerTitle, { color: currentTheme.colors.white }]}>Library</Text>
+                <TouchableOpacity
+                  style={[styles.calendarButton, { backgroundColor: currentTheme.colors.primary }]}
+                  onPress={() => navigation.navigate('Calendar')}
+                  activeOpacity={0.7}
+                >
+                  <MaterialIcons 
+                    name="event" 
+                    size={24} 
+                    color={currentTheme.colors.white} 
+                  />
+                </TouchableOpacity>
+              </>
             )}
           </View>
         </View>
@@ -1223,6 +1236,17 @@ const styles = StyleSheet.create({
   row: {
     justifyContent: 'space-between',
     paddingHorizontal: 16,
+  },
+  calendarButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
 });
 

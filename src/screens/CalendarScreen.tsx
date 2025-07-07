@@ -22,6 +22,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { stremioService } from '../services/stremioService';
 import { useLibrary } from '../hooks/useLibrary';
+import { useTraktContext } from '../contexts/TraktContext';
 import { format, parseISO, isThisWeek, isAfter, startOfToday, addWeeks, isBefore, isSameDay } from 'date-fns';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { CalendarSection } from '../components/calendar/CalendarSection';
@@ -55,6 +56,15 @@ const CalendarScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { libraryItems, loading: libraryLoading } = useLibrary();
   const { currentTheme } = useTheme();
+  const {
+    isAuthenticated: traktAuthenticated,
+    isLoading: traktLoading,
+    watchedShows,
+    watchlistShows,
+    continueWatching,
+    loadAllCollections
+  } = useTraktContext();
+  
   logger.log(`[Calendar] Initial load - Library has ${libraryItems?.length || 0} items, loading: ${libraryLoading}`);
   const [calendarData, setCalendarData] = useState<CalendarSection[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,15 +77,83 @@ const CalendarScreen = () => {
     setLoading(true);
     
     try {
-      // Filter for only series in library
-      const seriesItems = libraryItems.filter(item => item.type === 'series');
-      logger.log(`[Calendar] Library items: ${libraryItems.length}, Series items: ${seriesItems.length}`);
+      // Combine library series with Trakt series
+      const librarySeries = libraryItems.filter(item => item.type === 'series');
+      let allSeries = [...librarySeries];
+      
+      // Add Trakt watchlist and watched shows if authenticated
+      if (traktAuthenticated) {
+        const traktSeriesIds = new Set();
+        
+        // Add watchlist shows
+        if (watchlistShows) {
+          for (const item of watchlistShows) {
+            if (item.show && item.show.ids.imdb) {
+              const imdbId = item.show.ids.imdb;
+              if (!librarySeries.some(s => s.id === imdbId)) {
+                traktSeriesIds.add(imdbId);
+                allSeries.push({
+                  id: imdbId,
+                  name: item.show.title,
+                  type: 'series',
+                  poster: '', // Will try to fetch from TMDB
+                  year: item.show.year,
+                  traktSource: 'watchlist'
+                });
+              }
+            }
+          }
+        }
+        
+        // Add continue watching shows
+        if (continueWatching) {
+          for (const item of continueWatching) {
+            if (item.type === 'episode' && item.show && item.show.ids.imdb) {
+              const imdbId = item.show.ids.imdb;
+              if (!librarySeries.some(s => s.id === imdbId) && !traktSeriesIds.has(imdbId)) {
+                traktSeriesIds.add(imdbId);
+                allSeries.push({
+                  id: imdbId,
+                  name: item.show.title,
+                  type: 'series',
+                  poster: '', // Will try to fetch from TMDB
+                  year: item.show.year,
+                  traktSource: 'continue-watching'
+                });
+              }
+            }
+          }
+        }
+        
+        // Add watched shows (only recent ones to avoid too much data)
+        if (watchedShows) {
+          const recentWatched = watchedShows.slice(0, 20); // Limit to recent 20
+          for (const item of recentWatched) {
+            if (item.show && item.show.ids.imdb) {
+              const imdbId = item.show.ids.imdb;
+              if (!librarySeries.some(s => s.id === imdbId) && !traktSeriesIds.has(imdbId)) {
+                traktSeriesIds.add(imdbId);
+                allSeries.push({
+                  id: imdbId,
+                  name: item.show.title,
+                  type: 'series',
+                  poster: '', // Will try to fetch from TMDB
+                  year: item.show.year,
+                  traktSource: 'watched'
+                });
+              }
+            }
+          }
+        }
+      }
+      
+      logger.log(`[Calendar] Total series to check: ${allSeries.length} (Library: ${librarySeries.length}, Trakt: ${allSeries.length - librarySeries.length})`);
       
       let allEpisodes: CalendarEpisode[] = [];
       let seriesWithoutEpisodes: CalendarEpisode[] = [];
       
       // For each series, fetch upcoming episodes
-      for (const series of seriesItems) {
+      for (const series of allSeries) {
         try {
           logger.log(`[Calendar] Fetching episodes for series: ${series.name} (${series.id})`);
           const metadata = await stremioService.getMetaDetails(series.type, series.id);
@@ -215,17 +293,22 @@ const CalendarScreen = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [libraryItems]);
+  }, [libraryItems, traktAuthenticated, watchlistShows, continueWatching, watchedShows]);
   
   useEffect(() => {
-    if (libraryItems.length > 0 && !libraryLoading) {
-      logger.log(`[Calendar] Library loaded with ${libraryItems.length} items, fetching calendar data`);
+    if (!libraryLoading && !traktLoading) {
+      if (traktAuthenticated && (!watchlistShows || !continueWatching || !watchedShows)) {
+        logger.log(`[Calendar] Loading Trakt collections for calendar data`);
+        loadAllCollections();
+      } else {
+        logger.log(`[Calendar] Data ready, fetching calendar data - Library: ${libraryItems.length} items`);
+        fetchCalendarData();
+      }
+    } else if (!libraryLoading && !traktAuthenticated) {
+      logger.log(`[Calendar] Not authenticated with Trakt, using library only (${libraryItems.length} items)`);
       fetchCalendarData();
-    } else if (!libraryLoading) {
-      logger.log(`[Calendar] Library loaded but empty (${libraryItems.length} items)`);
-      setLoading(false);
     }
-  }, [libraryItems, libraryLoading, fetchCalendarData]);
+  }, [libraryItems, libraryLoading, traktLoading, traktAuthenticated, watchlistShows, continueWatching, watchedShows, fetchCalendarData, loadAllCollections]);
   
   const onRefresh = useCallback(() => {
     setRefreshing(true);

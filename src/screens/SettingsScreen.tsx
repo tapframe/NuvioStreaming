@@ -402,13 +402,6 @@ const SettingsScreen: React.FC = () => {
                 onPress={() => navigation.navigate('PlayerSettings')}
               />
               <SettingItem
-                title="Calendar"
-                description="Episode tracking"
-                icon="event"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('Calendar')}
-              />
-              <SettingItem
                 title="Notifications"
                 description="Episode reminders"
                 icon="notifications-none"
