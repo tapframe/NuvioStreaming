@@ -29,6 +29,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useTraktContext } from '../contexts/TraktContext';
 import TraktIcon from '../../assets/rating-icons/trakt.svg';
 import { traktService, TraktService, TraktImages } from '../services/traktService';
+import { TraktLoadingSpinner } from '../components/common/TraktLoadingSpinner';
 
 // Define interfaces for proper typing
 interface LibraryItem extends StreamingContent {
@@ -680,7 +681,7 @@ const LibraryScreen = () => {
 
   const renderTraktContent = () => {
     if (traktLoading) {
-      return <SkeletonLoader />;
+      return <TraktLoadingSpinner />;
     }
 
     // If no specific folder is selected, show the folder structure
@@ -839,7 +840,7 @@ const LibraryScreen = () => {
                   backgroundColor: currentTheme.colors.primary,
                   shadowColor: currentTheme.colors.black
                 }]}
-                onPress={() => navigation.navigate('Discover')}
+                onPress={() => navigation.navigate('MainTabs')}
                 activeOpacity={0.7}
               >
                 <Text style={[styles.exploreButtonText, { color: currentTheme.colors.white }]}>Explore Content</Text>
