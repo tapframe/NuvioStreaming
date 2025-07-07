@@ -209,15 +209,57 @@ const MetadataScreen: React.FC = () => {
 
   const handleShowStreams = useCallback(() => {
     const { watchProgress } = watchProgressData;
+
+    // Helper to build episodeId from episode object
+    const buildEpisodeId = (ep: any): string => {
+      return ep.stremioId || `${id}:${ep.season_number}:${ep.episode_number}`;
+    };
+
     if (type === 'series') {
-      const targetEpisodeId = watchProgress?.episodeId || episodeId || (episodes.length > 0 ? 
-        (episodes[0].stremioId || `${id}:${episodes[0].season_number}:${episodes[0].episode_number}`) : undefined);
-      
+      // Determine if current episode is finished
+      let progressPercent = 0;
+      if (watchProgress && watchProgress.duration > 0) {
+        progressPercent = (watchProgress.currentTime / watchProgress.duration) * 100;
+      }
+
+      let targetEpisodeId: string | undefined;
+
+      if (progressPercent >= 85 && watchProgress?.episodeId) {
+        // Try to navigate to next episode
+        const parts = watchProgress.episodeId.split(':');
+        if (parts.length >= 3) {
+          const currentSeason = parseInt(parts[parts.length - 2], 10);
+          const currentEpisode = parseInt(parts[parts.length - 1], 10);
+
+          // Find next episode in episodes array
+          const sortedEpisodes = [...episodes].sort((a, b) => {
+            if (a.season_number === b.season_number) {
+              return a.episode_number - b.episode_number;
+            }
+            return a.season_number - b.season_number;
+          });
+
+          const currentIndex = sortedEpisodes.findIndex(ep => ep.season_number === currentSeason && ep.episode_number === currentEpisode);
+
+          if (currentIndex !== -1 && currentIndex + 1 < sortedEpisodes.length) {
+            const nextEp = sortedEpisodes[currentIndex + 1];
+            targetEpisodeId = buildEpisodeId(nextEp);
+          }
+        }
+      }
+
+      // Fallback logic: if not finished or nextEp not found
+      if (!targetEpisodeId) {
+        targetEpisodeId = watchProgress?.episodeId || episodeId || (episodes.length > 0 ? buildEpisodeId(episodes[0]) : undefined);
+      }
+
       if (targetEpisodeId) {
         navigation.navigate('Streams', { id, type, episodeId: targetEpisodeId });
         return;
       }
     }
+
+    // Default movie or unknown flow
     navigation.navigate('Streams', { id, type, episodeId });
   }, [navigation, id, type, episodes, episodeId, watchProgressData.watchProgress]);
 

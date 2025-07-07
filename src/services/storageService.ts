@@ -224,13 +224,24 @@ class StorageService {
     try {
       const existingProgress = await this.getWatchProgress(id, type, episodeId);
       if (existingProgress) {
+        // Preserve the highest Trakt progress and currentTime values to avoid accidental regressions
+        const highestTraktProgress = (() => {
+          if (traktProgress === undefined) return existingProgress.traktProgress;
+          if (existingProgress.traktProgress === undefined) return traktProgress;
+          return Math.max(traktProgress, existingProgress.traktProgress);
+        })();
+
+        const highestCurrentTime = (() => {
+          if (!exactTime || exactTime <= 0) return existingProgress.currentTime;
+          return Math.max(exactTime, existingProgress.currentTime);
+        })();
+
         const updatedProgress: WatchProgress = {
           ...existingProgress,
           traktSynced,
           traktLastSynced: traktSynced ? Date.now() : existingProgress.traktLastSynced,
-          traktProgress: traktProgress !== undefined ? traktProgress : existingProgress.traktProgress,
-          // Update current time with exact time if provided
-          ...(exactTime && exactTime > 0 && { currentTime: exactTime })
+          traktProgress: highestTraktProgress,
+          currentTime: highestCurrentTime,
         };
         await this.setWatchProgress(id, type, updatedProgress, episodeId);
       }

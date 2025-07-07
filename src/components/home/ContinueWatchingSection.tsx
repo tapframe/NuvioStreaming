@@ -116,10 +116,67 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         const episodeId = episodeIdParts.length > 0 ? episodeIdParts.join(':') : undefined;
         const progress = allProgress[key];
         
-        // Skip items that are more than 85% complete (effectively finished)
+        // For series, skip episodes that are essentially finished (≥85%)
+        // For movies we still include them so users can "Watch Again"
         const progressPercent = (progress.currentTime / progress.duration) * 100;
         
-        if (progressPercent >= 85) {
+        // Skip fully watched movies
+        if (type === 'movie' && progressPercent >= 85) {
+          continue;
+        }
+
+        if (type === 'series' && progressPercent >= 85) {
+          // Determine next episode ID by incrementing episode number
+          let nextSeason: number | undefined;
+          let nextEpisode: number | undefined;
+          let nextEpisodeId: string | undefined;
+
+          if (episodeId) {
+            // Pattern 1: s1e1
+            const match = episodeId.match(/s(\d+)e(\d+)/i);
+            if (match) {
+              const currentSeason = parseInt(match[1], 10);
+              const currentEpisode = parseInt(match[2], 10);
+              nextSeason = currentSeason;
+              nextEpisode = currentEpisode + 1;
+              nextEpisodeId = `s${nextSeason}e${nextEpisode}`;
+            } else {
+              // Pattern 2: id:season:episode
+              const parts = episodeId.split(':');
+              if (parts.length >= 2) {
+                const seasonNum = parseInt(parts[parts.length - 2], 10);
+                const episodeNum = parseInt(parts[parts.length - 1], 10);
+                if (!isNaN(seasonNum) && !isNaN(episodeNum)) {
+                  nextSeason = seasonNum;
+                  nextEpisode = episodeNum + 1;
+                  nextEpisodeId = `${id}:${nextSeason}:${nextEpisode}`;
+                }
+              }
+            }
+          }
+
+          // Push placeholder for next episode with 0% progress
+          if (nextEpisodeId !== undefined) {
+            const basicContent = await catalogService.getBasicContentDetails(type, id);
+            const nextEpisodeItem = {
+              ...basicContent,
+              id,
+              type,
+              progress: 0,
+              lastUpdated: progress.lastUpdated,
+              season: nextSeason,
+              episode: nextEpisode,
+              episodeTitle: `Episode ${nextEpisode}`,
+            } as ContinueWatchingItem;
+
+            // Store in latestEpisodes to ensure single entry per show
+            const existingLatest = latestEpisodes[id];
+            if (!existingLatest || existingLatest.lastUpdated < nextEpisodeItem.lastUpdated) {
+              latestEpisodes[id] = nextEpisodeItem;
+            }
+          }
+
+          // Skip adding the finished episode itself
           continue;
         }
         
@@ -411,15 +468,22 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
             {/* Content Details */}
             <View style={styles.contentDetails}>
               <View style={styles.titleRow}>
-                <Text 
-                  style={[styles.contentTitle, { color: currentTheme.colors.highEmphasis }]}
-                  numberOfLines={1}
-                >
-                  {item.name}
-                </Text>
-                <View style={[styles.progressBadge, { backgroundColor: currentTheme.colors.primary }]}>
-                  <Text style={styles.progressText}>{Math.round(item.progress)}%</Text>
-                </View>
+                {(() => {
+                  const isUpNext = item.progress === 0;
+                  return (
+                    <View style={styles.titleRow}>
+                      <Text 
+                        style={[styles.contentTitle, { color: currentTheme.colors.highEmphasis }]}
+                        numberOfLines={1}
+                      >
+                        {item.name}
+                      </Text>
+                      <View style={[styles.progressBadge, { backgroundColor: currentTheme.colors.primary }]}>
+                        <Text style={styles.progressText}>{isUpNext ? 'Up Next' : `${Math.round(item.progress)}%`}</Text>
+                      </View>
+                    </View>
+                  );
+                })()}
               </View>
 
               {/* Episode Info or Year */}
@@ -450,22 +514,24 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
               })()}
 
               {/* Progress Bar */}
-              <View style={styles.wideProgressContainer}>
-                <View style={styles.wideProgressTrack}>
-                <View 
-                  style={[
-                      styles.wideProgressBar, 
-                      { 
-                        width: `${item.progress}%`, 
-                        backgroundColor: currentTheme.colors.primary 
-                      }
-                  ]} 
-                />
+              {item.progress > 0 && (
+                <View style={styles.wideProgressContainer}>
+                  <View style={styles.wideProgressTrack}>
+                    <View 
+                      style={[
+                        styles.wideProgressBar, 
+                        { 
+                          width: `${item.progress}%`, 
+                          backgroundColor: currentTheme.colors.primary 
+                        }
+                      ]} 
+                    />
+                  </View>
+                  <Text style={[styles.progressLabel, { color: currentTheme.colors.textMuted }]}>
+                    {Math.round(item.progress)}% watched
+                  </Text>
                 </View>
-                <Text style={[styles.progressLabel, { color: currentTheme.colors.textMuted }]}>
-                  {Math.round(item.progress)}% watched
-                </Text>
-              </View>
+              )}
             </View>
           </TouchableOpacity>
         )}

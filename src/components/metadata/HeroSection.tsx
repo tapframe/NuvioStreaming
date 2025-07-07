@@ -143,11 +143,36 @@ const ActionButtons = React.memo(({
   }, [isWatched]);
 
   const finalPlayButtonText = useMemo(() => {
-    if (isWatched) {
+    if (!isWatched) {
+      return playButtonText;
+    }
+
+    // If content is a movie, keep existing "Watch Again" label
+    if (type === 'movie') {
       return 'Watch Again';
     }
-    return playButtonText;
-  }, [isWatched, playButtonText]);
+
+    // For series, attempt to show the next episode label (e.g., "Play S02E05")
+    if (type === 'series' && watchProgress?.episodeId) {
+      const parts = watchProgress.episodeId.split(':');
+      if (parts.length >= 3) {
+        const seasonNum = parseInt(parts[parts.length - 2], 10);
+        const episodeNum = parseInt(parts[parts.length - 1], 10);
+        if (!isNaN(seasonNum) && !isNaN(episodeNum)) {
+          const nextSeason = seasonNum;
+          const nextEpisode = episodeNum + 1;
+          const seasonStr = nextSeason.toString().padStart(2, '0');
+          const episodeStr = nextEpisode.toString().padStart(2, '0');
+          return `Play S${seasonStr}E${episodeStr}`;
+        }
+      }
+      // Fallback label if parsing fails
+      return 'Play Next Episode';
+    }
+
+    // Default fallback
+    return 'Play';
+  }, [isWatched, playButtonText, type, watchProgress]);
 
   return (
     <Animated.View style={[styles.actionButtons, animatedStyle]}>
@@ -157,7 +182,12 @@ const ActionButtons = React.memo(({
         activeOpacity={0.85}
       >
         <MaterialIcons 
-          name={isWatched ? "replay" : (playButtonText === 'Resume' ? "play-circle-outline" : "play-arrow")} 
+          name={(() => {
+            if (isWatched) {
+              return type === 'movie' ? 'replay' : 'play-arrow';
+            }
+            return playButtonText === 'Resume' ? 'play-circle-outline' : 'play-arrow';
+          })()} 
           size={24} 
           color={isWatched ? "#fff" : "#000"} 
         />
