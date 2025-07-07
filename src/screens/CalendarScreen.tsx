@@ -236,43 +236,6 @@ const CalendarScreen = () => {
     setFilteredEpisodes([]);
   }, []);
   
-  if (libraryItems.length === 0 && !libraryLoading) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
-        <StatusBar barStyle="light-content" />
-        
-        <View style={[styles.header, { borderBottomColor: currentTheme.colors.border }]}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <MaterialIcons name="arrow-back" size={24} color={currentTheme.colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>Calendar</Text>
-          <View style={{ width: 40 }} />
-        </View>
-        
-        <View style={styles.emptyLibraryContainer}>
-          <MaterialIcons name="video-library" size={64} color={currentTheme.colors.lightGray} />
-          <Text style={styles.emptyText}>
-            Your library is empty
-          </Text>
-          <Text style={styles.emptySubtext}>
-            Add series to your library to see their upcoming episodes in the calendar
-          </Text>
-          <TouchableOpacity 
-            style={styles.discoverButton}
-            onPress={() => navigation.navigate('MainTabs')}
-          >
-            <Text style={styles.discoverButtonText}>
-              Return to Home
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
-  
   if (loading && !refreshing) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
@@ -353,6 +316,7 @@ const CalendarScreen = () => {
           renderItem={renderEpisodeItem}
           renderSectionHeader={renderSectionHeader}
           contentContainerStyle={styles.listContent}
+          removeClippedSubviews={false}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
