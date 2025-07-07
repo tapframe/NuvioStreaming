@@ -1562,6 +1562,29 @@ export class TraktService {
       return false;
     }
   }
+
+  public async getWatchedEpisodesHistory(page: number = 1, limit: number = 100): Promise<any[]> {
+    await this.ensureInitialized();
+
+    const cacheKey = `history_episodes_${page}_${limit}`;
+    const lastSync = this.lastSyncTimes.get(cacheKey) || 0;
+    const now = Date.now();
+    if (now - lastSync < this.SYNC_DEBOUNCE_MS) {
+      // Return cached result if we fetched recently
+      return (this as any)[cacheKey] || [];
+    }
+
+    const endpoint = `/sync/history/episodes?page=${page}&limit=${limit}`;
+    try {
+      const data = await this.apiRequest<any[]>(endpoint, 'GET');
+      (this as any)[cacheKey] = data;
+      this.lastSyncTimes.set(cacheKey, now);
+      return data;
+    } catch (error) {
+      logger.error('[TraktService] Failed to fetch watched episodes history:', error);
+      return [];
+    }
+  }
 }
 
 // Export a singleton instance

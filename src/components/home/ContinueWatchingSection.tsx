@@ -254,6 +254,62 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       // Wait for all content to be processed
       await Promise.all(contentPromises);
       
+      // -------------------- TRAKT HISTORY INTEGRATION --------------------
+      try {
+        const traktService = TraktService.getInstance();
+        const isAuthed = await traktService.isAuthenticated();
+        if (isAuthed) {
+          const historyItems = await traktService.getWatchedEpisodesHistory(1, 200);
+          const latestWatchedByShow: Record<string, { season: number; episode: number; watchedAt: number }> = {};
+
+          for (const item of historyItems) {
+            if (item.type !== 'episode') continue;
+            const showImdb = item.show?.ids?.imdb ? `tt${item.show.ids.imdb.replace(/^tt/, '')}` : null;
+            if (!showImdb) continue;
+
+            const season = item.episode?.season;
+            const epNum = item.episode?.number;
+            if (season === undefined || epNum === undefined) continue;
+            const watchedAt = new Date(item.watched_at).getTime();
+
+            const existing = latestWatchedByShow[showImdb];
+            if (!existing || existing.watchedAt < watchedAt) {
+              latestWatchedByShow[showImdb] = { season, episode: epNum, watchedAt };
+            }
+          }
+
+          // Create placeholders for each show if not already present
+          for (const [showId, info] of Object.entries(latestWatchedByShow)) {
+            if (latestEpisodes[showId]) continue; // already handled via progress
+
+            const nextEpisode = info.episode + 1;
+            const nextEpisodeId = `${showId}:${info.season}:${nextEpisode}`;
+
+            try {
+              const basicContent = await catalogService.getBasicContentDetails('series', showId);
+              if (!basicContent) continue;
+
+              const placeholder: ContinueWatchingItem = {
+                ...basicContent,
+                id: showId,
+                type: 'series',
+                progress: 0,
+                lastUpdated: info.watchedAt,
+                season: info.season,
+                episode: nextEpisode,
+                episodeTitle: `Episode ${nextEpisode}`,
+              } as ContinueWatchingItem;
+
+              latestEpisodes[showId] = placeholder;
+            } catch (err) {
+              logger.error('Failed to build placeholder from history:', err);
+            }
+          }
+        }
+      } catch (err) {
+        logger.error('Error merging Trakt history:', err);
+      }
+      
       // Add the latest episodes for each series to the items list
       progressItems.push(...Object.values(latestEpisodes));
       

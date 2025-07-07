@@ -10,6 +10,8 @@ import { tmdbService } from '../../services/tmdbService';
 import { storageService } from '../../services/storageService';
 import { useFocusEffect } from '@react-navigation/native';
 import Animated, { FadeIn } from 'react-native-reanimated';
+import { TraktService } from '../../services/traktService';
+import { logger } from '../../utils/logger';
 
 interface SeriesContentProps {
   episodes: Episode[];
@@ -65,6 +67,46 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
         };
       }
     });
+    
+    // ---------------- Trakt watched-history integration ----------------
+    try {
+      const traktService = TraktService.getInstance();
+      const isAuthed = await traktService.isAuthenticated();
+      if (isAuthed && metadata?.id) {
+        const historyItems = await traktService.getWatchedEpisodesHistory(1, 400);
+
+        historyItems.forEach(item => {
+          if (item.type !== 'episode') return;
+
+          const showImdb = item.show?.ids?.imdb ? `tt${item.show.ids.imdb.replace(/^tt/, '')}` : null;
+          if (!showImdb || showImdb !== metadata.id) return;
+
+          const season = item.episode?.season;
+          const epNum = item.episode?.number;
+          if (season === undefined || epNum === undefined) return;
+
+          const episodeId = `${metadata.id}:${season}:${epNum}`;
+          const watchedAt = new Date(item.watched_at).getTime();
+
+          // Mark as 100% completed (use 1/1 to avoid divide-by-zero)
+          const traktProgressEntry = {
+            currentTime: 1,
+            duration: 1,
+            lastUpdated: watchedAt,
+          };
+
+          const existing = progress[episodeId];
+          const existingPercent = existing ? (existing.currentTime / existing.duration) * 100 : 0;
+
+          // Prefer local progress if it is already >=85%; otherwise use Trakt data
+          if (!existing || existingPercent < 85) {
+            progress[episodeId] = traktProgressEntry;
+          }
+        });
+      }
+    } catch (err) {
+      logger.error('[SeriesContent] Failed to merge Trakt history:', err);
+    }
     
     setEpisodeProgress(progress);
   };
@@ -799,8 +841,8 @@ const styles = StyleSheet.create({
   },
   completedBadge: {
     position: 'absolute',
-    bottom: 8,
-    right: 8,
+    top: 8,
+    left: 8,
     width: 20,
     height: 20,
     borderRadius: 10,
@@ -808,6 +850,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.3)',
+    zIndex: 2,
   },
 
   // Horizontal Layout Styles
@@ -935,8 +978,8 @@ const styles = StyleSheet.create({
   },
   completedBadgeHorizontal: {
     position: 'absolute',
-    bottom: 12,
-    right: 12,
+    top: 12,
+    left: 12,
     width: 24,
     height: 24,
     borderRadius: 12,
