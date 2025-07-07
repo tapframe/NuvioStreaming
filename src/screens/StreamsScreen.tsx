@@ -24,6 +24,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import { RootStackParamList, RootStackNavigationProp } from '../navigation/AppNavigator';
 import { useMetadata } from '../hooks/useMetadata';
+import { useMetadataAssets } from '../hooks/useMetadataAssets';
 import { useTheme } from '../contexts/ThemeContext';
 import { Stream } from '../types/metadata';
 import { tmdbService } from '../services/tmdbService';
@@ -273,6 +274,11 @@ export const StreamsScreen = () => {
     groupedEpisodes,
     imdbId,
   } = useMetadata({ id, type });
+
+  // Get backdrop from metadata assets
+  const setMetadataStub = useCallback(() => {}, []);
+  const memoizedSettings = useMemo(() => settings, [settings.logoSourcePreference, settings.tmdbLanguagePreference]);
+  const { bannerImage } = useMetadataAssets(metadata, id, type, imdbId, memoizedSettings, setMetadataStub);
 
   // Create styles using current theme colors
   const styles = React.useMemo(() => createStyles(colors), [colors]);
@@ -578,6 +584,7 @@ export const StreamsScreen = () => {
         episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined,
         imdbId: imdbId || undefined,
         availableStreams: streamsToPass,
+        backdrop: bannerImage || undefined,
       });
     } catch (error) {
       logger.error('[StreamsScreen] Error locking orientation before navigation:', error);
@@ -598,9 +605,10 @@ export const StreamsScreen = () => {
         episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined,
         imdbId: imdbId || undefined,
         availableStreams: streamsToPass,
+        backdrop: bannerImage || undefined,
       });
     }
-  }, [metadata, type, currentEpisode, navigation, id, selectedEpisode, imdbId, episodeStreams, groupedStreams]);
+  }, [metadata, type, currentEpisode, navigation, id, selectedEpisode, imdbId, episodeStreams, groupedStreams, bannerImage]);
 
   // Update handleStreamPress
   const handleStreamPress = useCallback(async (stream: Stream) => {

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, TouchableOpacity, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text } from 'react-native';
+import { View, TouchableOpacity, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, Image, StyleSheet } from 'react-native';
 import { VLCPlayer } from 'react-native-vlc-media-player';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
@@ -10,16 +10,19 @@ import { storageService } from '../../services/storageService';
 import { logger } from '../../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import AndroidVideoPlayer from './AndroidVideoPlayer';
 import { useTraktAutosync } from '../../hooks/useTraktAutosync';
 import { useTraktAutosyncSettings } from '../../hooks/useTraktAutosyncSettings';
+import { useMetadata } from '../../hooks/useMetadata';
+import { useSettings } from '../../hooks/useSettings';
 
 import { 
   DEFAULT_SUBTITLE_SIZE, 
   AudioTrack,
   TextTrack,
   ResizeModeType, 
-  WyzieSubtitle, 
+  WyzieSubtitle,
   SubtitleCue,
   RESUME_PREF_KEY,
   RESUME_PREF,
@@ -57,7 +60,8 @@ const VideoPlayer: React.FC = () => {
     type,
     episodeId,
     imdbId,
-    availableStreams: passedAvailableStreams
+    availableStreams: passedAvailableStreams,
+    backdrop
   } = route.params;
 
   // Initialize Trakt autosync
@@ -152,6 +156,24 @@ const VideoPlayer: React.FC = () => {
   const isMounted = useRef(true);
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null);
   const [isSyncingBeforeClose, setIsSyncingBeforeClose] = useState(false);
+  
+  // Get metadata to access logo (only if we have a valid id)
+  const shouldLoadMetadata = Boolean(id && type);
+  const metadataResult = useMetadata({ 
+    id: id || 'placeholder', 
+    type: type || 'movie' 
+  });
+  const { metadata, loading: metadataLoading } = shouldLoadMetadata ? metadataResult : { metadata: null, loading: false };
+  const { settings } = useSettings();
+  
+  // Logo animation values
+  const logoScaleAnim = useRef(new Animated.Value(0.8)).current;
+  const logoOpacityAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  
+  // Check if we have a logo to show
+  const hasLogo = metadata && metadata.logo && !metadataLoading;
+  
   // Small offset (in seconds) used to avoid seeking to the *exact* end of the
   // file which triggers the `onEnd` callback and causes playback to restart.
   const END_EPSILON = 0.3;
@@ -237,7 +259,51 @@ const VideoPlayer: React.FC = () => {
   }, []);
 
   const startOpeningAnimation = () => {
-    // Animation logic here
+    // Logo entrance animation
+    Animated.parallel([
+      Animated.timing(logoOpacityAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.spring(logoScaleAnim, {
+        toValue: 1,
+        tension: 50,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    
+    // Continuous pulse animation for the logo
+    const createPulseAnimation = () => {
+      return Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.05,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]);
+    };
+    
+    const loopPulse = () => {
+      createPulseAnimation().start(() => {
+        if (!isOpeningAnimationComplete) {
+          loopPulse();
+        }
+      });
+    };
+    
+    // Start pulsing after a short delay
+    setTimeout(() => {
+      if (!isOpeningAnimationComplete) {
+        loopPulse();
+      }
+    }, 800);
   };
 
   const completeOpeningAnimation = () => {
@@ -389,7 +455,6 @@ const VideoPlayer: React.FC = () => {
         // Calculate position as fraction
         const position = timeInSeconds / duration;
         vlcRef.current.seek(position);
-        
         // Clear seek state after Android seek
         setTimeout(() => {
           if (isMounted.current) {
@@ -400,12 +465,18 @@ const VideoPlayer: React.FC = () => {
           }
         }, 500);
       } else {
-        // iOS fallback - use seek prop
-        const position = timeInSeconds / duration;
-        setSeekPosition(position);
-        
+        // iOS (and other platforms) – prefer direct seek on the ref to avoid re-mounts caused by the `seek` prop
+        const position = timeInSeconds / duration; // VLC expects a 0-1 fraction
+        if (vlcRef.current && typeof vlcRef.current.seek === 'function') {
+          vlcRef.current.seek(position);
+        } else {
+          // Fallback to legacy behaviour only if direct seek is unavailable
+          setSeekPosition(position);
+        }
+
         setTimeout(() => {
           if (isMounted.current) {
+            // Reset temporary seek state
             setSeekPosition(null);
             isSeeking.current = false;
             if (DEBUG_MODE) {
@@ -967,6 +1038,25 @@ const VideoPlayer: React.FC = () => {
         ]}
         pointerEvents={isOpeningAnimationComplete ? 'none' : 'auto'}
       >
+        {backdrop && (
+          <Image
+            source={{ uri: backdrop }}
+            style={[StyleSheet.absoluteFill, { width: screenDimensions.width, height: screenDimensions.height }]}
+            resizeMode="cover"
+            blurRadius={0}
+          />
+        )}
+        <LinearGradient
+          colors={[
+            'rgba(0,0,0,0.3)',
+            'rgba(0,0,0,0.6)',
+            'rgba(0,0,0,0.8)',
+            'rgba(0,0,0,0.9)'
+          ]}
+          locations={[0, 0.3, 0.7, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+        
         <TouchableOpacity 
           style={styles.loadingCloseButton}
           onPress={handleClose}
@@ -976,8 +1066,28 @@ const VideoPlayer: React.FC = () => {
         </TouchableOpacity>
         
         <View style={styles.openingContent}>
-          <ActivityIndicator size="large" color="#E50914" />
-          <Text style={styles.openingText}>Loading video...</Text>
+          {hasLogo ? (
+            <Animated.View style={{
+              transform: [
+                { scale: Animated.multiply(logoScaleAnim, pulseAnim) }
+              ],
+              opacity: logoOpacityAnim,
+              alignItems: 'center',
+            }}>
+              <Image
+                source={{ uri: metadata.logo }}
+                style={{
+                  width: 300,
+                  height: 180,
+                  resizeMode: 'contain',
+                }}
+              />
+            </Animated.View>
+          ) : (
+            <>
+              <ActivityIndicator size="large" color="#E50914" />
+            </>
+          )}
         </View>
       </Animated.View>
 
@@ -1055,7 +1165,6 @@ const VideoPlayer: React.FC = () => {
                   resizeMode={resizeMode as any}
                   audioTrack={selectedAudioTrack ?? undefined}
                   textTrack={useCustomSubtitles ? -1 : (selectedTextTrack ?? undefined)}
-                  seek={Platform.OS === 'ios' ? (seekPosition ?? undefined) : undefined}
                   autoAspectRatio
                 />
               </TouchableOpacity>

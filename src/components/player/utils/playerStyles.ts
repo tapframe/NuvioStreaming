@@ -474,7 +474,6 @@ export const styles = StyleSheet.create({
   },
   openingContent: {
     padding: 20,
-    backgroundColor: 'rgba(0,0,0,0.85)',
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',

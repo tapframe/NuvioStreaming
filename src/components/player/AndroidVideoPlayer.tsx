@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, TouchableOpacity, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text } from 'react-native';
+import { View, TouchableOpacity, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, Image, StyleSheet } from 'react-native';
 import Video, { VideoRef, SelectedTrack, SelectedTrackType, BufferingStrategyType } from 'react-native-video';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
@@ -10,8 +10,11 @@ import { storageService } from '../../services/storageService';
 import { logger } from '../../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTraktAutosync } from '../../hooks/useTraktAutosync';
 import { useTraktAutosyncSettings } from '../../hooks/useTraktAutosyncSettings';
+import { useMetadata } from '../../hooks/useMetadata';
+import { useSettings } from '../../hooks/useSettings';
 
 import { 
   DEFAULT_SUBTITLE_SIZE, 
@@ -62,7 +65,8 @@ const AndroidVideoPlayer: React.FC = () => {
     type,
     episodeId,
     imdbId,
-    availableStreams: passedAvailableStreams
+    availableStreams: passedAvailableStreams,
+    backdrop
   } = route.params;
 
   // Initialize Trakt autosync
@@ -157,7 +161,25 @@ const AndroidVideoPlayer: React.FC = () => {
   const isMounted = useRef(true);
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null);
   const [isSyncingBeforeClose, setIsSyncingBeforeClose] = useState(false);
-  // Offset in seconds to avoid seeking to the exact end, which fires onEnd and resets.
+  // Get metadata to access logo (only if we have a valid id)
+  const shouldLoadMetadata = Boolean(id && type);
+  const metadataResult = useMetadata({ 
+    id: id || 'placeholder', 
+    type: type || 'movie' 
+  });
+  const { metadata, loading: metadataLoading } = shouldLoadMetadata ? metadataResult : { metadata: null, loading: false };
+  const { settings } = useSettings();
+  
+  // Logo animation values
+  const logoScaleAnim = useRef(new Animated.Value(0.8)).current;
+  const logoOpacityAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  
+  // Check if we have a logo to show
+  const hasLogo = metadata && metadata.logo && !metadataLoading;
+  
+  // Small offset (in seconds) used to avoid seeking to the *exact* end of the
+  // file which triggers the `onEnd` callback and causes playback to restart.
   const END_EPSILON = 0.3;
 
   const hideControls = () => {
@@ -241,7 +263,51 @@ const AndroidVideoPlayer: React.FC = () => {
   }, []);
 
   const startOpeningAnimation = () => {
-    // Animation logic here
+    // Logo entrance animation
+    Animated.parallel([
+      Animated.timing(logoOpacityAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.spring(logoScaleAnim, {
+        toValue: 1,
+        tension: 50,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    
+    // Continuous pulse animation for the logo
+    const createPulseAnimation = () => {
+      return Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.05,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]);
+    };
+    
+    const loopPulse = () => {
+      createPulseAnimation().start(() => {
+        if (!isOpeningAnimationComplete) {
+          loopPulse();
+        }
+      });
+    };
+    
+    // Start pulsing after a short delay
+    setTimeout(() => {
+      if (!isOpeningAnimationComplete) {
+        loopPulse();
+      }
+    }, 800);
   };
 
   const completeOpeningAnimation = () => {
@@ -951,6 +1017,25 @@ const AndroidVideoPlayer: React.FC = () => {
         ]}
         pointerEvents={isOpeningAnimationComplete ? 'none' : 'auto'}
       >
+        {backdrop && (
+          <Image
+            source={{ uri: backdrop }}
+            style={[StyleSheet.absoluteFill, { width: screenDimensions.width, height: screenDimensions.height }]}
+            resizeMode="cover"
+            blurRadius={0}
+          />
+        )}
+        <LinearGradient
+          colors={[
+            'rgba(0,0,0,0.3)',
+            'rgba(0,0,0,0.6)',
+            'rgba(0,0,0,0.8)',
+            'rgba(0,0,0,0.9)'
+          ]}
+          locations={[0, 0.3, 0.7, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+        
         <TouchableOpacity 
           style={styles.loadingCloseButton}
           onPress={handleClose}
@@ -960,8 +1045,28 @@ const AndroidVideoPlayer: React.FC = () => {
         </TouchableOpacity>
         
         <View style={styles.openingContent}>
+          {hasLogo ? (
+            <Animated.View style={{
+              transform: [
+                { scale: Animated.multiply(logoScaleAnim, pulseAnim) }
+              ],
+              opacity: logoOpacityAnim,
+              alignItems: 'center',
+            }}>
+              <Image
+                source={{ uri: metadata.logo }}
+                style={{
+                  width: 300,
+                  height: 180,
+                  resizeMode: 'contain',
+                }}
+              />
+            </Animated.View>
+          ) : (
+            <>
           <ActivityIndicator size="large" color="#E50914" />
-          <Text style={styles.openingText}>Loading video...</Text>
+            </>
+          )}
         </View>
       </Animated.View>
 

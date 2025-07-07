@@ -66,6 +66,7 @@ export type RootStackParamList = {
     type: string; 
     stream: Stream;
     episodeId?: string;
+    backdrop?: string;
   };
   Player: { 
     uri: string; 
@@ -82,6 +83,7 @@ export type RootStackParamList = {
     episodeId?: string;
     imdbId?: string;
     availableStreams?: { [providerId: string]: { streams: any[]; addonName: string } };
+    backdrop?: string;
   };
   Catalog: { id: string; type: string; addonId?: string; name?: string; genreFilter?: string };
   Credits: { mediaId: string; mediaType: string };
