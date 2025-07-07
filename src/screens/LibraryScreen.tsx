@@ -883,7 +883,7 @@ const LibraryScreen = () => {
       <View style={{ flex: 1 }}>
         {/* Header Section with proper top spacing */}
         <View style={[styles.header, { height: headerHeight, paddingTop: topSpacing }]}>
-          <View style={styles.headerContent}>
+          <View style={[styles.headerContent, showTraktContent && { justifyContent: 'flex-start' }]}>
             {showTraktContent ? (
               <>
                 <TouchableOpacity
@@ -903,15 +903,12 @@ const LibraryScreen = () => {
                     color={currentTheme.colors.white} 
                   />
                 </TouchableOpacity>
-                <View style={styles.headerTitleContainer}>
-                  <Text style={[styles.headerTitle, { color: currentTheme.colors.white }]}>
+                <Text style={[styles.headerTitle, { color: currentTheme.colors.white, fontSize: 24, marginLeft: 16 }]}>
                     {selectedTraktFolder 
                       ? traktFolders.find(f => f.id === selectedTraktFolder)?.name || 'Collection'
                       : 'Trakt Collection'
                     }
-                  </Text>
-                </View>
-                <View style={styles.headerSpacer} />
+                </Text>
               </>
             ) : (
               <>
