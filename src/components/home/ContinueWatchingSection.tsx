@@ -556,9 +556,9 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                         {item.name}
                       </Text>
                       {isUpNext && (
-                        <View style={[styles.progressBadge, { backgroundColor: currentTheme.colors.primary }]}>
+                      <View style={[styles.progressBadge, { backgroundColor: currentTheme.colors.primary }]}>
                           <Text style={styles.progressText}>Up Next</Text>
-                        </View>
+                      </View>
                       )}
                     </View>
                   );

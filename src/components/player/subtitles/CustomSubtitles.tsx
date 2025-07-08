@@ -20,16 +20,17 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
   const inverseScale = 1 / zoomScale;
   return (
     <View
-      style={[
-        styles.customSubtitleContainer,
-        {
-          transform: [{ scale: inverseScale }],
-        },
-      ]}
+      style={styles.customSubtitleContainer}
       pointerEvents="none"
     >
       <View style={styles.customSubtitleWrapper}>
-        <Text style={[styles.customSubtitleText, { fontSize: subtitleSize }]}>
+        <Text style={[
+          styles.customSubtitleText, 
+          { 
+            fontSize: subtitleSize * inverseScale,
+            transform: [{ scale: inverseScale }],
+          }
+        ]}>
           {currentSubtitle}
         </Text>
       </View>

@@ -502,13 +502,13 @@ const AndroidVideoPlayer: React.FC = () => {
     
     const currentTimeInSeconds = data.currentTime;
     
-    // Only update if there's a significant change to avoid unnecessary updates
-    if (Math.abs(currentTimeInSeconds - currentTime) > 0.5) {
+    // Update time more frequently for subtitle synchronization (0.1s threshold)
+    if (Math.abs(currentTimeInSeconds - currentTime) > 0.1) {
       safeSetState(() => setCurrentTime(currentTimeInSeconds));
       const progressPercent = duration > 0 ? currentTimeInSeconds / duration : 0;
       Animated.timing(progressAnim, {
         toValue: progressPercent,
-        duration: 250,
+        duration: 100,
         useNativeDriver: false,
       }).start();
       const bufferedTime = data.playableDuration || currentTimeInSeconds;
@@ -1150,7 +1150,7 @@ const AndroidVideoPlayer: React.FC = () => {
                   playWhenInactive={false}
                   ignoreSilentSwitch="ignore"
                   mixWithOthers="inherit"
-                  progressUpdateInterval={1000}
+                  progressUpdateInterval={250}
                 />
               </TouchableOpacity>
             </View>
