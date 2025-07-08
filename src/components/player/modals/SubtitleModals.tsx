@@ -128,6 +128,12 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
     };
   }, [showSubtitleLanguageModal]);
 
+  React.useEffect(() => {
+    if (showSubtitleLanguageModal && !isLoadingSubtitleList && availableSubtitles.length === 0) {
+      fetchAvailableSubtitles();
+    }
+  }, [showSubtitleLanguageModal]);
+
   const modalStyle = useAnimatedStyle(() => ({
     opacity: modalOpacity.value,
   }));
@@ -371,6 +377,48 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                   }}>
                     Subtitle Source
                   </Text>
+                  
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: 'rgba(34, 197, 94, 0.08)',
+                      borderRadius: 20,
+                      padding: 20,
+                      borderWidth: 2,
+                      borderColor: 'rgba(34, 197, 94, 0.4)',
+                      marginBottom: 12,
+                    }}
+                    onPress={() => fetchAvailableSubtitles()}
+                  >
+                    <View style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{
+                          color: '#fff',
+                          fontSize: 16,
+                          fontWeight: '700',
+                          marginBottom: 8,
+                        }}>
+                          Search Online Subtitles
+                        </Text>
+                        <View style={{
+                          flexDirection: 'row',
+                          flexWrap: 'wrap',
+                          gap: 6,
+                        }}>
+                          <SubtitleBadge 
+                            text="WYZE" 
+                            color="#22C55E" 
+                            bgColor="rgba(34, 197, 94, 0.15)"
+                            icon="cloud-download"
+                          />
+                        </View>
+                      </View>
+                      <MaterialIcons name="cloud-download" size={24} color="#22C55E" />
+                    </View>
+                  </TouchableOpacity>
                   
                   <TouchableOpacity
                     style={{
@@ -716,49 +764,244 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                       </Text>
                     </View>
 
-                    {availableSubtitles.map((sub) => (
-                      <View key={sub.id} style={{ marginBottom: 12, width: '100%' }}>
-                        <TouchableOpacity
-                          style={{
-                            backgroundColor: 'rgba(34, 197, 94, 0.08)',
-                            borderRadius: 20,
-                            padding: 20,
-                            borderWidth: 2,
-                            borderColor: 'rgba(34, 197, 94, 0.4)',
-                            width: '100%',
-                          }}
-                          onPress={() => {
-                            loadWyzieSubtitle(sub);
-                            handleLanguageClose();
-                          }}
-                          activeOpacity={0.85}
-                        >
-                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                            <View style={{ flex: 1, marginRight: 16 }}>
-                              <Text style={{
-                                color: '#fff',
-                                fontSize: 16,
-                                fontWeight: '700',
-                                letterSpacing: -0.2,
-                                marginBottom: 4,
+                    {availableSubtitles.map((sub) => {
+                      const isCustomSelected = useCustomSubtitles && customSubtitles.length > 0;
+                      const isThisSubSelected = isCustomSelected; // Since we only load one custom sub at a time
+                      
+                      return (
+                        <View key={sub.id} style={{ marginBottom: 12, width: '100%' }}>
+                          <TouchableOpacity
+                            style={{
+                              backgroundColor: isThisSubSelected 
+                                ? 'rgba(34, 197, 94, 0.15)' 
+                                : 'rgba(34, 197, 94, 0.08)',
+                              borderRadius: 20,
+                              padding: 20,
+                              borderWidth: 2,
+                              borderColor: isThisSubSelected 
+                                ? 'rgba(34, 197, 94, 0.6)' 
+                                : 'rgba(34, 197, 94, 0.4)',
+                              width: '100%',
+                              elevation: isThisSubSelected ? 8 : 3,
+                              shadowColor: isThisSubSelected ? '#22C55E' : '#000',
+                              shadowOffset: { width: 0, height: isThisSubSelected ? 4 : 2 },
+                              shadowOpacity: isThisSubSelected ? 0.3 : 0.1,
+                              shadowRadius: isThisSubSelected ? 12 : 6,
+                            }}
+                            onPress={() => {
+                              loadWyzieSubtitle(sub);
+                              handleLanguageClose();
+                            }}
+                            activeOpacity={0.85}
+                            disabled={isLoadingSubtitles}
+                          >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                              <View style={{ flex: 1, marginRight: 16 }}>
+                                <View style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  marginBottom: 8,
+                                  gap: 12,
+                                }}>
+                                  <Text style={{
+                                    color: isThisSubSelected ? '#fff' : 'rgba(255, 255, 255, 0.95)',
+                                    fontSize: 16,
+                                    fontWeight: '700',
+                                    letterSpacing: -0.2,
+                                    flex: 1,
+                                  }}>
+                                    {sub.display}
+                                  </Text>
+                                  
+                                  {isThisSubSelected && (
+                                    <View 
+                                      style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        backgroundColor: 'rgba(34, 197, 94, 0.25)',
+                                        paddingHorizontal: 10,
+                                        paddingVertical: 5,
+                                        borderRadius: 14,
+                                        borderWidth: 1,
+                                        borderColor: 'rgba(34, 197, 94, 0.5)',
+                                      }}
+                                    >
+                                      <MaterialIcons name="check-circle" size={12} color="#22C55E" />
+                                      <Text style={{
+                                        color: '#22C55E',
+                                        fontSize: 10,
+                                        fontWeight: '800',
+                                        marginLeft: 3,
+                                        letterSpacing: 0.3,
+                                      }}>
+                                        LOADED
+                                      </Text>
+                                    </View>
+                                  )}
+                                </View>
+                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                                  <SubtitleBadge 
+                                    text={formatLanguage(sub.language)} 
+                                    color="#22C55E" 
+                                    bgColor="rgba(34, 197, 94, 0.15)"
+                                  />
+                                  {isThisSubSelected && (
+                                    <SubtitleBadge 
+                                      text="ACTIVE" 
+                                      color="#22C55E" 
+                                      bgColor="rgba(34, 197, 94, 0.2)"
+                                      icon="play-circle-outline"
+                                    />
+                                  )}
+                                </View>
+                              </View>
+                              
+                              <View style={{
+                                width: 48,
+                                height: 48,
+                                borderRadius: 24,
+                                backgroundColor: isThisSubSelected 
+                                  ? 'rgba(34, 197, 94, 0.15)' 
+                                  : 'rgba(255, 255, 255, 0.05)',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                borderWidth: 2,
+                                borderColor: isThisSubSelected 
+                                  ? 'rgba(34, 197, 94, 0.3)' 
+                                  : 'rgba(255, 255, 255, 0.1)',
                               }}>
-                                {sub.display}
-                              </Text>
-                              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                                <SubtitleBadge 
-                                  text={formatLanguage(sub.language)} 
-                                  color="#22C55E" 
-                                  bgColor="rgba(34, 197, 94, 0.15)"
-                                />
+                                {isLoadingSubtitles ? (
+                                  <ActivityIndicator size="small" color="#22C55E" />
+                                ) : (
+                                  <MaterialIcons 
+                                    name={isThisSubSelected ? "check-circle" : "cloud-download"} 
+                                    size={24} 
+                                    color={isThisSubSelected ? "#22C55E" : "rgba(255,255,255,0.6)"} 
+                                  />
+                                )}
                               </View>
                             </View>
-                            <MaterialIcons name="cloud-download" size={24} color="#22C55E" />
-                          </View>
-                        </TouchableOpacity>
-                      </View>
-                    ))}
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    })}
                   </>
                 )}
+
+                {/* No Subtitles Option */}
+                <View style={{ marginTop: 24, marginBottom: 12, width: '100%' }}>
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: selectedTextTrack === -1 && !useCustomSubtitles 
+                        ? 'rgba(239, 68, 68, 0.15)' 
+                        : 'rgba(107, 114, 128, 0.08)',
+                      borderRadius: 20,
+                      padding: 20,
+                      borderWidth: 2,
+                      borderColor: selectedTextTrack === -1 && !useCustomSubtitles 
+                        ? 'rgba(239, 68, 68, 0.4)' 
+                        : 'rgba(107, 114, 128, 0.3)',
+                      elevation: selectedTextTrack === -1 && !useCustomSubtitles ? 8 : 3,
+                      shadowColor: selectedTextTrack === -1 && !useCustomSubtitles ? '#EF4444' : '#000',
+                      shadowOffset: { width: 0, height: selectedTextTrack === -1 && !useCustomSubtitles ? 4 : 2 },
+                      shadowOpacity: selectedTextTrack === -1 && !useCustomSubtitles ? 0.3 : 0.1,
+                      shadowRadius: selectedTextTrack === -1 && !useCustomSubtitles ? 12 : 6,
+                      width: '100%',
+                    }}
+                    onPress={() => {
+                      selectTextTrack(-1);
+                      handleLanguageClose();
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <View style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      width: '100%',
+                    }}>
+                      <View style={{ flex: 1, marginRight: 16 }}>
+                        <View style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          marginBottom: 8,
+                          gap: 12,
+                        }}>
+                          <Text style={{
+                            color: selectedTextTrack === -1 && !useCustomSubtitles ? '#fff' : 'rgba(255, 255, 255, 0.95)',
+                            fontSize: 16,
+                            fontWeight: '700',
+                            letterSpacing: -0.2,
+                            flex: 1,
+                          }}>
+                            No Subtitles
+                          </Text>
+                          
+                          {selectedTextTrack === -1 && !useCustomSubtitles && (
+                            <View 
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                backgroundColor: 'rgba(239, 68, 68, 0.25)',
+                                paddingHorizontal: 10,
+                                paddingVertical: 5,
+                                borderRadius: 14,
+                                borderWidth: 1,
+                                borderColor: 'rgba(239, 68, 68, 0.5)',
+                              }}
+                            >
+                              <MaterialIcons name="visibility-off" size={12} color="#EF4444" />
+                              <Text style={{
+                                color: '#EF4444',
+                                fontSize: 10,
+                                fontWeight: '800',
+                                marginLeft: 3,
+                                letterSpacing: 0.3,
+                              }}>
+                                ACTIVE
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                        
+                        <View style={{
+                          flexDirection: 'row',
+                          flexWrap: 'wrap',
+                          gap: 6,
+                          alignItems: 'center',
+                        }}>
+                          <SubtitleBadge 
+                            text="DISABLED" 
+                            color="#6B7280" 
+                            bgColor="rgba(107, 114, 128, 0.15)"
+                            icon="visibility-off"
+                          />
+                        </View>
+                      </View>
+                      
+                      <View style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: 24,
+                        backgroundColor: selectedTextTrack === -1 && !useCustomSubtitles 
+                          ? 'rgba(239, 68, 68, 0.15)' 
+                          : 'rgba(255, 255, 255, 0.05)',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        borderWidth: 2,
+                        borderColor: selectedTextTrack === -1 && !useCustomSubtitles 
+                          ? 'rgba(239, 68, 68, 0.3)' 
+                          : 'rgba(255, 255, 255, 0.1)',
+                      }}>
+                        <MaterialIcons 
+                          name={selectedTextTrack === -1 && !useCustomSubtitles ? "check-circle" : "visibility-off"} 
+                          size={24} 
+                          color={selectedTextTrack === -1 && !useCustomSubtitles ? "#EF4444" : "rgba(255,255,255,0.6)"} 
+                        />
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                </View>
               </View>
             </ScrollView>
           </BlurView>
