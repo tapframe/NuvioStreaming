@@ -530,7 +530,7 @@ export const styles = StyleSheet.create({
   },
   customSubtitleContainer: {
     position: 'absolute',
-    bottom: 40, // Position above controls and progress bar
+    bottom: 20, // Position lower, closer to bottom
     left: 20,
     right: 20,
     alignItems: 'center',

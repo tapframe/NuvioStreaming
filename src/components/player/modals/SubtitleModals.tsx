@@ -169,28 +169,29 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
             contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
             showsVerticalScrollIndicator={false}
           >
-            {/* Font Size Section */}
-            <View style={{ marginBottom: 30 }}>
-              <Text style={{
-                color: 'rgba(255, 255, 255, 0.7)',
-                fontSize: 14,
-                fontWeight: '600',
-                marginBottom: 15,
-                textTransform: 'uppercase',
-                letterSpacing: 0.5,
-              }}>
-                Font Size
-              </Text>
-              
-              <View style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                borderRadius: 16,
-                padding: 16,
-              }}>
-                <TouchableOpacity
+            {/* Font Size Section - Only show for custom subtitles */}
+            {useCustomSubtitles && (
+              <View style={{ marginBottom: 30 }}>
+                <Text style={{
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  fontSize: 14,
+                  fontWeight: '600',
+                  marginBottom: 15,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                }}>
+                  Font Size
+                </Text>
+                
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: 16,
+                  padding: 16,
+                }}>
+                  <TouchableOpacity
                   style={{
                     width: 40,
                     height: 40,
@@ -226,10 +227,12 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                   <MaterialIcons name="add" size={20} color="#FFFFFF" />
                 </TouchableOpacity>
               </View>
-            </View>
+              </View>
+            )}
 
-            {/* Background Toggle Section */}
-            <View style={{ marginBottom: 30 }}>
+            {/* Background Toggle Section - Only show for custom subtitles */}
+            {useCustomSubtitles && (
+              <View style={{ marginBottom: 30 }}>
               <Text style={{
                 color: 'rgba(255, 255, 255, 0.7)',
                 fontSize: 14,
@@ -277,7 +280,8 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                   }} />
                 </TouchableOpacity>
               </View>
-            </View>
+              </View>
+            )}
 
             {/* Built-in Subtitles */}
             {vlcTextTracks.length > 0 && (
