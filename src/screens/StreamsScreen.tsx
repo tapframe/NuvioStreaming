@@ -837,48 +837,6 @@ export const StreamsScreen = () => {
     const streams = type === 'series' ? episodeStreams : groupedStreams;
     const installedAddons = stremioService.getInstalledAddons();
 
-    // Helper function to extract quality as a number for sorting
-    const getQualityNumeric = (title: string | undefined): number => {
-      if (!title) return 0;
-      
-      // First try to match quality with "p" (e.g., "1080p", "720p")
-      const matchWithP = title.match(/(\d+)p/i);
-      if (matchWithP) {
-        return parseInt(matchWithP[1], 10);
-      }
-      
-      // Then try to match standalone quality numbers at the end of the title
-      const matchAtEnd = title.match(/\b(\d{3,4})\s*$/);
-      if (matchAtEnd) {
-        const quality = parseInt(matchAtEnd[1], 10);
-        // Only return if it looks like a video quality (between 240 and 8000)
-        if (quality >= 240 && quality <= 8000) {
-          return quality;
-        }
-      }
-      
-      // Try to match quality patterns anywhere in the title with common formats
-      const qualityPatterns = [
-        /\b(\d{3,4})p\b/i,  // 1080p, 720p, etc.
-        /\b(\d{3,4})\s*$/,   // 1080, 720 at end
-        /\s(\d{3,4})\s/,     // 720 surrounded by spaces
-        /-\s*(\d{3,4})\s*$/,  // -720 at end
-        /\b(240|360|480|720|1080|1440|2160|4320|8000)\b/i // specific quality values
-      ];
-      
-      for (const pattern of qualityPatterns) {
-        const match = title.match(pattern);
-        if (match) {
-          const quality = parseInt(match[1], 10);
-          if (quality >= 240 && quality <= 8000) {
-            return quality;
-          }
-        }
-      }
-      
-      return 0;
-    };
-
     // Filter streams by selected provider - only if not "all"
     const filteredEntries = Object.entries(streams)
       .filter(([addonId]) => {
@@ -900,17 +858,10 @@ export const StreamsScreen = () => {
         return 0;
       })
       .map(([addonId, { addonName, streams: providerStreams }]) => {
-        // Sort streams by quality if possible
-        const sortedProviderStreams = [...providerStreams].sort((a, b) => {
-          const qualityA = getQualityNumeric(a.name || a.title);
-          const qualityB = getQualityNumeric(b.name || b.title);
-          return qualityB - qualityA; // Sort descending
-        });
-        
         return {
           title: addonName,
           addonId,
-          data: sortedProviderStreams
+          data: providerStreams
         };
       });
       
