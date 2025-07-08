@@ -30,12 +30,12 @@ import {
 } from './utils/playerTypes';
 import { safeDebugLog, parseSRT, DEBUG_MODE, formatTime } from './utils/playerUtils';
 import { styles } from './utils/playerStyles';
-import SubtitleModals from './modals/SubtitleModals';
-import AudioTrackModal from './modals/AudioTrackModal';
+import { SubtitleModals } from './modals/SubtitleModals';
+import { AudioTrackModal } from './modals/AudioTrackModal';
 import ResumeOverlay from './modals/ResumeOverlay';
 import PlayerControls from './controls/PlayerControls';
 import CustomSubtitles from './subtitles/CustomSubtitles';
-import SourcesModal from './modals/SourcesModal';
+import { SourcesModal } from './modals/SourcesModal';
 
 const VideoPlayer: React.FC = () => {
   // If on Android, use the AndroidVideoPlayer component
