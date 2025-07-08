@@ -1195,7 +1195,6 @@ const AndroidVideoPlayer: React.FC = () => {
             handleProgressBarDragEnd={handleProgressBarDragEnd}
             buffered={buffered}
             formatTime={formatTime}
-            seekToTime={seekToTime}
           />
           
           <CustomSubtitles
