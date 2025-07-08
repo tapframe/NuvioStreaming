@@ -141,6 +141,7 @@ const VideoPlayer: React.FC = () => {
   const [currentSubtitle, setCurrentSubtitle] = useState<string>('');
   const [subtitleSize, setSubtitleSize] = useState<number>(DEFAULT_SUBTITLE_SIZE);
   const [useCustomSubtitles, setUseCustomSubtitles] = useState<boolean>(false);
+  const [subtitleBackground, setSubtitleBackground] = useState<boolean>(true); // Add missing state
   const [isLoadingSubtitles, setIsLoadingSubtitles] = useState<boolean>(false);
   const [availableSubtitles, setAvailableSubtitles] = useState<WyzieSubtitle[]>([]);
   const [showSubtitleLanguageModal, setShowSubtitleLanguageModal] = useState<boolean>(false);
@@ -903,13 +904,19 @@ const VideoPlayer: React.FC = () => {
   }, []);
 
   const increaseSubtitleSize = () => {
-    const newSize = Math.min(subtitleSize + 2, 32);
+    const newSize = Math.min(subtitleSize + 2, 40);
+    setSubtitleSize(newSize);
     saveSubtitleSize(newSize);
   };
 
   const decreaseSubtitleSize = () => {
-    const newSize = Math.max(subtitleSize - 2, 8);
+    const newSize = Math.max(subtitleSize - 2, 12);
+    setSubtitleSize(newSize);
     saveSubtitleSize(newSize);
+  };
+  
+  const toggleSubtitleBackground = () => {
+    setSubtitleBackground(prev => !prev);
   };
 
   useEffect(() => {
@@ -1204,6 +1211,7 @@ const VideoPlayer: React.FC = () => {
             handleProgressBarDragEnd={handleProgressBarDragEnd}
             buffered={buffered}
             formatTime={formatTime}
+            seekToTime={seekToTime}
           />
           
           <CustomSubtitles
@@ -1211,6 +1219,7 @@ const VideoPlayer: React.FC = () => {
             currentSubtitle={currentSubtitle}
             subtitleSize={subtitleSize}
             zoomScale={zoomScale}
+            subtitleBackground={subtitleBackground}
           />
 
           <ResumeOverlay
@@ -1246,11 +1255,13 @@ const VideoPlayer: React.FC = () => {
         selectedTextTrack={selectedTextTrack}
         useCustomSubtitles={useCustomSubtitles}
         subtitleSize={subtitleSize}
+        subtitleBackground={subtitleBackground}
         fetchAvailableSubtitles={fetchAvailableSubtitles}
         loadWyzieSubtitle={loadWyzieSubtitle}
         selectTextTrack={selectTextTrack}
         increaseSubtitleSize={increaseSubtitleSize}
         decreaseSubtitleSize={decreaseSubtitleSize}
+        toggleSubtitleBackground={toggleSubtitleBackground}
       />
       
       <SourcesModal

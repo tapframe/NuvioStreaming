@@ -1,9 +1,10 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, Animated, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, Animated, StyleSheet, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { styles } from '../utils/playerStyles';
 import { getTrackDisplayName } from '../utils/playerUtils';
+import { SkiaProgressSlider } from './SkiaProgressSlider';
 
 interface PlayerControlsProps {
   showControls: boolean;
@@ -39,7 +40,10 @@ interface PlayerControlsProps {
   handleProgressBarDragEnd: () => void;
   buffered: number;
   formatTime: (seconds: number) => string;
+  seekToTime?: (time: number) => void;
 }
+
+const { width: screenWidth } = Dimensions.get('window');
 
 export const PlayerControls: React.FC<PlayerControlsProps> = ({
   showControls,
@@ -75,63 +79,61 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   handleProgressBarDragEnd,
   buffered,
   formatTime,
+  seekToTime,
 }) => {
+  // State for tracking preview time during dragging
+  const [previewTime, setPreviewTime] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Calculate slider width based on screen width minus padding
+  const sliderWidth = screenWidth - 40; // 20px padding on each side
+
+  const handleSeek = (time: number) => {
+    if (seekToTime) {
+      seekToTime(time);
+    }
+  };
+
+  const handleSeekPreview = (time: number) => {
+    setPreviewTime(time);
+  };
+
+  const handleSeekStart = () => {
+    setIsDragging(true);
+    handleProgressBarDragStart();
+  };
+
+  const handleSeekEnd = (time: number) => {
+    setIsDragging(false);
+    setPreviewTime(null);
+    handleProgressBarDragEnd();
+    handleSeek(time);
+  };
+
+  // Determine which time to display (preview time while dragging, otherwise current time)
+  const displayTime = isDragging && previewTime !== null ? previewTime : currentTime;
+
   return (
     <Animated.View
       style={[StyleSheet.absoluteFill, { opacity: fadeAnim }]}
       pointerEvents={showControls ? 'auto' : 'none'}
     >
-      {/* Progress bar with enhanced touch handling */}
+      {/* Progress bar with Skia slider */}
       <View style={styles.sliderContainer}>
-        <View
-          style={styles.progressTouchArea}
-          onTouchStart={handleProgressBarDragStart}
-          onTouchMove={handleProgressBarDragMove}
-          onTouchEnd={handleProgressBarDragEnd}
-        >
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={handleProgressBarTouch}
-            style={{width: '100%'}}
-          >
-            <View 
-              ref={progressBarRef}
-              style={styles.progressBarContainer}
-            >
-              {/* Buffered Progress */}
-              <View style={[styles.bufferProgress, { 
-                width: `${(buffered / (duration || 1)) * 100}%`
-              }]} />
-              {/* Animated Progress */}
-              <Animated.View 
-                style={[
-                  styles.progressBarFill, 
-                  { 
-                    width: progressAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ['0%', '100%']
-                    })
-                  }
-                ]} 
-              />
-            </View>
-            
-            {/* Progress Thumb - Moved outside the progressBarContainer */}
-            <Animated.View 
-              style={[
-                styles.progressThumb,
-                { 
-                  left: progressAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0%', '100%']
-                  })
-                }
-              ]} 
-            />
-          </TouchableOpacity>
-        </View>
+        <SkiaProgressSlider
+          currentTime={currentTime}
+          duration={duration}
+          buffered={buffered}
+          onSeek={handleSeek}
+          onSeekStart={handleSeekStart}
+          onSeekEnd={handleSeekEnd}
+          onSeekPreview={handleSeekPreview}
+          width={sliderWidth}
+        />
         <View style={styles.timeDisplay}>
-          <Text style={styles.duration}>{formatTime(currentTime)}</Text>
+          <Text style={[styles.duration, isDragging && { color: '#E50914' }]}>
+            {formatTime(displayTime)}
+          </Text>
           <Text style={styles.duration}>{formatTime(duration)}</Text>
         </View>
       </View>
