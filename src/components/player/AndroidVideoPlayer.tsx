@@ -145,6 +145,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const [customSubtitles, setCustomSubtitles] = useState<SubtitleCue[]>([]);
   const [currentSubtitle, setCurrentSubtitle] = useState<string>('');
   const [subtitleSize, setSubtitleSize] = useState<number>(DEFAULT_SUBTITLE_SIZE);
+  const [subtitleBackground, setSubtitleBackground] = useState<boolean>(true);
   const [useCustomSubtitles, setUseCustomSubtitles] = useState<boolean>(false);
   const [isLoadingSubtitles, setIsLoadingSubtitles] = useState<boolean>(false);
   const [availableSubtitles, setAvailableSubtitles] = useState<WyzieSubtitle[]>([]);
@@ -895,6 +896,10 @@ const AndroidVideoPlayer: React.FC = () => {
     saveSubtitleSize(newSize);
   };
 
+  const toggleSubtitleBackground = () => {
+    setSubtitleBackground(!subtitleBackground);
+  };
+
   useEffect(() => {
     if (pendingSeek && isPlayerReady && isVideoLoaded && duration > 0) {
       logger.log(`[AndroidVideoPlayer] Player ready after source change, seeking to position: ${pendingSeek.position}s out of ${duration}s total`);
@@ -1196,6 +1201,7 @@ const AndroidVideoPlayer: React.FC = () => {
             useCustomSubtitles={useCustomSubtitles}
             currentSubtitle={currentSubtitle}
             subtitleSize={subtitleSize}
+            subtitleBackground={subtitleBackground}
             zoomScale={zoomScale}
           />
 
@@ -1232,11 +1238,13 @@ const AndroidVideoPlayer: React.FC = () => {
         selectedTextTrack={selectedTextTrack}
         useCustomSubtitles={useCustomSubtitles}
         subtitleSize={subtitleSize}
+        subtitleBackground={subtitleBackground}
         fetchAvailableSubtitles={fetchAvailableSubtitles}
         loadWyzieSubtitle={loadWyzieSubtitle}
         selectTextTrack={selectTextTrack}
         increaseSubtitleSize={increaseSubtitleSize}
         decreaseSubtitleSize={decreaseSubtitleSize}
+        toggleSubtitleBackground={toggleSubtitleBackground}
       />
       
       <SourcesModal

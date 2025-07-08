@@ -537,7 +537,6 @@ export const styles = StyleSheet.create({
     zIndex: 1500, // Higher z-index to appear above other elements
   },
   customSubtitleWrapper: {
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     padding: 10,
     borderRadius: 5,
   },

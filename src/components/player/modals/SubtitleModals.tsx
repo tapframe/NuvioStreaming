@@ -24,11 +24,13 @@ interface SubtitleModalsProps {
   selectedTextTrack: number;
   useCustomSubtitles: boolean;
   subtitleSize: number;
+  subtitleBackground: boolean;
   fetchAvailableSubtitles: () => void;
   loadWyzieSubtitle: (subtitle: WyzieSubtitle) => void;
   selectTextTrack: (trackId: number) => void;
   increaseSubtitleSize: () => void;
   decreaseSubtitleSize: () => void;
+  toggleSubtitleBackground: () => void;
 }
 
 const { width, height } = Dimensions.get('window');
@@ -47,11 +49,13 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   selectedTextTrack,
   useCustomSubtitles,
   subtitleSize,
+  subtitleBackground,
   fetchAvailableSubtitles,
   loadWyzieSubtitle,
   selectTextTrack,
   increaseSubtitleSize,
   decreaseSubtitleSize,
+  toggleSubtitleBackground,
 }) => {
   // Track which specific online subtitle is currently loaded
   const [selectedOnlineSubtitleId, setSelectedOnlineSubtitleId] = React.useState<string | null>(null);
@@ -220,6 +224,57 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                   onPress={increaseSubtitleSize}
                 >
                   <MaterialIcons name="add" size={20} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Background Toggle Section */}
+            <View style={{ marginBottom: 30 }}>
+              <Text style={{
+                color: 'rgba(255, 255, 255, 0.7)',
+                fontSize: 14,
+                fontWeight: '600',
+                marginBottom: 15,
+                textTransform: 'uppercase',
+                letterSpacing: 0.5,
+              }}>
+                Background
+              </Text>
+              
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                borderRadius: 16,
+                padding: 16,
+              }}>
+                <Text style={{
+                  color: 'white',
+                  fontSize: 16,
+                  fontWeight: '500',
+                }}>
+                  Show Background
+                </Text>
+                
+                <TouchableOpacity
+                  style={{
+                    width: 50,
+                    height: 28,
+                    backgroundColor: subtitleBackground ? '#007AFF' : 'rgba(255, 255, 255, 0.2)',
+                    borderRadius: 14,
+                    justifyContent: 'center',
+                    alignItems: subtitleBackground ? 'flex-end' : 'flex-start',
+                    paddingHorizontal: 2,
+                  }}
+                  onPress={toggleSubtitleBackground}
+                >
+                  <View style={{
+                    width: 24,
+                    height: 24,
+                    backgroundColor: 'white',
+                    borderRadius: 12,
+                  }} />
                 </TouchableOpacity>
               </View>
             </View>
