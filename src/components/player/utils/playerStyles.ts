@@ -134,7 +134,7 @@ export const styles = StyleSheet.create({
     zIndex: 1000,
   },
   progressTouchArea: {
-    height: 30,
+    height: 40, // Increased from 30 to give more space for the thumb
     justifyContent: 'center',
     width: '100%',
   },
@@ -160,6 +160,21 @@ export const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: '#E50914',
     height: '100%',
+  },
+  progressThumb: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#E50914',
+    top: -6, // Position to center on the progress bar
+    marginLeft: -8, // Center the thumb horizontally
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 4,
+    zIndex: 10, // Ensure it appears above the progress bar
   },
   timeDisplay: {
     flexDirection: 'row',

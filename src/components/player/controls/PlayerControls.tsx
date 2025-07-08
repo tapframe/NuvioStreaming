@@ -115,6 +115,19 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 ]} 
               />
             </View>
+            
+            {/* Progress Thumb - Moved outside the progressBarContainer */}
+            <Animated.View 
+              style={[
+                styles.progressThumb,
+                { 
+                  left: progressAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0%', '100%']
+                  })
+                }
+              ]} 
+            />
           </TouchableOpacity>
         </View>
         <View style={styles.timeDisplay}>
