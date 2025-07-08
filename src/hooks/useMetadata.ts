@@ -213,6 +213,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             seasonNum,
             episodeNum,
             tmdbApiKey: effectiveApiKey,
+            title: (metadata as any)?.name || undefined,
+            year: metadata?.year || undefined,
         });
 
         const processTime = Date.now() - sourceStartTime;

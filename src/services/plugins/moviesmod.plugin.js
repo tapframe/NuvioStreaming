@@ -578,8 +578,9 @@
     // --- Main Plugin Entrypoint ---
 
     async function mainGetStreams(options) {
-        const { tmdbId, mediaType, seasonNum, episodeNum, tmdbApiKey, ...injected } = options;
-        injected.logger.log(`[MoviesMod] Fetching streams for TMDB ${mediaType}/${tmdbId}${seasonNum ? `, S${seasonNum}E${episodeNum}`: ''}`);
+        // Accept optional title/year passed from the host so we can skip TMDB calls when metadata is already available.
+        const { tmdbId, mediaType, seasonNum, episodeNum, tmdbApiKey, title: providedTitle, year: providedYear, ...injected } = options;
+        injected.logger.log(`[MoviesMod] Fetching streams for TMDB ${mediaType}/${tmdbId}${seasonNum ? ", S"+seasonNum+"E"+episodeNum: ''}`);
 
         try {
             const cacheKey = `moviesmod_v7_${tmdbId}_${mediaType}${seasonNum ? `_s${seasonNum}` : ''}`;
@@ -587,13 +588,20 @@
 
             if (!resolvedQualities) {
                 injected.logger.log(`[MoviesMod Cache] MISS for key: ${cacheKey}.`);
-                const tmdbUrl = `https://api.themoviedb.org/3/${mediaType === 'tv' ? 'tv' : 'movie'}/${tmdbId}?api_key=${tmdbApiKey}&language=en-US`;
-                const tmdbResponse = await injected.fetch(tmdbUrl);
-                const tmdbDetails = await tmdbResponse.json();
-                
-                const title = mediaType === 'tv' ? tmdbDetails.name : tmdbDetails.title;
-                const year = mediaType === 'tv' ? tmdbDetails.first_air_date?.substring(0, 4) : tmdbDetails.release_date?.substring(0, 4);
-                if (!title) throw new Error('Could not get title from TMDB');
+                // Prefer provided metadata to avoid extra API calls.
+                let title = providedTitle;
+                let year = providedYear ? String(providedYear) : undefined;
+
+                if (!title) {
+                    // Fallback to TMDB API if title is not provided.
+                    const tmdbUrl = `https://api.themoviedb.org/3/${mediaType === 'tv' ? 'tv' : 'movie'}/${tmdbId}?api_key=${tmdbApiKey}&language=en-US`;
+                    const tmdbResponse = await injected.fetch(tmdbUrl);
+                    const tmdbDetails = await tmdbResponse.json();
+                    title = mediaType === 'tv' ? tmdbDetails.name : tmdbDetails.title;
+                    year = mediaType === 'tv' ? tmdbDetails.first_air_date?.substring(0, 4) : tmdbDetails.release_date?.substring(0, 4);
+                }
+
+                if (!title) throw new Error('Could not get title from metadata or TMDB');
 
                 const searchResults = await searchMoviesMod(title, injected);
                 if (!searchResults.length) throw new Error(`No search results for "${title}"`);

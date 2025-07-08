@@ -414,8 +414,8 @@ const SettingsScreen: React.FC = () => {
                     icon="extension"
                     onPress={() => navigation.navigate('Plugins')}
                     renderControl={ChevronRight}
-                    isLast={true}
-                />
+                isLast={true}
+              />
             </SettingsCard>
 
             {/* Playback & Experience */}

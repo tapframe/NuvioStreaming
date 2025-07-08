@@ -32,6 +32,9 @@ interface GetStreamsOptions {
   seasonNum?: number;
   episodeNum?: number;
   tmdbApiKey: string;
+  // Optional metadata to avoid extra API calls
+  title?: string;
+  year?: string | number;
   // Injected properties
   logger: typeof logger;
   cache: Cache;
@@ -191,7 +194,7 @@ class PluginManager {
         if (persist) {
             await this.persistPluginUrl(url);
         }
-        return true;
+      return true;
       }
       
       logger.error(`[PluginManager] Plugin from ${url} executed but failed to register.`);
@@ -220,7 +223,7 @@ class PluginManager {
       };
 
       // Require and execute the built-in MoviesMod plugin module (IIFE)
-      //require('./plugins/moviesmod.plugin.js');
+      require('./plugins/moviesmod.plugin.js');
 
       delete (global as any).registerPlugin;
     } catch (error) {
