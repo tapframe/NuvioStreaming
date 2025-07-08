@@ -136,6 +136,8 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
           shadowOffset: { width: -5, height: 0 },
           shadowOpacity: 0.3,
           shadowRadius: 10,
+          borderTopLeftRadius: 20,
+          borderBottomLeftRadius: 20,
         }}
       >
         {/* Header */}
@@ -144,10 +146,10 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
           alignItems: 'center',
           justifyContent: 'space-between',
           paddingHorizontal: 20,
-          paddingTop: 50,
+          paddingTop: 60,
           paddingBottom: 20,
           borderBottomWidth: 1,
-          borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+          borderBottomColor: 'rgba(255, 255, 255, 0.08)',
         }}>
           <Text style={{
             color: '#FFFFFF',
@@ -180,7 +182,7 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
           {isChangingSource && (
             <View style={{
               backgroundColor: 'rgba(34, 197, 94, 0.1)',
-              borderRadius: 12,
+              borderRadius: 16,
               padding: 16,
               marginBottom: 20,
               flexDirection: 'row',
@@ -222,7 +224,7 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
                         key={`${providerId}-${index}`}
                         style={{
                           backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                          borderRadius: 12,
+                          borderRadius: 16,
                           padding: 16,
                           borderWidth: 1,
                           borderColor: isSelected ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255, 255, 255, 0.1)',
@@ -303,7 +305,7 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
           ) : (
             <View style={{
               backgroundColor: 'rgba(255, 255, 255, 0.05)',
-              borderRadius: 12,
+              borderRadius: 16,
               padding: 20,
               alignItems: 'center',
             }}>

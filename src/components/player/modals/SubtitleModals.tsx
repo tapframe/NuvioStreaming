@@ -6,10 +6,6 @@ import Animated, {
   FadeOut,
   SlideInRight,
   SlideOutRight,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-  runOnJS,
 } from 'react-native-reanimated';
 import { styles } from '../utils/playerStyles';
 import { WyzieSubtitle, SubtitleCue } from '../utils/playerTypes';
@@ -57,18 +53,29 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   increaseSubtitleSize,
   decreaseSubtitleSize,
 }) => {
+  // Track which specific online subtitle is currently loaded
+  const [selectedOnlineSubtitleId, setSelectedOnlineSubtitleId] = React.useState<string | null>(null);
+
   React.useEffect(() => {
     if (showSubtitleModal && !isLoadingSubtitleList && availableSubtitles.length === 0) {
       fetchAvailableSubtitles();
     }
   }, [showSubtitleModal]);
 
+  // Reset selected online subtitle when switching to built-in tracks
+  React.useEffect(() => {
+    if (!useCustomSubtitles) {
+      setSelectedOnlineSubtitleId(null);
+    }
+  }, [useCustomSubtitles]);
+
   const handleClose = () => {
     setShowSubtitleModal(false);
   };
 
-  const handleLanguageClose = () => {
-    setShowSubtitleLanguageModal(false);
+  const handleLoadWyzieSubtitle = (subtitle: WyzieSubtitle) => {
+    setSelectedOnlineSubtitleId(subtitle.id);
+    loadWyzieSubtitle(subtitle);
   };
 
   // Main subtitle menu
@@ -115,6 +122,8 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
             shadowOffset: { width: -5, height: 0 },
             shadowOpacity: 0.3,
             shadowRadius: 10,
+            borderTopLeftRadius: 20,
+            borderBottomLeftRadius: 20,
           }}
         >
           {/* Header */}
@@ -123,10 +132,10 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
             alignItems: 'center',
             justifyContent: 'space-between',
             paddingHorizontal: 20,
-            paddingTop: 50,
+            paddingTop: 60,
             paddingBottom: 20,
             borderBottomWidth: 1,
-            borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+            borderBottomColor: 'rgba(255, 255, 255, 0.08)',
           }}>
             <Text style={{
               color: '#FFFFFF',
@@ -174,7 +183,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                borderRadius: 12,
+                borderRadius: 16,
                 padding: 16,
               }}>
                 <TouchableOpacity
@@ -231,19 +240,20 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                 
                 <View style={{ gap: 8 }}>
                   {vlcTextTracks.map((track) => {
-                    const isSelected = selectedTextTrack === track.id;
+                    const isSelected = selectedTextTrack === track.id && !useCustomSubtitles;
                     return (
                       <TouchableOpacity
                         key={track.id}
                         style={{
                           backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                          borderRadius: 12,
+                          borderRadius: 16,
                           padding: 16,
                           borderWidth: 1,
                           borderColor: isSelected ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255, 255, 255, 0.1)',
                         }}
                         onPress={() => {
                           selectTextTrack(track.id);
+                          setSelectedOnlineSubtitleId(null);
                         }}
                         activeOpacity={0.7}
                       >
@@ -287,7 +297,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                 <TouchableOpacity
                   style={{
                     backgroundColor: 'rgba(34, 197, 94, 0.15)',
-                    borderRadius: 8,
+                    borderRadius: 12,
                     paddingHorizontal: 12,
                     paddingVertical: 6,
                     flexDirection: 'row',
@@ -315,19 +325,19 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
               {availableSubtitles.length > 0 ? (
                 <View style={{ gap: 8 }}>
                   {availableSubtitles.map((sub) => {
-                    const isSelected = useCustomSubtitles && customSubtitles.length > 0;
+                    const isSelected = useCustomSubtitles && selectedOnlineSubtitleId === sub.id;
                     return (
                       <TouchableOpacity
                         key={sub.id}
                         style={{
                           backgroundColor: isSelected ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                          borderRadius: 12,
+                          borderRadius: 16,
                           padding: 16,
                           borderWidth: 1,
                           borderColor: isSelected ? 'rgba(34, 197, 94, 0.3)' : 'rgba(255, 255, 255, 0.1)',
                         }}
                         onPress={() => {
-                          loadWyzieSubtitle(sub);
+                          handleLoadWyzieSubtitle(sub);
                         }}
                         activeOpacity={0.7}
                         disabled={isLoadingSubtitles}
@@ -365,7 +375,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                 <TouchableOpacity
                   style={{
                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    borderRadius: 12,
+                    borderRadius: 16,
                     padding: 20,
                     alignItems: 'center',
                     borderWidth: 1,
@@ -388,7 +398,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
               ) : (
                 <View style={{
                   backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  borderRadius: 12,
+                  borderRadius: 16,
                   padding: 20,
                   alignItems: 'center',
                 }}>
@@ -422,7 +432,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                   backgroundColor: selectedTextTrack === -1 && !useCustomSubtitles 
                     ? 'rgba(239, 68, 68, 0.15)' 
                     : 'rgba(255, 255, 255, 0.05)',
-                  borderRadius: 12,
+                  borderRadius: 16,
                   padding: 16,
                   borderWidth: 1,
                   borderColor: selectedTextTrack === -1 && !useCustomSubtitles 
@@ -431,6 +441,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                 }}
                 onPress={() => {
                   selectTextTrack(-1);
+                  setSelectedOnlineSubtitleId(null);
                 }}
                 activeOpacity={0.7}
               >
