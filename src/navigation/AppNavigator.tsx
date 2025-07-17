@@ -770,9 +770,20 @@ const AppNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootStack
               options={{ 
                 animation: 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 200 : 300,
+                // Force fullscreen presentation on iPad
+                presentation: Platform.OS === 'ios' ? 'fullScreenModal' : 'card',
+                // Disable gestures during video playback
+                gestureEnabled: false,
+                // Ensure proper orientation handling
+                orientation: 'landscape',
                 contentStyle: {
                   backgroundColor: '#000000', // Pure black for video player
                 },
+                // iPad-specific fullscreen options
+                ...(Platform.OS === 'ios' && {
+                  statusBarHidden: true,
+                  statusBarAnimation: 'none',
+                }),
               }}
             />
             <Stack.Screen 
