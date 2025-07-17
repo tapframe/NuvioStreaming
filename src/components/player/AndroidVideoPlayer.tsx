@@ -396,9 +396,9 @@ const AndroidVideoPlayer: React.FC = () => {
         clearInterval(progressSaveInterval);
       }
       
-      // Use the user's configured sync frequency instead of hard-coded 5000ms
-      // But ensure we have a minimum interval of 5 seconds
-      const syncInterval = Math.max(5000, traktSettings.syncFrequency);
+      // Use the user's configured sync frequency with increased minimum to reduce heating
+      // Minimum interval increased from 5s to 30s to reduce CPU usage
+      const syncInterval = Math.max(30000, traktSettings.syncFrequency);
       
       const interval = setInterval(() => {
         saveWatchProgress();

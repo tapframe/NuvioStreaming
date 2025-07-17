@@ -40,3 +40,6 @@ ALPHA_BUILD_2_ANNOUNCEMENT.md
 CHANGELOG.md
 .env.local
 android/
+HEATING_OPTIMIZATIONS.md
+ios
+android

@@ -64,6 +64,7 @@ import type { Theme } from '../contexts/ThemeContext';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import FirstTimeWelcome from '../components/FirstTimeWelcome';
+import { imageCacheService } from '../services/imageCacheService';
 
 // Constants
 const CATALOG_SETTINGS_KEY = 'catalog_settings';
@@ -324,21 +325,22 @@ const HomeScreen = () => {
     };
   }, [currentTheme.colors.darkBackground]);
 
-  // Preload images function - memoized to avoid recreating on every render
+  // Optimized preload images function with better memory management
   const preloadImages = useCallback(async (content: StreamingContent[]) => {
     if (!content.length) return;
     
     try {
-      // Limit concurrent prefetching to prevent memory pressure
-      const MAX_CONCURRENT_PREFETCH = 5;
-      const BATCH_SIZE = 3;
+      // Significantly reduced concurrent prefetching to prevent heating
+      const BATCH_SIZE = 2; // Reduced from 3 to 2
+      const MAX_IMAGES = 5; // Reduced from 10 to 5
       
-      const allImages = content.slice(0, 10) // Limit total images to prefetch
-        .map(item => [item.poster, item.banner, item.logo])
+      // Only preload the most important images (poster and banner, skip logo)
+      const allImages = content.slice(0, MAX_IMAGES)
+        .map(item => [item.poster, item.banner])
         .flat()
         .filter(Boolean) as string[];
 
-      // Process in small batches to prevent memory pressure
+      // Process in smaller batches with longer delays
       for (let i = 0; i < allImages.length; i += BATCH_SIZE) {
         const batch = allImages.slice(i, i + BATCH_SIZE);
         
@@ -346,18 +348,19 @@ const HomeScreen = () => {
           await Promise.all(
             batch.map(async (imageUrl) => {
               try {
-                await ExpoImage.prefetch(imageUrl);
-                // Small delay between prefetches to reduce memory pressure
-                await new Promise(resolve => setTimeout(resolve, 10));
+                // Use our cache service instead of direct prefetch
+                await imageCacheService.getCachedImageUrl(imageUrl);
+                // Increased delay between prefetches to reduce CPU load
+                await new Promise(resolve => setTimeout(resolve, 100));
               } catch (error) {
                 // Silently handle individual prefetch errors
               }
             })
           );
           
-          // Delay between batches to allow GC
+          // Longer delay between batches to allow GC and reduce heating
           if (i + BATCH_SIZE < allImages.length) {
-            await new Promise(resolve => setTimeout(resolve, 50));
+            await new Promise(resolve => setTimeout(resolve, 200));
           }
         } catch (error) {
           // Continue with next batch if current batch fails

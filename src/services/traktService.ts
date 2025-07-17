@@ -282,8 +282,8 @@ export class TraktService {
   private readonly DEFAULT_COMPLETION_THRESHOLD = 80; // 80%
 
   private constructor() {
-    // Initialize the cleanup interval for old stop calls
-    setInterval(() => this.cleanupOldStopCalls(), 5 * 60 * 1000); // Clean up every 5 minutes
+    // Increased cleanup interval from 5 minutes to 15 minutes to reduce heating
+    setInterval(() => this.cleanupOldStopCalls(), 15 * 60 * 1000); // Clean up every 15 minutes
     
     // Load user settings
     this.loadCompletionThreshold();

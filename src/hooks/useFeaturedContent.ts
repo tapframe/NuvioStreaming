@@ -304,7 +304,8 @@ export function useFeaturedContent() {
       }
     };
 
-    const intervalId = setInterval(rotateContent, 15000);
+    // Increased rotation interval from 15s to 45s to reduce heating
+    const intervalId = setInterval(rotateContent, 45000);
 
     return () => clearInterval(intervalId);
   }, [allFeaturedContent]);

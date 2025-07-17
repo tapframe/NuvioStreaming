@@ -32,19 +32,7 @@
         "UIFileSharingEnabled": true
       },
       "bundleIdentifier": "com.nuvio.app",
-      "associatedDomains": [],
-      "documentTypes": [
-        {
-          "name": "Matroska Video",
-          "role": "viewer",
-          "utis": [
-            "org.matroska.mkv"
-          ],
-          "extensions": [
-            "mkv"
-          ]
-        }
-      ]
+      "associatedDomains": []
     },
     "android": {
       "adaptiveIcon": {
@@ -57,12 +45,7 @@
         "WAKE_LOCK"
       ],
       "package": "com.nuvio.app",
-      "enableSplitAPKs": true,
-      "versionCode": 1,
-      "enableProguardInReleaseBuilds": true,
-      "enableHermes": true,
-      "enableSeparateBuildPerCPUArchitecture": true,
-      "enableVectorDrawables": true
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png"

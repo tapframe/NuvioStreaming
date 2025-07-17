@@ -390,8 +390,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         }
       };
     } else {
-      // Fallback: poll for updates every 30 seconds
-      const intervalId = setInterval(() => loadContinueWatching(true), 30000);
+      // Reduced polling frequency from 30s to 2 minutes to reduce heating
+      const intervalId = setInterval(() => loadContinueWatching(true), 120000);
       return () => {
         subscription.remove();
         clearInterval(intervalId);
