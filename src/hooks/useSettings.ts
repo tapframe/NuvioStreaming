@@ -36,6 +36,10 @@ export interface AppSettings {
   tmdbLanguagePreference: string; // Preferred language for TMDB logos (ISO 639-1 code)
   episodeLayoutStyle: 'vertical' | 'horizontal'; // Layout style for episode cards
   autoplayBestStream: boolean; // Automatically play the best available stream
+  // Local scraper settings
+  scraperRepositoryUrl: string; // URL to the scraper repository
+  enableLocalScrapers: boolean; // Enable/disable local scraper functionality
+  scraperTimeout: number; // Timeout for scraper execution in seconds
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -54,6 +58,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   tmdbLanguagePreference: 'en', // Default to English
   episodeLayoutStyle: 'horizontal', // Default to the new horizontal layout
   autoplayBestStream: false, // Disabled by default for user choice
+  // Local scraper defaults
+  scraperRepositoryUrl: '',
+  enableLocalScrapers: true,
+  scraperTimeout: 60, // 60 seconds timeout
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';

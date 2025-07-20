@@ -254,7 +254,8 @@ class NotificationService {
       this.librarySubscription = catalogService.subscribeToLibraryUpdates(async (libraryItems) => {
         if (!this.settings.enabled) return;
         
-        logger.log('[NotificationService] Library updated, syncing notifications for', libraryItems.length, 'items');
+ // Reduced logging verbosity
+        // logger.log('[NotificationService] Library updated, syncing notifications for', libraryItems.length, 'items');
         await this.syncNotificationsForLibrary(libraryItems);
       });
     } catch (error) {
@@ -267,7 +268,8 @@ class NotificationService {
     // Sync notifications every 6 hours
     this.backgroundSyncInterval = setInterval(async () => {
       if (this.settings.enabled) {
-        logger.log('[NotificationService] Running background notification sync');
+        // Reduced logging verbosity
+        // logger.log('[NotificationService] Running background notification sync');
         await this.performBackgroundSync();
       }
     }, 6 * 60 * 60 * 1000); // 6 hours
@@ -283,7 +285,8 @@ class NotificationService {
   private handleAppStateChange = async (nextAppState: AppStateStatus) => {
     if (nextAppState === 'active' && this.settings.enabled) {
       // App came to foreground, sync notifications
-      logger.log('[NotificationService] App became active, syncing notifications');
+      // Reduced logging verbosity
+      // logger.log('[NotificationService] App became active, syncing notifications');
       await this.performBackgroundSync();
     }
   };
@@ -299,7 +302,8 @@ class NotificationService {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
       
-      logger.log(`[NotificationService] Synced notifications for ${seriesItems.length} series from library`);
+      // Reduced logging verbosity
+      // logger.log(`[NotificationService] Synced notifications for ${seriesItems.length} series from library`);
     } catch (error) {
       logger.error('[NotificationService] Error syncing library notifications:', error);
     }
@@ -308,7 +312,8 @@ class NotificationService {
   // Perform comprehensive background sync including Trakt integration
   private async performBackgroundSync(): Promise<void> {
     try {
-      logger.log('[NotificationService] Starting comprehensive background sync');
+      // Reduced logging verbosity
+      // logger.log('[NotificationService] Starting comprehensive background sync');
       
       // Get library items
       const libraryItems = catalogService.getLibraryItems();
@@ -320,7 +325,8 @@ class NotificationService {
       // Clean up old notifications
       await this.cleanupOldNotifications();
       
-      logger.log('[NotificationService] Background sync completed');
+      // Reduced logging verbosity
+      // logger.log('[NotificationService] Background sync completed');
     } catch (error) {
       logger.error('[NotificationService] Error in background sync:', error);
     }
@@ -330,12 +336,14 @@ class NotificationService {
   private async syncTraktNotifications(): Promise<void> {
     try {
       const isAuthenticated = await traktService.isAuthenticated();
-      if (!isAuthenticated) {
-        logger.log('[NotificationService] Trakt not authenticated, skipping Trakt sync');
+      if (!traktService.isAuthenticated()) {
+        // Reduced logging verbosity
+        // logger.log('[NotificationService] Trakt not authenticated, skipping Trakt sync');
         return;
       }
 
-      logger.log('[NotificationService] Syncing comprehensive Trakt notifications');
+      // Reduced logging verbosity
+      // logger.log('[NotificationService] Syncing comprehensive Trakt notifications');
       
       // Get all Trakt data sources (same as calendar screen uses)
       const [watchlistShows, continueWatching, watchedShows, collectionShows] = await Promise.all([
@@ -418,7 +426,8 @@ class NotificationService {
         });
       }
 
-      logger.log(`[NotificationService] Found ${allTraktShows.size} unique Trakt shows from all sources`);
+      // Reduced logging verbosity
+      // logger.log(`[NotificationService] Found ${allTraktShows.size} unique Trakt shows from all sources`);
 
       // Sync notifications for each Trakt show
       let syncedCount = 0;
@@ -433,7 +442,8 @@ class NotificationService {
         }
       }
 
-      logger.log(`[NotificationService] Successfully synced notifications for ${syncedCount}/${allTraktShows.size} Trakt shows`);
+      // Reduced logging verbosity
+      // logger.log(`[NotificationService] Successfully synced notifications for ${syncedCount}/${allTraktShows.size} Trakt shows`);
     } catch (error) {
       logger.error('[NotificationService] Error syncing Trakt notifications:', error);
     }
@@ -442,7 +452,8 @@ class NotificationService {
   // Enhanced series notification update with TMDB fallback
   async updateNotificationsForSeries(seriesId: string): Promise<void> {
     try {
-      logger.log(`[NotificationService] Updating notifications for series: ${seriesId}`);
+      // Reduced logging verbosity - only log for debug purposes
+      // logger.log(`[NotificationService] Updating notifications for series: ${seriesId}`);
       
       // Try Stremio first
       let metadata = await stremioService.getMetaDetails('series', seriesId);
@@ -543,9 +554,10 @@ class NotificationService {
         }));
         
         const scheduledCount = await this.scheduleMultipleEpisodeNotifications(notificationItems);
-        logger.log(`[NotificationService] Scheduled ${scheduledCount} notifications for ${metadata.name}`);
+        // Reduced logging verbosity
+        // logger.log(`[NotificationService] Scheduled ${scheduledCount} notifications for ${metadata.name}`);
       } else {
-        logger.log(`[NotificationService] No upcoming episodes found for ${metadata.name}`);
+        // logger.log(`[NotificationService] No upcoming episodes found for ${metadata.name}`);
       }
     } catch (error) {
       logger.error(`[NotificationService] Error updating notifications for series ${seriesId}:`, error);
@@ -567,7 +579,8 @@ class NotificationService {
       if (validNotifications.length !== this.scheduledNotifications.length) {
         this.scheduledNotifications = validNotifications;
         await this.saveScheduledNotifications();
-        logger.log(`[NotificationService] Cleaned up ${this.scheduledNotifications.length - validNotifications.length} old notifications`);
+        // Reduced logging verbosity
+         // logger.log(`[NotificationService] Cleaned up ${this.scheduledNotifications.length - validNotifications.length} old notifications`);
       }
     } catch (error) {
       logger.error('[NotificationService] Error cleaning up notifications:', error);
@@ -576,7 +589,8 @@ class NotificationService {
 
   // Public method to manually trigger sync for all library items
   public async syncAllNotifications(): Promise<void> {
-    logger.log('[NotificationService] Manual sync triggered');
+    // Reduced logging verbosity
+    // logger.log('[NotificationService] Manual sync triggered');
     await this.performBackgroundSync();
   }
 
@@ -622,4 +636,4 @@ class NotificationService {
 }
 
 // Export singleton instance
-export const notificationService = NotificationService.getInstance(); 
+export const notificationService = NotificationService.getInstance();

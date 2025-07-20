@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { View, TouchableOpacity, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, Image, StyleSheet } from 'react-native';
 import { VLCPlayer } from 'react-native-vlc-media-player';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { RootStackParamList } from '../../navigation/AppNavigator';
+import { RootStackParamList, RootStackNavigationProp } from '../../navigation/AppNavigator';
 import { PinchGestureHandler, State, PinchGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import RNImmersiveMode from 'react-native-immersive-mode';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -43,7 +43,7 @@ const VideoPlayer: React.FC = () => {
     return <AndroidVideoPlayer />;
   }
 
-  const navigation = useNavigation();
+  const navigation = useNavigation<RootStackNavigationProp>();
   const route = useRoute<RouteProp<RootStackParamList, 'Player'>>();
 
   const {
@@ -1338,4 +1338,4 @@ const VideoPlayer: React.FC = () => {
   );
 };
 
-export default VideoPlayer; 
+export default VideoPlayer;

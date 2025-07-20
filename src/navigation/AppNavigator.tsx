@@ -39,6 +39,7 @@ import LogoSourceSettings from '../screens/LogoSourceSettings';
 import ThemeScreen from '../screens/ThemeScreen';
 import ProfilesScreen from '../screens/ProfilesScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
+import ScraperSettingsScreen from '../screens/ScraperSettingsScreen';
 
 // Stack navigator types
 export type RootStackParamList = {
@@ -104,6 +105,7 @@ export type RootStackParamList = {
   LogoSourceSettings: undefined;
   ThemeSettings: undefined;
   ProfilesSettings: undefined;
+  ScraperSettings: undefined;
 };
 
 export type RootStackNavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -1024,6 +1026,21 @@ const AppNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootStack
                 },
               }}
             />
+            <Stack.Screen 
+              name="ScraperSettings" 
+              component={ScraperSettingsScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
           </Stack.Navigator>
         </View>
       </PaperProvider>
@@ -1031,4 +1048,4 @@ const AppNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootStack
   );
 };
 
-export default AppNavigator; 
+export default AppNavigator;

@@ -402,6 +402,13 @@ const SettingsScreen: React.FC = () => {
                 onPress={() => navigation.navigate('PlayerSettings')}
               />
               <SettingItem
+                title="Local Scrapers"
+                description="Manage local scraper repositories"
+                icon="code"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('ScraperSettings')}
+              />
+              <SettingItem
                 title="Notifications"
                 description="Episode reminders"
                 icon="notifications-none"

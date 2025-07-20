@@ -2,6 +2,8 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logger } from '../utils/logger';
 import EventEmitter from 'eventemitter3';
+import { localScraperService } from './localScraperService';
+import { DEFAULT_SETTINGS, AppSettings } from '../hooks/useSettings';
 
 // Create an event emitter for addon changes
 export const addonEmitter = new EventEmitter();
@@ -617,6 +619,37 @@ class StremioService {
     
     const addons = this.getInstalledAddons();
     logger.log('📌 [getStreams] Installed addons:', addons.map(a => ({ id: a.id, name: a.name, url: a.url })));
+    
+    // Check if local scrapers are enabled and execute them first
+    try {
+      // Load settings from AsyncStorage directly
+      const settingsJson = await AsyncStorage.getItem('app_settings');
+      const settings: AppSettings = settingsJson ? JSON.parse(settingsJson) : DEFAULT_SETTINGS;
+      
+      if (settings.enableLocalScrapers) {
+        const hasScrapers = await localScraperService.hasScrapers();
+        if (hasScrapers) {
+          logger.log('🔧 [getStreams] Executing local scrapers for', type, id);
+          
+          // Execute local scrapers asynchronously
+          localScraperService.getStreams(type, id, undefined, undefined, (streams, scraperId, scraperName, error) => {
+            if (error) {
+              logger.error(`❌ [getStreams] Local scraper ${scraperName} failed:`, error);
+              if (callback) {
+                callback(null, scraperId, scraperName, error);
+              }
+            } else if (streams && streams.length > 0) {
+              logger.log(`✅ [getStreams] Local scraper ${scraperName} returned ${streams.length} streams`);
+              if (callback) {
+                callback(streams, scraperId, scraperName, null);
+              }
+            }
+          });
+        }
+      }
+    } catch (error) {
+      logger.error('❌ [getStreams] Failed to execute local scrapers:', error);
+    }
     
     // Check specifically for TMDB Embed addon
     const tmdbEmbed = addons.find(addon => addon.id === 'org.tmdbembedapi');
