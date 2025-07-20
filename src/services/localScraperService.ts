@@ -294,6 +294,9 @@ class LocalScraperService {
     // This is a simplified sandbox - in production, you'd want more security
     try {
       // Create a limited global context
+      const moduleExports = {};
+      const moduleObj = { exports: moduleExports };
+      
       const sandbox = {
         console: {
           log: (...args: any[]) => logger.log('[Scraper]', ...args),
@@ -310,13 +313,41 @@ class LocalScraperService {
         parseFloat,
         encodeURIComponent,
         decodeURIComponent,
+        // Add fetch for HTTP requests (using axios as polyfill)
+        fetch: async (url: string, options: any = {}) => {
+          const axiosConfig = {
+            url,
+            method: options.method || 'GET',
+            headers: options.headers || {},
+            data: options.body,
+            timeout: 30000
+          };
+          
+          try {
+            const response = await axios(axiosConfig);
+            return {
+              ok: response.status >= 200 && response.status < 300,
+              status: response.status,
+              statusText: response.statusText,
+              headers: response.headers,
+              json: async () => response.data,
+              text: async () => typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
+            };
+          } catch (error: any) {
+            throw new Error(`Fetch failed: ${error.message}`);
+          }
+        },
         // Add axios for HTTP requests
         axios: axios.create({
           timeout: 30000,
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
           }
-        })
+        }),
+        // Node.js compatibility
+        module: moduleObj,
+        exports: moduleExports,
+        global: {} // Empty global object
       };
       
       // Execute the scraper code with timeout
@@ -328,7 +359,7 @@ class LocalScraperService {
         try {
           // Create function from code
           const func = new Function('sandbox', 'params', `
-            const { console, setTimeout, clearTimeout, Promise, JSON, Date, Math, parseInt, parseFloat, encodeURIComponent, decodeURIComponent, axios } = sandbox;
+            const { console, setTimeout, clearTimeout, Promise, JSON, Date, Math, parseInt, parseFloat, encodeURIComponent, decodeURIComponent, axios, fetch, module, exports, global } = sandbox;
             ${code}
             
             // Call the main function (assuming it's exported)
@@ -336,6 +367,8 @@ class LocalScraperService {
               return getStreams(params.tmdbId, params.mediaType, params.season, params.episode);
             } else if (typeof module !== 'undefined' && module.exports && typeof module.exports.getStreams === 'function') {
               return module.exports.getStreams(params.tmdbId, params.mediaType, params.season, params.episode);
+            } else if (typeof global !== 'undefined' && global.getStreams && typeof global.getStreams === 'function') {
+              return global.getStreams(params.tmdbId, params.mediaType, params.season, params.episode);
             } else {
               throw new Error('No getStreams function found in scraper');
             }

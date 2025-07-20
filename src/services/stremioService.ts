@@ -4,6 +4,7 @@ import { logger } from '../utils/logger';
 import EventEmitter from 'eventemitter3';
 import { localScraperService } from './localScraperService';
 import { DEFAULT_SETTINGS, AppSettings } from '../hooks/useSettings';
+import { TMDBService } from './tmdbService';
 
 // Create an event emitter for addon changes
 export const addonEmitter = new EventEmitter();
@@ -631,8 +632,60 @@ class StremioService {
         if (hasScrapers) {
           logger.log('🔧 [getStreams] Executing local scrapers for', type, id);
           
-          // Execute local scrapers asynchronously
-          localScraperService.getStreams(type, id, undefined, undefined, (streams, scraperId, scraperName, error) => {
+          // Map Stremio types to local scraper types
+          const scraperType = type === 'series' ? 'tv' : type;
+          
+          // Parse the Stremio ID to extract IMDb ID and season/episode info
+          let tmdbId: string | null = null;
+          let season: number | undefined = undefined;
+          let episode: number | undefined = undefined;
+          
+          try {
+            const idParts = id.split(':');
+            let baseImdbId: string;
+            
+            // Handle different episode ID formats
+            if (idParts[0] === 'series') {
+              // Format: series:imdbId:season:episode
+              baseImdbId = idParts[1];
+              if (scraperType === 'tv' && idParts.length >= 4) {
+                season = parseInt(idParts[2], 10);
+                episode = parseInt(idParts[3], 10);
+              }
+            } else if (idParts[0].startsWith('tt')) {
+              // Format: imdbId:season:episode (direct IMDb ID)
+              baseImdbId = idParts[0];
+              if (scraperType === 'tv' && idParts.length >= 3) {
+                season = parseInt(idParts[1], 10);
+                episode = parseInt(idParts[2], 10);
+              }
+            } else {
+              // Fallback: assume first part is the ID
+              baseImdbId = idParts[0];
+              if (scraperType === 'tv' && idParts.length >= 3) {
+                season = parseInt(idParts[1], 10);
+                episode = parseInt(idParts[2], 10);
+              }
+            }
+            
+            // Convert IMDb ID to TMDB ID using TMDBService
+             const tmdbService = TMDBService.getInstance();
+            const tmdbIdNumber = await tmdbService.findTMDBIdByIMDB(baseImdbId);
+            
+            if (tmdbIdNumber) {
+              tmdbId = tmdbIdNumber.toString();
+              logger.log(`🔄 [getStreams] Converted IMDb ID ${baseImdbId} to TMDB ID ${tmdbId}${scraperType === 'tv' ? ` (S${season}E${episode})` : ''}`);
+            } else {
+              logger.warn(`⚠️ [getStreams] Could not convert IMDb ID ${baseImdbId} to TMDB ID`);
+              return; // Skip local scrapers if we can't convert the ID
+            }
+          } catch (error) {
+            logger.error(`❌ [getStreams] Failed to parse Stremio ID or convert to TMDB ID:`, error);
+            return; // Skip local scrapers if ID parsing fails
+          }
+          
+          // Execute local scrapers asynchronously with TMDB ID
+          localScraperService.getStreams(scraperType, tmdbId, season, episode, (streams, scraperId, scraperName, error) => {
             if (error) {
               logger.error(`❌ [getStreams] Local scraper ${scraperName} failed:`, error);
               if (callback) {

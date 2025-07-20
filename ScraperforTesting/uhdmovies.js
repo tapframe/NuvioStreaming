@@ -29,7 +29,7 @@ async function getUHDMoviesDomain() {
 
   try {
     console.log('[UHDMovies] Fetching latest domain...');
-    const response = await axios.get('https://raw.githubusercontent.com/phisher98/TVVVV/refs/heads/main/domains.json', { timeout: 10000 });
+    const response = await axios.get('https://raw.githubusercontent.com/phisher98/TVVVV/refs/heads/main/domains.json');
     if (response.data && response.data.UHDMovies) {
       uhdMoviesDomain = response.data.UHDMovies;
       domainCacheTimestamp = now;
@@ -101,8 +101,7 @@ const axiosInstance = axios.create({
     'Connection': 'keep-alive',
     'Upgrade-Insecure-Requests': '1',
     'Cache-Control': 'max-age=0'
-  },
-  timeout: 30000
+  }
 });
 
 // Simple In-Memory Cache
