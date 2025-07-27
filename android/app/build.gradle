@@ -96,6 +96,15 @@ android {
         versionCode 1
         versionName "1.0.0"
     }
+    
+    splits {
+        abi {
+            reset()
+            enable true
+            universalApk false  // If true, also generate a universal APK
+            include "arm64-v8a", "armeabi-v7a", "x86", "x86_64"
+        }
+    }
     signingConfigs {
         debug {
             storeFile file('debug.keystore')

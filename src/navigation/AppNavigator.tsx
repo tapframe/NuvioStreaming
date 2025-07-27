@@ -738,8 +738,8 @@ const AppNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootStack
               component={MetadataScreen}
               options={{ 
                 headerShown: false, 
-                animation: 'fade',
-                animationDuration: Platform.OS === 'android' ? 250 : 300,
+                animation: Platform.OS === 'android' ? 'none' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 0 : 300,
                 ...(Platform.OS === 'ios' && {
                   cardStyleInterpolator: customFadeInterpolator,
                   animationTypeForReplace: 'push',
