@@ -71,16 +71,32 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
   const streamInfo = useMemo(() => {
     const title = stream.title || '';
     const name = stream.name || '';
+    
+    // Helper function to format size from bytes
+    const formatSize = (bytes: number): string => {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    };
+    
+    // Get size from title (legacy format) or from stream.size field
+    let sizeDisplay = title.match(/💾\s*([\d.]+\s*[GM]B)/)?.[1];
+    if (!sizeDisplay && stream.size && typeof stream.size === 'number' && stream.size > 0) {
+      sizeDisplay = formatSize(stream.size);
+    }
+    
     return {
       quality: title.match(/(\d+)p/)?.[1] || null,
       isHDR: title.toLowerCase().includes('hdr'),
       isDolby: title.toLowerCase().includes('dolby') || title.includes('DV'),
-      size: title.match(/💾\s*([\d.]+\s*[GM]B)/)?.[1],
+      size: sizeDisplay,
       isDebrid: stream.behaviorHints?.cached,
       displayName: name || title || 'Unnamed Stream',
       subTitle: title && title !== name ? title : null
     };
-  }, [stream.name, stream.title, stream.behaviorHints]);
+  }, [stream.name, stream.title, stream.behaviorHints, stream.size]);
   
   // Animation delay based on index - stagger effect
   const enterDelay = 100 + (index * 30);
@@ -134,7 +150,7 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
             
             {streamInfo.size && (
               <View style={[styles.chip, { backgroundColor: theme.colors.darkGray }]}>
-                <Text style={[styles.chipText, { color: theme.colors.white }]}>{streamInfo.size}</Text>
+                <Text style={[styles.chipText, { color: theme.colors.white }]}>💾 {streamInfo.size}</Text>
               </View>
             )}
             
@@ -274,6 +290,8 @@ export const StreamsScreen = () => {
     setSelectedEpisode,
     groupedEpisodes,
     imdbId,
+    scraperStatuses,
+    activeFetchingScrapers,
   } = useMetadata({ id, type });
 
   // Get backdrop from metadata assets
@@ -1106,6 +1124,23 @@ export const StreamsScreen = () => {
           )}
         </Animated.View>
 
+        {/* Active Scrapers Status */}
+        {activeFetchingScrapers.length > 0 && (
+          <Animated.View 
+            entering={FadeIn.duration(300)}
+            style={styles.activeScrapersContainer}
+          >
+            <Text style={styles.activeScrapersTitle}>🔄 Fetching from:</Text>
+            <View style={styles.activeScrapersRow}>
+              {activeFetchingScrapers.map((scraperName, index) => (
+                <View key={scraperName} style={styles.activeScraperChip}>
+                  <Text style={styles.activeScraperText}>{scraperName}</Text>
+                </View>
+              ))}
+            </View>
+          </Animated.View>
+        )}
+
         {/* Update the streams/loading state display logic */}
         { showNoSourcesError ? (
             <Animated.View 
@@ -1651,6 +1686,39 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.white,
     fontSize: 14,
     fontWeight: '600',
+  },
+  activeScrapersContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    backgroundColor: colors.elevation1,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 8,
+    paddingVertical: 12,
+  },
+  activeScrapersTitle: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  activeScrapersRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  activeScraperChip: {
+    backgroundColor: colors.surfaceVariant,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.primary + '40',
+  },
+  activeScraperText: {
+    color: colors.highEmphasis,
+    fontSize: 12,
+    fontWeight: '500',
   },
 });
 

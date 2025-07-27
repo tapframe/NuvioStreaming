@@ -4,6 +4,7 @@ import { catalogService } from '../services/catalogService';
 import { stremioService } from '../services/stremioService';
 import { tmdbService } from '../services/tmdbService';
 import { cacheService } from '../services/cacheService';
+import { localScraperService, ScraperInfo } from '../services/localScraperService';
 import { Cast, Episode, GroupedEpisodes, GroupedStreams } from '../types/metadata';
 import { TMDBService } from '../services/tmdbService';
 import { logger } from '../utils/logger';
@@ -62,6 +63,16 @@ interface UseMetadataProps {
   addonId?: string;
 }
 
+interface ScraperStatus {
+  id: string;
+  name: string;
+  isLoading: boolean;
+  hasCompleted: boolean;
+  error: string | null;
+  startTime: number;
+  endTime: number | null;
+}
+
 interface UseMetadataReturn {
   metadata: StreamingContent | null;
   loading: boolean;
@@ -92,6 +103,8 @@ interface UseMetadataReturn {
   loadingRecommendations: boolean;
   setMetadata: React.Dispatch<React.SetStateAction<StreamingContent | null>>;
   imdbId: string | null;
+  scraperStatuses: ScraperStatus[];
+  activeFetchingScrapers: string[];
 }
 
 export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadataReturn => {
@@ -119,6 +132,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
   const [imdbId, setImdbId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [availableStreams, setAvailableStreams] = useState<{ [sourceType: string]: Stream }>({});
+  const [scraperStatuses, setScraperStatuses] = useState<ScraperStatus[]>([]);
+  const [activeFetchingScrapers, setActiveFetchingScrapers] = useState<string[]>([]);
 
   // Add hook for persistent seasons
   const { getSeason, saveSeason } = usePersistentSeasons();
@@ -134,10 +149,36 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       await stremioService.getStreams(type, id, 
         (streams, addonId, addonName, error) => {
           const processTime = Date.now() - sourceStartTime;
+          
+          // Update scraper status when we get a callback
+          if (addonId && addonName) {
+            setScraperStatuses(prevStatuses => {
+              const existingIndex = prevStatuses.findIndex(s => s.id === addonId);
+              const newStatus: ScraperStatus = {
+                id: addonId,
+                name: addonName,
+                isLoading: false,
+                hasCompleted: true,
+                error: error ? error.message : null,
+                startTime: sourceStartTime,
+                endTime: Date.now()
+              };
+              
+              if (existingIndex >= 0) {
+                const updated = [...prevStatuses];
+                updated[existingIndex] = newStatus;
+                return updated;
+              } else {
+                return [...prevStatuses, newStatus];
+              }
+            });
+            
+            // Remove from active fetching list
+            setActiveFetchingScrapers(prev => prev.filter(name => name !== addonName));
+          }
+          
           if (error) {
             logger.error(`❌ [${logPrefix}:${sourceName}] Error for addon ${addonName} (${addonId}):`, error);
-            // Optionally update state to show error for this specific addon?
-            // For now, just log the error.
           } else if (streams && addonId && addonName) {
             logger.log(`✅ [${logPrefix}:${sourceName}] Received ${streams.length} streams from ${addonName} (${addonId}) after ${processTime}ms`);
             
@@ -685,6 +726,10 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     try {
       console.log('🚀 [loadStreams] START - Loading streams for:', id);
       updateLoadingState();
+      
+      // Reset scraper tracking
+      setScraperStatuses([]);
+      setActiveFetchingScrapers([]);
 
       // Get TMDB ID for external sources and determine the correct ID for Stremio addons
       console.log('🔍 [loadStreams] Getting TMDB ID for:', id);
@@ -735,6 +780,80 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         console.log('ℹ️ [loadStreams] Using ID as both TMDB and Stremio ID:', tmdbId);
       }
       
+      // Initialize scraper tracking
+       try {
+         const allStremioAddons = await stremioService.getInstalledAddons();
+         const localScrapers = await localScraperService.getInstalledScrapers();
+         
+         // Filter Stremio addons to only include those that provide streams for this content type
+         const streamAddons = allStremioAddons.filter(addon => {
+           if (!addon.resources || !Array.isArray(addon.resources)) {
+             return false;
+           }
+           
+           let hasStreamResource = false;
+           
+           for (const resource of addon.resources) {
+             // Check if the current element is a ResourceObject
+             if (typeof resource === 'object' && resource !== null && 'name' in resource) {
+               const typedResource = resource as any;
+               if (typedResource.name === 'stream' && 
+                   Array.isArray(typedResource.types) && 
+                   typedResource.types.includes(type)) {
+                 hasStreamResource = true;
+                 break;
+               }
+             } 
+             // Check if the element is the simple string "stream" AND the addon has a top-level types array
+             else if (typeof resource === 'string' && resource === 'stream' && addon.types) {
+               if (Array.isArray(addon.types) && addon.types.includes(type)) {
+                 hasStreamResource = true;
+                 break;
+               }
+             }
+           }
+           
+           return hasStreamResource;
+         });
+         
+         // Initialize scraper statuses for tracking
+         const initialStatuses: ScraperStatus[] = [];
+         const initialActiveFetching: string[] = [];
+         
+         // Add stream-capable Stremio addons only
+         streamAddons.forEach(addon => {
+           initialStatuses.push({
+             id: addon.id,
+             name: addon.name,
+             isLoading: true,
+             hasCompleted: false,
+             error: null,
+             startTime: Date.now(),
+             endTime: null
+           });
+           initialActiveFetching.push(addon.name);
+         });
+         
+         // Add local scrapers if enabled
+          localScrapers.filter((scraper: ScraperInfo) => scraper.enabled).forEach((scraper: ScraperInfo) => {
+            initialStatuses.push({
+              id: scraper.id,
+              name: scraper.name,
+              isLoading: true,
+              hasCompleted: false,
+              error: null,
+              startTime: Date.now(),
+              endTime: null
+            });
+            initialActiveFetching.push(scraper.name);
+          });
+         
+         setScraperStatuses(initialStatuses);
+         setActiveFetchingScrapers(initialActiveFetching);
+       } catch (error) {
+         console.error('Failed to initialize scraper tracking:', error);
+       }
+      
       // Start Stremio request using the converted ID format
       console.log('🎬 [loadStreams] Using ID for Stremio addons:', stremioId);
       processStremioSource(type, stremioId, false);
@@ -756,6 +875,84 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     try {
       console.log('🚀 [loadEpisodeStreams] START - Loading episode streams for:', episodeId);
       updateEpisodeLoadingState();
+      
+      // Reset scraper tracking for episodes
+      setScraperStatuses([]);
+      setActiveFetchingScrapers([]);
+
+      // Initialize scraper tracking for episodes
+       try {
+         const allStremioAddons = await stremioService.getInstalledAddons();
+         const localScrapers = await localScraperService.getInstalledScrapers();
+         
+         // Filter Stremio addons to only include those that provide streams for series content
+         const streamAddons = allStremioAddons.filter(addon => {
+           if (!addon.resources || !Array.isArray(addon.resources)) {
+             return false;
+           }
+           
+           let hasStreamResource = false;
+           
+           for (const resource of addon.resources) {
+             // Check if the current element is a ResourceObject
+             if (typeof resource === 'object' && resource !== null && 'name' in resource) {
+               const typedResource = resource as any;
+               if (typedResource.name === 'stream' && 
+                   Array.isArray(typedResource.types) && 
+                   typedResource.types.includes('series')) {
+                 hasStreamResource = true;
+                 break;
+               }
+             } 
+             // Check if the element is the simple string "stream" AND the addon has a top-level types array
+             else if (typeof resource === 'string' && resource === 'stream' && addon.types) {
+               if (Array.isArray(addon.types) && addon.types.includes('series')) {
+                 hasStreamResource = true;
+                 break;
+               }
+             }
+           }
+           
+           return hasStreamResource;
+         });
+         
+         // Initialize scraper statuses for tracking
+         const initialStatuses: ScraperStatus[] = [];
+         const initialActiveFetching: string[] = [];
+         
+         // Add stream-capable Stremio addons only
+         streamAddons.forEach(addon => {
+           initialStatuses.push({
+             id: addon.id,
+             name: addon.name,
+             isLoading: true,
+             hasCompleted: false,
+             error: null,
+             startTime: Date.now(),
+             endTime: null
+           });
+           initialActiveFetching.push(addon.name);
+         });
+         
+         // Add local scrapers if enabled
+         localScrapers.filter((scraper: ScraperInfo) => scraper.enabled).forEach((scraper: ScraperInfo) => {
+           initialStatuses.push({
+             id: scraper.id,
+             name: scraper.name,
+             isLoading: true,
+             hasCompleted: false,
+             error: null,
+             startTime: Date.now(),
+             endTime: null
+           });
+           initialActiveFetching.push(scraper.name);
+         });
+         
+         setScraperStatuses(initialStatuses);
+         setActiveFetchingScrapers(initialActiveFetching);
+       } catch (error) {
+         console.error('Failed to initialize episode scraper tracking:', error);
+       }
 
       // Get TMDB ID for external sources and determine the correct ID for Stremio addons
       console.log('🔍 [loadEpisodeStreams] Getting TMDB ID for:', id);
@@ -987,5 +1184,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     loadingRecommendations,
     setMetadata,
     imdbId,
+    scraperStatuses,
+    activeFetchingScrapers,
   };
-}; 
+};
