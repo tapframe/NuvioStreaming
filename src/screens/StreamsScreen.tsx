@@ -184,6 +184,42 @@ const QualityTag = React.memo(({ text, color, theme }: { text: string; color: st
   );
 });
 
+const PulsingChip = memo(({ text, delay }: { text: string; delay: number }) => {
+  const { currentTheme } = useTheme();
+  const styles = React.useMemo(() => createStyles(currentTheme.colors), [currentTheme.colors]);
+  
+  const pulseValue = useSharedValue(0.7);
+  
+  useEffect(() => {
+    const startPulse = () => {
+      pulseValue.value = withTiming(1, { duration: 800 }, () => {
+        pulseValue.value = withTiming(0.7, { duration: 800 }, () => {
+          runOnJS(startPulse)();
+        });
+      });
+    };
+    
+    const timer = setTimeout(startPulse, delay);
+    return () => {
+      clearTimeout(timer);
+      cancelAnimation(pulseValue);
+    };
+  }, [delay]);
+  
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: pulseValue.value,
+      transform: [{ scale: interpolate(pulseValue.value, [0.7, 1], [0.95, 1], Extrapolate.CLAMP) }]
+    };
+  });
+  
+  return (
+    <Animated.View style={[styles.activeScraperChip, animatedStyle]}>
+      <Text style={styles.activeScraperText}>{text}</Text>
+    </Animated.View>
+  );
+});
+
 const ProviderFilter = memo(({ 
   selectedProvider, 
   providers, 
@@ -1130,12 +1166,10 @@ export const StreamsScreen = () => {
             entering={FadeIn.duration(300)}
             style={styles.activeScrapersContainer}
           >
-            <Text style={styles.activeScrapersTitle}>🔄 Fetching from:</Text>
+            <Text style={styles.activeScrapersTitle}>Fetching from:</Text>
             <View style={styles.activeScrapersRow}>
               {activeFetchingScrapers.map((scraperName, index) => (
-                <View key={scraperName} style={styles.activeScraperChip}>
-                  <Text style={styles.activeScraperText}>{scraperName}</Text>
-                </View>
+                <PulsingChip key={scraperName} text={scraperName} delay={index * 200} />
               ))}
             </View>
           </Animated.View>
