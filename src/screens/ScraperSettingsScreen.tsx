@@ -10,6 +10,7 @@ import {
   Switch,
   ActivityIndicator,
   RefreshControl,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -183,6 +184,13 @@ const ScraperSettingsScreen: React.FC = () => {
 
   const renderScraperItem = (scraper: ScraperInfo) => (
     <View key={scraper.id} style={styles.scraperItem}>
+      {scraper.logo && (
+        <Image
+          source={{ uri: scraper.logo }}
+          style={styles.scraperLogo}
+          resizeMode="contain"
+        />
+      )}
       <View style={styles.scraperInfo}>
         <Text style={styles.scraperName}>{scraper.name}</Text>
         <Text style={styles.scraperDescription}>{scraper.description}</Text>
@@ -507,6 +515,12 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: '#333',
+  },
+  scraperLogo: {
+    width: 40,
+    height: 40,
+    marginRight: 12,
+    borderRadius: 8,
   },
   scraperInfo: {
     flex: 1,

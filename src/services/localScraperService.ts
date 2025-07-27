@@ -21,6 +21,7 @@ export interface ScraperInfo {
   filename: string;
   supportedTypes: ('movie' | 'tv')[];
   enabled: boolean;
+  logo?: string;
 }
 
 export interface LocalScraperResult {
