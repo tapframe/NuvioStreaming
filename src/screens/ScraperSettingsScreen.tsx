@@ -73,7 +73,6 @@ const createStyles = (colors: any) => StyleSheet.create({
       justifyContent: 'space-between',
       alignItems: 'center',
       marginBottom: 16,
-      paddingHorizontal: 0,
     },
   sectionDescription: {
     fontSize: 14,
@@ -87,7 +86,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     padding: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 16,
     marginBottom: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -105,7 +103,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.elevation2,
     padding: 12,
-    marginHorizontal: 16,
     marginBottom: 8,
     borderRadius: 8,
     shadowColor: '#000',
@@ -606,7 +603,7 @@ const ScraperSettingsScreen: React.FC = () => {
         </View>
 
         {/* Installed Scrapers */}
-        <View style={[!settings.enableLocalScrapers && styles.disabledSection]}>
+        <View style={[styles.section, !settings.enableLocalScrapers && styles.disabledSection]}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, !settings.enableLocalScrapers && styles.disabledText]}>Installed Scrapers</Text>
             {installedScrapers.length > 0 && settings.enableLocalScrapers && (
@@ -697,7 +694,6 @@ const ScraperSettingsScreen: React.FC = () => {
     </View>
   );
 };
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
