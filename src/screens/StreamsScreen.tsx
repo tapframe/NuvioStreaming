@@ -29,6 +29,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { Stream } from '../types/metadata';
 import { tmdbService } from '../services/tmdbService';
 import { stremioService } from '../services/stremioService';
+import { localScraperService } from '../services/localScraperService';
 import { VideoPlayerService } from '../services/videoPlayerService';
 import { useSettings } from '../hooks/useSettings';
 import QualityBadge from '../components/metadata/QualityBadge';
@@ -365,7 +366,12 @@ export const StreamsScreen = () => {
     const checkProviders = async () => {
       // Check for Stremio addons
       const hasStremioProviders = await stremioService.hasStreamProviders();
-      const hasProviders = hasStremioProviders;
+      
+      // Check for local scrapers (only if enabled in settings)
+      const hasLocalScrapers = settings.enableLocalScrapers && await localScraperService.hasScrapers();
+      
+      // We have providers if we have either Stremio addons OR enabled local scrapers
+      const hasProviders = hasStremioProviders || hasLocalScrapers;
 
       if (!isMounted.current) return;
 
@@ -1648,4 +1654,4 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
 });
 
-export default memo(StreamsScreen); 
+export default memo(StreamsScreen);
