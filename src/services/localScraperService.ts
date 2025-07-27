@@ -294,6 +294,11 @@ class LocalScraperService {
   private async executeSandboxed(code: string, params: any): Promise<LocalScraperResult[]> {
     // This is a simplified sandbox - in production, you'd want more security
     try {
+      // Get URL validation setting from AsyncStorage
+      const settingsData = await AsyncStorage.getItem('app_settings');
+      const settings = settingsData ? JSON.parse(settingsData) : {};
+      const urlValidationEnabled = settings.enableScraperUrlValidation ?? true;
+      
       // Create a limited global context
       const moduleExports = {};
       const moduleObj = { exports: moduleExports };
@@ -373,7 +378,9 @@ class LocalScraperService {
         // Node.js compatibility
         module: moduleObj,
         exports: moduleExports,
-        global: {} // Empty global object
+        global: {}, // Empty global object
+        // URL validation setting
+        URL_VALIDATION_ENABLED: urlValidationEnabled
       };
       
       // Execute the scraper code with timeout
@@ -385,7 +392,7 @@ class LocalScraperService {
         try {
           // Create function from code
           const func = new Function('sandbox', 'params', `
-            const { console, setTimeout, clearTimeout, Promise, JSON, Date, Math, parseInt, parseFloat, encodeURIComponent, decodeURIComponent, require, axios, fetch, module, exports, global } = sandbox;
+            const { console, setTimeout, clearTimeout, Promise, JSON, Date, Math, parseInt, parseFloat, encodeURIComponent, decodeURIComponent, require, axios, fetch, module, exports, global, URL_VALIDATION_ENABLED } = sandbox;
             ${code}
             
             // Call the main function (assuming it's exported)

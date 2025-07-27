@@ -40,6 +40,7 @@ export interface AppSettings {
   scraperRepositoryUrl: string; // URL to the scraper repository
   enableLocalScrapers: boolean; // Enable/disable local scraper functionality
   scraperTimeout: number; // Timeout for scraper execution in seconds
+  enableScraperUrlValidation: boolean; // Enable/disable URL validation for scrapers
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -62,6 +63,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   scraperRepositoryUrl: '',
   enableLocalScrapers: true,
   scraperTimeout: 60, // 60 seconds timeout
+  enableScraperUrlValidation: true, // Enable URL validation by default
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';

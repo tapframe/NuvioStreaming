@@ -177,6 +177,10 @@ const ScraperSettingsScreen: React.FC = () => {
     await updateSetting('enableLocalScrapers', enabled);
   };
 
+  const handleToggleUrlValidation = async (enabled: boolean) => {
+    await updateSetting('enableScraperUrlValidation', enabled);
+  };
+
   const renderScraperItem = (scraper: ScraperInfo) => (
     <View key={scraper.id} style={styles.scraperItem}>
       <View style={styles.scraperInfo}>
@@ -230,6 +234,22 @@ const ScraperSettingsScreen: React.FC = () => {
               onValueChange={handleToggleLocalScrapers}
               trackColor={{ false: '#767577', true: '#007AFF' }}
               thumbColor={settings.enableLocalScrapers ? '#ffffff' : '#f4f3f4'}
+            />
+          </View>
+          
+          {/* URL Validation Toggle */}
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingTitle}>Enable URL Validation</Text>
+              <Text style={styles.settingDescription}>
+                Validate streaming URLs before returning them (may slow down results but improves reliability)
+              </Text>
+            </View>
+            <Switch
+              value={settings.enableScraperUrlValidation}
+              onValueChange={handleToggleUrlValidation}
+              trackColor={{ false: '#767577', true: '#007AFF' }}
+              thumbColor={settings.enableScraperUrlValidation ? '#ffffff' : '#f4f3f4'}
             />
           </View>
         </View>
