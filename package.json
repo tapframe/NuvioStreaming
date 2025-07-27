@@ -29,7 +29,7 @@
     "@types/react-native-video": "^5.0.20",
     "axios": "^1.10.0",
     "base64-js": "^1.5.1",
-    "cheerio": "^1.1.0",
+    "cheerio-without-node-native": "^0.20.2",
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",
     "eventemitter3": "^5.0.1",

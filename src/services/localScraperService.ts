@@ -25,6 +25,7 @@ export interface ScraperInfo {
 
 export interface LocalScraperResult {
   title: string;
+  name?: string;
   url: string;
   quality?: string;
   size?: string;
@@ -297,6 +298,18 @@ class LocalScraperService {
       const moduleExports = {};
       const moduleObj = { exports: moduleExports };
       
+      // Try to load cheerio-without-node-native
+      let cheerio = null;
+      try {
+        cheerio = require('cheerio-without-node-native');
+      } catch (error) {
+        try {
+          cheerio = require('react-native-cheerio');
+        } catch (error2) {
+          // Cheerio not available, scrapers will fall back to regex
+        }
+      }
+      
       const sandbox = {
         console: {
           log: (...args: any[]) => logger.log('[Scraper]', ...args),
@@ -313,6 +326,19 @@ class LocalScraperService {
         parseFloat,
         encodeURIComponent,
         decodeURIComponent,
+        // Add require function for specific modules
+        require: (moduleName: string) => {
+          switch (moduleName) {
+            case 'cheerio-without-node-native':
+              if (cheerio) return cheerio;
+              throw new Error('cheerio-without-node-native not available');
+            case 'react-native-cheerio':
+              if (cheerio) return cheerio;
+              throw new Error('react-native-cheerio not available');
+            default:
+              throw new Error(`Module '${moduleName}' is not available in sandbox`);
+          }
+        },
         // Add fetch for HTTP requests (using axios as polyfill)
         fetch: async (url: string, options: any = {}) => {
           const axiosConfig = {
@@ -359,7 +385,7 @@ class LocalScraperService {
         try {
           // Create function from code
           const func = new Function('sandbox', 'params', `
-            const { console, setTimeout, clearTimeout, Promise, JSON, Date, Math, parseInt, parseFloat, encodeURIComponent, decodeURIComponent, axios, fetch, module, exports, global } = sandbox;
+            const { console, setTimeout, clearTimeout, Promise, JSON, Date, Math, parseInt, parseFloat, encodeURIComponent, decodeURIComponent, require, axios, fetch, module, exports, global } = sandbox;
             ${code}
             
             // Call the main function (assuming it's exported)
@@ -404,8 +430,9 @@ class LocalScraperService {
     
     return results.map((result, index) => {
       const stream: Stream = {
-        name: result.title || `${scraper.name} Stream ${index + 1}`,
-        title: result.title || `${scraper.name} Stream ${index + 1}`,
+        // Preserve scraper's name and title if provided, otherwise use fallbacks
+        name: result.name || result.title || `${scraper.name} Stream ${index + 1}`,
+        title: result.title || result.name || `${scraper.name} Stream ${index + 1}`,
         url: result.url,
         addon: scraper.id,
         addonId: scraper.id,
@@ -420,6 +447,11 @@ class LocalScraperService {
       // Add additional properties if available
       if (result.infoHash) {
         stream.infoHash = result.infoHash;
+      }
+      
+      // Preserve any additional fields from the scraper result
+      if (result.quality && !stream.quality) {
+        stream.quality = result.quality;
       }
       
       return stream;
