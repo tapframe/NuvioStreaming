@@ -620,7 +620,8 @@ const PluginsScreen: React.FC = () => {
           {hasRepository && repositoryUrl && (
             <View style={[styles.currentRepoContainer, !settings.enableLocalScrapers && styles.disabledContainer]}>
               <Text style={[styles.currentRepoLabel, !settings.enableLocalScrapers && styles.disabledText]}>Current Repository:</Text>
-              <Text style={[styles.currentRepoUrl, !settings.enableLocalScrapers && styles.disabledText]}>{repositoryUrl}</Text>
+              <Text style={[styles.currentRepoUrl, !settings.enableLocalScrapers && styles.disabledText]}>{localScraperService.getRepositoryName()}</Text>
+              <Text style={[styles.currentRepoUrl, !settings.enableLocalScrapers && styles.disabledText, { fontSize: 12, opacity: 0.7, marginTop: 4 }]}>{repositoryUrl}</Text>
             </View>
           )}
           
@@ -788,9 +789,9 @@ const PluginsScreen: React.FC = () => {
           
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, !settings.enableLocalScrapers && styles.disabledText]}>Stream Display Mode</Text>
+              <Text style={[styles.settingTitle, !settings.enableLocalScrapers && styles.disabledText]}>Group Plugin Streams</Text>
               <Text style={[styles.settingDescription, !settings.enableLocalScrapers && styles.disabledText]}>
-                {settings.streamDisplayMode === 'separate' ? 'Show each provider separately' : 'Group all providers under one name'}
+                When enabled, all plugin streams are grouped under "{localScraperService.getRepositoryName()}". When disabled, each plugin shows as a separate provider.
               </Text>
             </View>
             <Switch
@@ -845,9 +846,9 @@ const PluginsScreen: React.FC = () => {
 
         {/* About */}
         <View style={[styles.section, styles.lastSection]}>
-          <Text style={styles.sectionTitle}>About Local Scrapers</Text>
+          <Text style={styles.sectionTitle}>About Plugins</Text>
           <Text style={styles.infoText}>
-            Local scrapers are JavaScript modules that can search for streaming links from various sources. 
+            Plugins are JavaScript modules that can search for streaming links from various sources. 
             They run locally on your device and can be installed from trusted repositories.
           </Text>
         </View>

@@ -216,46 +216,54 @@ class StremioService {
       // Ensure Cinemeta is always installed as a pre-installed addon
       const cinemetaId = 'com.linvo.cinemeta';
       if (!this.installedAddons.has(cinemetaId)) {
-        const cinemetaManifest: Manifest = {
-          id: cinemetaId,
-          name: 'Cinemeta',
-          version: '3.0.13',
-          description: 'Provides metadata for movies and series from TheTVDB, TheMovieDB, etc.',
-          url: 'https://v3-cinemeta.strem.io',
-          originalUrl: 'https://v3-cinemeta.strem.io/manifest.json',
-          types: ['movie', 'series'],
-          catalogs: [
-            {
-              type: 'movie',
-              id: 'top',
-              name: 'Top Movies',
-              extraSupported: ['search', 'genre', 'skip']
-            },
-            {
-              type: 'series',
-              id: 'top',
-              name: 'Top Series',
-              extraSupported: ['search', 'genre', 'skip']
+        try {
+          const cinemetaManifest = await this.getManifest('https://v3-cinemeta.strem.io/manifest.json');
+          this.installedAddons.set(cinemetaId, cinemetaManifest);
+          logger.log('✅ Cinemeta pre-installed as default addon with full manifest');
+        } catch (error) {
+          logger.error('Failed to fetch Cinemeta manifest, using fallback:', error);
+          // Fallback to minimal manifest if fetch fails
+          const fallbackManifest: Manifest = {
+            id: cinemetaId,
+            name: 'Cinemeta',
+            version: '3.0.13',
+            description: 'Provides metadata for movies and series from TheTVDB, TheMovieDB, etc.',
+            url: 'https://v3-cinemeta.strem.io',
+            originalUrl: 'https://v3-cinemeta.strem.io/manifest.json',
+            types: ['movie', 'series'],
+            catalogs: [
+              {
+                type: 'movie',
+                id: 'top',
+                name: 'Popular',
+                extraSupported: ['search', 'genre', 'skip']
+              },
+              {
+                type: 'series',
+                id: 'top',
+                name: 'Popular',
+                extraSupported: ['search', 'genre', 'skip']
+              }
+            ],
+            resources: [
+              {
+                name: 'catalog',
+                types: ['movie', 'series'],
+                idPrefixes: ['tt']
+              },
+              {
+                name: 'meta',
+                types: ['movie', 'series'],
+                idPrefixes: ['tt']
+              }
+            ],
+            behaviorHints: {
+              configurable: false
             }
-          ],
-          resources: [
-            {
-              name: 'catalog',
-              types: ['movie', 'series'],
-              idPrefixes: ['tt']
-            },
-            {
-              name: 'meta',
-              types: ['movie', 'series'],
-              idPrefixes: ['tt']
-            }
-          ],
-          behaviorHints: {
-            configurable: false
-          }
-        };
-        this.installedAddons.set(cinemetaId, cinemetaManifest);
-        logger.log('✅ Cinemeta pre-installed as default addon');
+          };
+          this.installedAddons.set(cinemetaId, fallbackManifest);
+          logger.log('✅ Cinemeta pre-installed with fallback manifest');
+        }
       }
       
       // Load addon order if exists

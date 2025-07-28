@@ -52,6 +52,7 @@ class LocalScraperService {
   private installedScrapers: Map<string, ScraperInfo> = new Map();
   private scraperCode: Map<string, string> = new Map();
   private repositoryUrl: string = '';
+  private repositoryName: string = '';
   private initialized: boolean = false;
 
   private constructor() {
@@ -175,6 +176,11 @@ class LocalScraperService {
     return this.repositoryUrl;
   }
 
+  // Get repository name
+  getRepositoryName(): string {
+    return this.repositoryName || 'Plugins';
+  }
+
   // Fetch and install scrapers from repository
   async refreshRepository(): Promise<void> {
     await this.ensureInitialized();
@@ -205,6 +211,11 @@ class LocalScraperService {
          }
        });
        const manifest: ScraperManifest = response.data;
+       
+       // Store repository name from manifest
+       if (manifest.name) {
+         this.repositoryName = manifest.name;
+       }
        
        logger.log('[LocalScraperService] getAvailableScrapers - Raw manifest data:', JSON.stringify(manifest, null, 2));
        logger.log('[LocalScraperService] getAvailableScrapers - Manifest scrapers count:', manifest.scrapers?.length || 0);
@@ -353,6 +364,11 @@ class LocalScraperService {
         }
       });
       const manifest: ScraperManifest = response.data;
+      
+      // Store repository name from manifest
+      if (manifest.name) {
+        this.repositoryName = manifest.name;
+      }
       
       // Return scrapers from manifest, respecting manifest's enabled field
       const availableScrapers = manifest.scrapers.map(scraperInfo => {

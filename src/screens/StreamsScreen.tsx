@@ -924,7 +924,7 @@ export const StreamsScreen = () => {
       
       // Add single grouped plugins chip if there are any plugins
       if (pluginProviders.length > 0) {
-        filterChips.push({ id: 'grouped-plugins', name: 'Plugins' });
+        filterChips.push({ id: 'grouped-plugins', name: localScraperService.getRepositoryName() });
       }
       
       return filterChips;
@@ -1028,7 +1028,7 @@ export const StreamsScreen = () => {
       }
       if (pluginStreams.length > 0) {
         sections.push({
-          title: pluginNames.join(', '),
+          title: localScraperService.getRepositoryName(),
           addonId: 'grouped-plugins',
           data: pluginStreams
         });
