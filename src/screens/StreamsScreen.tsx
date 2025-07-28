@@ -87,13 +87,16 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
       sizeDisplay = formatSize(stream.size);
     }
     
+    // Extract quality for badge display
+    const basicQuality = title.match(/(\d+)p/)?.[1] || null;
+    
     return {
-      quality: title.match(/(\d+)p/)?.[1] || null,
+      quality: basicQuality,
       isHDR: title.toLowerCase().includes('hdr'),
       isDolby: title.toLowerCase().includes('dolby') || title.includes('DV'),
       size: sizeDisplay,
       isDebrid: stream.behaviorHints?.cached,
-      displayName: name || title || 'Unnamed Stream',
+      displayName: name || 'Unnamed Stream',
       subTitle: title && title !== name ? title : null
     };
   }, [stream.name, stream.title, stream.behaviorHints, stream.size]);
@@ -140,10 +143,6 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
           </View>
           
           <View style={styles.streamMetaRow}>
-            {streamInfo.quality && streamInfo.quality >= "720" && (
-              <QualityBadge type="HD" />
-            )}
-            
             {streamInfo.isDolby && (
               <QualityBadge type="VISION" />
             )}

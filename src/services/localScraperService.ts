@@ -437,15 +437,29 @@ class LocalScraperService {
     }
     
     return results.map((result, index) => {
+      // Build title with quality information for UI compatibility
+      let title = result.title || result.name || `${scraper.name} Stream ${index + 1}`;
+      
+      // Add quality to title if available and not already present
+      if (result.quality && !title.includes(result.quality)) {
+        title = `${title} ${result.quality}`;
+      }
+      
+      // Build name with quality information
+      let streamName = result.name || `${scraper.name}`;
+      if (result.quality && !streamName.includes(result.quality)) {
+        streamName = `${streamName} - ${result.quality}`;
+      }
+      
       const stream: Stream = {
-        // Preserve scraper's name and title if provided, otherwise use fallbacks
-        name: result.name || result.title || `${scraper.name} Stream ${index + 1}`,
-        title: result.title || result.name || `${scraper.name} Stream ${index + 1}`,
+        // Include quality in name field for proper display
+        name: streamName,
+        title: title,
         url: result.url,
         addon: scraper.id,
         addonId: scraper.id,
         addonName: scraper.name,
-        description: result.quality ? `${result.quality}${result.size ? ` • ${result.size}` : ''}` : undefined,
+        description: result.size ? `${result.size}` : undefined,
         size: result.size ? this.parseSize(result.size) : undefined,
         behaviorHints: {
           bingeGroup: `local-scraper-${scraper.id}`
