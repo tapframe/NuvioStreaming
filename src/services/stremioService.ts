@@ -213,6 +213,51 @@ class StremioService {
         }
       }
       
+      // Ensure Cinemeta is always installed as a pre-installed addon
+      const cinemetaId = 'com.linvo.cinemeta';
+      if (!this.installedAddons.has(cinemetaId)) {
+        const cinemetaManifest: Manifest = {
+          id: cinemetaId,
+          name: 'Cinemeta',
+          version: '3.0.13',
+          description: 'Provides metadata for movies and series from TheTVDB, TheMovieDB, etc.',
+          url: 'https://v3-cinemeta.strem.io',
+          originalUrl: 'https://v3-cinemeta.strem.io/manifest.json',
+          types: ['movie', 'series'],
+          catalogs: [
+            {
+              type: 'movie',
+              id: 'top',
+              name: 'Top Movies',
+              extraSupported: ['search', 'genre', 'skip']
+            },
+            {
+              type: 'series',
+              id: 'top',
+              name: 'Top Series',
+              extraSupported: ['search', 'genre', 'skip']
+            }
+          ],
+          resources: [
+            {
+              name: 'catalog',
+              types: ['movie', 'series'],
+              idPrefixes: ['tt']
+            },
+            {
+              name: 'meta',
+              types: ['movie', 'series'],
+              idPrefixes: ['tt']
+            }
+          ],
+          behaviorHints: {
+            configurable: false
+          }
+        };
+        this.installedAddons.set(cinemetaId, cinemetaManifest);
+        logger.log('✅ Cinemeta pre-installed as default addon');
+      }
+      
       // Load addon order if exists
       const storedOrder = await AsyncStorage.getItem(this.ADDON_ORDER_KEY);
       if (storedOrder) {
@@ -221,13 +266,26 @@ class StremioService {
         this.addonOrder = this.addonOrder.filter(id => this.installedAddons.has(id));
       }
       
+      // Ensure Cinemeta is first in the order
+      if (!this.addonOrder.includes(cinemetaId)) {
+        this.addonOrder.unshift(cinemetaId);
+      } else {
+        // Move Cinemeta to the front if it's not already there
+        const cinemetaIndex = this.addonOrder.indexOf(cinemetaId);
+        if (cinemetaIndex > 0) {
+          this.addonOrder.splice(cinemetaIndex, 1);
+          this.addonOrder.unshift(cinemetaId);
+        }
+      }
+      
       // Add any missing addons to the order
       const installedIds = Array.from(this.installedAddons.keys());
       const missingIds = installedIds.filter(id => !this.addonOrder.includes(id));
       this.addonOrder = [...this.addonOrder, ...missingIds];
       
-      // Ensure order is saved
+      // Ensure order and addons are saved
       await this.saveAddonOrder();
+      await this.saveInstalledAddons();
       
       this.initialized = true;
     } catch (error) {
@@ -336,6 +394,12 @@ class StremioService {
   }
 
   removeAddon(id: string): void {
+    // Prevent removal of Cinemeta as it's a pre-installed addon
+    if (id === 'com.linvo.cinemeta') {
+      logger.warn('❌ Cannot remove Cinemeta - it is a pre-installed addon');
+      return;
+    }
+    
     if (this.installedAddons.has(id)) {
       this.installedAddons.delete(id);
       // Remove from order
@@ -357,6 +421,11 @@ class StremioService {
   async getInstalledAddonsAsync(): Promise<Manifest[]> {
     await this.ensureInitialized();
     return this.getInstalledAddons();
+  }
+
+  // Check if an addon is pre-installed and cannot be removed
+  isPreInstalledAddon(id: string): boolean {
+    return id === 'com.linvo.cinemeta';
   }
 
   private formatId(id: string): string {

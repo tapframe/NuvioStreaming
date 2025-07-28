@@ -187,12 +187,12 @@ const PulsingChip = memo(({ text, delay }: { text: string; delay: number }) => {
   const { currentTheme } = useTheme();
   const styles = React.useMemo(() => createStyles(currentTheme.colors), [currentTheme.colors]);
   
-  const pulseValue = useSharedValue(0.7);
+  const pulseValue = useSharedValue(0.6);
   
   useEffect(() => {
     const startPulse = () => {
-      pulseValue.value = withTiming(1, { duration: 800 }, () => {
-        pulseValue.value = withTiming(0.7, { duration: 800 }, () => {
+      pulseValue.value = withTiming(1, { duration: 1200 }, () => {
+        pulseValue.value = withTiming(0.6, { duration: 1200 }, () => {
           runOnJS(startPulse)();
         });
       });
@@ -207,8 +207,7 @@ const PulsingChip = memo(({ text, delay }: { text: string; delay: number }) => {
   
   const animatedStyle = useAnimatedStyle(() => {
     return {
-      opacity: pulseValue.value,
-      transform: [{ scale: interpolate(pulseValue.value, [0.7, 1], [0.95, 1], Extrapolate.CLAMP) }]
+      opacity: pulseValue.value
     };
   });
   
@@ -1722,36 +1721,34 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   activeScrapersContainer: {
     paddingHorizontal: 16,
-    paddingBottom: 12,
-    backgroundColor: colors.elevation1,
+    paddingVertical: 8,
+    backgroundColor: 'transparent',
     marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 8,
-    paddingVertical: 12,
+    marginBottom: 4,
   },
   activeScrapersTitle: {
-    color: colors.primary,
-    fontSize: 13,
-    fontWeight: '600',
-    marginBottom: 8,
+    color: colors.mediumEmphasis,
+    fontSize: 12,
+    fontWeight: '500',
+    marginBottom: 6,
+    opacity: 0.8,
   },
   activeScrapersRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 4,
   },
   activeScraperChip: {
-    backgroundColor: colors.surfaceVariant,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.primary + '40',
+    backgroundColor: colors.elevation2,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 0,
   },
   activeScraperText: {
-    color: colors.highEmphasis,
-    fontSize: 12,
-    fontWeight: '500',
+    color: colors.mediumEmphasis,
+    fontSize: 11,
+    fontWeight: '400',
   },
 });
 

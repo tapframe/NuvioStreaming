@@ -53,6 +53,8 @@ class NotificationService {
   private backgroundSyncInterval: NodeJS.Timeout | null = null;
   private librarySubscription: (() => void) | null = null;
   private appStateSubscription: any = null;
+  private lastSyncTime: number = 0;
+  private readonly MIN_SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes minimum between syncs
   
   private constructor() {
     // Initialize notifications
@@ -149,6 +151,16 @@ class NotificationService {
       return null;
     }
 
+    // Check if notification already exists for this episode
+    const existingNotification = this.scheduledNotifications.find(
+      notification => notification.seriesId === item.seriesId && 
+                     notification.season === item.season && 
+                     notification.episode === item.episode
+    );
+    if (existingNotification) {
+      return null; // Don't schedule duplicate notifications
+    }
+
     const releaseDate = parseISO(item.releaseDate);
     const now = new Date();
     
@@ -162,9 +174,9 @@ class NotificationService {
       const notificationTime = new Date(releaseDate);
       notificationTime.setHours(notificationTime.getHours() - this.settings.timeBeforeAiring);
       
-      // If notification time has already passed, set to now + 1 minute
+      // If notification time has already passed, don't schedule the notification
       if (notificationTime < now) {
-        notificationTime.setTime(now.getTime() + 60000);
+        return null;
       }
       
       // Schedule the notification
@@ -254,9 +266,17 @@ class NotificationService {
       this.librarySubscription = catalogService.subscribeToLibraryUpdates(async (libraryItems) => {
         if (!this.settings.enabled) return;
         
- // Reduced logging verbosity
-        // logger.log('[NotificationService] Library updated, syncing notifications for', libraryItems.length, 'items');
-        await this.syncNotificationsForLibrary(libraryItems);
+        const now = Date.now();
+        const timeSinceLastSync = now - this.lastSyncTime;
+        
+        // Only sync if enough time has passed since last sync
+        if (timeSinceLastSync >= this.MIN_SYNC_INTERVAL) {
+          // Reduced logging verbosity
+          // logger.log('[NotificationService] Library updated, syncing notifications for', libraryItems.length, 'items');
+          await this.syncNotificationsForLibrary(libraryItems);
+        } else {
+          // logger.log(`[NotificationService] Library updated, but skipping sync (last sync ${Math.round(timeSinceLastSync / 1000)}s ago)`);
+        }
       });
     } catch (error) {
       logger.error('[NotificationService] Error setting up library integration:', error);
@@ -284,10 +304,18 @@ class NotificationService {
 
   private handleAppStateChange = async (nextAppState: AppStateStatus) => {
     if (nextAppState === 'active' && this.settings.enabled) {
-      // App came to foreground, sync notifications
-      // Reduced logging verbosity
-      // logger.log('[NotificationService] App became active, syncing notifications');
-      await this.performBackgroundSync();
+      const now = Date.now();
+      const timeSinceLastSync = now - this.lastSyncTime;
+      
+      // Only sync if enough time has passed since last sync
+      if (timeSinceLastSync >= this.MIN_SYNC_INTERVAL) {
+        // App came to foreground, sync notifications
+        // Reduced logging verbosity
+        // logger.log('[NotificationService] App became active, syncing notifications');
+        await this.performBackgroundSync();
+      } else {
+        // logger.log(`[NotificationService] App became active, but skipping sync (last sync ${Math.round(timeSinceLastSync / 1000)}s ago)`);
+      }
     }
   };
 
@@ -312,6 +340,9 @@ class NotificationService {
   // Perform comprehensive background sync including Trakt integration
   private async performBackgroundSync(): Promise<void> {
     try {
+      // Update last sync time at the start
+      this.lastSyncTime = Date.now();
+      
       // Reduced logging verbosity
       // logger.log('[NotificationService] Starting comprehensive background sync');
       
@@ -467,7 +498,13 @@ class NotificationService {
           if (!video.released) return false;
           const releaseDate = parseISO(video.released);
           return releaseDate > now && releaseDate < fourWeeksLater;
-        });
+        }).map(video => ({
+          id: video.id,
+          title: (video as any).title || (video as any).name || `Episode ${video.episode}`,
+          season: video.season || 0,
+          episode: video.episode || 0,
+          released: video.released,
+        }));
       }
 
       // If no upcoming episodes from Stremio, try TMDB

@@ -586,21 +586,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
 });
 
-// Cinemeta addon details
-const cinemetaAddon: CommunityAddon = {
-  transportUrl: 'https://v3-cinemeta.strem.io/manifest.json',
-  manifest: {
-    id: 'com.linvo.cinemeta',
-    version: '3.0.13',
-    name: 'Cinemeta',
-    description: 'Provides metadata for movies and series from TheTVDB, TheMovieDB, etc.',
-    logo: 'https://static.strem.io/addons/cinemeta.png',
-    types: ['movie', 'series'],
-    behaviorHints: {
-      configurable: false
-    }
-  } as ExtendedManifest,
-};
+
 
 const AddonsScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
@@ -671,16 +657,15 @@ const AddonsScreen = () => {
       // Filter out addons without a manifest or transportUrl (basic validation)
       let validAddons = response.data.filter(addon => addon.manifest && addon.transportUrl);
 
-      // Filter out Cinemeta if it's already in the community list to avoid duplication
+      // Filter out Cinemeta since it's now pre-installed
       validAddons = validAddons.filter(addon => addon.manifest.id !== 'com.linvo.cinemeta');
 
-      // Add Cinemeta to the beginning of the list
-      setCommunityAddons([cinemetaAddon, ...validAddons]);
+      setCommunityAddons(validAddons);
     } catch (error) {
       logger.error('Failed to load community addons:', error);
       setCommunityError('Failed to load community addons. Please try again later.');
-      // Still show Cinemeta if the community list fails to load
-      setCommunityAddons([cinemetaAddon]);
+      // Set empty array on error since Cinemeta is pre-installed
+      setCommunityAddons([]);
     } finally {
       setCommunityLoading(false);
     }
@@ -746,6 +731,16 @@ const AddonsScreen = () => {
   };
 
   const handleRemoveAddon = (addon: ExtendedManifest) => {
+    // Check if this is a pre-installed addon
+    if (stremioService.isPreInstalledAddon(addon.id)) {
+      Alert.alert(
+        'Cannot Remove Addon',
+        `${addon.name} is a pre-installed addon and cannot be removed.`,
+        [{ text: 'OK', style: 'default' }]
+      );
+      return;
+    }
+    
     Alert.alert(
       'Uninstall Addon',
       `Are you sure you want to uninstall ${addon.name}?`,
@@ -900,6 +895,8 @@ const AddonsScreen = () => {
     const logo = item.logo || null;
     // Check if addon is configurable
     const isConfigurable = item.behaviorHints?.configurable === true;
+    // Check if addon is pre-installed
+    const isPreInstalled = stremioService.isPreInstalledAddon(item.id);
     
     // Format the types into a simple category text
     const categoryText = types.length > 0 
@@ -951,7 +948,14 @@ const AddonsScreen = () => {
             </View>
           )}
           <View style={styles.addonTitleContainer}>
-            <Text style={styles.addonName}>{item.name}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+              <Text style={styles.addonName}>{item.name}</Text>
+              {isPreInstalled && (
+                <View style={[styles.priorityBadge, { marginLeft: 8, backgroundColor: colors.success }]}>
+                  <Text style={[styles.priorityText, { fontSize: 10 }]}>PRE-INSTALLED</Text>
+                </View>
+              )}
+            </View>
             <View style={styles.addonMetaContainer}>
               <Text style={styles.addonVersion}>v{item.version || '1.0.0'}</Text>
               <Text style={styles.addonDot}>•</Text>
@@ -969,12 +973,14 @@ const AddonsScreen = () => {
                     <MaterialIcons name="settings" size={20} color={colors.primary} />
                   </TouchableOpacity>
                 )}
-                <TouchableOpacity 
-                  style={styles.deleteButton}
-                  onPress={() => handleRemoveAddon(item)}
-                >
-                  <MaterialIcons name="delete" size={20} color={colors.error} />
-                </TouchableOpacity>
+                {!stremioService.isPreInstalledAddon(item.id) && (
+                  <TouchableOpacity 
+                    style={styles.deleteButton}
+                    onPress={() => handleRemoveAddon(item)}
+                  >
+                    <MaterialIcons name="delete" size={20} color={colors.error} />
+                  </TouchableOpacity>
+                )}
               </>
             ) : (
               <View style={styles.priorityBadge}>
@@ -1410,4 +1416,4 @@ const AddonsScreen = () => {
   );
 };
 
-export default AddonsScreen; 
+export default AddonsScreen;
