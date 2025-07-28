@@ -1,31 +1,13 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Dimensions } from 'react-native';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
+import { MaterialIcons } from '@expo/vector-icons';
 import Animated, { 
   FadeIn, 
-  FadeOut, 
-  SlideInDown, 
-  SlideOutDown,
-  FadeInDown,
-  FadeInUp,
-  Layout,
-  withSpring,
-  withTiming,
-  useAnimatedStyle,
-  useSharedValue,
-  interpolate,
-  Easing,
-  withDelay,
-  withSequence,
-  runOnJS,
-  BounceIn,
-  ZoomIn
+  FadeOut,
+  SlideInRight,
+  SlideOutRight,
 } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
-import { styles } from '../utils/playerStyles';
 import { Stream } from '../../../types/streams';
-import QualityBadge from '../../metadata/QualityBadge';
 
 interface SourcesModalProps {
   showSourcesModal: boolean;
@@ -36,13 +18,10 @@ interface SourcesModalProps {
   isChangingSource: boolean;
 }
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
+const MENU_WIDTH = Math.min(width * 0.85, 400);
 
-// Fixed dimensions for the modal
-const MODAL_WIDTH = Math.min(width - 32, 520);
-const MODAL_MAX_HEIGHT = height * 0.85;
-
-const QualityIndicator = ({ quality }: { quality: string | null }) => {
+const QualityBadge = ({ quality }: { quality: string | null }) => {
   if (!quality) return null;
   
   const qualityNum = parseInt(quality);
@@ -61,84 +40,31 @@ const QualityIndicator = ({ quality }: { quality: string | null }) => {
   }
   
   return (
-    <Animated.View 
-      entering={ZoomIn.duration(200).delay(100)}
+    <View 
       style={{
         backgroundColor: `${color}20`,
         borderColor: `${color}60`,
         borderWidth: 1,
         paddingHorizontal: 8,
-        paddingVertical: 3,
+        paddingVertical: 4,
         borderRadius: 8,
         flexDirection: 'row',
         alignItems: 'center',
       }}
     >
-      <View style={{
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: color,
-        marginRight: 4,
-      }} />
       <Text style={{
         color: color,
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: '700',
         letterSpacing: 0.5,
       }}>
         {label}
       </Text>
-    </Animated.View>
+    </View>
   );
 };
 
-const StreamMetaBadge = ({ 
-  text, 
-  color, 
-  bgColor, 
-  icon,
-  delay = 0 
-}: { 
-  text: string; 
-  color: string; 
-  bgColor: string; 
-  icon?: string;
-  delay?: number;
-}) => (
-  <Animated.View 
-    entering={FadeInUp.duration(200).delay(delay)}
-    style={{
-      backgroundColor: bgColor,
-      borderColor: `${color}40`,
-      borderWidth: 1,
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-      borderRadius: 6,
-      flexDirection: 'row',
-      alignItems: 'center',
-      elevation: 2,
-      shadowColor: color,
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.3,
-      shadowRadius: 2,
-    }}
-  >
-    {icon && (
-      <MaterialIcons name={icon as any} size={10} color={color} style={{ marginRight: 2 }} />
-    )}
-    <Text style={{
-      color: color,
-      fontSize: 9,
-      fontWeight: '800',
-      letterSpacing: 0.3,
-    }}>
-      {text}
-    </Text>
-  </Animated.View>
-);
-
-const SourcesModal: React.FC<SourcesModalProps> = ({
+export const SourcesModal: React.FC<SourcesModalProps> = ({
   showSourcesModal,
   setShowSourcesModal,
   availableStreams,
@@ -146,36 +72,13 @@ const SourcesModal: React.FC<SourcesModalProps> = ({
   onSelectStream,
   isChangingSource,
 }) => {
-  const modalScale = useSharedValue(0.9);
-  const modalOpacity = useSharedValue(0);
-  
-  React.useEffect(() => {
-    if (showSourcesModal) {
-      modalScale.value = withSpring(1, {
-        damping: 20,
-        stiffness: 300,
-        mass: 0.8,
-      });
-      modalOpacity.value = withTiming(1, {
-        duration: 200,
-        easing: Easing.out(Easing.quad),
-      });
-    }
-  }, [showSourcesModal]);
-
-  const modalStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: modalScale.value }],
-    opacity: modalOpacity.value,
-  }));
+  const handleClose = () => {
+    setShowSourcesModal(false);
+  };
 
   if (!showSourcesModal) return null;
 
-  const sortedProviders = Object.entries(availableStreams).sort(([a], [b]) => {
-    // Put HDRezka first
-    if (a === 'hdrezka') return -1;
-    if (b === 'hdrezka') return 1;
-    return 0;
-  });
+  const sortedProviders = Object.entries(availableStreams);
 
   const handleStreamSelect = (stream: Stream) => {
     if (stream.url !== currentStreamUrl && !isChangingSource) {
@@ -193,465 +96,240 @@ const SourcesModal: React.FC<SourcesModalProps> = ({
     return stream.url === currentStreamUrl;
   };
 
-  const handleClose = () => {
-    modalScale.value = withTiming(0.9, { duration: 150 });
-    modalOpacity.value = withTiming(0, { duration: 150 });
-    setTimeout(() => setShowSourcesModal(false), 150);
-  };
-
   return (
-    <Animated.View 
-      entering={FadeIn.duration(250)}
-      exiting={FadeOut.duration(200)}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.9)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 9999,
-        padding: 16,
-      }}
-    >
+    <>
       {/* Backdrop */}
-      <TouchableOpacity 
+      <Animated.View 
+        entering={FadeIn.duration(200)}
+        exiting={FadeOut.duration(150)}
         style={{
           position: 'absolute',
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          zIndex: 9998,
         }}
-        onPress={handleClose}
-        activeOpacity={1}
-      />
-
-      {/* Modal Content */}
-      <Animated.View
-        style={[
-          {
-            width: MODAL_WIDTH,
-            maxHeight: MODAL_MAX_HEIGHT,
-            minHeight: height * 0.3,
-            overflow: 'hidden',
-            elevation: 25,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 12 },
-            shadowOpacity: 0.4,
-            shadowRadius: 25,
-            alignSelf: 'center',
-          },
-          modalStyle,
-        ]}
       >
-        {/* Glassmorphism Background */}
-        <BlurView 
-          intensity={100} 
-          tint="dark"
-          style={{
-            borderRadius: 28,
-            overflow: 'hidden',
-            backgroundColor: 'rgba(26, 26, 26, 0.8)',
-            width: '100%',
-            height: '100%',
-          }}
-        >
-          {/* Header */}
-          <LinearGradient
-            colors={[
-              'rgba(229, 9, 20, 0.95)',
-              'rgba(176, 6, 16, 0.95)',
-              'rgba(139, 5, 12, 0.9)'
-            ]}
-            locations={[0, 0.6, 1]}
+        <TouchableOpacity 
+          style={{ flex: 1 }}
+          onPress={handleClose}
+          activeOpacity={1}
+        />
+      </Animated.View>
+
+      {/* Side Menu */}
+      <Animated.View
+        entering={SlideInRight.duration(300)}
+        exiting={SlideOutRight.duration(250)}
+        style={{
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: MENU_WIDTH,
+          backgroundColor: '#1A1A1A',
+          zIndex: 9999,
+          elevation: 20,
+          shadowColor: '#000',
+          shadowOffset: { width: -5, height: 0 },
+          shadowOpacity: 0.3,
+          shadowRadius: 10,
+          borderTopLeftRadius: 20,
+          borderBottomLeftRadius: 20,
+        }}
+      >
+        {/* Header */}
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: 20,
+          paddingTop: 60,
+          paddingBottom: 20,
+          borderBottomWidth: 1,
+          borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+        }}>
+          <Text style={{
+            color: '#FFFFFF',
+            fontSize: 22,
+            fontWeight: '700',
+          }}>
+            Change Source
+          </Text>
+          <TouchableOpacity 
             style={{
-              paddingHorizontal: 28,
-              paddingVertical: 24,
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+            onPress={handleClose}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons name="close" size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView 
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {isChangingSource && (
+            <View style={{
+              backgroundColor: 'rgba(34, 197, 94, 0.1)',
+              borderRadius: 16,
+              padding: 16,
+              marginBottom: 20,
               flexDirection: 'row',
               alignItems: 'center',
-              justifyContent: 'space-between',
-              borderBottomWidth: 1,
-              borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-              width: '100%',
-            }}
-          >
-            <Animated.View 
-              entering={FadeInDown.duration(300).delay(100)}
-              style={{ flex: 1 }}
-            >
+            }}>
+              <ActivityIndicator size="small" color="#22C55E" />
               <Text style={{
-                color: '#fff',
-                fontSize: 24,
-                fontWeight: '800',
-                letterSpacing: -0.8,
-                textShadowColor: 'rgba(0, 0, 0, 0.3)',
-                textShadowOffset: { width: 0, height: 1 },
-                textShadowRadius: 2,
-              }}>
-                Switch Source
-              </Text>
-              <Text style={{
-                color: 'rgba(255, 255, 255, 0.85)',
+                color: '#22C55E',
                 fontSize: 14,
-                marginTop: 4,
-                fontWeight: '500',
-                letterSpacing: 0.2,
+                fontWeight: '600',
+                marginLeft: 12,
               }}>
-                Choose from {Object.values(availableStreams).reduce((acc, curr) => acc + curr.streams.length, 0)} available streams
+                Switching source...
               </Text>
-            </Animated.View>
-            
-            <Animated.View entering={BounceIn.duration(400).delay(200)}>
-              <TouchableOpacity 
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  marginLeft: 16,
-                  borderWidth: 1,
-                  borderColor: 'rgba(255, 255, 255, 0.2)',
-                }}
-                onPress={handleClose}
-                activeOpacity={0.7}
-              >
-                <MaterialIcons name="close" size={20} color="#fff" />
-              </TouchableOpacity>
-            </Animated.View>
-          </LinearGradient>
+            </View>
+          )}
 
-          {/* Content */}
-          <ScrollView 
-            style={{ 
-              maxHeight: MODAL_MAX_HEIGHT - 100, // Account for header height
-              backgroundColor: 'transparent',
-              width: '100%',
-            }}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ 
-              padding: 24,
-              paddingBottom: 32,
-              width: '100%',
-            }}
-            bounces={false}
-          >
-            {sortedProviders.map(([providerId, { streams, addonName }], providerIndex) => (
-              <Animated.View 
-                key={providerId}
-                entering={FadeInDown.duration(400).delay(150 + (providerIndex * 80))}
-                layout={Layout.springify()}
-                style={{
-                  marginBottom: streams.length > 0 ? 32 : 0,
-                  width: '100%',
-                }}
-              >
-                {/* Provider Header */}
-                <View style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  marginBottom: 20,
-                  paddingBottom: 12,
-                  borderBottomWidth: 1,
-                  borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-                  width: '100%',
+          {sortedProviders.length > 0 ? (
+            sortedProviders.map(([providerId, providerData]) => (
+              <View key={providerId} style={{ marginBottom: 30 }}>
+                <Text style={{
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  fontSize: 14,
+                  fontWeight: '600',
+                  marginBottom: 15,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
                 }}>
-                  <LinearGradient
-                    colors={providerId === 'hdrezka' ? ['#00d4aa', '#00a085'] : ['#E50914', '#B00610']}
-                    style={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: 6,
-                      marginRight: 16,
-                      elevation: 3,
-                      shadowColor: providerId === 'hdrezka' ? '#00d4aa' : '#E50914',
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.4,
-                      shadowRadius: 4,
-                    }}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{
-                      color: '#fff',
-                      fontSize: 18,
-                      fontWeight: '700',
-                      letterSpacing: -0.3,
-                    }}>
-                      {addonName}
-                    </Text>
-                    <Text style={{
-                      color: 'rgba(255, 255, 255, 0.6)',
-                      fontSize: 12,
-                      marginTop: 1,
-                      fontWeight: '500',
-                    }}>
-                      Provider • {streams.length} stream{streams.length !== 1 ? 's' : ''}
-                    </Text>
-                  </View>
-                  
-                  <View style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 16,
-                    borderWidth: 1,
-                    borderColor: 'rgba(255, 255, 255, 0.1)',
-                  }}>
-                    <Text style={{
-                      color: 'rgba(255, 255, 255, 0.7)',
-                      fontSize: 11,
-                      fontWeight: '700',
-                      letterSpacing: 0.5,
-                    }}>
-                      {streams.length}
-                    </Text>
-                  </View>
-                </View>
+                  {providerData.addonName} ({providerData.streams.length})
+                </Text>
                 
-                {/* Streams Grid */}
-                <View style={{ gap: 16, width: '100%' }}>
-                  {streams.map((stream, index) => {
-                    const quality = getQualityFromTitle(stream.title);
+                <View style={{ gap: 8 }}>
+                  {providerData.streams.map((stream, index) => {
                     const isSelected = isStreamSelected(stream);
-                    const isHDR = stream.title?.toLowerCase().includes('hdr');
-                    const isDolby = stream.title?.toLowerCase().includes('dolby') || stream.title?.includes('DV');
-                    const size = stream.title?.match(/💾\s*([\d.]+\s*[GM]B)/)?.[1];
-                    const isDebrid = stream.behaviorHints?.cached;
-                    const isHDRezka = providerId === 'hdrezka';
-
+                    const quality = getQualityFromTitle(stream.title) || stream.quality;
+                    
                     return (
-                      <Animated.View
-                        key={`${stream.url}-${index}`}
-                        entering={FadeInDown.duration(300).delay((providerIndex * 80) + (index * 40))}
-                        layout={Layout.springify()}
-                        style={{ width: '100%' }}
+                      <TouchableOpacity
+                        key={`${providerId}-${index}`}
+                        style={{
+                          backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                          borderRadius: 16,
+                          padding: 16,
+                          borderWidth: 1,
+                          borderColor: isSelected ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+                          opacity: isChangingSource && !isSelected ? 0.6 : 1,
+                        }}
+                        onPress={() => handleStreamSelect(stream)}
+                        activeOpacity={0.7}
+                        disabled={isChangingSource}
                       >
-                        <TouchableOpacity
-                          style={{
-                            backgroundColor: isSelected 
-                              ? 'rgba(229, 9, 20, 0.08)' 
-                              : 'rgba(255, 255, 255, 0.03)',
-                            borderRadius: 20,
-                            padding: 20,
-                            borderWidth: 2,
-                            borderColor: isSelected 
-                              ? 'rgba(229, 9, 20, 0.4)' 
-                              : 'rgba(255, 255, 255, 0.08)',
-                            elevation: isSelected ? 8 : 3,
-                            shadowColor: isSelected ? '#E50914' : '#000',
-                            shadowOffset: { width: 0, height: isSelected ? 4 : 2 },
-                            shadowOpacity: isSelected ? 0.3 : 0.1,
-                            shadowRadius: isSelected ? 12 : 6,
-                            transform: [{ scale: isSelected ? 1.02 : 1 }],
-                            width: '100%',
-                          }}
-                          onPress={() => handleStreamSelect(stream)}
-                          disabled={isChangingSource || isSelected}
-                          activeOpacity={0.85}
-                        >
-                          <View style={{
-                            flexDirection: 'row',
-                            alignItems: 'flex-start',
-                            justifyContent: 'space-between',
-                            width: '100%',
-                          }}>
-                            {/* Stream Info */}
-                            <View style={{ flex: 1, marginRight: 16 }}>
-                              {/* Title Row */}
-                              <View style={{
-                                flexDirection: 'row',
-                                alignItems: 'flex-start',
-                                marginBottom: 12,
-                                flexWrap: 'wrap',
-                                gap: 8,
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <View style={{ flex: 1 }}>
+                            <View style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              marginBottom: 8,
+                              gap: 8,
+                            }}>
+                              <Text style={{
+                                color: '#FFFFFF',
+                                fontSize: 15,
+                                fontWeight: '500',
+                                flex: 1,
                               }}>
-                                <Text style={{
-                                  color: isSelected ? '#fff' : 'rgba(255, 255, 255, 0.95)',
-                                  fontSize: 16,
-                                  fontWeight: '700',
-                                  letterSpacing: -0.2,
-                                  flex: 1,
-                                  lineHeight: 22,
-                                }}>
-                                  {isHDRezka ? `HDRezka ${stream.title}` : (stream.name || stream.title || 'Unnamed Stream')}
-                                </Text>
-                                
-                                {isSelected && (
-                                  <Animated.View 
-                                    entering={BounceIn.duration(300)}
-                                    style={{
-                                      flexDirection: 'row',
-                                      alignItems: 'center',
-                                      backgroundColor: 'rgba(229, 9, 20, 0.25)',
-                                      paddingHorizontal: 10,
-                                      paddingVertical: 5,
-                                      borderRadius: 14,
-                                      borderWidth: 1,
-                                      borderColor: 'rgba(229, 9, 20, 0.5)',
-                                      elevation: 4,
-                                      shadowColor: '#E50914',
-                                      shadowOffset: { width: 0, height: 2 },
-                                      shadowOpacity: 0.3,
-                                      shadowRadius: 4,
-                                    }}
-                                  >
-                                    <MaterialIcons name="play-circle-filled" size={12} color="#E50914" />
+                                {stream.title || stream.name || `Stream ${index + 1}`}
+                              </Text>
+                              {quality && <QualityBadge quality={quality} />}
+                            </View>
+                            
+                            {(stream.size || stream.lang) && (
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                {stream.size && (
+                                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <MaterialIcons name="storage" size={14} color="rgba(107, 114, 128, 0.8)" />
                                     <Text style={{
-                                      color: '#E50914',
-                                      fontSize: 10,
-                                      fontWeight: '800',
-                                      marginLeft: 3,
-                                      letterSpacing: 0.3,
-                                    }}>
-                                      PLAYING
-                                    </Text>
-                                  </Animated.View>
-                                )}
-                                
-                                {isChangingSource && isSelected && (
-                                  <Animated.View 
-                                    entering={FadeIn.duration(200)}
-                                    style={{
-                                      backgroundColor: 'rgba(229, 9, 20, 0.2)',
-                                      paddingHorizontal: 8,
-                                      paddingVertical: 4,
-                                      borderRadius: 12,
-                                      flexDirection: 'row',
-                                      alignItems: 'center',
-                                    }}
-                                  >
-                                    <ActivityIndicator size="small" color="#E50914" />
-                                    <Text style={{
-                                      color: '#E50914',
-                                      fontSize: 10,
+                                      color: 'rgba(107, 114, 128, 0.8)',
+                                      fontSize: 12,
                                       fontWeight: '600',
                                       marginLeft: 4,
                                     }}>
-                                      Switching...
+                                      {(stream.size / (1024 * 1024 * 1024)).toFixed(1)} GB
                                     </Text>
-                                  </Animated.View>
+                                  </View>
+                                )}
+                                {stream.lang && (
+                                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <MaterialIcons name="language" size={14} color="rgba(59, 130, 246, 0.8)" />
+                                    <Text style={{
+                                      color: 'rgba(59, 130, 246, 0.8)',
+                                      fontSize: 12,
+                                      fontWeight: '600',
+                                      marginLeft: 4,
+                                    }}>
+                                      {stream.lang.toUpperCase()}
+                                    </Text>
+                                  </View>
                                 )}
                               </View>
-                              
-                              {/* Subtitle */}
-                              {!isHDRezka && stream.title && stream.title !== stream.name && (
-                                <Text style={{
-                                  color: 'rgba(255, 255, 255, 0.65)',
-                                  fontSize: 13,
-                                  marginBottom: 12,
-                                  lineHeight: 18,
-                                  fontWeight: '400',
-                                }}>
-                                  {stream.title}
-                                </Text>
-                              )}
-                              
-                              {/* Enhanced Meta Info */}
-                              <View style={{
-                                flexDirection: 'row',
-                                flexWrap: 'wrap',
-                                gap: 6,
-                                alignItems: 'center',
-                              }}>
-                                <QualityIndicator quality={quality} />
-                                
-                                {isDolby && (
-                                  <StreamMetaBadge 
-                                    text="DOLBY" 
-                                    color="#8B5CF6" 
-                                    bgColor="rgba(139, 92, 246, 0.15)"
-                                    icon="hd"
-                                    delay={100}
-                                  />
-                                )}
-                                
-                                {isHDR && (
-                                  <StreamMetaBadge 
-                                    text="HDR" 
-                                    color="#F59E0B" 
-                                    bgColor="rgba(245, 158, 11, 0.15)"
-                                    icon="brightness-high"
-                                    delay={120}
-                                  />
-                                )}
-                                
-                                {size && (
-                                  <StreamMetaBadge 
-                                    text={size} 
-                                    color="#6B7280" 
-                                    bgColor="rgba(107, 114, 128, 0.15)"
-                                    icon="storage"
-                                    delay={140}
-                                  />
-                                )}
-                                
-                                {isDebrid && (
-                                  <StreamMetaBadge 
-                                    text="DEBRID" 
-                                    color="#00d4aa" 
-                                    bgColor="rgba(0, 212, 170, 0.15)"
-                                    icon="flash-on"
-                                    delay={160}
-                                  />
-                                )}
-                                
-                                {isHDRezka && (
-                                  <StreamMetaBadge 
-                                    text="HDREZKA" 
-                                    color="#00d4aa" 
-                                    bgColor="rgba(0, 212, 170, 0.15)"
-                                    icon="verified"
-                                    delay={180}
-                                  />
-                                )}
-                              </View>
-                            </View>
-                            
-                            {/* Enhanced Action Icon */}
-                            <View style={{
-                              width: 48,
-                              height: 48,
-                              borderRadius: 24,
-                              backgroundColor: isSelected 
-                                ? 'rgba(229, 9, 20, 0.15)' 
-                                : 'rgba(255, 255, 255, 0.05)',
-                              justifyContent: 'center',
-                              alignItems: 'center',
-                              borderWidth: 2,
-                              borderColor: isSelected 
-                                ? 'rgba(229, 9, 20, 0.3)' 
-                                : 'rgba(255, 255, 255, 0.1)',
-                              elevation: 4,
-                              shadowColor: isSelected ? '#E50914' : '#fff',
-                              shadowOffset: { width: 0, height: 2 },
-                              shadowOpacity: isSelected ? 0.2 : 0.05,
-                              shadowRadius: 4,
-                            }}>
-                              {isSelected ? (
-                                <Animated.View entering={ZoomIn.duration(200)}>
-                                  <MaterialIcons name="check-circle" size={24} color="#E50914" />
-                                </Animated.View>
-                              ) : (
-                                <MaterialIcons name="play-arrow" size={24} color="rgba(255,255,255,0.6)" />
-                              )}
-                            </View>
+                            )}
                           </View>
-                        </TouchableOpacity>
-                      </Animated.View>
+                          
+                          <View style={{
+                            marginLeft: 12,
+                            alignItems: 'center',
+                          }}>
+                            {isSelected ? (
+                              <MaterialIcons name="check" size={20} color="#3B82F6" />
+                            ) : (
+                              <MaterialIcons name="play-arrow" size={20} color="rgba(255,255,255,0.4)" />
+                            )}
+                          </View>
+                        </View>
+                      </TouchableOpacity>
                     );
                   })}
                 </View>
-              </Animated.View>
-            ))}
-          </ScrollView>
-        </BlurView>
+              </View>
+            ))
+          ) : (
+            <View style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.05)',
+              borderRadius: 16,
+              padding: 20,
+              alignItems: 'center',
+            }}>
+              <MaterialIcons name="error-outline" size={48} color="rgba(255,255,255,0.3)" />
+              <Text style={{
+                color: 'rgba(255, 255, 255, 0.6)',
+                fontSize: 16,
+                marginTop: 16,
+                textAlign: 'center',
+              }}>
+                No sources available
+              </Text>
+              <Text style={{
+                color: 'rgba(255, 255, 255, 0.4)',
+                fontSize: 14,
+                marginTop: 8,
+                textAlign: 'center',
+              }}>
+                Try searching for different content
+              </Text>
+            </View>
+          )}
+        </ScrollView>
       </Animated.View>
-    </Animated.View>
+    </>
   );
 };
-
-export default SourcesModal;

@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect, useMemo } from 'react';
+import React, { useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 import { useTheme } from '../contexts/ThemeContext';
 import { useMetadata } from '../hooks/useMetadata';
 import { CastSection } from '../components/metadata/CastSection';
+import { CastDetailsModal } from '../components/metadata/CastDetailsModal';
 import { SeriesContent } from '../components/metadata/SeriesContent';
 import { MovieContent } from '../components/metadata/MovieContent';
 import { MoreLikeThisSection } from '../components/metadata/MoreLikeThisSection';
@@ -56,9 +57,9 @@ const MetadataScreen: React.FC = () => {
 
   // Optimized state management - reduced state variables
   const [isContentReady, setIsContentReady] = useState(false);
-  const [showSkeleton, setShowSkeleton] = useState(true);
-  const transitionOpacity = useSharedValue(0);
-  const skeletonOpacity = useSharedValue(1);
+  const [showCastModal, setShowCastModal] = useState(false);
+  const [selectedCastMember, setSelectedCastMember] = useState<any>(null);
+  const transitionOpacity = useSharedValue(1);
 
   const {
     metadata,
@@ -187,26 +188,14 @@ const MetadataScreen: React.FC = () => {
   // Memoized derived values for performance
   const isReady = useMemo(() => !loading && metadata && !metadataError, [loading, metadata, metadataError]);
   
-  // Smooth skeleton to content transition
+  // Simple content ready state management
   useEffect(() => {
-    if (isReady && !isContentReady) {
-      // Small delay to ensure skeleton is rendered before starting transition
-      setTimeout(() => {
-        // Start fade out skeleton and fade in content simultaneously
-        skeletonOpacity.value = withTiming(0, { duration: 300 });
-        transitionOpacity.value = withTiming(1, { duration: 400 });
-        
-        // Hide skeleton after fade out completes
-        setTimeout(() => {
-          setShowSkeleton(false);
-          setIsContentReady(true);
-        }, 300);
-      }, 100);
+    if (isReady) {
+      setIsContentReady(true);
+      transitionOpacity.value = withTiming(1, { duration: 50 });
     } else if (!isReady && isContentReady) {
       setIsContentReady(false);
-      setShowSkeleton(true);
       transitionOpacity.value = 0;
-      skeletonOpacity.value = 1;
     }
   }, [isReady, isContentReady]);
 
@@ -223,25 +212,111 @@ const MetadataScreen: React.FC = () => {
 
   const handleShowStreams = useCallback(() => {
     const { watchProgress } = watchProgressData;
+
+    // Helper to build episodeId from episode object
+    const buildEpisodeId = (ep: any): string => {
+      return ep.stremioId || `${id}:${ep.season_number}:${ep.episode_number}`;
+    };
+
     if (type === 'series') {
-      const targetEpisodeId = watchProgress?.episodeId || episodeId || (episodes.length > 0 ? 
-        (episodes[0].stremioId || `${id}:${episodes[0].season_number}:${episodes[0].episode_number}`) : undefined);
-      
+      // Determine if current episode is finished
+      let progressPercent = 0;
+      if (watchProgress && watchProgress.duration > 0) {
+        progressPercent = (watchProgress.currentTime / watchProgress.duration) * 100;
+      }
+
+      let targetEpisodeId: string | undefined;
+
+      if (progressPercent >= 85 && watchProgress?.episodeId) {
+        // Try to navigate to next episode – support multiple episodeId formats
+        let currentSeason: number | null = null;
+        let currentEpisode: number | null = null;
+
+        const parts = watchProgress.episodeId.split(':');
+
+        if (parts.length === 3) {
+          // showId:season:episode
+          currentSeason = parseInt(parts[1], 10);
+          currentEpisode = parseInt(parts[2], 10);
+        } else if (parts.length === 2) {
+          // season:episode
+          currentSeason = parseInt(parts[0], 10);
+          currentEpisode = parseInt(parts[1], 10);
+        } else {
+          // pattern like s5e01
+          const match = watchProgress.episodeId.match(/s(\d+)e(\d+)/i);
+          if (match) {
+            currentSeason = parseInt(match[1], 10);
+            currentEpisode = parseInt(match[2], 10);
+          }
+        }
+
+        if (currentSeason !== null && currentEpisode !== null) {
+          // DIRECT APPROACH: Just create the next episode ID directly
+          // This ensures we navigate to the next episode even if it's not yet in our episodes array
+          const nextEpisodeId = `${id}:${currentSeason}:${currentEpisode + 1}`;
+          console.log(`[MetadataScreen] Created next episode ID directly: ${nextEpisodeId}`);
+          
+          // Still try to find the episode in our list to verify it exists
+          const nextEpisodeExists = episodes.some(ep => 
+            ep.season_number === currentSeason && ep.episode_number === (currentEpisode + 1)
+          );
+          
+          if (nextEpisodeExists) {
+            console.log(`[MetadataScreen] Verified next episode S${currentSeason}E${currentEpisode + 1} exists in episodes list`);
+          } else {
+            console.log(`[MetadataScreen] Warning: Next episode S${currentSeason}E${currentEpisode + 1} not found in episodes list, but proceeding anyway`);
+          }
+          
+          targetEpisodeId = nextEpisodeId;
+        }
+      }
+
+      // Fallback logic: if not finished or nextEp not found
+      if (!targetEpisodeId) {
+        targetEpisodeId = watchProgress?.episodeId || episodeId || (episodes.length > 0 ? buildEpisodeId(episodes[0]) : undefined);
+        console.log(`[MetadataScreen] Using fallback episode ID: ${targetEpisodeId}`);
+      }
+
       if (targetEpisodeId) {
-        navigation.navigate('Streams', { id, type, episodeId: targetEpisodeId });
+        // Ensure the episodeId has showId prefix (id:season:episode)
+        const epParts = targetEpisodeId.split(':');
+        let normalizedEpisodeId = targetEpisodeId;
+        if (epParts.length === 2) {
+          normalizedEpisodeId = `${id}:${epParts[0]}:${epParts[1]}`;
+        }
+        console.log(`[MetadataScreen] Navigating to streams with episodeId: ${normalizedEpisodeId}`);
+        navigation.navigate('Streams', { id, type, episodeId: normalizedEpisodeId });
         return;
       }
     }
-    navigation.navigate('Streams', { id, type, episodeId });
+
+    // Normalize fallback episodeId too
+    let fallbackEpisodeId = episodeId;
+    if (episodeId && episodeId.split(':').length === 2) {
+      const p = episodeId.split(':');
+      fallbackEpisodeId = `${id}:${p[0]}:${p[1]}`;
+    }
+    console.log(`[MetadataScreen] Navigating with fallback episodeId: ${fallbackEpisodeId}`);
+    navigation.navigate('Streams', { id, type, episodeId: fallbackEpisodeId });
   }, [navigation, id, type, episodes, episodeId, watchProgressData.watchProgress]);
 
   const handleEpisodeSelect = useCallback((episode: Episode) => {
+    console.log('[MetadataScreen] Selected Episode:', JSON.stringify(episode, null, 2));
     const episodeId = episode.stremioId || `${id}:${episode.season_number}:${episode.episode_number}`;
-    navigation.navigate('Streams', { id, type, episodeId });
+    navigation.navigate('Streams', { 
+      id, 
+      type, 
+      episodeId,
+      episodeThumbnail: episode.still_path || undefined
+    });
   }, [navigation, id, type]);
 
   const handleBack = useCallback(() => navigation.goBack(), [navigation]);
-  const handleSelectCastMember = useCallback(() => {}, []); // Simplified for performance
+  const handleSelectCastMember = useCallback((castMember: any) => {
+    setSelectedCastMember(castMember);
+    setShowCastModal(true);
+  }, []);
 
   // Ultra-optimized animated styles - minimal calculations
   const containerStyle = useAnimatedStyle(() => ({
@@ -255,10 +330,6 @@ const MetadataScreen: React.FC = () => {
 
   const transitionStyle = useAnimatedStyle(() => ({
     opacity: transitionOpacity.value,
-  }), []);
-
-  const skeletonStyle = useAnimatedStyle(() => ({
-    opacity: skeletonOpacity.value,
   }), []);
 
   // Memoized error component for performance
@@ -299,123 +370,123 @@ const MetadataScreen: React.FC = () => {
     return ErrorComponent;
   }
 
-  return (
-    <View style={StyleSheet.absoluteFill}>
-      {/* Skeleton Loading Screen - with fade out transition */}
-      {showSkeleton && (
-        <Animated.View 
-          style={[StyleSheet.absoluteFill, skeletonStyle]}
-          pointerEvents={metadata ? 'none' : 'auto'}
-        >
-          <MetadataLoadingScreen type={metadata?.type === 'movie' ? 'movie' : 'series'} />
-        </Animated.View>
-      )}
+  // Show loading screen if metadata is not yet available
+  if (loading || !isContentReady) {
+    return <MetadataLoadingScreen type={type as 'movie' | 'series'} />;
+  }
 
-      {/* Main Content - with fade in transition */}
+  return (
+    <SafeAreaView 
+      style={[containerStyle, styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}
+      edges={['bottom']}
+    >
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" animated />
+      
       {metadata && (
-        <Animated.View 
-          style={[StyleSheet.absoluteFill, transitionStyle]}
-          pointerEvents={metadata ? 'auto' : 'none'}
-        >
-          <SafeAreaView 
-            style={[containerStyle, styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}
-            edges={['bottom']}
+        <>
+          {/* Floating Header - Optimized */}
+          <FloatingHeader 
+            metadata={metadata}
+            logoLoadError={assetData.logoLoadError}
+            handleBack={handleBack}
+            handleToggleLibrary={handleToggleLibrary}
+            headerElementsY={animations.headerElementsY}
+            inLibrary={inLibrary}
+            headerOpacity={animations.headerOpacity}
+            headerElementsOpacity={animations.headerElementsOpacity}
+            safeAreaTop={safeAreaTop}
+            setLogoLoadError={assetData.setLogoLoadError}
+          />
+
+          <Animated.ScrollView
+            style={styles.scrollView}
+            showsVerticalScrollIndicator={false}
+            onScroll={animations.scrollHandler}
+            scrollEventThrottle={16}
+            bounces={false}
+            overScrollMode="never"
+            contentContainerStyle={styles.scrollContent}
           >
-            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" animated />
-            
-            {/* Floating Header - Optimized */}
-            <FloatingHeader 
+            {/* Hero Section - Optimized */}
+            <HeroSection 
               metadata={metadata}
+              bannerImage={assetData.bannerImage}
+              loadingBanner={assetData.loadingBanner}
               logoLoadError={assetData.logoLoadError}
-              handleBack={handleBack}
+              scrollY={animations.scrollY}
+              heroHeight={animations.heroHeight}
+              heroOpacity={animations.heroOpacity}
+              logoOpacity={animations.logoOpacity}
+              buttonsOpacity={animations.buttonsOpacity}
+              buttonsTranslateY={animations.buttonsTranslateY}
+              watchProgressOpacity={animations.watchProgressOpacity}
+              watchProgressWidth={animations.watchProgressWidth}
+              watchProgress={watchProgressData.watchProgress}
+              type={type as 'movie' | 'series'}
+              getEpisodeDetails={watchProgressData.getEpisodeDetails}
+              handleShowStreams={handleShowStreams}
               handleToggleLibrary={handleToggleLibrary}
-              headerElementsY={animations.headerElementsY}
               inLibrary={inLibrary}
-              headerOpacity={animations.headerOpacity}
-              headerElementsOpacity={animations.headerElementsOpacity}
-              safeAreaTop={safeAreaTop}
+              id={id}
+              navigation={navigation}
+              getPlayButtonText={watchProgressData.getPlayButtonText}
+              setBannerImage={assetData.setBannerImage}
               setLogoLoadError={assetData.setLogoLoadError}
+              groupedEpisodes={groupedEpisodes}
             />
 
-            <Animated.ScrollView
-              style={styles.scrollView}
-              showsVerticalScrollIndicator={false}
-              onScroll={animations.scrollHandler}
-              scrollEventThrottle={16}
-              bounces={false}
-              overScrollMode="never"
-              contentContainerStyle={styles.scrollContent}
-            >
-              {/* Hero Section - Optimized */}
-              <HeroSection 
+            {/* Main Content - Optimized */}
+            <Animated.View style={contentStyle}>
+              <MetadataDetails 
                 metadata={metadata}
-                bannerImage={assetData.bannerImage}
-                loadingBanner={assetData.loadingBanner}
-                logoLoadError={assetData.logoLoadError}
-                scrollY={animations.scrollY}
-                heroHeight={animations.heroHeight}
-                heroOpacity={animations.heroOpacity}
-                logoOpacity={animations.logoOpacity}
-                buttonsOpacity={animations.buttonsOpacity}
-                buttonsTranslateY={animations.buttonsTranslateY}
-                watchProgressOpacity={animations.watchProgressOpacity}
-                watchProgressWidth={animations.watchProgressWidth}
-                watchProgress={watchProgressData.watchProgress}
+                imdbId={imdbId}
                 type={type as 'movie' | 'series'}
-                getEpisodeDetails={watchProgressData.getEpisodeDetails}
-                handleShowStreams={handleShowStreams}
-                handleToggleLibrary={handleToggleLibrary}
-                inLibrary={inLibrary}
-                id={id}
-                navigation={navigation}
-                getPlayButtonText={watchProgressData.getPlayButtonText}
-                setBannerImage={assetData.setBannerImage}
-                setLogoLoadError={assetData.setLogoLoadError}
+                renderRatings={() => imdbId ? (
+                  <RatingsSection imdbId={imdbId} type={type === 'series' ? 'show' : 'movie'} />
+                ) : null}
               />
 
-              {/* Main Content - Optimized */}
-              <Animated.View style={contentStyle}>
-                <MetadataDetails 
-                  metadata={metadata}
-                  imdbId={imdbId}
-                  type={type as 'movie' | 'series'}
-                  renderRatings={() => imdbId ? (
-                    <RatingsSection imdbId={imdbId} type={type === 'series' ? 'show' : 'movie'} />
-                  ) : null}
+              {/* Cast Section with skeleton when loading */}
+              <CastSection
+                cast={cast}
+                loadingCast={loadingCast}
+                onSelectCastMember={handleSelectCastMember}
+              />
+
+              {/* Recommendations Section with skeleton when loading */}
+              {type === 'movie' && (
+                <MoreLikeThisSection 
+                  recommendations={recommendations}
+                  loadingRecommendations={loadingRecommendations}
                 />
+              )}
 
-                <CastSection
-                  cast={cast}
-                  loadingCast={loadingCast}
-                  onSelectCastMember={handleSelectCastMember}
+              {/* Series/Movie Content with episode skeleton when loading */}
+              {type === 'series' ? (
+                <SeriesContent
+                  episodes={Object.values(groupedEpisodes).flat()}
+                  selectedSeason={selectedSeason}
+                  loadingSeasons={loadingSeasons}
+                  onSeasonChange={handleSeasonChangeWithHaptics}
+                  onSelectEpisode={handleEpisodeSelect}
+                  groupedEpisodes={groupedEpisodes}
+                  metadata={metadata || undefined}
                 />
-
-                {type === 'movie' && (
-                  <MoreLikeThisSection 
-                    recommendations={recommendations}
-                    loadingRecommendations={loadingRecommendations}
-                  />
-                )}
-
-                {type === 'series' ? (
-                  <SeriesContent
-                    episodes={episodes}
-                    selectedSeason={selectedSeason}
-                    loadingSeasons={loadingSeasons}
-                    onSeasonChange={handleSeasonChangeWithHaptics}
-                    onSelectEpisode={handleEpisodeSelect}
-                    groupedEpisodes={groupedEpisodes}
-                    metadata={metadata || undefined}
-                  />
-                ) : (
-                  metadata && <MovieContent metadata={metadata} />
-                )}
-              </Animated.View>
-            </Animated.ScrollView>
-          </SafeAreaView>
-        </Animated.View>
+              ) : (
+                metadata && <MovieContent metadata={metadata} />
+              )}
+            </Animated.View>
+          </Animated.ScrollView>
+        </>
       )}
-    </View>
+      
+      {/* Cast Details Modal */}
+      <CastDetailsModal
+        visible={showCastModal}
+        onClose={() => setShowCastModal(false)}
+        castMember={selectedCastMember}
+      />
+    </SafeAreaView>
   );
 };
 
@@ -465,6 +536,44 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Skeleton loading styles
+  skeletonSection: {
+    padding: 16,
+    marginBottom: 24,
+  },
+  skeletonTitle: {
+    width: 150,
+    height: 20,
+    borderRadius: 4,
+    marginBottom: 16,
+  },
+  skeletonCastRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  skeletonCastItem: {
+    width: 80,
+    height: 120,
+    borderRadius: 8,
+  },
+  skeletonRecommendationsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  skeletonRecommendationItem: {
+    width: 120,
+    height: 180,
+    borderRadius: 8,
+  },
+  skeletonEpisodesContainer: {
+    gap: 12,
+  },
+  skeletonEpisodeItem: {
+    width: '100%',
+    height: 80,
+    borderRadius: 8,
+    marginBottom: 8,
   },
 });
 

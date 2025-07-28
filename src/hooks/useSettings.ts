@@ -34,9 +34,13 @@ export interface AppSettings {
   selectedHeroCatalogs: string[]; // Array of catalog IDs to display in hero section
   logoSourcePreference: 'metahub' | 'tmdb'; // Preferred source for title logos
   tmdbLanguagePreference: string; // Preferred language for TMDB logos (ISO 639-1 code)
-  enableInternalProviders: boolean; // Toggle for internal providers like HDRezka
   episodeLayoutStyle: 'vertical' | 'horizontal'; // Layout style for episode cards
   autoplayBestStream: boolean; // Automatically play the best available stream
+  // Local scraper settings
+  scraperRepositoryUrl: string; // URL to the scraper repository
+  enableLocalScrapers: boolean; // Enable/disable local scraper functionality
+  scraperTimeout: number; // Timeout for scraper execution in seconds
+  enableScraperUrlValidation: boolean; // Enable/disable URL validation for scrapers
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -49,13 +53,17 @@ export const DEFAULT_SETTINGS: AppSettings = {
   useExternalPlayer: false,
   preferredPlayer: 'internal',
   showHeroSection: true,
-  featuredContentSource: 'tmdb',
+  featuredContentSource: 'catalogs',
   selectedHeroCatalogs: [], // Empty array means all catalogs are selected
   logoSourcePreference: 'metahub', // Default to Metahub as first source
   tmdbLanguagePreference: 'en', // Default to English
-  enableInternalProviders: true, // Enable internal providers by default
   episodeLayoutStyle: 'horizontal', // Default to the new horizontal layout
   autoplayBestStream: false, // Disabled by default for user choice
+  // Local scraper defaults
+  scraperRepositoryUrl: '',
+  enableLocalScrapers: true,
+  scraperTimeout: 60, // 60 seconds timeout
+  enableScraperUrlValidation: true, // Enable URL validation by default
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';
@@ -78,10 +86,14 @@ export const useSettings = () => {
     try {
       const storedSettings = await AsyncStorage.getItem(SETTINGS_STORAGE_KEY);
       if (storedSettings) {
-        setSettings(JSON.parse(storedSettings));
+        const parsedSettings = JSON.parse(storedSettings);
+        // Merge with defaults to ensure all properties exist
+        setSettings({ ...DEFAULT_SETTINGS, ...parsedSettings });
       }
     } catch (error) {
       console.error('Failed to load settings:', error);
+      // Fallback to default settings on error
+      setSettings(DEFAULT_SETTINGS);
     }
   };
 

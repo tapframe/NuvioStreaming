@@ -36,11 +36,8 @@ const calculatePosterLayout = (screenWidth: number) => {
     const usableWidth = availableWidth - 8;
     const posterWidth = (usableWidth - (n - 1) * SPACING) / (n + 0.25);
     
-    console.log(`[CatalogSection] Testing ${n} posters: width=${posterWidth.toFixed(1)}px, screen=${screenWidth}px`);
-    
     if (posterWidth >= MIN_POSTER_WIDTH && posterWidth <= MAX_POSTER_WIDTH) {
       bestLayout = { numFullPosters: n, posterWidth };
-      console.log(`[CatalogSection] Selected layout: ${n} full posters at ${posterWidth.toFixed(1)}px each`);
     }
   }
   
@@ -79,17 +76,12 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
   return (
     <Animated.View 
       style={styles.catalogContainer}
-      entering={FadeIn.duration(400).delay(50)}
+      entering={FadeIn.duration(300).delay(50)}
     >
       <View style={styles.catalogHeader}>
         <View style={styles.titleContainer}>
-          <Text style={[styles.catalogTitle, { color: currentTheme.colors.highEmphasis }]}>{catalog.name}</Text>
-          <LinearGradient
-            colors={[currentTheme.colors.primary, currentTheme.colors.secondary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.titleUnderline}
-          />
+          <Text style={[styles.catalogTitle, { color: currentTheme.colors.text }]} numberOfLines={1}>{catalog.name}</Text>
+          <View style={[styles.titleUnderline, { backgroundColor: currentTheme.colors.primary }]} />
         </View>
         <TouchableOpacity
           onPress={() => 
@@ -99,10 +91,10 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
               addonId: catalog.addon
             })
           }
-          style={styles.seeAllButton}
+          style={styles.viewAllButton}
         >
-          <Text style={[styles.seeAllText, { color: currentTheme.colors.primary }]}>See More</Text>
-          <MaterialIcons name="arrow-forward" color={currentTheme.colors.primary} size={16} />
+          <Text style={[styles.viewAllText, { color: currentTheme.colors.textMuted }]}>View All</Text>
+          <MaterialIcons name="chevron-right" size={20} color={currentTheme.colors.textMuted} />
         </TouchableOpacity>
       </View>
       
@@ -117,15 +109,20 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
         decelerationRate="fast"
         snapToAlignment="start"
         ItemSeparatorComponent={() => <View style={{ width: 8 }} />}
-        initialNumToRender={4}
-        maxToRenderPerBatch={4}
-        windowSize={5}
+        initialNumToRender={3}
+        maxToRenderPerBatch={2}
+        windowSize={3}
         removeClippedSubviews={Platform.OS === 'android'}
+        updateCellsBatchingPeriod={50}
         getItemLayout={(data, index) => ({
           length: POSTER_WIDTH + 8,
           offset: (POSTER_WIDTH + 8) * index,
           index,
         })}
+        maintainVisibleContentPosition={{
+          minIndexForVisible: 0
+        }}
+        onEndReachedThreshold={1}
       />
     </Animated.View>
   );
@@ -133,45 +130,51 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
 
 const styles = StyleSheet.create({
   catalogContainer: {
-    marginBottom: 24,
+    marginBottom: 28,
   },
   catalogHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   titleContainer: {
     position: 'relative',
+    flex: 1,
+    marginRight: 16,
   },
   catalogTitle: {
-    fontSize: 19,
-    fontWeight: '700',
-    letterSpacing: 0.2,
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: 0.5,
     marginBottom: 4,
   },
   titleUnderline: {
     position: 'absolute',
     bottom: -2,
     left: 0,
-    width: 35,
-    height: 2,
-    borderRadius: 1,
+    width: 40,
+    height: 3,
+    borderRadius: 2,
     opacity: 0.8,
   },
-  seeAllButton: {
+  viewAllButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
-  seeAllText: {
+  viewAllText: {
     fontSize: 14,
     fontWeight: '600',
+    marginRight: 4,
   },
   catalogList: {
     paddingHorizontal: 16,
   },
 });
 
-export default CatalogSection; 
+export default React.memo(CatalogSection); 

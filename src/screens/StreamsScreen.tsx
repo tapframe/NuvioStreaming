@@ -16,7 +16,7 @@ import {
   Linking,
 } from 'react-native';
 import * as ScreenOrientation from 'expo-screen-orientation';
-import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useRoute, useNavigation } from '@react-navigation/native';
 import { RouteProp } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -24,10 +24,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import { RootStackParamList, RootStackNavigationProp } from '../navigation/AppNavigator';
 import { useMetadata } from '../hooks/useMetadata';
+import { useMetadataAssets } from '../hooks/useMetadataAssets';
 import { useTheme } from '../contexts/ThemeContext';
 import { Stream } from '../types/metadata';
 import { tmdbService } from '../services/tmdbService';
 import { stremioService } from '../services/stremioService';
+import { localScraperService } from '../services/localScraperService';
 import { VideoPlayerService } from '../services/videoPlayerService';
 import { useSettings } from '../hooks/useSettings';
 import QualityBadge from '../components/metadata/QualityBadge';
@@ -56,116 +58,56 @@ const DOLBY_ICON = 'https://upload.wikimedia.org/wikipedia/en/thumb/3/3f/Dolby_V
 const { width, height } = Dimensions.get('window');
 
 // Extracted Components
-const StreamCard = ({ stream, onPress, index, isLoading, statusMessage, theme, isExiting }: { 
+const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, theme }: { 
   stream: Stream; 
   onPress: () => void; 
   index: number;
   isLoading?: boolean;
   statusMessage?: string;
   theme: any;
-  isExiting?: boolean;
 }) => {
   const styles = React.useMemo(() => createStyles(theme.colors), [theme.colors]);
   
-  const quality = stream.title?.match(/(\d+)p/)?.[1] || null;
-  const isHDR = stream.title?.toLowerCase().includes('hdr');
-  const isDolby = stream.title?.toLowerCase().includes('dolby') || stream.title?.includes('DV');
-  const size = stream.title?.match(/💾\s*([\d.]+\s*[GM]B)/)?.[1];
-  const isDebrid = stream.behaviorHints?.cached;
+  const streamInfo = useMemo(() => {
+    const title = stream.title || '';
+    const name = stream.name || '';
+    
+    // Helper function to format size from bytes
+    const formatSize = (bytes: number): string => {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    };
+    
+    // Get size from title (legacy format) or from stream.size field
+    let sizeDisplay = title.match(/💾\s*([\d.]+\s*[GM]B)/)?.[1];
+    if (!sizeDisplay && stream.size && typeof stream.size === 'number' && stream.size > 0) {
+      sizeDisplay = formatSize(stream.size);
+    }
+    
+    // Extract quality for badge display
+    const basicQuality = title.match(/(\d+)p/)?.[1] || null;
+    
+    return {
+      quality: basicQuality,
+      isHDR: title.toLowerCase().includes('hdr'),
+      isDolby: title.toLowerCase().includes('dolby') || title.includes('DV'),
+      size: sizeDisplay,
+      isDebrid: stream.behaviorHints?.cached,
+      displayName: name || 'Unnamed Stream',
+      subTitle: title && title !== name ? title : null
+    };
+  }, [stream.name, stream.title, stream.behaviorHints, stream.size]);
   
-  // Determine if this is a HDRezka stream
-  const isHDRezka = stream.name === 'HDRezka';
-
-  // For HDRezka streams, the title contains the quality information
-  const displayTitle = isHDRezka ? `HDRezka ${stream.title}` : (stream.name || stream.title || 'Unnamed Stream');
-  const displayAddonName = isHDRezka ? '' : (stream.title || '');
-
-  // Animation delay based on index - stagger effect (only if not exiting)
-  const enterDelay = isExiting ? 0 : 100 + (index * 30);
-
-  // Use simple View when exiting to prevent animation conflicts
-  if (isExiting) {
-    return (
-      <View>
-        <TouchableOpacity 
-          style={[
-            styles.streamCard, 
-            isLoading && styles.streamCardLoading
-          ]} 
-          onPress={onPress}
-          disabled={isLoading}
-          activeOpacity={0.7}
-        >
-          <View style={styles.streamDetails}>
-            <View style={styles.streamNameRow}>
-              <View style={styles.streamTitleContainer}>
-                <Text style={[styles.streamName, { color: theme.colors.highEmphasis }]}>
-                  {displayTitle}
-                </Text>
-                {displayAddonName && displayAddonName !== displayTitle && (
-                  <Text style={[styles.streamAddonName, { color: theme.colors.mediumEmphasis }]}>
-                    {displayAddonName}
-                  </Text>
-                )}
-              </View>
-              
-              {/* Show loading indicator if stream is loading */}
-              {isLoading && (
-                <View style={styles.loadingIndicator}>
-                  <ActivityIndicator size="small" color={theme.colors.primary} />
-                  <Text style={[styles.loadingText, { color: theme.colors.primary }]}>
-                    {statusMessage || "Loading..."}
-                  </Text>
-                </View>
-              )}
-            </View>
-            
-            <View style={styles.streamMetaRow}>
-              {quality && quality >= "720" && (
-                <QualityBadge type="HD" />
-              )}
-              
-              {isDolby && (
-                <QualityBadge type="VISION" />
-              )}
-              
-              {size && (
-                <View style={[styles.chip, { backgroundColor: theme.colors.darkGray }]}>
-                  <Text style={[styles.chipText, { color: theme.colors.white }]}>{size}</Text>
-                </View>
-              )}
-              
-              {isDebrid && (
-                <View style={[styles.chip, { backgroundColor: theme.colors.success }]}>
-                  <Text style={[styles.chipText, { color: theme.colors.white }]}>DEBRID</Text>
-                </View>
-              )}
-              
-              {/* Special badge for HDRezka streams */}
-              {isHDRezka && (
-                <View style={[styles.chip, { backgroundColor: theme.colors.accent }]}>
-                  <Text style={[styles.chipText, { color: theme.colors.white }]}>HDREZKA</Text>
-                </View>
-              )}
-            </View>
-          </View>
-          
-          <View style={styles.streamAction}>
-            <MaterialIcons 
-              name="play-arrow" 
-              size={24} 
-              color={theme.colors.primary} 
-            />
-          </View>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  // Animation delay based on index - stagger effect
+  const enterDelay = 100 + (index * 30);
 
   return (
     <Animated.View
       entering={FadeInDown.duration(200).delay(enterDelay)}
-      layout={Layout.duration(200)}
+      exiting={FadeOut.duration(150)}
     >
       <TouchableOpacity 
         style={[
@@ -180,11 +122,11 @@ const StreamCard = ({ stream, onPress, index, isLoading, statusMessage, theme, i
           <View style={styles.streamNameRow}>
             <View style={styles.streamTitleContainer}>
               <Text style={[styles.streamName, { color: theme.colors.highEmphasis }]}>
-                {displayTitle}
+                {streamInfo.displayName}
               </Text>
-              {displayAddonName && displayAddonName !== displayTitle && (
+              {streamInfo.subTitle && (
                 <Text style={[styles.streamAddonName, { color: theme.colors.mediumEmphasis }]}>
-                  {displayAddonName}
+                  {streamInfo.subTitle}
                 </Text>
               )}
             </View>
@@ -201,30 +143,19 @@ const StreamCard = ({ stream, onPress, index, isLoading, statusMessage, theme, i
           </View>
           
           <View style={styles.streamMetaRow}>
-            {quality && quality >= "720" && (
-              <QualityBadge type="HD" />
-            )}
-            
-            {isDolby && (
+            {streamInfo.isDolby && (
               <QualityBadge type="VISION" />
             )}
             
-            {size && (
+            {streamInfo.size && (
               <View style={[styles.chip, { backgroundColor: theme.colors.darkGray }]}>
-                <Text style={[styles.chipText, { color: theme.colors.white }]}>{size}</Text>
+                <Text style={[styles.chipText, { color: theme.colors.white }]}>💾 {streamInfo.size}</Text>
               </View>
             )}
             
-            {isDebrid && (
+            {streamInfo.isDebrid && (
               <View style={[styles.chip, { backgroundColor: theme.colors.success }]}>
                 <Text style={[styles.chipText, { color: theme.colors.white }]}>DEBRID</Text>
-              </View>
-            )}
-            
-            {/* Special badge for HDRezka streams */}
-            {isHDRezka && (
-              <View style={[styles.chip, { backgroundColor: theme.colors.accent }]}>
-                <Text style={[styles.chipText, { color: theme.colors.white }]}>HDREZKA</Text>
               </View>
             )}
           </View>
@@ -240,7 +171,7 @@ const StreamCard = ({ stream, onPress, index, isLoading, statusMessage, theme, i
       </TouchableOpacity>
     </Animated.View>
   );
-};
+});
 
 const QualityTag = React.memo(({ text, color, theme }: { text: string; color: string; theme: any }) => {
   const styles = React.useMemo(() => createStyles(theme.colors), [theme.colors]);
@@ -249,6 +180,41 @@ const QualityTag = React.memo(({ text, color, theme }: { text: string; color: st
     <View style={[styles.chip, { backgroundColor: color }]}>
       <Text style={styles.chipText}>{text}</Text>
     </View>
+  );
+});
+
+const PulsingChip = memo(({ text, delay }: { text: string; delay: number }) => {
+  const { currentTheme } = useTheme();
+  const styles = React.useMemo(() => createStyles(currentTheme.colors), [currentTheme.colors]);
+  
+  const pulseValue = useSharedValue(0.6);
+  
+  useEffect(() => {
+    const startPulse = () => {
+      pulseValue.value = withTiming(1, { duration: 1200 }, () => {
+        pulseValue.value = withTiming(0.6, { duration: 1200 }, () => {
+          runOnJS(startPulse)();
+        });
+      });
+    };
+    
+    const timer = setTimeout(startPulse, delay);
+    return () => {
+      clearTimeout(timer);
+      cancelAnimation(pulseValue);
+    };
+  }, [delay]);
+  
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: pulseValue.value
+    };
+  });
+  
+  return (
+    <Animated.View style={[styles.activeScraperChip, animatedStyle]}>
+      <Text style={styles.activeScraperText}>{text}</Text>
+    </Animated.View>
   );
 });
 
@@ -268,7 +234,7 @@ const ProviderFilter = memo(({
   const renderItem = useCallback(({ item, index }: { item: { id: string; name: string }; index: number }) => (
     <Animated.View
       entering={FadeIn.duration(300).delay(100 + index * 40)}
-      layout={Layout.springify()}
+      exiting={FadeOut.duration(150)}
     >
       <TouchableOpacity
         key={item.id}
@@ -318,7 +284,7 @@ const ProviderFilter = memo(({
 export const StreamsScreen = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'Streams'>>();
   const navigation = useNavigation<RootStackNavigationProp>();
-  const { id, type, episodeId } = route.params;
+  const { id, type, episodeId, episodeThumbnail } = route.params;
   const { settings } = useSettings();
   const { currentTheme } = useTheme();
   const { colors } = currentTheme;
@@ -328,14 +294,10 @@ export const StreamsScreen = () => {
   const loadStartTimeRef = useRef(0);
   const hasDoneInitialLoadRef = useRef(false);
   
-  // Add state for handling orientation transition
-  const [isTransitioning, setIsTransitioning] = useState(false);
   
-  // Add state to prevent animation conflicts during exit
-  const [isExiting, setIsExiting] = useState(false);
 
-  // Add timing logs
-  const [loadStartTime, setLoadStartTime] = useState(0);
+  // Track when we started fetching streams so we can show an extended loading state
+  const [streamsLoadStart, setStreamsLoadStart] = useState<number | null>(null);
   const [providerLoadTimes, setProviderLoadTimes] = useState<{[key: string]: number}>({});
   
   // Prevent excessive re-renders by using this guard
@@ -344,6 +306,10 @@ export const StreamsScreen = () => {
       setter();
     }
   }, []);
+
+  useEffect(() => {
+    console.log('[StreamsScreen] Received thumbnail from params:', episodeThumbnail);
+  }, [episodeThumbnail]);
 
   const {
     metadata,
@@ -358,7 +324,14 @@ export const StreamsScreen = () => {
     setSelectedEpisode,
     groupedEpisodes,
     imdbId,
+    scraperStatuses,
+    activeFetchingScrapers,
   } = useMetadata({ id, type });
+
+  // Get backdrop from metadata assets
+  const setMetadataStub = useCallback(() => {}, []);
+  const memoizedSettings = useMemo(() => settings, [settings.logoSourcePreference, settings.tmdbLanguagePreference]);
+  const { bannerImage } = useMetadataAssets(metadata, id, type, imdbId, memoizedSettings, setMetadataStub);
 
   // Create styles using current theme colors
   const styles = React.useMemo(() => createStyles(colors), [colors]);
@@ -416,7 +389,7 @@ export const StreamsScreen = () => {
     }
     
     // Update loading states for individual providers
-    const expectedProviders = ['stremio', 'hdrezka'];
+    const expectedProviders = ['stremio'];
     const now = Date.now();
     
     setLoadingProviders(prevLoading => {
@@ -443,9 +416,14 @@ export const StreamsScreen = () => {
   // Update useEffect to check for sources
   useEffect(() => {
     const checkProviders = async () => {
-      // Check for both Stremio addons and if the internal provider is enabled
+      // Check for Stremio addons
       const hasStremioProviders = await stremioService.hasStreamProviders();
-      const hasProviders = hasStremioProviders || settings.enableInternalProviders;
+      
+      // Check for local scrapers (only if enabled in settings)
+      const hasLocalScrapers = settings.enableLocalScrapers && await localScraperService.hasScrapers();
+      
+      // We have providers if we have either Stremio addons OR enabled local scrapers
+      const hasProviders = hasStremioProviders || hasLocalScrapers;
 
       if (!isMounted.current) return;
 
@@ -461,13 +439,14 @@ export const StreamsScreen = () => {
           if (type === 'series' && episodeId) {
             logger.log(`🎬 Loading episode streams for: ${episodeId}`);
             setLoadingProviders({
-              'stremio': true,
-              'hdrezka': true
+              'stremio': true
             });
             setSelectedEpisode(episodeId);
+            setStreamsLoadStart(Date.now());
             loadEpisodeStreams(episodeId);
           } else if (type === 'movie') {
             logger.log(`🎬 Loading movie streams for: ${id}`);
+            setStreamsLoadStart(Date.now());
             loadStreams();
           }
   
@@ -483,7 +462,7 @@ export const StreamsScreen = () => {
     };
 
     checkProviders();
-  }, [type, id, episodeId, settings.autoplayBestStream, settings.enableInternalProviders]);
+  }, [type, id, episodeId, settings.autoplayBestStream]);
 
   React.useEffect(() => {
     // Trigger entrance animations
@@ -506,9 +485,6 @@ export const StreamsScreen = () => {
 
   // Memoize handlers
   const handleBack = useCallback(() => {
-    // Set exit state to prevent animation conflicts and hide content immediately
-    setIsExiting(true);
-    
     const cleanup = () => {
       headerOpacity.value = withTiming(0, { duration: 100 });
       heroScale.value = withTiming(0.95, { duration: 100 });
@@ -561,8 +537,6 @@ export const StreamsScreen = () => {
 
     // Provider priority (higher number = higher priority)
     const getProviderPriority = (addonId: string): number => {
-      if (addonId === 'hdrezka') return 100; // HDRezka highest priority
-      
       // Get Stremio addon installation order (earlier = higher priority)
       const installedAddons = stremioService.getInstalledAddons();
       const addonIndex = installedAddons.findIndex(addon => addon.id === addonId);
@@ -651,8 +625,7 @@ export const StreamsScreen = () => {
       const streamsToPass = type === 'series' ? episodeStreams : groupedStreams;
       
       // Determine the stream name using the same logic as StreamCard
-      const isHDRezka = stream.name === 'HDRezka';
-      const streamName = isHDRezka ? `HDRezka ${stream.title}` : (stream.name || stream.title || 'Unnamed Stream');
+      const streamName = stream.name || stream.title || 'Unnamed Stream';
       
       navigation.navigate('Player', {
         uri: stream.url,
@@ -669,6 +642,7 @@ export const StreamsScreen = () => {
         episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined,
         imdbId: imdbId || undefined,
         availableStreams: streamsToPass,
+        backdrop: bannerImage || undefined,
       });
     } catch (error) {
       logger.error('[StreamsScreen] Error locking orientation before navigation:', error);
@@ -689,9 +663,10 @@ export const StreamsScreen = () => {
         episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined,
         imdbId: imdbId || undefined,
         availableStreams: streamsToPass,
+        backdrop: bannerImage || undefined,
       });
     }
-  }, [metadata, type, currentEpisode, navigation, id, selectedEpisode, imdbId, episodeStreams, groupedStreams]);
+  }, [metadata, type, currentEpisode, navigation, id, selectedEpisode, imdbId, episodeStreams, groupedStreams, bannerImage]);
 
   // Update handleStreamPress
   const handleStreamPress = useCallback(async (stream: Stream) => {
@@ -892,11 +867,7 @@ export const StreamsScreen = () => {
       { id: 'all', name: 'All Providers' },
       ...Array.from(allProviders)
         .sort((a, b) => {
-          // Put HDRezka first
-          if (a === 'hdrezka') return -1;
-          if (b === 'hdrezka') return 1;
-          
-          // Then sort by Stremio addon installation order
+          // Sort by Stremio addon installation order
           const indexA = installedAddons.findIndex(addon => addon.id === a);
           const indexB = installedAddons.findIndex(addon => addon.id === b);
           
@@ -907,11 +878,6 @@ export const StreamsScreen = () => {
         })
         .map(provider => {
           const addonInfo = streams[provider];
-          
-          // Special handling for HDRezka
-          if (provider === 'hdrezka') {
-            return { id: provider, name: 'HDRezka' };
-          }
           
           // Standard handling for Stremio addons
           const installedAddon = installedAddons.find(addon => addon.id === provider);
@@ -929,48 +895,6 @@ export const StreamsScreen = () => {
     const streams = type === 'series' ? episodeStreams : groupedStreams;
     const installedAddons = stremioService.getInstalledAddons();
 
-    // Helper function to extract quality as a number for sorting
-    const getQualityNumeric = (title: string | undefined): number => {
-      if (!title) return 0;
-      
-      // First try to match quality with "p" (e.g., "1080p", "720p")
-      const matchWithP = title.match(/(\d+)p/i);
-      if (matchWithP) {
-        return parseInt(matchWithP[1], 10);
-      }
-      
-      // Then try to match standalone quality numbers at the end of the title
-      const matchAtEnd = title.match(/\b(\d{3,4})\s*$/);
-      if (matchAtEnd) {
-        const quality = parseInt(matchAtEnd[1], 10);
-        // Only return if it looks like a video quality (between 240 and 8000)
-        if (quality >= 240 && quality <= 8000) {
-          return quality;
-        }
-      }
-      
-      // Try to match quality patterns anywhere in the title with common formats
-      const qualityPatterns = [
-        /\b(\d{3,4})p\b/i,  // 1080p, 720p, etc.
-        /\b(\d{3,4})\s*$/,   // 1080, 720 at end
-        /\s(\d{3,4})\s/,     // 720 surrounded by spaces
-        /-\s*(\d{3,4})\s*$/,  // -720 at end
-        /\b(240|360|480|720|1080|1440|2160|4320|8000)\b/i // specific quality values
-      ];
-      
-      for (const pattern of qualityPatterns) {
-        const match = title.match(pattern);
-        if (match) {
-          const quality = parseInt(match[1], 10);
-          if (quality >= 240 && quality <= 8000) {
-            return quality;
-          }
-        }
-      }
-      
-      return 0;
-    };
-
     // Filter streams by selected provider - only if not "all"
     const filteredEntries = Object.entries(streams)
       .filter(([addonId]) => {
@@ -982,11 +906,7 @@ export const StreamsScreen = () => {
         return addonId === selectedProvider;
       })
       .sort(([addonIdA], [addonIdB]) => {
-        // Put HDRezka first
-        if (addonIdA === 'hdrezka') return -1;
-        if (addonIdB === 'hdrezka') return 1;
-        
-        // Then sort by Stremio addon installation order
+        // Sort by Stremio addon installation order
         const indexA = installedAddons.findIndex(addon => addon.id === addonIdA);
         const indexB = installedAddons.findIndex(addon => addon.id === addonIdB);
         
@@ -996,25 +916,10 @@ export const StreamsScreen = () => {
         return 0;
       })
       .map(([addonId, { addonName, streams: providerStreams }]) => {
-        let sortedProviderStreams = providerStreams;
-        if (addonId === 'hdrezka') {
-          sortedProviderStreams = [...providerStreams].sort((a, b) => {
-            const qualityA = getQualityNumeric(a.title);
-            const qualityB = getQualityNumeric(b.title);
-            return qualityB - qualityA; // Sort descending (e.g., 1080p before 720p)
-          });
-        } else {
-          // Sort other streams by quality if possible
-          sortedProviderStreams = [...providerStreams].sort((a, b) => {
-            const qualityA = getQualityNumeric(a.name || a.title);
-            const qualityB = getQualityNumeric(b.name || b.title);
-            return qualityB - qualityA; // Sort descending
-          });
-        }
         return {
           title: addonName,
           addonId,
-          data: sortedProviderStreams
+          data: providerStreams
         };
       });
       
@@ -1022,15 +927,30 @@ export const StreamsScreen = () => {
   }, [selectedProvider, type, episodeStreams, groupedStreams]);
 
   const episodeImage = useMemo(() => {
+    if (episodeThumbnail) {
+      if (episodeThumbnail.startsWith('http')) {
+        return episodeThumbnail;
+      }
+      return tmdbService.getImageUrl(episodeThumbnail, 'original');
+    }
     if (!currentEpisode) return null;
     if (currentEpisode.still_path) {
+      if (currentEpisode.still_path.startsWith('http')) {
+        return currentEpisode.still_path;
+      }
       return tmdbService.getImageUrl(currentEpisode.still_path, 'original');
     }
     return metadata?.poster || null;
-  }, [currentEpisode, metadata]);
+  }, [currentEpisode, metadata, episodeThumbnail]);
 
   const isLoading = type === 'series' ? loadingEpisodeStreams : loadingStreams;
   const streams = type === 'series' ? episodeStreams : groupedStreams;
+
+  // Determine extended loading phases
+  const streamsEmpty = Object.keys(streams).length === 0;
+  const loadElapsed = streamsLoadStart ? Date.now() - streamsLoadStart : 0;
+  const showInitialLoading = streamsEmpty && (streamsLoadStart === null || loadElapsed < 10000);
+  const showStillFetching = streamsEmpty && loadElapsed >= 10000;
 
   const heroStyle = useAnimatedStyle(() => ({
     transform: [{ scale: heroScale.value }],
@@ -1065,10 +985,9 @@ export const StreamsScreen = () => {
         isLoading={isLoading}
         statusMessage={undefined}
         theme={currentTheme}
-        isExiting={isExiting}
       />
     );
-  }, [handleStreamPress, currentTheme, isExiting]);
+  }, [handleStreamPress, currentTheme]);
 
   const renderSectionHeader = useCallback(({ section }: { section: { title: string; addonId: string } }) => {
     const isProviderLoading = loadingProviders[section.addonId];
@@ -1076,7 +995,7 @@ export const StreamsScreen = () => {
     return (
       <Animated.View
         entering={FadeIn.duration(400)}
-        layout={Layout.springify()}
+        exiting={FadeOut.duration(150)}
         style={styles.sectionHeaderContainer}
       >
         <View style={styles.sectionHeaderContent}>
@@ -1101,43 +1020,7 @@ export const StreamsScreen = () => {
     };
   }, []);
 
-  // Add orientation handling when screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      // Set transitioning state to mask any visual glitches
-      setIsTransitioning(true);
-      
-      // Immediately lock to portrait when returning to this screen
-      const lockToPortrait = async () => {
-        try {
-          await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-          // Small delay then unlock to allow natural portrait orientation
-          setTimeout(async () => {
-            try {
-              await ScreenOrientation.unlockAsync();
-              // Clear transition state after orientation is handled
-              setTimeout(() => {
-                setIsTransitioning(false);
-              }, 100);
-            } catch (error) {
-              logger.error('[StreamsScreen] Error unlocking orientation:', error);
-              setIsTransitioning(false);
-            }
-          }, 200);
-        } catch (error) {
-          logger.error('[StreamsScreen] Error locking to portrait:', error);
-          setIsTransitioning(false);
-        }
-      };
 
-      lockToPortrait();
-
-      return () => {
-        // Cleanup when screen loses focus
-        setIsTransitioning(false);
-      };
-    }, [])
-  );
 
   return (
     <View style={styles.container}>
@@ -1147,17 +1030,6 @@ export const StreamsScreen = () => {
         barStyle="light-content"
       />
       
-      {/* Instant overlay when exiting to prevent glitches */}
-      {isExiting && (
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.darkBackground, zIndex: 100 }]} />
-      )}
-      
-      {/* Transition overlay to mask orientation changes */}
-      {isTransitioning && (
-        <View style={styles.transitionOverlay}>
-          <ActivityIndicator size="small" color={colors.primary} />
-        </View>
-      )}
       
       <Animated.View
         entering={FadeIn.duration(300)}
@@ -1196,11 +1068,11 @@ export const StreamsScreen = () => {
       {type === 'series' && currentEpisode && (
         <Animated.View style={[styles.streamsHeroContainer, heroStyle]}>
           <Animated.View
-            entering={FadeIn.duration(600).springify()}
+            entering={FadeIn.duration(300)}
             style={StyleSheet.absoluteFill}
           >
             <Animated.View 
-              entering={FadeIn.duration(800).delay(100).springify().withInitialValues({
+              entering={FadeIn.duration(400).delay(100).withInitialValues({
                 transform: [{ scale: 1.05 }]
               })}
               style={StyleSheet.absoluteFill}
@@ -1286,6 +1158,21 @@ export const StreamsScreen = () => {
           )}
         </Animated.View>
 
+        {/* Active Scrapers Status */}
+        {activeFetchingScrapers.length > 0 && (
+          <Animated.View 
+            entering={FadeIn.duration(300)}
+            style={styles.activeScrapersContainer}
+          >
+            <Text style={styles.activeScrapersTitle}>Fetching from:</Text>
+            <View style={styles.activeScrapersRow}>
+              {activeFetchingScrapers.map((scraperName, index) => (
+                <PulsingChip key={scraperName} text={scraperName} delay={index * 200} />
+              ))}
+            </View>
+          </Animated.View>
+        )}
+
         {/* Update the streams/loading state display logic */}
         { showNoSourcesError ? (
             <Animated.View 
@@ -1299,13 +1186,13 @@ export const StreamsScreen = () => {
               </Text>
               <TouchableOpacity
                 style={styles.addSourcesButton}
-                onPress={() => navigation.navigate('Settings')}
+                onPress={() => navigation.navigate('Addons')}
               >
                 <Text style={styles.addSourcesButtonText}>Add Sources</Text>
               </TouchableOpacity>
             </Animated.View>
-        ) : Object.keys(streams).length === 0 ? (
-          (loadingStreams || loadingEpisodeStreams) ? (
+        ) : streamsEmpty ? (
+          showInitialLoading ? (
             <Animated.View 
               entering={FadeIn.duration(300)}
               style={styles.loadingContainer}
@@ -1314,6 +1201,14 @@ export const StreamsScreen = () => {
               <Text style={styles.loadingText}>
                 {isAutoplayWaiting ? 'Finding best stream for autoplay...' : 'Finding available streams...'}
               </Text>
+            </Animated.View>
+          ) : showStillFetching ? (
+            <Animated.View 
+              entering={FadeIn.duration(300)}
+              style={styles.loadingContainer}
+            >
+              <MaterialIcons name="hourglass-bottom" size={32} color={colors.primary} />
+              <Text style={styles.loadingText}>Still fetching streams…</Text>
             </Animated.View>
           ) : (
             // No streams and not loading = no streams available
@@ -1347,9 +1242,9 @@ export const StreamsScreen = () => {
               renderItem={renderItem}
               renderSectionHeader={renderSectionHeader}
               stickySectionHeadersEnabled={false}
-              initialNumToRender={8}
-              maxToRenderPerBatch={4}
-              windowSize={5}
+              initialNumToRender={6}
+              maxToRenderPerBatch={3}
+              windowSize={4}
               removeClippedSubviews={false}
               contentContainerStyle={styles.streamsContainer}
               style={styles.streamsContent}
@@ -1824,6 +1719,37 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  activeScrapersContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: 'transparent',
+    marginHorizontal: 16,
+    marginBottom: 4,
+  },
+  activeScrapersTitle: {
+    color: colors.mediumEmphasis,
+    fontSize: 12,
+    fontWeight: '500',
+    marginBottom: 6,
+    opacity: 0.8,
+  },
+  activeScrapersRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  activeScraperChip: {
+    backgroundColor: colors.elevation2,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 0,
+  },
+  activeScraperText: {
+    color: colors.mediumEmphasis,
+    fontSize: 11,
+    fontWeight: '400',
+  },
 });
 
-export default memo(StreamsScreen); 
+export default memo(StreamsScreen);

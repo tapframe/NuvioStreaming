@@ -9,6 +9,7 @@ import {
   Alert,
   SafeAreaView,
   StatusBar,
+  Platform,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
@@ -16,6 +17,8 @@ import { notificationService, NotificationSettings } from '../services/notificat
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 import { logger } from '../utils/logger';
+
+const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
 const NotificationSettingsScreen = () => {
   const navigation = useNavigation();
@@ -30,13 +33,19 @@ const NotificationSettingsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [testNotificationId, setTestNotificationId] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [notificationStats, setNotificationStats] = useState({ total: 0, upcoming: 0, thisWeek: 0 });
 
-  // Load settings on mount
+  // Load settings and stats on mount
   useEffect(() => {
     const loadSettings = async () => {
       try {
         const savedSettings = await notificationService.getSettings();
         setSettings(savedSettings);
+        
+        // Load notification stats
+        const stats = notificationService.getNotificationStats();
+        setNotificationStats(stats);
       } catch (error) {
         logger.error('Error loading notification settings:', error);
       } finally {
@@ -46,6 +55,14 @@ const NotificationSettingsScreen = () => {
 
     loadSettings();
   }, []);
+
+  // Refresh stats when settings change
+  useEffect(() => {
+    if (!loading) {
+      const stats = notificationService.getNotificationStats();
+      setNotificationStats(stats);
+    }
+  }, [settings, loading]);
 
   // Add countdown effect
   useEffect(() => {
@@ -120,6 +137,29 @@ const NotificationSettingsScreen = () => {
         },
       ]
     );
+  };
+
+  const handleSyncNotifications = async () => {
+    if (isSyncing) return;
+    
+    setIsSyncing(true);
+    try {
+      await notificationService.syncAllNotifications();
+      
+      // Refresh stats after sync
+      const stats = notificationService.getNotificationStats();
+      setNotificationStats(stats);
+      
+      Alert.alert(
+        'Sync Complete', 
+        `Successfully synced notifications for your library and Trakt items.\n\nScheduled: ${stats.upcoming} upcoming episodes\nThis week: ${stats.thisWeek} episodes`
+      );
+    } catch (error) {
+      logger.error('Error syncing notifications:', error);
+      Alert.alert('Error', 'Failed to sync notifications. Please try again.');
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleTestNotification = async () => {
@@ -296,6 +336,54 @@ const NotificationSettingsScreen = () => {
               </View>
               
               <View style={[styles.section, { borderBottomColor: currentTheme.colors.border }]}>
+                <Text style={[styles.sectionTitle, { color: currentTheme.colors.text }]}>Notification Status</Text>
+                
+                <View style={[styles.statsContainer, { backgroundColor: currentTheme.colors.elevation1 }]}>
+                  <View style={styles.statItem}>
+                    <MaterialIcons name="schedule" size={20} color={currentTheme.colors.primary} />
+                    <Text style={[styles.statLabel, { color: currentTheme.colors.textMuted }]}>Upcoming</Text>
+                    <Text style={[styles.statValue, { color: currentTheme.colors.text }]}>{notificationStats.upcoming}</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <MaterialIcons name="today" size={20} color={currentTheme.colors.primary} />
+                    <Text style={[styles.statLabel, { color: currentTheme.colors.textMuted }]}>This Week</Text>
+                    <Text style={[styles.statValue, { color: currentTheme.colors.text }]}>{notificationStats.thisWeek}</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <MaterialIcons name="notifications-active" size={20} color={currentTheme.colors.primary} />
+                    <Text style={[styles.statLabel, { color: currentTheme.colors.textMuted }]}>Total</Text>
+                    <Text style={[styles.statValue, { color: currentTheme.colors.text }]}>{notificationStats.total}</Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity 
+                  style={[
+                    styles.resetButton,
+                    { 
+                      backgroundColor: currentTheme.colors.primary + '20',
+                      borderColor: currentTheme.colors.primary + '50'
+                    }
+                  ]}
+                  onPress={handleSyncNotifications}
+                  disabled={isSyncing}
+                >
+                  <MaterialIcons 
+                    name={isSyncing ? "sync" : "sync"} 
+                    size={24} 
+                    color={currentTheme.colors.primary}
+                    style={isSyncing ? { transform: [{ rotate: '360deg' }] } : {}}
+                  />
+                  <Text style={[styles.resetButtonText, { color: currentTheme.colors.primary }]}>
+                    {isSyncing ? 'Syncing...' : 'Sync Library & Trakt'}
+                  </Text>
+                </TouchableOpacity>
+                
+                <Text style={[styles.resetDescription, { color: currentTheme.colors.lightGray }]}>
+                  Automatically syncs notifications for all shows in your library and Trakt watchlist/collection.
+                </Text>
+              </View>
+              
+              <View style={[styles.section, { borderBottomColor: currentTheme.colors.border }]}>
                 <Text style={[styles.sectionTitle, { color: currentTheme.colors.text }]}>Advanced</Text>
                 
                 <TouchableOpacity 
@@ -368,6 +456,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
+    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 12 : 12,
     borderBottomWidth: 1,
   },
   backButton: {
@@ -464,6 +553,27 @@ const styles = StyleSheet.create({
   },
   countdownText: {
     fontSize: 14,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statLabel: {
+    fontSize: 12,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 2,
   },
 });
 

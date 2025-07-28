@@ -11,7 +11,9 @@ import {
   Alert,
   Platform,
   Dimensions,
-  Image
+  Image,
+  Button,
+  Linking
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
@@ -24,14 +26,15 @@ import { stremioService } from '../services/stremioService';
 import { useCatalogContext } from '../contexts/CatalogContext';
 import { useTraktContext } from '../contexts/TraktContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { catalogService, DataSource } from '../services/catalogService';
+import { catalogService } from '../services/catalogService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Sentry from '@sentry/react-native';
 
 const { width } = Dimensions.get('window');
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
-// Card component with modern style
+// Card component with minimalistic style
 interface SettingsCardProps {
   children: React.ReactNode;
   title?: string;
@@ -41,18 +44,20 @@ const SettingsCard: React.FC<SettingsCardProps> = ({ children, title }) => {
   const { currentTheme } = useTheme();
   
   return (
-    <View style={[styles.cardContainer]}>
+    <View 
+      style={[styles.cardContainer]}
+    >
       {title && (
         <Text style={[
           styles.cardTitle,
           { color: currentTheme.colors.mediumEmphasis }
         ]}>
-          {title.toUpperCase()}
+          {title}
         </Text>
       )}
       <View style={[
         styles.card,
-        { backgroundColor: currentTheme.colors.elevation2 }
+        { backgroundColor: currentTheme.colors.elevation1 }
       ]}>
         {children}
       </View>
@@ -64,7 +69,7 @@ interface SettingItemProps {
   title: string;
   description?: string;
   icon: string;
-  renderControl: () => React.ReactNode;
+  renderControl?: () => React.ReactNode;
   isLast?: boolean;
   onPress?: () => void;
   badge?: string | number;
@@ -83,17 +88,17 @@ const SettingItem: React.FC<SettingItemProps> = ({
   
   return (
     <TouchableOpacity 
-      activeOpacity={0.7}
+      activeOpacity={0.6}
       onPress={onPress}
       style={[
         styles.settingItem, 
         !isLast && styles.settingItemBorder,
-        { borderBottomColor: 'rgba(255,255,255,0.08)' }
+        { borderBottomColor: currentTheme.colors.elevation2 }
       ]}
     >
       <View style={[
         styles.settingIconContainer,
-        { backgroundColor: 'rgba(255,255,255,0.1)' }
+        { backgroundColor: currentTheme.colors.elevation2 }
       ]}>
         <MaterialIcons name={icon} size={20} color={currentTheme.colors.primary} />
       </View>
@@ -103,20 +108,22 @@ const SettingItem: React.FC<SettingItemProps> = ({
             {title}
           </Text>
           {description && (
-            <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+            <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]} numberOfLines={1}>
               {description}
             </Text>
           )}
         </View>
         {badge && (
-          <View style={[styles.badge, { backgroundColor: currentTheme.colors.primary }]}>
-            <Text style={styles.badgeText}>{badge}</Text>
+          <View style={[styles.badge, { backgroundColor: `${currentTheme.colors.primary}20` }]}>
+            <Text style={[styles.badgeText, { color: currentTheme.colors.primary }]}>{String(badge)}</Text>
           </View>
         )}
       </View>
-      <View style={styles.settingControl}>
-        {renderControl()}
-      </View>
+      {renderControl && (
+        <View style={styles.settingControl}>
+          {renderControl()}
+        </View>
+      )}
     </TouchableOpacity>
   );
 };
@@ -150,7 +157,6 @@ const SettingsScreen: React.FC = () => {
   const [addonCount, setAddonCount] = useState<number>(0);
   const [catalogCount, setCatalogCount] = useState<number>(0);
   const [mdblistKeySet, setMdblistKeySet] = useState<boolean>(false);
-  const [discoverDataSource, setDiscoverDataSource] = useState<DataSource>(DataSource.STREMIO_ADDONS);
 
   const loadData = useCallback(async () => {
     try {
@@ -185,9 +191,6 @@ const SettingsScreen: React.FC = () => {
       const mdblistKey = await AsyncStorage.getItem('mdblist_api_key');
       setMdblistKeySet(!!mdblistKey);
       
-      // Get discover data source preference
-      const dataSource = await catalogService.getDataSourcePreference();
-      setDiscoverDataSource(dataSource);
     } catch (error) {
       console.error('Error loading settings data:', error);
     }
@@ -226,30 +229,46 @@ const SettingsScreen: React.FC = () => {
     );
   }, [updateSetting]);
 
+  const handleClearMDBListCache = () => {
+    Alert.alert(
+      "Clear MDBList Cache",
+      "Are you sure you want to clear all cached MDBList data? This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await AsyncStorage.removeItem('mdblist_cache');
+              Alert.alert("Success", "MDBList cache has been cleared.");
+            } catch (error) {
+              Alert.alert("Error", "Could not clear MDBList cache.");
+              console.error('Error clearing MDBList cache:', error);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const CustomSwitch = ({ value, onValueChange }: { value: boolean, onValueChange: (value: boolean) => void }) => (
     <Switch
       value={value}
       onValueChange={onValueChange}
-      trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
-      thumbColor={Platform.OS === 'android' ? (value ? currentTheme.colors.white : currentTheme.colors.white) : ''}
-      ios_backgroundColor={'rgba(255,255,255,0.1)'}
+      trackColor={{ false: currentTheme.colors.elevation2, true: currentTheme.colors.primary }}
+      thumbColor={value ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis}
+      ios_backgroundColor={currentTheme.colors.elevation2}
     />
   );
 
   const ChevronRight = () => (
     <MaterialIcons 
       name="chevron-right" 
-      size={22} 
-      color={'rgba(255,255,255,0.3)'}
+      size={20} 
+      color={currentTheme.colors.mediumEmphasis}
     />
   );
-
-  // Handle data source change
-  const handleDiscoverDataSourceChange = useCallback(async (value: string) => {
-    const dataSource = value as DataSource;
-    setDiscoverDataSource(dataSource);
-    await catalogService.setDataSourcePreference(dataSource);
-  }, []);
 
   const headerBaseHeight = Platform.OS === 'android' ? 80 : 60;
   const topSpacing = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top;
@@ -274,93 +293,55 @@ const SettingsScreen: React.FC = () => {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
           >
-            <SettingsCard title="User & Account">
+            {/* Account Section */}
+            <SettingsCard title="ACCOUNT">
               <SettingItem
                 title="Trakt"
-                description={isAuthenticated ? `Connected as ${userProfile?.username || 'User'}` : "Not Connected"}
+                description={isAuthenticated ? `@${userProfile?.username || 'User'}` : "Sign in to sync"}
                 icon="person"
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('TraktSettings')}
-                isLast={false}
               />
-            </SettingsCard>
-
-            <SettingsCard title="Profiles">
-              {isAuthenticated ? (
+              {isAuthenticated && (
                 <SettingItem
-                  title="Manage Profiles"
-                  description="Create and switch between profiles"
+                  title="Profiles"
+                  description="Manage multiple users"
                   icon="people"
                   renderControl={ChevronRight}
                   onPress={() => navigation.navigate('ProfilesSettings')}
                   isLast={true}
                 />
-              ) : (
-                <TouchableOpacity
-                  style={[
-                    styles.profileLockContainer,
-                    { 
-                      backgroundColor: `${currentTheme.colors.primary}10`,
-                      borderWidth: 1,
-                      borderColor: `${currentTheme.colors.primary}30`
-                    }
-                  ]}
-                  activeOpacity={1}
-                >
-                  <View style={styles.profileLockContent}>
-                    <MaterialIcons name="lock-outline" size={24} color={currentTheme.colors.primary} />
-                    <View style={styles.profileLockTextContainer}>
-                      <Text style={[styles.profileLockTitle, { color: currentTheme.colors.text }]}>
-                        Sign in to use Profiles
-                      </Text>
-                      <Text style={[styles.profileLockDescription, { color: currentTheme.colors.textMuted }]}>
-                        Create multiple profiles for different users and preferences
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.profileBenefits}>
-                    <View style={styles.benefitCol}>
-                      <View style={styles.benefitItem}>
-                        <MaterialIcons name="check-circle" size={16} color={currentTheme.colors.primary} />
-                        <Text style={[styles.benefitText, { color: currentTheme.colors.textMuted }]}>
-                          Separate watchlists
-                        </Text>
-                      </View>
-                      <View style={styles.benefitItem}>
-                        <MaterialIcons name="check-circle" size={16} color={currentTheme.colors.primary} />
-                        <Text style={[styles.benefitText, { color: currentTheme.colors.textMuted }]}>
-                          Content preferences
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={styles.benefitCol}>
-                      <View style={styles.benefitItem}>
-                        <MaterialIcons name="check-circle" size={16} color={currentTheme.colors.primary} />
-                        <Text style={[styles.benefitText, { color: currentTheme.colors.textMuted }]}>
-                          Personalized recommendations
-                        </Text>
-                      </View>
-                      <View style={styles.benefitItem}>
-                        <MaterialIcons name="check-circle" size={16} color={currentTheme.colors.primary} />
-                        <Text style={[styles.benefitText, { color: currentTheme.colors.textMuted }]}>
-                          Individual viewing history
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                  <TouchableOpacity
-                    style={[styles.loginButton, { backgroundColor: currentTheme.colors.primary }]}
-                    activeOpacity={0.7}
-                    onPress={() => navigation.navigate('TraktSettings')}
-                  >
-                    <Text style={styles.loginButtonText}>Connect with Trakt</Text>
-                    <MaterialIcons name="arrow-forward" size={18} color="#FFFFFF" style={styles.loginButtonIcon} />
-                  </TouchableOpacity>
-                </TouchableOpacity>
               )}
             </SettingsCard>
 
-            <SettingsCard title="Appearance">
+            {/* Content & Discovery */}
+            <SettingsCard title="CONTENT & DISCOVERY">
+              <SettingItem
+                title="Addons"
+                description={`${addonCount} installed`}
+                icon="extension"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('Addons')}
+              />
+              <SettingItem
+                title="Catalogs"
+                description={`${catalogCount} active`}
+                icon="view-list"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('CatalogSettings')}
+              />
+              <SettingItem
+                title="Home Screen"
+                description="Layout and content"
+                icon="home"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('HomeScreenSettings')}
+                isLast={true}
+              />
+            </SettingsCard>
+
+            {/* Appearance & Interface */}
+            <SettingsCard title="APPEARANCE">
               <SettingItem
                 title="Theme"
                 description={currentTheme.name}
@@ -370,194 +351,161 @@ const SettingsScreen: React.FC = () => {
               />
               <SettingItem
                 title="Episode Layout"
-                description={settings.episodeLayoutStyle === 'horizontal' ? 'Horizontal Cards' : 'Vertical List'}
+                description={settings?.episodeLayoutStyle === 'horizontal' ? 'Horizontal' : 'Vertical'}
                 icon="view-module"
                 renderControl={() => (
-                  <View style={styles.selectorContainer}>
-                    <TouchableOpacity
-                      style={[
-                        styles.selectorButton,
-                        settings.episodeLayoutStyle === 'vertical' && {
-                          backgroundColor: currentTheme.colors.primary
-                        }
-                      ]}
-                      onPress={() => updateSetting('episodeLayoutStyle', 'vertical')}
-                    >
-                      <Text style={[
-                        styles.selectorText,
-                        { color: currentTheme.colors.mediumEmphasis },
-                        settings.episodeLayoutStyle === 'vertical' && {
-                          color: currentTheme.colors.white,
-                          fontWeight: '600'
-                        }
-                      ]}>Vertical</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.selectorButton,
-                        settings.episodeLayoutStyle === 'horizontal' && {
-                          backgroundColor: currentTheme.colors.primary
-                        }
-                      ]}
-                      onPress={() => updateSetting('episodeLayoutStyle', 'horizontal')}
-                    >
-                      <Text style={[
-                        styles.selectorText,
-                        { color: currentTheme.colors.mediumEmphasis },
-                        settings.episodeLayoutStyle === 'horizontal' && {
-                          color: currentTheme.colors.white,
-                          fontWeight: '600'
-                        }
-                      ]}>Horizontal</Text>
-                    </TouchableOpacity>
-                  </View>
+                  <CustomSwitch
+                    value={settings?.episodeLayoutStyle === 'horizontal'}
+                    onValueChange={(value) => updateSetting('episodeLayoutStyle', value ? 'horizontal' : 'vertical')}
+                  />
                 )}
                 isLast={true}
               />
             </SettingsCard>
 
-            <SettingsCard title="Features">
+            {/* Integrations */}
+            <SettingsCard title="INTEGRATIONS">
               <SettingItem
-                title="Calendar"
-                description="Manage your show calendar settings"
-                icon="calendar-today"
+                title="MDBList"
+                description={mdblistKeySet ? "Connected" : "Enable to add ratings & reviews"}
+                icon="star"
                 renderControl={ChevronRight}
-                onPress={() => navigation.navigate('Calendar')}
+                onPress={() => navigation.navigate('MDBListSettings')}
+              />
+              <SettingItem
+                title="TMDB"
+                description="Metadata provider"
+                icon="movie"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('TMDBSettings')}
+              />
+              <SettingItem
+                title="Media Sources"
+                description="Logo & image preferences"
+                icon="image"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('LogoSourceSettings')}
+                isLast={true}
+              />
+            </SettingsCard>
+
+            {/* Playback & Experience */}
+            <SettingsCard title="PLAYBACK">
+              <SettingItem
+                title="Video Player"
+                description={Platform.OS === 'ios' 
+                  ? (settings?.preferredPlayer === 'internal' ? 'Built-in' : settings?.preferredPlayer?.toUpperCase() || 'Built-in')
+                  : (settings?.useExternalPlayer ? 'External' : 'Built-in')
+                }
+                icon="play-circle-outline"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('PlayerSettings')}
+              />
+              <SettingItem
+                title="Local Scrapers"
+                description="Manage local scraper repositories"
+                icon="code"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('ScraperSettings')}
               />
               <SettingItem
                 title="Notifications"
-                description="Configure episode notifications and reminders"
-                icon="notifications"
+                description="Episode reminders"
+                icon="notifications-none"
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('NotificationSettings')}
                 isLast={true}
               />
             </SettingsCard>
 
-            <SettingsCard title="Content">
+            {/* About & Support */}
+            <SettingsCard title="ABOUT">
               <SettingItem
-                title="Addons"
-                description="Manage your installed addons"
-                icon="extension"
+                title="Privacy Policy"
+                icon="lock"
+                onPress={() => Linking.openURL('https://github.com/Stremio/stremio-expo/blob/main/PRIVACY_POLICY.md')}
                 renderControl={ChevronRight}
-                onPress={() => navigation.navigate('Addons')}
-                badge={addonCount}
               />
               <SettingItem
-                title="Catalogs"
-                description="Configure content sources"
-                icon="view-list"
+                title="Report Issue"
+                icon="bug-report"
+                onPress={() => Sentry.showFeedbackWidget()}
                 renderControl={ChevronRight}
-                onPress={() => navigation.navigate('CatalogSettings')}
-                badge={catalogCount}
               />
               <SettingItem
-                title="Internal Providers"
-                description="Enable or disable built-in providers like HDRezka"
-                icon="source"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('InternalProvidersSettings')}
-              />
-              <SettingItem
-                title="Home Screen"
-                description="Customize layout and content"
-                icon="home"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('HomeScreenSettings')}
-              />
-              <SettingItem
-                title="MDBList Integration"
-                description={mdblistKeySet ? "Ratings and reviews provided by MDBList" : "Connect MDBList for ratings and reviews"}
+                title="Version"
+                description="1.0.0"
                 icon="info-outline"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('MDBListSettings')}
-              />
-              <SettingItem
-                title="Image Sources"
-                description="Choose primary source for title logos and backgrounds"
-                icon="image"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('LogoSourceSettings')}
-              />
-              <SettingItem
-                title="TMDB"
-                description="API & Metadata Settings"
-                icon="movie-filter"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('TMDBSettings')}
                 isLast={true}
               />
             </SettingsCard>
 
-            <SettingsCard title="Playback">
-              <SettingItem
-                title="Video Player"
-                description={Platform.OS === 'ios' 
-                  ? (settings.preferredPlayer === 'internal' 
-                    ? 'Built-in Player' 
-                    : settings.preferredPlayer 
-                      ? settings.preferredPlayer.toUpperCase()
-                      : 'Built-in Player')
-                  : (settings.useExternalPlayer ? 'External Player' : 'Built-in Player')
-                }
-                icon="play-arrow"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('PlayerSettings')}
-                isLast={true}
-              />
-            </SettingsCard>
+            {/* Developer Options - Only show in development */}
+            {__DEV__ && (
+              <SettingsCard title="DEVELOPER">
+                <SettingItem
+                  title="Test Onboarding"
+                  icon="play-circle-outline"
+                  onPress={() => navigation.navigate('Onboarding')}
+                  renderControl={ChevronRight}
+                />
+                <SettingItem
+                  title="Reset Onboarding"
+                  icon="refresh"
+                  onPress={async () => {
+                    try {
+                      await AsyncStorage.removeItem('hasCompletedOnboarding');
+                      Alert.alert('Success', 'Onboarding has been reset. Restart the app to see the onboarding flow.');
+                    } catch (error) {
+                      Alert.alert('Error', 'Failed to reset onboarding.');
+                    }
+                  }}
+                  renderControl={ChevronRight}
+                />
+                <SettingItem
+                  title="Clear All Data"
+                  icon="delete-forever"
+                  onPress={() => {
+                    Alert.alert(
+                      'Clear All Data',
+                      'This will reset all settings and clear all cached data. Are you sure?',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Clear',
+                          style: 'destructive',
+                          onPress: async () => {
+                            try {
+                              await AsyncStorage.clear();
+                              Alert.alert('Success', 'All data cleared. Please restart the app.');
+                            } catch (error) {
+                              Alert.alert('Error', 'Failed to clear data.');
+                            }
+                          }
+                        }
+                      ]
+                    );
+                  }}
+                  isLast={true}
+                />
+              </SettingsCard>
+            )}
 
-            <SettingsCard title="Discover">
-              <SettingItem
-                title="Content Source"
-                description="Choose where to get content for the Discover screen"
-                icon="explore"
-                renderControl={() => (
-                  <View style={styles.selectorContainer}>
-                    <TouchableOpacity
-                      style={[
-                        styles.selectorButton,
-                        discoverDataSource === DataSource.STREMIO_ADDONS && {
-                          backgroundColor: currentTheme.colors.primary
-                        }
-                      ]}
-                      onPress={() => handleDiscoverDataSourceChange(DataSource.STREMIO_ADDONS)}
-                    >
-                      <Text style={[
-                        styles.selectorText,
-                        { color: currentTheme.colors.mediumEmphasis },
-                        discoverDataSource === DataSource.STREMIO_ADDONS && {
-                          color: currentTheme.colors.white,
-                          fontWeight: '600'
-                        }
-                      ]}>Addons</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.selectorButton,
-                        discoverDataSource === DataSource.TMDB && {
-                          backgroundColor: currentTheme.colors.primary
-                        }
-                      ]}
-                      onPress={() => handleDiscoverDataSourceChange(DataSource.TMDB)}
-                    >
-                      <Text style={[
-                        styles.selectorText,
-                        { color: currentTheme.colors.mediumEmphasis },
-                        discoverDataSource === DataSource.TMDB && {
-                          color: currentTheme.colors.white,
-                          fontWeight: '600'
-                        }
-                      ]}>TMDB</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              />
-            </SettingsCard>
+            {/* Cache Management - Only show if MDBList is connected */}
+            {mdblistKeySet && (
+              <SettingsCard title="CACHE MANAGEMENT">
+                <SettingItem
+                  title="Clear MDBList Cache"
+                  icon="cached"
+                  onPress={handleClearMDBListCache}
+                  isLast={true}
+                />
+              </SettingsCard>
+            )}
 
-            <View style={styles.versionContainer}>
-              <Text style={[styles.versionText, {color: currentTheme.colors.mediumEmphasis}]}>
-                Version 1.0.0
+            <View style={styles.footer}>
+              <Text style={[styles.footerText, { color: currentTheme.colors.mediumEmphasis }]}>
+                Made with ❤️ by the Nuvio team
               </Text>
             </View>
           </ScrollView>
@@ -572,7 +520,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: 20,
+    paddingHorizontal: Math.max(1, width * 0.05),
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
@@ -581,7 +529,7 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: Math.min(32, width * 0.08),
     fontWeight: '800',
     letterSpacing: 0.3,
   },
@@ -607,11 +555,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     letterSpacing: 0.8,
-    marginLeft: 16,
+    marginLeft: Math.max(12, width * 0.04),
     marginBottom: 8,
   },
   card: {
-    marginHorizontal: 16,
+    marginHorizontal: Math.max(12, width * 0.04),
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -625,9 +573,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: Math.max(12, width * 0.04),
     borderBottomWidth: 0.5,
-    minHeight: 58,
+    minHeight: Math.max(54, width * 0.14),
     width: '100%',
   },
   settingItemBorder: {
@@ -650,12 +598,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   settingTitle: {
-    fontSize: 16,
+    fontSize: Math.min(16, width * 0.042),
     fontWeight: '500',
     marginBottom: 3,
   },
   settingDescription: {
-    fontSize: 14,
+    fontSize: Math.min(14, width * 0.037),
     opacity: 0.8,
   },
   settingControl: {
@@ -677,96 +625,39 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  versionContainer: {
+  segmentedControl: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 8,
+    padding: 2,
+  },
+  segment: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  segmentActive: {
+    backgroundColor: 'rgba(255,255,255,0.16)',
+  },
+  segmentText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  segmentTextActive: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  footer: {
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 10,
     marginBottom: 20,
   },
-  versionText: {
+  footerText: {
     fontSize: 14,
-  },
-  pickerContainer: {
-    flex: 1,
-  },
-  picker: {
-    flex: 1,
-  },
-  selectorContainer: {
-    flexDirection: 'row',
-    borderRadius: 8,
-    overflow: 'hidden',
-    height: 36,
-    width: 180,
-    marginRight: 8,
-  },
-  selectorButton: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  selectorText: {
-    fontSize: 13,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  profileLockContainer: {
-    padding: 16,
-    borderRadius: 8,
-    overflow: 'hidden',
-    marginVertical: 8,
-  },
-  profileLockContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  profileLockTextContainer: {
-    flex: 1,
-    marginHorizontal: 12,
-  },
-  profileLockTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  profileLockDescription: {
-    fontSize: 14,
-    opacity: 0.8,
-  },
-  profileBenefits: {
-    flexDirection: 'row',
-    marginTop: 16,
-    justifyContent: 'space-between',
-  },
-  benefitCol: {
-    flex: 1,
-  },
-  benefitItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  benefitText: {
-    fontSize: 14,
-    marginLeft: 8,
-  },
-  loginButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 8,
-    paddingVertical: 12,
-    marginTop: 16,
-  },
-  loginButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  loginButtonIcon: {
-    marginLeft: 8,
+    opacity: 0.5,
   },
 });
 

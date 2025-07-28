@@ -39,40 +39,45 @@ const SPACING = {
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
-// Screen dimensions and grid layout
-const { width } = Dimensions.get('window');
-
 // Dynamic column calculation based on screen width
 const calculateCatalogLayout = (screenWidth: number) => {
-  const MIN_ITEM_WIDTH = 120; // Increased minimum for better readability
-  const MAX_ITEM_WIDTH = 160; // Adjusted maximum
-  const HORIZONTAL_PADDING = SPACING.lg * 2; // Total horizontal padding
-  const ITEM_SPACING = SPACING.sm; // Space between items
+  const MIN_ITEM_WIDTH = 120;
+  const MAX_ITEM_WIDTH = 180; // Increased for tablets
+  const HORIZONTAL_PADDING = SPACING.lg * 2;
+  const ITEM_SPACING = SPACING.sm;
   
   // Calculate how many columns can fit
   const availableWidth = screenWidth - HORIZONTAL_PADDING;
   const maxColumns = Math.floor(availableWidth / (MIN_ITEM_WIDTH + ITEM_SPACING));
   
-  // Limit to reasonable number of columns (2-4 for better UX)
-  const numColumns = Math.min(Math.max(maxColumns, 2), 4);
+  // More flexible column limits for different screen sizes
+  let numColumns;
+  if (screenWidth < 600) {
+    // Phone: 2-3 columns
+    numColumns = Math.min(Math.max(maxColumns, 2), 3);
+  } else if (screenWidth < 900) {
+    // Small tablet: 3-5 columns
+    numColumns = Math.min(Math.max(maxColumns, 3), 5);
+  } else if (screenWidth < 1200) {
+    // Large tablet: 4-6 columns
+    numColumns = Math.min(Math.max(maxColumns, 4), 6);
+  } else {
+    // Very large screens: 5-8 columns
+    numColumns = Math.min(Math.max(maxColumns, 5), 8);
+  }
   
   // Calculate actual item width with proper spacing
   const totalSpacing = ITEM_SPACING * (numColumns - 1);
   const itemWidth = (availableWidth - totalSpacing) / numColumns;
   
-  // For 2 columns, ensure we use the full available width
-  const finalItemWidth = numColumns === 2 ? itemWidth : Math.min(itemWidth, MAX_ITEM_WIDTH);
+  // Ensure item width doesn't exceed maximum
+  const finalItemWidth = Math.min(itemWidth, MAX_ITEM_WIDTH);
   
   return {
     numColumns,
     itemWidth: finalItemWidth
   };
 };
-
-const catalogLayout = calculateCatalogLayout(width);
-const NUM_COLUMNS = catalogLayout.numColumns;
-const ITEM_MARGIN = SPACING.sm;
-const ITEM_WIDTH = catalogLayout.itemWidth;
 
 // Create a styles creator function that accepts the theme colors
 const createStyles = (colors: any) => StyleSheet.create({
@@ -85,6 +90,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 8 : 8,
+    // Center header on very wide screens
+    alignSelf: 'center',
+    maxWidth: 1400,
+    width: '100%',
   },
   backButton: {
     flexDirection: 'row',
@@ -103,10 +112,18 @@ const createStyles = (colors: any) => StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 16,
     paddingTop: 8,
+    // Center title on very wide screens
+    alignSelf: 'center',
+    maxWidth: 1400,
+    width: '100%',
   },
   list: {
     padding: SPACING.lg,
     paddingTop: SPACING.sm,
+    // Center content on very wide screens
+    alignSelf: 'center',
+    maxWidth: 1400, // Prevent content from being too wide on large screens
+    width: '100%',
   },
   item: {
     marginBottom: SPACING.lg,
@@ -162,6 +179,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: SPACING.xl,
+    // Center content on very wide screens
+    alignSelf: 'center',
+    maxWidth: 600, // Narrower max width for centered content
+    width: '100%',
   },
   emptyText: {
     color: colors.white,
@@ -188,16 +209,37 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   const { addonId, type, id, name: originalName, genreFilter } = route.params;
   const [items, setItems] = useState<Meta[]>([]);
   const [loading, setLoading] = useState(true);
+  const [paginating, setPaginating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dataSource, setDataSource] = useState<DataSource>(DataSource.STREMIO_ADDONS);
   const [actualCatalogName, setActualCatalogName] = useState<string | null>(null);
+  const [screenData, setScreenData] = useState(() => {
+    const { width } = Dimensions.get('window');
+    return {
+      width,
+      ...calculateCatalogLayout(width)
+    };
+  });
   const { currentTheme } = useTheme();
   const colors = currentTheme.colors;
   const styles = createStyles(colors);
   const isDarkMode = true;
+  const isInitialRender = React.useRef(true);
+
+  // Handle screen dimension changes
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setScreenData({
+        width: window.width,
+        ...calculateCatalogLayout(window.width)
+      });
+    });
+
+    return () => subscription?.remove();
+  }, []);
 
   const { getCustomName, isLoadingCustomNames } = useCustomCatalogNames();
   
@@ -262,7 +304,10 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
     try {
       if (shouldRefresh) {
         setRefreshing(true);
-      } else if (pageNum === 1) {
+        setHasMore(true); // Reset hasMore on refresh
+      } else if (pageNum > 1) {
+        setPaginating(true);
+      } else {
         setLoading(true);
       }
 
@@ -360,6 +405,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           setHasMore(false);
         } else {
           foundItems = true;
+          setHasMore(true); // Ensure hasMore is true if we found items
         }
         
         if (shouldRefresh || pageNum === 1) {
@@ -442,8 +488,11 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           index === self.findIndex((t) => t.id === item.id)
         );
         
-        if (uniqueItems.length === 0) {
+        if (uniqueItems.length === 0 && allItems.length === 0) {
           setHasMore(false);
+        } else {
+          foundItems = true;
+          setHasMore(true); // Ensure hasMore is true if we found items
         }
         
         if (shouldRefresh || pageNum === 1) {
@@ -467,30 +516,36 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setPaginating(false);
     }
   }, [addonId, type, id, genreFilter, dataSource]);
 
   useEffect(() => {
-    loadItems(1);
+    loadItems(1, true);
   }, [loadItems]);
 
   const handleRefresh = useCallback(() => {
     setPage(1);
+    setItems([]); // Clear items on refresh
     loadItems(1, true);
   }, [loadItems]);
 
   const handleLoadMore = useCallback(() => {
-    if (!loading && hasMore) {
+    if (isInitialRender.current) {
+      isInitialRender.current = false;
+      return;
+    }
+    if (!loading && !paginating && hasMore && !refreshing) {
       const nextPage = page + 1;
       setPage(nextPage);
       loadItems(nextPage);
     }
-  }, [loading, hasMore, page, loadItems]);
+  }, [loading, paginating, hasMore, page, loadItems, refreshing]);
 
   const renderItem = useCallback(({ item, index }: { item: Meta; index: number }) => {
     // Calculate if this is the last item in a row
-    const isLastInRow = (index + 1) % NUM_COLUMNS === 0;
-    // For 2-column layout, ensure proper spacing
+    const isLastInRow = (index + 1) % screenData.numColumns === 0;
+    // For proper spacing
     const rightMargin = isLastInRow ? 0 : SPACING.sm;
     
     return (
@@ -499,8 +554,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           styles.item,
           { 
             marginRight: rightMargin,
-            // For 2 columns, ensure items fill the available space properly
-            width: NUM_COLUMNS === 2 ? ITEM_WIDTH : ITEM_WIDTH
+            width: screenData.itemWidth
           }
         ]}
         onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type, addonId })}
@@ -527,7 +581,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
         </View>
       </TouchableOpacity>
     );
-  }, [navigation, styles, NUM_COLUMNS, ITEM_WIDTH]);
+  }, [navigation, styles, screenData.numColumns, screenData.itemWidth]);
 
   const renderEmptyState = () => (
     <View style={styles.centered}>
@@ -625,8 +679,8 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           data={items}
           renderItem={renderItem}
           keyExtractor={(item) => `${item.id}-${item.type}`}
-          numColumns={NUM_COLUMNS}
-          key={NUM_COLUMNS}
+          numColumns={screenData.numColumns}
+          key={screenData.numColumns}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -638,7 +692,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.5}
           ListFooterComponent={
-            loading && items.length > 0 ? (
+            paginating ? (
               <View style={styles.footer}>
                 <ActivityIndicator size="small" color={colors.primary} />
               </View>
@@ -652,4 +706,4 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   );
 };
 
-export default CatalogScreen; 
+export default CatalogScreen;

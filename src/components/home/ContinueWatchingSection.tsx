@@ -7,9 +7,11 @@ import {
   TouchableOpacity, 
   Dimensions,
   AppState,
-  AppStateStatus
+  AppStateStatus,
+  Alert,
+  ActivityIndicator
 } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
@@ -19,6 +21,9 @@ import { Image as ExpoImage } from 'expo-image';
 import { useTheme } from '../../contexts/ThemeContext';
 import { storageService } from '../../services/storageService';
 import { logger } from '../../utils/logger';
+import * as Haptics from 'expo-haptics';
+import { TraktService } from '../../services/traktService';
+import { stremioService } from '../../services/stremioService';
 
 // Define interface for continue watching items
 interface ContinueWatchingItem extends StreamingContent {
@@ -68,6 +73,20 @@ const isValidImdbId = (id: string): boolean => {
   return imdbPattern.test(id);
 };
 
+// Function to check if an episode has been released
+const isEpisodeReleased = (video: any): boolean => {
+  if (!video.released) return false;
+  
+  try {
+    const releaseDate = new Date(video.released);
+    const now = new Date();
+    return releaseDate <= now;
+  } catch (error) {
+    // If we can't parse the date, assume it's not released
+    return false;
+  }
+};
+
 // Create a proper imperative handle with React.forwardRef and updated type
 const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, ref) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
@@ -76,11 +95,55 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   const [loading, setLoading] = useState(true);
   const appState = useRef(AppState.currentState);
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
+  const longPressTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Use a state to track if a background refresh is in progress
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Cache for metadata to avoid redundant API calls
+  const metadataCache = useRef<Record<string, { metadata: any; basicContent: StreamingContent | null; timestamp: number }>>({});
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+  // Helper function to get cached or fetch metadata
+  const getCachedMetadata = useCallback(async (type: string, id: string) => {
+    const cacheKey = `${type}:${id}`;
+    const cached = metadataCache.current[cacheKey];
+    const now = Date.now();
+    
+    if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+      return cached;
+    }
+    
+    try {
+      const [metadata, basicContent] = await Promise.all([
+        stremioService.getMetaDetails(type, id),
+        catalogService.getBasicContentDetails(type, id)
+      ]);
+      
+      if (basicContent) {
+        const result = { metadata, basicContent, timestamp: now };
+        metadataCache.current[cacheKey] = result;
+        return result;
+      }
+      return null;
+    } catch (error) {
+      logger.error(`Failed to fetch metadata for ${type}:${id}:`, error);
+      return null;
+    }
+  }, []);
 
   // Modified loadContinueWatching to be more efficient
-  const loadContinueWatching = useCallback(async () => {
-    try {
+  const loadContinueWatching = useCallback(async (isBackgroundRefresh = false) => {
+    // Prevent multiple concurrent refreshes
+    if (isRefreshing) return;
+
+    if (!isBackgroundRefresh) {
       setLoading(true);
+    }
+    setIsRefreshing(true);
+
+    try {
       const allProgress = await storageService.getAllWatchProgress();
       
       if (Object.keys(allProgress).length === 0) {
@@ -90,96 +153,253 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
 
       const progressItems: ContinueWatchingItem[] = [];
       const latestEpisodes: Record<string, ContinueWatchingItem> = {};
-      const contentPromises: Promise<void>[] = [];
       
-      // Process each saved progress
+      // Group progress items by content ID to batch API calls
+      const contentGroups: Record<string, { type: string; id: string; episodes: Array<{ key: string; episodeId?: string; progress: any; progressPercent: number }> }> = {};
+      
+      // First pass: group by content ID
       for (const key in allProgress) {
-        // Parse the key to get type and id
         const keyParts = key.split(':');
         const [type, id, ...episodeIdParts] = keyParts;
         const episodeId = episodeIdParts.length > 0 ? episodeIdParts.join(':') : undefined;
         const progress = allProgress[key];
-        
-        // Skip items that are more than 85% complete (effectively finished)
         const progressPercent = (progress.currentTime / progress.duration) * 100;
         
-        if (progressPercent >= 85) {
+        // Skip fully watched movies
+        if (type === 'movie' && progressPercent >= 85) {
           continue;
         }
         
-        const contentPromise = (async () => {
-          try {
-            // Validate IMDB ID format before attempting to fetch
-            if (!isValidImdbId(id)) {
-              return;
-            }
+        const contentKey = `${type}:${id}`;
+        if (!contentGroups[contentKey]) {
+          contentGroups[contentKey] = { type, id, episodes: [] };
+        }
+        
+        contentGroups[contentKey].episodes.push({ key, episodeId, progress, progressPercent });
+      }
+      
+      // Second pass: process each content group with batched API calls
+      const contentPromises = Object.values(contentGroups).map(async (group) => {
+        try {
+          // Validate IMDB ID format before attempting to fetch
+          if (!isValidImdbId(group.id)) {
+            return;
+          }
+          
+          // Get metadata once per content
+          const cachedData = await getCachedMetadata(group.type, group.id);
+          if (!cachedData?.basicContent) {
+            return;
+          }
+          
+          const { metadata, basicContent } = cachedData;
+          
+          // Process all episodes for this content
+          for (const episode of group.episodes) {
+            const { key, episodeId, progress, progressPercent } = episode;
             
-            let content: StreamingContent | null = null;
-            
-            // Get basic content details using catalogService (no enhanced metadata needed for continue watching)
-            content = await catalogService.getBasicContentDetails(type, id);
-            
-            if (content) {
-              // Extract season and episode info from episodeId if available
-              let season: number | undefined;
-              let episode: number | undefined;
-              let episodeTitle: string | undefined;
-              
-              if (episodeId && type === 'series') {
-                // Try different episode ID formats
-                let match = episodeId.match(/s(\d+)e(\d+)/i); // Format: s1e1
+            if (group.type === 'series' && progressPercent >= 85) {
+              // Handle next episode logic for completed episodes
+              let nextSeason: number | undefined;
+              let nextEpisode: number | undefined;
+
+              if (episodeId) {
+                // Pattern 1: s1e1
+                const match = episodeId.match(/s(\d+)e(\d+)/i);
                 if (match) {
-                  season = parseInt(match[1], 10);
-                  episode = parseInt(match[2], 10);
-                  episodeTitle = `Episode ${episode}`;
+                  const currentSeason = parseInt(match[1], 10);
+                  const currentEpisode = parseInt(match[2], 10);
+                  nextSeason = currentSeason;
+                  nextEpisode = currentEpisode + 1;
                 } else {
-                  // Try format: seriesId:season:episode (e.g., tt0108778:4:6)
+                  // Pattern 2: id:season:episode
                   const parts = episodeId.split(':');
-                  if (parts.length >= 3) {
-                    const seasonPart = parts[parts.length - 2]; // Second to last part
-                    const episodePart = parts[parts.length - 1]; // Last part
-                    
-                    const seasonNum = parseInt(seasonPart, 10);
-                    const episodeNum = parseInt(episodePart, 10);
-                    
+                  if (parts.length >= 2) {
+                    const seasonNum = parseInt(parts[parts.length - 2], 10);
+                    const episodeNum = parseInt(parts[parts.length - 1], 10);
                     if (!isNaN(seasonNum) && !isNaN(episodeNum)) {
-                      season = seasonNum;
-                      episode = episodeNum;
-                      episodeTitle = `Episode ${episode}`;
+                      nextSeason = seasonNum;
+                      nextEpisode = episodeNum + 1;
                     }
                   }
                 }
               }
-              
-              const continueWatchingItem: ContinueWatchingItem = {
-                ...content,
-                progress: progressPercent,
-                lastUpdated: progress.lastUpdated,
-                season,
-                episode,
-                episodeTitle
-              };
-              
-              if (type === 'series') {
-                // For series, keep only the latest watched episode for each show
-                if (!latestEpisodes[id] || latestEpisodes[id].lastUpdated < progress.lastUpdated) {
-                  latestEpisodes[id] = continueWatchingItem;
+
+              // Check if next episode exists and has been released using cached metadata
+              if (nextSeason !== undefined && nextEpisode !== undefined && metadata?.videos && Array.isArray(metadata.videos)) {
+                const nextEpisodeVideo = metadata.videos.find((video: any) => 
+                  video.season === nextSeason && video.episode === nextEpisode
+                );
+                
+                if (nextEpisodeVideo && isEpisodeReleased(nextEpisodeVideo)) {
+                  const nextEpisodeItem = {
+                    ...basicContent,
+                    id: group.id,
+                    type: group.type,
+                    progress: 0,
+                    lastUpdated: progress.lastUpdated,
+                    season: nextSeason,
+                    episode: nextEpisode,
+                    episodeTitle: `Episode ${nextEpisode}`,
+                  } as ContinueWatchingItem;
+
+                  // Store in latestEpisodes to ensure single entry per show
+                  const existingLatest = latestEpisodes[group.id];
+                  if (!existingLatest || existingLatest.lastUpdated < nextEpisodeItem.lastUpdated) {
+                    latestEpisodes[group.id] = nextEpisodeItem;
+                  }
                 }
+              }
+              continue;
+            }
+            
+            // Handle in-progress episodes
+            let season: number | undefined;
+            let episodeNumber: number | undefined;
+            let episodeTitle: string | undefined;
+            
+            if (episodeId && group.type === 'series') {
+              // Try different episode ID formats
+              let match = episodeId.match(/s(\d+)e(\d+)/i); // Format: s1e1
+              if (match) {
+                season = parseInt(match[1], 10);
+                episodeNumber = parseInt(match[2], 10);
+                episodeTitle = `Episode ${episodeNumber}`;
               } else {
-                // For movies, add to the list directly
-                progressItems.push(continueWatchingItem);
+                // Try format: seriesId:season:episode (e.g., tt0108778:4:6)
+                const parts = episodeId.split(':');
+                if (parts.length >= 3) {
+                  const seasonPart = parts[parts.length - 2]; // Second to last part
+                  const episodePart = parts[parts.length - 1]; // Last part
+                  
+                  const seasonNum = parseInt(seasonPart, 10);
+                  const episodeNum = parseInt(episodePart, 10);
+                  
+                  if (!isNaN(seasonNum) && !isNaN(episodeNum)) {
+                    season = seasonNum;
+                    episodeNumber = episodeNum;
+                    episodeTitle = `Episode ${episodeNumber}`;
+                  }
+                }
               }
             }
-          } catch (error) {
-            logger.error(`Failed to get content details for ${type}:${id}`, error);
+            
+            const continueWatchingItem: ContinueWatchingItem = {
+              ...basicContent,
+              progress: progressPercent,
+              lastUpdated: progress.lastUpdated,
+              season,
+              episode: episodeNumber,
+              episodeTitle
+            };
+            
+            if (group.type === 'series') {
+              // For series, keep only the latest watched episode for each show
+              if (!latestEpisodes[group.id] || latestEpisodes[group.id].lastUpdated < progress.lastUpdated) {
+                latestEpisodes[group.id] = continueWatchingItem;
+              }
+            } else {
+              // For movies, add to the list directly
+              progressItems.push(continueWatchingItem);
+            }
           }
-        })();
-        
-        contentPromises.push(contentPromise);
-      }
+        } catch (error) {
+          logger.error(`Failed to process content group ${group.type}:${group.id}:`, error);
+        }
+      });
       
       // Wait for all content to be processed
-      await Promise.all(contentPromises);
+       await Promise.all(contentPromises);
+      
+      // -------------------- TRAKT HISTORY INTEGRATION --------------------
+      try {
+        const traktService = TraktService.getInstance();
+        const isAuthed = await traktService.isAuthenticated();
+        if (isAuthed) {
+          const historyItems = await traktService.getWatchedEpisodesHistory(1, 200);
+          const latestWatchedByShow: Record<string, { season: number; episode: number; watchedAt: number }> = {};
+
+          for (const item of historyItems) {
+            if (item.type !== 'episode') continue;
+            const showImdb = item.show?.ids?.imdb ? `tt${item.show.ids.imdb.replace(/^tt/, '')}` : null;
+            if (!showImdb) continue;
+
+            const season = item.episode?.season;
+            const epNum = item.episode?.number;
+            if (season === undefined || epNum === undefined) continue;
+            const watchedAt = new Date(item.watched_at).getTime();
+
+            const existing = latestWatchedByShow[showImdb];
+            if (!existing || existing.watchedAt < watchedAt) {
+              latestWatchedByShow[showImdb] = { season, episode: epNum, watchedAt };
+            }
+          }
+
+          // Process Trakt shows in batches using cached metadata
+          const traktPromises = Object.entries(latestWatchedByShow).map(async ([showId, info]) => {
+            try {
+              const nextEpisode = info.episode + 1;
+              
+              // Use cached metadata to validate next episode exists
+              const cachedData = await getCachedMetadata('series', showId);
+              if (!cachedData?.basicContent) return;
+              
+              const { metadata, basicContent } = cachedData;
+              let nextEpisodeVideo = null;
+              
+              if (metadata?.videos && Array.isArray(metadata.videos)) {
+                nextEpisodeVideo = metadata.videos.find((video: any) => 
+                  video.season === info.season && video.episode === nextEpisode
+                );
+              }
+              
+              if (nextEpisodeVideo && isEpisodeReleased(nextEpisodeVideo)) {
+                const placeholder: ContinueWatchingItem = {
+                  ...basicContent,
+                  id: showId,
+                  type: 'series',
+                  progress: 0,
+                  lastUpdated: info.watchedAt,
+                  season: info.season,
+                  episode: nextEpisode,
+                  episodeTitle: `Episode ${nextEpisode}`,
+                } as ContinueWatchingItem;
+
+                const existing = latestEpisodes[showId];
+                if (!existing || existing.lastUpdated < info.watchedAt) {
+                  latestEpisodes[showId] = placeholder;
+                }
+              }
+
+              // Persist "watched" progress for the episode that Trakt reported
+              const watchedEpisodeId = `${showId}:${info.season}:${info.episode}`;
+              const existingProgress = allProgress[`series:${showId}:${watchedEpisodeId}`];
+              const existingPercent = existingProgress ? (existingProgress.currentTime / existingProgress.duration) * 100 : 0;
+
+              if (!existingProgress || existingPercent < 85) {
+                await storageService.setWatchProgress(
+                  showId,
+                  'series',
+                  {
+                    currentTime: 1,
+                    duration: 1,
+                    lastUpdated: info.watchedAt,
+                    traktSynced: true,
+                    traktProgress: 100,
+                  } as any,
+                  `${info.season}:${info.episode}`
+                );
+              }
+            } catch (err) {
+              logger.error('Failed to build placeholder from history:', err);
+            }
+          });
+          
+          await Promise.all(traktPromises);
+        }
+      } catch (err) {
+        logger.error('Error merging Trakt history:', err);
+      }
       
       // Add the latest episodes for each series to the items list
       progressItems.push(...Object.values(latestEpisodes));
@@ -187,15 +407,21 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       // Sort by last updated time (most recent first)
       progressItems.sort((a, b) => b.lastUpdated - a.lastUpdated);
       
-      // Limit to 10 items
-      const finalItems = progressItems.slice(0, 10);
-      
-      setContinueWatchingItems(finalItems);
+      // Show all continue watching items (no limit)
+      setContinueWatchingItems(progressItems);
     } catch (error) {
       logger.error('Failed to load continue watching items:', error);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
+  }, [isRefreshing, getCachedMetadata]);
+
+  // Clear cache when component unmounts or when needed
+  useEffect(() => {
+    return () => {
+      metadataCache.current = {};
+    };
   }, []);
 
   // Function to handle app state changes
@@ -204,8 +430,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       appState.current.match(/inactive|background/) &&
       nextAppState === 'active'
     ) {
-      // App has come to the foreground - refresh data
-      loadContinueWatching();
+      // App has come to the foreground - trigger a background refresh
+      loadContinueWatching(true);
     }
     appState.current = nextAppState;
   }, [loadContinueWatching]);
@@ -222,8 +448,9 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         clearTimeout(refreshTimerRef.current);
       }
       refreshTimerRef.current = setTimeout(() => {
-        loadContinueWatching();
-      }, 300);
+        // Trigger a background refresh
+        loadContinueWatching(true);
+      }, 500); // Increased debounce time slightly
     };
 
     // Try to set up a custom event listener or use a timer as fallback
@@ -235,15 +462,21 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         if (refreshTimerRef.current) {
           clearTimeout(refreshTimerRef.current);
         }
+        if (longPressTimeoutRef.current) {
+          clearTimeout(longPressTimeoutRef.current);
+        }
       };
     } else {
-      // Fallback: poll for updates every 30 seconds
-      const intervalId = setInterval(loadContinueWatching, 30000);
+      // Reduced polling frequency from 30s to 2 minutes to reduce heating
+      const intervalId = setInterval(() => loadContinueWatching(true), 120000);
       return () => {
         subscription.remove();
         clearInterval(intervalId);
         if (refreshTimerRef.current) {
           clearTimeout(refreshTimerRef.current);
+        }
+        if (longPressTimeoutRef.current) {
+          clearTimeout(longPressTimeoutRef.current);
         }
       };
     }
@@ -254,13 +487,12 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     loadContinueWatching();
   }, [loadContinueWatching]);
 
-  // Properly expose the refresh method
+  // Expose the refresh function via the ref
   React.useImperativeHandle(ref, () => ({
     refresh: async () => {
-      await loadContinueWatching();
-      // Return whether there are items to help parent determine visibility
-      const hasItems = continueWatchingItems.length > 0;
-      return hasItems;
+      // Allow manual refresh to show loading indicator
+      await loadContinueWatching(false);
+      return true;
     }
   }));
 
@@ -268,22 +500,83 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     navigation.navigate('Metadata', { id, type });
   }, [navigation]);
 
+  // Handle long press to delete
+  const handleLongPress = useCallback((item: ContinueWatchingItem) => {
+    try {
+      // Trigger haptic feedback
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch (error) {
+      // Ignore haptic errors
+    }
+
+    // Show confirmation alert
+    Alert.alert(
+      "Remove from Continue Watching",
+      `Remove "${item.name}" from your continue watching list?`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        { 
+          text: "Remove", 
+          style: "destructive",
+          onPress: async () => {
+            setDeletingItemId(item.id);
+            try {
+              // Trigger haptic feedback for confirmation
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              
+              // Remove the watch progress
+              await storageService.removeWatchProgress(
+                item.id, 
+                item.type, 
+                item.type === 'series' && item.season && item.episode 
+                  ? `${item.season}:${item.episode}` 
+                  : undefined
+              );
+              
+              // Also remove from Trakt playback queue if authenticated
+              const traktService = TraktService.getInstance();
+              const isAuthed = await traktService.isAuthenticated();
+              if (isAuthed) {
+                await traktService.deletePlaybackForContent(
+                  item.id,
+                  item.type as 'movie' | 'series',
+                  item.season,
+                  item.episode
+                );
+              }
+              
+              // Update the list by filtering out the deleted item
+              setContinueWatchingItems(prev => 
+                prev.filter(i => i.id !== item.id || 
+                  (i.type === 'series' && item.type === 'series' && 
+                   (i.season !== item.season || i.episode !== item.episode))
+                )
+              );
+            } catch (error) {
+              logger.error('Failed to remove watch progress:', error);
+            } finally {
+              setDeletingItemId(null);
+            }
+          }
+        }
+      ]
+    );
+  }, []);
+
   // If no continue watching items, don't render anything
   if (continueWatchingItems.length === 0) {
     return null;
   }
 
   return (
-    <Animated.View entering={FadeIn.duration(400).delay(250)} style={styles.container}>
+    <Animated.View entering={FadeIn.duration(300).delay(150)} style={styles.container}>
       <View style={styles.header}>
         <View style={styles.titleContainer}>
-          <Text style={[styles.title, { color: currentTheme.colors.highEmphasis }]}>Continue Watching</Text>
-          <LinearGradient
-            colors={[currentTheme.colors.primary, currentTheme.colors.secondary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.titleUnderline}
-          />
+          <Text style={[styles.title, { color: currentTheme.colors.text }]}>Continue Watching</Text>
+          <View style={[styles.titleUnderline, { backgroundColor: currentTheme.colors.primary }]} />
         </View>
       </View>
       
@@ -298,30 +591,55 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
             }]}
             activeOpacity={0.8}
             onPress={() => handleContentPress(item.id, item.type)}
+            onLongPress={() => handleLongPress(item)}
+            delayLongPress={800}
           >
             {/* Poster Image */}
             <View style={styles.posterContainer}>
               <ExpoImage
-                source={{ uri: item.poster }}
-                style={styles.widePoster}
+                source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
+                style={styles.continueWatchingPoster}
                 contentFit="cover"
+                cachePolicy="memory"
                 transition={200}
-                cachePolicy="memory-disk"
+                placeholder={{ uri: 'https://via.placeholder.com/300x450' }}
+                placeholderContentFit="cover"
+                recyclingKey={item.id}
               />
+              
+              {/* Delete Indicator Overlay */}
+              {deletingItemId === item.id && (
+                <Animated.View 
+                  entering={FadeIn.duration(200)}
+                  exiting={FadeOut.duration(200)}
+                  style={styles.deletingOverlay}
+                >
+                  <ActivityIndicator size="large" color="#FFFFFF" />
+                </Animated.View>
+              )}
             </View>
 
             {/* Content Details */}
             <View style={styles.contentDetails}>
               <View style={styles.titleRow}>
-                <Text 
-                  style={[styles.contentTitle, { color: currentTheme.colors.highEmphasis }]}
-                  numberOfLines={1}
-                >
-                  {item.name}
-                </Text>
-                <View style={[styles.progressBadge, { backgroundColor: currentTheme.colors.primary }]}>
-                  <Text style={styles.progressText}>{Math.round(item.progress)}%</Text>
-                </View>
+                {(() => {
+                  const isUpNext = item.progress === 0;
+                  return (
+                    <View style={styles.titleRow}>
+                      <Text 
+                        style={[styles.contentTitle, { color: currentTheme.colors.highEmphasis }]}
+                        numberOfLines={1}
+                      >
+                        {item.name}
+                      </Text>
+                      {isUpNext && (
+                      <View style={[styles.progressBadge, { backgroundColor: currentTheme.colors.primary }]}>
+                          <Text style={styles.progressText}>Up Next</Text>
+                      </View>
+                      )}
+                    </View>
+                  );
+                })()}
               </View>
 
               {/* Episode Info or Year */}
@@ -352,22 +670,24 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
               })()}
 
               {/* Progress Bar */}
-              <View style={styles.wideProgressContainer}>
-                <View style={styles.wideProgressTrack}>
-                <View 
-                  style={[
-                      styles.wideProgressBar, 
-                      { 
-                        width: `${item.progress}%`, 
-                        backgroundColor: currentTheme.colors.primary 
-                      }
-                  ]} 
-                />
+              {item.progress > 0 && (
+                <View style={styles.wideProgressContainer}>
+                  <View style={styles.wideProgressTrack}>
+                    <View 
+                      style={[
+                        styles.wideProgressBar, 
+                        { 
+                          width: `${item.progress}%`, 
+                          backgroundColor: currentTheme.colors.primary 
+                        }
+                      ]} 
+                    />
+                  </View>
+                  <Text style={[styles.progressLabel, { color: currentTheme.colors.textMuted }]}>
+                    {Math.round(item.progress)}% watched
+                  </Text>
                 </View>
-                <Text style={[styles.progressLabel, { color: currentTheme.colors.textMuted }]}>
-                  {Math.round(item.progress)}% watched
-                </Text>
-              </View>
+              )}
             </View>
           </TouchableOpacity>
         )}
@@ -386,7 +706,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 24,
+    marginBottom: 28,
     paddingTop: 0,
     marginTop: 12,
   },
@@ -395,15 +715,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   titleContainer: {
     position: 'relative',
   },
   title: {
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: 0.3,
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: 0.5,
     marginBottom: 4,
   },
   titleUnderline: {
@@ -411,8 +731,8 @@ const styles = StyleSheet.create({
     bottom: -2,
     left: 0,
     width: 40,
-    height: 2,
-    borderRadius: 1,
+    height: 3,
+    borderRadius: 2,
     opacity: 0.8,
   },
   wideList: {
@@ -435,10 +755,23 @@ const styles = StyleSheet.create({
   posterContainer: {
     width: 80,
     height: '100%',
+    position: 'relative',
   },
-  widePoster: {
+  continueWatchingPoster: {
     width: '100%',
     height: '100%',
+    borderTopLeftRadius: 12,
+    borderBottomLeftRadius: 12,
+  },
+  deletingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
     borderTopLeftRadius: 12,
     borderBottomLeftRadius: 12,
   },
@@ -560,4 +893,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default React.memo(ContinueWatchingSection); 
+export default React.memo(ContinueWatchingSection);

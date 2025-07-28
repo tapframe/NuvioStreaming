@@ -3,6 +3,7 @@ import { StyleSheet } from 'react-native';
 export const styles = StyleSheet.create({
   container: {
     backgroundColor: '#000',
+    flex: 1,
     position: 'absolute',
     top: 0,
     left: 0,
@@ -134,7 +135,7 @@ export const styles = StyleSheet.create({
     zIndex: 1000,
   },
   progressTouchArea: {
-    height: 30,
+    height: 40, // Increased from 30 to give more space for the thumb
     justifyContent: 'center',
     width: '100%',
   },
@@ -160,6 +161,21 @@ export const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: '#E50914',
     height: '100%',
+  },
+  progressThumb: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#E50914',
+    top: -6, // Position to center on the progress bar
+    marginLeft: -8, // Center the thumb horizontally
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 4,
+    zIndex: 10, // Ensure it appears above the progress bar
   },
   timeDisplay: {
     flexDirection: 'row',
@@ -474,7 +490,6 @@ export const styles = StyleSheet.create({
   },
   openingContent: {
     padding: 20,
-    backgroundColor: 'rgba(0,0,0,0.85)',
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
@@ -531,14 +546,13 @@ export const styles = StyleSheet.create({
   },
   customSubtitleContainer: {
     position: 'absolute',
-    bottom: 40, // Position above controls and progress bar
+    bottom: 20, // Position lower, closer to bottom
     left: 20,
     right: 20,
     alignItems: 'center',
     zIndex: 1500, // Higher z-index to appear above other elements
   },
   customSubtitleWrapper: {
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     padding: 10,
     borderRadius: 5,
   },

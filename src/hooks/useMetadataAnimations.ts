@@ -7,6 +7,7 @@ import {
   Easing,
   useAnimatedScrollHandler,
   runOnUI,
+  cancelAnimation,
 } from 'react-native-reanimated';
 
 const { width, height } = Dimensions.get('window');
@@ -57,10 +58,11 @@ export const useMetadataAnimations = (safeAreaTop: number, watchProgress: any) =
   
   // Ultra-fast entrance sequence - batch animations for better performance
   useEffect(() => {
-    // Batch all entrance animations to run simultaneously
+    // Batch all entrance animations to run simultaneously with safety
     const enterAnimations = () => {
       'worklet';
       
+      try {
       // Start with slightly reduced values and animate to full visibility
       screenOpacity.value = withTiming(1, { 
         duration: 250, 
@@ -85,32 +87,70 @@ export const useMetadataAnimations = (safeAreaTop: number, watchProgress: any) =
         duration: 350, 
         easing: easings.fast 
       });
+      } catch (error) {
+        // Silently handle any animation errors
+        console.warn('Animation error in enterAnimations:', error);
+      }
     };
 
-    // Use runOnUI for better performance
+    // Use runOnUI for better performance with error handling
+    try {
     runOnUI(enterAnimations)();
+    } catch (error) {
+      console.warn('Failed to run enter animations:', error);
+    }
   }, []);
   
-  // Optimized watch progress animation
+  // Optimized watch progress animation with safety
   useEffect(() => {
     const hasProgress = watchProgress && watchProgress.duration > 0;
     
     const updateProgress = () => {
       'worklet';
+      
+      try {
     progressOpacity.value = withTiming(hasProgress ? 1 : 0, {
       duration: hasProgress ? 200 : 150,
       easing: easings.fast
     });
+      } catch (error) {
+        console.warn('Animation error in updateProgress:', error);
+      }
     };
     
+    try {
     runOnUI(updateProgress)();
+    } catch (error) {
+      console.warn('Failed to run progress animation:', error);
+    }
   }, [watchProgress]);
   
-  // Ultra-optimized scroll handler with minimal calculations
+  // Cleanup function to cancel animations
+  useEffect(() => {
+    return () => {
+      try {
+        cancelAnimation(screenOpacity);
+        cancelAnimation(contentOpacity);
+        cancelAnimation(heroOpacity);
+        cancelAnimation(heroScale);
+        cancelAnimation(uiElementsOpacity);
+        cancelAnimation(uiElementsTranslateY);
+        cancelAnimation(progressOpacity);
+        cancelAnimation(scrollY);
+        cancelAnimation(headerProgress);
+        cancelAnimation(staticHeaderElementsY);
+      } catch (error) {
+        console.warn('Error canceling animations:', error);
+      }
+    };
+  }, []);
+  
+  // Ultra-optimized scroll handler with minimal calculations and safety
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
       'worklet';
       
+      try {
       const rawScrollY = event.contentOffset.y;
       scrollY.value = rawScrollY;
 
@@ -124,6 +164,9 @@ export const useMetadataAnimations = (safeAreaTop: number, watchProgress: any) =
           duration: progress ? 200 : 150, 
           easing: easings.ultraFast 
         });
+        }
+      } catch (error) {
+        console.warn('Animation error in scroll handler:', error);
       }
     },
   });

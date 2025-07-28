@@ -1,28 +1,12 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Image, Dimensions } from 'react-native';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Dimensions } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import Animated, { 
   FadeIn, 
-  FadeOut, 
-  SlideInDown, 
-  SlideOutDown,
-  FadeInDown,
-  FadeInUp,
-  Layout,
-  withSpring,
-  withTiming,
-  useAnimatedStyle,
-  useSharedValue,
-  interpolate,
-  Easing,
-  withDelay,
-  withSequence,
-  runOnJS,
-  BounceIn,
-  ZoomIn
+  FadeOut,
+  SlideInRight,
+  SlideOutRight,
 } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 import { styles } from '../utils/playerStyles';
 import { WyzieSubtitle, SubtitleCue } from '../utils/playerTypes';
 import { getTrackDisplayName, formatLanguage } from '../utils/playerUtils';
@@ -40,63 +24,17 @@ interface SubtitleModalsProps {
   selectedTextTrack: number;
   useCustomSubtitles: boolean;
   subtitleSize: number;
+  subtitleBackground: boolean;
   fetchAvailableSubtitles: () => void;
   loadWyzieSubtitle: (subtitle: WyzieSubtitle) => void;
   selectTextTrack: (trackId: number) => void;
   increaseSubtitleSize: () => void;
   decreaseSubtitleSize: () => void;
+  toggleSubtitleBackground: () => void;
 }
 
 const { width, height } = Dimensions.get('window');
-
-// Fixed dimensions for the modals
-const MODAL_WIDTH = Math.min(width - 32, 520);
-const MODAL_MAX_HEIGHT = height * 0.85;
-
-const SubtitleBadge = ({ 
-  text, 
-  color, 
-  bgColor, 
-  icon,
-  delay = 0 
-}: { 
-  text: string; 
-  color: string; 
-  bgColor: string; 
-  icon?: string;
-  delay?: number;
-}) => (
-  <Animated.View 
-    entering={FadeInUp.duration(200).delay(delay)}
-    style={{
-      backgroundColor: bgColor,
-      borderColor: `${color}40`,
-      borderWidth: 1,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 8,
-      flexDirection: 'row',
-      alignItems: 'center',
-      elevation: 2,
-      shadowColor: color,
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.3,
-      shadowRadius: 2,
-    }}
-  >
-    {icon && (
-      <MaterialIcons name={icon as any} size={12} color={color} style={{ marginRight: 4 }} />
-    )}
-    <Text style={{
-      color: color,
-      fontSize: 10,
-      fontWeight: '700',
-      letterSpacing: 0.3,
-    }}>
-      {text}
-    </Text>
-  </Animated.View>
-);
+const MENU_WIDTH = Math.min(width * 0.85, 400);
 
 export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   showSubtitleModal,
@@ -111,1036 +49,492 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   selectedTextTrack,
   useCustomSubtitles,
   subtitleSize,
+  subtitleBackground,
   fetchAvailableSubtitles,
   loadWyzieSubtitle,
   selectTextTrack,
   increaseSubtitleSize,
   decreaseSubtitleSize,
+  toggleSubtitleBackground,
 }) => {
-  const modalScale = useSharedValue(0.9);
-  const modalOpacity = useSharedValue(0);
-  const languageModalScale = useSharedValue(0.9);
-  const languageModalOpacity = useSharedValue(0);
-  
+  // Track which specific online subtitle is currently loaded
+  const [selectedOnlineSubtitleId, setSelectedOnlineSubtitleId] = React.useState<string | null>(null);
+
   React.useEffect(() => {
-    if (showSubtitleModal) {
-      modalScale.value = withSpring(1, {
-        damping: 20,
-        stiffness: 300,
-        mass: 0.8,
-      });
-      modalOpacity.value = withTiming(1, {
-        duration: 200,
-        easing: Easing.out(Easing.quad),
-      });
+    if (showSubtitleModal && !isLoadingSubtitleList && availableSubtitles.length === 0) {
+      fetchAvailableSubtitles();
     }
   }, [showSubtitleModal]);
 
+  // Reset selected online subtitle when switching to built-in tracks
   React.useEffect(() => {
-    if (showSubtitleLanguageModal) {
-      languageModalScale.value = withSpring(1, {
-        damping: 20,
-        stiffness: 300,
-        mass: 0.8,
-      });
-      languageModalOpacity.value = withTiming(1, {
-        duration: 200,
-        easing: Easing.out(Easing.quad),
-      });
+    if (!useCustomSubtitles) {
+      setSelectedOnlineSubtitleId(null);
     }
-  }, [showSubtitleLanguageModal]);
-
-  const modalStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: modalScale.value }],
-    opacity: modalOpacity.value,
-  }));
-
-  const languageModalStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: languageModalScale.value }],
-    opacity: languageModalOpacity.value,
-  }));
+  }, [useCustomSubtitles]);
 
   const handleClose = () => {
-    modalScale.value = withTiming(0.9, { duration: 150 });
-    modalOpacity.value = withTiming(0, { duration: 150 });
-    setTimeout(() => setShowSubtitleModal(false), 150);
+    setShowSubtitleModal(false);
   };
 
-  const handleLanguageClose = () => {
-    languageModalScale.value = withTiming(0.9, { duration: 150 });
-    languageModalOpacity.value = withTiming(0, { duration: 150 });
-    setTimeout(() => setShowSubtitleLanguageModal(false), 150);
+  const handleLoadWyzieSubtitle = (subtitle: WyzieSubtitle) => {
+    setSelectedOnlineSubtitleId(subtitle.id);
+    loadWyzieSubtitle(subtitle);
   };
 
-  // Render subtitle settings modal
-  const renderSubtitleModal = () => {
+  // Main subtitle menu
+  const renderSubtitleMenu = () => {
     if (!showSubtitleModal) return null;
     
     return (
-      <Animated.View 
-        entering={FadeIn.duration(250)}
-        exiting={FadeOut.duration(200)}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.9)',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 9999,
-          padding: 16,
-        }}
-      >
+      <>
         {/* Backdrop */}
-        <TouchableOpacity 
+        <Animated.View 
+          entering={FadeIn.duration(200)}
+          exiting={FadeOut.duration(150)}
           style={{
             position: 'absolute',
             top: 0,
             left: 0,
             right: 0,
             bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 9998,
           }}
-          onPress={handleClose}
-          activeOpacity={1}
-        />
-
-        {/* Modal Content */}
-        <Animated.View
-          style={[
-            {
-              width: MODAL_WIDTH,
-              maxHeight: MODAL_MAX_HEIGHT,
-              minHeight: height * 0.3,
-              overflow: 'hidden',
-              elevation: 25,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 12 },
-              shadowOpacity: 0.4,
-              shadowRadius: 25,
-              alignSelf: 'center',
-            },
-            modalStyle,
-          ]}
         >
-          {/* Glassmorphism Background */}
-          <BlurView 
-            intensity={100} 
-            tint="dark"
-            style={{
-              borderRadius: 28,
-              overflow: 'hidden',
-              backgroundColor: 'rgba(26, 26, 26, 0.8)',
-              width: '100%',
-              height: '100%',
-            }}
-          >
-            {/* Header */}
-            <LinearGradient
-              colors={[
-                'rgba(139, 92, 246, 0.95)',
-                'rgba(124, 58, 237, 0.95)',
-                'rgba(109, 40, 217, 0.9)'
-              ]}
-              locations={[0, 0.6, 1]}
+          <TouchableOpacity 
+            style={{ flex: 1 }}
+            onPress={handleClose}
+            activeOpacity={1}
+          />
+        </Animated.View>
+
+        {/* Side Menu */}
+        <Animated.View
+          entering={SlideInRight.duration(300)}
+          exiting={SlideOutRight.duration(250)}
+          style={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            bottom: 0,
+            width: MENU_WIDTH,
+            backgroundColor: '#1A1A1A',
+            zIndex: 9999,
+            elevation: 20,
+            shadowColor: '#000',
+            shadowOffset: { width: -5, height: 0 },
+            shadowOpacity: 0.3,
+            shadowRadius: 10,
+            borderTopLeftRadius: 20,
+            borderBottomLeftRadius: 20,
+          }}
+        >
+          {/* Header */}
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 20,
+            paddingTop: 60,
+            paddingBottom: 20,
+            borderBottomWidth: 1,
+            borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+          }}>
+            <Text style={{
+              color: '#FFFFFF',
+              fontSize: 22,
+              fontWeight: '700',
+            }}>
+              Subtitles
+            </Text>
+            <TouchableOpacity 
               style={{
-                paddingHorizontal: 28,
-                paddingVertical: 24,
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+              onPress={handleClose}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons name="close" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView 
+            style={{ flex: 1 }}
+            contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Font Size Section - Only show for custom subtitles */}
+            {useCustomSubtitles && (
+              <View style={{ marginBottom: 30 }}>
+                <Text style={{
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  fontSize: 14,
+                  fontWeight: '600',
+                  marginBottom: 15,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                }}>
+                  Font Size
+                </Text>
+                
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: 16,
+                  padding: 16,
+                }}>
+                  <TouchableOpacity
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 20,
+                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                  onPress={decreaseSubtitleSize}
+                >
+                  <MaterialIcons name="remove" size={20} color="#FFFFFF" />
+                </TouchableOpacity>
+                
+                <Text style={{
+                  color: '#FFFFFF',
+                  fontSize: 18,
+                  fontWeight: '600',
+                }}>
+                  {subtitleSize}
+                </Text>
+                
+                <TouchableOpacity
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 20,
+                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                  onPress={increaseSubtitleSize}
+                >
+                  <MaterialIcons name="add" size={20} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+              </View>
+            )}
+
+            {/* Background Toggle Section - Only show for custom subtitles */}
+            {useCustomSubtitles && (
+              <View style={{ marginBottom: 30 }}>
+              <Text style={{
+                color: 'rgba(255, 255, 255, 0.7)',
+                fontSize: 14,
+                fontWeight: '600',
+                marginBottom: 15,
+                textTransform: 'uppercase',
+                letterSpacing: 0.5,
+              }}>
+                Background
+              </Text>
+              
+              <View style={{
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                borderBottomWidth: 1,
-                borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-                width: '100%',
-              }}
-            >
-              <Animated.View 
-                entering={FadeInDown.duration(300).delay(100)}
-                style={{ flex: 1 }}
-              >
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                borderRadius: 16,
+                padding: 16,
+              }}>
                 <Text style={{
-                  color: '#fff',
-                  fontSize: 24,
-                  fontWeight: '800',
-                  letterSpacing: -0.8,
-                  textShadowColor: 'rgba(0, 0, 0, 0.3)',
-                  textShadowOffset: { width: 0, height: 1 },
-                  textShadowRadius: 2,
-                }}>
-                  Subtitle Settings
-                </Text>
-                <Text style={{
-                  color: 'rgba(255, 255, 255, 0.85)',
-                  fontSize: 14,
-                  marginTop: 4,
+                  color: 'white',
+                  fontSize: 16,
                   fontWeight: '500',
-                  letterSpacing: 0.2,
                 }}>
-                  Configure subtitles and language options
+                  Show Background
                 </Text>
-              </Animated.View>
-              
-              <Animated.View entering={BounceIn.duration(400).delay(200)}>
-                <TouchableOpacity 
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 22,
-                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    marginLeft: 16,
-                    borderWidth: 1,
-                    borderColor: 'rgba(255, 255, 255, 0.2)',
-                  }}
-                  onPress={handleClose}
-                  activeOpacity={0.7}
-                >
-                  <MaterialIcons name="close" size={20} color="#fff" />
-                </TouchableOpacity>
-              </Animated.View>
-            </LinearGradient>
-
-            {/* Content */}
-            <ScrollView 
-              style={{ 
-                maxHeight: MODAL_MAX_HEIGHT - 100, // Account for header height
-                backgroundColor: 'transparent',
-                width: '100%',
-              }}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ 
-                padding: 24,
-                paddingBottom: 32,
-                width: '100%',
-              }}
-              bounces={false}
-            >
-              <View style={styles.modernTrackListContainer}>
                 
-                {/* External Subtitles Section */}
-                <Animated.View 
-                  entering={FadeInDown.duration(400).delay(150)}
-                  layout={Layout.springify()}
+                <TouchableOpacity
                   style={{
-                    marginBottom: 32,
+                    width: 50,
+                    height: 28,
+                    backgroundColor: subtitleBackground ? '#007AFF' : 'rgba(255, 255, 255, 0.2)',
+                    borderRadius: 14,
+                    justifyContent: 'center',
+                    alignItems: subtitleBackground ? 'flex-end' : 'flex-start',
+                    paddingHorizontal: 2,
                   }}
+                  onPress={toggleSubtitleBackground}
                 >
                   <View style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    marginBottom: 20,
-                    paddingBottom: 12,
-                    borderBottomWidth: 1,
-                    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-                  }}>
-                    <LinearGradient
-                      colors={['#4CAF50', '#388E3C']}
-                      style={{
-                        width: 12,
-                        height: 12,
-                        borderRadius: 6,
-                        marginRight: 16,
-                        elevation: 3,
-                        shadowColor: '#4CAF50',
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.4,
-                        shadowRadius: 4,
-                      }}
-                    />
-                    <View style={{ flex: 1 }}>
-                      <Text style={{
-                        color: '#fff',
-                        fontSize: 18,
-                        fontWeight: '700',
-                        letterSpacing: -0.3,
-                      }}>
-                        External Subtitles
-                      </Text>
-                      <Text style={{
-                        color: 'rgba(255, 255, 255, 0.6)',
-                        fontSize: 12,
-                        marginTop: 1,
-                        fontWeight: '500',
-                      }}>
-                        High quality with size control
-                      </Text>
-                    </View>
-                  </View>
+                    width: 24,
+                    height: 24,
+                    backgroundColor: 'white',
+                    borderRadius: 12,
+                  }} />
+                </TouchableOpacity>
+              </View>
+              </View>
+            )}
 
-                  {/* Custom subtitles option */}
-                  {customSubtitles.length > 0 && (
-                    <Animated.View
-                      entering={FadeInDown.duration(300).delay(200)}
-                      layout={Layout.springify()}
-                      style={{ marginBottom: 16 }}
-                    >
+            {/* Built-in Subtitles */}
+            {vlcTextTracks.length > 0 && (
+              <View style={{ marginBottom: 30 }}>
+                <Text style={{
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  fontSize: 14,
+                  fontWeight: '600',
+                  marginBottom: 15,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                }}>
+                  Built-in Subtitles
+                </Text>
+                
+                <View style={{ gap: 8 }}>
+                  {vlcTextTracks.map((track) => {
+                    const isSelected = selectedTextTrack === track.id && !useCustomSubtitles;
+                    return (
                       <TouchableOpacity
+                        key={track.id}
                         style={{
-                          backgroundColor: useCustomSubtitles 
-                            ? 'rgba(76, 175, 80, 0.08)' 
-                            : 'rgba(255, 255, 255, 0.03)',
-                          borderRadius: 20,
-                          padding: 20,
-                          borderWidth: 2,
-                          borderColor: useCustomSubtitles 
-                            ? 'rgba(76, 175, 80, 0.4)' 
-                            : 'rgba(255, 255, 255, 0.08)',
-                          elevation: useCustomSubtitles ? 8 : 3,
-                          shadowColor: useCustomSubtitles ? '#4CAF50' : '#000',
-                          shadowOffset: { width: 0, height: useCustomSubtitles ? 4 : 2 },
-                          shadowOpacity: useCustomSubtitles ? 0.3 : 0.1,
-                          shadowRadius: useCustomSubtitles ? 12 : 6,
+                          backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                          borderRadius: 16,
+                          padding: 16,
+                          borderWidth: 1,
+                          borderColor: isSelected ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255, 255, 255, 0.1)',
                         }}
                         onPress={() => {
-                          selectTextTrack(-999);
-                          setShowSubtitleModal(false);
+                          selectTextTrack(track.id);
+                          setSelectedOnlineSubtitleId(null);
                         }}
-                        activeOpacity={0.85}
+                        activeOpacity={0.7}
                       >
-                        <View style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                        }}>
-                          <View style={{ flex: 1, marginRight: 16 }}>
-                            <View style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              marginBottom: 8,
-                              gap: 12,
-                            }}>
-                              <Text style={{
-                                color: useCustomSubtitles ? '#fff' : 'rgba(255, 255, 255, 0.95)',
-                                fontSize: 16,
-                                fontWeight: '700',
-                                letterSpacing: -0.2,
-                                flex: 1,
-                              }}>
-                                Custom Subtitles
-                              </Text>
-                              
-                              {useCustomSubtitles && (
-                                <Animated.View 
-                                  entering={BounceIn.duration(300)}
-                                  style={{
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    backgroundColor: 'rgba(76, 175, 80, 0.25)',
-                                    paddingHorizontal: 10,
-                                    paddingVertical: 5,
-                                    borderRadius: 14,
-                                    borderWidth: 1,
-                                    borderColor: 'rgba(76, 175, 80, 0.5)',
-                                  }}
-                                >
-                                  <MaterialIcons name="subtitles" size={12} color="#4CAF50" />
-                                  <Text style={{
-                                    color: '#4CAF50',
-                                    fontSize: 10,
-                                    fontWeight: '800',
-                                    marginLeft: 3,
-                                    letterSpacing: 0.3,
-                                  }}>
-                                    ACTIVE
-                                  </Text>
-                                </Animated.View>
-                              )}
-                            </View>
-                            
-                            <View style={{
-                              flexDirection: 'row',
-                              flexWrap: 'wrap',
-                              gap: 6,
-                              alignItems: 'center',
-                            }}>
-                              <SubtitleBadge 
-                                text={`${customSubtitles.length} CUES`} 
-                                color="#4CAF50" 
-                                bgColor="rgba(76, 175, 80, 0.15)"
-                                icon="format-quote-close"
-                              />
-                              <SubtitleBadge 
-                                text="SIZE CONTROL" 
-                                color="#8B5CF6" 
-                                bgColor="rgba(139, 92, 246, 0.15)"
-                                icon="format-size"
-                                delay={50}
-                              />
-                            </View>
-                          </View>
-                          
-                          <View style={{
-                            width: 48,
-                            height: 48,
-                            borderRadius: 24,
-                            backgroundColor: useCustomSubtitles 
-                              ? 'rgba(76, 175, 80, 0.15)' 
-                              : 'rgba(255, 255, 255, 0.05)',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            borderWidth: 2,
-                            borderColor: useCustomSubtitles 
-                              ? 'rgba(76, 175, 80, 0.3)' 
-                              : 'rgba(255, 255, 255, 0.1)',
-                          }}>
-                            {useCustomSubtitles ? (
-                              <Animated.View entering={ZoomIn.duration(200)}>
-                                <MaterialIcons name="check-circle" size={24} color="#4CAF50" />
-                              </Animated.View>
-                            ) : (
-                              <MaterialIcons name="subtitles" size={24} color="rgba(255,255,255,0.6)" />
-                            )}
-                          </View>
-                        </View>
-                      </TouchableOpacity>
-                    </Animated.View>
-                  )}
-
-                  {/* Search for external subtitles */}
-                  <Animated.View
-                    entering={FadeInDown.duration(300).delay(250)}
-                    layout={Layout.springify()}
-                  >
-                    <TouchableOpacity
-                      style={{
-                        backgroundColor: 'rgba(33, 150, 243, 0.08)',
-                        borderRadius: 20,
-                        padding: 20,
-                        borderWidth: 2,
-                        borderColor: 'rgba(33, 150, 243, 0.2)',
-                        elevation: 3,
-                        shadowColor: '#2196F3',
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.1,
-                        shadowRadius: 6,
-                      }}
-                      onPress={() => {
-                        handleClose();
-                        fetchAvailableSubtitles();
-                      }}
-                      disabled={isLoadingSubtitleList}
-                      activeOpacity={0.85}
-                    >
-                      <View style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}>
-                        {isLoadingSubtitleList ? (
-                          <ActivityIndicator size="small" color="#2196F3" style={{ marginRight: 12 }} />
-                        ) : (
-                          <MaterialIcons name="search" size={20} color="#2196F3" style={{ marginRight: 12 }} />
-                        )}
-                        <Text style={{
-                          color: '#2196F3',
-                          fontSize: 16,
-                          fontWeight: '700',
-                          letterSpacing: -0.2,
-                        }}>
-                          {isLoadingSubtitleList ? 'Searching...' : 'Search Online Subtitles'}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  </Animated.View>
-                </Animated.View>
-
-                {/* Subtitle Size Controls */}
-                {useCustomSubtitles && (
-                  <Animated.View 
-                    entering={FadeInDown.duration(400).delay(200)}
-                    layout={Layout.springify()}
-                    style={{
-                      marginBottom: 32,
-                    }}
-                  >
-                    <View style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      marginBottom: 20,
-                      paddingBottom: 12,
-                      borderBottomWidth: 1,
-                      borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-                    }}>
-                      <LinearGradient
-                        colors={['#8B5CF6', '#7C3AED']}
-                        style={{
-                          width: 12,
-                          height: 12,
-                          borderRadius: 6,
-                          marginRight: 16,
-                          elevation: 3,
-                          shadowColor: '#8B5CF6',
-                          shadowOffset: { width: 0, height: 2 },
-                          shadowOpacity: 0.4,
-                          shadowRadius: 4,
-                        }}
-                      />
-                      <View style={{ flex: 1 }}>
-                        <Text style={{
-                          color: '#fff',
-                          fontSize: 18,
-                          fontWeight: '700',
-                          letterSpacing: -0.3,
-                        }}>
-                          Size Control
-                        </Text>
-                        <Text style={{
-                          color: 'rgba(255, 255, 255, 0.6)',
-                          fontSize: 12,
-                          marginTop: 1,
-                          fontWeight: '500',
-                        }}>
-                          Adjust font size for better readability
-                        </Text>
-                      </View>
-                    </View>
-
-                    <Animated.View
-                      entering={FadeInDown.duration(300).delay(300)}
-                      style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                        borderRadius: 20,
-                        padding: 24,
-                        borderWidth: 1,
-                        borderColor: 'rgba(255, 255, 255, 0.08)',
-                        elevation: 3,
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.1,
-                        shadowRadius: 6,
-                      }}
-                    >
-                      <View style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                      }}>
-                        <TouchableOpacity 
-                          style={{
-                            width: 48,
-                            height: 48,
-                            borderRadius: 24,
-                            backgroundColor: 'rgba(139, 92, 246, 0.15)',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            borderWidth: 2,
-                            borderColor: 'rgba(139, 92, 246, 0.3)',
-                            elevation: 4,
-                            shadowColor: '#8B5CF6',
-                            shadowOffset: { width: 0, height: 2 },
-                            shadowOpacity: 0.2,
-                            shadowRadius: 4,
-                          }}
-                          onPress={decreaseSubtitleSize}
-                          activeOpacity={0.7}
-                        >
-                          <MaterialIcons name="remove" size={24} color="#8B5CF6" />
-                        </TouchableOpacity>
-                        
-                        <View style={{
-                          alignItems: 'center',
-                          backgroundColor: 'rgba(139, 92, 246, 0.08)',
-                          paddingHorizontal: 24,
-                          paddingVertical: 16,
-                          borderRadius: 16,
-                          borderWidth: 1,
-                          borderColor: 'rgba(139, 92, 246, 0.2)',
-                          minWidth: 120,
-                        }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                           <Text style={{
-                            color: '#8B5CF6',
-                            fontSize: 24,
-                            fontWeight: '800',
-                            letterSpacing: -0.5,
+                            color: '#FFFFFF',
+                            fontSize: 15,
+                            fontWeight: '500',
+                            flex: 1,
                           }}>
-                            {subtitleSize}px
+                            {getTrackDisplayName(track)}
                           </Text>
-                          <Text style={{
-                            color: 'rgba(139, 92, 246, 0.7)',
-                            fontSize: 12,
-                            fontWeight: '600',
-                            marginTop: 2,
-                            letterSpacing: 0.3,
-                          }}>
-                            Font Size
-                          </Text>
-                        </View>
-                        
-                        <TouchableOpacity 
-                          style={{
-                            width: 48,
-                            height: 48,
-                            borderRadius: 24,
-                            backgroundColor: 'rgba(139, 92, 246, 0.15)',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            borderWidth: 2,
-                            borderColor: 'rgba(139, 92, 246, 0.3)',
-                            elevation: 4,
-                            shadowColor: '#8B5CF6',
-                            shadowOffset: { width: 0, height: 2 },
-                            shadowOpacity: 0.2,
-                            shadowRadius: 4,
-                          }}
-                          onPress={increaseSubtitleSize}
-                          activeOpacity={0.7}
-                        >
-                          <MaterialIcons name="add" size={24} color="#8B5CF6" />
-                        </TouchableOpacity>
-                      </View>
-                    </Animated.View>
-                  </Animated.View>
-                )}
-
-                {/* Available built-in subtitle tracks */}
-                {vlcTextTracks.length > 0 ? vlcTextTracks.map((track, index) => (
-                  <Animated.View
-                    key={track.id}
-                    entering={FadeInDown.duration(300).delay(400 + (index * 50))}
-                    layout={Layout.springify()}
-                    style={{ marginBottom: 16 }}
-                  >
-                    <TouchableOpacity
-                      style={{
-                        backgroundColor: (selectedTextTrack === track.id && !useCustomSubtitles) 
-                          ? 'rgba(255, 152, 0, 0.08)' 
-                          : 'rgba(255, 255, 255, 0.03)',
-                        borderRadius: 20,
-                        padding: 20,
-                        borderWidth: 2,
-                        borderColor: (selectedTextTrack === track.id && !useCustomSubtitles) 
-                          ? 'rgba(255, 152, 0, 0.4)' 
-                          : 'rgba(255, 255, 255, 0.08)',
-                        elevation: (selectedTextTrack === track.id && !useCustomSubtitles) ? 8 : 3,
-                        shadowColor: (selectedTextTrack === track.id && !useCustomSubtitles) ? '#FF9800' : '#000',
-                        shadowOffset: { width: 0, height: (selectedTextTrack === track.id && !useCustomSubtitles) ? 4 : 2 },
-                        shadowOpacity: (selectedTextTrack === track.id && !useCustomSubtitles) ? 0.3 : 0.1,
-                        shadowRadius: (selectedTextTrack === track.id && !useCustomSubtitles) ? 12 : 6,
-                      }}
-                      onPress={() => {
-                        selectTextTrack(track.id);
-                        handleClose();
-                      }}
-                      activeOpacity={0.85}
-                    >
-                      <View style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                      }}>
-                        <View style={{ flex: 1, marginRight: 16 }}>
-                          <View style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            marginBottom: 8,
-                            gap: 12,
-                          }}>
-                            <Text style={{
-                              color: (selectedTextTrack === track.id && !useCustomSubtitles) ? '#fff' : 'rgba(255, 255, 255, 0.95)',
-                              fontSize: 16,
-                              fontWeight: '700',
-                              letterSpacing: -0.2,
-                              flex: 1,
-                            }}>
-                              {getTrackDisplayName(track)}
-                            </Text>
-                            
-                            {(selectedTextTrack === track.id && !useCustomSubtitles) && (
-                              <Animated.View 
-                                entering={BounceIn.duration(300)}
-                                style={{
-                                  flexDirection: 'row',
-                                  alignItems: 'center',
-                                  backgroundColor: 'rgba(255, 152, 0, 0.25)',
-                                  paddingHorizontal: 10,
-                                  paddingVertical: 5,
-                                  borderRadius: 14,
-                                  borderWidth: 1,
-                                  borderColor: 'rgba(255, 152, 0, 0.5)',
-                                }}
-                              >
-                                <MaterialIcons name="subtitles" size={12} color="#FF9800" />
-                                <Text style={{
-                                  color: '#FF9800',
-                                  fontSize: 10,
-                                  fontWeight: '800',
-                                  marginLeft: 3,
-                                  letterSpacing: 0.3,
-                                }}>
-                                  ACTIVE
-                                </Text>
-                              </Animated.View>
-                            )}
-                          </View>
-                          
-                          <View style={{
-                            flexDirection: 'row',
-                            flexWrap: 'wrap',
-                            gap: 6,
-                            alignItems: 'center',
-                          }}>
-                            <SubtitleBadge 
-                              text="BUILT-IN" 
-                              color="#FF9800" 
-                              bgColor="rgba(255, 152, 0, 0.15)"
-                              icon="settings"
-                            />
-                            <SubtitleBadge 
-                              text="SYSTEM SIZE" 
-                              color="#6B7280" 
-                              bgColor="rgba(107, 114, 128, 0.15)"
-                              icon="format-size"
-                              delay={50}
-                            />
-                          </View>
-                        </View>
-                        
-                        <View style={{
-                          width: 48,
-                          height: 48,
-                          borderRadius: 24,
-                          backgroundColor: (selectedTextTrack === track.id && !useCustomSubtitles) 
-                            ? 'rgba(255, 152, 0, 0.15)' 
-                            : 'rgba(255, 255, 255, 0.05)',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          borderWidth: 2,
-                          borderColor: (selectedTextTrack === track.id && !useCustomSubtitles) 
-                            ? 'rgba(255, 152, 0, 0.3)' 
-                            : 'rgba(255, 255, 255, 0.1)',
-                        }}>
-                          {(selectedTextTrack === track.id && !useCustomSubtitles) ? (
-                            <Animated.View entering={ZoomIn.duration(200)}>
-                              <MaterialIcons name="check-circle" size={24} color="#FF9800" />
-                            </Animated.View>
-                          ) : (
-                            <MaterialIcons name="text-fields" size={24} color="rgba(255,255,255,0.6)" />
+                          {isSelected && (
+                            <MaterialIcons name="check" size={20} color="#3B82F6" />
                           )}
                         </View>
-                      </View>
-                    </TouchableOpacity>
-                  </Animated.View>
-                )) : (
-                  <Animated.View 
-                    entering={FadeInDown.duration(300).delay(400)}
-                    style={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.02)',
-                      borderRadius: 16,
-                      padding: 32,
-                      alignItems: 'center',
-                      borderWidth: 1,
-                      borderColor: 'rgba(255, 255, 255, 0.05)',
-                    }}
-                  >
-                    <MaterialIcons name="info-outline" size={32} color="rgba(255, 255, 255, 0.4)" />
-                    <Text style={{
-                      color: 'rgba(255, 255, 255, 0.6)',
-                      fontSize: 16,
-                      fontWeight: '600',
-                      marginTop: 12,
-                      textAlign: 'center',
-                      letterSpacing: -0.2,
-                    }}>
-                      No built-in subtitles available
-                    </Text>
-                    <Text style={{
-                      color: 'rgba(255, 255, 255, 0.4)',
-                      fontSize: 13,
-                      marginTop: 4,
-                      textAlign: 'center',
-                    }}>
-                      Try searching for external subtitles
-                    </Text>
-                  </Animated.View>
-                )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
-            </ScrollView>
-          </BlurView>
-        </Animated.View>
-      </Animated.View>
-    );
-  };
+            )}
 
-  // Render subtitle language selection modal
-  const renderSubtitleLanguageModal = () => {
-    if (!showSubtitleLanguageModal) return null;
-    
-    return (
-      <Animated.View 
-        entering={FadeIn.duration(250)}
-        exiting={FadeOut.duration(200)}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.9)',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 9999,
-          padding: 16,
-        }}
-      >
-        {/* Backdrop */}
-        <TouchableOpacity 
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-          }}
-          onPress={handleLanguageClose}
-          activeOpacity={1}
-        />
-
-        {/* Modal Content */}
-        <Animated.View
-          style={[
-            {
-              width: MODAL_WIDTH,
-              maxHeight: MODAL_MAX_HEIGHT,
-              minHeight: height * 0.3,
-              overflow: 'hidden',
-              elevation: 25,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 12 },
-              shadowOpacity: 0.4,
-              shadowRadius: 25,
-              alignSelf: 'center',
-            },
-            languageModalStyle,
-          ]}
-        >
-          {/* Glassmorphism Background */}
-          <BlurView 
-            intensity={100} 
-            tint="dark"
-            style={{
-              borderRadius: 28,
-              overflow: 'hidden',
-              backgroundColor: 'rgba(26, 26, 26, 0.8)',
-              width: '100%',
-              height: '100%',
-            }}
-          >
-            {/* Header */}
-            <LinearGradient
-              colors={[
-                'rgba(33, 150, 243, 0.95)',
-                'rgba(30, 136, 229, 0.95)',
-                'rgba(25, 118, 210, 0.9)'
-              ]}
-              locations={[0, 0.6, 1]}
-              style={{
-                paddingHorizontal: 28,
-                paddingVertical: 24,
+            {/* Online Subtitles */}
+            <View style={{ marginBottom: 30 }}>
+              <View style={{
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                borderBottomWidth: 1,
-                borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-                width: '100%',
-              }}
-            >
-              <Animated.View 
-                entering={FadeInDown.duration(300).delay(100)}
-                style={{ flex: 1 }}
-              >
+                marginBottom: 15,
+              }}>
                 <Text style={{
-                  color: '#fff',
-                  fontSize: 24,
-                  fontWeight: '800',
-                  letterSpacing: -0.8,
-                  textShadowColor: 'rgba(0, 0, 0, 0.3)',
-                  textShadowOffset: { width: 0, height: 1 },
-                  textShadowRadius: 2,
-                }}>
-                  Select Language
-                </Text>
-                <Text style={{
-                  color: 'rgba(255, 255, 255, 0.85)',
+                  color: 'rgba(255, 255, 255, 0.7)',
                   fontSize: 14,
-                  marginTop: 4,
-                  fontWeight: '500',
-                  letterSpacing: 0.2,
+                  fontWeight: '600',
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
                 }}>
-                  Choose from {availableSubtitles.length} available languages
+                  Online Subtitles
                 </Text>
-              </Animated.View>
-              
-              <Animated.View entering={BounceIn.duration(400).delay(200)}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 22,
-                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                    justifyContent: 'center',
+                    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+                    borderRadius: 12,
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    flexDirection: 'row',
                     alignItems: 'center',
-                    marginLeft: 16,
-                    borderWidth: 1,
-                    borderColor: 'rgba(255, 255, 255, 0.2)',
                   }}
-                  onPress={handleLanguageClose}
+                  onPress={() => fetchAvailableSubtitles()}
+                  disabled={isLoadingSubtitleList}
+                >
+                  {isLoadingSubtitleList ? (
+                    <ActivityIndicator size="small" color="#22C55E" />
+                  ) : (
+                    <MaterialIcons name="refresh" size={16} color="#22C55E" />
+                  )}
+                  <Text style={{
+                    color: '#22C55E',
+                    fontSize: 12,
+                    fontWeight: '600',
+                    marginLeft: 6,
+                  }}>
+                    {isLoadingSubtitleList ? 'Searching' : 'Refresh'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              
+              {availableSubtitles.length > 0 ? (
+                <View style={{ gap: 8 }}>
+                  {availableSubtitles.map((sub) => {
+                    const isSelected = useCustomSubtitles && selectedOnlineSubtitleId === sub.id;
+                    return (
+                      <TouchableOpacity
+                        key={sub.id}
+                        style={{
+                          backgroundColor: isSelected ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                          borderRadius: 16,
+                          padding: 16,
+                          borderWidth: 1,
+                          borderColor: isSelected ? 'rgba(34, 197, 94, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+                        }}
+                        onPress={() => {
+                          handleLoadWyzieSubtitle(sub);
+                        }}
+                        activeOpacity={0.7}
+                        disabled={isLoadingSubtitles}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{
+                              color: '#FFFFFF',
+                              fontSize: 15,
+                              fontWeight: '500',
+                              marginBottom: 4,
+                            }}>
+                              {sub.display}
+                            </Text>
+                            <Text style={{
+                              color: 'rgba(255, 255, 255, 0.6)',
+                              fontSize: 13,
+                            }}>
+                              {formatLanguage(sub.language)}
+                            </Text>
+                          </View>
+                          {isLoadingSubtitles ? (
+                            <ActivityIndicator size="small" color="#22C55E" />
+                          ) : isSelected ? (
+                            <MaterialIcons name="check" size={20} color="#22C55E" />
+                          ) : (
+                            <MaterialIcons name="download" size={20} color="rgba(255,255,255,0.4)" />
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : !isLoadingSubtitleList ? (
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    borderRadius: 16,
+                    padding: 20,
+                    alignItems: 'center',
+                    borderWidth: 1,
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    borderStyle: 'dashed',
+                  }}
+                  onPress={() => fetchAvailableSubtitles()}
                   activeOpacity={0.7}
                 >
-                  <MaterialIcons name="close" size={20} color="#fff" />
-                </TouchableOpacity>
-              </Animated.View>
-            </LinearGradient>
-
-            {/* Content */}
-            <ScrollView 
-              style={{ 
-                maxHeight: MODAL_MAX_HEIGHT - 100, // Account for header height
-                backgroundColor: 'transparent',
-                width: '100%',
-              }}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ 
-                padding: 24,
-                paddingBottom: 32,
-                width: '100%',
-              }}
-              bounces={false}
-            >
-              {availableSubtitles.length > 0 ? availableSubtitles.map((subtitle, index) => (
-                <Animated.View
-                  key={subtitle.id}
-                  entering={FadeInDown.duration(300).delay(150 + (index * 50))}
-                  layout={Layout.springify()}
-                  style={{ marginBottom: 16 }}
-                >
-                  <TouchableOpacity
-                    style={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                      borderRadius: 20,
-                      padding: 20,
-                      borderWidth: 2,
-                      borderColor: 'rgba(255, 255, 255, 0.08)',
-                      elevation: 3,
-                      shadowColor: '#000',
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.1,
-                      shadowRadius: 6,
-                    }}
-                    onPress={() => loadWyzieSubtitle(subtitle)}
-                    disabled={isLoadingSubtitles}
-                    activeOpacity={0.85}
-                  >
-                    <View style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}>
-                      <View style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        flex: 1,
-                        marginRight: 16,
-                      }}>
-                        <Image 
-                          source={{ uri: subtitle.flagUrl }}
-                          style={{
-                            width: 32,
-                            height: 24,
-                            borderRadius: 4,
-                            marginRight: 16,
-                          }}
-                          resizeMode="cover"
-                        />
-                        <View style={{ flex: 1 }}>
-                          <Text style={{
-                            color: 'rgba(255, 255, 255, 0.95)',
-                            fontSize: 16,
-                            fontWeight: '700',
-                            letterSpacing: -0.2,
-                            marginBottom: 4,
-                          }}>
-                            {formatLanguage(subtitle.language)}
-                          </Text>
-                          <Text style={{
-                            color: 'rgba(255, 255, 255, 0.6)',
-                            fontSize: 13,
-                            fontWeight: '500',
-                          }}>
-                            {subtitle.display}
-                          </Text>
-                        </View>
-                      </View>
-                      
-                      <View style={{
-                        width: 48,
-                        height: 48,
-                        borderRadius: 24,
-                        backgroundColor: isLoadingSubtitles 
-                          ? 'rgba(33, 150, 243, 0.15)' 
-                          : 'rgba(255, 255, 255, 0.05)',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        borderWidth: 2,
-                        borderColor: isLoadingSubtitles 
-                          ? 'rgba(33, 150, 243, 0.3)' 
-                          : 'rgba(255, 255, 255, 0.1)',
-                      }}>
-                        {isLoadingSubtitles ? (
-                          <ActivityIndicator size="small" color="#2196F3" />
-                        ) : (
-                          <MaterialIcons name="download" size={24} color="rgba(255,255,255,0.6)" />
-                        )}
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                </Animated.View>
-              )) : (
-                <Animated.View 
-                  entering={FadeInDown.duration(300).delay(150)}
-                  style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.02)',
-                    borderRadius: 20,
-                    padding: 40,
-                    alignItems: 'center',
-                    borderWidth: 1,
-                    borderColor: 'rgba(255, 255, 255, 0.05)',
-                  }}
-                >
-                  <MaterialIcons name="translate" size={48} color="rgba(255, 255, 255, 0.3)" />
+                  <MaterialIcons name="cloud-download" size={24} color="rgba(255,255,255,0.4)" />
                   <Text style={{
                     color: 'rgba(255, 255, 255, 0.6)',
-                    fontSize: 18,
-                    fontWeight: '700',
-                    marginTop: 16,
-                    textAlign: 'center',
-                    letterSpacing: -0.3,
-                  }}>
-                    No subtitles found
-                  </Text>
-                  <Text style={{
-                    color: 'rgba(255, 255, 255, 0.4)',
                     fontSize: 14,
                     marginTop: 8,
                     textAlign: 'center',
-                    lineHeight: 20,
                   }}>
-                    No subtitles are available for this content.{'\n'}Try searching again or check back later.
+                    Tap to search online
                   </Text>
-                </Animated.View>
+                </TouchableOpacity>
+              ) : (
+                <View style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: 16,
+                  padding: 20,
+                  alignItems: 'center',
+                }}>
+                  <ActivityIndicator size="large" color="#22C55E" />
+                  <Text style={{
+                    color: 'rgba(255, 255, 255, 0.6)',
+                    fontSize: 14,
+                    marginTop: 12,
+                  }}>
+                    Searching...
+                  </Text>
+                </View>
               )}
-            </ScrollView>
-          </BlurView>
+            </View>
+
+            {/* Turn Off Subtitles */}
+            <View>
+              <Text style={{
+                color: 'rgba(255, 255, 255, 0.7)',
+                fontSize: 14,
+                fontWeight: '600',
+                marginBottom: 15,
+                textTransform: 'uppercase',
+                letterSpacing: 0.5,
+              }}>
+                Options
+              </Text>
+              
+              <TouchableOpacity
+                style={{
+                  backgroundColor: selectedTextTrack === -1 && !useCustomSubtitles 
+                    ? 'rgba(239, 68, 68, 0.15)' 
+                    : 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: 16,
+                  padding: 16,
+                  borderWidth: 1,
+                  borderColor: selectedTextTrack === -1 && !useCustomSubtitles 
+                    ? 'rgba(239, 68, 68, 0.3)' 
+                    : 'rgba(255, 255, 255, 0.1)',
+                }}
+                onPress={() => {
+                  selectTextTrack(-1);
+                  setSelectedOnlineSubtitleId(null);
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                    <MaterialIcons 
+                      name="visibility-off" 
+                      size={20} 
+                      color={selectedTextTrack === -1 && !useCustomSubtitles ? "#EF4444" : "rgba(255,255,255,0.6)"} 
+                      style={{ marginRight: 12 }} 
+                    />
+                    <Text style={{
+                      color: '#FFFFFF',
+                      fontSize: 15,
+                      fontWeight: '500',
+                    }}>
+                      Turn Off Subtitles
+                    </Text>
+                  </View>
+                  {selectedTextTrack === -1 && !useCustomSubtitles && (
+                    <MaterialIcons name="check" size={20} color="#EF4444" />
+                  )}
+                </View>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
         </Animated.View>
-      </Animated.View>
+      </>
     );
   };
 
   return (
     <>
-      {renderSubtitleModal()}
-      {renderSubtitleLanguageModal()}
+      {renderSubtitleMenu()}
     </>
   );
 };

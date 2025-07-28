@@ -20,6 +20,7 @@ interface PlayerControlsProps {
   currentTime: number;
   duration: number;
   zoomScale: number;
+  currentResizeMode?: string;
   vlcAudioTracks: Array<{id: number, name: string, language?: string}>;
   selectedAudioTrack: number | null;
   availableStreams?: { [providerId: string]: { streams: any[]; addonName: string } };
@@ -55,6 +56,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   currentTime,
   duration,
   zoomScale,
+  currentResizeMode,
   vlcAudioTracks,
   selectedAudioTrack,
   availableStreams,
@@ -113,6 +115,19 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 ]} 
               />
             </View>
+            
+            {/* Progress Thumb - Moved outside the progressBarContainer */}
+            <Animated.View 
+              style={[
+                styles.progressThumb,
+                { 
+                  left: progressAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0%', '100%']
+                  })
+                }
+              ]} 
+            />
           </TouchableOpacity>
         </View>
         <View style={styles.timeDisplay}>
@@ -178,7 +193,11 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
               <TouchableOpacity style={styles.bottomButton} onPress={cycleAspectRatio}>
                 <Ionicons name="resize" size={20} color="white" />
                 <Text style={[styles.bottomButtonText, { fontSize: 14, textAlign: 'center' }]}>
-                  {zoomScale === 1.1 ? 'Fill' : 'Cover'}
+                  {currentResizeMode ? 
+                    (currentResizeMode === 'none' ? 'Original' : 
+                     currentResizeMode.charAt(0).toUpperCase() + currentResizeMode.slice(1)) :
+                    (zoomScale === 1.1 ? 'Fill' : 'Cover')
+                  }
                 </Text>
               </TouchableOpacity>
 

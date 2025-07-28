@@ -248,6 +248,7 @@ const TraktSettingsScreen: React.FC = () => {
                   </Text>
                   {userProfile.vip && (
                     <View style={styles.vipBadge}>
+                      <MaterialIcons name="star" size={14} color="#FFF" />
                       <Text style={styles.vipText}>VIP</Text>
                     </View>
                   )}
@@ -267,13 +268,11 @@ const TraktSettingsScreen: React.FC = () => {
                 style={[
                   styles.button,
                   styles.signOutButton,
-                  { backgroundColor: isDarkMode ? 'rgba(255,59,48,0.1)' : 'rgba(255,59,48,0.08)' }
+                  { backgroundColor: currentTheme.colors.error }
                 ]}
                 onPress={handleSignOut}
               >
-                <Text style={[styles.buttonText, { color: '#FF3B30' }]}>
-                  Sign Out
-                </Text>
+                <Text style={styles.buttonText}>Sign Out</Text>
               </TouchableOpacity>
             </View>
           ) : (

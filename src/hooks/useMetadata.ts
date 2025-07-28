@@ -3,8 +3,8 @@ import { StreamingContent } from '../services/catalogService';
 import { catalogService } from '../services/catalogService';
 import { stremioService } from '../services/stremioService';
 import { tmdbService } from '../services/tmdbService';
-import { hdrezkaService } from '../services/hdrezkaService';
 import { cacheService } from '../services/cacheService';
+import { localScraperService, ScraperInfo } from '../services/localScraperService';
 import { Cast, Episode, GroupedEpisodes, GroupedStreams } from '../types/metadata';
 import { TMDBService } from '../services/tmdbService';
 import { logger } from '../utils/logger';
@@ -63,6 +63,16 @@ interface UseMetadataProps {
   addonId?: string;
 }
 
+interface ScraperStatus {
+  id: string;
+  name: string;
+  isLoading: boolean;
+  hasCompleted: boolean;
+  error: string | null;
+  startTime: number;
+  endTime: number | null;
+}
+
 interface UseMetadataReturn {
   metadata: StreamingContent | null;
   loading: boolean;
@@ -93,6 +103,8 @@ interface UseMetadataReturn {
   loadingRecommendations: boolean;
   setMetadata: React.Dispatch<React.SetStateAction<StreamingContent | null>>;
   imdbId: string | null;
+  scraperStatuses: ScraperStatus[];
+  activeFetchingScrapers: string[];
 }
 
 export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadataReturn => {
@@ -120,6 +132,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
   const [imdbId, setImdbId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [availableStreams, setAvailableStreams] = useState<{ [sourceType: string]: Stream }>({});
+  const [scraperStatuses, setScraperStatuses] = useState<ScraperStatus[]>([]);
+  const [activeFetchingScrapers, setActiveFetchingScrapers] = useState<string[]>([]);
 
   // Add hook for persistent seasons
   const { getSeason, saveSeason } = usePersistentSeasons();
@@ -135,10 +149,36 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       await stremioService.getStreams(type, id, 
         (streams, addonId, addonName, error) => {
           const processTime = Date.now() - sourceStartTime;
+          
+          // Update scraper status when we get a callback
+          if (addonId && addonName) {
+            setScraperStatuses(prevStatuses => {
+              const existingIndex = prevStatuses.findIndex(s => s.id === addonId);
+              const newStatus: ScraperStatus = {
+                id: addonId,
+                name: addonName,
+                isLoading: false,
+                hasCompleted: true,
+                error: error ? error.message : null,
+                startTime: sourceStartTime,
+                endTime: Date.now()
+              };
+              
+              if (existingIndex >= 0) {
+                const updated = [...prevStatuses];
+                updated[existingIndex] = newStatus;
+                return updated;
+              } else {
+                return [...prevStatuses, newStatus];
+              }
+            });
+            
+            // Remove from active fetching list
+            setActiveFetchingScrapers(prev => prev.filter(name => name !== addonName));
+          }
+          
           if (error) {
             logger.error(`❌ [${logPrefix}:${sourceName}] Error for addon ${addonName} (${addonId}):`, error);
-            // Optionally update state to show error for this specific addon?
-            // For now, just log the error.
           } else if (streams && addonId && addonName) {
             logger.log(`✅ [${logPrefix}:${sourceName}] Received ${streams.length} streams from ${addonName} (${addonId}) after ${processTime}ms`);
             
@@ -184,97 +224,24 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     // Loading indicators should probably be managed based on callbacks completing.
   };
 
-  const processHDRezkaSource = async (type: string, id: string, season?: number, episode?: number, isEpisode = false) => {
-    const sourceStartTime = Date.now();
-    const logPrefix = isEpisode ? 'loadEpisodeStreams' : 'loadStreams';
-    const sourceName = 'hdrezka';
-    
-    logger.log(`🔍 [${logPrefix}:${sourceName}] Starting fetch`);
-
-    try {
-      const streams = await hdrezkaService.getStreams(
-        id,
-        type,
-        season,
-        episode
-      );
-      
-      const processTime = Date.now() - sourceStartTime;
-      
-      if (streams && streams.length > 0) {
-        logger.log(`✅ [${logPrefix}:${sourceName}] Received ${streams.length} streams after ${processTime}ms`);
-        
-        // Format response similar to Stremio format for the UI
-        return {
-          'hdrezka': {
-            addonName: 'HDRezka',
-            streams
-          }
-        };
-      } else {
-        logger.log(`⚠️ [${logPrefix}:${sourceName}] No streams found after ${processTime}ms`);
-        return {};
-      }
-    } catch (error) {
-      logger.error(`❌ [${logPrefix}:${sourceName}] Error:`, error);
-      return {};
-    }
-  };
-
-  const processExternalSource = async (sourceType: string, promise: Promise<any>, isEpisode = false) => {
-    try {
-      const startTime = Date.now();
-      const result = await promise;
-      const processingTime = Date.now() - startTime;
-      
-      if (result && Object.keys(result).length > 0) {
-        // Update the appropriate state based on whether this is for an episode or not
-        const updateState = (prevState: GroupedStreams) => {
-          const newState = { ...prevState };
-          
-          // Merge in the new streams
-          Object.entries(result).forEach(([provider, data]: [string, any]) => {
-            newState[provider] = data;
-          });
-          
-          return newState;
-        };
-        
-        if (isEpisode) {
-          setEpisodeStreams(updateState);
-        } else {
-          setGroupedStreams(updateState);
-        }
-        
-        console.log(`✅ [processExternalSource:${sourceType}] Processed in ${processingTime}ms, found streams:`, 
-          Object.values(result).reduce((acc: number, curr: any) => acc + (curr.streams?.length || 0), 0)
-        );
-        
-        // Return the result for the promise chain
-        return result;
-      } else {
-        console.log(`⚠️ [processExternalSource:${sourceType}] No streams found after ${processingTime}ms`);
-        return {};
-      }
-    } catch (error) {
-      console.error(`❌ [processExternalSource:${sourceType}] Error:`, error);
-      return {};
-    }
-  };
-
   const loadCast = async () => {
+    logger.log('[loadCast] Starting cast fetch for:', id);
     setLoadingCast(true);
     try {
+      // Check cache first
+      const cachedCast = cacheService.getCast(id, type);
+      if (cachedCast) {
+        logger.log('[loadCast] Using cached cast data');
+        setCast(cachedCast);
+        setLoadingCast(false);
+        return;
+      }
+
       // Handle TMDB IDs
-      let metadataId = id;
-      let metadataType = type;
-      
       if (id.startsWith('tmdb:')) {
-        const extractedTmdbId = id.split(':')[1];
-        logger.log('[loadCast] Using extracted TMDB ID:', extractedTmdbId);
-        
-        // For TMDB IDs, we'll use the TMDB API directly
-        const castData = await tmdbService.getCredits(parseInt(extractedTmdbId), type);
+        const tmdbId = id.split(':')[1];
+        logger.log('[loadCast] Using TMDB ID directly:', tmdbId);
+        const castData = await tmdbService.getCredits(parseInt(tmdbId), type);
         if (castData && castData.cast) {
           const formattedCast = castData.cast.map((actor: any) => ({
             id: actor.id,
@@ -282,49 +249,41 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             character: actor.character,
             profile_path: actor.profile_path
           }));
+          logger.log(`[loadCast] Found ${formattedCast.length} cast members from TMDB`);
           setCast(formattedCast);
+          cacheService.setCast(id, type, formattedCast);
           setLoadingCast(false);
-          return formattedCast;
+          return;
         }
-        setLoadingCast(false);
-        return [];
-      }
-      
-      // Continue with the existing logic for non-TMDB IDs
-      const cachedCast = cacheService.getCast(id, type);
-      if (cachedCast) {
-        setCast(cachedCast);
-        setLoadingCast(false);
-        return;
       }
 
-      // Load cast in parallel with a fallback to empty array
-      const castLoadingPromise = loadWithFallback(async () => {
-        const tmdbId = await withTimeout(
-          tmdbService.findTMDBIdByIMDB(id),
-          API_TIMEOUT
-        );
-        
-        if (tmdbId) {
-          const castData = await withTimeout(
-            tmdbService.getCredits(tmdbId, type),
-            API_TIMEOUT,
-            { cast: [], crew: [] }
-          );
-          
-          if (castData.cast && castData.cast.length > 0) {
-            setCast(castData.cast);
-            cacheService.setCast(id, type, castData.cast);
-            return castData.cast;
-          }
-        }
-        return [];
-      }, []);
+      // Handle IMDb IDs or convert to TMDB ID
+      let tmdbId;
+      if (id.startsWith('tt')) {
+        logger.log('[loadCast] Converting IMDb ID to TMDB ID');
+        tmdbId = await tmdbService.findTMDBIdByIMDB(id);
+      }
 
-      await castLoadingPromise;
+      if (tmdbId) {
+        logger.log('[loadCast] Fetching cast using TMDB ID:', tmdbId);
+        const castData = await tmdbService.getCredits(tmdbId, type);
+        if (castData && castData.cast) {
+          const formattedCast = castData.cast.map((actor: any) => ({
+            id: actor.id,
+            name: actor.name,
+            character: actor.character,
+            profile_path: actor.profile_path
+          }));
+          logger.log(`[loadCast] Found ${formattedCast.length} cast members`);
+          setCast(formattedCast);
+          cacheService.setCast(id, type, formattedCast);
+        }
+      } else {
+        logger.warn('[loadCast] Could not find TMDB ID for cast fetch');
+      }
     } catch (error) {
-      console.error('Failed to load cast:', error);
-      setCast([]);
+      logger.error('[loadCast] Failed to load cast:', error);
+      // Don't clear existing cast data on error
     } finally {
       setLoadingCast(false);
     }
@@ -539,13 +498,6 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         setMetadata(content.value);
         // Update cache
         cacheService.setMetadata(id, type, content.value);
-
-        if (type === 'series') {
-          // Load series data after the enhanced metadata is processed
-          setTimeout(() => {
-          loadSeriesData().catch(console.error);
-          }, 100);
-        }
       } else {
         throw new Error('Content not found');
       }
@@ -576,7 +528,10 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         const groupedAddonEpisodes: GroupedEpisodes = {};
         
                  addonVideos.forEach((video: any) => {
-          const seasonNumber = video.season || 1;
+          const seasonNumber = video.season;
+          if (!seasonNumber || seasonNumber < 1) {
+            return; // Skip season 0, which often contains extras
+          }
           const episodeNumber = video.episode || video.number || 1;
           
           if (!groupedAddonEpisodes[seasonNumber]) {
@@ -591,7 +546,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             season_number: seasonNumber,
             episode_number: episodeNumber,
             air_date: video.released ? video.released.split('T')[0] : video.firstAired ? video.firstAired.split('T')[0] : '',
-            still_path: video.thumbnail ? video.thumbnail.replace('https://image.tmdb.org/t/p/w500', '') : null,
+            still_path: video.thumbnail,
             vote_average: parseFloat(video.rating) || 0,
             runtime: undefined,
             episodeString: `S${seasonNumber.toString().padStart(2, '0')}E${episodeNumber.toString().padStart(2, '0')}`,
@@ -608,6 +563,32 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         });
         
         logger.log(`📺 Processed addon episodes into ${Object.keys(groupedAddonEpisodes).length} seasons`);
+        
+        // Fetch season posters from TMDB
+        try {
+          const tmdbIdToUse = tmdbId || (id.startsWith('tt') ? await tmdbService.findTMDBIdByIMDB(id) : null);
+          if (tmdbIdToUse) {
+            if (!tmdbId) setTmdbId(tmdbIdToUse);
+            const showDetails = await tmdbService.getTVShowDetails(tmdbIdToUse);
+            if (showDetails?.seasons) {
+              Object.keys(groupedAddonEpisodes).forEach(seasonStr => {
+                const seasonNum = parseInt(seasonStr, 10);
+                const seasonInfo = showDetails.seasons.find(s => s.season_number === seasonNum);
+                const seasonPosterPath = seasonInfo?.poster_path;
+                if (seasonPosterPath) {
+                  groupedAddonEpisodes[seasonNum] = groupedAddonEpisodes[seasonNum].map(ep => ({
+                    ...ep,
+                    season_poster_path: seasonPosterPath,
+                  }));
+                }
+              });
+              logger.log('🖼️ Successfully fetched and attached TMDB season posters to addon episodes.');
+            }
+          }
+        } catch (error) {
+          logger.error('Failed to fetch TMDB season posters for addon episodes:', error);
+        }
+        
         setGroupedEpisodes(groupedAddonEpisodes);
         
                  // Set the first available season
@@ -638,11 +619,16 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         ]);
         
         const transformedEpisodes: GroupedEpisodes = {};
-        Object.entries(allEpisodes).forEach(([season, episodes]) => {
-          const seasonInfo = showDetails?.seasons?.find(s => s.season_number === parseInt(season));
+        Object.entries(allEpisodes).forEach(([seasonStr, episodes]) => {
+          const seasonNum = parseInt(seasonStr, 10);
+          if (seasonNum < 1) {
+            return; // Skip season 0, which often contains extras
+          }
+          
+          const seasonInfo = showDetails?.seasons?.find(s => s.season_number === seasonNum);
           const seasonPosterPath = seasonInfo?.poster_path;
           
-          transformedEpisodes[parseInt(season)] = episodes.map(episode => ({
+          transformedEpisodes[seasonNum] = episodes.map(episode => ({
             ...episode,
             episodeString: `S${episode.season_number.toString().padStart(2, '0')}E${episode.episode_number.toString().padStart(2, '0')}`,
             season_poster_path: seasonPosterPath || null
@@ -740,6 +726,10 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     try {
       console.log('🚀 [loadStreams] START - Loading streams for:', id);
       updateLoadingState();
+      
+      // Reset scraper tracking
+      setScraperStatuses([]);
+      setActiveFetchingScrapers([]);
 
       // Get TMDB ID for external sources and determine the correct ID for Stremio addons
       console.log('🔍 [loadStreams] Getting TMDB ID for:', id);
@@ -790,48 +780,84 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         console.log('ℹ️ [loadStreams] Using ID as both TMDB and Stremio ID:', tmdbId);
       }
       
+      // Initialize scraper tracking
+       try {
+         const allStremioAddons = await stremioService.getInstalledAddons();
+         const localScrapers = await localScraperService.getInstalledScrapers();
+         
+         // Filter Stremio addons to only include those that provide streams for this content type
+         const streamAddons = allStremioAddons.filter(addon => {
+           if (!addon.resources || !Array.isArray(addon.resources)) {
+             return false;
+           }
+           
+           let hasStreamResource = false;
+           
+           for (const resource of addon.resources) {
+             // Check if the current element is a ResourceObject
+             if (typeof resource === 'object' && resource !== null && 'name' in resource) {
+               const typedResource = resource as any;
+               if (typedResource.name === 'stream' && 
+                   Array.isArray(typedResource.types) && 
+                   typedResource.types.includes(type)) {
+                 hasStreamResource = true;
+                 break;
+               }
+             } 
+             // Check if the element is the simple string "stream" AND the addon has a top-level types array
+             else if (typeof resource === 'string' && resource === 'stream' && addon.types) {
+               if (Array.isArray(addon.types) && addon.types.includes(type)) {
+                 hasStreamResource = true;
+                 break;
+               }
+             }
+           }
+           
+           return hasStreamResource;
+         });
+         
+         // Initialize scraper statuses for tracking
+         const initialStatuses: ScraperStatus[] = [];
+         const initialActiveFetching: string[] = [];
+         
+         // Add stream-capable Stremio addons only
+         streamAddons.forEach(addon => {
+           initialStatuses.push({
+             id: addon.id,
+             name: addon.name,
+             isLoading: true,
+             hasCompleted: false,
+             error: null,
+             startTime: Date.now(),
+             endTime: null
+           });
+           initialActiveFetching.push(addon.name);
+         });
+         
+         // Add local scrapers if enabled
+          localScrapers.filter((scraper: ScraperInfo) => scraper.enabled).forEach((scraper: ScraperInfo) => {
+            initialStatuses.push({
+              id: scraper.id,
+              name: scraper.name,
+              isLoading: true,
+              hasCompleted: false,
+              error: null,
+              startTime: Date.now(),
+              endTime: null
+            });
+            initialActiveFetching.push(scraper.name);
+          });
+         
+         setScraperStatuses(initialStatuses);
+         setActiveFetchingScrapers(initialActiveFetching);
+       } catch (error) {
+         console.error('Failed to initialize scraper tracking:', error);
+       }
+      
       // Start Stremio request using the converted ID format
       console.log('🎬 [loadStreams] Using ID for Stremio addons:', stremioId);
       processStremioSource(type, stremioId, false);
       
-      // Add HDRezka source  
-      const hdrezkaPromise = processExternalSource('hdrezka', processHDRezkaSource(type, id), false);
-      
-      // Include HDRezka in fetchPromises array
-      const fetchPromises: Promise<any>[] = [hdrezkaPromise];
-
-      // Wait only for external promises now
-      const results = await Promise.allSettled(fetchPromises);
-      const totalTime = Date.now() - startTime;
-      console.log(`✅ [loadStreams] External source requests completed in ${totalTime}ms (Stremio continues in background)`);
-      
-      const sourceTypes: string[] = ['hdrezka'];
-      results.forEach((result, index) => {
-        const source = sourceTypes[Math.min(index, sourceTypes.length - 1)];
-        console.log(`📊 [loadStreams:${source}] Status: ${result.status}`);
-        if (result.status === 'rejected') {
-          console.error(`❌ [loadStreams:${source}] Error:`, result.reason);
-        }
-      });
-
-      console.log('🧮 [loadStreams] Summary:');
-      console.log('  Total time for external sources:', totalTime + 'ms');
-      
-      // Log the final states - this might not include all Stremio addons yet
-      console.log('📦 [loadStreams] Current combined streams count:', 
-        Object.keys(groupedStreams).length > 0 ? 
-        Object.values(groupedStreams).reduce((acc, group: any) => acc + group.streams.length, 0) :
-        0
-      );
-
-      // Cache the final streams state - Note: This might be incomplete if Stremio addons are slow
-      setGroupedStreams(prev => {
-        // We might want to reconsider when exactly to cache or mark loading as fully complete
-        // cacheService.setStreams(id, type, prev); // Maybe cache incrementally in callback?
-        setPreloadedStreams(prev);
-        return prev;
-      });
-
       // Add a delay before marking loading as complete to give Stremio addons more time
       setTimeout(() => {
         setLoadingStreams(false);
@@ -849,6 +875,84 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     try {
       console.log('🚀 [loadEpisodeStreams] START - Loading episode streams for:', episodeId);
       updateEpisodeLoadingState();
+      
+      // Reset scraper tracking for episodes
+      setScraperStatuses([]);
+      setActiveFetchingScrapers([]);
+
+      // Initialize scraper tracking for episodes
+       try {
+         const allStremioAddons = await stremioService.getInstalledAddons();
+         const localScrapers = await localScraperService.getInstalledScrapers();
+         
+         // Filter Stremio addons to only include those that provide streams for series content
+         const streamAddons = allStremioAddons.filter(addon => {
+           if (!addon.resources || !Array.isArray(addon.resources)) {
+             return false;
+           }
+           
+           let hasStreamResource = false;
+           
+           for (const resource of addon.resources) {
+             // Check if the current element is a ResourceObject
+             if (typeof resource === 'object' && resource !== null && 'name' in resource) {
+               const typedResource = resource as any;
+               if (typedResource.name === 'stream' && 
+                   Array.isArray(typedResource.types) && 
+                   typedResource.types.includes('series')) {
+                 hasStreamResource = true;
+                 break;
+               }
+             } 
+             // Check if the element is the simple string "stream" AND the addon has a top-level types array
+             else if (typeof resource === 'string' && resource === 'stream' && addon.types) {
+               if (Array.isArray(addon.types) && addon.types.includes('series')) {
+                 hasStreamResource = true;
+                 break;
+               }
+             }
+           }
+           
+           return hasStreamResource;
+         });
+         
+         // Initialize scraper statuses for tracking
+         const initialStatuses: ScraperStatus[] = [];
+         const initialActiveFetching: string[] = [];
+         
+         // Add stream-capable Stremio addons only
+         streamAddons.forEach(addon => {
+           initialStatuses.push({
+             id: addon.id,
+             name: addon.name,
+             isLoading: true,
+             hasCompleted: false,
+             error: null,
+             startTime: Date.now(),
+             endTime: null
+           });
+           initialActiveFetching.push(addon.name);
+         });
+         
+         // Add local scrapers if enabled
+         localScrapers.filter((scraper: ScraperInfo) => scraper.enabled).forEach((scraper: ScraperInfo) => {
+           initialStatuses.push({
+             id: scraper.id,
+             name: scraper.name,
+             isLoading: true,
+             hasCompleted: false,
+             error: null,
+             startTime: Date.now(),
+             endTime: null
+           });
+           initialActiveFetching.push(scraper.name);
+         });
+         
+         setScraperStatuses(initialStatuses);
+         setActiveFetchingScrapers(initialActiveFetching);
+       } catch (error) {
+         console.error('Failed to initialize episode scraper tracking:', error);
+       }
 
       // Get TMDB ID for external sources and determine the correct ID for Stremio addons
       console.log('🔍 [loadEpisodeStreams] Getting TMDB ID for:', id);
@@ -906,40 +1010,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       console.log('🎬 [loadEpisodeStreams] Using episode ID for Stremio addons:', stremioEpisodeId);
       processStremioSource('series', stremioEpisodeId, true);
       
-      // Add HDRezka source for episodes
-      const hdrezkaEpisodePromise = processExternalSource('hdrezka',
-        processHDRezkaSource('series', id, parseInt(season), parseInt(episode), true),
-        true
-      );
-      
-      const fetchPromises: Promise<any>[] = [hdrezkaEpisodePromise];
-
-      // Wait only for external promises now
-      const results = await Promise.allSettled(fetchPromises);
-      const totalTime = Date.now() - startTime;
-      console.log(`✅ [loadEpisodeStreams] External source requests completed in ${totalTime}ms (Stremio continues in background)`);
-      
-      const sourceTypes: string[] = ['hdrezka'];
-      results.forEach((result, index) => {
-        const source = sourceTypes[Math.min(index, sourceTypes.length - 1)];
-        console.log(`📊 [loadEpisodeStreams:${source}] Status: ${result.status}`);
-        if (result.status === 'rejected') {
-          console.error(`❌ [loadEpisodeStreams:${source}] Error:`, result.reason);
-        }
-      });
-
-      console.log('🧮 [loadEpisodeStreams] Summary:');
-      console.log('  Total time for external sources:', totalTime + 'ms');
-      
-      // Update preloaded episode streams for future use
-      if (Object.keys(episodeStreams).length > 0) {
-        setPreloadedEpisodeStreams(prev => ({
-          ...prev,
-          [episodeId]: { ...episodeStreams }
-        }));
-      }
-
-      // Add a delay before marking loading as complete to give addons more time
+      // Add a delay before marking loading as complete to give Stremio addons more time
       setTimeout(() => {
         setLoadingEpisodeStreams(false);
       }, 10000); // 10 second delay to allow streams to load
@@ -1113,5 +1184,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     loadingRecommendations,
     setMetadata,
     imdbId,
+    scraperStatuses,
+    activeFetchingScrapers,
   };
-}; 
+};

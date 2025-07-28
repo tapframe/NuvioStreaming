@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, TouchableOpacity, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text } from 'react-native';
+import { View, TouchableOpacity, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, Image, StyleSheet } from 'react-native';
 import { VLCPlayer } from 'react-native-vlc-media-player';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { RootStackParamList } from '../../navigation/AppNavigator';
+import { RootStackParamList, RootStackNavigationProp } from '../../navigation/AppNavigator';
 import { PinchGestureHandler, State, PinchGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import RNImmersiveMode from 'react-native-immersive-mode';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -10,15 +10,19 @@ import { storageService } from '../../services/storageService';
 import { logger } from '../../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import AndroidVideoPlayer from './AndroidVideoPlayer';
 import { useTraktAutosync } from '../../hooks/useTraktAutosync';
+import { useTraktAutosyncSettings } from '../../hooks/useTraktAutosyncSettings';
+import { useMetadata } from '../../hooks/useMetadata';
+import { useSettings } from '../../hooks/useSettings';
 
-import { 
-  DEFAULT_SUBTITLE_SIZE, 
+import {
+  DEFAULT_SUBTITLE_SIZE,
   AudioTrack,
   TextTrack,
-  ResizeModeType, 
-  WyzieSubtitle, 
+  ResizeModeType,
+  WyzieSubtitle,
   SubtitleCue,
   RESUME_PREF_KEY,
   RESUME_PREF,
@@ -26,12 +30,12 @@ import {
 } from './utils/playerTypes';
 import { safeDebugLog, parseSRT, DEBUG_MODE, formatTime } from './utils/playerUtils';
 import { styles } from './utils/playerStyles';
-import SubtitleModals from './modals/SubtitleModals';
-import AudioTrackModal from './modals/AudioTrackModal';
+import { SubtitleModals } from './modals/SubtitleModals';
+import { AudioTrackModal } from './modals/AudioTrackModal';
 import ResumeOverlay from './modals/ResumeOverlay';
 import PlayerControls from './controls/PlayerControls';
 import CustomSubtitles from './subtitles/CustomSubtitles';
-import SourcesModal from './modals/SourcesModal';
+import { SourcesModal } from './modals/SourcesModal';
 
 const VideoPlayer: React.FC = () => {
   // If on Android, use the AndroidVideoPlayer component
@@ -39,9 +43,9 @@ const VideoPlayer: React.FC = () => {
     return <AndroidVideoPlayer />;
   }
 
-  const navigation = useNavigation();
+  const navigation = useNavigation<RootStackNavigationProp>();
   const route = useRoute<RouteProp<RootStackParamList, 'Player'>>();
-  
+
   const {
     uri,
     title = 'Episode Name',
@@ -56,7 +60,8 @@ const VideoPlayer: React.FC = () => {
     type,
     episodeId,
     imdbId,
-    availableStreams: passedAvailableStreams
+    availableStreams: passedAvailableStreams,
+    backdrop
   } = route.params;
 
   // Initialize Trakt autosync
@@ -74,6 +79,9 @@ const VideoPlayer: React.FC = () => {
     episodeId: episodeId
   });
 
+  // Get the Trakt autosync settings to use the user-configured sync frequency
+  const { settings: traktSettings } = useTraktAutosyncSettings();
+
   safeDebugLog("Component mounted with props", {
     uri, title, season, episode, episodeTitle, quality, year,
     streamProvider, id, type, episodeId, imdbId
@@ -81,6 +89,14 @@ const VideoPlayer: React.FC = () => {
 
   const screenData = Dimensions.get('screen');
   const [screenDimensions, setScreenDimensions] = useState(screenData);
+
+  // iPad-specific fullscreen handling
+  const isIPad = Platform.OS === 'ios' && (screenData.width > 1000 || screenData.height > 1000);
+  const shouldUseFullscreen = isIPad;
+
+  // Use window dimensions for iPad instead of screen dimensions
+  const windowData = Dimensions.get('window');
+  const effectiveDimensions = shouldUseFullscreen ? windowData : screenData;
 
   const [paused, setPaused] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -101,16 +117,15 @@ const VideoPlayer: React.FC = () => {
   const [isInitialSeekComplete, setIsInitialSeekComplete] = useState(false);
   const [showResumeOverlay, setShowResumeOverlay] = useState(false);
   const [resumePosition, setResumePosition] = useState<number | null>(null);
-  const [rememberChoice, setRememberChoice] = useState(false);
-  const [resumePreference, setResumePreference] = useState<string | null>(null);
+  const [savedDuration, setSavedDuration] = useState<number | null>(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const [isOpeningAnimationComplete, setIsOpeningAnimationComplete] = useState(false);
   const openingFadeAnim = useRef(new Animated.Value(0)).current;
   const openingScaleAnim = useRef(new Animated.Value(0.8)).current;
   const backgroundFadeAnim = useRef(new Animated.Value(1)).current;
   const [isBuffering, setIsBuffering] = useState(false);
-  const [vlcAudioTracks, setVlcAudioTracks] = useState<Array<{id: number, name: string, language?: string}>>([]);
-  const [vlcTextTracks, setVlcTextTracks] = useState<Array<{id: number, name: string, language?: string}>>([]);
+  const [vlcAudioTracks, setVlcAudioTracks] = useState<Array<{ id: number, name: string, language?: string }>>([]);
+  const [vlcTextTracks, setVlcTextTracks] = useState<Array<{ id: number, name: string, language?: string }>>([]);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
   const progressAnim = useRef(new Animated.Value(0)).current;
   const progressBarRef = useRef<View>(null);
@@ -133,6 +148,7 @@ const VideoPlayer: React.FC = () => {
   const [customSubtitles, setCustomSubtitles] = useState<SubtitleCue[]>([]);
   const [currentSubtitle, setCurrentSubtitle] = useState<string>('');
   const [subtitleSize, setSubtitleSize] = useState<number>(DEFAULT_SUBTITLE_SIZE);
+  const [subtitleBackground, setSubtitleBackground] = useState<boolean>(true);
   const [useCustomSubtitles, setUseCustomSubtitles] = useState<boolean>(false);
   const [isLoadingSubtitles, setIsLoadingSubtitles] = useState<boolean>(false);
   const [availableSubtitles, setAvailableSubtitles] = useState<WyzieSubtitle[]>([]);
@@ -147,6 +163,37 @@ const VideoPlayer: React.FC = () => {
   const [currentStreamProvider, setCurrentStreamProvider] = useState<string | undefined>(streamProvider);
   const [currentStreamName, setCurrentStreamName] = useState<string | undefined>(streamName);
   const isMounted = useRef(true);
+  const controlsTimeout = useRef<NodeJS.Timeout | null>(null);
+  const [isSyncingBeforeClose, setIsSyncingBeforeClose] = useState(false);
+
+  // Get metadata to access logo (only if we have a valid id)
+  const shouldLoadMetadata = Boolean(id && type);
+  const metadataResult = useMetadata({
+    id: id || 'placeholder',
+    type: type || 'movie'
+  });
+  const { metadata, loading: metadataLoading } = shouldLoadMetadata ? metadataResult : { metadata: null, loading: false };
+  const { settings } = useSettings();
+
+  // Logo animation values
+  const logoScaleAnim = useRef(new Animated.Value(0.8)).current;
+  const logoOpacityAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  // Check if we have a logo to show
+  const hasLogo = metadata && metadata.logo && !metadataLoading;
+
+  // Small offset (in seconds) used to avoid seeking to the *exact* end of the
+  // file which triggers the `onEnd` callback and causes playback to restart.
+  const END_EPSILON = 0.3;
+
+  const hideControls = () => {
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => setShowControls(false));
+  };
 
   const calculateVideoStyles = (videoWidth: number, videoHeight: number, screenWidth: number, screenHeight: number) => {
     return {
@@ -186,25 +233,47 @@ const VideoPlayer: React.FC = () => {
   };
 
   useEffect(() => {
-    if (videoAspectRatio && screenDimensions.width > 0 && screenDimensions.height > 0) {
+    if (videoAspectRatio && effectiveDimensions.width > 0 && effectiveDimensions.height > 0) {
       const styles = calculateVideoStyles(
         videoAspectRatio * 1000,
         1000,
-        screenDimensions.width,
-        screenDimensions.height
+        effectiveDimensions.width,
+        effectiveDimensions.height
       );
       setCustomVideoStyles(styles);
       if (DEBUG_MODE) {
         logger.log(`[VideoPlayer] Screen dimensions changed, recalculated styles:`, styles);
       }
     }
-  }, [screenDimensions, videoAspectRatio]);
+  }, [effectiveDimensions, videoAspectRatio]);
+
+  // Force landscape orientation immediately when component mounts
+  useEffect(() => {
+    const lockOrientation = async () => {
+      try {
+        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+        logger.log('[VideoPlayer] Locked to landscape orientation');
+      } catch (error) {
+        logger.warn('[VideoPlayer] Failed to lock orientation:', error);
+      }
+    };
+
+    // Lock orientation immediately
+    lockOrientation();
+
+    return () => {
+      // Unlock orientation when component unmounts
+      ScreenOrientation.unlockAsync().catch(() => {
+        // Ignore unlock errors
+      });
+    };
+  }, []);
 
   useEffect(() => {
     const subscription = Dimensions.addEventListener('change', ({ screen }) => {
       setScreenDimensions(screen);
     });
-    const initializePlayer = () => {
+    const initializePlayer = async () => {
       StatusBar.setHidden(true, 'none');
       enableImmersiveMode();
       startOpeningAnimation();
@@ -212,16 +281,56 @@ const VideoPlayer: React.FC = () => {
     initializePlayer();
     return () => {
       subscription?.remove();
-      const unlockOrientation = async () => {
-        await ScreenOrientation.unlockAsync();
-      };
-      unlockOrientation();
       disableImmersiveMode();
     };
   }, []);
 
   const startOpeningAnimation = () => {
-    // Animation logic here
+    // Logo entrance animation
+    Animated.parallel([
+      Animated.timing(logoOpacityAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.spring(logoScaleAnim, {
+        toValue: 1,
+        tension: 50,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Continuous pulse animation for the logo
+    const createPulseAnimation = () => {
+      return Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.05,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]);
+    };
+
+    const loopPulse = () => {
+      createPulseAnimation().start(() => {
+        if (!isOpeningAnimationComplete) {
+          loopPulse();
+        }
+      });
+    };
+
+    // Start pulsing after a short delay
+    setTimeout(() => {
+      if (!isOpeningAnimationComplete) {
+        loopPulse();
+      }
+    }, 800);
   };
 
   const completeOpeningAnimation = () => {
@@ -258,34 +367,17 @@ const VideoPlayer: React.FC = () => {
           logger.log(`[VideoPlayer] Loading watch progress for ${type}:${id}${episodeId ? `:${episodeId}` : ''}`);
           const savedProgress = await storageService.getWatchProgress(id, type, episodeId);
           logger.log(`[VideoPlayer] Saved progress:`, savedProgress);
-          
+
           if (savedProgress) {
             const progressPercent = (savedProgress.currentTime / savedProgress.duration) * 100;
             logger.log(`[VideoPlayer] Progress: ${progressPercent.toFixed(1)}% (${savedProgress.currentTime}/${savedProgress.duration})`);
-            
+
             if (progressPercent < 85) {
               setResumePosition(savedProgress.currentTime);
-              logger.log(`[VideoPlayer] Set resume position to: ${savedProgress.currentTime}`);
-              
-              const pref = await AsyncStorage.getItem(RESUME_PREF_KEY);
-              logger.log(`[VideoPlayer] Resume preference: ${pref}`);
-              
-              // TEMPORARY: Clear the preference to test overlay
-              if (pref) {
-                await AsyncStorage.removeItem(RESUME_PREF_KEY);
-                logger.log(`[VideoPlayer] CLEARED resume preference for testing`);
-                setShowResumeOverlay(true);
-                logger.log(`[VideoPlayer] Showing resume overlay after clearing preference`);
-              } else if (pref === RESUME_PREF.ALWAYS_RESUME) {
-                setInitialPosition(savedProgress.currentTime);
-                logger.log(`[VideoPlayer] Auto-resuming due to preference`);
-              } else if (pref === RESUME_PREF.ALWAYS_START_OVER) {
-                setInitialPosition(0);
-                logger.log(`[VideoPlayer] Auto-starting over due to preference`);
-              } else {
-                setShowResumeOverlay(true);
-                logger.log(`[VideoPlayer] Showing resume overlay`);
-              }
+              setSavedDuration(savedProgress.duration);
+              logger.log(`[VideoPlayer] Set resume position to: ${savedProgress.currentTime} of ${savedProgress.duration}`);
+              setShowResumeOverlay(true);
+              logger.log(`[VideoPlayer] Showing resume overlay`);
             } else {
               logger.log(`[VideoPlayer] Progress too high (${progressPercent.toFixed(1)}%), not showing resume overlay`);
             }
@@ -311,7 +403,7 @@ const VideoPlayer: React.FC = () => {
       };
       try {
         await storageService.setWatchProgress(id, type, progress, episodeId);
-        
+
         // Sync to Trakt if authenticated
         await traktAutosync.handleProgressUpdate(currentTime, duration);
       } catch (error) {
@@ -319,22 +411,30 @@ const VideoPlayer: React.FC = () => {
       }
     }
   };
-    
+
   useEffect(() => {
     if (id && type && !paused && duration > 0) {
       if (progressSaveInterval) {
         clearInterval(progressSaveInterval);
       }
+
+      // Use the user's configured sync frequency with increased minimum to reduce heating
+      // Minimum interval increased from 5s to 30s to reduce CPU usage
+      const syncInterval = Math.max(30000, traktSettings.syncFrequency);
+
       const interval = setInterval(() => {
         saveWatchProgress();
-      }, 5000);
+      }, syncInterval);
+
+      logger.log(`[VideoPlayer] Watch progress save interval set to ${syncInterval}ms`);
+
       setProgressSaveInterval(interval);
       return () => {
         clearInterval(interval);
         setProgressSaveInterval(null);
       };
     }
-  }, [id, type, paused, currentTime, duration]);
+  }, [id, type, paused, currentTime, duration, traktSettings.syncFrequency]);
 
   useEffect(() => {
     return () => {
@@ -345,59 +445,76 @@ const VideoPlayer: React.FC = () => {
       }
     };
   }, [id, type, currentTime, duration]);
-    
+
   const onPlaying = () => {
     if (isMounted.current && !isSeeking.current) {
       setPaused(false);
-      
-      // Start Trakt watching session only if duration is loaded
-      if (duration > 0) {
-        traktAutosync.handlePlaybackStart(currentTime, duration);
-      }
+
+      // Note: handlePlaybackStart is already called in onLoad
+      // We don't need to call it again here to avoid duplicate calls
     }
   };
 
   const onPaused = () => {
     if (isMounted.current) {
       setPaused(true);
+
+      // Send a forced pause update to Trakt immediately when user pauses
+      if (duration > 0) {
+        traktAutosync.handleProgressUpdate(currentTime, duration, true);
+        logger.log('[VideoPlayer] Sent forced pause update to Trakt');
+      }
     }
   };
 
-  const seekToTime = (timeInSeconds: number) => {
+  const seekToTime = (rawSeconds: number) => {
+    // Clamp to just before the end to avoid triggering onEnd.
+    const timeInSeconds = Math.max(0, Math.min(rawSeconds, duration > 0 ? duration - END_EPSILON : rawSeconds));
     if (vlcRef.current && duration > 0 && !isSeeking.current) {
       if (DEBUG_MODE) {
-        logger.log(`[VideoPlayer] Seeking to ${timeInSeconds.toFixed(2)}s`);
+        logger.log(`[VideoPlayer] Seeking to ${timeInSeconds.toFixed(2)}s out of ${duration.toFixed(2)}s`);
       }
-      
+
       isSeeking.current = true;
-      
+
       // For Android, use direct seeking on VLC player ref instead of seek prop
       if (Platform.OS === 'android' && vlcRef.current.seek) {
         // Calculate position as fraction
         const position = timeInSeconds / duration;
         vlcRef.current.seek(position);
-        
         // Clear seek state after Android seek
         setTimeout(() => {
           if (isMounted.current) {
             isSeeking.current = false;
+            if (DEBUG_MODE) {
+              logger.log(`[VideoPlayer] Android seek completed to ${timeInSeconds.toFixed(2)}s`);
+            }
           }
-        }, 300);
+        }, 500);
       } else {
-        // iOS fallback - use seek prop
-        const position = timeInSeconds / duration;
-        setSeekPosition(position);
-        
+        // iOS (and other platforms) – prefer direct seek on the ref to avoid re-mounts caused by the `seek` prop
+        const position = timeInSeconds / duration; // VLC expects a 0-1 fraction
+        if (vlcRef.current && typeof vlcRef.current.seek === 'function') {
+          vlcRef.current.seek(position);
+        } else {
+          // Fallback to legacy behaviour only if direct seek is unavailable
+          setSeekPosition(position);
+        }
+
         setTimeout(() => {
           if (isMounted.current) {
+            // Reset temporary seek state
             setSeekPosition(null);
             isSeeking.current = false;
+            if (DEBUG_MODE) {
+              logger.log(`[VideoPlayer] iOS seek completed to ${timeInSeconds.toFixed(2)}s`);
+            }
           }
         }, 500);
       }
     } else {
       if (DEBUG_MODE) {
-        logger.error('[VideoPlayer] Seek failed: Player not ready, duration is zero, or already seeking.');
+        logger.error(`[VideoPlayer] Seek failed: vlcRef=${!!vlcRef.current}, duration=${duration}, seeking=${isSeeking.current}`);
       }
     }
   };
@@ -408,17 +525,17 @@ const VideoPlayer: React.FC = () => {
       processProgressTouch(locationX);
     }
   };
-  
+
   const handleProgressBarDragStart = () => {
     setIsDragging(true);
   };
-  
+
   const handleProgressBarDragMove = (event: any) => {
     if (!isDragging || !duration || duration <= 0) return;
     const { locationX } = event.nativeEvent;
     processProgressTouch(locationX, true);
   };
-  
+
   const handleProgressBarDragEnd = () => {
     setIsDragging(false);
     if (pendingSeekValue.current !== null) {
@@ -426,11 +543,11 @@ const VideoPlayer: React.FC = () => {
       pendingSeekValue.current = null;
     }
   };
-  
+
   const processProgressTouch = (locationX: number, isDragging = false) => {
     progressBarRef.current?.measure((x, y, width, height, pageX, pageY) => {
-      const percentage = Math.max(0, Math.min(locationX / width, 1));
-      const seekTime = percentage * duration;
+      const percentage = Math.max(0, Math.min(locationX / width, 0.999));
+      const seekTime = Math.min(percentage * duration, duration - END_EPSILON);
       progressAnim.setValue(percentage);
       if (isDragging) {
         pendingSeekValue.current = seekTime;
@@ -443,9 +560,9 @@ const VideoPlayer: React.FC = () => {
 
   const handleProgress = (event: any) => {
     if (isDragging || isSeeking.current) return;
-    
+
     const currentTimeInSeconds = event.currentTime / 1000;
-    
+
     // Only update if there's a significant change to avoid unnecessary updates
     if (Math.abs(currentTimeInSeconds - currentTime) > 0.5) {
       safeSetState(() => setCurrentTime(currentTimeInSeconds));
@@ -468,6 +585,17 @@ const VideoPlayer: React.FC = () => {
       const videoDuration = data.duration / 1000;
       if (data.duration > 0) {
         setDuration(videoDuration);
+
+        // Store the actual duration for future reference and update existing progress
+        if (id && type) {
+          storageService.setContentDuration(id, type, videoDuration, episodeId);
+          storageService.updateProgressDuration(id, type, videoDuration, episodeId);
+
+          // Update the saved duration for resume overlay if it was using an estimate
+          if (savedDuration && Math.abs(savedDuration - videoDuration) > 60) {
+            setSavedDuration(videoDuration);
+          }
+        }
       }
       setVideoAspectRatio(data.videoSize.width / data.videoSize.height);
 
@@ -480,12 +608,12 @@ const VideoPlayer: React.FC = () => {
 
       setIsVideoLoaded(true);
       setIsPlayerReady(true);
-      
+
       // Start Trakt watching session when video loads with proper duration
       if (videoDuration > 0) {
         traktAutosync.handlePlaybackStart(currentTime, videoDuration);
       }
-      
+
       if (initialPosition && !isInitialSeekComplete) {
         logger.log(`[VideoPlayer] Seeking to initial position: ${initialPosition}s (duration: ${videoDuration}s)`);
         setTimeout(() => {
@@ -499,12 +627,13 @@ const VideoPlayer: React.FC = () => {
         }, 1000);
       }
       completeOpeningAnimation();
+      controlsTimeout.current = setTimeout(hideControls, 5000);
     }
   };
 
   const skip = (seconds: number) => {
     if (vlcRef.current) {
-      const newTime = Math.max(0, Math.min(currentTime + seconds, duration));
+      const newTime = Math.max(0, Math.min(currentTime + seconds, duration - END_EPSILON));
       seekToTime(newTime);
     }
   };
@@ -550,124 +679,120 @@ const VideoPlayer: React.FC = () => {
     }
   };
 
-  const handleClose = () => {
+  const handleClose = async () => {
     logger.log('[VideoPlayer] Close button pressed - syncing to Trakt before closing');
-    logger.log(`[VideoPlayer] Current progress: ${currentTime}/${duration} (${duration > 0 ? ((currentTime / duration) * 100).toFixed(1) : 0}%)`);
-    
-    // Sync progress to Trakt before closing
-    traktAutosync.handlePlaybackEnd(currentTime, duration, 'unmount');
-    
-    // Start exit animation
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-      Animated.timing(openingFadeAnim, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-    ]).start();
 
-    // Small delay to allow animation to start, then unlock orientation and navigate
-    setTimeout(() => {
-      ScreenOrientation.unlockAsync().then(() => {
-        disableImmersiveMode();
-        navigation.goBack();
-      }).catch(() => {
-        // Fallback: navigate even if orientation unlock fails
-        disableImmersiveMode();
-        navigation.goBack();
-      });
-    }, 100);
-  };
-    
-  useEffect(() => {
-    const loadResumePreference = async () => {
-      try {
-        logger.log(`[VideoPlayer] Loading resume preference, resumePosition=${resumePosition}`);
-        const pref = await AsyncStorage.getItem(RESUME_PREF_KEY);
-        logger.log(`[VideoPlayer] Resume preference loaded: ${pref}`);
-        
-        if (pref) {
-          setResumePreference(pref);
-          if (pref === RESUME_PREF.ALWAYS_RESUME && resumePosition !== null) {
-            logger.log(`[VideoPlayer] Auto-resuming due to preference`);
-            setShowResumeOverlay(false);
-            setInitialPosition(resumePosition);
-          } else if (pref === RESUME_PREF.ALWAYS_START_OVER) {
-            logger.log(`[VideoPlayer] Auto-starting over due to preference`);
-            setShowResumeOverlay(false);
-            setInitialPosition(0);
-          }
-          // Don't override overlay if no specific preference or preference doesn't match
-        } else {
-          logger.log(`[VideoPlayer] No resume preference found, keeping overlay state`);
-        }
-      } catch (error) {
-        logger.error('[VideoPlayer] Error loading resume preference:', error);
-      }
-    };
-    loadResumePreference();
-  }, [resumePosition]);
+    // Set syncing state to prevent multiple close attempts
+    setIsSyncingBeforeClose(true);
 
-  const resetResumePreference = async () => {
+    // Make sure we have the most accurate current time
+    const actualCurrentTime = currentTime;
+    const progressPercent = duration > 0 ? (actualCurrentTime / duration) * 100 : 0;
+
+    logger.log(`[VideoPlayer] Current progress: ${actualCurrentTime}/${duration} (${progressPercent.toFixed(1)}%)`);
+
     try {
-      await AsyncStorage.removeItem(RESUME_PREF_KEY);
-      setResumePreference(null);
+      // Force one last progress update (scrobble/pause) with the exact time
+      await traktAutosync.handleProgressUpdate(actualCurrentTime, duration, true);
+
+      // Sync progress to Trakt before closing
+      await traktAutosync.handlePlaybackEnd(actualCurrentTime, duration, 'unmount');
+
+      // Start exit animation
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(openingFadeAnim, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // Cleanup and navigate back
+      const cleanup = async () => {
+        try {
+          // Unlock orientation first
+          await ScreenOrientation.unlockAsync();
+          logger.log('[VideoPlayer] Orientation unlocked');
+        } catch (orientationError) {
+          logger.warn('[VideoPlayer] Failed to unlock orientation:', orientationError);
+        }
+
+        // Disable immersive mode
+        disableImmersiveMode();
+
+        // Navigate back with proper handling for fullscreen modal
+        try {
+          if (navigation.canGoBack()) {
+            navigation.goBack();
+          } else {
+            // Fallback: navigate to main tabs if can't go back
+            navigation.navigate('MainTabs');
+          }
+          logger.log('[VideoPlayer] Navigation completed');
+        } catch (navError) {
+          logger.error('[VideoPlayer] Navigation error:', navError);
+          // Last resort: try to navigate to home
+          navigation.navigate('MainTabs');
+        }
+      };
+
+      // Delay to ensure Trakt sync completes and animations finish
+      setTimeout(cleanup, 500);
+
     } catch (error) {
-      logger.error('[VideoPlayer] Error resetting resume preference:', error);
+      logger.error('[VideoPlayer] Error syncing to Trakt before closing:', error);
+      // Navigate anyway even if sync fails
+      disableImmersiveMode();
+      try {
+        await ScreenOrientation.unlockAsync();
+      } catch (orientationError) {
+        // Ignore orientation unlock errors
+      }
+
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        navigation.navigate('MainTabs');
+      }
     }
   };
 
   const handleResume = async () => {
-    if (resumePosition !== null && vlcRef.current) {
-      if (rememberChoice) {
-        try {
-          await AsyncStorage.setItem(RESUME_PREF_KEY, RESUME_PREF.ALWAYS_RESUME);
-        } catch (error) {
-          logger.error('[VideoPlayer] Error saving resume preference:', error);
-        }
-      }
-      setInitialPosition(resumePosition);
-      setShowResumeOverlay(false);
-      setTimeout(() => {
-        if (vlcRef.current) {
-          seekToTime(resumePosition);
-        }
-      }, 500);
+    if (resumePosition) {
+      seekToTime(resumePosition);
     }
+    setShowResumeOverlay(false);
   };
 
   const handleStartFromBeginning = async () => {
-    if (rememberChoice) {
-      try {
-        await AsyncStorage.setItem(RESUME_PREF_KEY, RESUME_PREF.ALWAYS_START_OVER);
-      } catch (error) {
-        logger.error('[VideoPlayer] Error saving resume preference:', error);
-      }
-    }
+    seekToTime(0);
     setShowResumeOverlay(false);
-    setInitialPosition(0);
-    if (vlcRef.current) {
-      seekToTime(0);
-      setCurrentTime(0);
-    }
   };
 
   const toggleControls = () => {
-    setShowControls(previousState => !previousState);
-  };
+    if (controlsTimeout.current) {
+      clearTimeout(controlsTimeout.current);
+      controlsTimeout.current = null;
+    }
 
-  useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: showControls ? 1 : 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  }, [showControls]);
+    setShowControls(prevShowControls => {
+      const newShowControls = !prevShowControls;
+      Animated.timing(fadeAnim, {
+        toValue: newShowControls ? 1 : 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+      if (newShowControls) {
+        controlsTimeout.current = setTimeout(hideControls, 5000);
+      }
+      return newShowControls;
+    });
+  };
 
   const handleError = (error: any) => {
     logger.error('[VideoPlayer] Playback Error:', error);
@@ -677,9 +802,27 @@ const VideoPlayer: React.FC = () => {
     setIsBuffering(event.isBuffering);
   };
 
-  const onEnd = () => {
-    // Sync final progress to Trakt
-    traktAutosync.handlePlaybackEnd(currentTime, duration, 'ended');
+  const onEnd = async () => {
+    // Make sure we report 100% progress to Trakt
+    const finalTime = duration;
+    setCurrentTime(finalTime);
+
+    try {
+      // Force one last progress update (scrobble/pause) with the exact final time
+      logger.log('[VideoPlayer] Video ended naturally, sending final progress update with 100%');
+      await traktAutosync.handleProgressUpdate(finalTime, duration, true);
+
+      // Small delay to ensure the progress update is processed
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // Now send the stop call
+      logger.log('[VideoPlayer] Sending final stop call after natural end');
+      await traktAutosync.handlePlaybackEnd(finalTime, duration, 'ended');
+
+      logger.log('[VideoPlayer] Completed video end sync to Trakt');
+    } catch (error) {
+      logger.error('[VideoPlayer] Error syncing to Trakt on video end:', error);
+    }
   };
 
   const selectAudioTrack = (trackId: number) => {
@@ -695,7 +838,7 @@ const VideoPlayer: React.FC = () => {
       setSelectedTextTrack(trackId);
     }
   };
-  
+
   const loadSubtitleSize = async () => {
     try {
       const savedSize = await AsyncStorage.getItem(SUBTITLE_SIZE_KEY);
@@ -740,8 +883,8 @@ const VideoPlayer: React.FC = () => {
       uniqueSubtitles.sort((a, b) => a.display.localeCompare(b.display));
       setAvailableSubtitles(uniqueSubtitles);
       if (autoSelectEnglish) {
-        const englishSubtitle = uniqueSubtitles.find(sub => 
-          sub.language.toLowerCase() === 'eng' || 
+        const englishSubtitle = uniqueSubtitles.find(sub =>
+          sub.language.toLowerCase() === 'eng' ||
           sub.language.toLowerCase() === 'en' ||
           sub.display.toLowerCase().includes('english')
         );
@@ -776,10 +919,10 @@ const VideoPlayer: React.FC = () => {
       setIsLoadingSubtitles(false);
     }
   };
-    
+
   const togglePlayback = () => {
     if (vlcRef.current) {
-        setPaused(!paused);
+      setPaused(!paused);
     }
   };
 
@@ -792,7 +935,7 @@ const VideoPlayer: React.FC = () => {
       }
     };
   }, []);
-  
+
   const safeSetState = (setter: any) => {
     if (isMounted.current) {
       setter();
@@ -806,7 +949,7 @@ const VideoPlayer: React.FC = () => {
       }
       return;
     }
-    const currentCue = customSubtitles.find(cue => 
+    const currentCue = customSubtitles.find(cue =>
       currentTime >= cue.start && currentTime <= cue.end
     );
     const newSubtitle = currentCue ? currentCue.text : '';
@@ -827,26 +970,30 @@ const VideoPlayer: React.FC = () => {
     saveSubtitleSize(newSize);
   };
 
+  const toggleSubtitleBackground = () => {
+    setSubtitleBackground(prev => !prev);
+  };
+
   useEffect(() => {
     if (pendingSeek && isPlayerReady && isVideoLoaded && duration > 0) {
       logger.log(`[VideoPlayer] Player ready after source change, seeking to position: ${pendingSeek.position}s out of ${duration}s total`);
-      
+
       if (pendingSeek.position > 0 && vlcRef.current) {
         const delayTime = Platform.OS === 'android' ? 1500 : 1000;
-        
+
         setTimeout(() => {
           if (vlcRef.current && duration > 0 && pendingSeek) {
             logger.log(`[VideoPlayer] Executing seek to ${pendingSeek.position}s`);
-            
+
             seekToTime(pendingSeek.position);
-            
+
             if (pendingSeek.shouldPlay) {
               setTimeout(() => {
                 logger.log('[VideoPlayer] Resuming playback after source change seek');
                 setPaused(false);
               }, 850); // Delay should be slightly more than seekToTime's internal timeout
             }
-            
+
             setTimeout(() => {
               setPendingSeek(null);
               setIsChangingSource(false);
@@ -861,7 +1008,7 @@ const VideoPlayer: React.FC = () => {
             setPaused(false);
           }, 500);
         }
-        
+
         setTimeout(() => {
           setPendingSeek(null);
           setIsChangingSource(false);
@@ -878,15 +1025,15 @@ const VideoPlayer: React.FC = () => {
 
     setIsChangingSource(true);
     setShowSourcesModal(false);
-    
+
     try {
       // Save current state
       const savedPosition = currentTime;
       const wasPlaying = !paused;
-      
+
       logger.log(`[VideoPlayer] Changing source from ${currentStreamUrl} to ${newStream.url}`);
       logger.log(`[VideoPlayer] Saved position: ${savedPosition}, was playing: ${wasPlaying}`);
-      
+
       // Extract quality and provider information from the new stream
       let newQuality = newStream.quality;
       if (!newQuality && newStream.title) {
@@ -894,38 +1041,38 @@ const VideoPlayer: React.FC = () => {
         const qualityMatch = newStream.title.match(/(\d+)p/);
         newQuality = qualityMatch ? qualityMatch[0] : undefined; // Use [0] to get full match like "1080p"
       }
-      
+
       // For provider, try multiple fields
       const newProvider = newStream.addonName || newStream.name || newStream.addon || 'Unknown';
-      
+
       // For stream name, prioritize the stream name over title
       const newStreamName = newStream.name || newStream.title || 'Unknown Stream';
-      
+
       logger.log(`[VideoPlayer] Stream object:`, newStream);
       logger.log(`[VideoPlayer] Extracted - Quality: ${newQuality}, Provider: ${newProvider}, Stream Name: ${newStreamName}`);
       logger.log(`[VideoPlayer] Available fields - quality: ${newStream.quality}, title: ${newStream.title}, addonName: ${newStream.addonName}, name: ${newStream.name}, addon: ${newStream.addon}`);
-      
+
       // Stop current playback
       if (vlcRef.current) {
         vlcRef.current.pause && vlcRef.current.pause();
       }
       setPaused(true);
-      
+
       // Set pending seek state
       setPendingSeek({ position: savedPosition, shouldPlay: wasPlaying });
-      
+
       // Update the stream URL and details immediately
       setCurrentStreamUrl(newStream.url);
       setCurrentQuality(newQuality);
       setCurrentStreamProvider(newProvider);
       setCurrentStreamName(newStreamName);
-      
+
       // Reset player state for new source
       setCurrentTime(0);
       setDuration(0);
       setIsPlayerReady(false);
       setIsVideoLoaded(false);
-      
+
     } catch (error) {
       logger.error('[VideoPlayer] Error changing source:', error);
       setPendingSeek(null);
@@ -934,14 +1081,22 @@ const VideoPlayer: React.FC = () => {
   };
 
   return (
-    <View style={[styles.container, {
-      width: screenDimensions.width,
-      height: screenDimensions.height,
-      position: 'absolute',
-      top: 0,
-      left: 0,
-    }]}> 
-      <Animated.View 
+    <View style={[
+      styles.container,
+      shouldUseFullscreen ? {
+        // iPad fullscreen: use flex layout instead of absolute positioning
+        flex: 1,
+        width: '100%',
+        height: '100%',
+      } : {
+        // iPhone: use absolute positioning with screen dimensions
+        width: screenDimensions.width,
+        height: screenDimensions.height,
+        position: 'absolute',
+        top: 0,
+        left: 0,
+      }]}>
+      <Animated.View
         style={[
           styles.openingOverlay,
           {
@@ -953,23 +1108,62 @@ const VideoPlayer: React.FC = () => {
         ]}
         pointerEvents={isOpeningAnimationComplete ? 'none' : 'auto'}
       >
-        <TouchableOpacity 
+        {backdrop && (
+          <Image
+            source={{ uri: backdrop }}
+            style={[StyleSheet.absoluteFill, { width: screenDimensions.width, height: screenDimensions.height }]}
+            resizeMode="cover"
+            blurRadius={0}
+          />
+        )}
+        <LinearGradient
+          colors={[
+            'rgba(0,0,0,0.3)',
+            'rgba(0,0,0,0.6)',
+            'rgba(0,0,0,0.8)',
+            'rgba(0,0,0,0.9)'
+          ]}
+          locations={[0, 0.3, 0.7, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+
+        <TouchableOpacity
           style={styles.loadingCloseButton}
           onPress={handleClose}
           activeOpacity={0.7}
         >
           <MaterialIcons name="close" size={24} color="#ffffff" />
         </TouchableOpacity>
-        
+
         <View style={styles.openingContent}>
-          <ActivityIndicator size="large" color="#E50914" />
-          <Text style={styles.openingText}>Loading video...</Text>
+          {hasLogo ? (
+            <Animated.View style={{
+              transform: [
+                { scale: Animated.multiply(logoScaleAnim, pulseAnim) }
+              ],
+              opacity: logoOpacityAnim,
+              alignItems: 'center',
+            }}>
+              <Image
+                source={{ uri: metadata.logo }}
+                style={{
+                  width: 300,
+                  height: 180,
+                  resizeMode: 'contain',
+                }}
+              />
+            </Animated.View>
+          ) : (
+            <>
+              <ActivityIndicator size="large" color="#E50914" />
+            </>
+          )}
         </View>
       </Animated.View>
 
       {/* Source Change Loading Overlay */}
       {isChangingSource && (
-        <Animated.View 
+        <Animated.View
           style={[
             styles.sourceChangeOverlay,
             {
@@ -988,7 +1182,7 @@ const VideoPlayer: React.FC = () => {
         </Animated.View>
       )}
 
-      <Animated.View 
+      <Animated.View
         style={[
           styles.videoPlayerContainer,
           {
@@ -1041,7 +1235,6 @@ const VideoPlayer: React.FC = () => {
                   resizeMode={resizeMode as any}
                   audioTrack={selectedAudioTrack ?? undefined}
                   textTrack={useCustomSubtitles ? -1 : (selectedTextTrack ?? undefined)}
-                  seek={Platform.OS === 'ios' ? (seekPosition ?? undefined) : undefined}
                   autoAspectRatio
                 />
               </TouchableOpacity>
@@ -1082,28 +1275,26 @@ const VideoPlayer: React.FC = () => {
             buffered={buffered}
             formatTime={formatTime}
           />
-          
+
           <CustomSubtitles
             useCustomSubtitles={useCustomSubtitles}
             currentSubtitle={currentSubtitle}
             subtitleSize={subtitleSize}
+            subtitleBackground={subtitleBackground}
+            zoomScale={zoomScale}
           />
 
           <ResumeOverlay
             showResumeOverlay={showResumeOverlay}
             resumePosition={resumePosition}
-            duration={duration}
-            title={title}
+            duration={savedDuration || duration}
+            title={episodeTitle || title}
             season={season}
             episode={episode}
-            rememberChoice={rememberChoice}
-            setRememberChoice={setRememberChoice}
-            resumePreference={resumePreference}
-            resetResumePreference={resetResumePreference}
             handleResume={handleResume}
             handleStartFromBeginning={handleStartFromBeginning}
           />
-        </TouchableOpacity> 
+        </TouchableOpacity>
       </Animated.View>
 
       <AudioTrackModal
@@ -1126,13 +1317,15 @@ const VideoPlayer: React.FC = () => {
         selectedTextTrack={selectedTextTrack}
         useCustomSubtitles={useCustomSubtitles}
         subtitleSize={subtitleSize}
+        subtitleBackground={subtitleBackground}
         fetchAvailableSubtitles={fetchAvailableSubtitles}
         loadWyzieSubtitle={loadWyzieSubtitle}
         selectTextTrack={selectTextTrack}
         increaseSubtitleSize={increaseSubtitleSize}
         decreaseSubtitleSize={decreaseSubtitleSize}
+        toggleSubtitleBackground={toggleSubtitleBackground}
       />
-      
+
       <SourcesModal
         showSourcesModal={showSourcesModal}
         setShowSourcesModal={setShowSourcesModal}
@@ -1141,8 +1334,8 @@ const VideoPlayer: React.FC = () => {
         onSelectStream={handleSelectStream}
         isChangingSource={isChangingSource}
       />
-    </View> 
+    </View>
   );
 };
 
-export default VideoPlayer; 
+export default VideoPlayer;

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, TouchableOpacity, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text } from 'react-native';
+import { View, TouchableOpacity, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, Image, StyleSheet } from 'react-native';
 import Video, { VideoRef, SelectedTrack, SelectedTrackType, BufferingStrategyType } from 'react-native-video';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
@@ -10,7 +10,11 @@ import { storageService } from '../../services/storageService';
 import { logger } from '../../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTraktAutosync } from '../../hooks/useTraktAutosync';
+import { useTraktAutosyncSettings } from '../../hooks/useTraktAutosyncSettings';
+import { useMetadata } from '../../hooks/useMetadata';
+import { useSettings } from '../../hooks/useSettings';
 
 import { 
   DEFAULT_SUBTITLE_SIZE, 
@@ -25,12 +29,12 @@ import {
 } from './utils/playerTypes';
 import { safeDebugLog, parseSRT, DEBUG_MODE, formatTime } from './utils/playerUtils';
 import { styles } from './utils/playerStyles';
-import SubtitleModals from './modals/SubtitleModals';
-import AudioTrackModal from './modals/AudioTrackModal';
+import { SubtitleModals } from './modals/SubtitleModals';
+import { AudioTrackModal } from './modals/AudioTrackModal';
 import ResumeOverlay from './modals/ResumeOverlay';
 import PlayerControls from './controls/PlayerControls';
 import CustomSubtitles from './subtitles/CustomSubtitles';
-import SourcesModal from './modals/SourcesModal';
+import { SourcesModal } from './modals/SourcesModal';
 
 // Map VLC resize modes to react-native-video resize modes
 const getVideoResizeMode = (resizeMode: ResizeModeType) => {
@@ -61,7 +65,8 @@ const AndroidVideoPlayer: React.FC = () => {
     type,
     episodeId,
     imdbId,
-    availableStreams: passedAvailableStreams
+    availableStreams: passedAvailableStreams,
+    backdrop
   } = route.params;
 
   // Initialize Trakt autosync
@@ -79,6 +84,9 @@ const AndroidVideoPlayer: React.FC = () => {
     episodeId: episodeId
   });
 
+  // Get the Trakt autosync settings to use the user-configured sync frequency
+  const { settings: traktSettings } = useTraktAutosyncSettings();
+
   safeDebugLog("Android Component mounted with props", {
     uri, title, season, episode, episodeTitle, quality, year,
     streamProvider, id, type, episodeId, imdbId
@@ -95,7 +103,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const [selectedAudioTrack, setSelectedAudioTrack] = useState<number | null>(null);
   const [textTracks, setTextTracks] = useState<TextTrack[]>([]);
   const [selectedTextTrack, setSelectedTextTrack] = useState<number>(-1);
-  const [resizeMode, setResizeMode] = useState<ResizeModeType>('stretch');
+  const [resizeMode, setResizeMode] = useState<ResizeModeType>('contain');
   const [buffered, setBuffered] = useState(0);
   const [seekTime, setSeekTime] = useState<number | null>(null);
   const videoRef = useRef<VideoRef>(null);
@@ -106,8 +114,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const [isInitialSeekComplete, setIsInitialSeekComplete] = useState(false);
   const [showResumeOverlay, setShowResumeOverlay] = useState(false);
   const [resumePosition, setResumePosition] = useState<number | null>(null);
-  const [rememberChoice, setRememberChoice] = useState(false);
-  const [resumePreference, setResumePreference] = useState<string | null>(null);
+  const [savedDuration, setSavedDuration] = useState<number | null>(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const [isOpeningAnimationComplete, setIsOpeningAnimationComplete] = useState(false);
   const openingFadeAnim = useRef(new Animated.Value(0)).current;
@@ -138,6 +145,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const [customSubtitles, setCustomSubtitles] = useState<SubtitleCue[]>([]);
   const [currentSubtitle, setCurrentSubtitle] = useState<string>('');
   const [subtitleSize, setSubtitleSize] = useState<number>(DEFAULT_SUBTITLE_SIZE);
+  const [subtitleBackground, setSubtitleBackground] = useState<boolean>(true);
   const [useCustomSubtitles, setUseCustomSubtitles] = useState<boolean>(false);
   const [isLoadingSubtitles, setIsLoadingSubtitles] = useState<boolean>(false);
   const [availableSubtitles, setAvailableSubtitles] = useState<WyzieSubtitle[]>([]);
@@ -152,6 +160,36 @@ const AndroidVideoPlayer: React.FC = () => {
   const [currentStreamProvider, setCurrentStreamProvider] = useState<string | undefined>(streamProvider);
   const [currentStreamName, setCurrentStreamName] = useState<string | undefined>(streamName);
   const isMounted = useRef(true);
+  const controlsTimeout = useRef<NodeJS.Timeout | null>(null);
+  const [isSyncingBeforeClose, setIsSyncingBeforeClose] = useState(false);
+  // Get metadata to access logo (only if we have a valid id)
+  const shouldLoadMetadata = Boolean(id && type);
+  const metadataResult = useMetadata({ 
+    id: id || 'placeholder', 
+    type: type || 'movie' 
+  });
+  const { metadata, loading: metadataLoading } = shouldLoadMetadata ? metadataResult : { metadata: null, loading: false };
+  const { settings } = useSettings();
+  
+  // Logo animation values
+  const logoScaleAnim = useRef(new Animated.Value(0.8)).current;
+  const logoOpacityAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  
+  // Check if we have a logo to show
+  const hasLogo = metadata && metadata.logo && !metadataLoading;
+  
+  // Small offset (in seconds) used to avoid seeking to the *exact* end of the
+  // file which triggers the `onEnd` callback and causes playback to restart.
+  const END_EPSILON = 0.3;
+
+  const hideControls = () => {
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => setShowControls(false));
+  };
 
   const calculateVideoStyles = (videoWidth: number, videoHeight: number, screenWidth: number, screenHeight: number) => {
     return {
@@ -226,7 +264,51 @@ const AndroidVideoPlayer: React.FC = () => {
   }, []);
 
   const startOpeningAnimation = () => {
-    // Animation logic here
+    // Logo entrance animation
+    Animated.parallel([
+      Animated.timing(logoOpacityAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.spring(logoScaleAnim, {
+        toValue: 1,
+        tension: 50,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    
+    // Continuous pulse animation for the logo
+    const createPulseAnimation = () => {
+      return Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.05,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]);
+    };
+    
+    const loopPulse = () => {
+      createPulseAnimation().start(() => {
+        if (!isOpeningAnimationComplete) {
+          loopPulse();
+        }
+      });
+    };
+    
+    // Start pulsing after a short delay
+    setTimeout(() => {
+      if (!isOpeningAnimationComplete) {
+        loopPulse();
+      }
+    }, 800);
   };
 
   const completeOpeningAnimation = () => {
@@ -270,21 +352,10 @@ const AndroidVideoPlayer: React.FC = () => {
             
             if (progressPercent < 85) {
               setResumePosition(savedProgress.currentTime);
-              logger.log(`[AndroidVideoPlayer] Set resume position to: ${savedProgress.currentTime}`);
-              
-              const pref = await AsyncStorage.getItem(RESUME_PREF_KEY);
-              logger.log(`[AndroidVideoPlayer] Resume preference: ${pref}`);
-              
-              if (pref === RESUME_PREF.ALWAYS_RESUME) {
-                setInitialPosition(savedProgress.currentTime);
-                logger.log(`[AndroidVideoPlayer] Auto-resuming due to preference`);
-              } else if (pref === RESUME_PREF.ALWAYS_START_OVER) {
-                setInitialPosition(0);
-                logger.log(`[AndroidVideoPlayer] Auto-starting over due to preference`);
-              } else {
-                setShowResumeOverlay(true);
-                logger.log(`[AndroidVideoPlayer] Showing resume overlay`);
-              }
+              setSavedDuration(savedProgress.duration);
+              logger.log(`[AndroidVideoPlayer] Set resume position to: ${savedProgress.currentTime} of ${savedProgress.duration}`);
+              setShowResumeOverlay(true);
+              logger.log(`[AndroidVideoPlayer] Showing resume overlay`);
             } else {
               logger.log(`[AndroidVideoPlayer] Progress too high (${progressPercent.toFixed(1)}%), not showing resume overlay`);
             }
@@ -324,16 +395,24 @@ const AndroidVideoPlayer: React.FC = () => {
       if (progressSaveInterval) {
         clearInterval(progressSaveInterval);
       }
+      
+      // Use the user's configured sync frequency with increased minimum to reduce heating
+      // Minimum interval increased from 5s to 30s to reduce CPU usage
+      const syncInterval = Math.max(30000, traktSettings.syncFrequency);
+      
       const interval = setInterval(() => {
         saveWatchProgress();
-      }, 5000);
+      }, syncInterval);
+      
+      logger.log(`[AndroidVideoPlayer] Watch progress save interval set to ${syncInterval}ms`);
+      
       setProgressSaveInterval(interval);
       return () => {
         clearInterval(interval);
         setProgressSaveInterval(null);
       };
     }
-  }, [id, type, paused, currentTime, duration]);
+  }, [id, type, paused, currentTime, duration, traktSettings.syncFrequency]);
 
   useEffect(() => {
     return () => {
@@ -345,25 +424,30 @@ const AndroidVideoPlayer: React.FC = () => {
     };
   }, [id, type, currentTime, duration]);
 
-  const seekToTime = (timeInSeconds: number) => {
+  const seekToTime = (rawSeconds: number) => {
+    // Clamp to just before the end of the media.
+    const timeInSeconds = Math.max(0, Math.min(rawSeconds, duration > 0 ? duration - END_EPSILON : rawSeconds));
     if (videoRef.current && duration > 0 && !isSeeking.current) {
       if (DEBUG_MODE) {
-        logger.log(`[AndroidVideoPlayer] Seeking to ${timeInSeconds.toFixed(2)}s`);
+        logger.log(`[AndroidVideoPlayer] Seeking to ${timeInSeconds.toFixed(2)}s out of ${duration.toFixed(2)}s`);
       }
       
       isSeeking.current = true;
       setSeekTime(timeInSeconds);
       
-      // Clear seek state after seek
+      // Clear seek state after seek with longer timeout
       setTimeout(() => {
         if (isMounted.current) {
           setSeekTime(null);
           isSeeking.current = false;
+          if (DEBUG_MODE) {
+            logger.log(`[AndroidVideoPlayer] Seek completed to ${timeInSeconds.toFixed(2)}s`);
         }
-      }, 100);
+        }
+      }, 500);
     } else {
       if (DEBUG_MODE) {
-        logger.error('[AndroidVideoPlayer] Seek failed: Player not ready, duration is zero, or already seeking.');
+        logger.error(`[AndroidVideoPlayer] Seek failed: videoRef=${!!videoRef.current}, duration=${duration}, seeking=${isSeeking.current}`);
       }
     }
   };
@@ -402,8 +486,8 @@ const AndroidVideoPlayer: React.FC = () => {
   
   const processProgressTouch = (locationX: number, isDragging = false) => {
     progressBarRef.current?.measure((x, y, width, height, pageX, pageY) => {
-      const percentage = Math.max(0, Math.min(locationX / width, 1));
-      const seekTime = percentage * duration;
+      const percentage = Math.max(0, Math.min(locationX / width, 0.999));
+      const seekTime = Math.min(percentage * duration, duration - END_EPSILON);
       progressAnim.setValue(percentage);
       if (isDragging) {
         pendingSeekValue.current = seekTime;
@@ -419,13 +503,13 @@ const AndroidVideoPlayer: React.FC = () => {
     
     const currentTimeInSeconds = data.currentTime;
     
-    // Only update if there's a significant change to avoid unnecessary updates
-    if (Math.abs(currentTimeInSeconds - currentTime) > 0.5) {
+    // Update time more frequently for subtitle synchronization (0.1s threshold)
+    if (Math.abs(currentTimeInSeconds - currentTime) > 0.1) {
       safeSetState(() => setCurrentTime(currentTimeInSeconds));
       const progressPercent = duration > 0 ? currentTimeInSeconds / duration : 0;
       Animated.timing(progressAnim, {
         toValue: progressPercent,
-        duration: 250,
+        duration: 100,
         useNativeDriver: false,
       }).start();
       const bufferedTime = data.playableDuration || currentTimeInSeconds;
@@ -441,6 +525,17 @@ const AndroidVideoPlayer: React.FC = () => {
       const videoDuration = data.duration;
       if (data.duration > 0) {
         setDuration(videoDuration);
+        
+        // Store the actual duration for future reference and update existing progress
+        if (id && type) {
+          storageService.setContentDuration(id, type, videoDuration, episodeId);
+          storageService.updateProgressDuration(id, type, videoDuration, episodeId);
+          
+          // Update the saved duration for resume overlay if it was using an estimate
+          if (savedDuration && Math.abs(savedDuration - videoDuration) > 60) {
+            setSavedDuration(videoDuration);
+          }
+        }
       }
       
       // Set aspect ratio from video dimensions
@@ -489,24 +584,26 @@ const AndroidVideoPlayer: React.FC = () => {
         }, 1000);
       }
       completeOpeningAnimation();
+      controlsTimeout.current = setTimeout(hideControls, 5000);
     }
   };
 
   const skip = (seconds: number) => {
     if (videoRef.current) {
-      const newTime = Math.max(0, Math.min(currentTime + seconds, duration));
+      const newTime = Math.max(0, Math.min(currentTime + seconds, duration - END_EPSILON));
       seekToTime(newTime);
     }
   };
 
   const cycleAspectRatio = () => {
-    const newZoom = zoomScale === 1.1 ? 1 : 1.1;
-    setZoomScale(newZoom);
-    setZoomTranslateX(0);
-    setZoomTranslateY(0);
-    setLastZoomScale(newZoom);
-    setLastTranslateX(0);
-    setLastTranslateY(0);
+    // Android: cycle through native resize modes
+    const resizeModes: ResizeModeType[] = ['contain', 'cover', 'fill', 'none'];
+    const currentIndex = resizeModes.indexOf(resizeMode);
+    const nextIndex = (currentIndex + 1) % resizeModes.length;
+    setResizeMode(resizeModes[nextIndex]);
+    if (DEBUG_MODE) {
+      logger.log(`[AndroidVideoPlayer] Resize mode changed to: ${resizeModes[nextIndex]}`);
+    }
   };
 
   const enableImmersiveMode = () => {
@@ -532,136 +629,119 @@ const AndroidVideoPlayer: React.FC = () => {
     }
   };
 
-  const handleClose = () => {
+  const handleClose = async () => {
     logger.log('[AndroidVideoPlayer] Close button pressed - syncing to Trakt before closing');
-    logger.log(`[AndroidVideoPlayer] Current progress: ${currentTime}/${duration} (${duration > 0 ? ((currentTime / duration) * 100).toFixed(1) : 0}%)`);
     
-    // Sync progress to Trakt before closing
-    traktAutosync.handlePlaybackEnd(currentTime, duration, 'unmount');
+    // Set syncing state to prevent multiple close attempts
+    setIsSyncingBeforeClose(true);
     
-    // Start exit animation
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-      Animated.timing(openingFadeAnim, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    // Small delay to allow animation to start, then unlock orientation and navigate
-    setTimeout(() => {
-      ScreenOrientation.unlockAsync().then(() => {
-        disableImmersiveMode();
-        navigation.goBack();
-      }).catch(() => {
-        // Fallback: navigate even if orientation unlock fails
-        disableImmersiveMode();
-        navigation.goBack();
-      });
-    }, 100);
-  };
+    // Make sure we have the most accurate current time
+    const actualCurrentTime = currentTime;
+    const progressPercent = duration > 0 ? (actualCurrentTime / duration) * 100 : 0;
     
-  useEffect(() => {
-    const loadResumePreference = async () => {
-      try {
-        logger.log(`[AndroidVideoPlayer] Loading resume preference, resumePosition=${resumePosition}`);
-        const pref = await AsyncStorage.getItem(RESUME_PREF_KEY);
-        logger.log(`[AndroidVideoPlayer] Resume preference loaded: ${pref}`);
-        
-        if (pref) {
-          setResumePreference(pref);
-          if (pref === RESUME_PREF.ALWAYS_RESUME && resumePosition !== null) {
-            logger.log(`[AndroidVideoPlayer] Auto-resuming due to preference`);
-            setShowResumeOverlay(false);
-            setInitialPosition(resumePosition);
-          } else if (pref === RESUME_PREF.ALWAYS_START_OVER) {
-            logger.log(`[AndroidVideoPlayer] Auto-starting over due to preference`);
-            setShowResumeOverlay(false);
-            setInitialPosition(0);
-          }
-          // Don't override overlay if no specific preference or preference doesn't match
-        } else {
-          logger.log(`[AndroidVideoPlayer] No resume preference found, keeping overlay state`);
-        }
-      } catch (error) {
-        logger.error('[AndroidVideoPlayer] Error loading resume preference:', error);
-      }
-    };
-    loadResumePreference();
-  }, [resumePosition]);
-
-  const resetResumePreference = async () => {
+    logger.log(`[AndroidVideoPlayer] Current progress: ${actualCurrentTime}/${duration} (${progressPercent.toFixed(1)}%)`);
+    
     try {
-      await AsyncStorage.removeItem(RESUME_PREF_KEY);
-      setResumePreference(null);
+      // Force one last progress update (scrobble/pause) with the exact time
+      await traktAutosync.handleProgressUpdate(actualCurrentTime, duration, true);
+      
+      // Sync progress to Trakt before closing
+      await traktAutosync.handlePlaybackEnd(actualCurrentTime, duration, 'unmount');
+      
+      // Start exit animation
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(openingFadeAnim, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
+  
+      // Longer delay to ensure Trakt sync completes
+      setTimeout(() => {
+        ScreenOrientation.unlockAsync().then(() => {
+          disableImmersiveMode();
+          navigation.goBack();
+        }).catch(() => {
+          // Fallback: navigate even if orientation unlock fails
+          disableImmersiveMode();
+          navigation.goBack();
+        });
+      }, 500); // Increased from 100ms to 500ms
     } catch (error) {
-      logger.error('[AndroidVideoPlayer] Error resetting resume preference:', error);
+      logger.error('[AndroidVideoPlayer] Error syncing to Trakt before closing:', error);
+      // Navigate anyway even if sync fails
+      disableImmersiveMode();
+      navigation.goBack();
     }
   };
 
   const handleResume = async () => {
-    if (resumePosition !== null && videoRef.current) {
-      if (rememberChoice) {
-        try {
-          await AsyncStorage.setItem(RESUME_PREF_KEY, RESUME_PREF.ALWAYS_RESUME);
-        } catch (error) {
-          logger.error('[AndroidVideoPlayer] Error saving resume preference:', error);
-        }
-      }
-      setInitialPosition(resumePosition);
-      setShowResumeOverlay(false);
-      setTimeout(() => {
-        if (videoRef.current) {
-          seekToTime(resumePosition);
-        }
-      }, 500);
+    if (resumePosition) {
+      seekToTime(resumePosition);
     }
+    setShowResumeOverlay(false);
   };
 
   const handleStartFromBeginning = async () => {
-    if (rememberChoice) {
-      try {
-        await AsyncStorage.setItem(RESUME_PREF_KEY, RESUME_PREF.ALWAYS_START_OVER);
-      } catch (error) {
-        logger.error('[AndroidVideoPlayer] Error saving resume preference:', error);
-      }
-    }
+    seekToTime(0);
     setShowResumeOverlay(false);
-    setInitialPosition(0);
-    if (videoRef.current) {
-      seekToTime(0);
-      setCurrentTime(0);
-    }
   };
 
   const toggleControls = () => {
-    setShowControls(previousState => !previousState);
+    if (controlsTimeout.current) {
+      clearTimeout(controlsTimeout.current);
+      controlsTimeout.current = null;
+    }
+    
+    setShowControls(prevShowControls => {
+      const newShowControls = !prevShowControls;
+      Animated.timing(fadeAnim, {
+        toValue: newShowControls ? 1 : 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+      if (newShowControls) {
+        controlsTimeout.current = setTimeout(hideControls, 5000);
+      }
+      return newShowControls;
+    });
   };
 
-  useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: showControls ? 1 : 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  }, [showControls]);
-
   const handleError = (error: any) => {
-    logger.error('[AndroidVideoPlayer] Playback Error:', error);
+    logger.error('AndroidVideoPlayer error: ', error);
   };
 
   const onBuffer = (data: any) => {
     setIsBuffering(data.isBuffering);
   };
 
-  const onEnd = () => {
-    // Sync final progress to Trakt
-    traktAutosync.handlePlaybackEnd(currentTime, duration, 'ended');
+  const onEnd = async () => {
+    // Make sure we report 100% progress to Trakt
+    const finalTime = duration;
+    setCurrentTime(finalTime);
+
+    try {
+      // Force one last progress update (scrobble/pause) with the exact final time
+      logger.log('[AndroidVideoPlayer] Video ended naturally, sending final progress update with 100%');
+      await traktAutosync.handleProgressUpdate(finalTime, duration, true);
+      
+      // Small delay to ensure the progress update is processed
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Now send the stop call
+      logger.log('[AndroidVideoPlayer] Sending final stop call after natural end');
+      await traktAutosync.handlePlaybackEnd(finalTime, duration, 'ended');
+      
+      logger.log('[AndroidVideoPlayer] Completed video end sync to Trakt');
+    } catch (error) {
+      logger.error('[AndroidVideoPlayer] Error syncing to Trakt on video end:', error);
+    }
   };
 
   const selectAudioTrack = (trackId: number) => {
@@ -761,7 +841,14 @@ const AndroidVideoPlayer: React.FC = () => {
     
   const togglePlayback = () => {
     if (videoRef.current) {
-        setPaused(!paused);
+      const newPausedState = !paused;
+      setPaused(newPausedState);
+      
+      // Send a forced pause update to Trakt immediately when user pauses
+      if (newPausedState && duration > 0) {
+        traktAutosync.handleProgressUpdate(currentTime, duration, true);
+        logger.log('[AndroidVideoPlayer] Sent forced pause update to Trakt');
+      }
     }
   };
 
@@ -807,6 +894,10 @@ const AndroidVideoPlayer: React.FC = () => {
   const decreaseSubtitleSize = () => {
     const newSize = Math.max(subtitleSize - 2, 8);
     saveSubtitleSize(newSize);
+  };
+
+  const toggleSubtitleBackground = () => {
+    setSubtitleBackground(!subtitleBackground);
   };
 
   useEffect(() => {
@@ -931,6 +1022,25 @@ const AndroidVideoPlayer: React.FC = () => {
         ]}
         pointerEvents={isOpeningAnimationComplete ? 'none' : 'auto'}
       >
+        {backdrop && (
+          <Image
+            source={{ uri: backdrop }}
+            style={[StyleSheet.absoluteFill, { width: screenDimensions.width, height: screenDimensions.height }]}
+            resizeMode="cover"
+            blurRadius={0}
+          />
+        )}
+        <LinearGradient
+          colors={[
+            'rgba(0,0,0,0.3)',
+            'rgba(0,0,0,0.6)',
+            'rgba(0,0,0,0.8)',
+            'rgba(0,0,0,0.9)'
+          ]}
+          locations={[0, 0.3, 0.7, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+        
         <TouchableOpacity 
           style={styles.loadingCloseButton}
           onPress={handleClose}
@@ -940,8 +1050,28 @@ const AndroidVideoPlayer: React.FC = () => {
         </TouchableOpacity>
         
         <View style={styles.openingContent}>
+          {hasLogo ? (
+            <Animated.View style={{
+              transform: [
+                { scale: Animated.multiply(logoScaleAnim, pulseAnim) }
+              ],
+              opacity: logoOpacityAnim,
+              alignItems: 'center',
+            }}>
+              <Image
+                source={{ uri: metadata.logo }}
+                style={{
+                  width: 300,
+                  height: 180,
+                  resizeMode: 'contain',
+                }}
+              />
+            </Animated.View>
+          ) : (
+            <>
           <ActivityIndicator size="large" color="#E50914" />
-          <Text style={styles.openingText}>Loading video...</Text>
+            </>
+          )}
         </View>
       </Animated.View>
 
@@ -1025,7 +1155,7 @@ const AndroidVideoPlayer: React.FC = () => {
                   playWhenInactive={false}
                   ignoreSilentSwitch="ignore"
                   mixWithOthers="inherit"
-                  progressUpdateInterval={1000}
+                  progressUpdateInterval={250}
                 />
               </TouchableOpacity>
             </View>
@@ -1046,6 +1176,7 @@ const AndroidVideoPlayer: React.FC = () => {
             currentTime={currentTime}
             duration={duration}
             zoomScale={zoomScale}
+            currentResizeMode={resizeMode}
             vlcAudioTracks={rnVideoAudioTracks}
             selectedAudioTrack={selectedAudioTrack}
             availableStreams={availableStreams}
@@ -1070,19 +1201,17 @@ const AndroidVideoPlayer: React.FC = () => {
             useCustomSubtitles={useCustomSubtitles}
             currentSubtitle={currentSubtitle}
             subtitleSize={subtitleSize}
+            subtitleBackground={subtitleBackground}
+            zoomScale={zoomScale}
           />
 
           <ResumeOverlay
             showResumeOverlay={showResumeOverlay}
             resumePosition={resumePosition}
-            duration={duration}
-            title={title}
+            duration={savedDuration || duration}
+            title={episodeTitle || title}
             season={season}
             episode={episode}
-            rememberChoice={rememberChoice}
-            setRememberChoice={setRememberChoice}
-            resumePreference={resumePreference}
-            resetResumePreference={resetResumePreference}
             handleResume={handleResume}
             handleStartFromBeginning={handleStartFromBeginning}
           />
@@ -1109,11 +1238,13 @@ const AndroidVideoPlayer: React.FC = () => {
         selectedTextTrack={selectedTextTrack}
         useCustomSubtitles={useCustomSubtitles}
         subtitleSize={subtitleSize}
+        subtitleBackground={subtitleBackground}
         fetchAvailableSubtitles={fetchAvailableSubtitles}
         loadWyzieSubtitle={loadWyzieSubtitle}
         selectTextTrack={selectTextTrack}
         increaseSubtitleSize={increaseSubtitleSize}
         decreaseSubtitleSize={decreaseSubtitleSize}
+        toggleSubtitleBackground={toggleSubtitleBackground}
       />
       
       <SourcesModal

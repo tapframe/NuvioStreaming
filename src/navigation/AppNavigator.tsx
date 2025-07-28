@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { NavigationContainer, DefaultTheme as NavigationDefaultTheme, DarkTheme as NavigationDarkTheme, Theme, NavigationProp } from '@react-navigation/native';
 import { createNativeStackNavigator, NativeStackNavigationOptions, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createBottomTabNavigator, BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { useColorScheme, Platform, Animated, StatusBar, TouchableOpacity, View, Text, AppState } from 'react-native';
+import { useColorScheme, Platform, Animated, StatusBar, TouchableOpacity, View, Text, AppState, Easing } from 'react-native';
 import { PaperProvider, MD3DarkTheme, MD3LightTheme, adaptNavigationTheme } from 'react-native-paper';
 import type { MD3Theme } from 'react-native-paper';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
@@ -17,7 +17,6 @@ import { useTheme } from '../contexts/ThemeContext';
 
 // Import screens with their proper types
 import HomeScreen from '../screens/HomeScreen';
-import DiscoverScreen from '../screens/DiscoverScreen';
 import LibraryScreen from '../screens/LibraryScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import MetadataScreen from '../screens/MetadataScreen';
@@ -39,13 +38,14 @@ import PlayerSettingsScreen from '../screens/PlayerSettingsScreen';
 import LogoSourceSettings from '../screens/LogoSourceSettings';
 import ThemeScreen from '../screens/ThemeScreen';
 import ProfilesScreen from '../screens/ProfilesScreen';
-import InternalProvidersSettings from '../screens/InternalProvidersSettings';
+import OnboardingScreen from '../screens/OnboardingScreen';
+import ScraperSettingsScreen from '../screens/ScraperSettingsScreen';
 
 // Stack navigator types
 export type RootStackParamList = {
+  Onboarding: undefined;
   MainTabs: undefined;
   Home: undefined;
-  Discover: undefined;
   Library: undefined;
   Settings: undefined;
   Search: undefined;
@@ -60,12 +60,14 @@ export type RootStackParamList = {
     id: string; 
     type: string;
     episodeId?: string;
+    episodeThumbnail?: string;
   };
   VideoPlayer: { 
     id: string; 
     type: string; 
     stream: Stream;
     episodeId?: string;
+    backdrop?: string;
   };
   Player: { 
     uri: string; 
@@ -82,6 +84,7 @@ export type RootStackParamList = {
     episodeId?: string;
     imdbId?: string;
     availableStreams?: { [providerId: string]: { streams: any[]; addonName: string } };
+    backdrop?: string;
   };
   Catalog: { id: string; type: string; addonId?: string; name?: string; genreFilter?: string };
   Credits: { mediaId: string; mediaType: string };
@@ -102,7 +105,7 @@ export type RootStackParamList = {
   LogoSourceSettings: undefined;
   ThemeSettings: undefined;
   ProfilesSettings: undefined;
-  InternalProvidersSettings: undefined;
+  ScraperSettings: undefined;
 };
 
 export type RootStackNavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -110,8 +113,8 @@ export type RootStackNavigationProp = NativeStackNavigationProp<RootStackParamLi
 // Tab navigator types
 export type MainTabParamList = {
   Home: undefined;
-  Discover: undefined;
   Library: undefined;
+  Search: undefined;
   Settings: undefined;
 };
 
@@ -298,7 +301,7 @@ export const CustomNavigationDarkTheme: Theme = {
 type IconNameType = 'home' | 'home-outline' | 'compass' | 'compass-outline' | 
                    'play-box-multiple' | 'play-box-multiple-outline' | 
                    'puzzle' | 'puzzle-outline' | 
-                   'cog' | 'cog-outline';
+                   'cog' | 'cog-outline' | 'feature-search' | 'feature-search-outline';
 
 // Add TabIcon component
 const TabIcon = React.memo(({ focused, color, iconName }: { 
@@ -395,8 +398,6 @@ const WrappedScreen: React.FC<{Screen: React.ComponentType<any>}> = ({ Screen })
 
 // Tab Navigator
 const MainTabs = () => {
-  // Always use dark mode
-  const isDarkMode = true;
   const { currentTheme } = useTheme();
   
   const renderTabBar = (props: BottomTabBarProps) => {
@@ -479,11 +480,11 @@ const MainTabs = () => {
                 case 'Home':
                   iconName = 'home';
                   break;
-                case 'Discover':
-                  iconName = 'compass';
-                  break;
                 case 'Library':
                   iconName = 'play-box-multiple';
+                  break;
+                case 'Search':
+                  iconName = 'feature-search';
                   break;
                 case 'Settings':
                   iconName = 'cog';
@@ -538,124 +539,86 @@ const MainTabs = () => {
       
       <Tab.Navigator
         tabBar={renderTabBar}
-        screenOptions={({ route }) => ({
-          tabBarIcon: ({ focused, color, size }) => {
-            let iconName: IconNameType = 'home';
-            
-            switch (route.name) {
-              case 'Home':
-                iconName = 'home';
-                break;
-              case 'Discover':
-                iconName = 'compass';
-                break;
-              case 'Library':
-                iconName = 'play-box-multiple';
-                break;
-              case 'Settings':
-                iconName = 'cog';
-                break;
-            }
-            
-            return <TabIcon focused={focused} color={color} iconName={iconName} />;
+        screenOptions={({ route, navigation, theme }) => ({
+          transitionSpec: {
+            animation: 'timing',
+            config: {
+              duration: 200,
+              easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
+            },
           },
-          tabBarActiveTintColor: currentTheme.colors.primary,
-          tabBarInactiveTintColor: currentTheme.colors.white,
+          sceneStyleInterpolator: ({ current }) => ({
+            sceneStyle: {
+              opacity: current.progress.interpolate({
+                inputRange: [-1, 0, 1],
+                outputRange: [0, 1, 0],
+              }),
+              transform: [
+                {
+                  scale: current.progress.interpolate({
+                    inputRange: [-1, 0, 1],
+                    outputRange: [0.95, 1, 0.95],
+                  }),
+                },
+                {
+                  translateY: current.progress.interpolate({
+                    inputRange: [-1, 0, 1],
+                    outputRange: [8, 0, 8],
+                  }),
+                },
+              ],
+            },
+          }),
+          header: () => (route.name === 'Home' ? <NuvioHeader /> : null),
+          headerShown: route.name === 'Home',
+          tabBarShowLabel: false,
           tabBarStyle: {
             position: 'absolute',
-            backgroundColor: 'transparent',
             borderTopWidth: 0,
             elevation: 0,
-            height: 85,
-            paddingBottom: 20,
-            paddingTop: 12,
-          },
-          tabBarLabelStyle: {
-            fontSize: 12,
-            fontWeight: '600',
-            marginTop: 0,
-          },
-          // Completely disable animations between tabs for better performance
-          animationEnabled: false,
-          // Keep all screens mounted and active
-          lazy: false,
-          freezeOnBlur: false,
-          detachPreviousScreen: false,
-          // Configure how the screen renders
-          detachInactiveScreens: false,
-          tabBarBackground: () => (
-            Platform.OS === 'ios' ? (
-              <BlurView
-                tint="dark"
-                intensity={75}
-                style={{
-                  position: 'absolute',
-                  height: '100%',
-                  width: '100%',
-                  borderTopColor: currentTheme.colors.border,
-                  borderTopWidth: 0.5,
-                  shadowColor: currentTheme.colors.black,
-                  shadowOffset: { width: 0, height: -2 },
-                  shadowOpacity: 0.1,
-                  shadowRadius: 3,
-                }}
-              />
-            ) : (
-              <LinearGradient
-                colors={[
-                  'rgba(0, 0, 0, 0)',
-                  'rgba(0, 0, 0, 0.65)',
-                  'rgba(0, 0, 0, 0.85)',
-                  'rgba(0, 0, 0, 0.98)',
-                ]}
-                locations={[0, 0.2, 0.4, 0.8]}
-                style={{
-                  position: 'absolute',
-                  height: '100%',
-                  width: '100%',
-                }}
-              />
-            )
-          ),
-          header: () => route.name === 'Home' ? <NuvioHeader /> : null,
-          headerShown: route.name === 'Home',
-          // Add fixed screen styling to help with consistency
-          contentStyle: {
             backgroundColor: currentTheme.colors.darkBackground,
           },
+          detachInactiveScreens: false,
         })}
-        // Global configuration for the tab navigator
-        detachInactiveScreens={false}
       >
-        <Tab.Screen 
-          name="Home" 
+        <Tab.Screen
+          name="Home"
           component={HomeScreen}
-          options={{ 
+          options={{
             tabBarLabel: 'Home',
+            tabBarIcon: ({ color, size, focused }) => (
+              <MaterialCommunityIcons name={focused ? 'home' : 'home-outline'} size={size} color={color} />
+            ),
           }}
         />
-        <Tab.Screen 
-          name="Discover"
-          component={DiscoverScreen}
-          options={{ 
-            tabBarLabel: 'Discover',
-            headerShown: false
-          }}
-        />
-        <Tab.Screen 
-          name="Library" 
+        <Tab.Screen
+          name="Library"
           component={LibraryScreen}
-          options={{ 
+          options={{
             tabBarLabel: 'Library',
-            headerShown: false
+            tabBarIcon: ({ color, size, focused }) => (
+              <MaterialCommunityIcons name={focused ? 'play-box-multiple' : 'play-box-multiple-outline'} size={size} color={color} />
+            ),
           }}
         />
-        <Tab.Screen 
-          name="Settings" 
+        <Tab.Screen
+          name="Search"
+          component={SearchScreen}
+          options={{
+            tabBarLabel: 'Search',
+            tabBarIcon: ({ color, size, focused }) => (
+              <MaterialCommunityIcons name={focused ? 'feature-search' : 'feature-search-outline'} size={size} color={color} />
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Settings"
           component={SettingsScreen}
-          options={{ 
+          options={{
             tabBarLabel: 'Settings',
-            headerShown: false
+            tabBarIcon: ({ color, size, focused }) => (
+              <MaterialCommunityIcons name={focused ? 'cog' : 'cog-outline'} size={size} color={color} />
+            ),
           }}
         />
       </Tab.Navigator>
@@ -690,7 +653,7 @@ const customFadeInterpolator = ({ current, layouts }: any) => {
 };
 
 // Stack Navigator
-const AppNavigator = () => {
+const AppNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootStackParamList }) => {
   const { currentTheme } = useTheme();
   
   // Handle Android-specific optimizations
@@ -719,6 +682,7 @@ const AppNavigator = () => {
           })
         }}>
           <Stack.Navigator
+            initialRouteName={initialRouteName || 'MainTabs'}
             screenOptions={{
               headerShown: false,
               // Use slide_from_right for consistency and smooth transitions
@@ -749,6 +713,18 @@ const AppNavigator = () => {
             }}
           >
             <Stack.Screen 
+              name="Onboarding" 
+              component={OnboardingScreen}
+              options={{
+                headerShown: false,
+                animation: 'fade',
+                animationDuration: 300,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
               name="MainTabs" 
               component={MainTabs as any} 
               options={{
@@ -762,8 +738,8 @@ const AppNavigator = () => {
               component={MetadataScreen}
               options={{ 
                 headerShown: false, 
-                animation: 'fade',
-                animationDuration: Platform.OS === 'android' ? 250 : 300,
+                animation: Platform.OS === 'android' ? 'none' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 0 : 300,
                 ...(Platform.OS === 'ios' && {
                   cardStyleInterpolator: customFadeInterpolator,
                   animationTypeForReplace: 'push',
@@ -796,9 +772,20 @@ const AppNavigator = () => {
               options={{ 
                 animation: 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 200 : 300,
+                // Force fullscreen presentation on iPad
+                presentation: Platform.OS === 'ios' ? 'fullScreenModal' : 'card',
+                // Disable gestures during video playback
+                gestureEnabled: false,
+                // Ensure proper orientation handling
+                orientation: 'landscape',
                 contentStyle: {
                   backgroundColor: '#000000', // Pure black for video player
                 },
+                // iPad-specific fullscreen options
+                ...(Platform.OS === 'ios' && {
+                  statusBarHidden: true,
+                  statusBarAnimation: 'none',
+                }),
               }}
             />
             <Stack.Screen 
@@ -1040,8 +1027,8 @@ const AppNavigator = () => {
               }}
             />
             <Stack.Screen 
-              name="InternalProvidersSettings" 
-              component={InternalProvidersSettings}
+              name="ScraperSettings" 
+              component={ScraperSettingsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
@@ -1061,4 +1048,4 @@ const AppNavigator = () => {
   );
 };
 
-export default AppNavigator; 
+export default AppNavigator;

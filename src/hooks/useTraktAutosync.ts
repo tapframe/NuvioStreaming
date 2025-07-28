@@ -186,7 +186,8 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
           options.type,
           true,
           progressPercent,
-          options.episodeId
+          options.episodeId,
+          currentTime
         );
         
         logger.log(`[TraktAutosync] Synced progress ${progressPercent.toFixed(1)}%: ${contentData.title}`);
@@ -215,6 +216,7 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
 
     // ENHANCED DEDUPLICATION: Check if we've already stopped this session
     // However, allow updates if the new progress is significantly higher (>5% improvement)
+    let isSignificantUpdate = false;
     if (hasStopped.current) {
       const currentProgressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
       const progressImprovement = currentProgressPercent - lastSyncProgress.current;
@@ -223,6 +225,7 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
         logger.log(`[TraktAutosync] Session already stopped, but progress improved significantly by ${progressImprovement.toFixed(1)}% (${lastSyncProgress.current.toFixed(1)}% → ${currentProgressPercent.toFixed(1)}%), allowing update`);
         // Reset stopped flag to allow this significant update
         hasStopped.current = false;
+        isSignificantUpdate = true;
       } else {
         logger.log(`[TraktAutosync] Already stopped this session, skipping duplicate call (reason: ${reason})`);
         return;
@@ -230,7 +233,8 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
     }
 
     // ENHANCED DEDUPLICATION: Prevent rapid successive calls (within 5 seconds)
-    if (now - lastStopCall.current < 5000) {
+    // Bypass for significant updates
+    if (!isSignificantUpdate && now - lastStopCall.current < 5000) {
       logger.log(`[TraktAutosync] Ignoring rapid successive stop call within 5 seconds (reason: ${reason})`);
       return;
     }
@@ -255,13 +259,13 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
           maxProgress = lastSyncProgress.current;
         }
         
-                 // Also check local storage for the highest recorded progress
-         try {
-           const savedProgress = await storageService.getWatchProgress(
-             options.id, 
-             options.type, 
-             options.episodeId
-           );
+        // Also check local storage for the highest recorded progress
+        try {
+          const savedProgress = await storageService.getWatchProgress(
+            options.id, 
+            options.type, 
+            options.episodeId
+          );
           
           if (savedProgress && savedProgress.duration > 0) {
             const savedProgressPercent = (savedProgress.currentTime / savedProgress.duration) * 100;
@@ -292,11 +296,17 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
         }
       }
       
-      // Only stop if we have meaningful progress (>= 1%) or it's a natural video end
-      // Skip unmount calls with very low progress unless video actually ended
-      if (reason === 'unmount' && progressPercent < 1) {
+      // Only stop if we have meaningful progress (>= 0.5%) or it's a natural video end
+      // Lower threshold for unmount calls to catch more edge cases
+      if (reason === 'unmount' && progressPercent < 0.5) {
         logger.log(`[TraktAutosync] Skipping unmount stop for ${options.title} - too early (${progressPercent.toFixed(1)}%)`);
         return;
+      }
+      
+      // For natural end events, always set progress to at least 90%
+      if (reason === 'ended' && progressPercent < 90) {
+        logger.log(`[TraktAutosync] Natural end detected but progress is low (${progressPercent.toFixed(1)}%), boosting to 90%`);
+        progressPercent = 90;
       }
       
       // Mark stop attempt and update timestamp
@@ -315,7 +325,8 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
           options.type,
           true,
           progressPercent,
-          options.episodeId
+          options.episodeId,
+          currentTime
         );
         
         // Mark session as complete if high progress (scrobbled)
@@ -344,7 +355,7 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
       // Reset stop flag on error so we can try again
       hasStopped.current = false;
     }
-  }, [isAuthenticated, autosyncSettings.enabled, stopWatching, buildContentData, options]);
+  }, [isAuthenticated, autosyncSettings.enabled, stopWatching, startWatching, buildContentData, options]);
 
   // Reset state (useful when switching content)
   const resetState = useCallback(() => {

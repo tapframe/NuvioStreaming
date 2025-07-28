@@ -2,6 +2,9 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logger } from '../utils/logger';
 import EventEmitter from 'eventemitter3';
+import { localScraperService } from './localScraperService';
+import { DEFAULT_SETTINGS, AppSettings } from '../hooks/useSettings';
+import { TMDBService } from './tmdbService';
 
 // Create an event emitter for addon changes
 export const addonEmitter = new EventEmitter();
@@ -175,10 +178,6 @@ class StremioService {
   private addonOrder: string[] = [];
   private readonly STORAGE_KEY = 'stremio-addons';
   private readonly ADDON_ORDER_KEY = 'stremio-addon-order';
-  private readonly DEFAULT_ADDONS = [
-    'https://v3-cinemeta.strem.io/manifest.json',
-    'https://opensubtitles-v3.strem.io/manifest.json'
-  ];
   private readonly MAX_CONCURRENT_REQUESTS = 3;
   private readonly DEFAULT_PAGE_SIZE = 50;
   private initialized: boolean = false;
@@ -214,6 +213,51 @@ class StremioService {
         }
       }
       
+      // Ensure Cinemeta is always installed as a pre-installed addon
+      const cinemetaId = 'com.linvo.cinemeta';
+      if (!this.installedAddons.has(cinemetaId)) {
+        const cinemetaManifest: Manifest = {
+          id: cinemetaId,
+          name: 'Cinemeta',
+          version: '3.0.13',
+          description: 'Provides metadata for movies and series from TheTVDB, TheMovieDB, etc.',
+          url: 'https://v3-cinemeta.strem.io',
+          originalUrl: 'https://v3-cinemeta.strem.io/manifest.json',
+          types: ['movie', 'series'],
+          catalogs: [
+            {
+              type: 'movie',
+              id: 'top',
+              name: 'Top Movies',
+              extraSupported: ['search', 'genre', 'skip']
+            },
+            {
+              type: 'series',
+              id: 'top',
+              name: 'Top Series',
+              extraSupported: ['search', 'genre', 'skip']
+            }
+          ],
+          resources: [
+            {
+              name: 'catalog',
+              types: ['movie', 'series'],
+              idPrefixes: ['tt']
+            },
+            {
+              name: 'meta',
+              types: ['movie', 'series'],
+              idPrefixes: ['tt']
+            }
+          ],
+          behaviorHints: {
+            configurable: false
+          }
+        };
+        this.installedAddons.set(cinemetaId, cinemetaManifest);
+        logger.log('✅ Cinemeta pre-installed as default addon');
+      }
+      
       // Load addon order if exists
       const storedOrder = await AsyncStorage.getItem(this.ADDON_ORDER_KEY);
       if (storedOrder) {
@@ -222,24 +266,33 @@ class StremioService {
         this.addonOrder = this.addonOrder.filter(id => this.installedAddons.has(id));
       }
       
+      // Ensure Cinemeta is first in the order
+      if (!this.addonOrder.includes(cinemetaId)) {
+        this.addonOrder.unshift(cinemetaId);
+      } else {
+        // Move Cinemeta to the front if it's not already there
+        const cinemetaIndex = this.addonOrder.indexOf(cinemetaId);
+        if (cinemetaIndex > 0) {
+          this.addonOrder.splice(cinemetaIndex, 1);
+          this.addonOrder.unshift(cinemetaId);
+        }
+      }
+      
       // Add any missing addons to the order
       const installedIds = Array.from(this.installedAddons.keys());
       const missingIds = installedIds.filter(id => !this.addonOrder.includes(id));
       this.addonOrder = [...this.addonOrder, ...missingIds];
       
-      // If no addons, install defaults
-      if (this.installedAddons.size === 0) {
-        await this.installDefaultAddons();
-      }
-      
-      // Ensure order is saved
+      // Ensure order and addons are saved
       await this.saveAddonOrder();
+      await this.saveInstalledAddons();
       
       this.initialized = true;
     } catch (error) {
       logger.error('Failed to initialize addons:', error);
-      // Install defaults as fallback
-      await this.installDefaultAddons();
+      // Initialize with empty state on error
+      this.installedAddons = new Map();
+      this.addonOrder = [];
       this.initialized = true;
     }
   }
@@ -273,20 +326,6 @@ class StremioService {
       }
     }
     throw lastError;
-  }
-
-  private async installDefaultAddons(): Promise<void> {
-    try {
-      for (const url of this.DEFAULT_ADDONS) {
-        const manifest = await this.getManifest(url);
-        if (manifest) {
-          this.installedAddons.set(manifest.id, manifest);
-        }
-      }
-      await this.saveInstalledAddons();
-    } catch (error) {
-      logger.error('Failed to install default addons:', error);
-    }
   }
 
   private async saveInstalledAddons(): Promise<void> {
@@ -355,6 +394,12 @@ class StremioService {
   }
 
   removeAddon(id: string): void {
+    // Prevent removal of Cinemeta as it's a pre-installed addon
+    if (id === 'com.linvo.cinemeta') {
+      logger.warn('❌ Cannot remove Cinemeta - it is a pre-installed addon');
+      return;
+    }
+    
     if (this.installedAddons.has(id)) {
       this.installedAddons.delete(id);
       // Remove from order
@@ -376,6 +421,11 @@ class StremioService {
   async getInstalledAddonsAsync(): Promise<Manifest[]> {
     await this.ensureInitialized();
     return this.getInstalledAddons();
+  }
+
+  // Check if an addon is pre-installed and cannot be removed
+  isPreInstalledAddon(id: string): boolean {
+    return id === 'com.linvo.cinemeta';
   }
 
   private formatId(id: string): string {
@@ -535,13 +585,12 @@ class StremioService {
           
                     if (hasMetaSupport) {
             try {
-              logger.log(`HTTP GET: ${wouldBeUrl} (preferred addon: ${preferredAddon.name})`);
+             
               const response = await this.retryRequest(async () => {
                 return await axios.get(wouldBeUrl, { timeout: 10000 });
               });
               
               if (response.data && response.data.meta) {
-                logger.log(`✅ Metadata fetched successfully from preferred addon: ${wouldBeUrl}`);
                 return response.data.meta;
               }
             } catch (error) {
@@ -564,13 +613,12 @@ class StremioService {
       for (const baseUrl of cinemetaUrls) {
         try {
           const url = `${baseUrl}/meta/${type}/${id}.json`;
-          logger.log(`HTTP GET: ${url}`);
+          
           const response = await this.retryRequest(async () => {
             return await axios.get(url, { timeout: 10000 });
           });
           
           if (response.data && response.data.meta) {
-            logger.log(`✅ Metadata fetched successfully from: ${url}`);
             return response.data.meta;
           }
         } catch (error) {
@@ -619,7 +667,6 @@ class StremioService {
           });
           
           if (response.data && response.data.meta) {
-            logger.log(`✅ Metadata fetched successfully from: ${url}`);
             return response.data.meta;
           }
         } catch (error) {
@@ -642,6 +689,89 @@ class StremioService {
     
     const addons = this.getInstalledAddons();
     logger.log('📌 [getStreams] Installed addons:', addons.map(a => ({ id: a.id, name: a.name, url: a.url })));
+    
+    // Check if local scrapers are enabled and execute them first
+    try {
+      // Load settings from AsyncStorage directly
+      const settingsJson = await AsyncStorage.getItem('app_settings');
+      const settings: AppSettings = settingsJson ? JSON.parse(settingsJson) : DEFAULT_SETTINGS;
+      
+      if (settings.enableLocalScrapers) {
+        const hasScrapers = await localScraperService.hasScrapers();
+        if (hasScrapers) {
+          logger.log('🔧 [getStreams] Executing local scrapers for', type, id);
+          
+          // Map Stremio types to local scraper types
+          const scraperType = type === 'series' ? 'tv' : type;
+          
+          // Parse the Stremio ID to extract IMDb ID and season/episode info
+          let tmdbId: string | null = null;
+          let season: number | undefined = undefined;
+          let episode: number | undefined = undefined;
+          
+          try {
+            const idParts = id.split(':');
+            let baseImdbId: string;
+            
+            // Handle different episode ID formats
+            if (idParts[0] === 'series') {
+              // Format: series:imdbId:season:episode
+              baseImdbId = idParts[1];
+              if (scraperType === 'tv' && idParts.length >= 4) {
+                season = parseInt(idParts[2], 10);
+                episode = parseInt(idParts[3], 10);
+              }
+            } else if (idParts[0].startsWith('tt')) {
+              // Format: imdbId:season:episode (direct IMDb ID)
+              baseImdbId = idParts[0];
+              if (scraperType === 'tv' && idParts.length >= 3) {
+                season = parseInt(idParts[1], 10);
+                episode = parseInt(idParts[2], 10);
+              }
+            } else {
+              // Fallback: assume first part is the ID
+              baseImdbId = idParts[0];
+              if (scraperType === 'tv' && idParts.length >= 3) {
+                season = parseInt(idParts[1], 10);
+                episode = parseInt(idParts[2], 10);
+              }
+            }
+            
+            // Convert IMDb ID to TMDB ID using TMDBService
+             const tmdbService = TMDBService.getInstance();
+            const tmdbIdNumber = await tmdbService.findTMDBIdByIMDB(baseImdbId);
+            
+            if (tmdbIdNumber) {
+              tmdbId = tmdbIdNumber.toString();
+              logger.log(`🔄 [getStreams] Converted IMDb ID ${baseImdbId} to TMDB ID ${tmdbId}${scraperType === 'tv' ? ` (S${season}E${episode})` : ''}`);
+            } else {
+              logger.warn(`⚠️ [getStreams] Could not convert IMDb ID ${baseImdbId} to TMDB ID`);
+              return; // Skip local scrapers if we can't convert the ID
+            }
+          } catch (error) {
+            logger.error(`❌ [getStreams] Failed to parse Stremio ID or convert to TMDB ID:`, error);
+            return; // Skip local scrapers if ID parsing fails
+          }
+          
+          // Execute local scrapers asynchronously with TMDB ID
+          localScraperService.getStreams(scraperType, tmdbId, season, episode, (streams, scraperId, scraperName, error) => {
+            if (error) {
+              logger.error(`❌ [getStreams] Local scraper ${scraperName} failed:`, error);
+              if (callback) {
+                callback(null, scraperId, scraperName, error);
+              }
+            } else if (streams && streams.length > 0) {
+              logger.log(`✅ [getStreams] Local scraper ${scraperName} returned ${streams.length} streams`);
+              if (callback) {
+                callback(streams, scraperId, scraperName, null);
+              }
+            }
+          });
+        }
+      }
+    } catch (error) {
+      logger.error('❌ [getStreams] Failed to execute local scrapers:', error);
+    }
     
     // Check specifically for TMDB Embed addon
     const tmdbEmbed = addons.find(addon => addon.id === 'org.tmdbembedapi');

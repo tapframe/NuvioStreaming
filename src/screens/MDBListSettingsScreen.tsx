@@ -32,10 +32,10 @@ const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 export const isMDBListEnabled = async (): Promise<boolean> => {
   try {
     const enabledSetting = await AsyncStorage.getItem(MDBLIST_ENABLED_STORAGE_KEY);
-    return enabledSetting === null || enabledSetting === 'true';
+    return enabledSetting === 'true';
   } catch (error) {
     logger.error('[MDBList] Error checking if MDBList is enabled:', error);
-    return true; // Default to enabled if there's an error
+    return false; // Default to disabled if there's an error
   }
 };
 
@@ -364,7 +364,7 @@ const MDBListSettingsScreen = () => {
   const [apiKey, setApiKey] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isKeySet, setIsKeySet] = useState(false);
-  const [isMdbListEnabled, setIsMdbListEnabled] = useState(true);
+  const [isMdbListEnabled, setIsMdbListEnabled] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [enabledProviders, setEnabledProviders] = useState<Record<string, boolean>>({});
@@ -388,14 +388,14 @@ const MDBListSettingsScreen = () => {
         setIsMdbListEnabled(savedSetting === 'true');
         logger.log('[MDBListSettingsScreen] MDBList enabled setting:', savedSetting === 'true');
       } else {
-        // Default to enabled if no setting found
-        setIsMdbListEnabled(true);
-        await AsyncStorage.setItem(MDBLIST_ENABLED_STORAGE_KEY, 'true');
-        logger.log('[MDBListSettingsScreen] MDBList enabled setting not found, defaulting to true');
+        // Default to disabled if no setting found
+        setIsMdbListEnabled(false);
+        await AsyncStorage.setItem(MDBLIST_ENABLED_STORAGE_KEY, 'false');
+        logger.log('[MDBListSettingsScreen] MDBList enabled setting not found, defaulting to false');
       }
     } catch (error) {
       logger.error('[MDBListSettingsScreen] Failed to load MDBList enabled setting:', error);
-      setIsMdbListEnabled(true);
+      setIsMdbListEnabled(false);
     }
   };
 

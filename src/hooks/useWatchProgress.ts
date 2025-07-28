@@ -170,7 +170,6 @@ export const useWatchProgress = (
   // Subscribe to storage changes for real-time updates
   useEffect(() => {
     const unsubscribe = storageService.subscribeToWatchProgressUpdates(() => {
-      logger.log('[useWatchProgress] Storage updated, reloading progress');
       loadWatchProgress();
     });
     

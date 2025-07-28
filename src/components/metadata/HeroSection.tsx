@@ -21,6 +21,7 @@ import Animated, {
   withTiming,
   runOnJS,
   withRepeat,
+  FadeIn,
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useTraktContext } from '../../contexts/TraktContext';
@@ -66,6 +67,7 @@ interface HeroSectionProps {
   getPlayButtonText: () => string;
   setBannerImage: (bannerImage: string | null) => void;
   setLogoLoadError: (error: boolean) => void;
+  groupedEpisodes?: { [seasonNumber: number]: any[] };
 }
 
 // Ultra-optimized ActionButtons Component - minimal re-renders
@@ -79,7 +81,8 @@ const ActionButtons = React.memo(({
   playButtonText,
   animatedStyle,
   isWatched,
-  watchProgress
+  watchProgress,
+  groupedEpisodes
 }: {
   handleShowStreams: () => void;
   toggleLibrary: () => void;
@@ -91,6 +94,7 @@ const ActionButtons = React.memo(({
   animatedStyle: any;
   isWatched: boolean;
   watchProgress: any;
+  groupedEpisodes?: { [seasonNumber: number]: any[] };
 }) => {
   const { currentTheme } = useTheme();
   
@@ -128,25 +132,95 @@ const ActionButtons = React.memo(({
 
   // Determine play button style and text based on watched status
   const playButtonStyle = useMemo(() => {
-    if (isWatched) {
+    if (isWatched && type === 'movie') {
+      // Only movies get the dark watched style for "Watch Again"
       return [styles.actionButton, styles.playButton, styles.watchedPlayButton];
     }
+    // All other buttons (Resume, Play SxxEyy, regular Play) get white background
     return [styles.actionButton, styles.playButton];
-  }, [isWatched]);
+  }, [isWatched, type]);
 
   const playButtonTextStyle = useMemo(() => {
-    if (isWatched) {
+    if (isWatched && type === 'movie') {
+      // Only movies get white text for "Watch Again"
       return [styles.playButtonText, styles.watchedPlayButtonText];
     }
+    // All other buttons get black text
     return styles.playButtonText;
-  }, [isWatched]);
+  }, [isWatched, type]);
 
   const finalPlayButtonText = useMemo(() => {
-    if (isWatched) {
-      return 'Watch Again';
+    // For movies, handle watched state
+    if (type === 'movie') {
+      return isWatched ? 'Watch Again' : playButtonText;
     }
-    return playButtonText;
-  }, [isWatched, playButtonText]);
+
+    // For series, validate next episode existence for both watched and resume cases
+    if (type === 'series' && watchProgress?.episodeId && groupedEpisodes) {
+      let seasonNum: number | null = null;
+      let episodeNum: number | null = null;
+
+      const parts = watchProgress.episodeId.split(':');
+
+      if (parts.length === 3) {
+        // Format: showId:season:episode
+        seasonNum = parseInt(parts[1], 10);
+        episodeNum = parseInt(parts[2], 10);
+      } else if (parts.length === 2) {
+        // Format: season:episode (no show id)
+        seasonNum = parseInt(parts[0], 10);
+        episodeNum = parseInt(parts[1], 10);
+      } else {
+        // Try pattern s1e2
+        const match = watchProgress.episodeId.match(/s(\d+)e(\d+)/i);
+        if (match) {
+          seasonNum = parseInt(match[1], 10);
+          episodeNum = parseInt(match[2], 10);
+        }
+      }
+
+      if (seasonNum !== null && episodeNum !== null && !isNaN(seasonNum) && !isNaN(episodeNum)) {
+        if (isWatched) {
+          // For watched episodes, check if next episode exists
+          const nextEpisode = episodeNum + 1;
+          const currentSeasonEpisodes = groupedEpisodes[seasonNum] || [];
+          const nextEpisodeExists = currentSeasonEpisodes.some(ep => 
+            ep.episode_number === nextEpisode
+          );
+          
+          if (nextEpisodeExists) {
+            // Show the NEXT episode number only if it exists
+            const seasonStr = seasonNum.toString().padStart(2, '0');
+            const episodeStr = nextEpisode.toString().padStart(2, '0');
+            return `Play S${seasonStr}E${episodeStr}`;
+          } else {
+            // If next episode doesn't exist, show generic text
+            return 'Completed';
+          }
+        } else {
+          // For non-watched episodes, check if current episode exists
+          const currentSeasonEpisodes = groupedEpisodes[seasonNum] || [];
+          const currentEpisodeExists = currentSeasonEpisodes.some(ep => 
+            ep.episode_number === episodeNum
+          );
+          
+          if (currentEpisodeExists) {
+            // Current episode exists, use original button text
+            return playButtonText;
+          } else {
+            // Current episode doesn't exist, fallback to generic play
+            return 'Play';
+          }
+        }
+      }
+
+      // Fallback label if parsing fails
+      return isWatched ? 'Play Next Episode' : playButtonText;
+    }
+
+    // Default fallback for non-series or missing data
+    return isWatched ? 'Play' : playButtonText;
+  }, [isWatched, playButtonText, type, watchProgress, groupedEpisodes]);
 
   return (
     <Animated.View style={[styles.actionButtons, animatedStyle]}>
@@ -156,18 +230,16 @@ const ActionButtons = React.memo(({
         activeOpacity={0.85}
       >
         <MaterialIcons 
-          name={isWatched ? "replay" : (playButtonText === 'Resume' ? "play-circle-outline" : "play-arrow")} 
+          name={(() => {
+            if (isWatched) {
+              return type === 'movie' ? 'replay' : 'play-arrow';
+            }
+            return playButtonText === 'Resume' ? 'play-circle-outline' : 'play-arrow';
+          })()} 
           size={24} 
-          color={isWatched ? "#fff" : "#000"} 
+          color={isWatched && type === 'movie' ? "#fff" : "#000"} 
         />
         <Text style={playButtonTextStyle}>{finalPlayButtonText}</Text>
-        
-        {/* Subtle watched indicator in play button */}
-        {isWatched && (
-          <View style={styles.watchedIndicator}>
-            <MaterialIcons name="check" size={12} color="#fff" />
-          </View>
-        )}
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -178,17 +250,7 @@ const ActionButtons = React.memo(({
         {Platform.OS === 'ios' ? (
           <ExpoBlurView intensity={80} style={styles.blurBackground} tint="dark" />
         ) : (
-          Constants.executionEnvironment === ExecutionEnvironment.StoreClient ? (
-            <View style={styles.androidFallbackBlur} />
-          ) : (
-            <CommunityBlurView
-              style={styles.blurBackground}
-              blurType="dark"
-              blurAmount={8}
-              overlayColor="rgba(255,255,255,0.1)"
-              reducedTransparencyFallbackColor="rgba(255,255,255,0.15)"
-            />
-          )
+          <View style={styles.androidFallbackBlur} />
         )}
         <MaterialIcons
           name={inLibrary ? 'bookmark' : 'bookmark-border'}
@@ -209,17 +271,7 @@ const ActionButtons = React.memo(({
           {Platform.OS === 'ios' ? (
             <ExpoBlurView intensity={80} style={styles.blurBackgroundRound} tint="dark" />
           ) : (
-            Constants.executionEnvironment === ExecutionEnvironment.StoreClient ? (
-              <View style={styles.androidFallbackBlurRound} />
-            ) : (
-              <CommunityBlurView
-                style={styles.blurBackgroundRound}
-                blurType="dark"
-                blurAmount={8}
-                overlayColor="rgba(255,255,255,0.1)"
-                reducedTransparencyFallbackColor="rgba(255,255,255,0.15)"
-              />
-            )
+            <View style={styles.androidFallbackBlurRound} />
           )}
           <MaterialIcons 
             name="assessment" 
@@ -256,6 +308,10 @@ const WatchProgressDisplay = React.memo(({
   const { currentTheme } = useTheme();
   const { isAuthenticated: isTraktAuthenticated, forceSyncTraktProgress } = useTraktContext();
   
+  // State to trigger refresh after manual sync
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
+  
   // Animated values for enhanced effects
   const completionGlow = useSharedValue(0);
   const celebrationScale = useSharedValue(1);
@@ -263,19 +319,50 @@ const WatchProgressDisplay = React.memo(({
   const progressBoxOpacity = useSharedValue(0);
   const progressBoxScale = useSharedValue(0.8);
   const progressBoxTranslateY = useSharedValue(20);
+  const syncRotation = useSharedValue(0);
+  
+  // Animate the sync icon when syncing
+  useEffect(() => {
+    if (isSyncing) {
+      syncRotation.value = withRepeat(
+        withTiming(360, { duration: 1000 }),
+        -1, // Infinite repeats
+        false // No reverse
+      );
+    } else {
+      syncRotation.value = 0;
+    }
+  }, [isSyncing, syncRotation]);
   
   // Handle manual Trakt sync
   const handleTraktSync = useMemo(() => async () => {
     if (isTraktAuthenticated && forceSyncTraktProgress) {
       logger.log('[HeroSection] Manual Trakt sync requested');
+      setIsSyncing(true);
       try {
         const success = await forceSyncTraktProgress();
         logger.log(`[HeroSection] Manual Trakt sync ${success ? 'successful' : 'failed'}`);
+        
+        // Force component to re-render after a short delay to update sync status
+        if (success) {
+          setTimeout(() => {
+            setRefreshTrigger(prev => prev + 1);
+            setIsSyncing(false);
+          }, 500);
+        } else {
+          setIsSyncing(false);
+        }
       } catch (error) {
         logger.error('[HeroSection] Manual Trakt sync error:', error);
+        setIsSyncing(false);
       }
     }
-  }, [isTraktAuthenticated, forceSyncTraktProgress]);
+  }, [isTraktAuthenticated, forceSyncTraktProgress, setRefreshTrigger]);
+
+  // Sync rotation animation style
+  const syncIconStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${syncRotation.value}deg` }],
+  }));
   
   // Memoized progress calculation with Trakt integration
   const progressData = useMemo(() => {
@@ -350,7 +437,8 @@ const WatchProgressDisplay = React.memo(({
           displayText = `${Math.round(progressPercent)}% watched (${Math.round(watchProgress.traktProgress)}% on Trakt)`;
         }
       } else {
-        syncStatus = ' • Sync pending';
+        // Do not show "Sync pending" label anymore; leave status empty.
+        syncStatus = '';
       }
     }
 
@@ -363,7 +451,7 @@ const WatchProgressDisplay = React.memo(({
       isTraktSynced: watchProgress.traktSynced && isTraktAuthenticated,
       isWatched: false
     };
-  }, [watchProgress, type, getEpisodeDetails, isTraktAuthenticated, isWatched]);
+  }, [watchProgress, type, getEpisodeDetails, isTraktAuthenticated, isWatched, refreshTrigger]);
 
   // Trigger appearance and completion animations
   useEffect(() => {
@@ -483,14 +571,6 @@ const WatchProgressDisplay = React.memo(({
               {progressData.displayText}
             </Text>
             
-            {/* Progress percentage badge */}
-            {!isCompleted && (
-              <View style={styles.percentageBadge}>
-                <Text style={styles.percentageText}>
-                  {Math.round(progressData.progressPercent)}%
-                </Text>
-          </View>
-        )}
       </View>
           
           <Text style={[styles.watchProgressSubText, { 
@@ -519,16 +599,19 @@ const WatchProgressDisplay = React.memo(({
                   style={styles.traktSyncButtonInline}
             onPress={handleTraktSync}
             activeOpacity={0.7}
+            disabled={isSyncing}
                 >
                   <LinearGradient
                     colors={['#E50914', '#B8070F']}
                     style={styles.syncButtonGradientInline}
           >
-            <MaterialIcons 
-              name="refresh" 
+            <Animated.View style={syncIconStyle}>
+              <MaterialIcons 
+                name={isSyncing ? "sync" : "refresh"} 
                       size={12} 
                       color="#fff" 
-            />
+              />
+            </Animated.View>
                   </LinearGradient>
           </TouchableOpacity>
               )}
@@ -563,6 +646,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
   getPlayButtonText,
   setBannerImage,
   setLogoLoadError,
+  groupedEpisodes,
 }) => {
   const { currentTheme } = useTheme();
   const { isAuthenticated: isTraktAuthenticated } = useTraktContext();
@@ -684,20 +768,24 @@ const HeroSection: React.FC<HeroSectionProps> = ({
     }]
   }), []);
 
-  // Ultra-optimized genre rendering
+  // Ultra-optimized genre rendering with smooth animation
   const genreElements = useMemo(() => {
     if (!metadata?.genres?.length) return null;
 
     const genresToDisplay = metadata.genres.slice(0, 3); // Reduced to 3 for performance
     return genresToDisplay.map((genreName: string, index: number, array: string[]) => (
-      <React.Fragment key={`${genreName}-${index}`}>
+      <Animated.View
+        key={`${genreName}-${index}`}
+        entering={FadeIn.duration(400).delay(200 + index * 100)}
+        style={{ flexDirection: 'row', alignItems: 'center' }}
+      >
         <Text style={[styles.genreText, { color: currentTheme.colors.text }]}>
           {genreName}
         </Text>
         {index < array.length - 1 && (
           <Text style={[styles.genreDot, { color: currentTheme.colors.text }]}>•</Text>
         )}
-      </React.Fragment>
+      </Animated.View>
     ));
   }, [metadata.genres, currentTheme.colors.text]);
 
@@ -814,6 +902,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
             animatedStyle={buttonsAnimatedStyle}
             isWatched={isWatched}
             watchProgress={watchProgress}
+            groupedEpisodes={groupedEpisodes}
           />
         </View>
       </LinearGradient>
@@ -1158,18 +1247,6 @@ const styles = StyleSheet.create({
       fontWeight: '600',
       textAlign: 'center',
     },
-    percentageBadge: {
-      backgroundColor: 'rgba(255,255,255,0.2)',
-      borderRadius: 8,
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-      marginLeft: 8,
-    },
-    percentageText: {
-      fontSize: 10,
-      fontWeight: '600',
-      color: '#fff',
-    },
     watchProgressSubText: {
       fontSize: 9,
       textAlign: 'center',
@@ -1228,4 +1305,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default React.memo(HeroSection); 
+export default React.memo(HeroSection);

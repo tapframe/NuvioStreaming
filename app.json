@@ -4,7 +4,7 @@
     "slug": "nuvio",
     "version": "1.0.0",
     "orientation": "default",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/ios/AppIcon.appiconset/Icon-App-60x60@3x.png",
     "userInterfaceStyle": "dark",
     "scheme": "stremioexpo",
     "newArchEnabled": true,
@@ -15,6 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
+      "icon": "./assets/ios/AppIcon.appiconset/Icon-App-60x60@3x.png",
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
@@ -24,38 +25,28 @@
         ],
         "NSLocalNetworkUsageDescription": "App uses the local network to discover and connect to devices.",
         "NSMicrophoneUsageDescription": "This app does not require microphone access.",
-        "UIBackgroundModes": ["audio"],
+        "UIBackgroundModes": [
+          "audio"
+        ],
         "LSSupportsOpeningDocumentsInPlace": true,
         "UIFileSharingEnabled": true
       },
       "bundleIdentifier": "com.nuvio.app",
-      "associatedDomains": [],
-      "documentTypes": [
-        {
-          "name": "Matroska Video",
-          "role": "viewer",
-          "utis": ["org.matroska.mkv"],
-          "extensions": ["mkv"]
-        }
-      ]
+      "associatedDomains": []
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#020404",
-        "monochromeImage": "./assets/icon.png"
+        "foregroundImage": "./assets/android/mipmap-xxxhdpi/ic_launcher_foreground.png",
+        "backgroundColor": "#020404"
       },
+      "icon": "./assets/android/mipmap-xxxhdpi/ic_launcher.png",
       "permissions": [
         "INTERNET",
         "WAKE_LOCK"
       ],
       "package": "com.nuvio.app",
-      "enableSplitAPKs": true,
       "versionCode": 1,
-      "enableProguardInReleaseBuilds": true,
-      "enableHermes": true,
-      "enableSeparateBuildPerCPUArchitecture": true,
-      "enableVectorDrawables": true
+      "architectures": ["arm64-v8a", "armeabi-v7a", "x86", "x86_64"]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -65,6 +56,16 @@
         "projectId": "909107b8-fe61-45ce-b02f-b02510d306a6"
       }
     },
-    "owner": "nayifleo"
+    "owner": "nayifleo",
+    "plugins": [
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "react-native",
+          "organization": "tapframe"
+        }
+      ]
+    ]
   }
 }

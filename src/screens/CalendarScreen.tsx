@@ -10,7 +10,8 @@ import {
   SafeAreaView,
   StatusBar,
   Dimensions,
-  SectionList
+  SectionList,
+  Platform
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -19,15 +20,17 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../contexts/ThemeContext';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { stremioService } from '../services/stremioService';
 import { useLibrary } from '../hooks/useLibrary';
+import { useTraktContext } from '../contexts/TraktContext';
 import { format, parseISO, isThisWeek, isAfter, startOfToday, addWeeks, isBefore, isSameDay } from 'date-fns';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import { CalendarSection } from '../components/calendar/CalendarSection';
+import { CalendarSection as CalendarSectionComponent } from '../components/calendar/CalendarSection';
 import { tmdbService } from '../services/tmdbService';
 import { logger } from '../utils/logger';
+import { useCalendarData } from '../hooks/useCalendarData';
 
 const { width } = Dimensions.get('window');
+const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
 interface CalendarEpisode {
   id: string;
@@ -53,182 +56,26 @@ const CalendarScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { libraryItems, loading: libraryLoading } = useLibrary();
   const { currentTheme } = useTheme();
+  const { calendarData, loading, refresh } = useCalendarData();
+  const {
+    isAuthenticated: traktAuthenticated,
+    isLoading: traktLoading,
+    watchedShows,
+    watchlistShows,
+    continueWatching,
+    loadAllCollections
+  } = useTraktContext();
+  
   logger.log(`[Calendar] Initial load - Library has ${libraryItems?.length || 0} items, loading: ${libraryLoading}`);
-  const [calendarData, setCalendarData] = useState<CalendarSection[]>([]);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [filteredEpisodes, setFilteredEpisodes] = useState<CalendarEpisode[]>([]);
 
-  const fetchCalendarData = useCallback(async () => {
-    logger.log("[Calendar] Starting to fetch calendar data");
-    setLoading(true);
-    
-    try {
-      // Filter for only series in library
-      const seriesItems = libraryItems.filter(item => item.type === 'series');
-      logger.log(`[Calendar] Library items: ${libraryItems.length}, Series items: ${seriesItems.length}`);
-      
-      let allEpisodes: CalendarEpisode[] = [];
-      let seriesWithoutEpisodes: CalendarEpisode[] = [];
-      
-      // For each series, fetch upcoming episodes
-      for (const series of seriesItems) {
-        try {
-          logger.log(`[Calendar] Fetching episodes for series: ${series.name} (${series.id})`);
-          const metadata = await stremioService.getMetaDetails(series.type, series.id);
-          logger.log(`[Calendar] Metadata fetched:`, metadata ? 'success' : 'null');
-          
-          if (metadata?.videos && metadata.videos.length > 0) {
-            logger.log(`[Calendar] Series ${series.name} has ${metadata.videos.length} videos`);
-            // Filter for upcoming episodes or recently released
-            const today = startOfToday();
-            const fourWeeksLater = addWeeks(today, 4);
-            const twoWeeksAgo = addWeeks(today, -2);
-            
-            // Get TMDB ID for additional metadata
-            const tmdbId = await tmdbService.findTMDBIdByIMDB(series.id);
-            let tmdbEpisodes: { [key: string]: any } = {};
-            
-            if (tmdbId) {
-              const allTMDBEpisodes = await tmdbService.getAllEpisodes(tmdbId);
-              // Flatten episodes into a map for easy lookup
-              Object.values(allTMDBEpisodes).forEach(seasonEpisodes => {
-                seasonEpisodes.forEach(episode => {
-                  const key = `${episode.season_number}:${episode.episode_number}`;
-                  tmdbEpisodes[key] = episode;
-                });
-              });
-            }
-            
-            const upcomingEpisodes = metadata.videos
-              .filter(video => {
-                if (!video.released) return false;
-                const releaseDate = parseISO(video.released);
-                return isBefore(releaseDate, fourWeeksLater) && isAfter(releaseDate, twoWeeksAgo);
-              })
-              .map(video => {
-                const tmdbEpisode = tmdbEpisodes[`${video.season}:${video.episode}`] || {};
-                return {
-                  id: video.id,
-                  seriesId: series.id,
-                  title: tmdbEpisode.name || video.title || `Episode ${video.episode}`,
-                  seriesName: series.name || metadata.name,
-                  poster: series.poster || metadata.poster || '',
-                  releaseDate: video.released,
-                  season: video.season || 0,
-                  episode: video.episode || 0,
-                  overview: tmdbEpisode.overview || '',
-                  vote_average: tmdbEpisode.vote_average || 0,
-                  still_path: tmdbEpisode.still_path || null,
-                  season_poster_path: tmdbEpisode.season_poster_path || null
-                };
-              });
-            
-            if (upcomingEpisodes.length > 0) {
-              allEpisodes = [...allEpisodes, ...upcomingEpisodes];
-            } else {
-              // Add to series without episode dates
-              seriesWithoutEpisodes.push({
-                id: series.id,
-                seriesId: series.id,
-                title: 'No upcoming episodes',
-                seriesName: series.name || (metadata?.name || ''),
-                poster: series.poster || (metadata?.poster || ''),
-                releaseDate: '',
-                season: 0,
-                episode: 0,
-                overview: '',
-                vote_average: 0,
-                still_path: null,
-                season_poster_path: null
-              });
-            }
-          } else {
-            // Add to series without episode dates
-            seriesWithoutEpisodes.push({
-              id: series.id,
-              seriesId: series.id,
-              title: 'No upcoming episodes',
-              seriesName: series.name || (metadata?.name || ''),
-              poster: series.poster || (metadata?.poster || ''),
-              releaseDate: '',
-              season: 0,
-              episode: 0,
-              overview: '',
-              vote_average: 0,
-              still_path: null,
-              season_poster_path: null
-            });
-          }
-        } catch (error) {
-          logger.error(`Error fetching episodes for ${series.name}:`, error);
-        }
-      }
-      
-      // Sort episodes by release date
-      allEpisodes.sort((a, b) => {
-        return new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime();
-      });
-      
-      // Group episodes into sections
-      const thisWeekEpisodes = allEpisodes.filter(
-        episode => isThisWeek(parseISO(episode.releaseDate))
-      );
-      
-      const upcomingEpisodes = allEpisodes.filter(
-        episode => isAfter(parseISO(episode.releaseDate), new Date()) && 
-          !isThisWeek(parseISO(episode.releaseDate))
-      );
-      
-      const recentEpisodes = allEpisodes.filter(
-        episode => isBefore(parseISO(episode.releaseDate), new Date()) && 
-          !isThisWeek(parseISO(episode.releaseDate))
-      );
-      
-      logger.log(`[Calendar] Episodes summary: All episodes: ${allEpisodes.length}, This Week: ${thisWeekEpisodes.length}, Upcoming: ${upcomingEpisodes.length}, Recent: ${recentEpisodes.length}, No Schedule: ${seriesWithoutEpisodes.length}`);
-      
-      const sections: CalendarSection[] = [];
-      
-      if (thisWeekEpisodes.length > 0) {
-        sections.push({ title: 'This Week', data: thisWeekEpisodes });
-      }
-      
-      if (upcomingEpisodes.length > 0) {
-        sections.push({ title: 'Upcoming', data: upcomingEpisodes });
-      }
-      
-      if (recentEpisodes.length > 0) {
-        sections.push({ title: 'Recently Released', data: recentEpisodes });
-      }
-      
-      if (seriesWithoutEpisodes.length > 0) {
-        sections.push({ title: 'Series with No Scheduled Episodes', data: seriesWithoutEpisodes });
-      }
-      
-      setCalendarData(sections);
-    } catch (error) {
-      logger.error('Error fetching calendar data:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [libraryItems]);
-  
-  useEffect(() => {
-    if (libraryItems.length > 0 && !libraryLoading) {
-      logger.log(`[Calendar] Library loaded with ${libraryItems.length} items, fetching calendar data`);
-      fetchCalendarData();
-    } else if (!libraryLoading) {
-      logger.log(`[Calendar] Library loaded but empty (${libraryItems.length} items)`);
-      setLoading(false);
-    }
-  }, [libraryItems, libraryLoading, fetchCalendarData]);
-  
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchCalendarData();
-  }, [fetchCalendarData]);
+    refresh(true);
+    setRefreshing(false);
+  }, [refresh]);
   
   const handleSeriesPress = useCallback((seriesId: string, episode?: CalendarEpisode) => {
     navigation.navigate('Metadata', {
@@ -360,7 +207,7 @@ const CalendarScreen = () => {
   );
   
   // Process all episodes once data is loaded
-  const allEpisodes = calendarData.reduce((acc, section) => 
+  const allEpisodes = calendarData.reduce((acc: CalendarEpisode[], section: CalendarSection) => 
     [...acc, ...section.data], [] as CalendarEpisode[]);
   
   // Log when rendering with relevant state info
@@ -388,43 +235,6 @@ const CalendarScreen = () => {
     setSelectedDate(null);
     setFilteredEpisodes([]);
   }, []);
-  
-  if (libraryItems.length === 0 && !libraryLoading) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
-        <StatusBar barStyle="light-content" />
-        
-        <View style={[styles.header, { borderBottomColor: currentTheme.colors.border }]}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <MaterialIcons name="arrow-back" size={24} color={currentTheme.colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>Calendar</Text>
-          <View style={{ width: 40 }} />
-        </View>
-        
-        <View style={styles.emptyLibraryContainer}>
-          <MaterialIcons name="video-library" size={64} color={currentTheme.colors.lightGray} />
-          <Text style={styles.emptyText}>
-            Your library is empty
-          </Text>
-          <Text style={styles.emptySubtext}>
-            Add series to your library to see their upcoming episodes in the calendar
-          </Text>
-          <TouchableOpacity 
-            style={styles.discoverButton}
-            onPress={() => navigation.navigate('MainTabs')}
-          >
-            <Text style={styles.discoverButtonText}>
-              Return to Home
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
   
   if (loading && !refreshing) {
     return (
@@ -464,7 +274,7 @@ const CalendarScreen = () => {
         </View>
       )}
       
-      <CalendarSection 
+      <CalendarSectionComponent 
         episodes={allEpisodes}
         onSelectDate={handleDateSelect}
       />
@@ -506,6 +316,7 @@ const CalendarScreen = () => {
           renderItem={renderEpisodeItem}
           renderSectionHeader={renderSectionHeader}
           contentContainerStyle={styles.listContent}
+          removeClippedSubviews={false}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -663,6 +474,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
+    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 12 : 12,
+    borderBottomWidth: 1,
   },
   backButton: {
     padding: 8,

@@ -70,6 +70,7 @@ export interface StreamingContent {
   imdb_id?: string;
   slug?: string;
   releaseInfo?: string;
+  traktSource?: 'watchlist' | 'continue-watching' | 'watched';
 }
 
 export interface CatalogContent {
@@ -640,18 +641,47 @@ class CatalogService {
     };
   }
 
-  public addToLibrary(content: StreamingContent): void {
+  public async addToLibrary(content: StreamingContent): Promise<void> {
     const key = `${content.type}:${content.id}`;
     this.library[key] = content;
     this.saveLibrary();
     this.notifyLibrarySubscribers();
+    
+    // Auto-setup notifications for series when added to library
+    if (content.type === 'series') {
+      try {
+        const { notificationService } = await import('./notificationService');
+        await notificationService.updateNotificationsForSeries(content.id);
+        console.log(`[CatalogService] Auto-setup notifications for series: ${content.name}`);
+      } catch (error) {
+        console.error(`[CatalogService] Failed to setup notifications for ${content.name}:`, error);
+      }
+    }
   }
 
-  public removeFromLibrary(type: string, id: string): void {
+  public async removeFromLibrary(type: string, id: string): Promise<void> {
     const key = `${type}:${id}`;
     delete this.library[key];
     this.saveLibrary();
     this.notifyLibrarySubscribers();
+    
+    // Cancel notifications for series when removed from library
+    if (type === 'series') {
+      try {
+        const { notificationService } = await import('./notificationService');
+        // Cancel all notifications for this series
+        const scheduledNotifications = await notificationService.getScheduledNotifications();
+        const seriesToCancel = scheduledNotifications.filter(notification => notification.seriesId === id);
+        
+        for (const notification of seriesToCancel) {
+          await notificationService.cancelNotification(notification.id);
+        }
+        
+        console.log(`[CatalogService] Cancelled ${seriesToCancel.length} notifications for removed series: ${id}`);
+      } catch (error) {
+        console.error(`[CatalogService] Failed to cancel notifications for removed series ${id}:`, error);
+      }
+    }
   }
 
   private addToRecentContent(content: StreamingContent): void {
