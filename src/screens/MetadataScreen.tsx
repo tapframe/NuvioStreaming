@@ -432,6 +432,7 @@ const MetadataScreen: React.FC = () => {
               getPlayButtonText={watchProgressData.getPlayButtonText}
               setBannerImage={assetData.setBannerImage}
               setLogoLoadError={assetData.setLogoLoadError}
+              groupedEpisodes={groupedEpisodes}
             />
 
             {/* Main Content - Optimized */}

@@ -67,6 +67,7 @@ interface HeroSectionProps {
   getPlayButtonText: () => string;
   setBannerImage: (bannerImage: string | null) => void;
   setLogoLoadError: (error: boolean) => void;
+  groupedEpisodes?: { [seasonNumber: number]: any[] };
 }
 
 // Ultra-optimized ActionButtons Component - minimal re-renders
@@ -80,7 +81,8 @@ const ActionButtons = React.memo(({
   playButtonText,
   animatedStyle,
   isWatched,
-  watchProgress
+  watchProgress,
+  groupedEpisodes
 }: {
   handleShowStreams: () => void;
   toggleLibrary: () => void;
@@ -92,6 +94,7 @@ const ActionButtons = React.memo(({
   animatedStyle: any;
   isWatched: boolean;
   watchProgress: any;
+  groupedEpisodes?: { [seasonNumber: number]: any[] };
 }) => {
   const { currentTheme } = useTheme();
   
@@ -147,17 +150,13 @@ const ActionButtons = React.memo(({
   }, [isWatched, type]);
 
   const finalPlayButtonText = useMemo(() => {
-    if (!isWatched) {
-      return playButtonText;
-    }
-
-    // If content is a movie, keep existing "Watch Again" label
+    // For movies, handle watched state
     if (type === 'movie') {
-      return 'Watch Again';
+      return isWatched ? 'Watch Again' : playButtonText;
     }
 
-    // For series, attempt to show the next episode label (e.g., "Play S02E05")
-    if (type === 'series' && watchProgress?.episodeId) {
+    // For series, validate next episode existence for both watched and resume cases
+    if (type === 'series' && watchProgress?.episodeId && groupedEpisodes) {
       let seasonNum: number | null = null;
       let episodeNum: number | null = null;
 
@@ -181,20 +180,47 @@ const ActionButtons = React.memo(({
       }
 
       if (seasonNum !== null && episodeNum !== null && !isNaN(seasonNum) && !isNaN(episodeNum)) {
-        // For watched episodes, show the NEXT episode number
-        const nextEpisode = episodeNum + 1;
-        const seasonStr = seasonNum.toString().padStart(2, '0');
-        const episodeStr = nextEpisode.toString().padStart(2, '0');
-        return `Play S${seasonStr}E${episodeStr}`;
+        if (isWatched) {
+          // For watched episodes, check if next episode exists
+          const nextEpisode = episodeNum + 1;
+          const currentSeasonEpisodes = groupedEpisodes[seasonNum] || [];
+          const nextEpisodeExists = currentSeasonEpisodes.some(ep => 
+            ep.episode_number === nextEpisode
+          );
+          
+          if (nextEpisodeExists) {
+            // Show the NEXT episode number only if it exists
+            const seasonStr = seasonNum.toString().padStart(2, '0');
+            const episodeStr = nextEpisode.toString().padStart(2, '0');
+            return `Play S${seasonStr}E${episodeStr}`;
+          } else {
+            // If next episode doesn't exist, show generic text
+            return 'Completed';
+          }
+        } else {
+          // For non-watched episodes, check if current episode exists
+          const currentSeasonEpisodes = groupedEpisodes[seasonNum] || [];
+          const currentEpisodeExists = currentSeasonEpisodes.some(ep => 
+            ep.episode_number === episodeNum
+          );
+          
+          if (currentEpisodeExists) {
+            // Current episode exists, use original button text
+            return playButtonText;
+          } else {
+            // Current episode doesn't exist, fallback to generic play
+            return 'Play';
+          }
+        }
       }
 
       // Fallback label if parsing fails
-      return 'Play Next Episode';
+      return isWatched ? 'Play Next Episode' : playButtonText;
     }
 
-    // Default fallback
-    return 'Play';
-  }, [isWatched, playButtonText, type, watchProgress]);
+    // Default fallback for non-series or missing data
+    return isWatched ? 'Play' : playButtonText;
+  }, [isWatched, playButtonText, type, watchProgress, groupedEpisodes]);
 
   return (
     <Animated.View style={[styles.actionButtons, animatedStyle]}>
@@ -620,6 +646,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
   getPlayButtonText,
   setBannerImage,
   setLogoLoadError,
+  groupedEpisodes,
 }) => {
   const { currentTheme } = useTheme();
   const { isAuthenticated: isTraktAuthenticated } = useTraktContext();
@@ -875,6 +902,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
             animatedStyle={buttonsAnimatedStyle}
             isWatched={isWatched}
             watchProgress={watchProgress}
+            groupedEpisodes={groupedEpisodes}
           />
         </View>
       </LinearGradient>
@@ -1277,4 +1305,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default React.memo(HeroSection); 
+export default React.memo(HeroSection);
