@@ -23,6 +23,7 @@ export interface ScraperInfo {
   enabled: boolean;
   logo?: string;
   contentLanguage?: string[];
+  manifestEnabled?: boolean; // Whether the scraper is enabled in the manifest
 }
 
 export interface LocalScraperResult {
@@ -189,17 +190,48 @@ class LocalScraperService {
     try {
       logger.log('[LocalScraperService] Fetching repository manifest from:', this.repositoryUrl);
       
-      // Fetch manifest
-      const manifestUrl = this.repositoryUrl.endsWith('/') 
+      // Fetch manifest with cache busting
+      const baseManifestUrl = this.repositoryUrl.endsWith('/') 
         ? `${this.repositoryUrl}manifest.json`
         : `${this.repositoryUrl}/manifest.json`;
+      const manifestUrl = `${baseManifestUrl}?t=${Date.now()}`;
       
-      const response = await axios.get(manifestUrl, { timeout: 10000 });
-      const manifest: ScraperManifest = response.data;
+      const response = await axios.get(manifestUrl, { 
+         timeout: 10000,
+         headers: {
+           'Cache-Control': 'no-cache',
+           'Pragma': 'no-cache',
+           'Expires': '0'
+         }
+       });
+       const manifest: ScraperManifest = response.data;
+       
+       logger.log('[LocalScraperService] getAvailableScrapers - Raw manifest data:', JSON.stringify(manifest, null, 2));
+       logger.log('[LocalScraperService] getAvailableScrapers - Manifest scrapers count:', manifest.scrapers?.length || 0);
+       
+       // Log each scraper's enabled status from manifest
+       manifest.scrapers?.forEach(scraper => {
+         logger.log(`[LocalScraperService] getAvailableScrapers - Scraper ${scraper.name}: enabled=${scraper.enabled}`);
+       });
       
       logger.log('[LocalScraperService] Found', manifest.scrapers.length, 'scrapers in repository');
       
-      // Download and install each scraper
+      // Get current manifest scraper IDs
+      const manifestScraperIds = new Set(manifest.scrapers.map(s => s.id));
+      
+      // Remove scrapers that are no longer in the manifest
+      const currentScraperIds = Array.from(this.installedScrapers.keys());
+      for (const scraperId of currentScraperIds) {
+        if (!manifestScraperIds.has(scraperId)) {
+          logger.log('[LocalScraperService] Removing scraper no longer in manifest:', this.installedScrapers.get(scraperId)?.name || scraperId);
+          this.installedScrapers.delete(scraperId);
+          this.scraperCode.delete(scraperId);
+          // Remove from AsyncStorage cache
+          await AsyncStorage.removeItem(`scraper-code-${scraperId}`);
+        }
+      }
+      
+      // Download and install each scraper from manifest
       for (const scraperInfo of manifest.scrapers) {
         await this.downloadScraper(scraperInfo);
       }
@@ -296,6 +328,65 @@ class LocalScraperService {
     return Array.from(this.installedScrapers.values());
   }
 
+  // Get available scrapers from manifest.json (for display in settings)
+  async getAvailableScrapers(): Promise<ScraperInfo[]> {
+    if (!this.repositoryUrl) {
+      logger.log('[LocalScraperService] No repository URL configured, returning installed scrapers');
+      return this.getInstalledScrapers();
+    }
+
+    try {
+      logger.log('[LocalScraperService] Fetching available scrapers from manifest');
+      
+      // Fetch manifest with cache busting
+      const baseManifestUrl = this.repositoryUrl.endsWith('/') 
+        ? `${this.repositoryUrl}manifest.json`
+        : `${this.repositoryUrl}/manifest.json`;
+      const manifestUrl = `${baseManifestUrl}?t=${Date.now()}`;
+      
+      const response = await axios.get(manifestUrl, { 
+        timeout: 10000,
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
+      const manifest: ScraperManifest = response.data;
+      
+      // Return scrapers from manifest, respecting manifest's enabled field
+      const availableScrapers = manifest.scrapers.map(scraperInfo => {
+        const installedScraper = this.installedScrapers.get(scraperInfo.id);
+        
+        // Create a copy with manifest data
+        const scraperWithManifestData = {
+          ...scraperInfo,
+          // Store the manifest's enabled state separately
+          manifestEnabled: scraperInfo.enabled,
+          // If manifest says enabled: false, scraper cannot be enabled
+          // If manifest says enabled: true, use installed state or default to false
+          enabled: scraperInfo.enabled ? (installedScraper?.enabled ?? false) : false
+        };
+        
+        return scraperWithManifestData;
+      });
+      
+      logger.log('[LocalScraperService] Found', availableScrapers.length, 'available scrapers in repository');
+       
+       // Log final scraper states being returned to UI
+       availableScrapers.forEach(scraper => {
+         logger.log(`[LocalScraperService] Final scraper ${scraper.name}: manifestEnabled=${scraper.manifestEnabled}, enabled=${scraper.enabled}`);
+       });
+       
+       return availableScrapers;
+      
+    } catch (error) {
+      logger.error('[LocalScraperService] Failed to fetch available scrapers from manifest:', error);
+      // Fallback to installed scrapers if manifest fetch fails
+      return this.getInstalledScrapers();
+    }
+  }
+
   // Enable/disable scraper
   async setScraperEnabled(scraperId: string, enabled: boolean): Promise<void> {
     await this.ensureInitialized();
@@ -313,8 +404,14 @@ class LocalScraperService {
   async getStreams(type: string, tmdbId: string, season?: number, episode?: number, callback?: ScraperCallback): Promise<void> {
     await this.ensureInitialized();
     
-    const enabledScrapers = Array.from(this.installedScrapers.values())
-      .filter(scraper => scraper.enabled && scraper.supportedTypes.includes(type as 'movie' | 'tv'));
+    // Get available scrapers from manifest (respects manifestEnabled)
+    const availableScrapers = await this.getAvailableScrapers();
+    const enabledScrapers = availableScrapers
+      .filter(scraper => 
+        scraper.enabled && 
+        scraper.manifestEnabled !== false && 
+        scraper.supportedTypes.includes(type as 'movie' | 'tv')
+      );
     
     if (enabledScrapers.length === 0) {
       logger.log('[LocalScraperService] No enabled scrapers found for type:', type);

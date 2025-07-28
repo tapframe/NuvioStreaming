@@ -314,11 +314,23 @@ const createStyles = (colors: any) => StyleSheet.create({
      opacity: 0.5,
    },
    disabledImage: {
-     opacity: 0.3,
-   },
- });
+    opacity: 0.3,
+  },
+  availableIndicator: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 8,
+  },
+  availableIndicatorText: {
+    color: colors.white,
+    fontSize: 10,
+    fontWeight: '600',
+  },
+});
 
-const ScraperSettingsScreen: React.FC = () => {
+const PluginsScreen: React.FC = () => {
   const navigation = useNavigation();
   const { settings, updateSetting } = useSettings();
   const { currentTheme } = useTheme();
@@ -337,7 +349,7 @@ const ScraperSettingsScreen: React.FC = () => {
 
   const loadScrapers = async () => {
     try {
-      const scrapers = await localScraperService.getInstalledScrapers();
+      const scrapers = await localScraperService.getAvailableScrapers();
       setInstalledScrapers(scrapers);
     } catch (error) {
       logger.error('[ScraperSettings] Failed to load scrapers:', error);
@@ -395,7 +407,7 @@ const ScraperSettingsScreen: React.FC = () => {
     try {
       setIsRefreshing(true);
       await localScraperService.refreshRepository();
-      await loadScrapers();
+      await loadScrapers(); // This will now load available scrapers from manifest
       Alert.alert('Success', 'Repository refreshed successfully');
     } catch (error) {
       logger.error('[ScraperSettings] Failed to refresh repository:', error);
@@ -411,11 +423,25 @@ const ScraperSettingsScreen: React.FC = () => {
 
   const handleToggleScraper = async (scraperId: string, enabled: boolean) => {
     try {
+      if (enabled) {
+        // If enabling a scraper, ensure it's installed first
+        const installedScrapers = await localScraperService.getInstalledScrapers();
+        const isInstalled = installedScrapers.some(scraper => scraper.id === scraperId);
+        
+        if (!isInstalled) {
+          // Need to install the scraper first
+          setIsRefreshing(true);
+          await localScraperService.refreshRepository();
+          setIsRefreshing(false);
+        }
+      }
+      
       await localScraperService.setScraperEnabled(scraperId, enabled);
       await loadScrapers();
     } catch (error) {
       logger.error('[ScraperSettings] Failed to toggle scraper:', error);
       Alert.alert('Error', 'Failed to update scraper status');
+      setIsRefreshing(false);
     }
   };
 
@@ -502,7 +528,7 @@ const ScraperSettingsScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
       
-      <Text style={styles.headerTitle}>Local Scrapers</Text>
+      <Text style={styles.headerTitle}>Plugins</Text>
 
       <ScrollView
         style={styles.scrollView}
@@ -606,10 +632,10 @@ const ScraperSettingsScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Installed Scrapers */}
+        {/* Available Scrapers */}
         <View style={[styles.section, !settings.enableLocalScrapers && styles.disabledSection]}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, !settings.enableLocalScrapers && styles.disabledText]}>Installed Scrapers</Text>
+            <Text style={[styles.sectionTitle, !settings.enableLocalScrapers && styles.disabledText]}>Available Scrapers</Text>
             {installedScrapers.length > 0 && settings.enableLocalScrapers && (
               <TouchableOpacity
                 style={styles.clearButton}
@@ -619,56 +645,78 @@ const ScraperSettingsScreen: React.FC = () => {
               </TouchableOpacity>
             )}
           </View>
+          <Text style={[styles.sectionDescription, !settings.enableLocalScrapers && styles.disabledText]}>
+            Scrapers available in the repository. Only enabled scrapers that are also installed will be used for streaming.
+          </Text>
 
           {installedScrapers.length === 0 ? (
              <View style={[styles.emptyContainer, !settings.enableLocalScrapers && styles.disabledContainer]}>
                <Ionicons name="download-outline" size={48} color={!settings.enableLocalScrapers ? colors.elevation3 : colors.mediumGray} />
-               <Text style={[styles.emptyStateTitle, !settings.enableLocalScrapers && styles.disabledText]}>No Scrapers Installed</Text>
+               <Text style={[styles.emptyStateTitle, !settings.enableLocalScrapers && styles.disabledText]}>No Scrapers Available</Text>
                <Text style={[styles.emptyStateDescription, !settings.enableLocalScrapers && styles.disabledText]}>
-                 Configure a repository above to install scrapers.
+                 Configure a repository above to view available scrapers.
                </Text>
              </View>
            ) : (
              <View style={styles.scrapersContainer}>
-               {installedScrapers.map((scraper) => (
-                 <View key={scraper.id} style={[styles.scraperItem, !settings.enableLocalScrapers && styles.disabledContainer]}>
-                   {scraper.logo ? (
-                     <Image
-                       source={{ uri: scraper.logo }}
-                       style={[styles.scraperLogo, !settings.enableLocalScrapers && styles.disabledImage]}
-                       resizeMode="contain"
-                     />
-                   ) : (
-                     <View style={[styles.scraperLogo, !settings.enableLocalScrapers && styles.disabledContainer]} />
-                   )}
-                   <View style={styles.scraperInfo}>
-                     <Text style={[styles.scraperName, !settings.enableLocalScrapers && styles.disabledText]}>{scraper.name}</Text>
-                     <Text style={[styles.scraperDescription, !settings.enableLocalScrapers && styles.disabledText]}>{scraper.description}</Text>
-                     <View style={styles.scraperMeta}>
-                       <Text style={[styles.scraperVersion, !settings.enableLocalScrapers && styles.disabledText]}>v{scraper.version}</Text>
-                       <Text style={[styles.scraperDot, !settings.enableLocalScrapers && styles.disabledText]}>•</Text>
-                       <Text style={[styles.scraperTypes, !settings.enableLocalScrapers && styles.disabledText]}>
-                         {scraper.supportedTypes && Array.isArray(scraper.supportedTypes) ? scraper.supportedTypes.join(', ') : 'Unknown'}
-                       </Text>
-                       {scraper.contentLanguage && Array.isArray(scraper.contentLanguage) && scraper.contentLanguage.length > 0 && (
-                         <>
-                           <Text style={[styles.scraperDot, !settings.enableLocalScrapers && styles.disabledText]}>•</Text>
-                           <Text style={[styles.scraperLanguage, !settings.enableLocalScrapers && styles.disabledText]}>
-                             {scraper.contentLanguage.map(lang => lang.toUpperCase()).join(', ')}
-                           </Text>
-                         </>
-                       )}
+               {installedScrapers.map((scraper) => {
+                 // Check if scraper is actually installed (has cached code)
+                 const isInstalled = localScraperService.getInstalledScrapers().then(installed => 
+                   installed.some(s => s.id === scraper.id)
+                 );
+                 
+                 return (
+                   <View key={scraper.id} style={[styles.scraperItem, !settings.enableLocalScrapers && styles.disabledContainer]}>
+                     {scraper.logo ? (
+                       <Image
+                         source={{ uri: scraper.logo }}
+                         style={[styles.scraperLogo, !settings.enableLocalScrapers && styles.disabledImage]}
+                         resizeMode="contain"
+                       />
+                     ) : (
+                       <View style={[styles.scraperLogo, !settings.enableLocalScrapers && styles.disabledContainer]} />
+                     )}
+                     <View style={styles.scraperInfo}>
+                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <Text style={[styles.scraperName, !settings.enableLocalScrapers && styles.disabledText]}>{scraper.name}</Text>
+                          {scraper.manifestEnabled === false ? (
+                            <View style={[styles.availableIndicator, { backgroundColor: colors.mediumGray }]}>
+                              <Text style={styles.availableIndicatorText}>Disabled</Text>
+                            </View>
+                          ) : !scraper.enabled && (
+                            <View style={styles.availableIndicator}>
+                              <Text style={styles.availableIndicatorText}>Available</Text>
+                            </View>
+                          )}
+                        </View>
+                       <Text style={[styles.scraperDescription, !settings.enableLocalScrapers && styles.disabledText]}>{scraper.description}</Text>
+                       <View style={styles.scraperMeta}>
+                         <Text style={[styles.scraperVersion, !settings.enableLocalScrapers && styles.disabledText]}>v{scraper.version}</Text>
+                         <Text style={[styles.scraperDot, !settings.enableLocalScrapers && styles.disabledText]}>•</Text>
+                         <Text style={[styles.scraperTypes, !settings.enableLocalScrapers && styles.disabledText]}>
+                           {scraper.supportedTypes && Array.isArray(scraper.supportedTypes) ? scraper.supportedTypes.join(', ') : 'Unknown'}
+                         </Text>
+                         {scraper.contentLanguage && Array.isArray(scraper.contentLanguage) && scraper.contentLanguage.length > 0 && (
+                           <>
+                             <Text style={[styles.scraperDot, !settings.enableLocalScrapers && styles.disabledText]}>•</Text>
+                             <Text style={[styles.scraperLanguage, !settings.enableLocalScrapers && styles.disabledText]}>
+                               {scraper.contentLanguage.map(lang => lang.toUpperCase()).join(', ')}
+                             </Text>
+                           </>
+                         )}
+                       </View>
                      </View>
+                     <Switch
+                           value={scraper.enabled && settings.enableLocalScrapers}
+                           onValueChange={(enabled) => handleToggleScraper(scraper.id, enabled)}
+                           trackColor={{ false: colors.elevation3, true: colors.primary }}
+                           thumbColor={scraper.enabled && settings.enableLocalScrapers ? colors.white : '#f4f3f4'}
+                           disabled={!settings.enableLocalScrapers || scraper.manifestEnabled === false}
+                           style={{ opacity: (!settings.enableLocalScrapers || scraper.manifestEnabled === false) ? 0.5 : 1 }}
+                         />
                    </View>
-                   <Switch
-                     value={scraper.enabled && settings.enableLocalScrapers}
-                     onValueChange={(enabled) => handleToggleScraper(scraper.id, enabled)}
-                     trackColor={{ false: colors.elevation3, true: colors.primary }}
-                     thumbColor={scraper.enabled && settings.enableLocalScrapers ? colors.white : '#f4f3f4'}
-                     disabled={!settings.enableLocalScrapers}
-                   />
-                 </View>
-               ))}
+                 );
+               })}
              </View>
            )}
         </View>
@@ -945,4 +993,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ScraperSettingsScreen;
+export default PluginsScreen;

@@ -324,6 +324,13 @@ const SettingsScreen: React.FC = () => {
                 onPress={() => navigation.navigate('Addons')}
               />
               <SettingItem
+                title="Plugins"
+                description="Manage plugins and repositories"
+                icon="code"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('ScraperSettings')}
+              />
+              <SettingItem
                 title="Catalogs"
                 description={`${catalogCount} active`}
                 icon="view-list"
@@ -400,13 +407,6 @@ const SettingsScreen: React.FC = () => {
                 icon="play-circle-outline"
                 renderControl={ChevronRight}
                 onPress={() => navigation.navigate('PlayerSettings')}
-              />
-              <SettingItem
-                title="Local Scrapers"
-                description="Manage local scraper repositories"
-                icon="code"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('ScraperSettings')}
               />
               <SettingItem
                 title="Notifications"

@@ -39,7 +39,7 @@ import LogoSourceSettings from '../screens/LogoSourceSettings';
 import ThemeScreen from '../screens/ThemeScreen';
 import ProfilesScreen from '../screens/ProfilesScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
-import ScraperSettingsScreen from '../screens/ScraperSettingsScreen';
+import PluginsScreen from '../screens/PluginsScreen';
 
 // Stack navigator types
 export type RootStackParamList = {
@@ -1028,7 +1028,7 @@ const AppNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootStack
             />
             <Stack.Screen 
               name="ScraperSettings" 
-              component={ScraperSettingsScreen}
+              component={PluginsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
