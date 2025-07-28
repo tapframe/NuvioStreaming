@@ -328,6 +328,33 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
   },
+  qualityChipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  qualityChip: {
+    backgroundColor: colors.elevation2,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.elevation3,
+  },
+  qualityChipSelected: {
+    backgroundColor: '#ff3b30',
+    borderColor: '#ff3b30',
+  },
+  qualityChipText: {
+    color: colors.white,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  qualityChipTextSelected: {
+    color: colors.white,
+    fontWeight: '600',
+  },
 });
 
 const PluginsScreen: React.FC = () => {
@@ -509,6 +536,25 @@ const PluginsScreen: React.FC = () => {
   const handleToggleUrlValidation = async (enabled: boolean) => {
     await updateSetting('enableScraperUrlValidation', enabled);
   };
+
+  const handleToggleQualityExclusion = async (quality: string) => {
+    const currentExcluded = settings.excludedQualities || [];
+    const isExcluded = currentExcluded.includes(quality);
+    
+    let newExcluded: string[];
+    if (isExcluded) {
+      // Remove from excluded list
+      newExcluded = currentExcluded.filter(q => q !== quality);
+    } else {
+      // Add to excluded list
+      newExcluded = [...currentExcluded, quality];
+    }
+    
+    await updateSetting('excludedQualities', newExcluded);
+  };
+
+  // Define available quality options
+  const qualityOptions = ['2160p', '4K', '1080p', '720p', '360p', 'DV', 'HDR', 'REMUX', '480p', 'CAM', 'TS'];
 
 
 
@@ -757,6 +803,45 @@ const PluginsScreen: React.FC = () => {
           </View>
         </View>
 
+        {/* Quality Filtering */}
+        <View style={[styles.section, !settings.enableLocalScrapers && styles.disabledSection]}>
+          <Text style={[styles.sectionTitle, !settings.enableLocalScrapers && styles.disabledText]}>Quality Filtering</Text>
+          <Text style={[styles.sectionDescription, !settings.enableLocalScrapers && styles.disabledText]}>
+            Exclude specific video qualities from search results. Tap on a quality to exclude it from plugin results.
+          </Text>
+          
+          <View style={styles.qualityChipsContainer}>
+            {qualityOptions.map((quality) => {
+              const isExcluded = (settings.excludedQualities || []).includes(quality);
+              return (
+                <TouchableOpacity
+                  key={quality}
+                  style={[
+                    styles.qualityChip,
+                    isExcluded && styles.qualityChipSelected,
+                    !settings.enableLocalScrapers && styles.disabledButton
+                  ]}
+                  onPress={() => handleToggleQualityExclusion(quality)}
+                  disabled={!settings.enableLocalScrapers}
+                >
+                  <Text style={[
+                    styles.qualityChipText,
+                    isExcluded && styles.qualityChipTextSelected,
+                    !settings.enableLocalScrapers && styles.disabledText
+                  ]}>
+                    {isExcluded ? '✕ ' : ''}{quality}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          
+          {(settings.excludedQualities || []).length > 0 && (
+            <Text style={[styles.infoText, { marginTop: 12 }, !settings.enableLocalScrapers && styles.disabledText]}>
+              💡 Excluded qualities: {(settings.excludedQualities || []).join(', ')}
+            </Text>
+          )}
+        </View>
 
         {/* About */}
         <View style={[styles.section, styles.lastSection]}>

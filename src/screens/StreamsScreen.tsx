@@ -516,6 +516,27 @@ export const StreamsScreen = () => {
     setSelectedProvider(provider);
   }, []);
 
+  // Helper function to filter streams by quality exclusions
+  const filterStreamsByQuality = useCallback((streams: Stream[]) => {
+    if (!settings.excludedQualities || settings.excludedQualities.length === 0) {
+      return streams;
+    }
+
+    return streams.filter(stream => {
+      const streamTitle = stream.title || stream.name || '';
+      
+      // Check if any excluded quality is found in the stream title
+      const hasExcludedQuality = settings.excludedQualities.some(excludedQuality => {
+        // Create a case-insensitive regex pattern for the quality
+        const pattern = new RegExp(excludedQuality.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        return pattern.test(streamTitle);
+      });
+      
+      // Return true to keep the stream (if it doesn't have excluded quality)
+      return !hasExcludedQuality;
+    });
+  }, [settings.excludedQualities]);
+
   // Function to determine the best stream based on quality, provider priority, and other factors
   const getBestStream = useCallback((streamsData: typeof groupedStreams): Stream | null => {
     if (!streamsData || Object.keys(streamsData).length === 0) {
@@ -566,7 +587,10 @@ export const StreamsScreen = () => {
     }> = [];
 
     Object.entries(streamsData).forEach(([addonId, { streams }]) => {
-      streams.forEach(stream => {
+      // Apply quality filtering to streams before processing
+      const filteredStreams = filterStreamsByQuality(streams);
+      
+      filteredStreams.forEach(stream => {
         const quality = getQualityNumeric(stream.name || stream.title);
         const providerPriority = getProviderPriority(addonId);
         const isDebrid = stream.behaviorHints?.cached || false;
@@ -607,7 +631,7 @@ export const StreamsScreen = () => {
     logger.log(`🎯 Best stream selected: ${allStreams[0].stream.name || allStreams[0].stream.title} (Quality: ${allStreams[0].quality}p, Provider Priority: ${allStreams[0].providerPriority}, Cached: ${allStreams[0].isCached})`);
     
     return allStreams[0].stream;
-  }, []);
+  }, [filterStreamsByQuality]);
 
   const currentEpisode = useMemo(() => {
     if (!selectedEpisode) return null;
@@ -977,13 +1001,17 @@ export const StreamsScreen = () => {
       
       filteredEntries.forEach(([addonId, { addonName, streams: providerStreams }]) => {
         const isInstalledAddon = installedAddons.some(addon => addon.id === addonId);
+        
+        // Apply quality filtering to streams
+        const filteredStreams = filterStreamsByQuality(providerStreams);
+        
         if (isInstalledAddon) {
-          addonStreams.push(...providerStreams);
+          addonStreams.push(...filteredStreams);
           if (!addonNames.includes(addonName)) {
             addonNames.push(addonName);
           }
         } else {
-          pluginStreams.push(...providerStreams);
+          pluginStreams.push(...filteredStreams);
           if (!pluginNames.includes(addonName)) {
             pluginNames.push(addonName);
           }
@@ -1010,14 +1038,17 @@ export const StreamsScreen = () => {
     } else {
       // Use separate sections for each provider (current behavior)
       return filteredEntries.map(([addonId, { addonName, streams: providerStreams }]) => {
+        // Apply quality filtering to streams
+        const filteredStreams = filterStreamsByQuality(providerStreams);
+        
         return {
           title: addonName,
           addonId,
-          data: providerStreams
+          data: filteredStreams
         };
       });
     }
-  }, [selectedProvider, type, episodeStreams, groupedStreams, settings.streamDisplayMode]);
+  }, [selectedProvider, type, episodeStreams, groupedStreams, settings.streamDisplayMode, filterStreamsByQuality]);
 
   const episodeImage = useMemo(() => {
     if (episodeThumbnail) {
