@@ -578,10 +578,18 @@ const VideoPlayer: React.FC = () => {
   };
 
   const onLoad = (data: any) => {
-    if (DEBUG_MODE) {
-      logger.log('[VideoPlayer] Video loaded:', data);
-    }
-    if (isMounted.current) {
+    try {
+      if (DEBUG_MODE) {
+        logger.log('[VideoPlayer] Video loaded:', data);
+      }
+      if (!isMounted.current) {
+        logger.warn('[VideoPlayer] Component unmounted, skipping onLoad');
+        return;
+      }
+      if (!data) {
+        logger.error('[VideoPlayer] onLoad called with null/undefined data');
+        return;
+      }
       const videoDuration = data.duration / 1000;
       if (data.duration > 0) {
         setDuration(videoDuration);
@@ -597,7 +605,14 @@ const VideoPlayer: React.FC = () => {
           }
         }
       }
-      setVideoAspectRatio(data.videoSize.width / data.videoSize.height);
+      // Set aspect ratio with null check for videoSize
+      if (data.videoSize && data.videoSize.width && data.videoSize.height) {
+        setVideoAspectRatio(data.videoSize.width / data.videoSize.height);
+      } else {
+        // Fallback to 16:9 aspect ratio if videoSize is not available
+        setVideoAspectRatio(16 / 9);
+        logger.warn('[VideoPlayer] videoSize not available, using default 16:9 aspect ratio');
+      }
 
       if (data.audioTracks && data.audioTracks.length > 0) {
         setVlcAudioTracks(data.audioTracks);
@@ -628,6 +643,15 @@ const VideoPlayer: React.FC = () => {
       }
       completeOpeningAnimation();
       controlsTimeout.current = setTimeout(hideControls, 5000);
+    } catch (error) {
+      logger.error('[VideoPlayer] Error in onLoad:', error);
+      // Set fallback values to prevent crashes
+      if (isMounted.current) {
+        setVideoAspectRatio(16 / 9);
+        setIsVideoLoaded(true);
+        setIsPlayerReady(true);
+        completeOpeningAnimation();
+      }
     }
   };
 

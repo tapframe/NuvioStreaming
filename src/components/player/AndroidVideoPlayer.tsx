@@ -518,10 +518,18 @@ const AndroidVideoPlayer: React.FC = () => {
   };
 
   const onLoad = (data: any) => {
-    if (DEBUG_MODE) {
-      logger.log('[AndroidVideoPlayer] Video loaded:', data);
-    }
-    if (isMounted.current) {
+    try {
+      if (DEBUG_MODE) {
+        logger.log('[AndroidVideoPlayer] Video loaded:', data);
+      }
+      if (!isMounted.current) {
+        logger.warn('[AndroidVideoPlayer] Component unmounted, skipping onLoad');
+        return;
+      }
+      if (!data) {
+        logger.error('[AndroidVideoPlayer] onLoad called with null/undefined data');
+        return;
+      }
       const videoDuration = data.duration;
       if (data.duration > 0) {
         setDuration(videoDuration);
@@ -541,6 +549,10 @@ const AndroidVideoPlayer: React.FC = () => {
       // Set aspect ratio from video dimensions
       if (data.naturalSize && data.naturalSize.width && data.naturalSize.height) {
         setVideoAspectRatio(data.naturalSize.width / data.naturalSize.height);
+      } else {
+        // Fallback to 16:9 aspect ratio if naturalSize is not available
+        setVideoAspectRatio(16 / 9);
+        logger.warn('[AndroidVideoPlayer] naturalSize not available, using default 16:9 aspect ratio');
       }
 
       // Handle audio tracks
@@ -585,6 +597,15 @@ const AndroidVideoPlayer: React.FC = () => {
       }
       completeOpeningAnimation();
       controlsTimeout.current = setTimeout(hideControls, 5000);
+    } catch (error) {
+      logger.error('[AndroidVideoPlayer] Error in onLoad:', error);
+      // Set fallback values to prevent crashes
+      if (isMounted.current) {
+        setVideoAspectRatio(16 / 9);
+        setIsVideoLoaded(true);
+        setIsPlayerReady(true);
+        completeOpeningAnimation();
+      }
     }
   };
 
