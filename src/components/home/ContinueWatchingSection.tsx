@@ -73,6 +73,20 @@ const isValidImdbId = (id: string): boolean => {
   return imdbPattern.test(id);
 };
 
+// Function to check if an episode has been released
+const isEpisodeReleased = (video: any): boolean => {
+  if (!video.released) return false;
+  
+  try {
+    const releaseDate = new Date(video.released);
+    const now = new Date();
+    return releaseDate <= now;
+  } catch (error) {
+    // If we can't parse the date, assume it's not released
+    return false;
+  }
+};
+
 // Create a proper imperative handle with React.forwardRef and updated type
 const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, ref) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
@@ -211,13 +225,13 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                 }
               }
 
-              // Check if next episode exists using cached metadata
+              // Check if next episode exists and has been released using cached metadata
               if (nextSeason !== undefined && nextEpisode !== undefined && metadata?.videos && Array.isArray(metadata.videos)) {
-                const nextEpisodeExists = metadata.videos.some((video: any) => 
+                const nextEpisodeVideo = metadata.videos.find((video: any) => 
                   video.season === nextSeason && video.episode === nextEpisode
                 );
                 
-                if (nextEpisodeExists) {
+                if (nextEpisodeVideo && isEpisodeReleased(nextEpisodeVideo)) {
                   const nextEpisodeItem = {
                     ...basicContent,
                     id: group.id,
@@ -331,15 +345,15 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
               if (!cachedData?.basicContent) return;
               
               const { metadata, basicContent } = cachedData;
-              let nextEpisodeExists = false;
+              let nextEpisodeVideo = null;
               
               if (metadata?.videos && Array.isArray(metadata.videos)) {
-                nextEpisodeExists = metadata.videos.some((video: any) => 
+                nextEpisodeVideo = metadata.videos.find((video: any) => 
                   video.season === info.season && video.episode === nextEpisode
                 );
               }
               
-              if (nextEpisodeExists) {
+              if (nextEpisodeVideo && isEpisodeReleased(nextEpisodeVideo)) {
                 const placeholder: ContinueWatchingItem = {
                   ...basicContent,
                   id: showId,
