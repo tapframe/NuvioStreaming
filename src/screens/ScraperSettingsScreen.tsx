@@ -648,7 +648,7 @@ const ScraperSettingsScreen: React.FC = () => {
                        <Text style={[styles.scraperVersion, !settings.enableLocalScrapers && styles.disabledText]}>v{scraper.version}</Text>
                        <Text style={[styles.scraperDot, !settings.enableLocalScrapers && styles.disabledText]}>•</Text>
                        <Text style={[styles.scraperTypes, !settings.enableLocalScrapers && styles.disabledText]}>
-                         {scraper.supportedTypes.join(', ')}
+                         {scraper.supportedTypes && Array.isArray(scraper.supportedTypes) ? scraper.supportedTypes.join(', ') : 'Unknown'}
                        </Text>
                        {scraper.contentLanguage && Array.isArray(scraper.contentLanguage) && scraper.contentLanguage.length > 0 && (
                          <>

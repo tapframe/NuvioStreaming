@@ -78,15 +78,59 @@ class LocalScraperService {
       const storedScrapers = await AsyncStorage.getItem(this.STORAGE_KEY);
       if (storedScrapers) {
         const scrapers: ScraperInfo[] = JSON.parse(storedScrapers);
+        const validScrapers: ScraperInfo[] = [];
+        
         scrapers.forEach(scraper => {
+          // Skip scrapers with missing essential fields
+          if (!scraper.id || !scraper.name || !scraper.version) {
+            logger.warn('[LocalScraperService] Skipping invalid scraper with missing essential fields:', scraper);
+            return;
+          }
+          
           // Ensure contentLanguage is an array (migration for older scrapers)
           if (!scraper.contentLanguage) {
             scraper.contentLanguage = ['en']; // Default to English
           } else if (typeof scraper.contentLanguage === 'string') {
             scraper.contentLanguage = [scraper.contentLanguage]; // Convert string to array
           }
+          
+          // Ensure supportedTypes is an array (migration for older scrapers)
+          if (!scraper.supportedTypes || !Array.isArray(scraper.supportedTypes)) {
+            scraper.supportedTypes = ['movie', 'tv']; // Default to both types
+          }
+          
+          // Ensure other required fields have defaults
+          if (!scraper.description) {
+            scraper.description = 'No description available';
+          }
+          if (!scraper.filename) {
+            scraper.filename = `${scraper.id}.js`;
+          }
+          if (scraper.enabled === undefined) {
+            scraper.enabled = true;
+          }
+          
           this.installedScrapers.set(scraper.id, scraper);
+          validScrapers.push(scraper);
         });
+        
+        // Save cleaned scrapers back to storage if any were filtered out
+        if (validScrapers.length !== scrapers.length) {
+          logger.log('[LocalScraperService] Cleaned up invalid scrapers, saving valid ones');
+          await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(validScrapers));
+          
+          // Clean up cached code for removed scrapers
+          const validScraperIds = new Set(validScrapers.map(s => s.id));
+          const removedScrapers = scrapers.filter(s => s.id && !validScraperIds.has(s.id));
+          for (const removedScraper of removedScrapers) {
+            try {
+              await AsyncStorage.removeItem(`scraper-code-${removedScraper.id}`);
+              logger.log('[LocalScraperService] Removed cached code for invalid scraper:', removedScraper.id);
+            } catch (error) {
+              logger.error('[LocalScraperService] Failed to remove cached code for', removedScraper.id, ':', error);
+            }
+          }
+        }
       }
 
       // Load scraper code from cache
@@ -192,6 +236,11 @@ class LocalScraperService {
         updatedScraperInfo.contentLanguage = ['en']; // Default to English
       } else if (typeof updatedScraperInfo.contentLanguage === 'string') {
         updatedScraperInfo.contentLanguage = [updatedScraperInfo.contentLanguage]; // Convert string to array
+      }
+      
+      // Ensure supportedTypes is an array (migration for older scrapers)
+      if (!updatedScraperInfo.supportedTypes || !Array.isArray(updatedScraperInfo.supportedTypes)) {
+        updatedScraperInfo.supportedTypes = ['movie', 'tv']; // Default to both types
       }
       
       this.installedScrapers.set(scraperInfo.id, updatedScraperInfo);
