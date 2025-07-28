@@ -739,6 +739,22 @@ const PluginsScreen: React.FC = () => {
               disabled={!settings.enableLocalScrapers}
             />
           </View>
+          
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={[styles.settingTitle, !settings.enableLocalScrapers && styles.disabledText]}>Stream Display Mode</Text>
+              <Text style={[styles.settingDescription, !settings.enableLocalScrapers && styles.disabledText]}>
+                {settings.streamDisplayMode === 'separate' ? 'Show each provider separately' : 'Group all providers under one name'}
+              </Text>
+            </View>
+            <Switch
+               value={settings.streamDisplayMode === 'grouped'}
+               onValueChange={(value) => updateSetting('streamDisplayMode', value ? 'grouped' : 'separate')}
+               trackColor={{ false: colors.elevation3, true: colors.primary }}
+               thumbColor={settings.streamDisplayMode === 'grouped' ? colors.white : '#f4f3f4'}
+               disabled={!settings.enableLocalScrapers}
+             />
+          </View>
         </View>
 
 

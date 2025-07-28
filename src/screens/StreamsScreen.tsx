@@ -101,15 +101,8 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
     };
   }, [stream.name, stream.title, stream.behaviorHints, stream.size]);
   
-  // Animation delay based on index - stagger effect
-  const enterDelay = 100 + (index * 30);
-
   return (
-    <Animated.View
-      entering={FadeInDown.duration(200).delay(enterDelay)}
-      exiting={FadeOut.duration(150)}
-    >
-      <TouchableOpacity 
+    <TouchableOpacity 
         style={[
           styles.streamCard, 
           isLoading && styles.streamCardLoading
@@ -169,7 +162,6 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
           />
         </View>
       </TouchableOpacity>
-    </Animated.View>
   );
 });
 
@@ -232,11 +224,7 @@ const ProviderFilter = memo(({
   const styles = React.useMemo(() => createStyles(theme.colors), [theme.colors]);
   
   const renderItem = useCallback(({ item, index }: { item: { id: string; name: string }; index: number }) => (
-    <Animated.View
-      entering={FadeIn.duration(300).delay(100 + index * 40)}
-      exiting={FadeOut.duration(150)}
-    >
-      <TouchableOpacity
+    <TouchableOpacity
         key={item.id}
         style={[
           styles.filterChip,
@@ -251,13 +239,10 @@ const ProviderFilter = memo(({
           {item.name}
         </Text>
       </TouchableOpacity>
-    </Animated.View>
   ), [selectedProvider, onSelect, styles]);
 
   return (
-    <Animated.View
-      entering={FadeIn.duration(300)}
-    >
+    <View>
       <FlatList
         data={providers}
         renderItem={renderItem}
@@ -277,7 +262,7 @@ const ProviderFilter = memo(({
           index,
         })}
       />
-    </Animated.View>
+    </View>
   );
 });
 
@@ -385,7 +370,12 @@ export const StreamsScreen = () => {
     if (providersWithStreams.length > 0) {
       logger.log(`📊 Providers with streams: ${providersWithStreams.join(', ')}`);
       const providersWithStreamsSet = new Set(providersWithStreams);
-      setAvailableProviders(providersWithStreamsSet);
+      
+      // Only update if we have new providers, don't remove existing ones during loading
+      setAvailableProviders(prevProviders => {
+        const newProviders = new Set([...prevProviders, ...providersWithStreamsSet]);
+        return newProviders;
+      });
     }
     
     // Update loading states for individual providers
@@ -407,11 +397,28 @@ export const StreamsScreen = () => {
   }, [loadingStreams, loadingEpisodeStreams, groupedStreams, episodeStreams, type]);
 
   // Reset the selected provider to 'all' if the current selection is no longer available
+  // But preserve special filter values like 'grouped-plugins' and 'all'
   useEffect(() => {
-    if (selectedProvider !== 'all' && !availableProviders.has(selectedProvider)) {
+    // Don't reset if it's a special filter value
+    const isSpecialFilter = selectedProvider === 'all' || selectedProvider === 'grouped-plugins';
+    
+    if (isSpecialFilter) {
+      return; // Always preserve special filters
+    }
+    
+    // Check if provider exists in current streams data
+    const currentStreamsData = type === 'series' ? episodeStreams : groupedStreams;
+    const hasStreamsForProvider = currentStreamsData[selectedProvider] && 
+                                 currentStreamsData[selectedProvider].streams && 
+                                 currentStreamsData[selectedProvider].streams.length > 0;
+    
+    // Only reset if the provider doesn't exist in available providers AND doesn't have streams
+    const isAvailableProvider = availableProviders.has(selectedProvider);
+    
+    if (!isAvailableProvider && !hasStreamsForProvider) {
       setSelectedProvider('all');
     }
-  }, [selectedProvider, availableProviders]);
+  }, [selectedProvider, availableProviders, episodeStreams, groupedStreams, type]);
 
   // Update useEffect to check for sources
   useEffect(() => {
@@ -863,6 +870,43 @@ export const StreamsScreen = () => {
       )
     ]);
 
+    // In grouped mode, separate addons and plugins
+    if (settings.streamDisplayMode === 'grouped') {
+      const addonProviders: string[] = [];
+      const pluginProviders: string[] = [];
+      
+      Array.from(allProviders).forEach(provider => {
+        const isInstalledAddon = installedAddons.some(addon => addon.id === provider);
+        if (isInstalledAddon) {
+          addonProviders.push(provider);
+        } else {
+          pluginProviders.push(provider);
+        }
+      });
+      
+      const filterChips = [{ id: 'all', name: 'All Providers' }];
+      
+      // Add individual addon chips
+      addonProviders
+        .sort((a, b) => {
+          const indexA = installedAddons.findIndex(addon => addon.id === a);
+          const indexB = installedAddons.findIndex(addon => addon.id === b);
+          return indexA - indexB;
+        })
+        .forEach(provider => {
+          const installedAddon = installedAddons.find(addon => addon.id === provider);
+          filterChips.push({ id: provider, name: installedAddon?.name || provider });
+        });
+      
+      // Add single grouped plugins chip if there are any plugins
+      if (pluginProviders.length > 0) {
+        filterChips.push({ id: 'grouped-plugins', name: 'Plugins' });
+      }
+      
+      return filterChips;
+    }
+
+    // Normal mode - individual chips for all providers
     return [
       { id: 'all', name: 'All Providers' },
       ...Array.from(allProviders)
@@ -889,19 +933,26 @@ export const StreamsScreen = () => {
           return { id: provider, name: displayName };
         })
     ];
-  }, [availableProviders, type, episodeStreams, groupedStreams]);
+  }, [availableProviders, type, episodeStreams, groupedStreams, settings.streamDisplayMode]);
 
   const sections = useMemo(() => {
     const streams = type === 'series' ? episodeStreams : groupedStreams;
     const installedAddons = stremioService.getInstalledAddons();
 
-    // Filter streams by selected provider - only if not "all"
+    // Filter streams by selected provider
     const filteredEntries = Object.entries(streams)
       .filter(([addonId]) => {
         // If "all" is selected, show all providers
         if (selectedProvider === 'all') {
           return true;
         }
+        
+        // In grouped mode, handle special 'grouped-plugins' filter
+        if (settings.streamDisplayMode === 'grouped' && selectedProvider === 'grouped-plugins') {
+          const isInstalledAddon = installedAddons.some(addon => addon.id === addonId);
+          return !isInstalledAddon; // Show only plugins (non-installed addons)
+        }
+        
         // Otherwise only show the selected provider
         return addonId === selectedProvider;
       })
@@ -914,17 +965,59 @@ export const StreamsScreen = () => {
         if (indexA !== -1) return -1;
         if (indexB !== -1) return 1;
         return 0;
-      })
-      .map(([addonId, { addonName, streams: providerStreams }]) => {
+      });
+
+    // Check if we should group all streams under one section
+    if (settings.streamDisplayMode === 'grouped') {
+      // Separate streams by type: installed addons vs plugins
+      const addonStreams: Stream[] = [];
+      const pluginStreams: Stream[] = [];
+      const addonNames: string[] = [];
+      const pluginNames: string[] = [];
+      
+      filteredEntries.forEach(([addonId, { addonName, streams: providerStreams }]) => {
+        const isInstalledAddon = installedAddons.some(addon => addon.id === addonId);
+        if (isInstalledAddon) {
+          addonStreams.push(...providerStreams);
+          if (!addonNames.includes(addonName)) {
+            addonNames.push(addonName);
+          }
+        } else {
+          pluginStreams.push(...providerStreams);
+          if (!pluginNames.includes(addonName)) {
+            pluginNames.push(addonName);
+          }
+        }
+      });
+      
+      const sections = [];
+      if (addonStreams.length > 0) {
+        sections.push({
+          title: addonNames.join(', '),
+          addonId: 'grouped-addons',
+          data: addonStreams
+        });
+      }
+      if (pluginStreams.length > 0) {
+        sections.push({
+          title: pluginNames.join(', '),
+          addonId: 'grouped-plugins',
+          data: pluginStreams
+        });
+      }
+      
+      return sections;
+    } else {
+      // Use separate sections for each provider (current behavior)
+      return filteredEntries.map(([addonId, { addonName, streams: providerStreams }]) => {
         return {
           title: addonName,
           addonId,
           data: providerStreams
         };
       });
-      
-    return filteredEntries;
-  }, [selectedProvider, type, episodeStreams, groupedStreams]);
+    }
+  }, [selectedProvider, type, episodeStreams, groupedStreams, settings.streamDisplayMode]);
 
   const episodeImage = useMemo(() => {
     if (episodeThumbnail) {
@@ -993,11 +1086,7 @@ export const StreamsScreen = () => {
     const isProviderLoading = loadingProviders[section.addonId];
     
     return (
-      <Animated.View
-        entering={FadeIn.duration(400)}
-        exiting={FadeOut.duration(150)}
-        style={styles.sectionHeaderContainer}
-      >
+      <View style={styles.sectionHeaderContainer}>
         <View style={styles.sectionHeaderContent}>
           <Text style={styles.streamGroupTitle}>{section.title}</Text>
           {isProviderLoading && (
@@ -1009,7 +1098,7 @@ export const StreamsScreen = () => {
             </View>
           )}
         </View>
-      </Animated.View>
+      </View>
     );
   }, [styles.streamGroupTitle, styles.sectionHeaderContainer, styles.sectionHeaderContent, styles.sectionLoadingIndicator, styles.sectionLoadingText, loadingProviders, colors.primary]);
 

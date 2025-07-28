@@ -41,6 +41,7 @@ export interface AppSettings {
   enableLocalScrapers: boolean; // Enable/disable local scraper functionality
   scraperTimeout: number; // Timeout for scraper execution in seconds
   enableScraperUrlValidation: boolean; // Enable/disable URL validation for scrapers
+  streamDisplayMode: 'separate' | 'grouped'; // How to display streaming links - separately by provider or grouped under one name
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -64,6 +65,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   enableLocalScrapers: true,
   scraperTimeout: 60, // 60 seconds timeout
   enableScraperUrlValidation: true, // Enable URL validation by default
+  streamDisplayMode: 'separate', // Default to separate display by provider
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';
