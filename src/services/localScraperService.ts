@@ -22,6 +22,7 @@ export interface ScraperInfo {
   supportedTypes: ('movie' | 'tv')[];
   enabled: boolean;
   logo?: string;
+  contentLanguage?: string[];
 }
 
 export interface LocalScraperResult {
@@ -78,12 +79,29 @@ class LocalScraperService {
       if (storedScrapers) {
         const scrapers: ScraperInfo[] = JSON.parse(storedScrapers);
         scrapers.forEach(scraper => {
+          // Ensure contentLanguage is an array (migration for older scrapers)
+          if (!scraper.contentLanguage) {
+            scraper.contentLanguage = ['en']; // Default to English
+          } else if (typeof scraper.contentLanguage === 'string') {
+            scraper.contentLanguage = [scraper.contentLanguage]; // Convert string to array
+          }
           this.installedScrapers.set(scraper.id, scraper);
         });
       }
 
       // Load scraper code from cache
       await this.loadScraperCode();
+      
+      // Auto-refresh repository on app startup if URL is configured
+      if (this.repositoryUrl) {
+        try {
+          logger.log('[LocalScraperService] Auto-refreshing repository on startup');
+          await this.performRepositoryRefresh();
+        } catch (error) {
+          logger.error('[LocalScraperService] Auto-refresh failed on startup:', error);
+          // Don't fail initialization if auto-refresh fails
+        }
+      }
       
       this.initialized = true;
       logger.log('[LocalScraperService] Initialized with', this.installedScrapers.size, 'scrapers');
@@ -115,7 +133,11 @@ class LocalScraperService {
   // Fetch and install scrapers from repository
   async refreshRepository(): Promise<void> {
     await this.ensureInitialized();
-    
+    await this.performRepositoryRefresh();
+  }
+
+  // Internal method to refresh repository without initialization check
+  private async performRepositoryRefresh(): Promise<void> {
     if (!this.repositoryUrl) {
       throw new Error('No repository URL configured');
     }
@@ -160,10 +182,19 @@ class LocalScraperService {
       const scraperCode = response.data;
       
       // Store scraper info and code
-      this.installedScrapers.set(scraperInfo.id, {
+      const updatedScraperInfo = {
         ...scraperInfo,
         enabled: this.installedScrapers.get(scraperInfo.id)?.enabled ?? true // Preserve enabled state
-      });
+      };
+      
+      // Ensure contentLanguage is an array (migration for older scrapers)
+      if (!updatedScraperInfo.contentLanguage) {
+        updatedScraperInfo.contentLanguage = ['en']; // Default to English
+      } else if (typeof updatedScraperInfo.contentLanguage === 'string') {
+        updatedScraperInfo.contentLanguage = [updatedScraperInfo.contentLanguage]; // Convert string to array
+      }
+      
+      this.installedScrapers.set(scraperInfo.id, updatedScraperInfo);
       
       this.scraperCode.set(scraperInfo.id, scraperCode);
       

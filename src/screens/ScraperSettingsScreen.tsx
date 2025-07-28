@@ -150,6 +150,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 12,
     color: colors.mediumGray,
   },
+  scraperLanguage: {
+    fontSize: 12,
+    color: colors.mediumGray,
+  },
   settingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -646,6 +650,14 @@ const ScraperSettingsScreen: React.FC = () => {
                        <Text style={[styles.scraperTypes, !settings.enableLocalScrapers && styles.disabledText]}>
                          {scraper.supportedTypes.join(', ')}
                        </Text>
+                       {scraper.contentLanguage && Array.isArray(scraper.contentLanguage) && scraper.contentLanguage.length > 0 && (
+                         <>
+                           <Text style={[styles.scraperDot, !settings.enableLocalScrapers && styles.disabledText]}>•</Text>
+                           <Text style={[styles.scraperLanguage, !settings.enableLocalScrapers && styles.disabledText]}>
+                             {scraper.contentLanguage.map(lang => lang.toUpperCase()).join(', ')}
+                           </Text>
+                         </>
+                       )}
                      </View>
                    </View>
                    <Switch
