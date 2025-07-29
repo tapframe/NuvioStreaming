@@ -713,15 +713,25 @@ const AndroidVideoPlayer: React.FC = () => {
   const handleError = (error: any) => {
     logger.error('AndroidVideoPlayer error: ', error);
     
+    // Check for specific AVFoundation server configuration errors
+    const isServerConfigError = error?.error?.code === -11850 || 
+                               error?.code === -11850 ||
+                               (error?.error?.localizedDescription && 
+                                error.error.localizedDescription.includes('server is not correctly configured'));
+    
     // Format error details for user display
     let errorMessage = 'An unknown error occurred';
     if (error) {
-      if (typeof error === 'string') {
+      if (isServerConfigError) {
+        errorMessage = 'Stream server configuration issue. This may be a temporary problem with the video source.';
+      } else if (typeof error === 'string') {
         errorMessage = error;
       } else if (error.message) {
         errorMessage = error.message;
       } else if (error.error && error.error.message) {
         errorMessage = error.error.message;
+      } else if (error.error && error.error.localizedDescription) {
+        errorMessage = error.error.localizedDescription;
       } else if (error.code) {
         errorMessage = `Error Code: ${error.code}`;
       } else {
@@ -1175,12 +1185,25 @@ const AndroidVideoPlayer: React.FC = () => {
                   style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
                   source={(() => {
                     // Use headers from route params if available, otherwise no headers
-                    const sourceWithHeaders = headers ? {
+                    let processedHeaders = headers;
+                    
+                    // For iOS and Xprime streams, filter out potentially problematic headers
+                    if (Platform.OS === 'ios' && headers && (streamProvider === 'xprime' || streamProvider === 'Xprime')) {
+                      // Remove headers that might cause AVFoundation issues
+                      const { 'Sec-Fetch-Dest': _, 'Sec-Fetch-Mode': __, 'Sec-Fetch-Site': ___, 'DNT': ____, ...filteredHeaders } = headers;
+                      processedHeaders = {
+                        'User-Agent': headers['User-Agent'] || 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15',
+                        'Referer': headers['Referer'] || headers['Origin'] || 'https://xprime.tv/',
+                        'Accept': 'video/mp4,video/*;q=0.9,*/*;q=0.8'
+                      };
+                    }
+                    
+                    const sourceWithHeaders = processedHeaders ? {
                       uri: currentStreamUrl,
-                      headers: headers
+                      headers: processedHeaders
                     } : { uri: currentStreamUrl };
                     
-                    console.log('[AndroidVideoPlayer] Using headers from route params:', headers);
+                    console.log('[AndroidVideoPlayer] Using headers from route params:', processedHeaders);
                     
                     return sourceWithHeaders;
                   })()}
