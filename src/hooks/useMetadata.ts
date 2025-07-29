@@ -858,10 +858,27 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       console.log('🎬 [loadStreams] Using ID for Stremio addons:', stremioId);
       processStremioSource(type, stremioId, false);
       
-      // Add a delay before marking loading as complete to give Stremio addons more time
-      setTimeout(() => {
+      // Monitor scraper completion status instead of using fixed timeout
+      const checkScrapersCompletion = () => {
+        setScraperStatuses(currentStatuses => {
+          const allCompleted = currentStatuses.every(status => status.hasCompleted || status.error !== null);
+          if (allCompleted && currentStatuses.length > 0) {
+            setLoadingStreams(false);
+            setActiveFetchingScrapers([]);
+          }
+          return currentStatuses;
+        });
+      };
+      
+      // Check completion periodically
+      const completionInterval = setInterval(checkScrapersCompletion, 1000);
+      
+      // Fallback timeout after 30 seconds
+      const fallbackTimeout = setTimeout(() => {
+        clearInterval(completionInterval);
         setLoadingStreams(false);
-      }, 10000); // 10 second delay to allow streams to load
+        setActiveFetchingScrapers([]);
+      }, 30000);
 
     } catch (error) {
       console.error('❌ [loadStreams] Failed to load streams:', error);
@@ -1010,10 +1027,27 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       console.log('🎬 [loadEpisodeStreams] Using episode ID for Stremio addons:', stremioEpisodeId);
       processStremioSource('series', stremioEpisodeId, true);
       
-      // Add a delay before marking loading as complete to give Stremio addons more time
-      setTimeout(() => {
+      // Monitor scraper completion status instead of using fixed timeout
+      const checkEpisodeScrapersCompletion = () => {
+        setScraperStatuses(currentStatuses => {
+          const allCompleted = currentStatuses.every(status => status.hasCompleted || status.error !== null);
+          if (allCompleted && currentStatuses.length > 0) {
+            setLoadingEpisodeStreams(false);
+            setActiveFetchingScrapers([]);
+          }
+          return currentStatuses;
+        });
+      };
+      
+      // Check completion periodically
+      const episodeCompletionInterval = setInterval(checkEpisodeScrapersCompletion, 1000);
+      
+      // Fallback timeout after 30 seconds
+      const episodeFallbackTimeout = setTimeout(() => {
+        clearInterval(episodeCompletionInterval);
         setLoadingEpisodeStreams(false);
-      }, 10000); // 10 second delay to allow streams to load
+        setActiveFetchingScrapers([]);
+      }, 30000);
 
     } catch (error) {
       console.error('❌ [loadEpisodeStreams] Failed to load episode streams:', error);

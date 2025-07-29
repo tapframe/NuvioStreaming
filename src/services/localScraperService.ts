@@ -577,11 +577,7 @@ class LocalScraperService {
         URL_VALIDATION_ENABLED: urlValidationEnabled
       };
       
-      // Execute the scraper code with timeout
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Scraper execution timeout')), 60000); // 60 second timeout
-      });
-      
+      // Execute the scraper code without timeout
       const executionPromise = new Promise<LocalScraperResult[]>((resolve, reject) => {
         try {
           // Create function from code
@@ -614,7 +610,7 @@ class LocalScraperService {
         }
       });
       
-      return await Promise.race([executionPromise, timeoutPromise]) as LocalScraperResult[];
+      return await executionPromise;
       
     } catch (error) {
       logger.error('[LocalScraperService] Sandbox execution failed:', error);
