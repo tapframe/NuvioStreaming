@@ -345,7 +345,10 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
         onPress={() => onSelectEpisode(episode)}
         activeOpacity={0.7}
       >
-        <View style={styles.episodeImageContainer}>
+        <View style={[
+          styles.episodeImageContainer,
+          isTablet && styles.episodeImageContainerTablet
+        ]}>
           <Image
             source={{ uri: episodeImage }}
             style={styles.episodeImage}
@@ -371,12 +374,25 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
           )}
         </View>
 
-        <View style={styles.episodeInfo}>
-          <View style={styles.episodeHeader}>
-            <Text style={[styles.episodeTitle, { color: currentTheme.colors.text }]} numberOfLines={2}>
+        <View style={[
+          styles.episodeInfo,
+          isTablet && styles.episodeInfoTablet
+        ]}>
+          <View style={[
+            styles.episodeHeader,
+            isTablet && styles.episodeHeaderTablet
+          ]}>
+            <Text style={[
+              styles.episodeTitle,
+              isTablet && styles.episodeTitleTablet,
+              { color: currentTheme.colors.text }
+            ]} numberOfLines={2}>
               {episode.name}
             </Text>
-            <View style={styles.episodeMetadata}>
+            <View style={[
+              styles.episodeMetadata,
+              isTablet && styles.episodeMetadataTablet
+            ]}>
               {episode.vote_average > 0 && (
                 <View style={styles.ratingContainer}>
                   <Image
@@ -404,7 +420,11 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               )}
             </View>
           </View>
-          <Text style={[styles.episodeOverview, { color: currentTheme.colors.mediumEmphasis }]} numberOfLines={2}>
+          <Text style={[
+            styles.episodeOverview,
+            isTablet && styles.episodeOverviewTablet,
+            { color: currentTheme.colors.mediumEmphasis }
+          ]} numberOfLines={isTablet ? 3 : 2}>
             {episode.overview || 'No description available'}
           </Text>
         </View>
@@ -716,12 +736,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   episodeListContentVerticalTablet: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 16,
   },
   episodeGridVertical: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    gap: 16,
   },
   episodeCardVertical: {
     flexDirection: 'row',
@@ -738,14 +759,19 @@ const styles = StyleSheet.create({
     height: 120,
   },
   episodeCardVerticalTablet: {
-    width: '48%',
-    flexDirection: 'column',
-    height: 120,
+    width: '47%',
+    flexDirection: 'row',
+    height: 140,
+    marginBottom: 0,
   },
   episodeImageContainer: {
     position: 'relative',
     width: 120,
     height: 120,
+  },
+  episodeImageContainerTablet: {
+    width: 140,
+    height: 140,
   },
   episodeImage: {
     width: '100%',
@@ -775,8 +801,14 @@ const styles = StyleSheet.create({
     padding: 12,
     justifyContent: 'center',
   },
+  episodeInfoTablet: {
+    padding: 16,
+  },
   episodeHeader: {
     marginBottom: 4,
+  },
+  episodeHeaderTablet: {
+    marginBottom: 6,
   },
   episodeTitle: {
     fontSize: 15,
@@ -784,10 +816,18 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
     marginBottom: 2,
   },
+  episodeTitleTablet: {
+    fontSize: 16,
+    marginBottom: 4,
+  },
   episodeMetadata: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+  },
+  episodeMetadataTablet: {
+    gap: 6,
+    flexWrap: 'wrap',
   },
   ratingContainer: {
     flexDirection: 'row',
@@ -827,6 +867,10 @@ const styles = StyleSheet.create({
   episodeOverview: {
     fontSize: 13,
     lineHeight: 18,
+  },
+  episodeOverviewTablet: {
+    fontSize: 14,
+    lineHeight: 20,
   },
   progressBarContainer: {
     position: 'absolute',
@@ -1053,4 +1097,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-}); 
+});
