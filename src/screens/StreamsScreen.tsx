@@ -537,6 +537,84 @@ export const StreamsScreen = () => {
     });
   }, [settings.excludedQualities]);
 
+  // Helper function to sort streams based on user preference
+  const sortStreams = useCallback((streams: Stream[]) => {
+    const installedAddons = stremioService.getInstalledAddons();
+    
+    // Helper function to extract quality as number
+    const getQualityNumeric = (title: string | undefined): number => {
+      if (!title) return 0;
+      
+      // Check for 4K first (treat as 2160p)
+      if (/\b4k\b/i.test(title)) {
+        return 2160;
+      }
+      
+      const matchWithP = title.match(/(\d+)p/i);
+      if (matchWithP) return parseInt(matchWithP[1], 10);
+      
+      const qualityPatterns = [
+        /\b(240|360|480|720|1080|1440|2160|4320|8000)\b/i
+      ];
+      
+      for (const pattern of qualityPatterns) {
+        const match = title.match(pattern);
+        if (match) {
+          const quality = parseInt(match[1], 10);
+          if (quality >= 240 && quality <= 8000) return quality;
+        }
+      }
+      return 0;
+    };
+
+    // Provider priority (higher number = higher priority)
+    const getProviderPriority = (stream: Stream): number => {
+      const addonId = stream.addonId || stream.addonName || '';
+      const addonIndex = installedAddons.findIndex(addon => addon.id === addonId);
+      
+      if (addonIndex !== -1) {
+        // Higher priority for addons installed earlier (reverse index)
+        return 50 - addonIndex;
+      }
+      
+      return 0; // Unknown providers get lowest priority
+    };
+
+    return [...streams].sort((a, b) => {
+      const qualityA = getQualityNumeric(a.name || a.title);
+      const qualityB = getQualityNumeric(b.name || b.title);
+      const providerPriorityA = getProviderPriority(a);
+      const providerPriorityB = getProviderPriority(b);
+      const isCachedA = a.behaviorHints?.cached || false;
+      const isCachedB = b.behaviorHints?.cached || false;
+
+      // Always prioritize cached/debrid streams first
+      if (isCachedA !== isCachedB) {
+        return isCachedA ? -1 : 1;
+      }
+
+      if (settings.streamSortMode === 'quality-then-scraper') {
+        // Sort by quality first, then by provider
+        if (qualityA !== qualityB) {
+          return qualityB - qualityA; // Higher quality first
+        }
+        if (providerPriorityA !== providerPriorityB) {
+          return providerPriorityB - providerPriorityA; // Better provider first
+        }
+      } else {
+        // Default: Sort by provider first, then by quality
+        if (providerPriorityA !== providerPriorityB) {
+          return providerPriorityB - providerPriorityA; // Better provider first
+        }
+        if (qualityA !== qualityB) {
+          return qualityB - qualityA; // Higher quality first
+        }
+      }
+
+      return 0;
+    });
+  }, [settings.excludedQualities, settings.streamSortMode]);
+
   // Function to determine the best stream based on quality, provider priority, and other factors
   const getBestStream = useCallback((streamsData: typeof groupedStreams): Stream | null => {
     if (!streamsData || Object.keys(streamsData).length === 0) {
@@ -546,6 +624,12 @@ export const StreamsScreen = () => {
     // Helper function to extract quality as number
     const getQualityNumeric = (title: string | undefined): number => {
       if (!title) return 0;
+      
+      // Check for 4K first (treat as 2160p)
+      if (/\b4k\b/i.test(title)) {
+        return 2160;
+      }
+      
       const matchWithP = title.match(/(\d+)p/i);
       if (matchWithP) return parseInt(matchWithP[1], 10);
       
@@ -997,16 +1081,17 @@ export const StreamsScreen = () => {
       filteredEntries.forEach(([addonId, { addonName, streams: providerStreams }]) => {
         const isInstalledAddon = installedAddons.some(addon => addon.id === addonId);
         
-        // Apply quality filtering to streams
+        // Apply quality filtering and sorting to streams
         const filteredStreams = filterStreamsByQuality(providerStreams);
+        const sortedStreams = sortStreams(filteredStreams);
         
         if (isInstalledAddon) {
-          addonStreams.push(...filteredStreams);
+          addonStreams.push(...sortedStreams);
           if (!addonNames.includes(addonName)) {
             addonNames.push(addonName);
           }
         } else {
-          pluginStreams.push(...filteredStreams);
+          pluginStreams.push(...sortedStreams);
           if (!pluginNames.includes(addonName)) {
             pluginNames.push(addonName);
           }
@@ -1015,17 +1100,25 @@ export const StreamsScreen = () => {
       
       const sections = [];
       if (addonStreams.length > 0) {
+        // Apply final sorting to the combined addon streams for quality-first mode
+        const finalSortedAddonStreams = settings.streamSortMode === 'quality-then-scraper' ? 
+          sortStreams(addonStreams) : addonStreams;
+        
         sections.push({
           title: addonNames.join(', '),
           addonId: 'grouped-addons',
-          data: addonStreams
+          data: finalSortedAddonStreams
         });
       }
       if (pluginStreams.length > 0) {
+        // Apply final sorting to the combined plugin streams for quality-first mode
+        const finalSortedPluginStreams = settings.streamSortMode === 'quality-then-scraper' ? 
+          sortStreams(pluginStreams) : pluginStreams;
+        
         sections.push({
           title: localScraperService.getRepositoryName(),
           addonId: 'grouped-plugins',
-          data: pluginStreams
+          data: finalSortedPluginStreams
         });
       }
       
@@ -1033,17 +1126,18 @@ export const StreamsScreen = () => {
     } else {
       // Use separate sections for each provider (current behavior)
       return filteredEntries.map(([addonId, { addonName, streams: providerStreams }]) => {
-        // Apply quality filtering to streams
+        // Apply quality filtering and sorting to streams
         const filteredStreams = filterStreamsByQuality(providerStreams);
+        const sortedStreams = sortStreams(filteredStreams);
         
         return {
           title: addonName,
           addonId,
-          data: filteredStreams
+          data: sortedStreams
         };
       });
     }
-  }, [selectedProvider, type, episodeStreams, groupedStreams, settings.streamDisplayMode, filterStreamsByQuality]);
+  }, [selectedProvider, type, episodeStreams, groupedStreams, settings.streamDisplayMode, filterStreamsByQuality, sortStreams]);
 
   const episodeImage = useMemo(() => {
     if (episodeThumbnail) {

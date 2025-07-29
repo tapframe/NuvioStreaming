@@ -42,6 +42,7 @@ export interface AppSettings {
   scraperTimeout: number; // Timeout for scraper execution in seconds
   enableScraperUrlValidation: boolean; // Enable/disable URL validation for scrapers
   streamDisplayMode: 'separate' | 'grouped'; // How to display streaming links - separately by provider or grouped under one name
+  streamSortMode: 'scraper-then-quality' | 'quality-then-scraper'; // How to sort streams - by scraper first or quality first
   // Quality filtering settings
   excludedQualities: string[]; // Array of quality strings to exclude (e.g., ['2160p', '4K', '1080p', '720p'])
 }
@@ -68,6 +69,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   scraperTimeout: 60, // 60 seconds timeout
   enableScraperUrlValidation: true, // Enable URL validation by default
   streamDisplayMode: 'separate', // Default to separate display by provider
+  streamSortMode: 'scraper-then-quality', // Default to current behavior (scraper first, then quality)
   // Quality filtering defaults
   excludedQualities: [], // No qualities excluded by default
 };

@@ -796,10 +796,32 @@ const PluginsScreen: React.FC = () => {
             </View>
             <Switch
                value={settings.streamDisplayMode === 'grouped'}
-               onValueChange={(value) => updateSetting('streamDisplayMode', value ? 'grouped' : 'separate')}
+               onValueChange={(value) => {
+                 updateSetting('streamDisplayMode', value ? 'grouped' : 'separate');
+                 // Auto-disable quality sorting when grouping is disabled
+                 if (!value && settings.streamSortMode === 'quality-then-scraper') {
+                   updateSetting('streamSortMode', 'scraper-then-quality');
+                 }
+               }}
                trackColor={{ false: colors.elevation3, true: colors.primary }}
                thumbColor={settings.streamDisplayMode === 'grouped' ? colors.white : '#f4f3f4'}
                disabled={!settings.enableLocalScrapers}
+             />
+          </View>
+          
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={[styles.settingTitle, (!settings.enableLocalScrapers || settings.streamDisplayMode !== 'grouped') && styles.disabledText]}>Sort by Quality First</Text>
+              <Text style={[styles.settingDescription, (!settings.enableLocalScrapers || settings.streamDisplayMode !== 'grouped') && styles.disabledText]}>
+                When enabled, streams are sorted by quality first, then by scraper. When disabled, streams are sorted by scraper first, then by quality. Only available when grouping is enabled.
+              </Text>
+            </View>
+            <Switch
+               value={settings.streamSortMode === 'quality-then-scraper'}
+               onValueChange={(value) => updateSetting('streamSortMode', value ? 'quality-then-scraper' : 'scraper-then-quality')}
+               trackColor={{ false: colors.elevation3, true: colors.primary }}
+               thumbColor={settings.streamSortMode === 'quality-then-scraper' ? colors.white : '#f4f3f4'}
+               disabled={!settings.enableLocalScrapers || settings.streamDisplayMode !== 'grouped'}
              />
           </View>
         </View>
