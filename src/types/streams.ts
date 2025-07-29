@@ -11,11 +11,7 @@ export interface Stream {
   quality?: string;
   type?: string;
   lang?: string;
-  headers?: {
-    Referer?: string;
-    'User-Agent'?: string;
-    Origin?: string;
-  };
+  headers?: { [key: string]: string };
   files?: {
     file: string;
     type: string;
@@ -40,4 +36,4 @@ export interface GroupedStreams {
     addonName: string;
     streams: Stream[];
   };
-} 
+}

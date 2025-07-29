@@ -672,6 +672,7 @@ export const StreamsScreen = () => {
       year: metadata?.year,
       streamProvider: streamProvider,
       streamName: streamName,
+      headers: stream.headers || undefined,
       id,
       type,
       episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined,

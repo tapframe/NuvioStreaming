@@ -4,6 +4,7 @@ import Video, { VideoRef, SelectedTrack, BufferingStrategyType, ResizeMode } fro
 
 interface VideoPlayerProps {
   src: string;
+  headers?: { [key: string]: string };
   paused: boolean;
   volume: number;
   currentTime: number;
@@ -20,6 +21,7 @@ interface VideoPlayerProps {
 
 export const AndroidVideoPlayer: React.FC<VideoPlayerProps> = ({
   src,
+  headers,
   paused,
   volume,
   currentTime,
@@ -83,7 +85,7 @@ export const AndroidVideoPlayer: React.FC<VideoPlayerProps> = ({
   return (
     <Video
       ref={videoRef}
-      source={{ uri: src }}
+      source={headers ? { uri: src, headers } : { uri: src }}
       style={{ flex: 1 }}
       paused={paused}
       volume={volume}
@@ -118,4 +120,4 @@ export const AndroidVideoPlayer: React.FC<VideoPlayerProps> = ({
   );
 };
 
-export default AndroidVideoPlayer; 
+export default AndroidVideoPlayer;

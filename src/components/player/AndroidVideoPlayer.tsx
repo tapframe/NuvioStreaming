@@ -61,6 +61,7 @@ const AndroidVideoPlayer: React.FC = () => {
     year,
     streamProvider,
     streamName,
+    headers,
     id,
     type,
     episodeId,
@@ -1129,39 +1130,13 @@ const AndroidVideoPlayer: React.FC = () => {
                   ref={videoRef}
                   style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
                   source={(() => {
-                    // Add specific headers for Xprime streams
-                    const isXprimeStream = currentStreamProvider === 'xprime' || 
-                                          currentStreamProvider === 'Xprime' || 
-                                          currentStreamUrl?.includes('xprime.tv');
-                    
-                    // Debug logging for Xprime detection
-                    console.log('[AndroidVideoPlayer] Xprime Detection Debug:');
-                    console.log('  currentStreamProvider:', currentStreamProvider);
-                    console.log('  currentStreamUrl:', currentStreamUrl);
-                    console.log('  isXprimeStream:', isXprimeStream);
-                    console.log('  URL includes xprime.tv:', currentStreamUrl?.includes('xprime.tv'));
-                    
-                    const sourceWithHeaders = isXprimeStream ? {
+                    // Use headers from route params if available, otherwise no headers
+                    const sourceWithHeaders = headers ? {
                       uri: currentStreamUrl,
-                      headers: {
-                        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36',
-                        'Accept': 'video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5',
-                        'Accept-Language': 'en-US,en;q=0.9',
-                        'Accept-Encoding': 'identity',
-                        'Origin': 'https://xprime.tv',
-                        'Referer': 'https://xprime.tv/',
-                        'Sec-Fetch-Dest': 'video',
-                        'Sec-Fetch-Mode': 'no-cors',
-                        'Sec-Fetch-Site': 'cross-site',
-                        'DNT': '1'
-                      }
+                      headers: headers
                     } : { uri: currentStreamUrl };
                     
-                    if (isXprimeStream) {
-                      console.log('[AndroidVideoPlayer] Applying Xprime headers:', sourceWithHeaders.headers);
-                    } else {
-                      console.log('[AndroidVideoPlayer] No special headers applied');
-                    }
+                    console.log('[AndroidVideoPlayer] Using headers from route params:', headers);
                     
                     return sourceWithHeaders;
                   })()}

@@ -669,6 +669,11 @@ class LocalScraperService {
         stream.quality = result.quality;
       }
       
+      // Pass headers from scraper result if available
+      if (result.headers) {
+        stream.headers = result.headers;
+      }
+      
       return stream;
     }).filter(stream => stream.url); // Filter out streams without URLs
   }
