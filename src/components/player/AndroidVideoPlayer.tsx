@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, TouchableOpacity, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, Image, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, Image, StyleSheet, Modal } from 'react-native';
 import Video, { VideoRef, SelectedTrack, SelectedTrackType, BufferingStrategyType } from 'react-native-video';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
@@ -162,6 +162,9 @@ const AndroidVideoPlayer: React.FC = () => {
   const isMounted = useRef(true);
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null);
   const [isSyncingBeforeClose, setIsSyncingBeforeClose] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorDetails, setErrorDetails] = useState<string>('');
+  const errorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Get metadata to access logo (only if we have a valid id)
   const shouldLoadMetadata = Boolean(id && type);
   const metadataResult = useMetadata({ 
@@ -709,6 +712,44 @@ const AndroidVideoPlayer: React.FC = () => {
 
   const handleError = (error: any) => {
     logger.error('AndroidVideoPlayer error: ', error);
+    
+    // Format error details for user display
+    let errorMessage = 'An unknown error occurred';
+    if (error) {
+      if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      } else if (error.error && error.error.message) {
+        errorMessage = error.error.message;
+      } else if (error.code) {
+        errorMessage = `Error Code: ${error.code}`;
+      } else {
+        errorMessage = JSON.stringify(error, null, 2);
+      }
+    }
+    
+    setErrorDetails(errorMessage);
+    setShowErrorModal(true);
+    
+    // Clear any existing timeout
+    if (errorTimeoutRef.current) {
+      clearTimeout(errorTimeoutRef.current);
+    }
+    
+    // Auto-exit after 5 seconds if user doesn't dismiss
+    errorTimeoutRef.current = setTimeout(() => {
+      handleErrorExit();
+    }, 5000);
+  };
+  
+  const handleErrorExit = () => {
+    if (errorTimeoutRef.current) {
+      clearTimeout(errorTimeoutRef.current);
+      errorTimeoutRef.current = null;
+    }
+    setShowErrorModal(false);
+    handleClose();
   };
 
   const onBuffer = (data: any) => {
@@ -850,6 +891,9 @@ const AndroidVideoPlayer: React.FC = () => {
       isMounted.current = false;
       if (seekDebounceTimer.current) {
         clearTimeout(seekDebounceTimer.current);
+      }
+      if (errorTimeoutRef.current) {
+        clearTimeout(errorTimeoutRef.current);
       }
     };
   }, []);
@@ -1254,6 +1298,100 @@ const AndroidVideoPlayer: React.FC = () => {
         onSelectStream={handleSelectStream}
         isChangingSource={isChangingSource}
       />
+      
+      {/* Error Modal */}
+      <Modal
+        visible={showErrorModal}
+        transparent
+        animationType="fade"
+        onRequestClose={handleErrorExit}
+      >
+        <View style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: 'rgba(0,0,0,0.8)'
+        }}>
+          <View style={{
+            backgroundColor: '#1a1a1a',
+            borderRadius: 14,
+            width: '85%',
+            maxHeight: '70%',
+            padding: 20,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.25,
+            shadowRadius: 8,
+            elevation: 5,
+          }}>
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginBottom: 16
+            }}>
+              <MaterialIcons name="error" size={24} color="#ff4444" style={{ marginRight: 8 }} />
+              <Text style={{
+                fontSize: 18,
+                fontWeight: 'bold',
+                color: '#ffffff',
+                flex: 1
+              }}>Playback Error</Text>
+              <TouchableOpacity onPress={handleErrorExit}>
+                <MaterialIcons name="close" size={24} color="#ffffff" />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={{
+              fontSize: 14,
+              color: '#cccccc',
+              marginBottom: 16,
+              lineHeight: 20
+            }}>The video player encountered an error and cannot continue playback:</Text>
+            
+            <View style={{
+              backgroundColor: '#2a2a2a',
+              borderRadius: 8,
+              padding: 12,
+              marginBottom: 20,
+              maxHeight: 200
+            }}>
+              <Text style={{
+                fontSize: 12,
+                color: '#ff8888',
+                fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace'
+              }}>{errorDetails}</Text>
+            </View>
+            
+            <View style={{
+              flexDirection: 'row',
+              justifyContent: 'flex-end'
+            }}>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#ff4444',
+                  borderRadius: 8,
+                  paddingVertical: 10,
+                  paddingHorizontal: 20
+                }}
+                onPress={handleErrorExit}
+              >
+                <Text style={{
+                  color: '#ffffff',
+                  fontWeight: '600',
+                  fontSize: 16
+                }}>Exit Player</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={{
+              fontSize: 12,
+              color: '#888888',
+              textAlign: 'center',
+              marginTop: 12
+            }}>This dialog will auto-close in 5 seconds</Text>
+          </View>
+        </View>
+      </Modal>
     </View> 
   );
 };
