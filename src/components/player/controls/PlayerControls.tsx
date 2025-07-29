@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Animated, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Animated, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import Slider from '@react-native-community/slider';
 import { styles } from '../utils/playerStyles';
 import { getTrackDisplayName } from '../utils/playerUtils';
 
@@ -31,12 +32,10 @@ interface PlayerControlsProps {
   setShowAudioModal: (show: boolean) => void;
   setShowSubtitleModal: (show: boolean) => void;
   setShowSourcesModal?: (show: boolean) => void;
-  progressBarRef: React.RefObject<View>;
-  progressAnim: Animated.Value;
-  handleProgressBarTouch: (event: any) => void;
-  handleProgressBarDragStart: () => void;
-  handleProgressBarDragMove: (event: any) => void;
-  handleProgressBarDragEnd: () => void;
+  // Slider-specific props
+  onSliderValueChange: (value: number) => void;
+  onSlidingStart: () => void;
+  onSlidingComplete: (value: number) => void;
   buffered: number;
   formatTime: (seconds: number) => string;
 }
@@ -67,12 +66,9 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   setShowAudioModal,
   setShowSubtitleModal,
   setShowSourcesModal,
-  progressBarRef,
-  progressAnim,
-  handleProgressBarTouch,
-  handleProgressBarDragStart,
-  handleProgressBarDragMove,
-  handleProgressBarDragEnd,
+  onSliderValueChange,
+  onSlidingStart,
+  onSlidingComplete,
   buffered,
   formatTime,
 }) => {
@@ -81,55 +77,25 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
       style={[StyleSheet.absoluteFill, { opacity: fadeAnim }]}
       pointerEvents={showControls ? 'auto' : 'none'}
     >
-      {/* Progress bar with enhanced touch handling */}
+      {/* Progress slider with native iOS slider */}
       <View style={styles.sliderContainer}>
-        <View
-          style={styles.progressTouchArea}
-          onTouchStart={handleProgressBarDragStart}
-          onTouchMove={handleProgressBarDragMove}
-          onTouchEnd={handleProgressBarDragEnd}
-        >
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={handleProgressBarTouch}
-            style={{width: '100%'}}
-          >
-            <View 
-              ref={progressBarRef}
-              style={styles.progressBarContainer}
-            >
-              {/* Buffered Progress */}
-              <View style={[styles.bufferProgress, { 
-                width: `${(buffered / (duration || 1)) * 100}%`
-              }]} />
-              {/* Animated Progress */}
-              <Animated.View 
-                style={[
-                  styles.progressBarFill, 
-                  { 
-                    width: progressAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ['0%', '100%']
-                    })
-                  }
-                ]} 
-              />
-            </View>
-            
-            {/* Progress Thumb - Moved outside the progressBarContainer */}
-            <Animated.View 
-              style={[
-                styles.progressThumb,
-                { 
-                  left: progressAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0%', '100%']
-                  })
-                }
-              ]} 
-            />
-          </TouchableOpacity>
-        </View>
+        <Slider
+          style={{
+            width: '100%',
+            height: 40,
+            marginHorizontal: 0,
+          }}
+          minimumValue={0}
+          maximumValue={duration || 1}
+          value={currentTime}
+          onValueChange={onSliderValueChange}
+          onSlidingStart={onSlidingStart}
+          onSlidingComplete={onSlidingComplete}
+          minimumTrackTintColor="#FFFFFF"
+          maximumTrackTintColor="rgba(255, 255, 255, 0.3)"
+          thumbTintColor={Platform.OS === 'android' ? '#FFFFFF' : undefined}
+          tapToSeek={Platform.OS === 'ios'}
+        />
         <View style={styles.timeDisplay}>
           <Text style={styles.duration}>{formatTime(currentTime)}</Text>
           <Text style={styles.duration}>{formatTime(duration)}</Text>
@@ -244,4 +210,4 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   );
 };
 
-export default PlayerControls; 
+export default PlayerControls;

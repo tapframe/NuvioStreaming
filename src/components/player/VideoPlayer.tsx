@@ -11,6 +11,7 @@ import { logger } from '../../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import Slider from '@react-native-community/slider';
 import AndroidVideoPlayer from './AndroidVideoPlayer';
 import { useTraktAutosync } from '../../hooks/useTraktAutosync';
 import { useTraktAutosyncSettings } from '../../hooks/useTraktAutosyncSettings';
@@ -127,8 +128,7 @@ const VideoPlayer: React.FC = () => {
   const [vlcAudioTracks, setVlcAudioTracks] = useState<Array<{ id: number, name: string, language?: string }>>([]);
   const [vlcTextTracks, setVlcTextTracks] = useState<Array<{ id: number, name: string, language?: string }>>([]);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
-  const progressAnim = useRef(new Animated.Value(0)).current;
-  const progressBarRef = useRef<View>(null);
+  // Removed progressAnim and progressBarRef - no longer needed with React Native Community Slider
   const [isDragging, setIsDragging] = useState(false);
   const isSeeking = useRef(false);
   const seekDebounceTimer = useRef<NodeJS.Timeout | null>(null);
@@ -515,44 +515,29 @@ const VideoPlayer: React.FC = () => {
     }
   };
 
-  const handleProgressBarTouch = (event: any) => {
-    if (duration > 0) {
-      const { locationX } = event.nativeEvent;
-      processProgressTouch(locationX);
+  // Slider callback functions for React Native Community Slider
+  const handleSliderValueChange = (value: number) => {
+    if (isDragging && duration > 0) {
+      const seekTime = Math.min(value, duration - END_EPSILON);
+      setCurrentTime(seekTime);
+      pendingSeekValue.current = seekTime;
     }
   };
 
-  const handleProgressBarDragStart = () => {
+  const handleSlidingStart = () => {
     setIsDragging(true);
   };
 
-  const handleProgressBarDragMove = (event: any) => {
-    if (!isDragging || !duration || duration <= 0) return;
-    const { locationX } = event.nativeEvent;
-    processProgressTouch(locationX, true);
-  };
-
-  const handleProgressBarDragEnd = () => {
+  const handleSlidingComplete = (value: number) => {
     setIsDragging(false);
-    if (pendingSeekValue.current !== null) {
-      seekToTime(pendingSeekValue.current);
+    if (duration > 0) {
+      const seekTime = Math.min(value, duration - END_EPSILON);
+      seekToTime(seekTime);
       pendingSeekValue.current = null;
     }
   };
 
-  const processProgressTouch = (locationX: number, isDragging = false) => {
-    progressBarRef.current?.measure((x, y, width, height, pageX, pageY) => {
-      const percentage = Math.max(0, Math.min(locationX / width, 0.999));
-      const seekTime = Math.min(percentage * duration, duration - END_EPSILON);
-      progressAnim.setValue(percentage);
-      if (isDragging) {
-        pendingSeekValue.current = seekTime;
-        setCurrentTime(seekTime);
-      } else {
-        seekToTime(seekTime);
-      }
-    });
-  };
+  // Removed processProgressTouch - no longer needed with React Native Community Slider
 
   const handleProgress = (event: any) => {
     if (isDragging || isSeeking.current) return;
@@ -562,12 +547,7 @@ const VideoPlayer: React.FC = () => {
     // Only update if there's a significant change to avoid unnecessary updates
     if (Math.abs(currentTimeInSeconds - currentTime) > 0.5) {
       safeSetState(() => setCurrentTime(currentTimeInSeconds));
-      const progressPercent = duration > 0 ? currentTimeInSeconds / duration : 0;
-      Animated.timing(progressAnim, {
-        toValue: progressPercent,
-        duration: 250,
-        useNativeDriver: false,
-      }).start();
+      // Removed progressAnim animation - no longer needed with React Native Community Slider
       const bufferedTime = event.bufferTime / 1000 || currentTimeInSeconds;
       safeSetState(() => setBuffered(bufferedTime));
     }
@@ -1273,12 +1253,9 @@ const VideoPlayer: React.FC = () => {
             setShowAudioModal={setShowAudioModal}
             setShowSubtitleModal={setShowSubtitleModal}
             setShowSourcesModal={setShowSourcesModal}
-            progressBarRef={progressBarRef}
-            progressAnim={progressAnim}
-            handleProgressBarTouch={handleProgressBarTouch}
-            handleProgressBarDragStart={handleProgressBarDragStart}
-            handleProgressBarDragMove={handleProgressBarDragMove}
-            handleProgressBarDragEnd={handleProgressBarDragEnd}
+            onSliderValueChange={handleSliderValueChange}
+            onSlidingStart={handleSlidingStart}
+            onSlidingComplete={handleSlidingComplete}
             buffered={buffered}
             formatTime={formatTime}
           />
