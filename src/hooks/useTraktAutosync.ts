@@ -165,11 +165,11 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
       const progressPercent = (currentTime / duration) * 100;
       const now = Date.now();
       
-      // Use the user's configured sync frequency
-      const timeSinceLastSync = now - lastSyncTime.current;
+      // IMMEDIATE SYNC: Remove all debouncing and frequency checks for instant sync
       const progressDiff = Math.abs(progressPercent - lastSyncProgress.current);
       
-      if (!force && timeSinceLastSync < autosyncSettings.syncFrequency && progressDiff < 5) {
+      // Only skip if not forced and progress difference is minimal (< 1%)
+      if (!force && progressDiff < 1) {
         return;
       }
 
@@ -195,7 +195,7 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
     } catch (error) {
       logger.error('[TraktAutosync] Error syncing progress:', error);
     }
-  }, [isAuthenticated, autosyncSettings.enabled, autosyncSettings.syncFrequency, updateProgress, buildContentData, options]);
+  }, [isAuthenticated, autosyncSettings.enabled, updateProgress, buildContentData, options]);
 
   // Handle playback end/pause
   const handlePlaybackEnd = useCallback(async (currentTime: number, duration: number, reason: 'ended' | 'unmount' = 'ended') => {
@@ -232,10 +232,10 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
       }
     }
 
-    // ENHANCED DEDUPLICATION: Prevent rapid successive calls (within 5 seconds)
-    // Bypass for significant updates
-    if (!isSignificantUpdate && now - lastStopCall.current < 5000) {
-      logger.log(`[TraktAutosync] Ignoring rapid successive stop call within 5 seconds (reason: ${reason})`);
+    // IMMEDIATE SYNC: Remove debouncing for instant sync when closing
+    // Only prevent truly duplicate calls (within 1 second)
+    if (!isSignificantUpdate && now - lastStopCall.current < 1000) {
+      logger.log(`[TraktAutosync] Ignoring duplicate stop call within 1 second (reason: ${reason})`);
       return;
     }
 
@@ -377,4 +377,4 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
     handlePlaybackEnd,
     resetState
   };
-} 
+}

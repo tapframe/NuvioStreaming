@@ -645,59 +645,44 @@ export const StreamsScreen = () => {
   }, [selectedEpisode, groupedEpisodes, id]);
 
   const navigateToPlayer = useCallback(async (stream: Stream) => {
+    // Prepare available streams for the change source feature
+    const streamsToPass = type === 'series' ? episodeStreams : groupedStreams;
+    
+    // Determine the stream name using the same logic as StreamCard
+    const streamName = stream.name || stream.title || 'Unnamed Stream';
+    
+    // Navigate to player immediately without waiting for orientation lock
+    // This prevents delay in player opening
+    navigation.navigate('Player', {
+      uri: stream.url,
+      title: metadata?.name || '',
+      episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
+      season: type === 'series' ? currentEpisode?.season_number : undefined,
+      episode: type === 'series' ? currentEpisode?.episode_number : undefined,
+      quality: stream.title?.match(/(\d+)p/)?.[1] || undefined,
+      year: metadata?.year,
+      streamProvider: stream.name,
+      streamName: streamName,
+      id,
+      type,
+      episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined,
+      imdbId: imdbId || undefined,
+      availableStreams: streamsToPass,
+      backdrop: bannerImage || undefined,
+    });
+    
+    // Lock orientation to landscape after navigation has started
+    // This allows the player to open immediately while orientation is being set
     try {
-      // Lock orientation to landscape before navigation to prevent glitches
-      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-      
-      // Small delay to ensure orientation is set before navigation
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Prepare available streams for the change source feature
-      const streamsToPass = type === 'series' ? episodeStreams : groupedStreams;
-      
-      // Determine the stream name using the same logic as StreamCard
-      const streamName = stream.name || stream.title || 'Unnamed Stream';
-      
-      navigation.navigate('Player', {
-        uri: stream.url,
-        title: metadata?.name || '',
-        episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
-        season: type === 'series' ? currentEpisode?.season_number : undefined,
-        episode: type === 'series' ? currentEpisode?.episode_number : undefined,
-        quality: stream.title?.match(/(\d+)p/)?.[1] || undefined,
-        year: metadata?.year,
-        streamProvider: stream.name,
-        streamName: streamName,
-        id,
-        type,
-        episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined,
-        imdbId: imdbId || undefined,
-        availableStreams: streamsToPass,
-        backdrop: bannerImage || undefined,
-      });
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE)
+        .catch(error => {
+          logger.error('[StreamsScreen] Error locking orientation after navigation:', error);
+        });
     } catch (error) {
-      logger.error('[StreamsScreen] Error locking orientation before navigation:', error);
-      // Fallback: navigate anyway
-      const streamsToPass = type === 'series' ? episodeStreams : groupedStreams;
-      
-      navigation.navigate('Player', {
-        uri: stream.url,
-        title: metadata?.name || '',
-        episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
-        season: type === 'series' ? currentEpisode?.season_number : undefined,
-        episode: type === 'series' ? currentEpisode?.episode_number : undefined,
-        quality: stream.title?.match(/(\d+)p/)?.[1] || undefined,
-        year: metadata?.year,
-        streamProvider: stream.name,
-        id,
-        type,
-        episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined,
-        imdbId: imdbId || undefined,
-        availableStreams: streamsToPass,
-        backdrop: bannerImage || undefined,
-      });
+      logger.error('[StreamsScreen] Error locking orientation after navigation:', error);
     }
   }, [metadata, type, currentEpisode, navigation, id, selectedEpisode, imdbId, episodeStreams, groupedStreams, bannerImage]);
+
 
   // Update handleStreamPress
   const handleStreamPress = useCallback(async (stream: Stream) => {

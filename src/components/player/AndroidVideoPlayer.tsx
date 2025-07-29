@@ -264,16 +264,16 @@ const AndroidVideoPlayer: React.FC = () => {
   }, []);
 
   const startOpeningAnimation = () => {
-    // Logo entrance animation
+    // Logo entrance animation - optimized for faster appearance
     Animated.parallel([
       Animated.timing(logoOpacityAnim, {
         toValue: 1,
-        duration: 600,
+        duration: 300, // Reduced from 600ms to 300ms
         useNativeDriver: true,
       }),
       Animated.spring(logoScaleAnim, {
         toValue: 1,
-        tension: 50,
+        tension: 80, // Increased tension for faster spring
         friction: 8,
         useNativeDriver: true,
       }),
@@ -284,12 +284,12 @@ const AndroidVideoPlayer: React.FC = () => {
       return Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 1.05,
-          duration: 1000,
+          duration: 800, // Reduced from 1000ms to 800ms
           useNativeDriver: true,
         }),
         Animated.timing(pulseAnim, {
           toValue: 1,
-          duration: 1000,
+          duration: 800, // Reduced from 1000ms to 800ms
           useNativeDriver: true,
         }),
       ]);
@@ -303,38 +303,34 @@ const AndroidVideoPlayer: React.FC = () => {
       });
     };
     
-    // Start pulsing after a short delay
-    setTimeout(() => {
-      if (!isOpeningAnimationComplete) {
-        loopPulse();
-      }
-    }, 800);
+    // Start pulsing immediately without delay
+    // Removed the 800ms delay
+    loopPulse();
   };
 
   const completeOpeningAnimation = () => {
     Animated.parallel([
       Animated.timing(openingFadeAnim, {
         toValue: 1,
-        duration: 600,
+        duration: 300, // Reduced from 600ms to 300ms
         useNativeDriver: true,
       }),
       Animated.timing(openingScaleAnim, {
         toValue: 1,
-        duration: 700,
+        duration: 350, // Reduced from 700ms to 350ms
         useNativeDriver: true,
       }),
       Animated.timing(backgroundFadeAnim, {
         toValue: 0,
-        duration: 800,
+        duration: 400, // Reduced from 800ms to 400ms
         useNativeDriver: true,
       }),
     ]).start(() => {
       openingScaleAnim.setValue(1);
       openingFadeAnim.setValue(1);
       setIsOpeningAnimationComplete(true);
-      setTimeout(() => {
-        backgroundFadeAnim.setValue(0);
-      }, 100);
+      // Removed the 100ms delay
+      backgroundFadeAnim.setValue(0);
     });
   };
 
@@ -396,15 +392,14 @@ const AndroidVideoPlayer: React.FC = () => {
         clearInterval(progressSaveInterval);
       }
       
-      // Use the user's configured sync frequency with increased minimum to reduce heating
-      // Minimum interval increased from 5s to 30s to reduce CPU usage
-      const syncInterval = Math.max(30000, traktSettings.syncFrequency);
+      // IMMEDIATE SYNC: Reduce sync interval to 5 seconds for near real-time sync
+      const syncInterval = 5000; // 5 seconds for immediate sync
       
       const interval = setInterval(() => {
         saveWatchProgress();
       }, syncInterval);
       
-      logger.log(`[AndroidVideoPlayer] Watch progress save interval set to ${syncInterval}ms`);
+      logger.log(`[AndroidVideoPlayer] Watch progress save interval set to ${syncInterval}ms (immediate sync mode)`);
       
       setProgressSaveInterval(interval);
       return () => {
@@ -412,7 +407,7 @@ const AndroidVideoPlayer: React.FC = () => {
         setProgressSaveInterval(null);
       };
     }
-  }, [id, type, paused, currentTime, duration, traktSettings.syncFrequency]);
+  }, [id, type, paused, currentTime, duration]);
 
   useEffect(() => {
     return () => {
@@ -583,8 +578,12 @@ const AndroidVideoPlayer: React.FC = () => {
         traktAutosync.handlePlaybackStart(currentTime, videoDuration);
       }
       
+      // Complete opening animation immediately before seeking
+      completeOpeningAnimation();
+      
       if (initialPosition && !isInitialSeekComplete) {
         logger.log(`[AndroidVideoPlayer] Seeking to initial position: ${initialPosition}s (duration: ${videoDuration}s)`);
+        // Reduced timeout from 1000ms to 500ms
         setTimeout(() => {
           if (videoRef.current && videoDuration > 0 && isMounted.current) {
             seekToTime(initialPosition);
@@ -593,9 +592,9 @@ const AndroidVideoPlayer: React.FC = () => {
           } else {
             logger.error(`[AndroidVideoPlayer] Initial seek failed: videoRef=${!!videoRef.current}, duration=${videoDuration}, mounted=${isMounted.current}`);
           }
-        }, 1000);
+        }, 500);
       }
-      completeOpeningAnimation();
+      
       controlsTimeout.current = setTimeout(hideControls, 5000);
     } catch (error) {
       logger.error('[AndroidVideoPlayer] Error in onLoad:', error);
@@ -651,9 +650,13 @@ const AndroidVideoPlayer: React.FC = () => {
   };
 
   const handleClose = async () => {
-    logger.log('[AndroidVideoPlayer] Close button pressed - syncing to Trakt before closing');
-    
-    // Set syncing state to prevent multiple close attempts
+    // Prevent multiple close attempts
+    if (isSyncingBeforeClose) {
+      logger.log('[AndroidVideoPlayer] Close already in progress, ignoring duplicate call');
+      return;
+    }
+
+    logger.log('[AndroidVideoPlayer] Close button pressed - closing immediately and syncing to Trakt in background');
     setIsSyncingBeforeClose(true);
     
     // Make sure we have the most accurate current time
@@ -662,44 +665,34 @@ const AndroidVideoPlayer: React.FC = () => {
     
     logger.log(`[AndroidVideoPlayer] Current progress: ${actualCurrentTime}/${duration} (${progressPercent.toFixed(1)}%)`);
     
-    try {
-      // Force one last progress update (scrobble/pause) with the exact time
-      await traktAutosync.handleProgressUpdate(actualCurrentTime, duration, true);
-      
-      // Sync progress to Trakt before closing
-      await traktAutosync.handlePlaybackEnd(actualCurrentTime, duration, 'unmount');
-      
-      // Start exit animation
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-        Animated.timing(openingFadeAnim, {
-          toValue: 0,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-      ]).start();
-  
-      // Longer delay to ensure Trakt sync completes
-      setTimeout(() => {
-        ScreenOrientation.unlockAsync().then(() => {
-          disableImmersiveMode();
-          navigation.goBack();
-        }).catch(() => {
-          // Fallback: navigate even if orientation unlock fails
-          disableImmersiveMode();
-          navigation.goBack();
-        });
-      }, 500); // Increased from 100ms to 500ms
-    } catch (error) {
-      logger.error('[AndroidVideoPlayer] Error syncing to Trakt before closing:', error);
-      // Navigate anyway even if sync fails
+    // Navigate immediately without delay
+    ScreenOrientation.unlockAsync().then(() => {
       disableImmersiveMode();
       navigation.goBack();
-    }
+    }).catch(() => {
+      // Fallback: navigate even if orientation unlock fails
+      disableImmersiveMode();
+      navigation.goBack();
+    });
+
+    // Send Trakt sync in background (don't await)
+    const backgroundSync = async () => {
+      try {
+        logger.log('[AndroidVideoPlayer] Starting background Trakt sync');
+        // Force one last progress update (scrobble/pause) with the exact time
+        await traktAutosync.handleProgressUpdate(actualCurrentTime, duration, true);
+        
+        // Sync progress to Trakt
+        await traktAutosync.handlePlaybackEnd(actualCurrentTime, duration, 'unmount');
+        
+        logger.log('[AndroidVideoPlayer] Background Trakt sync completed successfully');
+      } catch (error) {
+        logger.error('[AndroidVideoPlayer] Error in background Trakt sync:', error);
+      }
+    };
+
+    // Start background sync without blocking UI
+    backgroundSync();
   };
 
   const handleResume = async () => {
@@ -752,10 +745,8 @@ const AndroidVideoPlayer: React.FC = () => {
       logger.log('[AndroidVideoPlayer] Video ended naturally, sending final progress update with 100%');
       await traktAutosync.handleProgressUpdate(finalTime, duration, true);
       
-      // Small delay to ensure the progress update is processed
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Now send the stop call
+      // IMMEDIATE SYNC: Remove delay for instant sync
+      // Now send the stop call immediately
       logger.log('[AndroidVideoPlayer] Sending final stop call after natural end');
       await traktAutosync.handlePlaybackEnd(finalTime, duration, 'ended');
       
@@ -1280,4 +1271,4 @@ const AndroidVideoPlayer: React.FC = () => {
   );
 };
 
-export default AndroidVideoPlayer; 
+export default AndroidVideoPlayer;

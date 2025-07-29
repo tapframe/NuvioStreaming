@@ -269,14 +269,14 @@ export class TraktService {
   private readonly SCROBBLE_EXPIRY_MS = 46 * 60 * 1000; // 46 minutes (based on Trakt's expiry window)
   private scrobbledTimestamps: Map<string, number> = new Map();
 
-  // Track currently watching sessions to avoid duplicate starts
+  // Track currently watching sessions to avoid duplicate starts// Sync debouncing
   private currentlyWatching: Set<string> = new Set();
   private lastSyncTimes: Map<string, number> = new Map();
-  private readonly SYNC_DEBOUNCE_MS = 60000; // 60 seconds
+  private readonly SYNC_DEBOUNCE_MS = 1000; // 1 second for immediate sync
   
   // Debounce for stop calls
   private lastStopCalls: Map<string, number> = new Map();
-  private readonly STOP_DEBOUNCE_MS = 10000; // 10 seconds debounce for stop calls
+  private readonly STOP_DEBOUNCE_MS = 1000; // 1 second debounce for immediate stop calls
   
   // Default completion threshold (overridden by user settings)
   private readonly DEFAULT_COMPLETION_THRESHOLD = 80; // 80%
@@ -1336,8 +1336,8 @@ export class TraktService {
       const watchingKey = this.getWatchingKey(contentData);
       const lastSync = this.lastSyncTimes.get(watchingKey) || 0;
       
-      // Debounce API calls unless forced
-      if (!force && (now - lastSync) < this.SYNC_DEBOUNCE_MS) {
+      // IMMEDIATE SYNC: Remove debouncing for instant sync, only prevent truly rapid calls (< 500ms)
+      if (!force && (now - lastSync) < 500) {
         return true; // Skip this sync, but return success
       }
 
@@ -1377,9 +1377,9 @@ export class TraktService {
       const watchingKey = this.getWatchingKey(contentData);
       const now = Date.now();
       
-      // Enhanced deduplication: Check if we recently stopped this content
+      // IMMEDIATE SYNC: Reduce debouncing for instant sync, only prevent truly duplicate calls (< 1 second)
       const lastStopTime = this.lastStopCalls.get(watchingKey);
-      if (lastStopTime && (now - lastStopTime) < this.STOP_DEBOUNCE_MS) {
+      if (lastStopTime && (now - lastStopTime) < 1000) {
         logger.log(`[TraktService] Ignoring duplicate stop call for ${contentData.title} (last stop ${((now - lastStopTime) / 1000).toFixed(1)}s ago)`);
         return true; // Return success to avoid error handling
       }
@@ -1588,4 +1588,4 @@ export class TraktService {
 }
 
 // Export a singleton instance
-export const traktService = TraktService.getInstance(); 
+export const traktService = TraktService.getInstance();

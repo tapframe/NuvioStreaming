@@ -286,16 +286,16 @@ const VideoPlayer: React.FC = () => {
   }, []);
 
   const startOpeningAnimation = () => {
-    // Logo entrance animation
+    // Logo entrance animation - optimized for faster appearance
     Animated.parallel([
       Animated.timing(logoOpacityAnim, {
         toValue: 1,
-        duration: 600,
+        duration: 300, // Reduced from 600ms to 300ms
         useNativeDriver: true,
       }),
       Animated.spring(logoScaleAnim, {
         toValue: 1,
-        tension: 50,
+        tension: 80, // Increased tension for faster spring
         friction: 8,
         useNativeDriver: true,
       }),
@@ -306,12 +306,12 @@ const VideoPlayer: React.FC = () => {
       return Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 1.05,
-          duration: 1000,
+          duration: 800, // Reduced from 1000ms to 800ms
           useNativeDriver: true,
         }),
         Animated.timing(pulseAnim, {
           toValue: 1,
-          duration: 1000,
+          duration: 800, // Reduced from 1000ms to 800ms
           useNativeDriver: true,
         }),
       ]);
@@ -325,29 +325,26 @@ const VideoPlayer: React.FC = () => {
       });
     };
 
-    // Start pulsing after a short delay
-    setTimeout(() => {
-      if (!isOpeningAnimationComplete) {
-        loopPulse();
-      }
-    }, 800);
+    // Start pulsing immediately without delay
+    // Removed the 800ms delay
+    loopPulse();
   };
 
   const completeOpeningAnimation = () => {
     Animated.parallel([
       Animated.timing(openingFadeAnim, {
         toValue: 1,
-        duration: 600,
+        duration: 300, // Reduced from 600ms to 300ms
         useNativeDriver: true,
       }),
       Animated.timing(openingScaleAnim, {
         toValue: 1,
-        duration: 700,
+        duration: 350, // Reduced from 700ms to 350ms
         useNativeDriver: true,
       }),
       Animated.timing(backgroundFadeAnim, {
         toValue: 0,
-        duration: 800,
+        duration: 400, // Reduced from 800ms to 400ms
         useNativeDriver: true,
       }),
     ]).start(() => {
@@ -418,15 +415,14 @@ const VideoPlayer: React.FC = () => {
         clearInterval(progressSaveInterval);
       }
 
-      // Use the user's configured sync frequency with increased minimum to reduce heating
-      // Minimum interval increased from 5s to 30s to reduce CPU usage
-      const syncInterval = Math.max(30000, traktSettings.syncFrequency);
+      // IMMEDIATE SYNC: Reduce sync interval to 5 seconds for near real-time sync
+      const syncInterval = 5000; // 5 seconds for immediate sync
 
       const interval = setInterval(() => {
         saveWatchProgress();
       }, syncInterval);
 
-      logger.log(`[VideoPlayer] Watch progress save interval set to ${syncInterval}ms`);
+      logger.log(`[VideoPlayer] Watch progress save interval set to ${syncInterval}ms (immediate sync mode)`);
 
       setProgressSaveInterval(interval);
       return () => {
@@ -434,7 +430,7 @@ const VideoPlayer: React.FC = () => {
         setProgressSaveInterval(null);
       };
     }
-  }, [id, type, paused, currentTime, duration, traktSettings.syncFrequency]);
+  }, [id, type, paused, currentTime, duration]);
 
   useEffect(() => {
     return () => {
@@ -629,8 +625,12 @@ const VideoPlayer: React.FC = () => {
         traktAutosync.handlePlaybackStart(currentTime, videoDuration);
       }
 
+      // Complete opening animation immediately before seeking
+      completeOpeningAnimation();
+      
       if (initialPosition && !isInitialSeekComplete) {
         logger.log(`[VideoPlayer] Seeking to initial position: ${initialPosition}s (duration: ${videoDuration}s)`);
+        // Reduced timeout from 1000ms to 500ms
         setTimeout(() => {
           if (vlcRef.current && videoDuration > 0 && isMounted.current) {
             seekToTime(initialPosition);
@@ -639,9 +639,9 @@ const VideoPlayer: React.FC = () => {
           } else {
             logger.error(`[VideoPlayer] Initial seek failed: vlcRef=${!!vlcRef.current}, duration=${videoDuration}, mounted=${isMounted.current}`);
           }
-        }, 1000);
+        }, 500);
       }
-      completeOpeningAnimation();
+      
       controlsTimeout.current = setTimeout(hideControls, 5000);
     } catch (error) {
       logger.error('[VideoPlayer] Error in onLoad:', error);
@@ -704,9 +704,13 @@ const VideoPlayer: React.FC = () => {
   };
 
   const handleClose = async () => {
-    logger.log('[VideoPlayer] Close button pressed - syncing to Trakt before closing');
+    // Prevent multiple close attempts
+    if (isSyncingBeforeClose) {
+      logger.log('[VideoPlayer] Close already in progress, ignoring duplicate call');
+      return;
+    }
 
-    // Set syncing state to prevent multiple close attempts
+    logger.log('[VideoPlayer] Close button pressed - closing immediately and syncing to Trakt in background');
     setIsSyncingBeforeClose(true);
 
     // Make sure we have the most accurate current time
@@ -715,75 +719,56 @@ const VideoPlayer: React.FC = () => {
 
     logger.log(`[VideoPlayer] Current progress: ${actualCurrentTime}/${duration} (${progressPercent.toFixed(1)}%)`);
 
-    try {
-      // Force one last progress update (scrobble/pause) with the exact time
-      await traktAutosync.handleProgressUpdate(actualCurrentTime, duration, true);
+    // Cleanup and navigate back immediately without delay
+    const cleanup = async () => {
+      try {
+        // Unlock orientation first
+        await ScreenOrientation.unlockAsync();
+        logger.log('[VideoPlayer] Orientation unlocked');
+      } catch (orientationError) {
+        logger.warn('[VideoPlayer] Failed to unlock orientation:', orientationError);
+      }
 
-      // Sync progress to Trakt before closing
-      await traktAutosync.handlePlaybackEnd(actualCurrentTime, duration, 'unmount');
+      // Disable immersive mode
+      disableImmersiveMode();
 
-      // Start exit animation
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-        Animated.timing(openingFadeAnim, {
-          toValue: 0,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-      ]).start();
-
-      // Cleanup and navigate back
-      const cleanup = async () => {
-        try {
-          // Unlock orientation first
-          await ScreenOrientation.unlockAsync();
-          logger.log('[VideoPlayer] Orientation unlocked');
-        } catch (orientationError) {
-          logger.warn('[VideoPlayer] Failed to unlock orientation:', orientationError);
-        }
-
-        // Disable immersive mode
-        disableImmersiveMode();
-
-        // Navigate back with proper handling for fullscreen modal
-        try {
-          if (navigation.canGoBack()) {
-            navigation.goBack();
-          } else {
-            // Fallback: navigate to main tabs if can't go back
-            navigation.navigate('MainTabs');
-          }
-          logger.log('[VideoPlayer] Navigation completed');
-        } catch (navError) {
-          logger.error('[VideoPlayer] Navigation error:', navError);
-          // Last resort: try to navigate to home
+      // Navigate back with proper handling for fullscreen modal
+      try {
+        if (navigation.canGoBack()) {
+          navigation.goBack();
+        } else {
+          // Fallback: navigate to main tabs if can't go back
           navigation.navigate('MainTabs');
         }
-      };
-
-      // Delay to ensure Trakt sync completes and animations finish
-      setTimeout(cleanup, 500);
-
-    } catch (error) {
-      logger.error('[VideoPlayer] Error syncing to Trakt before closing:', error);
-      // Navigate anyway even if sync fails
-      disableImmersiveMode();
-      try {
-        await ScreenOrientation.unlockAsync();
-      } catch (orientationError) {
-        // Ignore orientation unlock errors
-      }
-
-      if (navigation.canGoBack()) {
-        navigation.goBack();
-      } else {
+        logger.log('[VideoPlayer] Navigation completed');
+      } catch (navError) {
+        logger.error('[VideoPlayer] Navigation error:', navError);
+        // Last resort: try to navigate to home
         navigation.navigate('MainTabs');
       }
-    }
+    };
+
+    // Navigate immediately
+    cleanup();
+
+    // Send Trakt sync in background (don't await)
+    const backgroundSync = async () => {
+      try {
+        logger.log('[VideoPlayer] Starting background Trakt sync');
+        // Force one last progress update (scrobble/pause) with the exact time
+        await traktAutosync.handleProgressUpdate(actualCurrentTime, duration, true);
+        
+        // Sync progress to Trakt
+        await traktAutosync.handlePlaybackEnd(actualCurrentTime, duration, 'unmount');
+        
+        logger.log('[VideoPlayer] Background Trakt sync completed successfully');
+      } catch (error) {
+        logger.error('[VideoPlayer] Error in background Trakt sync:', error);
+      }
+    };
+
+    // Start background sync without blocking UI
+    backgroundSync();
   };
 
   const handleResume = async () => {
@@ -836,10 +821,8 @@ const VideoPlayer: React.FC = () => {
       logger.log('[VideoPlayer] Video ended naturally, sending final progress update with 100%');
       await traktAutosync.handleProgressUpdate(finalTime, duration, true);
 
-      // Small delay to ensure the progress update is processed
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      // Now send the stop call
+      // IMMEDIATE SYNC: Remove delay for instant sync
+      // Now send the stop call immediately
       logger.log('[VideoPlayer] Sending final stop call after natural end');
       await traktAutosync.handlePlaybackEnd(finalTime, duration, 'ended');
 
