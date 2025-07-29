@@ -650,6 +650,15 @@ export const StreamsScreen = () => {
     
     // Determine the stream name using the same logic as StreamCard
     const streamName = stream.name || stream.title || 'Unnamed Stream';
+    const streamProvider = stream.addonId || stream.addonName || stream.name;
+    
+    // Debug logging for stream provider identification
+    console.log('[StreamsScreen] Stream Provider Debug:');
+    console.log('  stream.addonId:', stream.addonId);
+    console.log('  stream.addonName:', stream.addonName);
+    console.log('  stream.name:', stream.name);
+    console.log('  final streamProvider:', streamProvider);
+    console.log('  stream.url:', stream.url);
     
     // Navigate to player immediately without waiting for orientation lock
     // This prevents delay in player opening
@@ -661,7 +670,7 @@ export const StreamsScreen = () => {
       episode: type === 'series' ? currentEpisode?.episode_number : undefined,
       quality: stream.title?.match(/(\d+)p/)?.[1] || undefined,
       year: metadata?.year,
-      streamProvider: stream.name,
+      streamProvider: streamProvider,
       streamName: streamName,
       id,
       type,

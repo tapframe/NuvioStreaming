@@ -39,23 +39,32 @@ import CustomSubtitles from './subtitles/CustomSubtitles';
 import { SourcesModal } from './modals/SourcesModal';
 
 const VideoPlayer: React.FC = () => {
-  // If on Android, use the AndroidVideoPlayer component
-  if (Platform.OS === 'android') {
+  const route = useRoute<RouteProp<RootStackParamList, 'Player'>>();
+  const { streamProvider, uri } = route.params;
+  
+  // Check if the stream is from Xprime
+  const isXprimeStream = streamProvider === 'xprime' || streamProvider === 'Xprime';
+  
+  // Check if the file format is MKV
+  const isMkvFile = uri && (uri.toLowerCase().includes('.mkv') || uri.toLowerCase().includes('mkv'));
+  
+  // Use AndroidVideoPlayer for:
+  // - Android devices
+  // - Xprime streams on any platform
+  // - Non-MKV files on iOS
+  if (Platform.OS === 'android' || isXprimeStream || (Platform.OS === 'ios' && !isMkvFile)) {
     return <AndroidVideoPlayer />;
   }
 
   const navigation = useNavigation<RootStackNavigationProp>();
-  const route = useRoute<RouteProp<RootStackParamList, 'Player'>>();
 
   const {
-    uri,
     title = 'Episode Name',
     season,
     episode,
     episodeTitle,
     quality,
     year,
-    streamProvider,
     streamName,
     id,
     type,
@@ -1210,7 +1219,43 @@ const VideoPlayer: React.FC = () => {
                 <VLCPlayer
                   ref={vlcRef}
                   style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
-                  source={{ uri: currentStreamUrl }}
+                  source={(() => {
+                    // Add specific headers for Xprime streams
+                    const isXprimeStream = currentStreamProvider === 'xprime' || 
+                                          currentStreamProvider === 'Xprime' || 
+                                          currentStreamUrl?.includes('xprime.tv');
+                    
+                    // Debug logging for Xprime detection
+                    console.log('[VideoPlayer] Xprime Detection Debug:');
+                    console.log('  currentStreamProvider:', currentStreamProvider);
+                    console.log('  currentStreamUrl:', currentStreamUrl);
+                    console.log('  isXprimeStream:', isXprimeStream);
+                    console.log('  URL includes xprime.tv:', currentStreamUrl?.includes('xprime.tv'));
+                    
+                    const sourceWithHeaders = isXprimeStream ? {
+                      uri: currentStreamUrl,
+                      headers: {
+                        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36',
+                        'Accept': 'video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5',
+                        'Accept-Language': 'en-US,en;q=0.9',
+                        'Accept-Encoding': 'identity',
+                        'Origin': 'https://xprime.tv',
+                        'Referer': 'https://xprime.tv/',
+                        'Sec-Fetch-Dest': 'video',
+                        'Sec-Fetch-Mode': 'no-cors',
+                        'Sec-Fetch-Site': 'cross-site',
+                        'DNT': '1'
+                      }
+                    } : { uri: currentStreamUrl };
+                    
+                    if (isXprimeStream) {
+                      console.log('[VideoPlayer] Applying Xprime headers:', sourceWithHeaders.headers);
+                    } else {
+                      console.log('[VideoPlayer] No special headers applied');
+                    }
+                    
+                    return sourceWithHeaders;
+                  })()}
                   paused={paused}
                   onProgress={handleProgress}
                   onLoad={onLoad}
