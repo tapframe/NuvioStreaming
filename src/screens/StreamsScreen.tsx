@@ -57,6 +57,10 @@ const DOLBY_ICON = 'https://upload.wikimedia.org/wikipedia/en/thumb/3/3f/Dolby_V
 
 const { width, height } = Dimensions.get('window');
 
+// Cache for scraper logos to avoid repeated async calls
+const scraperLogoCache = new Map<string, string>();
+let scraperLogoCachePromise: Promise<void> | null = null;
+
 // Extracted Components
 const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, theme }: { 
   stream: Stream; 
@@ -101,6 +105,47 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
     };
   }, [stream.name, stream.title, stream.behaviorHints, stream.size]);
   
+  // Get scraper logo for local scrapers using cache
+  const [scraperLogo, setScraperLogo] = React.useState<string | null>(() => {
+    const scraperId = stream.addonId || stream.addon;
+    return scraperId ? scraperLogoCache.get(scraperId) || null : null;
+  });
+  
+  React.useEffect(() => {
+    const scraperId = stream.addonId || stream.addon;
+    if (!scraperId) return;
+    
+    // Check cache first
+    const cachedLogo = scraperLogoCache.get(scraperId);
+    if (cachedLogo) {
+      setScraperLogo(cachedLogo);
+      return;
+    }
+    
+    // If not in cache, fetch asynchronously
+    let isMounted = true;
+    
+    const getScraperLogo = async () => {
+      try {
+        const availableScrapers = await localScraperService.getAvailableScrapers();
+        const scraper = availableScrapers.find(s => s.id === scraperId);
+        if (scraper && scraper.logo && isMounted) {
+          // Cache the logo for future use
+          scraperLogoCache.set(scraperId, scraper.logo);
+          setScraperLogo(scraper.logo);
+        }
+      } catch (error) {
+        // Silently fail if we can't get scraper info
+      }
+    };
+    
+    getScraperLogo();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [stream.addonId, stream.addon]);
+  
   return (
     <TouchableOpacity 
         style={[
@@ -111,6 +156,17 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
         disabled={isLoading}
         activeOpacity={0.7}
       >
+        {/* Scraper Logo */}
+        {scraperLogo && (
+          <View style={styles.scraperLogoContainer}>
+            <Image
+              source={{ uri: scraperLogo }}
+              style={styles.scraperLogo}
+              resizeMode="contain"
+            />
+          </View>
+        )}
+        
         <View style={styles.streamDetails}>
           <View style={styles.streamNameRow}>
             <View style={styles.streamTitleContainer}>
@@ -354,6 +410,28 @@ export const StreamsScreen = () => {
 
   // Add state for no sources error
   const [showNoSourcesError, setShowNoSourcesError] = useState(false);
+  
+  // Preload scraper logos to cache for faster display
+  React.useEffect(() => {
+    const preloadScraperLogos = async () => {
+      if (scraperLogoCachePromise) return; // Already loading
+      
+      scraperLogoCachePromise = (async () => {
+        try {
+          const availableScrapers = await localScraperService.getAvailableScrapers();
+          availableScrapers.forEach(scraper => {
+            if (scraper.logo && scraper.id) {
+              scraperLogoCache.set(scraper.id, scraper.logo);
+            }
+          });
+        } catch (error) {
+          // Silently fail
+        }
+      })();
+    };
+    
+    preloadScraperLogos();
+  }, []);
 
   // Monitor streams loading and update available providers immediately
   useEffect(() => {
@@ -1573,6 +1651,19 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderColor: colors.cardHighlight,
     width: '100%',
     zIndex: 1,
+  },
+  scraperLogoContainer: {
+    width: 32,
+    height: 32,
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.elevation2,
+    borderRadius: 6,
+  },
+  scraperLogo: {
+    width: 24,
+    height: 24,
   },
   streamCardLoading: {
     opacity: 0.7,
