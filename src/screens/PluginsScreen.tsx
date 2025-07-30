@@ -824,6 +824,22 @@ const PluginsScreen: React.FC = () => {
                disabled={!settings.enableLocalScrapers || settings.streamDisplayMode !== 'grouped'}
              />
           </View>
+          
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={[styles.settingTitle, !settings.enableLocalScrapers && styles.disabledText]}>Show Scraper Logos</Text>
+              <Text style={[styles.settingDescription, !settings.enableLocalScrapers && styles.disabledText]}>
+                Display scraper logos next to streaming links on the streams screen.
+              </Text>
+            </View>
+            <Switch
+               value={settings.showScraperLogos && settings.enableLocalScrapers}
+               onValueChange={(value) => updateSetting('showScraperLogos', value)}
+               trackColor={{ false: colors.elevation3, true: colors.primary }}
+               thumbColor={settings.showScraperLogos && settings.enableLocalScrapers ? colors.white : '#f4f3f4'}
+               disabled={!settings.enableLocalScrapers}
+             />
+          </View>
         </View>
 
         {/* Quality Filtering */}
