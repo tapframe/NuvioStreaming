@@ -62,13 +62,14 @@ const scraperLogoCache = new Map<string, string>();
 let scraperLogoCachePromise: Promise<void> | null = null;
 
 // Extracted Components
-const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, theme }: { 
+const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, theme, showLogos }: { 
   stream: Stream; 
   onPress: () => void; 
   index: number;
   isLoading?: boolean;
   statusMessage?: string;
   theme: any;
+  showLogos?: boolean;
 }) => {
   const styles = React.useMemo(() => createStyles(theme.colors), [theme.colors]);
   
@@ -157,7 +158,7 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
         activeOpacity={0.7}
       >
         {/* Scraper Logo */}
-        {scraperLogo && (
+        {showLogos && scraperLogo && (
           <View style={styles.scraperLogoContainer}>
             <Image
               source={{ uri: scraperLogo }}
@@ -1276,9 +1277,10 @@ export const StreamsScreen = () => {
         isLoading={isLoading}
         statusMessage={undefined}
         theme={currentTheme}
+        showLogos={settings.showScraperLogos}
       />
     );
-  }, [handleStreamPress, currentTheme]);
+  }, [handleStreamPress, currentTheme, settings.showScraperLogos]);
 
   const renderSectionHeader = useCallback(({ section }: { section: { title: string; addonId: string } }) => {
     const isProviderLoading = loadingProviders[section.addonId];

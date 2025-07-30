@@ -711,55 +711,112 @@ const AndroidVideoPlayer: React.FC = () => {
   };
 
   const handleError = (error: any) => {
-    logger.error('AndroidVideoPlayer error: ', error);
-    
-    // Check for specific AVFoundation server configuration errors
-    const isServerConfigError = error?.error?.code === -11850 || 
-                               error?.code === -11850 ||
-                               (error?.error?.localizedDescription && 
-                                error.error.localizedDescription.includes('server is not correctly configured'));
-    
-    // Format error details for user display
-    let errorMessage = 'An unknown error occurred';
-    if (error) {
-      if (isServerConfigError) {
-        errorMessage = 'Stream server configuration issue. This may be a temporary problem with the video source.';
-      } else if (typeof error === 'string') {
-        errorMessage = error;
-      } else if (error.message) {
-        errorMessage = error.message;
-      } else if (error.error && error.error.message) {
-        errorMessage = error.error.message;
-      } else if (error.error && error.error.localizedDescription) {
-        errorMessage = error.error.localizedDescription;
-      } else if (error.code) {
-        errorMessage = `Error Code: ${error.code}`;
-      } else {
-        errorMessage = JSON.stringify(error, null, 2);
+    try {
+      logger.error('AndroidVideoPlayer error: ', error);
+      
+      // Early return if component is unmounted to prevent iOS crashes
+      if (!isMounted.current) {
+        logger.warn('[AndroidVideoPlayer] Component unmounted, skipping error handling');
+        return;
+      }
+      
+      // Check for specific AVFoundation server configuration errors
+      const isServerConfigError = error?.error?.code === -11850 || 
+                                 error?.code === -11850 ||
+                                 (error?.error?.localizedDescription && 
+                                  error.error.localizedDescription.includes('server is not correctly configured'));
+      
+      // Format error details for user display
+      let errorMessage = 'An unknown error occurred';
+      if (error) {
+        if (isServerConfigError) {
+          errorMessage = 'Stream server configuration issue. This may be a temporary problem with the video source.';
+        } else if (typeof error === 'string') {
+          errorMessage = error;
+        } else if (error.message) {
+          errorMessage = error.message;
+        } else if (error.error && error.error.message) {
+          errorMessage = error.error.message;
+        } else if (error.error && error.error.localizedDescription) {
+          errorMessage = error.error.localizedDescription;
+        } else if (error.code) {
+          errorMessage = `Error Code: ${error.code}`;
+        } else {
+          try {
+            errorMessage = JSON.stringify(error, null, 2);
+          } catch (jsonError) {
+            errorMessage = 'Error occurred but details could not be serialized';
+          }
+        }
+      }
+      
+      // Use safeSetState to prevent crashes on iOS when component is unmounted
+      safeSetState(() => {
+        setErrorDetails(errorMessage);
+        setShowErrorModal(true);
+      });
+      
+      // Clear any existing timeout
+      if (errorTimeoutRef.current) {
+        clearTimeout(errorTimeoutRef.current);
+      }
+      
+      // Auto-exit after 5 seconds if user doesn't dismiss
+      errorTimeoutRef.current = setTimeout(() => {
+        if (isMounted.current) {
+          handleErrorExit();
+        }
+      }, 5000);
+    } catch (handlerError) {
+      // Fallback error handling to prevent crashes during error processing
+      logger.error('[AndroidVideoPlayer] Error in error handler:', handlerError);
+      if (isMounted.current) {
+        // Minimal safe error handling
+        safeSetState(() => {
+          setErrorDetails('A critical error occurred');
+          setShowErrorModal(true);
+        });
+        // Force exit after 3 seconds if error handler itself fails
+        setTimeout(() => {
+          if (isMounted.current) {
+            handleClose();
+          }
+        }, 3000);
       }
     }
-    
-    setErrorDetails(errorMessage);
-    setShowErrorModal(true);
-    
-    // Clear any existing timeout
-    if (errorTimeoutRef.current) {
-      clearTimeout(errorTimeoutRef.current);
-    }
-    
-    // Auto-exit after 5 seconds if user doesn't dismiss
-    errorTimeoutRef.current = setTimeout(() => {
-      handleErrorExit();
-    }, 5000);
   };
   
   const handleErrorExit = () => {
-    if (errorTimeoutRef.current) {
-      clearTimeout(errorTimeoutRef.current);
-      errorTimeoutRef.current = null;
+    try {
+      // Early return if component is unmounted
+      if (!isMounted.current) {
+        logger.warn('[AndroidVideoPlayer] Component unmounted, skipping error exit');
+        return;
+      }
+      
+      if (errorTimeoutRef.current) {
+        clearTimeout(errorTimeoutRef.current);
+        errorTimeoutRef.current = null;
+      }
+      
+      // Use safeSetState to prevent crashes on iOS when component is unmounted
+      safeSetState(() => {
+        setShowErrorModal(false);
+      });
+      
+      // Add small delay before closing to ensure modal state is updated
+      setTimeout(() => {
+        if (isMounted.current) {
+          handleClose();
+        }
+      }, 100);
+    } catch (exitError) {
+      logger.error('[AndroidVideoPlayer] Error in handleErrorExit:', exitError);
+      // Force close as last resort
+      if (isMounted.current) {
+        handleClose();
+      }
     }
-    setShowErrorModal(false);
-    handleClose();
   };
 
   const onBuffer = (data: any) => {
@@ -1323,12 +1380,15 @@ const AndroidVideoPlayer: React.FC = () => {
       />
       
       {/* Error Modal */}
-      <Modal
-        visible={showErrorModal}
-        transparent
-        animationType="fade"
-        onRequestClose={handleErrorExit}
-      >
+      {isMounted.current && (
+        <Modal
+          visible={showErrorModal}
+          transparent
+          animationType="fade"
+          onRequestClose={handleErrorExit}
+          supportedOrientations={['landscape', 'portrait']}
+          statusBarTranslucent={true}
+        >
         <View style={{
           flex: 1,
           justifyContent: 'center',
@@ -1414,7 +1474,8 @@ const AndroidVideoPlayer: React.FC = () => {
             }}>This dialog will auto-close in 5 seconds</Text>
           </View>
         </View>
-      </Modal>
+        </Modal>
+      )}
     </View> 
   );
 };
