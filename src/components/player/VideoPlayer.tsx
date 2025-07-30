@@ -1264,13 +1264,13 @@ const VideoPlayer: React.FC = () => {
                   ref={vlcRef}
                   style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
                   source={(() => {
-                    // Use headers from route params if available, otherwise no headers
+                    // FORCEFULLY use headers from route params if available - no filtering or modification
                     const sourceWithHeaders = headers ? {
                       uri: currentStreamUrl,
                       headers: headers
                     } : { uri: currentStreamUrl };
                     
-                    console.log('[VideoPlayer] Using headers from route params:', headers);
+                    console.log('[VideoPlayer] FORCEFULLY using headers from route params:', headers);
                     
                     return sourceWithHeaders;
                   })()}

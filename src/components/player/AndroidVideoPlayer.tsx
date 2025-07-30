@@ -1241,26 +1241,13 @@ const AndroidVideoPlayer: React.FC = () => {
                   ref={videoRef}
                   style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
                   source={(() => {
-                    // Use headers from route params if available, otherwise no headers
-                    let processedHeaders = headers;
-                    
-                    // For iOS and Xprime streams, filter out potentially problematic headers
-                    if (Platform.OS === 'ios' && headers && (streamProvider === 'xprime' || streamProvider === 'Xprime')) {
-                      // Remove headers that might cause AVFoundation issues
-                      const { 'Sec-Fetch-Dest': _, 'Sec-Fetch-Mode': __, 'Sec-Fetch-Site': ___, 'DNT': ____, ...filteredHeaders } = headers;
-                      processedHeaders = {
-                        'User-Agent': headers['User-Agent'] || 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15',
-                        'Referer': headers['Referer'] || headers['Origin'] || 'https://xprime.tv/',
-                        'Accept': 'video/mp4,video/*;q=0.9,*/*;q=0.8'
-                      };
-                    }
-                    
-                    const sourceWithHeaders = processedHeaders ? {
+                    // FORCEFULLY use headers from route params if available - no filtering or modification
+                    const sourceWithHeaders = headers ? {
                       uri: currentStreamUrl,
-                      headers: processedHeaders
+                      headers: headers
                     } : { uri: currentStreamUrl };
                     
-                    console.log('[AndroidVideoPlayer] Using headers from route params:', processedHeaders);
+                    console.log('[AndroidVideoPlayer] FORCEFULLY using headers from route params:', headers);
                     
                     return sourceWithHeaders;
                   })()}
