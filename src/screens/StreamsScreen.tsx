@@ -14,7 +14,9 @@ import {
   Alert,
   Dimensions,
   Linking,
+  Clipboard,
 } from 'react-native';
+
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { RouteProp } from '@react-navigation/native';
@@ -71,6 +73,27 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
   theme: any;
   showLogos?: boolean;
 }) => {
+  
+  // Handle long press to copy stream URL to clipboard
+  const handleLongPress = useCallback(async () => {
+    if (stream.url) {
+      try {
+        await Clipboard.setString(stream.url);
+        Alert.alert(
+          'Copied!',
+          'Stream URL has been copied to clipboard.',
+          [{ text: 'OK' }]
+        );
+      } catch (error) {
+        // Fallback: show URL in alert if clipboard fails
+        Alert.alert(
+          'Stream URL',
+          stream.url,
+          [{ text: 'OK' }]
+        );
+      }
+    }
+  }, [stream.url]);
   const styles = React.useMemo(() => createStyles(theme.colors), [theme.colors]);
   
   const streamInfo = useMemo(() => {
@@ -154,6 +177,7 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
           isLoading && styles.streamCardLoading
         ]} 
         onPress={onPress}
+        onLongPress={handleLongPress}
         disabled={isLoading}
         activeOpacity={0.7}
       >
@@ -822,6 +846,25 @@ export const StreamsScreen = () => {
     console.log('  stream.name:', stream.name);
     console.log('  final streamProvider:', streamProvider);
     console.log('  stream.url:', stream.url);
+    
+    // Enhanced logging for NetMirror streams
+    if (streamProvider && (streamProvider.toLowerCase().includes('netmirror') || stream.url?.includes('nm-cdn'))) {
+      console.log('\n[StreamsScreen] 🎬 NETMIRROR STREAM DETAILS:');
+      console.log('  📺 Stream Name:', streamName);
+      console.log('  🔗 Final Extracted URL:', stream.url);
+      console.log('  📋 Headers:', JSON.stringify(stream.headers, null, 2));
+      console.log('  🎯 Quality:', stream.title?.match(/(\d+)p/)?.[1] || 'Unknown');
+      console.log('  📱 Platform:', Platform.OS);
+      console.log('  ⚙️ Stream Object:', JSON.stringify({
+        name: stream.name,
+        title: stream.title,
+        url: stream.url,
+        headers: stream.headers,
+        addonId: stream.addonId,
+        addonName: stream.addonName
+      }, null, 2));
+      console.log('\n');
+    }
     
     // Navigate to player immediately without waiting for orientation lock
     // This prevents delay in player opening
