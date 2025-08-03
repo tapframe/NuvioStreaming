@@ -22,7 +22,7 @@
     "@sentry/react-native": "^6.15.1",
     "@types/lodash": "^4.17.16",
     "@types/react-native-video": "^5.0.20",
-    "axios": "^1.10.0",
+    "axios": "^1.11.0",
     "axios-cookiejar-support": "^6.0.4",
     "cheerio-without-node-native": "^0.20.2",
     "date-fns": "^4.1.0",

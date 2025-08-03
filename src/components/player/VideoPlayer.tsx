@@ -567,6 +567,7 @@ const VideoPlayer: React.FC = () => {
 
   const onLoad = (data: any) => {
     try {
+    
       if (DEBUG_MODE) {
         logger.log('[VideoPlayer] Video loaded:', data);
       }
@@ -796,6 +797,16 @@ const VideoPlayer: React.FC = () => {
   };
 
   const handleError = (error: any) => {
+    // Enhanced HTTP error response logging
+    console.log('\n❌ [VideoPlayer] HTTP RESPONSE ERROR:');
+    console.log('📍 URL:', currentStreamUrl);
+    console.log('📊 Status:', error?.error?.code ? `${error.error.code} (${error.error.domain || 'Unknown Domain'})` : 'Unknown Error Code');
+    console.log('💬 Error Message:', error?.error?.localizedDescription || error?.message || 'Unknown error');
+    console.log('🔍 Error Type:', error?.error?.domain || 'Unknown');
+    console.log('📋 Full Error Object:', JSON.stringify(error, null, 2));
+    console.log('⏰ Error Time:', new Date().toISOString());
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+    
     logger.error('[VideoPlayer] Playback Error:', error);
     
     // Format error details for user display
@@ -1270,7 +1281,16 @@ const VideoPlayer: React.FC = () => {
                       headers: headers
                     } : { uri: currentStreamUrl };
                     
-                    console.log('[VideoPlayer] FORCEFULLY using headers from route params:', headers);
+                    // Enhanced HTTP request logging
+                    console.log('\n🌐 [VideoPlayer] HTTP REQUEST DETAILS:');
+                    console.log('📍 URL:', currentStreamUrl);
+                    console.log('🔧 Method: GET (Video Stream)');
+                    console.log('📋 Headers:', headers ? JSON.stringify(headers, null, 2) : 'No headers');
+                    console.log('🎬 Stream Provider:', currentStreamProvider || streamProvider || 'Unknown');
+                    console.log('📺 Stream Name:', currentStreamName || streamName || 'Unknown');
+                    console.log('🎯 Quality:', currentQuality || quality || 'Unknown');
+                    console.log('⏰ Timestamp:', new Date().toISOString());
+                    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
                     
                     return sourceWithHeaders;
                   })()}

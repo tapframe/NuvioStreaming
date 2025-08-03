@@ -15,6 +15,7 @@ import { useTraktAutosync } from '../../hooks/useTraktAutosync';
 import { useTraktAutosyncSettings } from '../../hooks/useTraktAutosyncSettings';
 import { useMetadata } from '../../hooks/useMetadata';
 import { useSettings } from '../../hooks/useSettings';
+import { testVideoStreamUrl } from '../../utils/httpInterceptor';
 
 import { 
   DEFAULT_SUBTITLE_SIZE, 
@@ -497,6 +498,17 @@ const AndroidVideoPlayer: React.FC = () => {
 
   const onLoad = (data: any) => {
     try {
+      // Enhanced HTTP response logging
+      console.log('\n✅ [AndroidVideoPlayer] HTTP RESPONSE SUCCESS:');
+      console.log('📍 URL:', currentStreamUrl);
+      console.log('📊 Status: 200 OK (Video Stream Loaded)');
+      console.log('📺 Duration:', data?.duration ? `${data.duration.toFixed(2)}s` : 'Unknown');
+      console.log('📐 Resolution:', data?.naturalSize ? `${data.naturalSize.width}x${data.naturalSize.height}` : 'Unknown');
+      console.log('🎵 Audio Tracks:', data?.audioTracks?.length || 0);
+      console.log('📝 Text Tracks:', data?.textTracks?.length || 0);
+      console.log('⏰ Response Time:', new Date().toISOString());
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+      
       if (DEBUG_MODE) {
         logger.log('[AndroidVideoPlayer] Video loaded:', data);
       }
@@ -619,7 +631,7 @@ const AndroidVideoPlayer: React.FC = () => {
           NativeModules.StatusBarManager.setHidden(true);
         }
       } catch (error) {
-        console.log('Immersive mode error:', error);
+        // Immersive mode error - silently handled
       }
     }
   };
@@ -712,6 +724,16 @@ const AndroidVideoPlayer: React.FC = () => {
 
   const handleError = (error: any) => {
     try {
+      // Enhanced HTTP error response logging
+      console.log('\n❌ [AndroidVideoPlayer] HTTP RESPONSE ERROR:');
+      console.log('📍 URL:', currentStreamUrl);
+      console.log('📊 Status:', error?.error?.code ? `${error.error.code} (${error.error.domain || 'Unknown Domain'})` : 'Unknown Error Code');
+      console.log('💬 Error Message:', error?.error?.localizedDescription || error?.message || 'Unknown error');
+      console.log('🔍 Error Type:', error?.error?.domain || 'Unknown');
+      console.log('📋 Full Error Object:', JSON.stringify(error, null, 2));
+      console.log('⏰ Error Time:', new Date().toISOString());
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+      
       logger.error('AndroidVideoPlayer error: ', error);
       
       // Early return if component is unmounted to prevent iOS crashes
@@ -1046,6 +1068,24 @@ const AndroidVideoPlayer: React.FC = () => {
     }
   }, [pendingSeek, isPlayerReady, isVideoLoaded, duration]);
 
+  // HTTP stream testing with logging
+  useEffect(() => {
+    if (currentStreamUrl && currentStreamUrl.trim() !== '') {
+      const testStream = async () => {
+        try {
+          console.log('\n🔍 [AndroidVideoPlayer] Testing video stream URL...');
+          const isValid = await testVideoStreamUrl(currentStreamUrl, headers || {});
+          console.log(`✅ [AndroidVideoPlayer] Stream test result: ${isValid ? 'VALID' : 'INVALID'}`);
+        } catch (error) {
+          console.log('❌ [AndroidVideoPlayer] Stream test failed:', error);
+        }
+      };
+      
+      // Test the stream URL when it changes
+      testStream();
+    }
+  }, [currentStreamUrl, headers]);
+
   const handleSelectStream = async (newStream: any) => {
     if (newStream.url === currentStreamUrl) {
       setShowSourcesModal(false);
@@ -1247,7 +1287,16 @@ const AndroidVideoPlayer: React.FC = () => {
                       headers: headers
                     } : { uri: currentStreamUrl };
                     
-                    console.log('[AndroidVideoPlayer] FORCEFULLY using headers from route params:', headers);
+                    // Enhanced HTTP request logging
+                    console.log('\n🌐 [AndroidVideoPlayer] HTTP REQUEST DETAILS:');
+                    console.log('📍 URL:', currentStreamUrl);
+                    console.log('🔧 Method: GET (Video Stream)');
+                    console.log('📋 Headers:', headers ? JSON.stringify(headers, null, 2) : 'No headers');
+                    console.log('🎬 Stream Provider:', currentStreamProvider || 'Unknown');
+                    console.log('📺 Stream Name:', currentStreamName || 'Unknown');
+                    console.log('🎯 Quality:', currentQuality || 'Unknown');
+                    console.log('⏰ Timestamp:', new Date().toISOString());
+                    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
                     
                     return sourceWithHeaders;
                   })()}
