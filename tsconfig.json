@@ -3,6 +3,8 @@
   "compilerOptions": {
     "strict": true,
     "jsx": "react-jsx",
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "target": "es2017",
+    "downlevelIteration": true
   }
 }

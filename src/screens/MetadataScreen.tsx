@@ -15,6 +15,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../contexts/ThemeContext';
 import { useMetadata } from '../hooks/useMetadata';
+import { useDominantColor, preloadDominantColor } from '../hooks/useDominantColor';
 import { CastSection } from '../components/metadata/CastSection';
 import { CastDetailsModal } from '../components/metadata/CastDetailsModal';
 import { SeriesContent } from '../components/metadata/SeriesContent';
@@ -98,6 +99,43 @@ const MetadataScreen: React.FC = () => {
   const watchProgressData = useWatchProgress(id, type as 'movie' | 'series', episodeId, episodes);
   const assetData = useMetadataAssets(metadata, id, type, imdbId, settings, setMetadata);
   const animations = useMetadataAnimations(safeAreaTop, watchProgressData.watchProgress);
+  
+  // Extract dominant color from hero image for dynamic background
+  const heroImageUri = useMemo(() => {
+    if (!metadata) return null;
+    return assetData.bannerImage || metadata.banner || metadata.poster || null;
+  }, [metadata, assetData.bannerImage]);
+  
+  // Preload color extraction as soon as we have the URI
+  useEffect(() => {
+    if (heroImageUri) {
+      preloadDominantColor(heroImageUri);
+    }
+  }, [heroImageUri]);
+  
+  const { dominantColor, loading: colorLoading } = useDominantColor(heroImageUri);
+  
+  // Memoized background color with immediate fallback and smooth transition
+  const dynamicBackgroundColor = useMemo(() => {
+    // Start with theme background, then use extracted color when available and different from fallback
+    if (dominantColor && dominantColor !== '#1a1a1a' && dominantColor !== null && dominantColor !== currentTheme.colors.darkBackground) {
+      return dominantColor;
+    }
+    // Always return theme background as immediate fallback
+    return currentTheme.colors.darkBackground;
+  }, [dominantColor, currentTheme.colors.darkBackground]);
+
+  // Debug logging for color extraction timing
+  useEffect(() => {
+    if (heroImageUri && dominantColor) {
+      console.log('[MetadataScreen] Dynamic background color:', {
+        dominantColor,
+        fallback: currentTheme.colors.darkBackground,
+        finalColor: dynamicBackgroundColor,
+        heroImageUri
+      });
+    }
+  }, [dominantColor, dynamicBackgroundColor, heroImageUri, currentTheme.colors.darkBackground]);
 
   // Focus effect for performance optimization
   useFocusEffect(
@@ -389,7 +427,7 @@ const MetadataScreen: React.FC = () => {
     
     return (
       <SafeAreaView 
-        style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}
+        style={[styles.container, { backgroundColor: dynamicBackgroundColor }]}
         edges={['bottom']}
       >
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
@@ -428,7 +466,7 @@ const MetadataScreen: React.FC = () => {
 
   return (
     <SafeAreaView 
-      style={[containerStyle, styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}
+      style={[containerStyle, styles.container, { backgroundColor: dynamicBackgroundColor }]}
       edges={['bottom']}
     >
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" animated />
@@ -484,6 +522,7 @@ const MetadataScreen: React.FC = () => {
               setBannerImage={assetData.setBannerImage}
               setLogoLoadError={assetData.setLogoLoadError}
               groupedEpisodes={groupedEpisodes}
+              dynamicBackgroundColor={dynamicBackgroundColor}
             />
 
             {/* Main Content - Optimized */}

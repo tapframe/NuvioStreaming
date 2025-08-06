@@ -70,6 +70,7 @@ interface HeroSectionProps {
   setBannerImage: (bannerImage: string | null) => void;
   setLogoLoadError: (error: boolean) => void;
   groupedEpisodes?: { [seasonNumber: number]: any[] };
+  dynamicBackgroundColor?: string;
 }
 
 // Ultra-optimized ActionButtons Component - minimal re-renders
@@ -677,6 +678,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   setBannerImage,
   setLogoLoadError,
   groupedEpisodes,
+  dynamicBackgroundColor,
 }) => {
   const { currentTheme } = useTheme();
   const { isAuthenticated: isTraktAuthenticated } = useTraktContext();
@@ -929,15 +931,17 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
         />
       )}
 
-      {/* Optimized Gradient */}
+      {/* Ultra-light Gradient with subtle dynamic background blend */}
       <LinearGradient
         colors={[
           'rgba(0,0,0,0)',
-          'rgba(0,0,0,0.4)',
-          'rgba(0,0,0,0.8)',
-          themeColors.darkBackground
+          'rgba(0,0,0,0.05)',
+          'rgba(0,0,0,0.15)',
+          'rgba(0,0,0,0.35)',
+          'rgba(0,0,0,0.65)',
+          dynamicBackgroundColor || themeColors.darkBackground
         ]}
-        locations={[0, 0.6, 0.85, 1]}
+        locations={[0, 0.3, 0.55, 0.75, 0.9, 1]}
         style={styles.heroGradient}
       >
         <View style={styles.heroContent}>
@@ -994,6 +998,23 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
           />
         </View>
       </LinearGradient>
+      
+      {/* Ultra-subtle bottom fade for feather-light seamless blend */}
+      <LinearGradient
+        colors={[
+          'transparent',
+          `${dynamicBackgroundColor || themeColors.darkBackground}05`,
+          `${dynamicBackgroundColor || themeColors.darkBackground}15`,
+          `${dynamicBackgroundColor || themeColors.darkBackground}30`,
+          `${dynamicBackgroundColor || themeColors.darkBackground}50`,
+          `${dynamicBackgroundColor || themeColors.darkBackground}70`,
+          `${dynamicBackgroundColor || themeColors.darkBackground}85`,
+          dynamicBackgroundColor || themeColors.darkBackground
+        ]}
+        locations={[0, 0.15, 0.3, 0.45, 0.65, 0.8, 0.92, 1]}
+        style={styles.bottomFadeGradient}
+        pointerEvents="none"
+      />
     </Animated.View>
   );
 });
@@ -1017,10 +1038,20 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     paddingBottom: 20,
   },
+  bottomFadeGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 200,
+    zIndex: -1,
+  },
   heroContent: {
     padding: 16,
     paddingTop: 8,
     paddingBottom: 8,
+    position: 'relative',
+    zIndex: 5,
   },
   logoContainer: {
     alignItems: 'center',
@@ -1075,6 +1106,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: '100%',
     position: 'relative',
+    zIndex: 10,
   },
   actionButton: {
     flexDirection: 'row',
