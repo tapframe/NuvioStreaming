@@ -114,7 +114,7 @@ export const useWatchProgress = (
               const mostRecentProgress = sortedProgresses[0];
               const progress = mostRecentProgress.progress;
               
-              logger.log(`[useWatchProgress] Using most recent progress for ${mostRecentProgress.episodeId}, updated at ${new Date(progress.lastUpdated).toLocaleString()}`);
+              // Removed excessive logging for most recent progress
               
               setWatchProgress({
                 ...progress,
@@ -204,4 +204,4 @@ export const useWatchProgress = (
     getPlayButtonText,
     loadWatchProgress
   };
-}; 
+};

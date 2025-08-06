@@ -17,13 +17,13 @@ import { useTraktAutosync } from '../../hooks/useTraktAutosync';
 import { useTraktAutosyncSettings } from '../../hooks/useTraktAutosyncSettings';
 import { useMetadata } from '../../hooks/useMetadata';
 import { useSettings } from '../../hooks/useSettings';
+import { stremioService, Subtitle } from '../../services/stremioService';
 
 import {
   DEFAULT_SUBTITLE_SIZE,
   AudioTrack,
   TextTrack,
   ResizeModeType,
-  WyzieSubtitle,
   SubtitleCue,
   RESUME_PREF_KEY,
   RESUME_PREF,
@@ -160,7 +160,7 @@ const VideoPlayer: React.FC = () => {
   const [subtitleBackground, setSubtitleBackground] = useState<boolean>(true);
   const [useCustomSubtitles, setUseCustomSubtitles] = useState<boolean>(false);
   const [isLoadingSubtitles, setIsLoadingSubtitles] = useState<boolean>(false);
-  const [availableSubtitles, setAvailableSubtitles] = useState<WyzieSubtitle[]>([]);
+  const [availableSubtitles, setAvailableSubtitles] = useState<Subtitle[]>([]);
   const [showSubtitleLanguageModal, setShowSubtitleLanguageModal] = useState<boolean>(false);
   const [isLoadingSubtitleList, setIsLoadingSubtitleList] = useState<boolean>(false);
   const [showSourcesModal, setShowSourcesModal] = useState<boolean>(false);
@@ -434,7 +434,7 @@ const VideoPlayer: React.FC = () => {
         saveWatchProgress();
       }, syncInterval);
 
-      logger.log(`[VideoPlayer] Watch progress save interval set to ${syncInterval}ms (immediate sync mode)`);
+      // Removed excessive logging for watch progress save interval
 
       setProgressSaveInterval(interval);
       return () => {
@@ -797,15 +797,7 @@ const VideoPlayer: React.FC = () => {
   };
 
   const handleError = (error: any) => {
-    // Enhanced HTTP error response logging
-    console.log('\n❌ [VideoPlayer] HTTP RESPONSE ERROR:');
-    console.log('📍 URL:', currentStreamUrl);
-    console.log('📊 Status:', error?.error?.code ? `${error.error.code} (${error.error.domain || 'Unknown Domain'})` : 'Unknown Error Code');
-    console.log('💬 Error Message:', error?.error?.localizedDescription || error?.message || 'Unknown error');
-    console.log('🔍 Error Type:', error?.error?.domain || 'Unknown');
-    console.log('📋 Full Error Object:', JSON.stringify(error, null, 2));
-    console.log('⏰ Error Time:', new Date().toISOString());
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+    // HTTP error response logging removed
     
     logger.error('[VideoPlayer] Playback Error:', error);
     
@@ -915,43 +907,56 @@ const VideoPlayer: React.FC = () => {
     }
     setIsLoadingSubtitleList(true);
     try {
-      let searchUrl = `https://sub.wyzie.ru/search?id=${targetImdbId}&encoding=utf-8&source=all`;
+      // Determine content type and ID format for Stremio
+      let contentType = 'movie';
+      let contentId = targetImdbId;
+      let videoId: string | undefined;
+      
       if (season && episode) {
-        searchUrl += `&season=${season}&episode=${episode}`;
+        contentType = 'series';
+        videoId = `series:${targetImdbId}:${season}:${episode}`;
       }
-      const response = await fetch(searchUrl);
-      const subtitles: WyzieSubtitle[] = await response.json();
-      const uniqueSubtitles = subtitles.reduce((acc, current) => {
-        const exists = acc.find(item => item.language === current.language);
+      
+      logger.log(`[VideoPlayer] Fetching subtitles for ${contentType}: ${contentId}${videoId ? ` (${videoId})` : ''}`);
+      
+      const subtitles = await stremioService.getSubtitles(contentType, contentId, videoId);
+      
+      // Remove duplicates based on language
+      const uniqueSubtitles = subtitles.reduce((acc: Subtitle[], current: Subtitle) => {
+        const exists = acc.find((item: Subtitle) => item.lang === current.lang);
         if (!exists) {
           acc.push(current);
         }
         return acc;
-      }, [] as WyzieSubtitle[]);
-      uniqueSubtitles.sort((a, b) => a.display.localeCompare(b.display));
+      }, [] as Subtitle[]);
+      
+      // Sort by language
+      uniqueSubtitles.sort((a: Subtitle, b: Subtitle) => a.lang.localeCompare(b.lang));
       setAvailableSubtitles(uniqueSubtitles);
+      
       if (autoSelectEnglish) {
-        const englishSubtitle = uniqueSubtitles.find(sub =>
-          sub.language.toLowerCase() === 'eng' ||
-          sub.language.toLowerCase() === 'en' ||
-          sub.display.toLowerCase().includes('english')
+        const englishSubtitle = uniqueSubtitles.find((sub: Subtitle) =>
+          sub.lang.toLowerCase() === 'eng' ||
+          sub.lang.toLowerCase() === 'en' ||
+          sub.lang.toLowerCase().includes('english')
         );
         if (englishSubtitle) {
-          loadWyzieSubtitle(englishSubtitle);
+          loadStremioSubtitle(englishSubtitle);
           return;
         }
       }
-      if (!autoSelectEnglish) {
+      
+      if (!autoSelectEnglish && uniqueSubtitles.length > 0) {
         setShowSubtitleLanguageModal(true);
       }
     } catch (error) {
-      logger.error('[VideoPlayer] Error fetching subtitles from Wyzie API:', error);
+      logger.error('[VideoPlayer] Error fetching subtitles from Stremio addons:', error);
     } finally {
       setIsLoadingSubtitleList(false);
     }
   };
 
-  const loadWyzieSubtitle = async (subtitle: WyzieSubtitle) => {
+  const loadStremioSubtitle = async (subtitle: Subtitle) => {
     setShowSubtitleLanguageModal(false);
     setIsLoadingSubtitles(true);
     try {
@@ -961,10 +966,14 @@ const VideoPlayer: React.FC = () => {
       setCustomSubtitles(parsedCues);
       setUseCustomSubtitles(true);
       setSelectedTextTrack(-1);
+      logger.log(`[VideoPlayer] Loaded subtitle: ${subtitle.lang} from ${subtitle.addonName}`);
     } catch (error) {
-      logger.error('[VideoPlayer] Error loading Wyzie subtitle:', error);
+      logger.error('[VideoPlayer] Error loading Stremio subtitle:', error);
     } finally {
-      setIsLoadingSubtitles(false);
+      // Add a small delay to ensure state updates are processed
+      setTimeout(() => {
+        setIsLoadingSubtitles(false);
+      }, 100);
     }
   };
 
@@ -1004,8 +1013,10 @@ const VideoPlayer: React.FC = () => {
       currentTime >= cue.start && currentTime <= cue.end
     );
     const newSubtitle = currentCue ? currentCue.text : '';
-    setCurrentSubtitle(newSubtitle);
-  }, [currentTime, customSubtitles, useCustomSubtitles]);
+    if (newSubtitle !== currentSubtitle) {
+      setCurrentSubtitle(newSubtitle);
+    }
+  }, [currentTime, customSubtitles, useCustomSubtitles, currentSubtitle]);
 
   useEffect(() => {
     loadSubtitleSize();
@@ -1281,16 +1292,7 @@ const VideoPlayer: React.FC = () => {
                       headers: headers
                     } : { uri: currentStreamUrl };
                     
-                    // Enhanced HTTP request logging
-                    console.log('\n🌐 [VideoPlayer] HTTP REQUEST DETAILS:');
-                    console.log('📍 URL:', currentStreamUrl);
-                    console.log('🔧 Method: GET (Video Stream)');
-                    console.log('📋 Headers:', headers ? JSON.stringify(headers, null, 2) : 'No headers');
-                    console.log('🎬 Stream Provider:', currentStreamProvider || streamProvider || 'Unknown');
-                    console.log('📺 Stream Name:', currentStreamName || streamName || 'Unknown');
-                    console.log('🎯 Quality:', currentQuality || quality || 'Unknown');
-                    console.log('⏰ Timestamp:', new Date().toISOString());
-                    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+                    // HTTP request logging removed
                     
                     return sourceWithHeaders;
                   })()}
@@ -1386,7 +1388,7 @@ const VideoPlayer: React.FC = () => {
         subtitleSize={subtitleSize}
         subtitleBackground={subtitleBackground}
         fetchAvailableSubtitles={fetchAvailableSubtitles}
-        loadWyzieSubtitle={loadWyzieSubtitle}
+        loadStremioSubtitle={loadStremioSubtitle}
         selectTextTrack={selectTextTrack}
         increaseSubtitleSize={increaseSubtitleSize}
         decreaseSubtitleSize={decreaseSubtitleSize}

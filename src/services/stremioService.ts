@@ -1121,8 +1121,10 @@ class StremioService {
       // For series episodes, use the videoId directly which includes series ID + episode info
       let url = '';
       if (type === 'series' && videoId) {
-        // For series, the format should be /subtitles/series/tt12345:1:2.json
-        url = `${baseUrl}/subtitles/${type}/${videoId}.json`;
+        // For series, extract the IMDB ID and episode info from videoId (series:tt12345:1:2)
+        // and construct the proper URL format: /subtitles/series/tt12345:1:2.json
+        const episodeInfo = videoId.replace('series:', '');
+        url = `${baseUrl}/subtitles/series/${episodeInfo}.json`;
       } else {
         // For movies, the format is /subtitles/movie/tt12345.json
         url = `${baseUrl}/subtitles/${type}/${id}.json`;

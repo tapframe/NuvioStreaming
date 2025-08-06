@@ -16,13 +16,13 @@ import { useTraktAutosyncSettings } from '../../hooks/useTraktAutosyncSettings';
 import { useMetadata } from '../../hooks/useMetadata';
 import { useSettings } from '../../hooks/useSettings';
 import { testVideoStreamUrl } from '../../utils/httpInterceptor';
+import { stremioService, Subtitle } from '../../services/stremioService';
 
 import { 
   DEFAULT_SUBTITLE_SIZE, 
   AudioTrack,
   TextTrack,
   ResizeModeType, 
-  WyzieSubtitle, 
   SubtitleCue,
   RESUME_PREF_KEY,
   RESUME_PREF,
@@ -149,7 +149,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const [subtitleBackground, setSubtitleBackground] = useState<boolean>(true);
   const [useCustomSubtitles, setUseCustomSubtitles] = useState<boolean>(false);
   const [isLoadingSubtitles, setIsLoadingSubtitles] = useState<boolean>(false);
-  const [availableSubtitles, setAvailableSubtitles] = useState<WyzieSubtitle[]>([]);
+  const [availableSubtitles, setAvailableSubtitles] = useState<Subtitle[]>([]);
   const [showSubtitleLanguageModal, setShowSubtitleLanguageModal] = useState<boolean>(false);
   const [isLoadingSubtitleList, setIsLoadingSubtitleList] = useState<boolean>(false);
   const [showSourcesModal, setShowSourcesModal] = useState<boolean>(false);
@@ -403,7 +403,7 @@ const AndroidVideoPlayer: React.FC = () => {
         saveWatchProgress();
       }, syncInterval);
       
-      logger.log(`[AndroidVideoPlayer] Watch progress save interval set to ${syncInterval}ms (immediate sync mode)`);
+      // Removed excessive logging for watch progress save interval
       
       setProgressSaveInterval(interval);
       return () => {
@@ -498,16 +498,7 @@ const AndroidVideoPlayer: React.FC = () => {
 
   const onLoad = (data: any) => {
     try {
-      // Enhanced HTTP response logging
-      console.log('\n✅ [AndroidVideoPlayer] HTTP RESPONSE SUCCESS:');
-      console.log('📍 URL:', currentStreamUrl);
-      console.log('📊 Status: 200 OK (Video Stream Loaded)');
-      console.log('📺 Duration:', data?.duration ? `${data.duration.toFixed(2)}s` : 'Unknown');
-      console.log('📐 Resolution:', data?.naturalSize ? `${data.naturalSize.width}x${data.naturalSize.height}` : 'Unknown');
-      console.log('🎵 Audio Tracks:', data?.audioTracks?.length || 0);
-      console.log('📝 Text Tracks:', data?.textTracks?.length || 0);
-      console.log('⏰ Response Time:', new Date().toISOString());
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+      // HTTP response logging removed
       
       if (DEBUG_MODE) {
         logger.log('[AndroidVideoPlayer] Video loaded:', data);
@@ -724,15 +715,7 @@ const AndroidVideoPlayer: React.FC = () => {
 
   const handleError = (error: any) => {
     try {
-      // Enhanced HTTP error response logging
-      console.log('\n❌ [AndroidVideoPlayer] HTTP RESPONSE ERROR:');
-      console.log('📍 URL:', currentStreamUrl);
-      console.log('📊 Status:', error?.error?.code ? `${error.error.code} (${error.error.domain || 'Unknown Domain'})` : 'Unknown Error Code');
-      console.log('💬 Error Message:', error?.error?.localizedDescription || error?.message || 'Unknown error');
-      console.log('🔍 Error Type:', error?.error?.domain || 'Unknown');
-      console.log('📋 Full Error Object:', JSON.stringify(error, null, 2));
-      console.log('⏰ Error Time:', new Date().toISOString());
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+      // HTTP error response logging removed
       
       logger.error('AndroidVideoPlayer error: ', error);
       
@@ -908,56 +891,89 @@ const AndroidVideoPlayer: React.FC = () => {
     }
     setIsLoadingSubtitleList(true);
     try {
-      let searchUrl = `https://sub.wyzie.ru/search?id=${targetImdbId}&encoding=utf-8&source=all`;
+      // Determine content type and ID format for Stremio
+      let contentType = 'movie';
+      let contentId = targetImdbId;
+      let videoId: string | undefined;
+      
       if (season && episode) {
-        searchUrl += `&season=${season}&episode=${episode}`;
+        contentType = 'series';
+        videoId = `series:${targetImdbId}:${season}:${episode}`;
       }
-      const response = await fetch(searchUrl);
-      const subtitles: WyzieSubtitle[] = await response.json();
-      const uniqueSubtitles = subtitles.reduce((acc, current) => {
-        const exists = acc.find(item => item.language === current.language);
+      
+      logger.log(`[AndroidVideoPlayer] Fetching subtitles for ${contentType}: ${contentId}${videoId ? ` (${videoId})` : ''}`);
+      
+      const subtitles = await stremioService.getSubtitles(contentType, contentId, videoId);
+      
+      // Remove duplicates based on language
+      const uniqueSubtitles = subtitles.reduce((acc: Subtitle[], current: Subtitle) => {
+        const exists = acc.find((item: Subtitle) => item.lang === current.lang);
         if (!exists) {
           acc.push(current);
         }
         return acc;
-      }, [] as WyzieSubtitle[]);
-      uniqueSubtitles.sort((a, b) => a.display.localeCompare(b.display));
+      }, [] as Subtitle[]);
+      
+      // Sort by language
+      uniqueSubtitles.sort((a: Subtitle, b: Subtitle) => a.lang.localeCompare(b.lang));
       setAvailableSubtitles(uniqueSubtitles);
+      
       if (autoSelectEnglish) {
-        const englishSubtitle = uniqueSubtitles.find(sub => 
-          sub.language.toLowerCase() === 'eng' || 
-          sub.language.toLowerCase() === 'en' ||
-          sub.display.toLowerCase().includes('english')
+        const englishSubtitle = uniqueSubtitles.find((sub: Subtitle) =>
+          sub.lang.toLowerCase() === 'eng' ||
+          sub.lang.toLowerCase() === 'en' ||
+          sub.lang.toLowerCase().includes('english')
         );
         if (englishSubtitle) {
-          loadWyzieSubtitle(englishSubtitle);
+          loadStremioSubtitle(englishSubtitle);
           return;
         }
       }
-      if (!autoSelectEnglish) {
+      
+      if (!autoSelectEnglish && uniqueSubtitles.length > 0) {
         setShowSubtitleLanguageModal(true);
       }
     } catch (error) {
-      logger.error('[AndroidVideoPlayer] Error fetching subtitles from Wyzie API:', error);
+      logger.error('[AndroidVideoPlayer] Error fetching subtitles from Stremio addons:', error);
     } finally {
       setIsLoadingSubtitleList(false);
     }
   };
 
-  const loadWyzieSubtitle = async (subtitle: WyzieSubtitle) => {
+  const loadStremioSubtitle = async (subtitle: Subtitle) => {
+    console.log('[AndroidVideoPlayer] Starting subtitle load, setting isLoadingSubtitles to true');
     setShowSubtitleLanguageModal(false);
     setIsLoadingSubtitles(true);
     try {
       const response = await fetch(subtitle.url);
       const srtContent = await response.text();
       const parsedCues = parseSRT(srtContent);
+      
+      // Force a microtask delay before updating subtitle state
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
       setCustomSubtitles(parsedCues);
       setUseCustomSubtitles(true);
       setSelectedTextTrack(-1);
+      logger.log(`[AndroidVideoPlayer] Loaded subtitle: ${subtitle.lang} from ${subtitle.addonName}`);
+      console.log('[AndroidVideoPlayer] Subtitle loaded successfully');
+      
+      // Force a state update by triggering a seek
+      if (videoRef.current && duration > 0) {
+        const currentPos = currentTime;
+        console.log('[AndroidVideoPlayer] Forcing a micro-seek to refresh subtitle state');
+        videoRef.current.seek(currentPos);
+      }
     } catch (error) {
-      logger.error('[AndroidVideoPlayer] Error loading Wyzie subtitle:', error);
+      logger.error('[AndroidVideoPlayer] Error loading Stremio subtitle:', error);
+      console.log('[AndroidVideoPlayer] Subtitle loading failed:', error);
     } finally {
-      setIsLoadingSubtitles(false);
+      console.log('[AndroidVideoPlayer] Setting isLoadingSubtitles to false');
+      // Add a small delay to ensure state updates are processed
+      setTimeout(() => {
+        setIsLoadingSubtitles(false);
+        console.log('[AndroidVideoPlayer] isLoadingSubtitles set to false');
+      }, 100);
     }
   };
     
@@ -1004,8 +1020,10 @@ const AndroidVideoPlayer: React.FC = () => {
       currentTime >= cue.start && currentTime <= cue.end
     );
     const newSubtitle = currentCue ? currentCue.text : '';
-    setCurrentSubtitle(newSubtitle);
-  }, [currentTime, customSubtitles, useCustomSubtitles]);
+    if (newSubtitle !== currentSubtitle) {
+      setCurrentSubtitle(newSubtitle);
+    }
+  }, [currentTime, customSubtitles, useCustomSubtitles, currentSubtitle]);
 
   useEffect(() => {
     loadSubtitleSize();
@@ -1073,11 +1091,10 @@ const AndroidVideoPlayer: React.FC = () => {
     if (currentStreamUrl && currentStreamUrl.trim() !== '') {
       const testStream = async () => {
         try {
-          console.log('\n🔍 [AndroidVideoPlayer] Testing video stream URL...');
-          const isValid = await testVideoStreamUrl(currentStreamUrl, headers || {});
-          console.log(`✅ [AndroidVideoPlayer] Stream test result: ${isValid ? 'VALID' : 'INVALID'}`);
+          // Stream testing without verbose logging
+          await testVideoStreamUrl(currentStreamUrl, headers || {});
         } catch (error) {
-          console.log('❌ [AndroidVideoPlayer] Stream test failed:', error);
+          // Stream test failed silently
         }
       };
       
@@ -1287,16 +1304,7 @@ const AndroidVideoPlayer: React.FC = () => {
                       headers: headers
                     } : { uri: currentStreamUrl };
                     
-                    // Enhanced HTTP request logging
-                    console.log('\n🌐 [AndroidVideoPlayer] HTTP REQUEST DETAILS:');
-                    console.log('📍 URL:', currentStreamUrl);
-                    console.log('🔧 Method: GET (Video Stream)');
-                    console.log('📋 Headers:', headers ? JSON.stringify(headers, null, 2) : 'No headers');
-                    console.log('🎬 Stream Provider:', currentStreamProvider || 'Unknown');
-                    console.log('📺 Stream Name:', currentStreamName || 'Unknown');
-                    console.log('🎯 Quality:', currentQuality || 'Unknown');
-                    console.log('⏰ Timestamp:', new Date().toISOString());
-                    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+                    // HTTP request logging removed
                     
                     return sourceWithHeaders;
                   })()}
@@ -1399,7 +1407,7 @@ const AndroidVideoPlayer: React.FC = () => {
         subtitleSize={subtitleSize}
         subtitleBackground={subtitleBackground}
         fetchAvailableSubtitles={fetchAvailableSubtitles}
-        loadWyzieSubtitle={loadWyzieSubtitle}
+        loadStremioSubtitle={loadStremioSubtitle}
         selectTextTrack={selectTextTrack}
         increaseSubtitleSize={increaseSubtitleSize}
         decreaseSubtitleSize={decreaseSubtitleSize}

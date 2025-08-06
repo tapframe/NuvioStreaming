@@ -8,7 +8,8 @@ import Animated, {
   SlideOutRight,
 } from 'react-native-reanimated';
 import { styles } from '../utils/playerStyles';
-import { WyzieSubtitle, SubtitleCue } from '../utils/playerTypes';
+import { SubtitleCue } from '../utils/playerTypes';
+import { Subtitle } from '../../../services/stremioService';
 import { getTrackDisplayName, formatLanguage } from '../utils/playerUtils';
 
 interface SubtitleModalsProps {
@@ -19,14 +20,14 @@ interface SubtitleModalsProps {
   isLoadingSubtitleList: boolean;
   isLoadingSubtitles: boolean;
   customSubtitles: SubtitleCue[];
-  availableSubtitles: WyzieSubtitle[];
+  availableSubtitles: Subtitle[];
   vlcTextTracks: Array<{id: number, name: string, language?: string}>;
   selectedTextTrack: number;
   useCustomSubtitles: boolean;
   subtitleSize: number;
   subtitleBackground: boolean;
   fetchAvailableSubtitles: () => void;
-  loadWyzieSubtitle: (subtitle: WyzieSubtitle) => void;
+  loadStremioSubtitle: (subtitle: Subtitle) => void;
   selectTextTrack: (trackId: number) => void;
   increaseSubtitleSize: () => void;
   decreaseSubtitleSize: () => void;
@@ -51,7 +52,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   subtitleSize,
   subtitleBackground,
   fetchAvailableSubtitles,
-  loadWyzieSubtitle,
+  loadStremioSubtitle,
   selectTextTrack,
   increaseSubtitleSize,
   decreaseSubtitleSize,
@@ -59,6 +60,8 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
 }) => {
   // Track which specific online subtitle is currently loaded
   const [selectedOnlineSubtitleId, setSelectedOnlineSubtitleId] = React.useState<string | null>(null);
+  // Track which subtitle is currently being loaded
+  const [loadingSubtitleId, setLoadingSubtitleId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (showSubtitleModal && !isLoadingSubtitleList && availableSubtitles.length === 0) {
@@ -77,10 +80,25 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
     setShowSubtitleModal(false);
   };
 
-  const handleLoadWyzieSubtitle = (subtitle: WyzieSubtitle) => {
+  const handleLoadStremioSubtitle = (subtitle: Subtitle) => {
+    console.log('[SubtitleModals] Starting to load subtitle:', subtitle.id);
+    setLoadingSubtitleId(subtitle.id);
     setSelectedOnlineSubtitleId(subtitle.id);
-    loadWyzieSubtitle(subtitle);
+    loadStremioSubtitle(subtitle);
   };
+
+  // Clear loading state when subtitle loading is complete
+  React.useEffect(() => {
+    console.log('[SubtitleModals] isLoadingSubtitles changed:', isLoadingSubtitles);
+    if (!isLoadingSubtitles) {
+      console.log('[SubtitleModals] Clearing loadingSubtitleId');
+      // Force clear loading state with a small delay to ensure proper re-render
+      setTimeout(() => {
+        setLoadingSubtitleId(null);
+        console.log('[SubtitleModals] loadingSubtitleId cleared');
+      }, 50);
+    }
+  }, [isLoadingSubtitles]);
 
   // Main subtitle menu
   const renderSubtitleMenu = () => {
@@ -396,10 +414,10 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                           borderColor: isSelected ? 'rgba(34, 197, 94, 0.3)' : 'rgba(255, 255, 255, 0.1)',
                         }}
                         onPress={() => {
-                          handleLoadWyzieSubtitle(sub);
+                          handleLoadStremioSubtitle(sub);
                         }}
                         activeOpacity={0.7}
-                        disabled={isLoadingSubtitles}
+                        disabled={loadingSubtitleId === sub.id}
                       >
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                           <View style={{ flex: 1 }}>
@@ -409,16 +427,16 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                               fontWeight: '500',
                               marginBottom: 4,
                             }}>
-                              {sub.display}
+                              {formatLanguage(sub.lang)}
                             </Text>
                             <Text style={{
                               color: 'rgba(255, 255, 255, 0.6)',
                               fontSize: 13,
                             }}>
-                              {formatLanguage(sub.language)}
+                              {sub.addonName || 'Stremio Addon'}
                             </Text>
                           </View>
-                          {isLoadingSubtitles ? (
+                          {loadingSubtitleId === sub.id ? (
                             <ActivityIndicator size="small" color="#22C55E" />
                           ) : isSelected ? (
                             <MaterialIcons name="check" size={20} color="#22C55E" />
@@ -539,4 +557,4 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   );
 };
 
-export default SubtitleModals; 
+export default SubtitleModals;

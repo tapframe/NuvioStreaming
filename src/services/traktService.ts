@@ -598,14 +598,7 @@ export class TraktService {
 
     const response = await fetch(`${TRAKT_API_URL}${endpoint}`, options);
 
-    // Debug log API responses for scrobble endpoints
-    if (endpoint.includes('/scrobble/')) {
-      logger.log(`[TraktService] DEBUG API Response for ${endpoint}:`, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries())
-      });
-    }
+    // Debug logging removed to reduce terminal noise
 
     // Handle rate limiting with exponential backoff
     if (response.status === 429) {
@@ -693,7 +686,7 @@ export class TraktService {
 
     // Debug log successful scrobble responses
     if (endpoint.includes('/scrobble/')) {
-      logger.log(`[TraktService] DEBUG API Success for ${endpoint}:`, responseData);
+      // API success logging removed
     }
     
     return responseData;
@@ -1150,7 +1143,7 @@ export class TraktService {
           progress: Math.round(progress * 100) / 100 // Round to 2 decimal places
         };
         
-        logger.log('[TraktService] DEBUG movie payload:', JSON.stringify(payload, null, 2));
+        // Movie payload logging removed
         return payload;
       } else if (contentData.type === 'episode') {
         if (!contentData.season || !contentData.episode || !contentData.showTitle || !contentData.showYear) {
@@ -1192,7 +1185,7 @@ export class TraktService {
           payload.episode.ids.imdb = cleanEpisodeImdbId;
         }
 
-        logger.log('[TraktService] DEBUG episode payload:', JSON.stringify(payload, null, 2));
+        // Episode payload logging removed
         return payload;
       }
 
@@ -1287,17 +1280,7 @@ export class TraktService {
         return true;
       }
 
-      // Debug log the content data being sent
-      logger.log(`[TraktService] DEBUG scrobbleStart payload:`, {
-        type: contentData.type,
-        title: contentData.title,
-        year: contentData.year,
-        imdbId: contentData.imdbId,
-        season: contentData.season,
-        episode: contentData.episode,
-        showTitle: contentData.showTitle,
-        progress: progress
-      });
+      // Debug log removed to reduce terminal noise
       
       // Only start if not already watching this content
       if (this.currentlyWatching.has(watchingKey)) {
@@ -1485,23 +1468,23 @@ export class TraktService {
   public async debugPlaybackProgress(): Promise<void> {
     try {
       if (!await this.isAuthenticated()) {
-        logger.log('[TraktService] DEBUG: Not authenticated');
+        // Debug logging removed
         return;
       }
 
       const progress = await this.getPlaybackProgress();
-      logger.log(`[TraktService] DEBUG: Found ${progress.length} items in Trakt playback progress:`);
+      // Progress logging removed
       
       progress.forEach((item, index) => {
         if (item.type === 'movie' && item.movie) {
-          logger.log(`[TraktService] DEBUG ${index + 1}: Movie "${item.movie.title}" (${item.movie.year}) - ${item.progress.toFixed(1)}% - Paused: ${item.paused_at}`);
+          // Movie progress logging removed
         } else if (item.type === 'episode' && item.episode && item.show) {
-          logger.log(`[TraktService] DEBUG ${index + 1}: Episode "${item.show.title}" S${item.episode.season}E${item.episode.number} - ${item.progress.toFixed(1)}% - Paused: ${item.paused_at}`);
+          // Episode progress logging removed
         }
       });
       
       if (progress.length === 0) {
-        logger.log('[TraktService] DEBUG: No items found in Trakt playback progress');
+        // No progress logging removed
       }
     } catch (error) {
       logger.error('[TraktService] DEBUG: Error fetching playback progress:', error);

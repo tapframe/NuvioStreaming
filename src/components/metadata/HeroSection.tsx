@@ -799,7 +799,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
     // Check Trakt progress first if available and user is authenticated
     if (isTraktAuthenticated && watchProgress.traktProgress !== undefined) {
       const traktWatched = watchProgress.traktProgress >= 95;
-      logger.log(`[HeroSection] Trakt authenticated: ${isTraktAuthenticated}, Trakt progress: ${watchProgress.traktProgress}%, Watched: ${traktWatched}`);
+      // Removed excessive logging for Trakt progress
       return traktWatched;
     }
     
@@ -807,7 +807,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
     if (watchProgress.duration === 0) return false;
     const progressPercent = (watchProgress.currentTime / watchProgress.duration) * 100;
     const localWatched = progressPercent >= 85;
-    logger.log(`[HeroSection] Local progress: ${progressPercent.toFixed(1)}%, Watched: ${localWatched}`);
+    // Removed excessive logging for local progress
     return localWatched;
   }, [watchProgress, isTraktAuthenticated]);
 

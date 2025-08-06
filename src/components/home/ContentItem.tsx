@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Platform, Text } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -53,6 +53,8 @@ const POSTER_WIDTH = posterLayout.posterWidth;
 const ContentItem = React.memo(({ item, onPress }: ContentItemProps) => {
   const [menuVisible, setMenuVisible] = useState(false);
   const [isWatched, setIsWatched] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const { currentTheme } = useTheme();
 
   const handleLongPress = useCallback(() => {
@@ -101,12 +103,26 @@ const ContentItem = React.memo(({ item, onPress }: ContentItemProps) => {
               source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
               style={styles.poster}
               contentFit="cover"
-              cachePolicy="memory"
+              cachePolicy="memory-disk"
               transition={200}
               placeholder={{ uri: 'https://via.placeholder.com/300x450' }}
               placeholderContentFit="cover"
               recyclingKey={item.id}
+              onLoad={() => {
+                setImageLoaded(true);
+                setImageError(false);
+              }}
+              onError={() => {
+                setImageError(true);
+                setImageLoaded(false);
+              }}
+              priority="low"
             />
+            {imageError && (
+              <View style={[styles.loadingOverlay, { backgroundColor: currentTheme.colors.elevation1 }]}>
+                <MaterialIcons name="broken-image" size={24} color={currentTheme.colors.textMuted} />
+              </View>
+            )}
             {isWatched && (
               <View style={styles.watchedIndicator}>
                 <MaterialIcons name="check-circle" size={22} color={currentTheme.colors.success} />
@@ -191,12 +207,11 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   title: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
     marginTop: 4,
     textAlign: 'center',
-    fontFamily: 'SpaceMono-Regular',
   }
 });
 
-export default ContentItem; 
+export default ContentItem;

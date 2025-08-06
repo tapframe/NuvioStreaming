@@ -350,9 +350,7 @@ class StorageService {
         };
         await this.setWatchProgress(id, type, newProgress, episodeId);
         
-        const timeSource = exactTime ? 'exact' : 'calculated';
-        const durationSource = await this.getContentDuration(id, type, episodeId) ? 'stored' : 'estimated';
-        logger.log(`[StorageService] Created progress from Trakt: ${(currentTime/60).toFixed(1)}min (${timeSource}) of ${(duration/60).toFixed(0)}min (${durationSource})`);
+        // Progress creation logging removed
       } else {
         // Local progress exists - merge intelligently
         const localProgressPercent = (localProgress.currentTime / localProgress.duration) * 100;
@@ -416,11 +414,7 @@ class StorageService {
           };
           await this.setWatchProgress(id, type, updatedProgress, episodeId);
         
-        // Only log significant changes
-        if (progressDiff > 10 || traktProgress === 100) {
-          const timeSource = exactTime ? 'exact' : 'calculated';
-          logger.log(`[StorageService] Updated progress: ${(currentTime/60).toFixed(1)}min (${timeSource}) = ${traktProgress}%`);
-        }
+        // Progress update logging removed
       }
     } catch (error) {
       logger.error('Error merging with Trakt progress:', error);
@@ -428,4 +422,4 @@ class StorageService {
   }
 }
 
-export const storageService = StorageService.getInstance(); 
+export const storageService = StorageService.getInstance();

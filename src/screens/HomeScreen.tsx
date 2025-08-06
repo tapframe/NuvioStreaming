@@ -85,7 +85,8 @@ type HomeScreenListItem =
   | { type: 'continueWatching'; key: string }
   | { type: 'catalog'; catalog: CatalogContent; key: string }
   | { type: 'placeholder'; key: string }
-  | { type: 'welcome'; key: string };
+  | { type: 'welcome'; key: string }
+  | { type: 'loadMore'; key: string };
 
 // Sample categories (real app would get these from API)
 const SAMPLE_CATEGORIES: Category[] = [
@@ -122,6 +123,7 @@ const HomeScreen = () => {
   const [loadedCatalogCount, setLoadedCatalogCount] = useState(0);
   const [hasAddons, setHasAddons] = useState<boolean | null>(null);
   const totalCatalogsRef = useRef(0);
+  const [visibleCatalogCount, setVisibleCatalogCount] = useState(8); // Moderate number of visible catalogs
   
   const { 
     featuredContent, 
@@ -131,7 +133,7 @@ const HomeScreen = () => {
     refreshFeatured 
   } = useFeaturedContent();
 
-    // Progressive catalog loading function
+    // Progressive catalog loading function with performance optimizations
   const loadCatalogsProgressively = useCallback(async () => {
     setCatalogsLoading(true);
     setCatalogs([]);
@@ -155,6 +157,24 @@ const HomeScreen = () => {
       const catalogPromises: Promise<void>[] = [];
       let catalogIndex = 0;
       
+      // Limit concurrent catalog loading to prevent overwhelming the system
+      const MAX_CONCURRENT_CATALOGS = 5;
+      let activeCatalogLoads = 0;
+      const catalogQueue: (() => Promise<void>)[] = [];
+      
+      const processCatalogQueue = async () => {
+        while (catalogQueue.length > 0 && activeCatalogLoads < MAX_CONCURRENT_CATALOGS) {
+          const catalogLoader = catalogQueue.shift();
+          if (catalogLoader) {
+            activeCatalogLoads++;
+            catalogLoader().finally(() => {
+              activeCatalogLoads--;
+              processCatalogQueue(); // Process next in queue
+            });
+          }
+        }
+      };
+      
       for (const addon of addons) {
         if (addon.catalogs) {
           for (const catalog of addon.catalogs) {
@@ -167,29 +187,29 @@ const HomeScreen = () => {
               const currentIndex = catalogIndex;
               catalogPlaceholders.push(null); // Reserve position
               
-              const catalogPromise = (async () => {
+              const catalogLoader = async () => {
                 try {
                   const manifest = addonManifests.find((a: any) => a.id === addon.id);
                   if (!manifest) return;
 
                   const metas = await stremioService.getCatalog(manifest, catalog.type, catalog.id, 1);
                   if (metas && metas.length > 0) {
-                    const items = metas.map((meta: any) => ({
+                    // Limit items per catalog to reduce memory usage
+                    const limitedMetas = metas.slice(0, 20); // Moderate limit for better content variety
+                    
+                    const items = limitedMetas.map((meta: any) => ({
                       id: meta.id,
                       type: meta.type,
                       name: meta.name,
                       poster: meta.poster,
                       posterShape: meta.posterShape,
-                      banner: meta.background,
-                      logo: meta.logo,
+                      // Remove banner and logo to reduce memory usage
                       imdbRating: meta.imdbRating,
                       year: meta.year,
                       genres: meta.genres,
                       description: meta.description,
                       runtime: meta.runtime,
                       released: meta.released,
-                      trailerStreams: meta.trailerStreams,
-                      videos: meta.videos,
                       directors: meta.director,
                       creators: meta.creator,
                       certification: meta.certification
@@ -221,9 +241,9 @@ const HomeScreen = () => {
                 } finally {
                   setLoadedCatalogCount(prev => prev + 1);
                 }
-              })();
+              };
               
-              catalogPromises.push(catalogPromise);
+              catalogQueue.push(catalogLoader);
               catalogIndex++;
             }
           }
@@ -235,11 +255,28 @@ const HomeScreen = () => {
       // Initialize catalogs array with proper length
       setCatalogs(new Array(catalogIndex).fill(null));
       
-      // Start all catalog loading promises but don't wait for them
-      // They will update the state progressively as they complete
-      await Promise.allSettled(catalogPromises);
+      // Start processing the catalog queue
+      processCatalogQueue();
       
-      // Only set catalogsLoading to false after all promises have settled
+      // Wait for all catalogs to load with a timeout
+      const checkAllLoaded = () => {
+        return new Promise<void>((resolve) => {
+          const interval = setInterval(() => {
+            if (loadedCatalogCount >= catalogIndex || catalogQueue.length === 0) {
+              clearInterval(interval);
+              resolve();
+            }
+          }, 100);
+          
+          // Timeout after 30 seconds
+          setTimeout(() => {
+            clearInterval(interval);
+            resolve();
+          }, 30000);
+        });
+      };
+      
+      await checkAllLoaded();
       setCatalogsLoading(false);
     } catch (error) {
       console.error('[HomeScreen] Error in progressive catalog loading:', error);
@@ -322,48 +359,67 @@ const HomeScreen = () => {
       if (refreshTimeoutRef.current) {
         clearTimeout(refreshTimeoutRef.current);
       }
+      
+      // Clear image cache when component unmounts to free memory
+       try {
+         ExpoImage.clearMemoryCache();
+       } catch (error) {
+         console.warn('Failed to clear image cache:', error);
+       }
     };
   }, [currentTheme.colors.darkBackground]);
 
-  // Optimized preload images function with better memory management
+  // Periodic memory cleanup when many catalogs are loaded
+  useEffect(() => {
+    if (catalogs.filter(c => c).length > 15) {
+      const cleanup = setTimeout(() => {
+         try {
+           ExpoImage.clearMemoryCache();
+         } catch (error) {
+           console.warn('Failed to clear image cache:', error);
+         }
+       }, 60000); // Clean every 60 seconds when many catalogs are loaded
+      
+      return () => clearTimeout(cleanup);
+    }
+  }, [catalogs]);
+
+  // Balanced preload images function
   const preloadImages = useCallback(async (content: StreamingContent[]) => {
     if (!content.length) return;
     
     try {
-      // Significantly reduced concurrent prefetching to prevent heating
-      const BATCH_SIZE = 2; // Reduced from 3 to 2
-      const MAX_IMAGES = 5; // Reduced from 10 to 5
+      // Moderate prefetching for better performance balance
+      const MAX_IMAGES = 6; // Preload 6 most important images
       
-      // Only preload the most important images (poster and banner, skip logo)
-      const allImages = content.slice(0, MAX_IMAGES)
-        .map(item => [item.poster, item.banner])
-        .flat()
+      // Only preload poster images (skip banner and logo entirely)
+      const posterImages = content.slice(0, MAX_IMAGES)
+        .map(item => item.poster)
         .filter(Boolean) as string[];
 
-      // Process in smaller batches with longer delays
-      for (let i = 0; i < allImages.length; i += BATCH_SIZE) {
-        const batch = allImages.slice(i, i + BATCH_SIZE);
+      // Process in batches of 2 with moderate delays
+      for (let i = 0; i < posterImages.length; i += 2) {
+        const batch = posterImages.slice(i, i + 2);
         
-        try {
-          await Promise.all(
-            batch.map(async (imageUrl) => {
-              try {
-                // Use our cache service instead of direct prefetch
-                await imageCacheService.getCachedImageUrl(imageUrl);
-                // Increased delay between prefetches to reduce CPU load
-                await new Promise(resolve => setTimeout(resolve, 100));
-              } catch (error) {
-                // Silently handle individual prefetch errors
-              }
-            })
-          );
-          
-          // Longer delay between batches to allow GC and reduce heating
-          if (i + BATCH_SIZE < allImages.length) {
-            await new Promise(resolve => setTimeout(resolve, 200));
+        await Promise.all(batch.map(async (imageUrl) => {
+          try {
+            // Use our cache service with timeout
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Timeout')), 2000)
+            );
+            
+            await Promise.race([
+              imageCacheService.getCachedImageUrl(imageUrl),
+              timeoutPromise
+            ]);
+          } catch (error) {
+            // Skip failed images and continue
           }
-        } catch (error) {
-          // Continue with next batch if current batch fails
+        }));
+        
+        // Moderate delay between batches
+        if (i + 2 < posterImages.length) {
+          await new Promise(resolve => setTimeout(resolve, 200));
         }
       }
     } catch (error) {
@@ -490,7 +546,10 @@ const HomeScreen = () => {
     data.push({ type: 'thisWeek', key: 'thisWeek' });
     data.push({ type: 'continueWatching', key: 'continueWatching' });
 
-    catalogs.forEach((catalog, index) => {
+    // Only show a limited number of catalogs initially for performance
+    const catalogsToShow = catalogs.slice(0, visibleCatalogCount);
+    
+    catalogsToShow.forEach((catalog, index) => {
       if (catalog) {
         data.push({ type: 'catalog', catalog, key: `${catalog.addon}-${catalog.id}-${index}` });
       } else {
@@ -499,8 +558,17 @@ const HomeScreen = () => {
       }
     });
 
+    // Add a "Load More" button if there are more catalogs to show
+    if (catalogs.length > visibleCatalogCount && catalogs.filter(c => c).length > visibleCatalogCount) {
+      data.push({ type: 'loadMore', key: 'load-more' } as any);
+    }
+
     return data;
-  }, [hasAddons, showHeroSection, catalogs]);
+  }, [hasAddons, showHeroSection, catalogs, visibleCatalogCount]);
+
+  const handleLoadMoreCatalogs = useCallback(() => {
+    setVisibleCatalogCount(prev => Math.min(prev + 5, catalogs.length));
+  }, [catalogs.length]);
 
   const renderListItem = useCallback(({ item }: { item: HomeScreenListItem }) => {
     switch (item.type) {
@@ -535,13 +603,29 @@ const HomeScreen = () => {
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.placeholderPosters}>
-                {[...Array(5)].map((_, posterIndex) => (
+                {[...Array(3)].map((_, posterIndex) => (
                   <View
                     key={posterIndex}
                     style={[styles.placeholderPoster, { backgroundColor: currentTheme.colors.elevation1 }]}
                   />
                 ))}
               </ScrollView>
+            </View>
+          </Animated.View>
+        );
+      case 'loadMore':
+        return (
+          <Animated.View entering={FadeIn.duration(300)}>
+            <View style={styles.loadMoreContainer}>
+              <TouchableOpacity
+                style={[styles.loadMoreButton, { backgroundColor: currentTheme.colors.primary }]}
+                onPress={handleLoadMoreCatalogs}
+              >
+                <MaterialIcons name="expand-more" size={20} color={currentTheme.colors.white} />
+                <Text style={[styles.loadMoreText, { color: currentTheme.colors.white }]}>
+                  Load More Catalogs
+                </Text>
+              </TouchableOpacity>
             </View>
           </Animated.View>
         );
@@ -556,7 +640,8 @@ const HomeScreen = () => {
     featuredContent,
     isSaved,
     handleSaveToLibrary,
-    currentTheme.colors
+    currentTheme.colors,
+    handleLoadMoreCatalogs
   ]);
 
   const ListFooterComponent = useMemo(() => (
@@ -608,9 +693,9 @@ const HomeScreen = () => {
           ]}
           showsVerticalScrollIndicator={false}
           ListFooterComponent={ListFooterComponent}
-          initialNumToRender={5}
-          maxToRenderPerBatch={5}
-          windowSize={11}
+          initialNumToRender={4}
+          maxToRenderPerBatch={3}
+          windowSize={7}
           removeClippedSubviews={Platform.OS === 'android'}
           onEndReachedThreshold={0.5}
           updateCellsBatchingPeriod={50}
@@ -618,11 +703,8 @@ const HomeScreen = () => {
             minIndexForVisible: 0,
             autoscrollToTopThreshold: 10
           }}
-          getItemLayout={(data, index) => ({
-            length: index === 0 ? 400 : 280, // Approximate heights for different item types
-            offset: index === 0 ? 0 : 400 + (index - 1) * 280,
-            index,
-          })}
+          disableIntervalMomentum={true}
+          scrollEventThrottle={16}
         />
       </View>
     );
@@ -756,6 +838,27 @@ const styles = StyleSheet.create<any>({
     fontSize: 14,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  loadMoreContainer: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  loadMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  loadMoreText: {
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '600',
   },
   loadingContainer: {
     flex: 1,
@@ -1131,4 +1234,4 @@ const styles = StyleSheet.create<any>({
   },
 });
 
-export default React.memo(HomeScreen); 
+export default React.memo(HomeScreen);

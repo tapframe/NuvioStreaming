@@ -109,7 +109,7 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
         decelerationRate="fast"
         snapToAlignment="start"
         ItemSeparatorComponent={() => <View style={{ width: 8 }} />}
-        initialNumToRender={3}
+        initialNumToRender={4}
         maxToRenderPerBatch={2}
         windowSize={3}
         removeClippedSubviews={Platform.OS === 'android'}
@@ -122,7 +122,8 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
         maintainVisibleContentPosition={{
           minIndexForVisible: 0
         }}
-        onEndReachedThreshold={1}
+        onEndReachedThreshold={0.5}
+        scrollEventThrottle={16}
       />
     </Animated.View>
   );
@@ -177,4 +178,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default React.memo(CatalogSection); 
+export default React.memo(CatalogSection);

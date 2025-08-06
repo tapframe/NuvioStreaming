@@ -190,7 +190,7 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
           currentTime
         );
         
-        logger.log(`[TraktAutosync] Synced progress ${progressPercent.toFixed(1)}%: ${contentData.title}`);
+        // Progress sync logging removed
       }
     } catch (error) {
       logger.error('[TraktAutosync] Error syncing progress:', error);
@@ -201,7 +201,7 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
   const handlePlaybackEnd = useCallback(async (currentTime: number, duration: number, reason: 'ended' | 'unmount' = 'ended') => {
     const now = Date.now();
     
-    logger.log(`[TraktAutosync] handlePlaybackEnd called: reason=${reason}, time=${currentTime}, duration=${duration}, authenticated=${isAuthenticated}, enabled=${autosyncSettings.enabled}, started=${hasStartedWatching.current}, stopped=${hasStopped.current}, complete=${isSessionComplete.current}, session=${sessionKey.current}, unmountCount=${unmountCount.current}`);
+    // Removed excessive logging for handlePlaybackEnd calls
     
     if (!isAuthenticated || !autosyncSettings.enabled) {
       logger.log(`[TraktAutosync] Skipping handlePlaybackEnd: authenticated=${isAuthenticated}, enabled=${autosyncSettings.enabled}`);
@@ -227,7 +227,7 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
         hasStopped.current = false;
         isSignificantUpdate = true;
       } else {
-        logger.log(`[TraktAutosync] Already stopped this session, skipping duplicate call (reason: ${reason})`);
+        // Already stopped this session, skipping duplicate call
         return;
       }
     }
@@ -247,7 +247,7 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
 
     try {
       let progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
-      logger.log(`[TraktAutosync] Initial progress calculation: ${progressPercent.toFixed(1)}%`);
+      // Initial progress calculation logging removed
       
       // For unmount calls, always use the highest available progress
       // Check current progress, last synced progress, and local storage progress
@@ -278,28 +278,26 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
         }
         
         if (maxProgress !== progressPercent) {
-          logger.log(`[TraktAutosync] Using highest available progress for unmount: ${maxProgress.toFixed(1)}% (current: ${progressPercent.toFixed(1)}%, last synced: ${lastSyncProgress.current.toFixed(1)}%)`);
+          // Highest progress logging removed
           progressPercent = maxProgress;
         } else {
-          logger.log(`[TraktAutosync] Current progress is already highest: ${progressPercent.toFixed(1)}%`);
+          // Current progress logging removed
         }
       }
 
       // If we have valid progress but no started session, force start one first
       if (!hasStartedWatching.current && progressPercent > 1) {
-        logger.log(`[TraktAutosync] Force starting session for progress: ${progressPercent.toFixed(1)}%`);
         const contentData = buildContentData();
         const success = await startWatching(contentData, progressPercent);
         if (success) {
           hasStartedWatching.current = true;
-          logger.log(`[TraktAutosync] Force started watching: ${contentData.title}`);
         }
       }
       
       // Only stop if we have meaningful progress (>= 0.5%) or it's a natural video end
       // Lower threshold for unmount calls to catch more edge cases
       if (reason === 'unmount' && progressPercent < 0.5) {
-        logger.log(`[TraktAutosync] Skipping unmount stop for ${options.title} - too early (${progressPercent.toFixed(1)}%)`);
+        // Early unmount stop logging removed
         return;
       }
       

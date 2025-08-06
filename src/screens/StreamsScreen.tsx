@@ -839,32 +839,9 @@ export const StreamsScreen = () => {
     const streamName = stream.name || stream.title || 'Unnamed Stream';
     const streamProvider = stream.addonId || stream.addonName || stream.name;
     
-    // Debug logging for stream provider identification
-    console.log('[StreamsScreen] Stream Provider Debug:');
-    console.log('  stream.addonId:', stream.addonId);
-    console.log('  stream.addonName:', stream.addonName);
-    console.log('  stream.name:', stream.name);
-    console.log('  final streamProvider:', streamProvider);
-    console.log('  stream.url:', stream.url);
+    // Stream provider debug logging removed
     
-    // Enhanced logging for NetMirror streams
-    if (streamProvider && (streamProvider.toLowerCase().includes('netmirror') || stream.url?.includes('nm-cdn'))) {
-      console.log('\n[StreamsScreen] 🎬 NETMIRROR STREAM DETAILS:');
-      console.log('  📺 Stream Name:', streamName);
-      console.log('  🔗 Final Extracted URL:', stream.url);
-      console.log('  📋 Headers:', JSON.stringify(stream.headers, null, 2));
-      console.log('  🎯 Quality:', stream.title?.match(/(\d+)p/)?.[1] || 'Unknown');
-      console.log('  📱 Platform:', Platform.OS);
-      console.log('  ⚙️ Stream Object:', JSON.stringify({
-        name: stream.name,
-        title: stream.title,
-        url: stream.url,
-        headers: stream.headers,
-        addonId: stream.addonId,
-        addonName: stream.addonName
-      }, null, 2));
-      console.log('\n');
-    }
+    // NetMirror stream logging removed
     
     // Navigate to player immediately without waiting for orientation lock
     // This prevents delay in player opening

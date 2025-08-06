@@ -28,15 +28,15 @@ export const ResumeOverlay: React.FC<ResumeOverlayProps> = ({
   handleStartFromBeginning,
 }) => {
   useEffect(() => {
-    logger.log(`[ResumeOverlay] Props changed: showOverlay=${showResumeOverlay}, resumePosition=${resumePosition}, duration=${duration}, title=${title}`);
+    // Removed excessive logging for props changes
   }, [showResumeOverlay, resumePosition, duration, title]);
 
   if (!showResumeOverlay || resumePosition === null) {
-    logger.log(`[ResumeOverlay] Not showing overlay: showOverlay=${showResumeOverlay}, resumePosition=${resumePosition}`);
+    // Removed excessive logging for overlay visibility
     return null;
   }
   
-  logger.log(`[ResumeOverlay] Rendering overlay for ${title} at ${resumePosition}s`);
+  // Removed excessive logging for overlay rendering
   
   return (
     <View style={styles.resumeOverlay}>
@@ -91,4 +91,4 @@ export const ResumeOverlay: React.FC<ResumeOverlayProps> = ({
   );
 };
 
-export default ResumeOverlay; 
+export default ResumeOverlay;
