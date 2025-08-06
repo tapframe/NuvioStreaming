@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, memo, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   Dimensions,
   TouchableOpacity,
   Platform,
+  InteractionManager,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -22,6 +23,7 @@ import Animated, {
   runOnJS,
   withRepeat,
   FadeIn,
+  runOnUI,
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useTraktContext } from '../../contexts/TraktContext';
@@ -71,7 +73,7 @@ interface HeroSectionProps {
 }
 
 // Ultra-optimized ActionButtons Component - minimal re-renders
-const ActionButtons = React.memo(({ 
+const ActionButtons = memo(({ 
   handleShowStreams, 
   toggleLibrary, 
   inLibrary, 
@@ -98,17 +100,27 @@ const ActionButtons = React.memo(({
 }) => {
   const { currentTheme } = useTheme();
   
-  // Memoized navigation handler
-  const handleRatingsPress = useMemo(() => async () => {
+  // Performance optimization: Cache theme colors
+  const themeColors = useMemo(() => ({
+    white: currentTheme.colors.white,
+    black: '#000',
+    primary: currentTheme.colors.primary
+  }), [currentTheme.colors.white, currentTheme.colors.primary]);
+  
+  // Optimized navigation handler with useCallback
+  const handleRatingsPress = useCallback(async () => {
+    // Early return if no ID
+    if (!id) return;
+    
     let finalTmdbId: number | null = null;
     
-    if (id?.startsWith('tmdb:')) {
+    if (id.startsWith('tmdb:')) {
       const numericPart = id.split(':')[1];
       const parsedId = parseInt(numericPart, 10);
       if (!isNaN(parsedId)) {
         finalTmdbId = parsedId;
       }
-    } else if (id?.startsWith('tt')) {
+    } else if (id.startsWith('tt')) {
       try {
         const tmdbService = TMDBService.getInstance();
         const convertedId = await tmdbService.findTMDBIdByIMDB(id);
@@ -118,7 +130,7 @@ const ActionButtons = React.memo(({
       } catch (error) {
         logger.error(`[HeroSection] Error converting IMDb ID ${id}:`, error);
       }
-    } else if (id) {
+    } else {
       const parsedId = parseInt(id, 10);
       if (!isNaN(parsedId)) {
         finalTmdbId = parsedId;
@@ -126,11 +138,14 @@ const ActionButtons = React.memo(({
     }
     
     if (finalTmdbId !== null) {
-      navigation.navigate('ShowRatings', { showId: finalTmdbId });
+      // Use requestAnimationFrame for smoother navigation
+      requestAnimationFrame(() => {
+        navigation.navigate('ShowRatings', { showId: finalTmdbId });
+      });
     }
   }, [id, navigation]);
 
-  // Determine play button style and text based on watched status
+  // Optimized play button style calculation
   const playButtonStyle = useMemo(() => {
     if (isWatched && type === 'movie') {
       // Only movies get the dark watched style for "Watch Again"
@@ -285,7 +300,7 @@ const ActionButtons = React.memo(({
 });
 
 // Enhanced WatchProgress Component with Trakt integration and watched status
-const WatchProgressDisplay = React.memo(({ 
+const WatchProgressDisplay = memo(({ 
   watchProgress, 
   type, 
   getEpisodeDetails, 
@@ -623,7 +638,22 @@ const WatchProgressDisplay = React.memo(({
   );
 });
 
-const HeroSection: React.FC<HeroSectionProps> = ({
+/**
+ * HeroSection Component - Performance Optimized
+ * 
+ * Optimizations Applied:
+ * - Component memoization with React.memo
+ * - Lazy loading system using InteractionManager
+ * - Optimized image loading with useCallback handlers
+ * - Cached theme colors to reduce re-renders
+ * - Conditional rendering based on shouldLoadSecondaryData
+ * - Memory management with cleanup on unmount
+ * - Development-mode performance monitoring
+ * - Optimized animated styles and memoized calculations
+ * - Reduced re-renders through strategic memoization
+ * - runOnUI for animation performance
+ */
+const HeroSection: React.FC<HeroSectionProps> = memo(({
   metadata,
   bannerImage,
   loadingBanner,
@@ -650,21 +680,47 @@ const HeroSection: React.FC<HeroSectionProps> = ({
 }) => {
   const { currentTheme } = useTheme();
   const { isAuthenticated: isTraktAuthenticated } = useTraktContext();
-  
-  // Enhanced state for smooth image loading
+
+  // Performance optimization: Refs for avoiding re-renders
+  const interactionComplete = useRef(false);
+  const [shouldLoadSecondaryData, setShouldLoadSecondaryData] = useState(false);
+
+  // Image loading state with optimized management
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const imageOpacity = useSharedValue(1);
   const imageLoadOpacity = useSharedValue(0);
   const shimmerOpacity = useSharedValue(0.3);
   
+  // Performance optimization: Cache theme colors
+  const themeColors = useMemo(() => ({
+    black: currentTheme.colors.black,
+    darkBackground: currentTheme.colors.darkBackground,
+    highEmphasis: currentTheme.colors.highEmphasis,
+    text: currentTheme.colors.text
+  }), [currentTheme.colors.black, currentTheme.colors.darkBackground, currentTheme.colors.highEmphasis, currentTheme.colors.text]);
+  
   // Memoized image source
   const imageSource = useMemo(() => 
     bannerImage || metadata.banner || metadata.poster
   , [bannerImage, metadata.banner, metadata.poster]);
   
-  // Start shimmer animation for loading state
+  // Performance optimization: Lazy loading setup
   useEffect(() => {
+    const timer = InteractionManager.runAfterInteractions(() => {
+      if (!interactionComplete.current) {
+        interactionComplete.current = true;
+        setShouldLoadSecondaryData(true);
+      }
+    });
+    
+    return () => timer.cancel();
+  }, []);
+
+  // Optimized shimmer animation for loading state
+  useEffect(() => {
+    if (!shouldLoadSecondaryData) return;
+    
     if (!imageLoaded && imageSource) {
       // Start shimmer animation
       shimmerOpacity.value = withRepeat(
@@ -676,9 +732,9 @@ const HeroSection: React.FC<HeroSectionProps> = ({
       // Stop shimmer when loaded
       shimmerOpacity.value = withTiming(0.3, { duration: 300 });
     }
-  }, [imageLoaded, imageSource]);
+  }, [imageLoaded, imageSource, shouldLoadSecondaryData]);
   
-  // Reset loading state when image source changes
+  // Optimized loading state reset when image source changes
   useEffect(() => {
     if (imageSource) {
       setImageLoaded(false);
@@ -686,26 +742,33 @@ const HeroSection: React.FC<HeroSectionProps> = ({
     }
   }, [imageSource]);
   
-  // Enhanced image handlers with smooth transitions
-  const handleImageError = () => {
+  // Optimized image handlers with useCallback
+  const handleImageError = useCallback(() => {
+    if (!shouldLoadSecondaryData) return;
+    
+    runOnUI(() => {
+      imageOpacity.value = withTiming(0.6, { duration: 150 });
+      imageLoadOpacity.value = withTiming(0, { duration: 150 });
+    })();
+    
     setImageError(true);
     setImageLoaded(false);
-    imageOpacity.value = withTiming(0.6, { duration: 150 });
-    imageLoadOpacity.value = withTiming(0, { duration: 150 });
-    runOnJS(() => {
-      if (bannerImage !== metadata.banner) {
-        setBannerImage(metadata.banner || metadata.poster);
-      }
-    })();
-  };
+    
+    // Fallback to poster if banner fails
+    if (bannerImage !== metadata.banner) {
+      setBannerImage(metadata.banner || metadata.poster);
+    }
+  }, [shouldLoadSecondaryData, bannerImage, metadata.banner, metadata.poster, setBannerImage]);
 
-  const handleImageLoad = () => {
+  const handleImageLoad = useCallback(() => {
+    runOnUI(() => {
+      imageOpacity.value = withTiming(1, { duration: 150 });
+      imageLoadOpacity.value = withTiming(1, { duration: 400 });
+    })();
+    
     setImageError(false);
     setImageLoaded(true);
-    imageOpacity.value = withTiming(1, { duration: 150 });
-    // Smooth fade-in for the loaded image
-    imageLoadOpacity.value = withTiming(1, { duration: 400 });
-  };
+  }, []);
 
   // Ultra-optimized animated styles - single calculations
   const heroAnimatedStyle = useAnimatedStyle(() => ({
@@ -768,9 +831,9 @@ const HeroSection: React.FC<HeroSectionProps> = ({
     }]
   }), []);
 
-  // Ultra-optimized genre rendering with smooth animation
+  // Optimized genre rendering with lazy loading and memory management
   const genreElements = useMemo(() => {
-    if (!metadata?.genres?.length) return null;
+    if (!shouldLoadSecondaryData || !metadata?.genres?.length) return null;
 
     const genresToDisplay = metadata.genres.slice(0, 3); // Reduced to 3 for performance
     return genresToDisplay.map((genreName: string, index: number, array: string[]) => (
@@ -779,15 +842,15 @@ const HeroSection: React.FC<HeroSectionProps> = ({
         entering={FadeIn.duration(400).delay(200 + index * 100)}
         style={{ flexDirection: 'row', alignItems: 'center' }}
       >
-        <Text style={[styles.genreText, { color: currentTheme.colors.text }]}>
+        <Text style={[styles.genreText, { color: themeColors.text }]}>
           {genreName}
         </Text>
         {index < array.length - 1 && (
-          <Text style={[styles.genreDot, { color: currentTheme.colors.text }]}>•</Text>
+          <Text style={[styles.genreDot, { color: themeColors.text }]}>•</Text>
         )}
       </Animated.View>
     ));
-  }, [metadata.genres, currentTheme.colors.text]);
+  }, [metadata.genres, themeColors.text, shouldLoadSecondaryData]);
 
   // Memoized play button text
   const playButtonText = useMemo(() => getPlayButtonText(), [getPlayButtonText]);
@@ -811,13 +874,38 @@ const HeroSection: React.FC<HeroSectionProps> = ({
     return localWatched;
   }, [watchProgress, isTraktAuthenticated]);
 
+  // Memory management and cleanup
+  useEffect(() => {
+    return () => {
+      // Reset animation values on unmount
+      imageOpacity.value = 1;
+      imageLoadOpacity.value = 0;
+      shimmerOpacity.value = 0.3;
+      interactionComplete.current = false;
+    };
+  }, []);
+
+  // Development-only performance monitoring
+  useEffect(() => {
+    if (__DEV__) {
+      const startTime = Date.now();
+      const timer = setTimeout(() => {
+        const renderTime = Date.now() - startTime;
+        if (renderTime > 100) {
+          console.warn(`[HeroSection] Slow render detected: ${renderTime}ms`);
+        }
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  });
+
   return (
     <Animated.View style={[styles.heroSection, heroAnimatedStyle]}>
       {/* Optimized Background */}
-      <View style={[styles.absoluteFill, { backgroundColor: currentTheme.colors.black }]} />
+      <View style={[styles.absoluteFill, { backgroundColor: themeColors.black }]} />
       
-      {/* Loading placeholder for smooth transition */}
-      {((imageSource && !imageLoaded) || loadingBanner) && (
+      {/* Optimized shimmer loading effect */}
+      {shouldLoadSecondaryData && ((imageSource && !imageLoaded) || loadingBanner) && (
         <Animated.View style={[styles.absoluteFill, {
           opacity: shimmerOpacity,
         }]}>
@@ -830,8 +918,8 @@ const HeroSection: React.FC<HeroSectionProps> = ({
         </Animated.View>
       )}
       
-      {/* Enhanced Background Image with smooth loading */}
-      {imageSource && !loadingBanner && (
+      {/* Optimized background image with lazy loading */}
+      {shouldLoadSecondaryData && imageSource && !loadingBanner && (
         <Animated.Image 
           source={{ uri: imageSource }}
           style={[styles.absoluteFill, backdropImageStyle]}
@@ -841,13 +929,13 @@ const HeroSection: React.FC<HeroSectionProps> = ({
         />
       )}
 
-      {/* Simplified Gradient */}
+      {/* Optimized Gradient */}
       <LinearGradient
         colors={[
           'rgba(0,0,0,0)',
           'rgba(0,0,0,0.4)',
           'rgba(0,0,0,0.8)',
-          currentTheme.colors.darkBackground
+          themeColors.darkBackground
         ]}
         locations={[0, 0.6, 0.85, 1]}
         style={styles.heroGradient}
@@ -856,7 +944,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
           {/* Optimized Title/Logo */}
           <View style={styles.logoContainer}>
             <Animated.View style={[styles.titleLogoContainer, logoAnimatedStyle]}>
-              {metadata.logo && !logoLoadError ? (
+              {shouldLoadSecondaryData && metadata.logo && !logoLoadError ? (
                 <Image
                   source={{ uri: metadata.logo }}
                   style={styles.titleLogo}
@@ -867,7 +955,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
                   }}
                 />
               ) : (
-                <Text style={[styles.heroTitle, { color: currentTheme.colors.highEmphasis }]}>
+                <Text style={[styles.heroTitle, { color: themeColors.highEmphasis }]}>
                   {metadata.name}
                 </Text>
               )}
@@ -883,8 +971,8 @@ const HeroSection: React.FC<HeroSectionProps> = ({
             isWatched={isWatched}
           />
 
-          {/* Optimized Genres */}
-          {genreElements && (
+          {/* Optimized genre display with lazy loading */}
+          {shouldLoadSecondaryData && genreElements && (
             <View style={styles.genreContainer}>
               {genreElements}
             </View>
@@ -908,7 +996,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
       </LinearGradient>
     </Animated.View>
   );
-};
+});
 
 // Ultra-optimized styles
 const styles = StyleSheet.create({
@@ -1305,4 +1393,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default React.memo(HeroSection);
+export default HeroSection;

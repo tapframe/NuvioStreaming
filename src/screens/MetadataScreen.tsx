@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useState, useEffect, useMemo, useRef, memo } from 'react';
 import {
   View,
   Text,
@@ -7,9 +7,10 @@ import {
   ActivityIndicator,
   Dimensions,
   TouchableOpacity,
+  InteractionManager,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../contexts/ThemeContext';
@@ -27,6 +28,7 @@ import Animated, {
   Extrapolate,
   useSharedValue,
   withTiming,
+  runOnJS,
 } from 'react-native-reanimated';
 import { RouteProp } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -45,6 +47,14 @@ import { TraktService, TraktPlaybackItem } from '../services/traktService';
 
 const { height } = Dimensions.get('window');
 
+// Memoized components for better performance
+const MemoizedCastSection = memo(CastSection);
+const MemoizedSeriesContent = memo(SeriesContent);
+const MemoizedMovieContent = memo(MovieContent);
+const MemoizedMoreLikeThisSection = memo(MoreLikeThisSection);
+const MemoizedRatingsSection = memo(RatingsSection);
+const MemoizedCastDetailsModal = memo(CastDetailsModal);
+
 const MetadataScreen: React.FC = () => {
   const route = useRoute<RouteProp<Record<string, RouteParams & { episodeId?: string; addonId?: string }>, string>>();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
@@ -59,7 +69,10 @@ const MetadataScreen: React.FC = () => {
   const [isContentReady, setIsContentReady] = useState(false);
   const [showCastModal, setShowCastModal] = useState(false);
   const [selectedCastMember, setSelectedCastMember] = useState<any>(null);
+  const [shouldLoadSecondaryData, setShouldLoadSecondaryData] = useState(false);
+  const [isScreenFocused, setIsScreenFocused] = useState(true);
   const transitionOpacity = useSharedValue(1);
+  const interactionComplete = useRef(false);
 
   const {
     metadata,
@@ -81,134 +94,160 @@ const MetadataScreen: React.FC = () => {
     imdbId,
   } = useMetadata({ id, type, addonId });
 
-  // Optimized hooks with memoization
+  // Optimized hooks with memoization and conditional loading
   const watchProgressData = useWatchProgress(id, type as 'movie' | 'series', episodeId, episodes);
   const assetData = useMetadataAssets(metadata, id, type, imdbId, settings, setMetadata);
   const animations = useMetadataAnimations(safeAreaTop, watchProgressData.watchProgress);
 
-  // Fetch and log Trakt progress data when entering the screen
+  // Focus effect for performance optimization
+  useFocusEffect(
+    useCallback(() => {
+      setIsScreenFocused(true);
+      
+      // Delay secondary data loading until interactions are complete
+      const timer = setTimeout(() => {
+        if (!interactionComplete.current) {
+          InteractionManager.runAfterInteractions(() => {
+            setShouldLoadSecondaryData(true);
+            interactionComplete.current = true;
+          });
+        }
+      }, 100);
+
+      return () => {
+        setIsScreenFocused(false);
+        clearTimeout(timer);
+      };
+    }, [])
+  );
+
+  // Optimize secondary data loading
   useEffect(() => {
-    const fetchTraktProgress = async () => {
-      try {
-        const traktService = TraktService.getInstance();
-        const isAuthenticated = await traktService.isAuthenticated();
-        
-        console.log(`[MetadataScreen] === TRAKT PROGRESS DATA FOR ${type.toUpperCase()}: ${metadata?.name || id} ===`);
-        console.log(`[MetadataScreen] IMDB ID: ${id}`);
-        console.log(`[MetadataScreen] Trakt authenticated: ${isAuthenticated}`);
-        
-        if (!isAuthenticated) {
-          console.log(`[MetadataScreen] Not authenticated with Trakt, no progress data available`);
-          return;
-        }
-
-        // Get all playback progress from Trakt
-        const allProgress = await traktService.getPlaybackProgress();
-        console.log(`[MetadataScreen] Total Trakt progress items: ${allProgress.length}`);
-        
-        if (allProgress.length === 0) {
-          console.log(`[MetadataScreen] No Trakt progress data found`);
-          return;
-        }
-
-        // Filter progress for current content
-        let relevantProgress: TraktPlaybackItem[] = [];
-        
-        if (type === 'movie') {
-          relevantProgress = allProgress.filter(item => 
-            item.type === 'movie' && 
-            item.movie?.ids.imdb === id.replace('tt', '')
-          );
-        } else if (type === 'series') {
-          relevantProgress = allProgress.filter(item => 
-            item.type === 'episode' && 
-            item.show?.ids.imdb === id.replace('tt', '')
-          );
-        }
-
-        console.log(`[MetadataScreen] Relevant progress items for this ${type}: ${relevantProgress.length}`);
-        
-        if (relevantProgress.length === 0) {
-          console.log(`[MetadataScreen] No Trakt progress found for this ${type}`);
-          return;
-        }
-
-        // Log detailed progress information
-        relevantProgress.forEach((item, index) => {
-          console.log(`[MetadataScreen] --- Progress Item ${index + 1} ---`);
-          console.log(`[MetadataScreen] Type: ${item.type}`);
-          console.log(`[MetadataScreen] Progress: ${item.progress.toFixed(2)}%`);
-          console.log(`[MetadataScreen] Paused at: ${item.paused_at}`);
-          console.log(`[MetadataScreen] Trakt ID: ${item.id}`);
-          
-          if (item.movie) {
-            console.log(`[MetadataScreen] Movie: ${item.movie.title} (${item.movie.year})`);
-            console.log(`[MetadataScreen] Movie IMDB: tt${item.movie.ids.imdb}`);
-            console.log(`[MetadataScreen] Movie TMDB: ${item.movie.ids.tmdb}`);
-          }
-          
-          if (item.episode && item.show) {
-            console.log(`[MetadataScreen] Show: ${item.show.title} (${item.show.year})`);
-            console.log(`[MetadataScreen] Show IMDB: tt${item.show.ids.imdb}`);
-            console.log(`[MetadataScreen] Episode: S${item.episode.season}E${item.episode.number} - ${item.episode.title}`);
-            console.log(`[MetadataScreen] Episode IMDB: ${item.episode.ids.imdb || 'N/A'}`);
-            console.log(`[MetadataScreen] Episode TMDB: ${item.episode.ids.tmdb || 'N/A'}`);
-          }
-          
-          console.log(`[MetadataScreen] Raw item:`, JSON.stringify(item, null, 2));
-        });
-
-        // Find most recent progress if multiple episodes
-        if (type === 'series' && relevantProgress.length > 1) {
-          const mostRecent = relevantProgress.sort((a, b) => 
-            new Date(b.paused_at).getTime() - new Date(a.paused_at).getTime()
-          )[0];
-          
-          console.log(`[MetadataScreen] === MOST RECENT EPISODE PROGRESS ===`);
-          if (mostRecent.episode && mostRecent.show) {
-            console.log(`[MetadataScreen] Most recent: S${mostRecent.episode.season}E${mostRecent.episode.number} - ${mostRecent.episode.title}`);
-            console.log(`[MetadataScreen] Progress: ${mostRecent.progress.toFixed(2)}%`);
-            console.log(`[MetadataScreen] Watched on: ${new Date(mostRecent.paused_at).toLocaleString()}`);
-          }
-        }
-
-        console.log(`[MetadataScreen] === END TRAKT PROGRESS DATA ===`);
-        
-      } catch (error) {
-        console.error(`[MetadataScreen] Failed to fetch Trakt progress:`, error);
-      }
-    };
-
-    // Only fetch when we have metadata loaded
-    if (metadata && id) {
-      fetchTraktProgress();
+    if (metadata && isScreenFocused && !shouldLoadSecondaryData) {
+      const timer = setTimeout(() => {
+        setShouldLoadSecondaryData(true);
+      }, 300);
+      return () => clearTimeout(timer);
     }
-  }, [metadata, id, type]);
+  }, [metadata, isScreenFocused, shouldLoadSecondaryData]);
+
+  // Optimized Trakt progress fetching - only when secondary data should load
+  const fetchTraktProgress = useCallback(async () => {
+    if (!shouldLoadSecondaryData || !metadata || !id) return;
+    
+    try {
+      const traktService = TraktService.getInstance();
+      const isAuthenticated = await traktService.isAuthenticated();
+      
+      if (!isAuthenticated) {
+        console.log(`[MetadataScreen] Not authenticated with Trakt`);
+        return;
+      }
+
+      // Get all playback progress from Trakt (cached)
+      const allProgress = await traktService.getPlaybackProgress();
+      
+      if (allProgress.length === 0) return;
+
+      // Filter progress for current content
+      let relevantProgress: TraktPlaybackItem[] = [];
+      
+      if (type === 'movie') {
+        relevantProgress = allProgress.filter(item => 
+          item.type === 'movie' && 
+          item.movie?.ids.imdb === id.replace('tt', '')
+        );
+      } else if (type === 'series') {
+        relevantProgress = allProgress.filter(item => 
+          item.type === 'episode' && 
+          item.show?.ids.imdb === id.replace('tt', '')
+        );
+      }
+
+      if (relevantProgress.length === 0) return;
+
+      // Log only essential progress information for performance
+      console.log(`[MetadataScreen] Found ${relevantProgress.length} Trakt progress items for ${type}`);
+      
+      // Find most recent progress if multiple episodes
+      if (type === 'series' && relevantProgress.length > 1) {
+        const mostRecent = relevantProgress.sort((a, b) => 
+          new Date(b.paused_at).getTime() - new Date(a.paused_at).getTime()
+        )[0];
+        
+        if (mostRecent.episode && mostRecent.show) {
+          console.log(`[MetadataScreen] Most recent: S${mostRecent.episode.season}E${mostRecent.episode.number} - ${mostRecent.progress.toFixed(1)}%`);
+        }
+      }
+        
+    } catch (error) {
+      console.error(`[MetadataScreen] Failed to fetch Trakt progress:`, error);
+    }
+  }, [shouldLoadSecondaryData, metadata, id, type]);
+
+  // Debounced Trakt progress fetching
+  useEffect(() => {
+    if (shouldLoadSecondaryData && metadata && id) {
+      const timer = setTimeout(fetchTraktProgress, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [shouldLoadSecondaryData, metadata, id, fetchTraktProgress]);
+
+  // Memory management and cleanup
+  useEffect(() => {
+    return () => {
+      // Cleanup on unmount
+      if (transitionOpacity.value !== 0) {
+        transitionOpacity.value = 0;
+      }
+      // Reset secondary data loading state
+      setShouldLoadSecondaryData(false);
+      interactionComplete.current = false;
+    };
+  }, []);
+
+  // Performance monitoring (development only)
+  useEffect(() => {
+    if (__DEV__ && metadata) {
+      const startTime = Date.now();
+      const timer = setTimeout(() => {
+        const renderTime = Date.now() - startTime;
+        if (renderTime > 100) {
+          console.warn(`[MetadataScreen] Slow render detected: ${renderTime}ms for ${metadata.name}`);
+        }
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [metadata]);
 
   // Memoized derived values for performance
   const isReady = useMemo(() => !loading && metadata && !metadataError, [loading, metadata, metadataError]);
   
-  // Simple content ready state management
+  // Optimized content ready state management
   useEffect(() => {
-    if (isReady) {
+    if (isReady && isScreenFocused) {
       setIsContentReady(true);
       transitionOpacity.value = withTiming(1, { duration: 50 });
     } else if (!isReady && isContentReady) {
       setIsContentReady(false);
       transitionOpacity.value = 0;
     }
-  }, [isReady, isContentReady]);
+  }, [isReady, isContentReady, isScreenFocused]);
 
-  // Optimized callback functions with reduced dependencies
+  // Optimized callback functions with reduced dependencies and haptics throttling
   const handleToggleLibrary = useCallback(() => {
-    Haptics.impactAsync(inLibrary ? Haptics.ImpactFeedbackStyle.Light : Haptics.ImpactFeedbackStyle.Medium);
+    if (isScreenFocused) {
+      Haptics.impactAsync(inLibrary ? Haptics.ImpactFeedbackStyle.Light : Haptics.ImpactFeedbackStyle.Medium);
+    }
     toggleLibrary();
-  }, [inLibrary, toggleLibrary]);
+  }, [inLibrary, toggleLibrary, isScreenFocused]);
 
   const handleSeasonChangeWithHaptics = useCallback((seasonNumber: number) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (isScreenFocused) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
     handleSeasonChange(seasonNumber);
-  }, [handleSeasonChange]);
+  }, [handleSeasonChange, isScreenFocused]);
 
   const handleShowStreams = useCallback(() => {
     const { watchProgress } = watchProgressData;
@@ -302,26 +341,38 @@ const MetadataScreen: React.FC = () => {
   }, [navigation, id, type, episodes, episodeId, watchProgressData.watchProgress]);
 
   const handleEpisodeSelect = useCallback((episode: Episode) => {
-    console.log('[MetadataScreen] Selected Episode:', JSON.stringify(episode, null, 2));
+    if (!isScreenFocused) return;
+    
+    console.log('[MetadataScreen] Selected Episode:', episode.episode_number, episode.season_number);
     const episodeId = episode.stremioId || `${id}:${episode.season_number}:${episode.episode_number}`;
-    navigation.navigate('Streams', { 
-      id, 
-      type, 
-      episodeId,
-      episodeThumbnail: episode.still_path || undefined
+    
+    // Optimize navigation with requestAnimationFrame
+    requestAnimationFrame(() => {
+      navigation.navigate('Streams', { 
+        id, 
+        type, 
+        episodeId,
+        episodeThumbnail: episode.still_path || undefined
+      });
     });
-  }, [navigation, id, type]);
+  }, [navigation, id, type, isScreenFocused]);
 
-  const handleBack = useCallback(() => navigation.goBack(), [navigation]);
+  const handleBack = useCallback(() => {
+    if (isScreenFocused) {
+      navigation.goBack();
+    }
+  }, [navigation, isScreenFocused]);
+  
   const handleSelectCastMember = useCallback((castMember: any) => {
+    if (!isScreenFocused) return;
     setSelectedCastMember(castMember);
     setShowCastModal(true);
-  }, []);
+  }, [isScreenFocused]);
 
-  // Ultra-optimized animated styles - minimal calculations
+  // Ultra-optimized animated styles - minimal calculations with conditional updates
   const containerStyle = useAnimatedStyle(() => ({
-    opacity: animations.screenOpacity.value,
-  }), []);
+    opacity: isScreenFocused ? animations.screenOpacity.value : 0.8,
+  }), [isScreenFocused]);
 
   const contentStyle = useAnimatedStyle(() => ({
     opacity: animations.contentOpacity.value,
@@ -441,21 +492,23 @@ const MetadataScreen: React.FC = () => {
                 metadata={metadata}
                 imdbId={imdbId}
                 type={type as 'movie' | 'series'}
-                renderRatings={() => imdbId ? (
-                  <RatingsSection imdbId={imdbId} type={type === 'series' ? 'show' : 'movie'} />
+                renderRatings={() => imdbId && shouldLoadSecondaryData ? (
+                  <MemoizedRatingsSection imdbId={imdbId} type={type === 'series' ? 'show' : 'movie'} />
                 ) : null}
               />
 
-              {/* Cast Section with skeleton when loading */}
-              <CastSection
-                cast={cast}
-                loadingCast={loadingCast}
-                onSelectCastMember={handleSelectCastMember}
-              />
+              {/* Cast Section with skeleton when loading - Lazy loaded */}
+              {shouldLoadSecondaryData && (
+                <MemoizedCastSection
+                  cast={cast}
+                  loadingCast={loadingCast}
+                  onSelectCastMember={handleSelectCastMember}
+                />
+              )}
 
-              {/* Recommendations Section with skeleton when loading */}
-              {type === 'movie' && (
-                <MoreLikeThisSection 
+              {/* Recommendations Section with skeleton when loading - Lazy loaded */}
+              {type === 'movie' && shouldLoadSecondaryData && (
+                <MemoizedMoreLikeThisSection 
                   recommendations={recommendations}
                   loadingRecommendations={loadingRecommendations}
                 />
@@ -463,7 +516,7 @@ const MetadataScreen: React.FC = () => {
 
               {/* Series/Movie Content with episode skeleton when loading */}
               {type === 'series' ? (
-                <SeriesContent
+                <MemoizedSeriesContent
                   episodes={Object.values(groupedEpisodes).flat()}
                   selectedSeason={selectedSeason}
                   loadingSeasons={loadingSeasons}
@@ -473,19 +526,21 @@ const MetadataScreen: React.FC = () => {
                   metadata={metadata || undefined}
                 />
               ) : (
-                metadata && <MovieContent metadata={metadata} />
+                metadata && <MemoizedMovieContent metadata={metadata} />
               )}
             </Animated.View>
           </Animated.ScrollView>
         </>
       )}
       
-      {/* Cast Details Modal */}
-      <CastDetailsModal
-        visible={showCastModal}
-        onClose={() => setShowCastModal(false)}
-        castMember={selectedCastMember}
-      />
+      {/* Cast Details Modal - Memoized */}
+      {showCastModal && (
+        <MemoizedCastDetailsModal
+          visible={showCastModal}
+          onClose={() => setShowCastModal(false)}
+          castMember={selectedCastMember}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -576,5 +631,17 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 });
+
+// Performance Optimizations Applied:
+// 1. Memoized components (Cast, Series, Movie, Ratings, Modal)
+// 2. Lazy loading of secondary data (cast, recommendations, ratings)
+// 3. Focus-based rendering and interaction management
+// 4. Debounced Trakt progress fetching with reduced logging
+// 5. Optimized callback functions with screen focus checks
+// 6. Conditional haptics feedback based on screen focus
+// 7. Memory management and cleanup on unmount
+// 8. Performance monitoring in development mode
+// 9. Reduced re-renders through better state management
+// 10. RequestAnimationFrame for navigation optimization
 
 export default MetadataScreen;
