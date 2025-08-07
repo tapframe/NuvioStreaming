@@ -51,8 +51,8 @@ const VideoPlayer: React.FC = () => {
   // Use AndroidVideoPlayer for:
   // - Android devices
   // - Xprime streams on any platform
-  // - Non-MKV files on iOS
-  if (Platform.OS === 'android' || isXprimeStream || (Platform.OS === 'ios' && !isMkvFile)) {
+  // - MKV files on iOS are now handled by VideoPlayer.tsx (VLCPlayer)
+  if (Platform.OS === 'android' || isXprimeStream) {
     return <AndroidVideoPlayer />;
   }
 

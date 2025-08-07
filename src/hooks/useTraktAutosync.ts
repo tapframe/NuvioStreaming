@@ -204,7 +204,7 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
     // Removed excessive logging for handlePlaybackEnd calls
     
     if (!isAuthenticated || !autosyncSettings.enabled) {
-      logger.log(`[TraktAutosync] Skipping handlePlaybackEnd: authenticated=${isAuthenticated}, enabled=${autosyncSettings.enabled}`);
+      // logger.log(`[TraktAutosync] Skipping handlePlaybackEnd: authenticated=${isAuthenticated}, enabled=${autosyncSettings.enabled}`);
       return;
     }
 

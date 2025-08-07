@@ -956,23 +956,34 @@ const AndroidVideoPlayer: React.FC = () => {
       setUseCustomSubtitles(true);
       setSelectedTextTrack(-1);
       logger.log(`[AndroidVideoPlayer] Loaded subtitle: ${subtitle.lang} from ${subtitle.addonName}`);
-      console.log('[AndroidVideoPlayer] Subtitle loaded successfully');
+      console.log('[AndroidVideoPlayer] Subtitle loaded successfully, about to seek');
       
       // Force a state update by triggering a seek
-      if (videoRef.current && duration > 0) {
+      if (videoRef.current && duration > 0 && !isSeeking.current) {
         const currentPos = currentTime;
-        console.log('[AndroidVideoPlayer] Forcing a micro-seek to refresh subtitle state');
-        videoRef.current.seek(currentPos);
+        console.log(`[AndroidVideoPlayer] Forcing a micro-seek to refresh subtitle state from ${currentPos}s`);
+        seekToTime(currentPos);
+        
+        // Wait for seek to complete before clearing loading state
+        setTimeout(() => {
+          console.log('[AndroidVideoPlayer] Clearing isLoadingSubtitles after seek timeout');
+          setIsLoadingSubtitles(false);
+        }, 600); // Wait longer than seekToTime's internal timeout (500ms)
+      } else {
+        console.warn(`[AndroidVideoPlayer] Cannot seek to refresh subtitles: videoRef=${!!videoRef.current}, duration=${duration}, seeking=${isSeeking.current}`);
+        // Clear loading state immediately if we can't seek
+        setTimeout(() => {
+          setIsLoadingSubtitles(false);
+          console.log('[AndroidVideoPlayer] isLoadingSubtitles set to false (no seek)');
+        }, 100);
       }
     } catch (error) {
       logger.error('[AndroidVideoPlayer] Error loading Stremio subtitle:', error);
       console.log('[AndroidVideoPlayer] Subtitle loading failed:', error);
-    } finally {
-      console.log('[AndroidVideoPlayer] Setting isLoadingSubtitles to false');
-      // Add a small delay to ensure state updates are processed
+      // Clear loading state on error
       setTimeout(() => {
         setIsLoadingSubtitles(false);
-        console.log('[AndroidVideoPlayer] isLoadingSubtitles set to false');
+        console.log('[AndroidVideoPlayer] isLoadingSubtitles set to false (error)');
       }, 100);
     }
   };
