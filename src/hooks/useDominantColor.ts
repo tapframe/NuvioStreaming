@@ -11,6 +11,133 @@ interface DominantColorResult {
 // Simple in-memory cache for extracted colors
 const colorCache = new Map<string, string>();
 
+// Helper function to calculate color vibrancy
+const calculateVibrancy = (hex: string): number => {
+  const r = parseInt(hex.substr(1, 2), 16);
+  const g = parseInt(hex.substr(3, 2), 16);
+  const b = parseInt(hex.substr(5, 2), 16);
+  
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const saturation = max === 0 ? 0 : (max - min) / max;
+  
+  return saturation * (max / 255);
+};
+
+// Helper function to calculate color brightness
+const calculateBrightness = (hex: string): number => {
+  const r = parseInt(hex.substr(1, 2), 16);
+  const g = parseInt(hex.substr(3, 2), 16);
+  const b = parseInt(hex.substr(5, 2), 16);
+  
+  return (r * 299 + g * 587 + b * 114) / 1000;
+};
+
+// Helper function to darken a color
+const darkenColor = (hex: string, factor: number = 0.1): string => {
+  const r = parseInt(hex.substr(1, 2), 16);
+  const g = parseInt(hex.substr(3, 2), 16);
+  const b = parseInt(hex.substr(5, 2), 16);
+  
+  const newR = Math.floor(r * factor);
+  const newG = Math.floor(g * factor);
+  const newB = Math.floor(b * factor);
+  
+  return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+};
+
+// Enhanced color selection logic
+const selectBestColor = (result: ImageColorsResult): string => {
+  let candidates: string[] = [];
+  
+  if (result.platform === 'android') {
+    // Collect all available colors
+    candidates = [
+      result.dominant,
+      result.vibrant,
+      result.darkVibrant,
+      result.muted,
+      result.darkMuted,
+      result.lightVibrant,
+      result.lightMuted,
+      result.average
+    ].filter(Boolean);
+  } else if (result.platform === 'ios') {
+    candidates = [
+      result.primary,
+      result.secondary,
+      result.background,
+      result.detail
+    ].filter(Boolean);
+  } else if (result.platform === 'web') {
+    candidates = [
+      result.dominant,
+      result.vibrant,
+      result.darkVibrant,
+      result.muted,
+      result.darkMuted,
+      result.lightVibrant,
+      result.lightMuted
+    ].filter(Boolean);
+  }
+  
+  if (candidates.length === 0) {
+    return '#1a1a1a';
+  }
+  
+  // Score each color based on vibrancy and appropriateness for backgrounds
+  const scoredColors = candidates.map(color => {
+    const brightness = calculateBrightness(color);
+    const vibrancy = calculateVibrancy(color);
+    
+    // Prefer colors that are:
+    // 1. Not too bright (good for backgrounds)
+    // 2. Have decent vibrancy (not too gray)
+    // 3. Not too dark (still visible)
+    let score = 0;
+    
+    // Brightness scoring (prefer medium-dark colors)
+    if (brightness >= 30 && brightness <= 120) {
+      score += 3;
+    } else if (brightness >= 15 && brightness <= 150) {
+      score += 2;
+    } else if (brightness >= 5) {
+      score += 1;
+    }
+    
+    // Vibrancy scoring (prefer some color over pure gray)
+    if (vibrancy >= 0.3) {
+      score += 3;
+    } else if (vibrancy >= 0.15) {
+      score += 2;
+    } else if (vibrancy >= 0.05) {
+      score += 1;
+    }
+    
+    return { color, score, brightness, vibrancy };
+  });
+  
+  // Sort by score (highest first)
+  scoredColors.sort((a, b) => b.score - a.score);
+  
+  // Get the best color
+  let bestColor = scoredColors[0].color;
+  const bestBrightness = scoredColors[0].brightness;
+  
+  // Apply more aggressive darkening to make colors darker overall
+  if (bestBrightness > 60) {
+    bestColor = darkenColor(bestColor, 0.18);
+  } else if (bestBrightness > 40) {
+    bestColor = darkenColor(bestColor, 0.3);
+  } else if (bestBrightness > 20) {
+    bestColor = darkenColor(bestColor, 0.5);
+  } else {
+    bestColor = darkenColor(bestColor, 0.7);
+  }
+  
+  return bestColor;
+};
+
 // Preload function to start extraction early
 export const preloadDominantColor = async (imageUri: string | null) => {
   if (!imageUri || colorCache.has(imageUri)) return;
@@ -22,34 +149,11 @@ export const preloadDominantColor = async (imageUri: string | null) => {
       fallback: '#1a1a1a',
       cache: true,
       key: imageUri,
-      quality: 'low',
+      quality: 'high', // Use higher quality for better color extraction
+      pixelSpacing: 3, // Better sampling (Android only)
     });
 
-    let extractedColor = '#1a1a1a';
-    
-    if (result.platform === 'android') {
-      extractedColor = result.darkMuted || result.muted || result.darkVibrant || result.dominant || '#1a1a1a';
-    } else if (result.platform === 'ios') {
-      extractedColor = result.background || result.primary || '#1a1a1a';
-    } else if (result.platform === 'web') {
-      extractedColor = result.darkMuted || result.muted || result.dominant || '#1a1a1a';
-    }
-
-    // Apply darkening logic
-    const hex = extractedColor.replace('#', '');
-    const r = parseInt(hex.substr(0, 2), 16);
-    const g = parseInt(hex.substr(2, 2), 16);
-    const b = parseInt(hex.substr(4, 2), 16);
-    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-    
-    if (brightness > 50) {
-      const darkenFactor = 0.15;
-      const newR = Math.floor(r * darkenFactor);
-      const newG = Math.floor(g * darkenFactor);
-      const newB = Math.floor(b * darkenFactor);
-      extractedColor = `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
-    }
-
+    const extractedColor = selectBestColor(result);
     colorCache.set(imageUri, extractedColor);
   } catch (err) {
     console.warn('[preloadDominantColor] Failed to preload color:', err);
@@ -92,41 +196,11 @@ export const useDominantColor = (imageUri: string | null): DominantColorResult =
         fallback: '#1a1a1a',
         cache: true,
         key: uri,
-        quality: 'low', // Use low quality for better performance
+        quality: 'high', // Use higher quality for better accuracy
+        pixelSpacing: 3, // Better pixel sampling (Android only)
       });
 
-      let extractedColor = '#1a1a1a'; // Default fallback
-
-      // Handle different platform results
-      if (result.platform === 'android') {
-        // Prefer darker, more muted colors for background
-        extractedColor = result.darkMuted || result.muted || result.darkVibrant || result.dominant || '#1a1a1a';
-      } else if (result.platform === 'ios') {
-        // Use background color from iOS, or fallback to primary
-        extractedColor = result.background || result.primary || '#1a1a1a';
-      } else if (result.platform === 'web') {
-        // Use muted colors for web
-        extractedColor = result.darkMuted || result.muted || result.dominant || '#1a1a1a';
-      }
-
-      // Ensure the color is dark enough for a background
-      // Convert hex to RGB to check brightness
-      const hex = extractedColor.replace('#', '');
-      const r = parseInt(hex.substr(0, 2), 16);
-      const g = parseInt(hex.substr(2, 2), 16);
-      const b = parseInt(hex.substr(4, 2), 16);
-      
-      // Calculate brightness (0-255)
-      const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-      
-      // If too bright, darken it significantly
-      if (brightness > 50) {
-        const darkenFactor = 0.15;
-        const newR = Math.floor(r * darkenFactor);
-        const newG = Math.floor(g * darkenFactor);
-        const newB = Math.floor(b * darkenFactor);
-        extractedColor = `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
-      }
+      const extractedColor = selectBestColor(result);
 
       // Cache the extracted color for future use
       colorCache.set(uri, extractedColor);

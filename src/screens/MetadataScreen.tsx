@@ -30,6 +30,7 @@ import Animated, {
   useSharedValue,
   withTiming,
   runOnJS,
+  Easing,
 } from 'react-native-reanimated';
 import { RouteProp } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -115,13 +116,36 @@ const MetadataScreen: React.FC = () => {
   
   const { dominantColor, loading: colorLoading } = useDominantColor(heroImageUri);
   
-  // Memoized background color with immediate fallback and smooth transition
+  // Create a shared value for animated background color transitions
+  const backgroundColorShared = useSharedValue(currentTheme.colors.darkBackground);
+  
+  // Update the shared value when dominant color changes
+  useEffect(() => {
+    if (dominantColor && dominantColor !== '#1a1a1a' && dominantColor !== null && dominantColor !== currentTheme.colors.darkBackground) {
+      // Smoothly transition to the new color
+      backgroundColorShared.value = withTiming(dominantColor, {
+        duration: 800, // Longer duration for smoother transition
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1), // Smooth easing curve
+      });
+    } else {
+      // Transition back to theme background if needed
+      backgroundColorShared.value = withTiming(currentTheme.colors.darkBackground, {
+        duration: 800,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      });
+    }
+  }, [dominantColor, currentTheme.colors.darkBackground]);
+  
+  // Create an animated style for the background color
+  const animatedBackgroundStyle = useAnimatedStyle(() => ({
+    backgroundColor: backgroundColorShared.value,
+  }));
+  
+  // For compatibility with existing code, maintain the static value as well
   const dynamicBackgroundColor = useMemo(() => {
-    // Start with theme background, then use extracted color when available and different from fallback
     if (dominantColor && dominantColor !== '#1a1a1a' && dominantColor !== null && dominantColor !== currentTheme.colors.darkBackground) {
       return dominantColor;
     }
-    // Always return theme background as immediate fallback
     return currentTheme.colors.darkBackground;
   }, [dominantColor, currentTheme.colors.darkBackground]);
 
@@ -465,8 +489,9 @@ const MetadataScreen: React.FC = () => {
   }
 
   return (
+    <Animated.View style={[animatedBackgroundStyle, { flex: 1 }]}>
     <SafeAreaView 
-      style={[containerStyle, styles.container, { backgroundColor: dynamicBackgroundColor }]}
+      style={[containerStyle, styles.container]}
       edges={['bottom']}
     >
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" animated />
@@ -581,6 +606,7 @@ const MetadataScreen: React.FC = () => {
         />
       )}
     </SafeAreaView>
+    </Animated.View>
   );
 };
 

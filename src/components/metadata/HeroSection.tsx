@@ -786,16 +786,9 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     const logoScale = hasProgress ? 0.85 : 1;
     
     return {
-    opacity: logoOpacity.value,
+      opacity: logoOpacity.value,
       transform: [
-        { 
-      translateY: interpolate(
-        scrollY.value,
-        [0, 100],
-        [0, -20],
-        Extrapolate.CLAMP
-      )
-        },
+        // Keep logo stable by not applying translateY based on scroll
         { scale: withTiming(logoScale, { duration: 300 }) }
       ]
     };
@@ -944,6 +937,22 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
         locations={[0, 0.3, 0.55, 0.75, 0.9, 1]}
         style={styles.heroGradient}
       >
+        {/* Enhanced bottom fade with stronger gradient */}
+        <LinearGradient
+          colors={[
+            'transparent',
+            `${dynamicBackgroundColor || themeColors.darkBackground}10`,
+            `${dynamicBackgroundColor || themeColors.darkBackground}25`,
+            `${dynamicBackgroundColor || themeColors.darkBackground}45`,
+            `${dynamicBackgroundColor || themeColors.darkBackground}65`,
+            `${dynamicBackgroundColor || themeColors.darkBackground}85`,
+            `${dynamicBackgroundColor || themeColors.darkBackground}95`,
+            dynamicBackgroundColor || themeColors.darkBackground
+          ]}
+          locations={[0, 0.1, 0.25, 0.4, 0.6, 0.75, 0.9, 1]}
+          style={styles.bottomFadeGradient}
+          pointerEvents="none"
+        />
         <View style={styles.heroContent}>
           {/* Optimized Title/Logo */}
           <View style={styles.logoContainer}>
@@ -998,23 +1007,6 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
           />
         </View>
       </LinearGradient>
-      
-      {/* Ultra-subtle bottom fade for feather-light seamless blend */}
-      <LinearGradient
-        colors={[
-          'transparent',
-          `${dynamicBackgroundColor || themeColors.darkBackground}05`,
-          `${dynamicBackgroundColor || themeColors.darkBackground}15`,
-          `${dynamicBackgroundColor || themeColors.darkBackground}30`,
-          `${dynamicBackgroundColor || themeColors.darkBackground}50`,
-          `${dynamicBackgroundColor || themeColors.darkBackground}70`,
-          `${dynamicBackgroundColor || themeColors.darkBackground}85`,
-          dynamicBackgroundColor || themeColors.darkBackground
-        ]}
-        locations={[0, 0.15, 0.3, 0.45, 0.65, 0.8, 0.92, 1]}
-        style={styles.bottomFadeGradient}
-        pointerEvents="none"
-      />
     </Animated.View>
   );
 });
@@ -1043,15 +1035,15 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 200,
-    zIndex: -1,
+    height: 400,
+    zIndex: 1,
   },
   heroContent: {
     padding: 16,
     paddingTop: 8,
     paddingBottom: 8,
     position: 'relative',
-    zIndex: 5,
+    zIndex: 2,
   },
   logoContainer: {
     alignItems: 'center',
@@ -1106,7 +1098,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: '100%',
     position: 'relative',
-    zIndex: 10,
   },
   actionButton: {
     flexDirection: 'row',
@@ -1276,153 +1267,153 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     backgroundColor: 'rgba(255,255,255,0.15)',
   },
-          watchedIndicator: {
-      position: 'absolute',
-      top: 4,
-      right: 4,
-      backgroundColor: 'rgba(0,0,0,0.6)',
-      borderRadius: 8,
-      width: 16,
-      height: 16,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    watchedPlayButton: {
-      backgroundColor: '#1e1e1e',
-      borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.3)',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.25,
-      shadowRadius: 4,
-      elevation: 4,
-    },
-    watchedPlayButtonText: {
-      color: '#fff',
-      fontWeight: '700',
-      marginLeft: 6,
-      fontSize: 15,
-    },
-    // Enhanced progress indicator styles
-    progressShimmer: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      borderRadius: 2,
-      backgroundColor: 'rgba(255,255,255,0.1)',
-    },
-    completionGlow: {
-      position: 'absolute',
-      top: -2,
-      left: -2,
-      right: -2,
-      bottom: -2,
-      borderRadius: 4,
-      backgroundColor: 'rgba(0,255,136,0.2)',
-    },
-    completionIndicator: {
-      position: 'absolute',
-      right: 4,
-      top: -6,
-      bottom: -6,
-      width: 16,
-      height: 16,
-      borderRadius: 8,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    completionGradient: {
-      width: 16,
-      height: 16,
-      borderRadius: 8,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    sparkleContainer: {
-      position: 'absolute',
-      top: -10,
-      left: 0,
-      right: 0,
-      bottom: -10,
-      borderRadius: 2,
-    },
-    sparkle: {
-      position: 'absolute',
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    progressInfoMain: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 2,
-    },
-    watchProgressMainText: {
-      fontSize: 11,
-      fontWeight: '600',
-      textAlign: 'center',
-    },
-    watchProgressSubText: {
-      fontSize: 9,
-      textAlign: 'center',
-      opacity: 0.8,
-      marginBottom: 1,
-    },
-    syncStatusContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginTop: 2,
-      width: '100%',
-      flexWrap: 'wrap',
-    },
-    syncStatusText: {
-      fontSize: 9,
-      marginLeft: 4,
-      fontWeight: '500',
-    },
-    traktSyncButtonEnhanced: {
-      position: 'absolute',
-      top: 8,
-      right: 8,
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      overflow: 'hidden',
-    },
-    traktSyncButtonInline: {
-      marginLeft: 8,
-      width: 20,
-      height: 20,
-      borderRadius: 10,
-      overflow: 'hidden',
-    },
-    syncButtonGradient: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    syncButtonGradientInline: {
-      width: 20,
-      height: 20,
-      borderRadius: 10,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    traktIndicatorGradient: {
-      width: 16,
-      height: 16,
-      borderRadius: 8,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
+  watchedIndicator: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  watchedPlayButton: {
+    backgroundColor: '#1e1e1e',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  watchedPlayButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    marginLeft: 6,
+    fontSize: 15,
+  },
+  // Enhanced progress indicator styles
+  progressShimmer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  completionGlow: {
+    position: 'absolute',
+    top: -2,
+    left: -2,
+    right: -2,
+    bottom: -2,
+    borderRadius: 4,
+    backgroundColor: 'rgba(0,255,136,0.2)',
+  },
+  completionIndicator: {
+    position: 'absolute',
+    right: 4,
+    top: -6,
+    bottom: -6,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  completionGradient: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sparkleContainer: {
+    position: 'absolute',
+    top: -10,
+    left: 0,
+    right: 0,
+    bottom: -10,
+    borderRadius: 2,
+  },
+  sparkle: {
+    position: 'absolute',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressInfoMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  watchProgressMainText: {
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  watchProgressSubText: {
+    fontSize: 9,
+    textAlign: 'center',
+    opacity: 0.8,
+    marginBottom: 1,
+  },
+  syncStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+    width: '100%',
+    flexWrap: 'wrap',
+  },
+  syncStatusText: {
+    fontSize: 9,
+    marginLeft: 4,
+    fontWeight: '500',
+  },
+  traktSyncButtonEnhanced: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  traktSyncButtonInline: {
+    marginLeft: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  syncButtonGradient: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  syncButtonGradientInline: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  traktIndicatorGradient: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });
 
 export default HeroSection;
