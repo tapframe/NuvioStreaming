@@ -102,12 +102,12 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   subtitleOffsetSec,
   setSubtitleOffsetSec,
 }) => {
-  // Track which specific online subtitle is currently loaded
+  // Track which specific addon subtitle is currently loaded
   const [selectedOnlineSubtitleId, setSelectedOnlineSubtitleId] = React.useState<string | null>(null);
-  // Track which online subtitle is currently loading to show spinner per-item
+  // Track which addon subtitle is currently loading to show spinner per-item
   const [loadingSubtitleId, setLoadingSubtitleId] = React.useState<string | null>(null);
   // Active tab for better organization
-  const [activeTab, setActiveTab] = React.useState<'built-in' | 'online' | 'appearance'>(useCustomSubtitles ? 'online' : 'built-in');
+  const [activeTab, setActiveTab] = React.useState<'built-in' | 'addon' | 'appearance'>(useCustomSubtitles ? 'addon' : 'built-in');
   // Responsive tuning
   const isCompact = width < 360 || height < 640;
   const sectionPad = isCompact ? 12 : 16;
@@ -122,7 +122,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
     }
   }, [showSubtitleModal]);
 
-  // Reset selected online subtitle when switching to built-in tracks
+  // Reset selected addon subtitle when switching to built-in tracks
   React.useEffect(() => {
     if (!useCustomSubtitles) {
       setSelectedOnlineSubtitleId(null);
@@ -138,7 +138,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
 
   // Keep tab in sync with current usage
   React.useEffect(() => {
-    setActiveTab(useCustomSubtitles ? 'online' : 'built-in');
+    setActiveTab(useCustomSubtitles ? 'addon' : 'built-in');
   }, [useCustomSubtitles]);
 
   const handleClose = () => {
@@ -214,7 +214,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
               <Text style={{ color: '#FFFFFF', fontSize: 22, fontWeight: '700' }}>Subtitles</Text>
               <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: useCustomSubtitles ? 'rgba(34,197,94,0.2)' : 'rgba(59,130,246,0.2)' }}>
                 <Text style={{ color: useCustomSubtitles ? '#22C55E' : '#3B82F6', fontSize: 11, fontWeight: '700' }}>
-                  {useCustomSubtitles ? 'Online in use' : 'Built‑in in use'}
+                  {useCustomSubtitles ? 'Addon in use' : 'Built‑in in use'}
                 </Text>
               </View>
             </View>
@@ -238,7 +238,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
           <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 6 }}>
             {([
               { key: 'built-in', label: 'Built‑in' },
-              { key: 'online', label: 'Online' },
+              { key: 'addon', label: 'Addons' },
               { key: 'appearance', label: 'Appearance' },
             ] as const).map(tab => (
               <TouchableOpacity
@@ -315,7 +315,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
               </View>
             )}
 
-            {activeTab === 'online' && (
+            {activeTab === 'addon' && (
             <View style={{ marginBottom: 30 }}>
               <View style={{
                 flexDirection: 'row',
@@ -330,7 +330,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                   textTransform: 'uppercase',
                   letterSpacing: 0.5,
                 }}>
-                  Online Subtitles
+                  Addon Subtitles
                 </Text>
                 <TouchableOpacity
                   style={{
@@ -381,7 +381,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                     marginTop: 8,
                     textAlign: 'center',
                   }}>
-                    Tap to search online
+                    Tap to fetch from addons
                   </Text>
                 </TouchableOpacity>
               ) : isLoadingSubtitleList ? (
@@ -426,7 +426,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                               {sub.display}
                             </Text>
                             <Text style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: 13 }}>
-                              {formatLanguage(sub.language)}
+                              {formatLanguage(sub.language)}{sub.source ? ` · ${sub.source}` : ''}
                             </Text>
                           </View>
                           {(isLoadingSubtitles && loadingSubtitleId === sub.id) ? (

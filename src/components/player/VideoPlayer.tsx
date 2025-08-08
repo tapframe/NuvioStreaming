@@ -33,7 +33,7 @@ import { safeDebugLog, parseSRT, DEBUG_MODE, formatTime } from './utils/playerUt
 import { styles } from './utils/playerStyles';
 import { SubtitleModals } from './modals/SubtitleModals';
 import { AudioTrackModal } from './modals/AudioTrackModal';
-import ResumeOverlay from './modals/ResumeOverlay';
+// Removed ResumeOverlay usage when alwaysResume is enabled
 import PlayerControls from './controls/PlayerControls';
 import CustomSubtitles from './subtitles/CustomSubtitles';
 import { SourcesModal } from './modals/SourcesModal';
@@ -95,8 +95,8 @@ const VideoPlayer: React.FC = () => {
     episodeId: episodeId
   });
 
-  // Get the Trakt autosync settings to use the user-configured sync frequency
-  const { settings: traktSettings } = useTraktAutosyncSettings();
+  // App settings
+  const { settings: appSettings } = useSettings();
 
   safeDebugLog("Component mounted with props", {
     uri, title, season, episode, episodeTitle, quality, year,
@@ -401,10 +401,17 @@ const VideoPlayer: React.FC = () => {
 
             if (progressPercent < 85) {
               setResumePosition(savedProgress.currentTime);
-              setSavedDuration(savedProgress.duration);
-              logger.log(`[VideoPlayer] Set resume position to: ${savedProgress.currentTime} of ${savedProgress.duration}`);
-              setShowResumeOverlay(true);
-              logger.log(`[VideoPlayer] Showing resume overlay`);
+               setSavedDuration(savedProgress.duration);
+               setInitialPosition(savedProgress.currentTime);
+               logger.log(`[VideoPlayer] Set resume position to: ${savedProgress.currentTime} of ${savedProgress.duration}`);
+               if (appSettings.alwaysResume) {
+                logger.log(`[VideoPlayer] AlwaysResume enabled. Auto-seeking to ${savedProgress.currentTime}`);
+                // Seek immediately after load
+                seekToTime(savedProgress.currentTime);
+              } else {
+                setShowResumeOverlay(true);
+                logger.log(`[VideoPlayer] Showing resume overlay`);
+              }
             } else {
               logger.log(`[VideoPlayer] Progress too high (${progressPercent.toFixed(1)}%), not showing resume overlay`);
             }
@@ -419,7 +426,7 @@ const VideoPlayer: React.FC = () => {
       }
     };
     loadWatchProgress();
-  }, [id, type, episodeId]);
+  }, [id, type, episodeId, appSettings.alwaysResume]);
 
   const saveWatchProgress = async () => {
     if (id && type && currentTime > 0 && duration > 0) {
@@ -919,7 +926,7 @@ const VideoPlayer: React.FC = () => {
     }
     setIsLoadingSubtitleList(true);
     try {
-      // Fetch from installed OpenSubtitles v3 addon via Stremio only
+      // Fetch from all installed subtitle-capable addons via Stremio
       const stremioType = type === 'series' ? 'series' : 'movie';
       const stremioVideoId = stremioType === 'series' && season && episode
         ? `series:${targetImdbId}:${season}:${episode}`
@@ -931,37 +938,28 @@ const VideoPlayer: React.FC = () => {
         flagUrl: '',
         format: 'srt',
         encoding: 'utf-8',
-        media: 'opensubtitles',
+        media: sub.addonName || sub.addon || '',
         display: sub.lang || 'Unknown',
         language: (sub.lang || '').toLowerCase(),
         isHearingImpaired: false,
-        source: sub.addonName || 'OpenSubtitles v3',
+        source: sub.addonName || sub.addon || 'Addon',
       }));
-
-      // De-duplicate by language
-      const uniqueSubtitles = stremioSubs.reduce((acc, current) => {
-        const exists = acc.find(item => item.language === current.language);
-        if (!exists) {
-          acc.push(current);
-        }
-        return acc;
-      }, [] as WyzieSubtitle[]);
-      // Sort with English languages first, then alphabetical
+      // Sort with English languages first, then alphabetical over full list
       const isEnglish = (s: WyzieSubtitle) => {
         const lang = (s.language || '').toLowerCase();
         const disp = (s.display || '').toLowerCase();
         return lang === 'en' || lang === 'eng' || /^en([-_]|$)/.test(lang) || disp.includes('english');
       };
-      uniqueSubtitles.sort((a, b) => {
+      stremioSubs.sort((a, b) => {
         const aIsEn = isEnglish(a);
         const bIsEn = isEnglish(b);
         if (aIsEn && !bIsEn) return -1;
         if (!aIsEn && bIsEn) return 1;
         return (a.display || '').localeCompare(b.display || '');
       });
-      setAvailableSubtitles(uniqueSubtitles);
+      setAvailableSubtitles(stremioSubs);
       if (autoSelectEnglish) {
-        const englishSubtitle = uniqueSubtitles.find(sub =>
+        const englishSubtitle = stremioSubs.find(sub =>
           sub.language.toLowerCase() === 'eng' ||
           sub.language.toLowerCase() === 'en' ||
           sub.display.toLowerCase().includes('english')
@@ -1277,6 +1275,14 @@ const VideoPlayer: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    if (isVideoLoaded && initialPosition && !isInitialSeekComplete && duration > 0) {
+      logger.log(`[VideoPlayer] Post-load initial seek to: ${initialPosition}s`);
+      seekToTime(initialPosition);
+      setIsInitialSeekComplete(true);
+    }
+  }, [isVideoLoaded, initialPosition, duration]);
+
   return (
     <View style={[
       styles.container,
@@ -1496,16 +1502,7 @@ const VideoPlayer: React.FC = () => {
             lineHeightMultiplier={subtitleLineHeightMultiplier}
           />
 
-          <ResumeOverlay
-            showResumeOverlay={showResumeOverlay}
-            resumePosition={resumePosition}
-            duration={savedDuration || duration}
-            title={episodeTitle || title}
-            season={season}
-            episode={episode}
-            handleResume={handleResume}
-            handleStartFromBeginning={handleStartFromBeginning}
-          />
+          {/* Resume overlay removed when AlwaysResume is enabled; overlay component omitted */}
         </TouchableOpacity>
       </Animated.View>
 

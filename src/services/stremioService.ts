@@ -265,6 +265,40 @@ class StremioService {
           logger.log('✅ Cinemeta pre-installed with fallback manifest');
         }
       }
+
+      // Ensure OpenSubtitles v3 is always installed as a pre-installed addon
+      const opensubsId = 'org.stremio.opensubtitlesv3';
+      if (!this.installedAddons.has(opensubsId)) {
+        try {
+          const opensubsManifest = await this.getManifest('https://opensubtitles-v3.strem.io/manifest.json');
+          this.installedAddons.set(opensubsId, opensubsManifest);
+          logger.log('✅ OpenSubtitles v3 pre-installed as default subtitles addon');
+        } catch (error) {
+          logger.error('Failed to fetch OpenSubtitles manifest, using fallback:', error);
+          const fallbackManifest: Manifest = {
+            id: opensubsId,
+            name: 'OpenSubtitles v3',
+            version: '1.0.0',
+            description: 'OpenSubtitles v3 Addon for Stremio',
+            url: 'https://opensubtitles-v3.strem.io',
+            originalUrl: 'https://opensubtitles-v3.strem.io/manifest.json',
+            types: ['movie', 'series'],
+            catalogs: [],
+            resources: [
+              {
+                name: 'subtitles',
+                types: ['movie', 'series'],
+                idPrefixes: ['tt']
+              }
+            ],
+            behaviorHints: {
+              configurable: false
+            }
+          };
+          this.installedAddons.set(opensubsId, fallbackManifest);
+          logger.log('✅ OpenSubtitles v3 pre-installed with fallback manifest');
+        }
+      }
       
       // Load addon order if exists
       const storedOrder = await AsyncStorage.getItem(this.ADDON_ORDER_KEY);
@@ -285,6 +319,21 @@ class StremioService {
           this.addonOrder.unshift(cinemetaId);
         }
       }
+
+      // Ensure OpenSubtitles v3 is present right after Cinemeta (if not already ordered)
+      const ensureOpensubsPosition = () => {
+        const idx = this.addonOrder.indexOf(opensubsId);
+        const cinIdx = this.addonOrder.indexOf(cinemetaId);
+        if (idx === -1) {
+          // Insert after Cinemeta
+          this.addonOrder.splice(cinIdx + 1, 0, opensubsId);
+        } else if (idx <= cinIdx) {
+          // Move it to right after Cinemeta
+          this.addonOrder.splice(idx, 1);
+          this.addonOrder.splice(cinIdx + 1, 0, opensubsId);
+        }
+      };
+      ensureOpensubsPosition();
       
       // Add any missing addons to the order
       const installedIds = Array.from(this.installedAddons.keys());
@@ -1103,52 +1152,59 @@ class StremioService {
 
   async getSubtitles(type: string, id: string, videoId?: string): Promise<Subtitle[]> {
     await this.ensureInitialized();
-    
-    // Find the OpenSubtitles v3 addon
-    const openSubtitlesAddon = this.getInstalledAddons().find(
-      addon => addon.id === 'org.stremio.opensubtitlesv3'
-    );
-    
-    if (!openSubtitlesAddon) {
-      logger.warn('OpenSubtitles v3 addon not found');
+    // Collect from all installed addons that expose a subtitles resource
+    const addons = this.getInstalledAddons();
+    const subtitleAddons = addons.filter(addon => {
+      if (!addon.resources) return false;
+      return addon.resources.some((resource: any) => {
+        if (typeof resource === 'string') return resource === 'subtitles';
+        return resource && resource.name === 'subtitles';
+      });
+    });
+
+    if (subtitleAddons.length === 0) {
+      logger.warn('No subtitle-capable addons installed');
       return [];
     }
-    
-    try {
-      const baseUrl = this.getAddonBaseURL(openSubtitlesAddon.url || '').baseUrl;
-      
-      // Construct the query URL with the correct format
-      // For series episodes, use the videoId directly which includes series ID + episode info
-      let url = '';
-      if (type === 'series' && videoId) {
-        // For series, extract the IMDB ID and episode info from videoId (series:tt12345:1:2)
-        // and construct the proper URL format: /subtitles/series/tt12345:1:2.json
-        const episodeInfo = videoId.replace('series:', '');
-        url = `${baseUrl}/subtitles/series/${episodeInfo}.json`;
-      } else {
-        // For movies, the format is /subtitles/movie/tt12345.json
-        url = `${baseUrl}/subtitles/${type}/${id}.json`;
+
+    const requests = subtitleAddons.map(async (addon) => {
+      if (!addon.url) return [] as Subtitle[];
+      try {
+        const { baseUrl } = this.getAddonBaseURL(addon.url || '');
+        let url = '';
+        if (type === 'series' && videoId) {
+          const episodeInfo = videoId.replace('series:', '');
+          url = `${baseUrl}/subtitles/series/${episodeInfo}.json`;
+        } else {
+          url = `${baseUrl}/subtitles/${type}/${id}.json`;
+        }
+        logger.log(`Fetching subtitles from ${addon.name}: ${url}`);
+        const response = await this.retryRequest(async () => axios.get(url, { timeout: 10000 }));
+        if (response.data && Array.isArray(response.data.subtitles)) {
+          return response.data.subtitles.map((sub: any) => ({
+            ...sub,
+            addon: addon.id,
+            addonName: addon.name,
+          })) as Subtitle[];
+        }
+      } catch (error) {
+        logger.error(`Failed to fetch subtitles from ${addon.name}:`, error);
       }
-      
-      logger.log(`Fetching subtitles from: ${url}`);
-      
-      const response = await this.retryRequest(async () => {
-        return await axios.get(url, { timeout: 10000 });
-      });
-      
-      if (response.data && response.data.subtitles) {
-        // Process and return the subtitles
-        return response.data.subtitles.map((sub: any) => ({
-          ...sub,
-          addon: openSubtitlesAddon.id,
-          addonName: openSubtitlesAddon.name
-        }));
-      }
-    } catch (error) {
-      logger.error('Failed to fetch subtitles:', error);
-    }
-    
-    return [];
+      return [] as Subtitle[];
+    });
+
+    const all = await Promise.all(requests);
+    // Flatten and de-duplicate by URL
+    const merged = ([] as Subtitle[]).concat(...all);
+    const seen = new Set<string>();
+    const deduped = merged.filter(s => {
+      const key = s.url;
+      if (!key) return false;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    return deduped;
   }
 
   // Add methods to move addons in the order

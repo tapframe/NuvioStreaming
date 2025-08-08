@@ -43,9 +43,11 @@ export interface AppSettings {
   enableScraperUrlValidation: boolean; // Enable/disable URL validation for scrapers
   streamDisplayMode: 'separate' | 'grouped'; // How to display streaming links - separately by provider or grouped under one name
   streamSortMode: 'scraper-then-quality' | 'quality-then-scraper'; // How to sort streams - by scraper first or quality first
-  showScraperLogos: boolean; // Show/hide scraper logos next to streaming links
+  showScraperLogos: boolean; // Show scraper logos next to streaming links
   // Quality filtering settings
   excludedQualities: string[]; // Array of quality strings to exclude (e.g., ['2160p', '4K', '1080p', '720p'])
+  // Playback behavior
+  alwaysResume: boolean; // If true, resume automatically without prompt when progress < 85%
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -74,6 +76,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showScraperLogos: true, // Show scraper logos by default
   // Quality filtering defaults
   excludedQualities: [], // No qualities excluded by default
+  // Playback behavior defaults
+  alwaysResume: false,
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';

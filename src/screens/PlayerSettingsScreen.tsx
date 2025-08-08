@@ -265,18 +265,51 @@ const PlayerSettingsScreen: React.FC = () => {
                       { color: currentTheme.colors.textMuted },
                     ]}
                   >
-                    Automatically play the highest quality stream when available
+                    Automatically start the highest quality stream available.
                   </Text>
                 </View>
                 <Switch
                   value={settings.autoplayBestStream}
                   onValueChange={(value) => updateSetting('autoplayBestStream', value)}
-                  trackColor={{ 
-                    false: 'rgba(255,255,255,0.2)', 
-                    true: currentTheme.colors.primary + '40' 
-                  }}
-                  thumbColor={settings.autoplayBestStream ? currentTheme.colors.primary : 'rgba(255,255,255,0.8)'}
-                  ios_backgroundColor="rgba(255,255,255,0.2)"
+                  thumbColor={settings.autoplayBestStream ? currentTheme.colors.primary : undefined}
+                />
+              </View>
+            </View>
+
+            <View style={styles.settingItem}>
+              <View style={styles.settingContent}>
+                <View style={[
+                  styles.settingIconContainer,
+                  { backgroundColor: 'rgba(255,255,255,0.1)' }
+                ]}>
+                  <MaterialIcons
+                    name="restore"
+                    size={20}
+                    color={currentTheme.colors.primary}
+                  />
+                </View>
+                <View style={styles.settingText}>
+                  <Text
+                    style={[
+                      styles.settingTitle,
+                      { color: currentTheme.colors.text },
+                    ]}
+                  >
+                    Always Resume
+                  </Text>
+                  <Text
+                    style={[
+                      styles.settingDescription,
+                      { color: currentTheme.colors.textMuted },
+                    ]}
+                  >
+                    Skip the resume prompt and automatically continue where you left off (if less than 85% watched).
+                  </Text>
+                </View>
+                <Switch
+                  value={settings.alwaysResume}
+                  onValueChange={(value) => updateSetting('alwaysResume', value)}
+                  thumbColor={settings.alwaysResume ? currentTheme.colors.primary : undefined}
                 />
               </View>
             </View>
