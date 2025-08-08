@@ -771,8 +771,8 @@ const AppNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootStack
               name="Player" 
               component={VideoPlayer as any} 
               options={{ 
-                animation: 'slide_from_right',
-                animationDuration: Platform.OS === 'android' ? 200 : 300,
+                animation: Platform.OS === 'android' ? 'none' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 0 : 300,
                 // Force fullscreen presentation on iPad
                 presentation: Platform.OS === 'ios' ? 'fullScreenModal' : 'card',
                 // Disable gestures during video playback

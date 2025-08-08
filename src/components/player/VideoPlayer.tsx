@@ -134,6 +134,9 @@ const VideoPlayer: React.FC = () => {
   const [showResumeOverlay, setShowResumeOverlay] = useState(false);
   const [resumePosition, setResumePosition] = useState<number | null>(null);
   const [savedDuration, setSavedDuration] = useState<number | null>(null);
+  const initialSeekTargetRef = useRef<number | null>(null);
+  const initialSeekVerifiedRef = useRef(false);
+  const isSourceSeekableRef = useRef<boolean | null>(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const [isOpeningAnimationComplete, setIsOpeningAnimationComplete] = useState(false);
   const openingFadeAnim = useRef(new Animated.Value(0)).current;
@@ -292,10 +295,7 @@ const VideoPlayer: React.FC = () => {
     lockOrientation();
 
     return () => {
-      // Unlock orientation when component unmounts
-      ScreenOrientation.unlockAsync().catch(() => {
-        // Ignore unlock errors
-      });
+      // Do not unlock orientation here; we unlock explicitly on close to avoid mid-transition flips
     };
   }, []);
 
@@ -403,6 +403,7 @@ const VideoPlayer: React.FC = () => {
               setResumePosition(savedProgress.currentTime);
                setSavedDuration(savedProgress.duration);
                setInitialPosition(savedProgress.currentTime);
+               initialSeekTargetRef.current = savedProgress.currentTime;
                logger.log(`[VideoPlayer] Set resume position to: ${savedProgress.currentTime} of ${savedProgress.duration}`);
                if (appSettings.alwaysResume) {
                 logger.log(`[VideoPlayer] AlwaysResume enabled. Auto-seeking to ${savedProgress.currentTime}`);
@@ -1280,6 +1281,24 @@ const VideoPlayer: React.FC = () => {
       logger.log(`[VideoPlayer] Post-load initial seek to: ${initialPosition}s`);
       seekToTime(initialPosition);
       setIsInitialSeekComplete(true);
+      // Verify whether the seek actually took effect (detect non-seekable sources)
+      if (!initialSeekVerifiedRef.current) {
+        initialSeekVerifiedRef.current = true;
+        const target = initialSeekTargetRef.current ?? initialPosition;
+        setTimeout(() => {
+          const delta = Math.abs(currentTime - (target || 0));
+          if (target && (currentTime < target - 1.5)) {
+            logger.warn(`[VideoPlayer] Initial seek appears ignored (delta=${delta.toFixed(2)}). Treating source as non-seekable; starting from 0`);
+            isSourceSeekableRef.current = false;
+            // Reset resume intent and continue from 0
+            setInitialPosition(null);
+            setResumePosition(null);
+            setShowResumeOverlay(false);
+          } else {
+            isSourceSeekableRef.current = true;
+          }
+        }, 1200);
+      }
     }
   }, [isVideoLoaded, initialPosition, duration]);
 

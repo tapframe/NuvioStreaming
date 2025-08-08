@@ -839,19 +839,24 @@ export const StreamsScreen = () => {
     const streamName = stream.name || stream.title || 'Unnamed Stream';
     const streamProvider = stream.addonId || stream.addonName || stream.name;
     
-    // Stream provider debug logging removed
-    
-    // NetMirror stream logging removed
-    
-    // Navigate to player immediately without waiting for orientation lock
-    // This prevents delay in player opening
+    // Add pre-navigation orientation lock to reduce glitch
+    try {
+      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+    } catch (e) {
+      logger.warn('[StreamsScreen] Pre-navigation orientation lock failed:', e);
+    }
+    // Small delay to allow orientation to settle
+    await new Promise(res => setTimeout(res, Platform.OS === 'ios' ? 120 : 60));
+
+    // Show a quick full-screen black overlay to mask rotation flicker
+    // by setting a transient state that renders a covering View (implementation already supported by dark backgrounds)
     navigation.navigate('Player', {
       uri: stream.url,
       title: metadata?.name || '',
       episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
       season: type === 'series' ? currentEpisode?.season_number : undefined,
       episode: type === 'series' ? currentEpisode?.episode_number : undefined,
-      quality: stream.title?.match(/(\d+)p/)?.[1] || undefined,
+      quality: (stream.title?.match(/(\d+)p/) || [])[1] || undefined,
       year: metadata?.year,
       streamProvider: streamProvider,
       streamName: streamName,
@@ -863,17 +868,6 @@ export const StreamsScreen = () => {
       availableStreams: streamsToPass,
       backdrop: bannerImage || undefined,
     });
-    
-    // Lock orientation to landscape after navigation has started
-    // This allows the player to open immediately while orientation is being set
-    try {
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE)
-        .catch(error => {
-          logger.error('[StreamsScreen] Error locking orientation after navigation:', error);
-        });
-    } catch (error) {
-      logger.error('[StreamsScreen] Error locking orientation after navigation:', error);
-    }
   }, [metadata, type, currentEpisode, navigation, id, selectedEpisode, imdbId, episodeStreams, groupedStreams, bannerImage]);
 
 

@@ -276,10 +276,6 @@ const AndroidVideoPlayer: React.FC = () => {
     initializePlayer();
     return () => {
       subscription?.remove();
-      const unlockOrientation = async () => {
-        await ScreenOrientation.unlockAsync();
-      };
-      unlockOrientation();
       disableImmersiveMode();
     };
   }, []);
