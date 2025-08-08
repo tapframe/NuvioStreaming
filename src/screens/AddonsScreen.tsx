@@ -30,8 +30,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { logger } from '../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlurView as ExpoBlurView } from 'expo-blur';
-import { BlurView as CommunityBlurView } from '@react-native-community/blur';
-import Constants, { ExecutionEnvironment } from 'expo-constants';
+// Removed community blur and expo-constants for Android overlay
 import axios from 'axios';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -560,7 +559,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: colors.transparentDark,
   },
   androidBlurContainer: {
     position: 'absolute',
@@ -582,7 +581,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'black',
+    backgroundColor: colors.darkBackground,
   },
 });
 
@@ -1298,19 +1297,8 @@ const AddonsScreen = () => {
           {Platform.OS === 'ios' ? (
             <ExpoBlurView intensity={80} style={styles.blurOverlay} tint="dark" />
           ) : (
-            Constants.executionEnvironment === ExecutionEnvironment.StoreClient ? (
-              <View style={[styles.androidBlurContainer, styles.androidFallbackBlur]} />
-            ) : (
-              <View style={styles.androidBlurContainer}>
-                <CommunityBlurView
-                  style={styles.androidBlur}
-                  blurType="dark"
-                  blurAmount={8}
-                  overlayColor="rgba(0,0,0,0.4)"
-                  reducedTransparencyFallbackColor="black"
-                />
-              </View>
-            )
+            // Android: use solid themed background instead of semi-transparent overlay
+            <View style={[styles.androidBlurContainer, { backgroundColor: colors.darkBackground }]} />
           )}
           <View style={styles.modalContent}>
             {addonDetails && (

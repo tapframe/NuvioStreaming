@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Platform, useWindowDimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import Animated, { 
   FadeIn, 
@@ -10,6 +10,7 @@ import Animated, {
 import { styles } from '../utils/playerStyles';
 import { WyzieSubtitle, SubtitleCue } from '../utils/playerTypes';
 import { getTrackDisplayName, formatLanguage } from '../utils/playerUtils';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface SubtitleModalsProps {
   showSubtitleModal: boolean;
@@ -56,8 +57,7 @@ interface SubtitleModalsProps {
   setSubtitleOffsetSec: (n: number) => void;
 }
 
-const { width, height } = Dimensions.get('window');
-const MENU_WIDTH = Math.min(width * 0.85, 400);
+// Dynamic sizing handled inside component with useWindowDimensions
 
 export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   showSubtitleModal,
@@ -102,6 +102,10 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   subtitleOffsetSec,
   setSubtitleOffsetSec,
 }) => {
+  const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const isIos = Platform.OS === 'ios';
+  const isLandscape = width > height;
   // Track which specific addon subtitle is currently loaded
   const [selectedOnlineSubtitleId, setSelectedOnlineSubtitleId] = React.useState<string | null>(null);
   // Track which addon subtitle is currently loading to show spinner per-item
@@ -114,7 +118,11 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   const chipPadH = isCompact ? 8 : 12;
   const chipPadV = isCompact ? 6 : 8;
   const controlBtn = { size: isCompact ? 28 : 32, radius: isCompact ? 14 : 16 };
-  const previewHeight = isCompact ? 90 : 120;
+  const previewHeight = isCompact ? 90 : (isIos && isLandscape ? 100 : 120);
+  const menuWidth = Math.min(
+    width * (isIos ? (isLandscape ? 0.6 : 0.8) : 0.85),
+    isIos ? 420 : 400
+  );
  
   React.useEffect(() => {
     if (showSubtitleModal && !isLoadingSubtitleList && availableSubtitles.length === 0) {
@@ -187,7 +195,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
             top: 0,
             right: 0,
             bottom: 0,
-            width: MENU_WIDTH,
+            width: menuWidth,
             backgroundColor: '#1A1A1A',
             zIndex: 9999,
             elevation: 20,
@@ -197,6 +205,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
             shadowRadius: 10,
             borderTopLeftRadius: 20,
             borderBottomLeftRadius: 20,
+            paddingRight: 0,
           }}
         >
           {/* Header */}
@@ -205,7 +214,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
             alignItems: 'center',
             justifyContent: 'space-between',
             paddingHorizontal: 20,
-            paddingTop: 60,
+            paddingTop: insets.top + (isCompact ? 8 : 12),
             paddingBottom: 12,
             borderBottomWidth: 1,
             borderBottomColor: 'rgba(255, 255, 255, 0.08)',
@@ -260,7 +269,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
 
           <ScrollView 
             style={{ flex: 1 }}
-            contentContainerStyle={{ padding: 20, paddingBottom: isCompact ? 24 : 40 }}
+            contentContainerStyle={{ padding: 20, paddingBottom: (isCompact ? 24 : 40) + (isIos ? insets.bottom : 0) }}
             showsVerticalScrollIndicator={false}
           >
             {activeTab === 'built-in' && (
