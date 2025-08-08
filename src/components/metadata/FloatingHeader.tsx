@@ -8,7 +8,6 @@ import {
   Dimensions,
 } from 'react-native';
 import { BlurView as ExpoBlurView } from 'expo-blur';
-import { BlurView as CommunityBlurView } from '@react-native-community/blur';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import Animated, {
@@ -114,13 +113,12 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
           </Animated.View>
         </ExpoBlurView>
       ) : (
-        <View style={[styles.blurContainer, { paddingTop: Math.max(safeAreaTop * 0.8, safeAreaTop - 6) }]}>
-          <CommunityBlurView
-            style={styles.absoluteFill}
-            blurType="dark"
-            blurAmount={15}
-            reducedTransparencyFallbackColor="rgba(20, 20, 20, 0.9)"
-          />
+        <View
+          style={[
+            styles.blurContainer,
+            { paddingTop: Math.max(safeAreaTop * 0.8, safeAreaTop - 6), backgroundColor: currentTheme.colors.darkBackground }
+          ]}
+        >
           <Animated.View style={[styles.floatingHeaderContent, headerElementsStyle]}>
             <TouchableOpacity 
               style={styles.backButton} 

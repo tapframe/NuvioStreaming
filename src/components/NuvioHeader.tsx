@@ -5,8 +5,6 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { BlurView as ExpoBlurView } from 'expo-blur';
-import { BlurView as CommunityBlurView } from '@react-native-community/blur';
-import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { useTheme } from '../contexts/ThemeContext';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -20,29 +18,18 @@ export const NuvioHeader = () => {
   if (route.name !== 'Home') {
     return null;
   }
-  
-  // Determine if running in Expo Go
-  const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
   return (
     <View style={styles.container}>
-      <View style={styles.headerContainer}>
+      <View style={[
+        styles.headerContainer,
+        Platform.OS === 'android' && { backgroundColor: currentTheme.colors.darkBackground }
+      ]}>
         {Platform.OS === 'ios' ? (
           <ExpoBlurView intensity={60} style={styles.blurOverlay} tint="dark" />
         ) : (
-          isExpoGo ? (
-            <View style={[styles.androidBlurContainer, styles.androidFallbackBlur]} />
-          ) : (
-            <View style={styles.androidBlurContainer}>
-              <CommunityBlurView
-                style={styles.androidBlur}
-                blurType="dark"
-                blurAmount={8}
-                overlayColor="rgba(0,0,0,0.4)"
-                reducedTransparencyFallbackColor="black"
-              />
-            </View>
-          )
+          // Android: solid themed background instead of blur/transparent overlay
+          <View style={[styles.androidBlurContainer, { backgroundColor: currentTheme.colors.darkBackground }]} />
         )}
         <View style={styles.contentContainer}>
           <View style={styles.logoContainer}>
@@ -56,7 +43,13 @@ export const NuvioHeader = () => {
             style={styles.searchButton}
             onPress={() => navigation.navigate('Search')}
           >
-            <View style={styles.iconWrapper}>
+            <View style={[
+              styles.iconWrapper,
+              { 
+                backgroundColor: currentTheme.colors.transparentLight,
+                borderColor: currentTheme.colors.border
+              }
+            ]}>
               <MaterialCommunityIcons 
                 name="magnify" 
                 size={24} 
