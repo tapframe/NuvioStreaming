@@ -26,6 +26,7 @@ import { stremioService } from '../services/stremioService';
 import { useCatalogContext } from '../contexts/CatalogContext';
 import { useTraktContext } from '../contexts/TraktContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAccount } from '../contexts/AccountContext';
 import { catalogService } from '../services/catalogService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
@@ -135,6 +136,7 @@ const SettingsScreen: React.FC = () => {
   const { isAuthenticated, userProfile, refreshAuthStatus } = useTraktContext();
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
+  const { user, signOut } = useAccount();
   
   // Add a useEffect to check authentication status on focus
   useEffect(() => {
@@ -295,6 +297,27 @@ const SettingsScreen: React.FC = () => {
           >
             {/* Account Section */}
             <SettingsCard title="ACCOUNT">
+              {user ? (
+                <>
+                  <SettingItem
+                    title={user.email || user.id}
+                    description="Signed in"
+                    icon="account-circle"
+                  />
+                  <SettingItem
+                    title="Sign out"
+                    icon="logout"
+                    onPress={signOut}
+                  />
+                </>
+              ) : (
+                <SettingItem
+                  title="Sign in / Create account"
+                  description="Sync across devices"
+                  icon="login"
+                  onPress={() => navigation.navigate('Account')}
+                />
+              )}
               <SettingItem
                 title="Trakt"
                 description={isAuthenticated ? `@${userProfile?.username || 'User'}` : "Sign in to sync"}

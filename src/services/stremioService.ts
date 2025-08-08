@@ -199,7 +199,8 @@ class StremioService {
     if (this.initialized) return;
     
     try {
-      const storedAddons = await AsyncStorage.getItem(this.STORAGE_KEY);
+      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      const storedAddons = await AsyncStorage.getItem(`@user:${scope}:${this.STORAGE_KEY}`);
       
       if (storedAddons) {
         const parsed = JSON.parse(storedAddons);
@@ -301,7 +302,7 @@ class StremioService {
       }
       
       // Load addon order if exists
-      const storedOrder = await AsyncStorage.getItem(this.ADDON_ORDER_KEY);
+      const storedOrder = await AsyncStorage.getItem(`@user:${scope}:${this.ADDON_ORDER_KEY}`);
       if (storedOrder) {
         this.addonOrder = JSON.parse(storedOrder);
         // Filter out any ids that aren't in installedAddons
@@ -388,7 +389,8 @@ class StremioService {
   private async saveInstalledAddons(): Promise<void> {
     try {
       const addonsArray = Array.from(this.installedAddons.values());
-      await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(addonsArray));
+      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      await AsyncStorage.setItem(`@user:${scope}:${this.STORAGE_KEY}`, JSON.stringify(addonsArray));
     } catch (error) {
       logger.error('Failed to save addons:', error);
     }
@@ -396,7 +398,8 @@ class StremioService {
 
   private async saveAddonOrder(): Promise<void> {
     try {
-      await AsyncStorage.setItem(this.ADDON_ORDER_KEY, JSON.stringify(this.addonOrder));
+      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      await AsyncStorage.setItem(`@user:${scope}:${this.ADDON_ORDER_KEY}`, JSON.stringify(this.addonOrder));
     } catch (error) {
       logger.error('Failed to save addon order:', error);
     }
@@ -470,9 +473,26 @@ class StremioService {
 
   getInstalledAddons(): Manifest[] {
     // Return addons in the specified order
-    return this.addonOrder
+    const result = this.addonOrder
       .filter(id => this.installedAddons.has(id))
       .map(id => this.installedAddons.get(id)!);
+    // Ensure pre-installed presence
+    const cinId = 'com.linvo.cinemeta';
+    const osId = 'org.stremio.opensubtitlesv3';
+    if (!result.find(a => a.id === cinId) && this.installedAddons.has(cinId)) {
+      result.unshift(this.installedAddons.get(cinId)!);
+    }
+    if (!result.find(a => a.id === osId) && this.installedAddons.has(osId)) {
+      // Put OpenSubtitles right after Cinemeta if possible, else at start
+      const cinIdx = result.findIndex(a => a.id === cinId);
+      const osManifest = this.installedAddons.get(osId)!;
+      if (cinIdx >= 0) {
+        result.splice(cinIdx + 1, 0, osManifest);
+      } else {
+        result.unshift(osManifest);
+      }
+    }
+    return result;
   }
 
   async getInstalledAddonsAsync(): Promise<Manifest[]> {
@@ -749,8 +769,10 @@ class StremioService {
     
     // Check if local scrapers are enabled and execute them first
     try {
-      // Load settings from AsyncStorage directly
-      const settingsJson = await AsyncStorage.getItem('app_settings');
+      // Load settings from AsyncStorage directly (scoped with fallback)
+      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      const settingsJson = (await AsyncStorage.getItem(`@user:${scope}:app_settings`))
+        || (await AsyncStorage.getItem('app_settings'));
       const settings: AppSettings = settingsJson ? JSON.parse(settingsJson) : DEFAULT_SETTINGS;
       
       if (settings.enableLocalScrapers) {

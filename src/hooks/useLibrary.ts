@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StreamingContent } from '../types/metadata';
 import { catalogService } from '../services/catalogService';
 
-const LIBRARY_STORAGE_KEY = 'stremio-library';
+const LEGACY_LIBRARY_STORAGE_KEY = 'stremio-library';
 
 export const useLibrary = () => {
   const [libraryItems, setLibraryItems] = useState<StreamingContent[]>([]);
@@ -13,7 +13,17 @@ export const useLibrary = () => {
   const loadLibraryItems = useCallback(async () => {
     try {
       setLoading(true);
-      const storedItems = await AsyncStorage.getItem(LIBRARY_STORAGE_KEY);
+      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      const scopedKey = `@user:${scope}:stremio-library`;
+      let storedItems = await AsyncStorage.getItem(scopedKey);
+      if (!storedItems) {
+        // migrate legacy into scoped
+        const legacy = await AsyncStorage.getItem(LEGACY_LIBRARY_STORAGE_KEY);
+        if (legacy) {
+          await AsyncStorage.setItem(scopedKey, legacy);
+          storedItems = legacy;
+        }
+      }
       
       if (storedItems) {
         const parsedItems = JSON.parse(storedItems);
@@ -40,8 +50,11 @@ export const useLibrary = () => {
         acc[`${item.type}:${item.id}`] = item;
         return acc;
       }, {} as Record<string, StreamingContent>);
-      
-      await AsyncStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(itemsObject));
+      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      const scopedKey = `@user:${scope}:stremio-library`;
+      await AsyncStorage.setItem(scopedKey, JSON.stringify(itemsObject));
+      // keep legacy for backward-compat
+      await AsyncStorage.setItem(LEGACY_LIBRARY_STORAGE_KEY, JSON.stringify(itemsObject));
     } catch (error) {
       console.error('Error saving library items:', error);
     }
@@ -49,18 +62,33 @@ export const useLibrary = () => {
 
   // Add item to library
   const addToLibrary = useCallback(async (item: StreamingContent) => {
-    const updatedItems = [...libraryItems, { ...item, inLibrary: true }];
-    setLibraryItems(updatedItems);
-    await saveLibraryItems(updatedItems);
-    return true;
+    try {
+      await catalogService.addToLibrary({ ...item, inLibrary: true });
+      return true;
+    } catch (e) {
+      console.error('Error adding to library via catalogService:', e);
+      // Fallback local write
+      const updatedItems = [...libraryItems, { ...item, inLibrary: true }];
+      setLibraryItems(updatedItems);
+      await saveLibraryItems(updatedItems);
+      return true;
+    }
   }, [libraryItems, saveLibraryItems]);
 
   // Remove item from library
   const removeFromLibrary = useCallback(async (id: string) => {
-    const updatedItems = libraryItems.filter(item => item.id !== id);
-    setLibraryItems(updatedItems);
-    await saveLibraryItems(updatedItems);
-    return true;
+    try {
+      const type = libraryItems.find(i => i.id === id)?.type || 'movie';
+      await catalogService.removeFromLibrary(type, id);
+      return true;
+    } catch (e) {
+      console.error('Error removing from library via catalogService:', e);
+      // Fallback local write
+      const updatedItems = libraryItems.filter(item => item.id !== id);
+      setLibraryItems(updatedItems);
+      await saveLibraryItems(updatedItems);
+      return true;
+    }
   }, [libraryItems, saveLibraryItems]);
 
   // Toggle item in library

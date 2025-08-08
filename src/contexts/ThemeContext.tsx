@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { settingsEmitter } from '../hooks/useSettings';
 import { colors as defaultColors } from '../styles/colors';
 
 // Define the Theme interface
@@ -154,7 +155,7 @@ interface ThemeContextProps {
 // Create the context
 const ThemeContext = createContext<ThemeContextProps | undefined>(undefined);
 
-// Storage keys
+// Storage keys (kept for backward compatibility). Primary source of truth is app_settings
 const CURRENT_THEME_KEY = 'current_theme';
 const CUSTOM_THEMES_KEY = 'custom_themes';
 
@@ -163,34 +164,29 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [currentTheme, setCurrentThemeState] = useState<Theme>(DEFAULT_THEMES[0]);
   const [availableThemes, setAvailableThemes] = useState<Theme[]>(DEFAULT_THEMES);
 
-  // Load themes from AsyncStorage on mount
+  // Load themes from app_settings (scoped), with legacy fallbacks
   useEffect(() => {
     const loadThemes = async () => {
       try {
-        // Load current theme ID
-        const savedThemeId = await AsyncStorage.getItem(CURRENT_THEME_KEY);
-        
-        // Load custom themes
-        const customThemesJson = await AsyncStorage.getItem(CUSTOM_THEMES_KEY);
+        const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+        const appSettingsJson = await AsyncStorage.getItem(`@user:${scope}:app_settings`);
+        const appSettings = appSettingsJson ? JSON.parse(appSettingsJson) : {};
+        const savedThemeId = appSettings.themeId || (await AsyncStorage.getItem(CURRENT_THEME_KEY));
+        const customThemesJson = appSettings.customThemes ? JSON.stringify(appSettings.customThemes) : await AsyncStorage.getItem(CUSTOM_THEMES_KEY);
         const customThemes = customThemesJson ? JSON.parse(customThemesJson) : [];
-        
-        // Combine default and custom themes
         const allThemes = [...DEFAULT_THEMES, ...customThemes];
         setAvailableThemes(allThemes);
-        
-        // Set current theme
         if (savedThemeId) {
           const theme = allThemes.find(t => t.id === savedThemeId);
-          if (theme) {
-            setCurrentThemeState(theme);
-          }
+          if (theme) setCurrentThemeState(theme);
         }
       } catch (error) {
         console.error('Failed to load themes:', error);
       }
     };
-    
     loadThemes();
+    // Stop live refresh from remote; only refresh on app restart or local changes
+    return () => {};
   }, []);
 
   // Set current theme
@@ -198,7 +194,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const theme = availableThemes.find(t => t.id === themeId);
     if (theme) {
       setCurrentThemeState(theme);
+      // Persist into scoped app_settings and legacy key for backward compat
+      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      const key = `@user:${scope}:app_settings`;
+      let settings = {} as any;
+      try { settings = JSON.parse((await AsyncStorage.getItem(key)) || '{}'); } catch {}
+      settings.themeId = themeId;
+      await AsyncStorage.setItem(key, JSON.stringify(settings));
       await AsyncStorage.setItem(CURRENT_THEME_KEY, themeId);
+      // Do not emit global settings sync for themes (sync on app restart only)
     }
   };
 
@@ -220,7 +224,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       const updatedCustomThemes = [...customThemes, newTheme];
       const updatedAllThemes = [...DEFAULT_THEMES, ...updatedCustomThemes];
       
-      // Save to storage
+      // Save to storage (scoped app_settings + legacy key)
+      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      const key = `@user:${scope}:app_settings`;
+      let settings = {} as any;
+      try { settings = JSON.parse((await AsyncStorage.getItem(key)) || '{}'); } catch {}
+      settings.customThemes = updatedCustomThemes;
+      await AsyncStorage.setItem(key, JSON.stringify(settings));
       await AsyncStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(updatedCustomThemes));
       
       // Update state
@@ -229,6 +239,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       // Set as current theme
       setCurrentThemeState(newTheme);
       await AsyncStorage.setItem(CURRENT_THEME_KEY, id);
+      // Do not emit global settings sync for themes
     } catch (error) {
       console.error('Failed to add custom theme:', error);
     }
@@ -250,7 +261,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       // Update available themes
       const updatedAllThemes = [...DEFAULT_THEMES, ...updatedCustomThemes];
       
-      // Save to storage
+      // Save to storage (scoped app_settings + legacy key)
+      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      const key = `@user:${scope}:app_settings`;
+      let settings = {} as any;
+      try { settings = JSON.parse((await AsyncStorage.getItem(key)) || '{}'); } catch {}
+      settings.customThemes = updatedCustomThemes;
+      await AsyncStorage.setItem(key, JSON.stringify(settings));
       await AsyncStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(updatedCustomThemes));
       
       // Update state
@@ -260,6 +277,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       if (currentTheme.id === updatedTheme.id) {
         setCurrentThemeState(updatedTheme);
       }
+      // Do not emit global settings sync for themes
     } catch (error) {
       console.error('Failed to update custom theme:', error);
     }
@@ -279,7 +297,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       const customThemes = availableThemes.filter(t => t.isEditable && t.id !== themeId);
       const updatedAllThemes = [...DEFAULT_THEMES, ...customThemes];
       
-      // Save to storage
+      // Save to storage (scoped app_settings + legacy key)
+      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      const key = `@user:${scope}:app_settings`;
+      let settings = {} as any;
+      try { settings = JSON.parse((await AsyncStorage.getItem(key)) || '{}'); } catch {}
+      settings.customThemes = customThemes;
+      await AsyncStorage.setItem(key, JSON.stringify(settings));
       await AsyncStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(customThemes));
       
       // Update state
@@ -290,6 +314,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         setCurrentThemeState(DEFAULT_THEMES[0]);
         await AsyncStorage.setItem(CURRENT_THEME_KEY, DEFAULT_THEMES[0].id);
       }
+      // Do not emit global settings sync for themes
     } catch (error) {
       console.error('Failed to delete custom theme:', error);
     }

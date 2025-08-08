@@ -20,6 +20,13 @@ class SettingsEventEmitter {
 // Singleton instance for app-wide access
 export const settingsEmitter = new SettingsEventEmitter();
 
+export interface CustomThemeDef {
+  id: string;
+  name: string;
+  colors: { primary: string; secondary: string; darkBackground: string };
+  isEditable: boolean;
+}
+
 export interface AppSettings {
   enableDarkMode: boolean;
   enableNotifications: boolean;
@@ -48,6 +55,9 @@ export interface AppSettings {
   excludedQualities: string[]; // Array of quality strings to exclude (e.g., ['2160p', '4K', '1080p', '720p'])
   // Playback behavior
   alwaysResume: boolean; // If true, resume automatically without prompt when progress < 85%
+  // Theme settings
+  themeId: string;
+  customThemes: CustomThemeDef[];
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -78,6 +88,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   excludedQualities: [], // No qualities excluded by default
   // Playback behavior defaults
   alwaysResume: false,
+  // Theme defaults
+  themeId: 'default',
+  customThemes: [],
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';
@@ -98,7 +111,8 @@ export const useSettings = () => {
 
   const loadSettings = async () => {
     try {
-      const storedSettings = await AsyncStorage.getItem(SETTINGS_STORAGE_KEY);
+      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      const storedSettings = await AsyncStorage.getItem(`@user:${scope}:${SETTINGS_STORAGE_KEY}`);
       if (storedSettings) {
         const parsedSettings = JSON.parse(storedSettings);
         // Merge with defaults to ensure all properties exist
@@ -118,7 +132,8 @@ export const useSettings = () => {
   ) => {
     const newSettings = { ...settings, [key]: value };
     try {
-      await AsyncStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings));
+      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      await AsyncStorage.setItem(`@user:${scope}:${SETTINGS_STORAGE_KEY}`, JSON.stringify(newSettings));
       setSettings(newSettings);
       console.log(`Setting updated: ${key}`, value);
       

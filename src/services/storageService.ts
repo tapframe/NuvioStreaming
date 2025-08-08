@@ -15,7 +15,9 @@ class StorageService {
   private readonly WATCH_PROGRESS_KEY = '@watch_progress:';
   private readonly CONTENT_DURATION_KEY = '@content_duration:';
   private readonly SUBTITLE_SETTINGS_KEY = '@subtitle_settings';
+  private readonly WP_TOMBSTONES_KEY = '@wp_tombstones';
   private watchProgressSubscribers: (() => void)[] = [];
+  private watchProgressRemoveListeners: ((id: string, type: string, episodeId?: string) => void)[] = [];
   private notificationDebounceTimer: NodeJS.Timeout | null = null;
   private lastNotificationTime: number = 0;
   private readonly NOTIFICATION_DEBOUNCE_MS = 1000; // 1 second debounce
@@ -30,12 +32,79 @@ class StorageService {
     return StorageService.instance;
   }
 
-  private getWatchProgressKey(id: string, type: string, episodeId?: string): string {
-    return `${this.WATCH_PROGRESS_KEY}${type}:${id}${episodeId ? `:${episodeId}` : ''}`;
+  private async getUserScope(): Promise<string> {
+    try {
+      const scope = await AsyncStorage.getItem('@user:current');
+      return scope || 'local';
+    } catch {
+      return 'local';
+    }
   }
 
-  private getContentDurationKey(id: string, type: string, episodeId?: string): string {
-    return `${this.CONTENT_DURATION_KEY}${type}:${id}${episodeId ? `:${episodeId}` : ''}`;
+  private async getWatchProgressKeyScoped(id: string, type: string, episodeId?: string): Promise<string> {
+    const scope = await this.getUserScope();
+    return `@user:${scope}:${this.WATCH_PROGRESS_KEY}${type}:${id}${episodeId ? `:${episodeId}` : ''}`;
+  }
+
+  private async getContentDurationKeyScoped(id: string, type: string, episodeId?: string): Promise<string> {
+    const scope = await this.getUserScope();
+    return `@user:${scope}:${this.CONTENT_DURATION_KEY}${type}:${id}${episodeId ? `:${episodeId}` : ''}`;
+  }
+
+  private async getSubtitleSettingsKeyScoped(): Promise<string> {
+    const scope = await this.getUserScope();
+    return `@user:${scope}:${this.SUBTITLE_SETTINGS_KEY}`;
+  }
+
+  private async getTombstonesKeyScoped(): Promise<string> {
+    const scope = await this.getUserScope();
+    return `@user:${scope}:${this.WP_TOMBSTONES_KEY}`;
+  }
+
+  private buildWpKeyString(id: string, type: string, episodeId?: string): string {
+    return `${type}:${id}${episodeId ? `:${episodeId}` : ''}`;
+  }
+
+  public async addWatchProgressTombstone(
+    id: string,
+    type: string,
+    episodeId?: string,
+    deletedAtMs?: number
+  ): Promise<void> {
+    try {
+      const key = await this.getTombstonesKeyScoped();
+      const json = (await AsyncStorage.getItem(key)) || '{}';
+      const map = JSON.parse(json) as Record<string, number>;
+      map[this.buildWpKeyString(id, type, episodeId)] = deletedAtMs || Date.now();
+      await AsyncStorage.setItem(key, JSON.stringify(map));
+    } catch {}
+  }
+
+  public async clearWatchProgressTombstone(
+    id: string,
+    type: string,
+    episodeId?: string
+  ): Promise<void> {
+    try {
+      const key = await this.getTombstonesKeyScoped();
+      const json = (await AsyncStorage.getItem(key)) || '{}';
+      const map = JSON.parse(json) as Record<string, number>;
+      const k = this.buildWpKeyString(id, type, episodeId);
+      if (map[k] != null) {
+        delete map[k];
+        await AsyncStorage.setItem(key, JSON.stringify(map));
+      }
+    } catch {}
+  }
+
+  public async getWatchProgressTombstones(): Promise<Record<string, number>> {
+    try {
+      const key = await this.getTombstonesKeyScoped();
+      const json = (await AsyncStorage.getItem(key)) || '{}';
+      return JSON.parse(json) as Record<string, number>;
+    } catch {
+      return {};
+    }
   }
 
   public async setContentDuration(
@@ -45,7 +114,7 @@ class StorageService {
     episodeId?: string
   ): Promise<void> {
     try {
-      const key = this.getContentDurationKey(id, type, episodeId);
+      const key = await this.getContentDurationKeyScoped(id, type, episodeId);
       await AsyncStorage.setItem(key, duration.toString());
     } catch (error) {
       logger.error('Error setting content duration:', error);
@@ -58,7 +127,7 @@ class StorageService {
     episodeId?: string
   ): Promise<number | null> {
     try {
-      const key = this.getContentDurationKey(id, type, episodeId);
+      const key = await this.getContentDurationKeyScoped(id, type, episodeId);
       const data = await AsyncStorage.getItem(key);
       return data ? parseFloat(data) : null;
     } catch (error) {
@@ -99,7 +168,16 @@ class StorageService {
     episodeId?: string
   ): Promise<void> {
     try {
-      const key = this.getWatchProgressKey(id, type, episodeId);
+      const key = await this.getWatchProgressKeyScoped(id, type, episodeId);
+      // Do not resurrect if tombstone exists and is newer than this progress
+      try {
+        const tombstones = await this.getWatchProgressTombstones();
+        const tombKey = this.buildWpKeyString(id, type, episodeId);
+        const tombAt = tombstones[tombKey];
+        if (tombAt && (progress.lastUpdated == null || progress.lastUpdated <= tombAt)) {
+          return;
+        }
+      } catch {}
       
       // Check if progress has actually changed significantly
       const existingProgress = await this.getWatchProgress(id, type, episodeId);
@@ -113,7 +191,8 @@ class StorageService {
         }
       }
       
-      await AsyncStorage.setItem(key, JSON.stringify(progress));
+       const updated = { ...progress, lastUpdated: Date.now() };
+       await AsyncStorage.setItem(key, JSON.stringify(updated));
       
       // Use debounced notification to reduce spam
       this.debouncedNotifySubscribers();
@@ -164,13 +243,21 @@ class StorageService {
     };
   }
 
+  public onWatchProgressRemoved(listener: (id: string, type: string, episodeId?: string) => void): () => void {
+    this.watchProgressRemoveListeners.push(listener);
+    return () => {
+      const index = this.watchProgressRemoveListeners.indexOf(listener);
+      if (index > -1) this.watchProgressRemoveListeners.splice(index, 1);
+    };
+  }
+
   public async getWatchProgress(
     id: string, 
     type: string,
     episodeId?: string
   ): Promise<WatchProgress | null> {
     try {
-      const key = this.getWatchProgressKey(id, type, episodeId);
+      const key = await this.getWatchProgressKeyScoped(id, type, episodeId);
       const data = await AsyncStorage.getItem(key);
       return data ? JSON.parse(data) : null;
     } catch (error) {
@@ -185,10 +272,13 @@ class StorageService {
     episodeId?: string
   ): Promise<void> {
     try {
-      const key = this.getWatchProgressKey(id, type, episodeId);
+      const key = await this.getWatchProgressKeyScoped(id, type, episodeId);
       await AsyncStorage.removeItem(key);
+      await this.addWatchProgressTombstone(id, type, episodeId);
       // Notify subscribers
       this.notifyWatchProgressSubscribers();
+      // Emit explicit remove event for sync layer
+      try { this.watchProgressRemoveListeners.forEach(l => l(id, type, episodeId)); } catch {}
     } catch (error) {
       logger.error('Error removing watch progress:', error);
     }
@@ -196,12 +286,14 @@ class StorageService {
 
   public async getAllWatchProgress(): Promise<Record<string, WatchProgress>> {
     try {
+      const scope = await this.getUserScope();
+      const prefix = `@user:${scope}:${this.WATCH_PROGRESS_KEY}`;
       const keys = await AsyncStorage.getAllKeys();
-      const watchProgressKeys = keys.filter(key => key.startsWith(this.WATCH_PROGRESS_KEY));
+      const watchProgressKeys = keys.filter(key => key.startsWith(prefix));
       const pairs = await AsyncStorage.multiGet(watchProgressKeys);
       return pairs.reduce((acc, [key, value]) => {
         if (value) {
-          acc[key.replace(this.WATCH_PROGRESS_KEY, '')] = JSON.parse(value);
+          acc[key.replace(prefix, '')] = JSON.parse(value);
         }
         return acc;
       }, {} as Record<string, WatchProgress>);
@@ -223,7 +315,7 @@ class StorageService {
     exactTime?: number
   ): Promise<void> {
     try {
-      const existingProgress = await this.getWatchProgress(id, type, episodeId);
+        const existingProgress = await this.getWatchProgress(id, type, episodeId);
       if (existingProgress) {
         // Preserve the highest Trakt progress and currentTime values to avoid accidental regressions
         const highestTraktProgress = (() => {
@@ -272,6 +364,12 @@ class StorageService {
       }> = [];
 
       for (const [key, progress] of Object.entries(allProgress)) {
+        // Skip if tombstoned and tombstone is newer
+        const tombstones = await this.getWatchProgressTombstones();
+        const tombAt = tombstones[key];
+        if (tombAt && (progress.lastUpdated == null || progress.lastUpdated <= tombAt)) {
+          continue;
+        }
         // Check if needs sync (either never synced or local progress is newer)
         const needsSync = !progress.traktSynced || 
           (progress.traktLastSynced && progress.lastUpdated > progress.traktLastSynced);
@@ -424,7 +522,8 @@ class StorageService {
 
   public async saveSubtitleSettings(settings: Record<string, any>): Promise<void> {
     try {
-      await AsyncStorage.setItem(this.SUBTITLE_SETTINGS_KEY, JSON.stringify(settings));
+      const key = await this.getSubtitleSettingsKeyScoped();
+      await AsyncStorage.setItem(key, JSON.stringify(settings));
     } catch (error) {
       logger.error('Error saving subtitle settings:', error);
     }
@@ -432,7 +531,8 @@ class StorageService {
 
   public async getSubtitleSettings(): Promise<Record<string, any> | null> {
     try {
-      const data = await AsyncStorage.getItem(this.SUBTITLE_SETTINGS_KEY);
+      const key = await this.getSubtitleSettingsKeyScoped();
+      const data = await AsyncStorage.getItem(key);
       return data ? JSON.parse(data) : null;
     } catch (error) {
       logger.error('Error loading subtitle settings:', error);

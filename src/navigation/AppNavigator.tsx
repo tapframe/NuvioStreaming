@@ -39,6 +39,8 @@ import LogoSourceSettings from '../screens/LogoSourceSettings';
 import ThemeScreen from '../screens/ThemeScreen';
 import ProfilesScreen from '../screens/ProfilesScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
+import AuthScreen from '../screens/AuthScreen';
+import { AccountProvider, useAccount } from '../contexts/AccountContext';
 import PluginsScreen from '../screens/PluginsScreen';
 
 // Stack navigator types
@@ -654,8 +656,9 @@ const customFadeInterpolator = ({ current, layouts }: any) => {
 };
 
 // Stack Navigator
-const AppNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootStackParamList }) => {
+const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootStackParamList }) => {
   const { currentTheme } = useTheme();
+  const { user, loading } = useAccount();
   
   // Handle Android-specific optimizations
   useEffect(() => {
@@ -713,6 +716,17 @@ const AppNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootStack
               }),
             }}
           >
+            {!loading && !user && (
+              <Stack.Screen
+                name="Account"
+                component={AuthScreen as any}
+                options={{
+                  headerShown: false,
+                  animation: 'fade',
+                  contentStyle: { backgroundColor: currentTheme.colors.darkBackground },
+                }}
+              />
+            )}
             <Stack.Screen 
               name="Onboarding" 
               component={OnboardingScreen}
@@ -771,7 +785,7 @@ const AppNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootStack
               name="Player" 
               component={VideoPlayer as any} 
               options={{ 
-                animation: Platform.OS === 'android' ? 'none' : 'fade',
+                animation: Platform.OS === 'android' ? 'none' : 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 0 : 300,
                 // Force fullscreen presentation on iPad
                 presentation: Platform.OS === 'ios' ? 'fullScreenModal' : 'card',
@@ -1048,5 +1062,11 @@ const AppNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootStack
     </SafeAreaProvider>
   );
 };
+
+const AppNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootStackParamList }) => (
+  <AccountProvider>
+    <InnerNavigator initialRouteName={initialRouteName} />
+  </AccountProvider>
+);
 
 export default AppNavigator;

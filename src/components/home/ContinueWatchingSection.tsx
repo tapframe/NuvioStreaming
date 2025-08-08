@@ -66,11 +66,9 @@ const { width } = Dimensions.get('window');
 const posterLayout = calculatePosterLayout(width);
 const POSTER_WIDTH = posterLayout.posterWidth;
 
-// Function to validate IMDB ID format
-const isValidImdbId = (id: string): boolean => {
-  // IMDB IDs should start with 'tt' followed by 7-10 digits
-  const imdbPattern = /^tt\d{7,10}$/;
-  return imdbPattern.test(id);
+// Allow any known id formats (imdb 'tt...', kitsu 'kitsu:...', tmdb 'tmdb:...', or others)
+const isSupportedId = (id: string): boolean => {
+  return typeof id === 'string' && id.length > 0;
 };
 
 // Function to check if an episode has been released
@@ -181,10 +179,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       // Second pass: process each content group with batched API calls
       const contentPromises = Object.values(contentGroups).map(async (group) => {
         try {
-          // Validate IMDB ID format before attempting to fetch
-          if (!isValidImdbId(group.id)) {
-            return;
-          }
+          // Allow any ID; meta resolution will try Cinemeta first, then other addons
+          if (!isSupportedId(group.id)) return;
           
           // Get metadata once per content
           const cachedData = await getCachedMetadata(group.type, group.id);

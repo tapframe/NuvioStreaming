@@ -86,12 +86,14 @@ const CATALOG_SETTINGS_KEY = 'catalog_settings';
 
 class CatalogService {
   private static instance: CatalogService;
-  private readonly LIBRARY_KEY = 'stremio-library';
+  private readonly LEGACY_LIBRARY_KEY = 'stremio-library';
   private readonly RECENT_CONTENT_KEY = 'stremio-recent-content';
   private library: Record<string, StreamingContent> = {};
   private recentContent: StreamingContent[] = [];
   private readonly MAX_RECENT_ITEMS = 20;
   private librarySubscribers: ((items: StreamingContent[]) => void)[] = [];
+  private libraryAddListeners: ((item: StreamingContent) => void)[] = [];
+  private libraryRemoveListeners: ((type: string, id: string) => void)[] = [];
 
   private constructor() {
     this.loadLibrary();
@@ -107,7 +109,16 @@ class CatalogService {
 
   private async loadLibrary(): Promise<void> {
     try {
-      const storedLibrary = await AsyncStorage.getItem(this.LIBRARY_KEY);
+      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      const scopedKey = `@user:${scope}:stremio-library`;
+      let storedLibrary = (await AsyncStorage.getItem(scopedKey));
+      if (!storedLibrary) {
+        // Fallback: read legacy and migrate into scoped
+        storedLibrary = await AsyncStorage.getItem(this.LEGACY_LIBRARY_KEY);
+        if (storedLibrary) {
+          await AsyncStorage.setItem(scopedKey, storedLibrary);
+        }
+      }
       if (storedLibrary) {
         this.library = JSON.parse(storedLibrary);
       }
@@ -118,7 +129,10 @@ class CatalogService {
 
   private async saveLibrary(): Promise<void> {
     try {
-      await AsyncStorage.setItem(this.LIBRARY_KEY, JSON.stringify(this.library));
+      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      const scopedKey = `@user:${scope}:stremio-library`;
+      await AsyncStorage.setItem(scopedKey, JSON.stringify(this.library));
+      await AsyncStorage.setItem(this.LEGACY_LIBRARY_KEY, JSON.stringify(this.library));
     } catch (error) {
       logger.error('Failed to save library:', error);
     }
@@ -623,6 +637,20 @@ class CatalogService {
     this.librarySubscribers.forEach(callback => callback(items));
   }
 
+  public onLibraryAdd(listener: (item: StreamingContent) => void): () => void {
+    this.libraryAddListeners.push(listener);
+    return () => {
+      this.libraryAddListeners = this.libraryAddListeners.filter(l => l !== listener);
+    };
+  }
+
+  public onLibraryRemove(listener: (type: string, id: string) => void): () => void {
+    this.libraryRemoveListeners.push(listener);
+    return () => {
+      this.libraryRemoveListeners = this.libraryRemoveListeners.filter(l => l !== listener);
+    };
+  }
+
   public getLibraryItems(): StreamingContent[] {
     return Object.values(this.library);
   }
@@ -646,17 +674,18 @@ class CatalogService {
     this.library[key] = content;
     this.saveLibrary();
     this.notifyLibrarySubscribers();
+    try { this.libraryAddListeners.forEach(l => l(content)); } catch {}
     
     // Auto-setup notifications for series when added to library
-    if (content.type === 'series') {
-      try {
-        const { notificationService } = await import('./notificationService');
-        await notificationService.updateNotificationsForSeries(content.id);
-        console.log(`[CatalogService] Auto-setup notifications for series: ${content.name}`);
-      } catch (error) {
-        console.error(`[CatalogService] Failed to setup notifications for ${content.name}:`, error);
-      }
-    }
+    // if (content.type === 'series') {
+    //   try {
+    //     const { notificationService } = await import('./notificationService');
+    //     await notificationService.updateNotificationsForSeries(content.id);
+    //     console.log(`[CatalogService] Auto-setup notifications for series: ${content.name}`);
+    //   } catch (error) {
+    //     console.error(`[CatalogService] Failed to setup notifications for ${content.name}:`, error);
+    //   }
+    // }
   }
 
   public async removeFromLibrary(type: string, id: string): Promise<void> {
@@ -664,24 +693,25 @@ class CatalogService {
     delete this.library[key];
     this.saveLibrary();
     this.notifyLibrarySubscribers();
+    try { this.libraryRemoveListeners.forEach(l => l(type, id)); } catch {}
     
     // Cancel notifications for series when removed from library
-    if (type === 'series') {
-      try {
-        const { notificationService } = await import('./notificationService');
-        // Cancel all notifications for this series
-        const scheduledNotifications = await notificationService.getScheduledNotifications();
-        const seriesToCancel = scheduledNotifications.filter(notification => notification.seriesId === id);
-        
-        for (const notification of seriesToCancel) {
-          await notificationService.cancelNotification(notification.id);
-        }
-        
-        console.log(`[CatalogService] Cancelled ${seriesToCancel.length} notifications for removed series: ${id}`);
-      } catch (error) {
-        console.error(`[CatalogService] Failed to cancel notifications for removed series ${id}:`, error);
-      }
-    }
+    // if (type === 'series') {
+    //   try {
+    //     const { notificationService } = await import('./notificationService');
+    //     // Cancel all notifications for this series
+    //     const scheduledNotifications = await notificationService.getScheduledNotifications();
+    //     const seriesToCancel = scheduledNotifications.filter(notification => notification.seriesId === id);
+    //     
+    //     for (const notification of seriesToCancel) {
+    //       await notificationService.cancelNotification(notification.id);
+    //     }
+    //     
+    //     console.log(`[CatalogService] Cancelled ${seriesToCancel.length} notifications for removed series: ${id}`);
+    //   } catch (error) {
+    //     console.error(`[CatalogService] Failed to cancel notifications for removed series ${id}:`, error);
+    //   }
+    // }
   }
 
   private addToRecentContent(content: StreamingContent): void {
