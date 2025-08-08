@@ -8,8 +8,7 @@ import Animated, {
   SlideOutRight,
 } from 'react-native-reanimated';
 import { styles } from '../utils/playerStyles';
-import { SubtitleCue } from '../utils/playerTypes';
-import { Subtitle } from '../../../services/stremioService';
+import { WyzieSubtitle, SubtitleCue } from '../utils/playerTypes';
 import { getTrackDisplayName, formatLanguage } from '../utils/playerUtils';
 
 interface SubtitleModalsProps {
@@ -20,14 +19,14 @@ interface SubtitleModalsProps {
   isLoadingSubtitleList: boolean;
   isLoadingSubtitles: boolean;
   customSubtitles: SubtitleCue[];
-  availableSubtitles: Subtitle[];
+  availableSubtitles: WyzieSubtitle[];
   vlcTextTracks: Array<{id: number, name: string, language?: string}>;
   selectedTextTrack: number;
   useCustomSubtitles: boolean;
   subtitleSize: number;
   subtitleBackground: boolean;
   fetchAvailableSubtitles: () => void;
-  loadStremioSubtitle: (subtitle: Subtitle) => void;
+  loadWyzieSubtitle: (subtitle: WyzieSubtitle) => void;
   selectTextTrack: (trackId: number) => void;
   increaseSubtitleSize: () => void;
   decreaseSubtitleSize: () => void;
@@ -52,7 +51,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   subtitleSize,
   subtitleBackground,
   fetchAvailableSubtitles,
-  loadStremioSubtitle,
+  loadWyzieSubtitle,
   selectTextTrack,
   increaseSubtitleSize,
   decreaseSubtitleSize,
@@ -60,7 +59,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
 }) => {
   // Track which specific online subtitle is currently loaded
   const [selectedOnlineSubtitleId, setSelectedOnlineSubtitleId] = React.useState<string | null>(null);
-  // Track which subtitle is currently being loaded
+  // Track which online subtitle is currently loading to show spinner per-item
   const [loadingSubtitleId, setLoadingSubtitleId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -76,29 +75,24 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
     }
   }, [useCustomSubtitles]);
 
+  // Clear loading state when subtitles have finished loading
+  React.useEffect(() => {
+    if (!isLoadingSubtitles) {
+      setLoadingSubtitleId(null);
+    }
+  }, [isLoadingSubtitles]);
+
+  // Only OpenSubtitles are provided now; render as a single list
+
   const handleClose = () => {
     setShowSubtitleModal(false);
   };
 
-  const handleLoadStremioSubtitle = (subtitle: Subtitle) => {
-    console.log('[SubtitleModals] Starting to load subtitle:', subtitle.id);
-    setLoadingSubtitleId(subtitle.id);
+  const handleLoadWyzieSubtitle = (subtitle: WyzieSubtitle) => {
     setSelectedOnlineSubtitleId(subtitle.id);
-    loadStremioSubtitle(subtitle);
+    setLoadingSubtitleId(subtitle.id);
+    loadWyzieSubtitle(subtitle);
   };
-
-  // Clear loading state when subtitle loading is complete
-  React.useEffect(() => {
-    console.log('[SubtitleModals] isLoadingSubtitles changed:', isLoadingSubtitles);
-    if (!isLoadingSubtitles) {
-      console.log('[SubtitleModals] Clearing loadingSubtitleId');
-      // Force clear loading state with a small delay to ensure proper re-render
-      setTimeout(() => {
-        setLoadingSubtitleId(null);
-        console.log('[SubtitleModals] loadingSubtitleId cleared');
-      }, 50);
-    }
-  }, [isLoadingSubtitles]);
 
   // Main subtitle menu
   const renderSubtitleMenu = () => {
@@ -398,57 +392,8 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                   </Text>
                 </TouchableOpacity>
               </View>
-              
-              {availableSubtitles.length > 0 ? (
-                <View style={{ gap: 8 }}>
-                  {availableSubtitles.map((sub) => {
-                    const isSelected = useCustomSubtitles && selectedOnlineSubtitleId === sub.id;
-                    return (
-                      <TouchableOpacity
-                        key={sub.id}
-                        style={{
-                          backgroundColor: isSelected ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                          borderRadius: 16,
-                          padding: 16,
-                          borderWidth: 1,
-                          borderColor: isSelected ? 'rgba(34, 197, 94, 0.3)' : 'rgba(255, 255, 255, 0.1)',
-                        }}
-                        onPress={() => {
-                          handleLoadStremioSubtitle(sub);
-                        }}
-                        activeOpacity={0.7}
-                        disabled={loadingSubtitleId === sub.id}
-                      >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <View style={{ flex: 1 }}>
-                            <Text style={{
-                              color: '#FFFFFF',
-                              fontSize: 15,
-                              fontWeight: '500',
-                              marginBottom: 4,
-                            }}>
-                              {formatLanguage(sub.lang)}
-                            </Text>
-                            <Text style={{
-                              color: 'rgba(255, 255, 255, 0.6)',
-                              fontSize: 13,
-                            }}>
-                              {sub.addonName || 'Stremio Addon'}
-                            </Text>
-                          </View>
-                          {loadingSubtitleId === sub.id ? (
-                            <ActivityIndicator size="small" color="#22C55E" />
-                          ) : isSelected ? (
-                            <MaterialIcons name="check" size={20} color="#22C55E" />
-                          ) : (
-                            <MaterialIcons name="download" size={20} color="rgba(255,255,255,0.4)" />
-                          )}
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              ) : !isLoadingSubtitleList ? (
+
+              {(availableSubtitles.length === 0) && !isLoadingSubtitleList ? (
                 <TouchableOpacity
                   style={{
                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
@@ -472,7 +417,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                     Tap to search online
                   </Text>
                 </TouchableOpacity>
-              ) : (
+              ) : isLoadingSubtitleList ? (
                 <View style={{
                   backgroundColor: 'rgba(255, 255, 255, 0.05)',
                   borderRadius: 16,
@@ -487,6 +432,47 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                   }}>
                     Searching...
                   </Text>
+                </View>
+              ) : (
+                <View style={{ gap: 8 }}>
+                  {availableSubtitles.map((sub) => {
+                    const isSelected = useCustomSubtitles && selectedOnlineSubtitleId === sub.id;
+                    return (
+                      <TouchableOpacity
+                        key={sub.id}
+                        style={{
+                          backgroundColor: isSelected ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                          borderRadius: 16,
+                          padding: 16,
+                          borderWidth: 1,
+                          borderColor: isSelected ? 'rgba(34, 197, 94, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+                        }}
+                        onPress={() => {
+                          handleLoadWyzieSubtitle(sub);
+                        }}
+                        activeOpacity={0.7}
+                        disabled={isLoadingSubtitles}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '500', marginBottom: 4 }}>
+                              {sub.display}
+                            </Text>
+                            <Text style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: 13 }}>
+                              {formatLanguage(sub.language)}
+                            </Text>
+                          </View>
+                          {(isLoadingSubtitles && loadingSubtitleId === sub.id) ? (
+                            <ActivityIndicator size="small" color="#22C55E" />
+                          ) : isSelected ? (
+                            <MaterialIcons name="check" size={20} color="#22C55E" />
+                          ) : (
+                            <MaterialIcons name="download" size={20} color="rgba(255,255,255,0.4)" />
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               )}
             </View>
@@ -557,4 +543,4 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   );
 };
 
-export default SubtitleModals;
+export default SubtitleModals; 

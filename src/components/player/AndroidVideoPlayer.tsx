@@ -15,14 +15,13 @@ import { useTraktAutosync } from '../../hooks/useTraktAutosync';
 import { useTraktAutosyncSettings } from '../../hooks/useTraktAutosyncSettings';
 import { useMetadata } from '../../hooks/useMetadata';
 import { useSettings } from '../../hooks/useSettings';
-import { testVideoStreamUrl } from '../../utils/httpInterceptor';
-import { stremioService, Subtitle } from '../../services/stremioService';
 
 import { 
   DEFAULT_SUBTITLE_SIZE, 
   AudioTrack,
   TextTrack,
   ResizeModeType, 
+  WyzieSubtitle, 
   SubtitleCue,
   RESUME_PREF_KEY,
   RESUME_PREF,
@@ -36,6 +35,8 @@ import ResumeOverlay from './modals/ResumeOverlay';
 import PlayerControls from './controls/PlayerControls';
 import CustomSubtitles from './subtitles/CustomSubtitles';
 import { SourcesModal } from './modals/SourcesModal';
+import { stremioService } from '../../services/stremioService';
+import axios from 'axios';
 
 // Map VLC resize modes to react-native-video resize modes
 const getVideoResizeMode = (resizeMode: ResizeModeType) => {
@@ -145,11 +146,12 @@ const AndroidVideoPlayer: React.FC = () => {
   const pinchRef = useRef<PinchGestureHandler>(null);
   const [customSubtitles, setCustomSubtitles] = useState<SubtitleCue[]>([]);
   const [currentSubtitle, setCurrentSubtitle] = useState<string>('');
+  const [customSubtitleVersion, setCustomSubtitleVersion] = useState<number>(0);
   const [subtitleSize, setSubtitleSize] = useState<number>(DEFAULT_SUBTITLE_SIZE);
   const [subtitleBackground, setSubtitleBackground] = useState<boolean>(true);
   const [useCustomSubtitles, setUseCustomSubtitles] = useState<boolean>(false);
   const [isLoadingSubtitles, setIsLoadingSubtitles] = useState<boolean>(false);
-  const [availableSubtitles, setAvailableSubtitles] = useState<Subtitle[]>([]);
+  const [availableSubtitles, setAvailableSubtitles] = useState<WyzieSubtitle[]>([]);
   const [showSubtitleLanguageModal, setShowSubtitleLanguageModal] = useState<boolean>(false);
   const [isLoadingSubtitleList, setIsLoadingSubtitleList] = useState<boolean>(false);
   const [showSourcesModal, setShowSourcesModal] = useState<boolean>(false);
@@ -403,8 +405,6 @@ const AndroidVideoPlayer: React.FC = () => {
         saveWatchProgress();
       }, syncInterval);
       
-      // Removed excessive logging for watch progress save interval
-      
       setProgressSaveInterval(interval);
       return () => {
         clearInterval(interval);
@@ -498,8 +498,6 @@ const AndroidVideoPlayer: React.FC = () => {
 
   const onLoad = (data: any) => {
     try {
-      // HTTP response logging removed
-      
       if (DEBUG_MODE) {
         logger.log('[AndroidVideoPlayer] Video loaded:', data);
       }
@@ -622,7 +620,7 @@ const AndroidVideoPlayer: React.FC = () => {
           NativeModules.StatusBarManager.setHidden(true);
         }
       } catch (error) {
-        // Immersive mode error - silently handled
+        console.log('Immersive mode error:', error);
       }
     }
   };
@@ -715,8 +713,6 @@ const AndroidVideoPlayer: React.FC = () => {
 
   const handleError = (error: any) => {
     try {
-      // HTTP error response logging removed
-      
       logger.error('AndroidVideoPlayer error: ', error);
       
       // Early return if component is unmounted to prevent iOS crashes
@@ -891,100 +887,183 @@ const AndroidVideoPlayer: React.FC = () => {
     }
     setIsLoadingSubtitleList(true);
     try {
-      // Determine content type and ID format for Stremio
-      let contentType = 'movie';
-      let contentId = targetImdbId;
-      let videoId: string | undefined;
-      
-      if (season && episode) {
-        contentType = 'series';
-        videoId = `series:${targetImdbId}:${season}:${episode}`;
-      }
-      
-      logger.log(`[AndroidVideoPlayer] Fetching subtitles for ${contentType}: ${contentId}${videoId ? ` (${videoId})` : ''}`);
-      
-      const subtitles = await stremioService.getSubtitles(contentType, contentId, videoId);
-      
-      // Remove duplicates based on language
-      const uniqueSubtitles = subtitles.reduce((acc: Subtitle[], current: Subtitle) => {
-        const exists = acc.find((item: Subtitle) => item.lang === current.lang);
+      // Fetch from installed OpenSubtitles v3 addon via Stremio only
+      const stremioType = type === 'series' ? 'series' : 'movie';
+      const stremioVideoId = stremioType === 'series' && season && episode
+        ? `series:${targetImdbId}:${season}:${episode}`
+        : undefined;
+      const stremioResults = await stremioService.getSubtitles(stremioType, targetImdbId, stremioVideoId);
+      const stremioSubs: WyzieSubtitle[] = (stremioResults || []).map(sub => ({
+        id: sub.id || `${sub.lang}-${sub.url}`,
+        url: sub.url,
+        flagUrl: '',
+        format: 'srt',
+        encoding: 'utf-8',
+        media: 'opensubtitles',
+        display: sub.lang || 'Unknown',
+        language: (sub.lang || '').toLowerCase(),
+        isHearingImpaired: false,
+        source: sub.addonName || 'OpenSubtitles v3',
+      }));
+
+      // De-duplicate by language
+      const uniqueSubtitles = stremioSubs.reduce((acc, current) => {
+        const exists = acc.find(item => item.language === current.language);
         if (!exists) {
           acc.push(current);
         }
         return acc;
-      }, [] as Subtitle[]);
-      
-      // Sort by language
-      uniqueSubtitles.sort((a: Subtitle, b: Subtitle) => a.lang.localeCompare(b.lang));
+      }, [] as WyzieSubtitle[]);
+      uniqueSubtitles.sort((a, b) => a.display.localeCompare(b.display));
       setAvailableSubtitles(uniqueSubtitles);
-      
       if (autoSelectEnglish) {
-        const englishSubtitle = uniqueSubtitles.find((sub: Subtitle) =>
-          sub.lang.toLowerCase() === 'eng' ||
-          sub.lang.toLowerCase() === 'en' ||
-          sub.lang.toLowerCase().includes('english')
+        const englishSubtitle = uniqueSubtitles.find(sub => 
+          sub.language.toLowerCase() === 'eng' || 
+          sub.language.toLowerCase() === 'en' ||
+          sub.display.toLowerCase().includes('english')
         );
         if (englishSubtitle) {
-          loadStremioSubtitle(englishSubtitle);
+          loadWyzieSubtitle(englishSubtitle);
           return;
         }
       }
-      
-      if (!autoSelectEnglish && uniqueSubtitles.length > 0) {
+      if (!autoSelectEnglish) {
         setShowSubtitleLanguageModal(true);
       }
     } catch (error) {
-      logger.error('[AndroidVideoPlayer] Error fetching subtitles from Stremio addons:', error);
+      logger.error('[AndroidVideoPlayer] Error fetching subtitles from OpenSubtitles addon:', error);
     } finally {
       setIsLoadingSubtitleList(false);
     }
   };
 
-  const loadStremioSubtitle = async (subtitle: Subtitle) => {
-    console.log('[AndroidVideoPlayer] Starting subtitle load, setting isLoadingSubtitles to true');
+  const loadWyzieSubtitle = async (subtitle: WyzieSubtitle) => {
+    logger.log(`[AndroidVideoPlayer] Subtitle click received: id=${subtitle.id}, lang=${subtitle.language}, url=${subtitle.url}`);
     setShowSubtitleLanguageModal(false);
+    logger.log('[AndroidVideoPlayer] setShowSubtitleLanguageModal(false)');
     setIsLoadingSubtitles(true);
+    logger.log('[AndroidVideoPlayer] isLoadingSubtitles -> true');
     try {
-      const response = await fetch(subtitle.url);
-      const srtContent = await response.text();
+      logger.log('[AndroidVideoPlayer] Fetching subtitle SRT start');
+      let srtContent = '';
+      try {
+        const axiosResp = await axios.get(subtitle.url, {
+          timeout: 10000,
+          headers: {
+            'Accept': 'text/plain, */*',
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Nuvio/1.0'
+          },
+          responseType: 'text',
+          transitional: {
+            clarifyTimeoutError: true
+          }
+        });
+        srtContent = typeof axiosResp.data === 'string' ? axiosResp.data : String(axiosResp.data || '');
+      } catch (axiosErr: any) {
+        logger.warn('[AndroidVideoPlayer] Axios subtitle fetch failed, falling back to fetch()', {
+          message: axiosErr?.message,
+          code: axiosErr?.code
+        });
+        // Fallback with explicit timeout using AbortController
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        try {
+          const resp = await fetch(subtitle.url, { signal: controller.signal });
+          srtContent = await resp.text();
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      }
+      logger.log(`[AndroidVideoPlayer] Fetching subtitle SRT done, size=${srtContent.length}`);
       const parsedCues = parseSRT(srtContent);
+      logger.log(`[AndroidVideoPlayer] Parsed cues count=${parsedCues.length}`);
       
-      // Force a microtask delay before updating subtitle state
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
-      setCustomSubtitles(parsedCues);
-      setUseCustomSubtitles(true);
-      setSelectedTextTrack(-1);
-      logger.log(`[AndroidVideoPlayer] Loaded subtitle: ${subtitle.lang} from ${subtitle.addonName}`);
-      console.log('[AndroidVideoPlayer] Subtitle loaded successfully, about to seek');
-      
-      // Force a state update by triggering a seek
-      if (videoRef.current && duration > 0 && !isSeeking.current) {
-        const currentPos = currentTime;
-        console.log(`[AndroidVideoPlayer] Forcing a micro-seek to refresh subtitle state from ${currentPos}s`);
-        seekToTime(currentPos);
+      // iOS AVPlayer workaround: clear subtitle state first, then apply
+      if (Platform.OS === 'ios') {
+        logger.log('[AndroidVideoPlayer] iOS detected; clearing subtitle state before apply');
+        // Immediately stop spinner so UI doesn't get stuck
+        setIsLoadingSubtitles(false);
+        logger.log('[AndroidVideoPlayer] isLoadingSubtitles -> false (early stop for iOS)');
+        // Step 1: Clear any existing subtitle state
+        setUseCustomSubtitles(false);
+        logger.log('[AndroidVideoPlayer] useCustomSubtitles -> false');
+        setCustomSubtitles([]);
+        logger.log('[AndroidVideoPlayer] customSubtitles -> []');
+        setSelectedTextTrack(-1);
+        logger.log('[AndroidVideoPlayer] selectedTextTrack -> -1');
         
-        // Wait for seek to complete before clearing loading state
-        setTimeout(() => {
-          console.log('[AndroidVideoPlayer] Clearing isLoadingSubtitles after seek timeout');
-          setIsLoadingSubtitles(false);
-        }, 600); // Wait longer than seekToTime's internal timeout (500ms)
+        // Step 2: Apply immediately (no scheduling), then do a small micro-nudge
+        logger.log('[AndroidVideoPlayer] Applying parsed cues immediately (iOS)');
+        setCustomSubtitles(parsedCues);
+        logger.log('[AndroidVideoPlayer] customSubtitles <- parsedCues');
+        setUseCustomSubtitles(true);
+        logger.log('[AndroidVideoPlayer] useCustomSubtitles -> true');
+        setSelectedTextTrack(-1);
+        logger.log('[AndroidVideoPlayer] selectedTextTrack -> -1 (disable native while using custom)');
+        setCustomSubtitleVersion(v => v + 1);
+        logger.log('[AndroidVideoPlayer] customSubtitleVersion incremented');
+
+        // Immediately set current subtitle based on currentTime to avoid waiting for next onProgress
+        try {
+          const cueNow = parsedCues.find(cue => currentTime >= cue.start && currentTime <= cue.end);
+          const textNow = cueNow ? cueNow.text : '';
+          setCurrentSubtitle(textNow);
+          logger.log('[AndroidVideoPlayer] currentSubtitle set immediately after apply (iOS)');
+        } catch (e) {
+          logger.error('[AndroidVideoPlayer] Error setting immediate subtitle', e);
+        }
+
+        // Micro-seek nudge to force AVPlayer to refresh rendering
+        try {
+          if (videoRef.current && duration > 0) {
+            const wasPaused = paused;
+            const original = currentTime;
+            const forward = Math.min(original + 0.05, Math.max(duration - 0.1, 0));
+            logger.log('[AndroidVideoPlayer] Performing micro-seek nudge (iOS)', { original, forward });
+            if (wasPaused) {
+              setPaused(false);
+            }
+            // Give state a moment to apply before seeking
+            setTimeout(() => {
+              try {
+                videoRef.current?.seek(forward);
+                setTimeout(() => {
+                  videoRef.current?.seek(original);
+                  if (wasPaused) {
+                    setPaused(true);
+                  }
+                  logger.log('[AndroidVideoPlayer] Micro-seek nudge complete (iOS)');
+                }, 150);
+              } catch (e) {
+                logger.warn('[AndroidVideoPlayer] Inner micro-seek failed (iOS)', e);
+                if (wasPaused) setPaused(true);
+              }
+            }, 50);
+          }
+        } catch(e) {
+          logger.warn('[AndroidVideoPlayer] Outer micro-seek failed (iOS)', e);
+        }
       } else {
-        console.warn(`[AndroidVideoPlayer] Cannot seek to refresh subtitles: videoRef=${!!videoRef.current}, duration=${duration}, seeking=${isSeeking.current}`);
-        // Clear loading state immediately if we can't seek
-        setTimeout(() => {
-          setIsLoadingSubtitles(false);
-          console.log('[AndroidVideoPlayer] isLoadingSubtitles set to false (no seek)');
-        }, 100);
+        // Android works immediately
+        setCustomSubtitles(parsedCues);
+        logger.log('[AndroidVideoPlayer] (Android) customSubtitles <- parsedCues');
+        setUseCustomSubtitles(true);
+        logger.log('[AndroidVideoPlayer] (Android) useCustomSubtitles -> true');
+        setSelectedTextTrack(-1);
+        logger.log('[AndroidVideoPlayer] (Android) selectedTextTrack -> -1');
+        setIsLoadingSubtitles(false);
+        logger.log('[AndroidVideoPlayer] (Android) isLoadingSubtitles -> false');
+        try {
+          const cueNow = parsedCues.find(cue => currentTime >= cue.start && currentTime <= cue.end);
+          const textNow = cueNow ? cueNow.text : '';
+          setCurrentSubtitle(textNow);
+          logger.log('[AndroidVideoPlayer] currentSubtitle set immediately after apply (Android)');
+        } catch {}
       }
     } catch (error) {
-      logger.error('[AndroidVideoPlayer] Error loading Stremio subtitle:', error);
-      console.log('[AndroidVideoPlayer] Subtitle loading failed:', error);
-      // Clear loading state on error
-      setTimeout(() => {
-        setIsLoadingSubtitles(false);
-        console.log('[AndroidVideoPlayer] isLoadingSubtitles set to false (error)');
-      }, 100);
+      logger.error('[AndroidVideoPlayer] Error loading Wyzie subtitle:', error);
+      setIsLoadingSubtitles(false);
+      logger.log('[AndroidVideoPlayer] isLoadingSubtitles -> false (error path)');
     }
   };
     
@@ -996,7 +1075,6 @@ const AndroidVideoPlayer: React.FC = () => {
       // Send a forced pause update to Trakt immediately when user pauses
       if (newPausedState && duration > 0) {
         traktAutosync.handleProgressUpdate(currentTime, duration, true);
-        logger.log('[AndroidVideoPlayer] Sent forced pause update to Trakt');
       }
     }
   };
@@ -1031,10 +1109,8 @@ const AndroidVideoPlayer: React.FC = () => {
       currentTime >= cue.start && currentTime <= cue.end
     );
     const newSubtitle = currentCue ? currentCue.text : '';
-    if (newSubtitle !== currentSubtitle) {
-      setCurrentSubtitle(newSubtitle);
-    }
-  }, [currentTime, customSubtitles, useCustomSubtitles, currentSubtitle]);
+    setCurrentSubtitle(newSubtitle);
+  }, [currentTime, customSubtitles, useCustomSubtitles]);
 
   useEffect(() => {
     loadSubtitleSize();
@@ -1096,23 +1172,6 @@ const AndroidVideoPlayer: React.FC = () => {
       }
     }
   }, [pendingSeek, isPlayerReady, isVideoLoaded, duration]);
-
-  // HTTP stream testing with logging
-  useEffect(() => {
-    if (currentStreamUrl && currentStreamUrl.trim() !== '') {
-      const testStream = async () => {
-        try {
-          // Stream testing without verbose logging
-          await testVideoStreamUrl(currentStreamUrl, headers || {});
-        } catch (error) {
-          // Stream test failed silently
-        }
-      };
-      
-      // Test the stream URL when it changes
-      testStream();
-    }
-  }, [currentStreamUrl, headers]);
 
   const handleSelectStream = async (newStream: any) => {
     if (newStream.url === currentStreamUrl) {
@@ -1315,16 +1374,25 @@ const AndroidVideoPlayer: React.FC = () => {
                       headers: headers
                     } : { uri: currentStreamUrl };
                     
-                    // HTTP request logging removed
+                    // HTTP request logging removed; source prepared
                     
                     return sourceWithHeaders;
                   })()}
                   paused={paused}
                   onProgress={handleProgress}
-                  onLoad={onLoad}
+                  onLoad={(e) => {
+                    logger.log('[AndroidVideoPlayer] onLoad fired', { duration: e?.duration });
+                    onLoad(e);
+                  }}
                   onEnd={onEnd}
-                  onError={handleError}
-                  onBuffer={onBuffer}
+                  onError={(err) => {
+                    logger.error('[AndroidVideoPlayer] onError', err);
+                    handleError(err);
+                  }}
+                  onBuffer={(buf) => {
+                    logger.log('[AndroidVideoPlayer] onBuffer', buf);
+                    onBuffer(buf);
+                  }}
                   resizeMode={getVideoResizeMode(resizeMode)}
                   selectedAudioTrack={selectedAudioTrack !== null ? { type: SelectedTrackType.INDEX, value: selectedAudioTrack } : undefined}
                   selectedTextTrack={useCustomSubtitles ? { type: SelectedTrackType.DISABLED } : (selectedTextTrack >= 0 ? { type: SelectedTrackType.INDEX, value: selectedTextTrack } : undefined)}
@@ -1376,6 +1444,7 @@ const AndroidVideoPlayer: React.FC = () => {
           />
           
           <CustomSubtitles
+            key={customSubtitleVersion}
             useCustomSubtitles={useCustomSubtitles}
             currentSubtitle={currentSubtitle}
             subtitleSize={subtitleSize}
@@ -1418,7 +1487,7 @@ const AndroidVideoPlayer: React.FC = () => {
         subtitleSize={subtitleSize}
         subtitleBackground={subtitleBackground}
         fetchAvailableSubtitles={fetchAvailableSubtitles}
-        loadStremioSubtitle={loadStremioSubtitle}
+        loadWyzieSubtitle={loadWyzieSubtitle}
         selectTextTrack={selectTextTrack}
         increaseSubtitleSize={increaseSubtitleSize}
         decreaseSubtitleSize={decreaseSubtitleSize}

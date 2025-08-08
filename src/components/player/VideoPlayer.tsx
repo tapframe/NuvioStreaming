@@ -17,13 +17,13 @@ import { useTraktAutosync } from '../../hooks/useTraktAutosync';
 import { useTraktAutosyncSettings } from '../../hooks/useTraktAutosyncSettings';
 import { useMetadata } from '../../hooks/useMetadata';
 import { useSettings } from '../../hooks/useSettings';
-import { stremioService, Subtitle } from '../../services/stremioService';
 
 import {
   DEFAULT_SUBTITLE_SIZE,
   AudioTrack,
   TextTrack,
   ResizeModeType,
+  WyzieSubtitle,
   SubtitleCue,
   RESUME_PREF_KEY,
   RESUME_PREF,
@@ -37,6 +37,7 @@ import ResumeOverlay from './modals/ResumeOverlay';
 import PlayerControls from './controls/PlayerControls';
 import CustomSubtitles from './subtitles/CustomSubtitles';
 import { SourcesModal } from './modals/SourcesModal';
+import { stremioService } from '../../services/stremioService';
 
 const VideoPlayer: React.FC = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'Player'>>();
@@ -51,8 +52,8 @@ const VideoPlayer: React.FC = () => {
   // Use AndroidVideoPlayer for:
   // - Android devices
   // - Xprime streams on any platform
-  // - MKV files on iOS are now handled by VideoPlayer.tsx (VLCPlayer)
-  if (Platform.OS === 'android' || isXprimeStream) {
+  // - Non-MKV files on iOS
+  if (Platform.OS === 'android' || isXprimeStream || (Platform.OS === 'ios' && !isMkvFile)) {
     return <AndroidVideoPlayer />;
   }
 
@@ -160,7 +161,7 @@ const VideoPlayer: React.FC = () => {
   const [subtitleBackground, setSubtitleBackground] = useState<boolean>(true);
   const [useCustomSubtitles, setUseCustomSubtitles] = useState<boolean>(false);
   const [isLoadingSubtitles, setIsLoadingSubtitles] = useState<boolean>(false);
-  const [availableSubtitles, setAvailableSubtitles] = useState<Subtitle[]>([]);
+  const [availableSubtitles, setAvailableSubtitles] = useState<WyzieSubtitle[]>([]);
   const [showSubtitleLanguageModal, setShowSubtitleLanguageModal] = useState<boolean>(false);
   const [isLoadingSubtitleList, setIsLoadingSubtitleList] = useState<boolean>(false);
   const [showSourcesModal, setShowSourcesModal] = useState<boolean>(false);
@@ -434,8 +435,6 @@ const VideoPlayer: React.FC = () => {
         saveWatchProgress();
       }, syncInterval);
 
-      // Removed excessive logging for watch progress save interval
-
       setProgressSaveInterval(interval);
       return () => {
         clearInterval(interval);
@@ -470,7 +469,6 @@ const VideoPlayer: React.FC = () => {
       // Send a forced pause update to Trakt immediately when user pauses
       if (duration > 0) {
         traktAutosync.handleProgressUpdate(currentTime, duration, true);
-        logger.log('[VideoPlayer] Sent forced pause update to Trakt');
       }
     }
   };
@@ -567,7 +565,6 @@ const VideoPlayer: React.FC = () => {
 
   const onLoad = (data: any) => {
     try {
-    
       if (DEBUG_MODE) {
         logger.log('[VideoPlayer] Video loaded:', data);
       }
@@ -797,8 +794,6 @@ const VideoPlayer: React.FC = () => {
   };
 
   const handleError = (error: any) => {
-    // HTTP error response logging removed
-    
     logger.error('[VideoPlayer] Playback Error:', error);
     
     // Format error details for user display
@@ -907,56 +902,57 @@ const VideoPlayer: React.FC = () => {
     }
     setIsLoadingSubtitleList(true);
     try {
-      // Determine content type and ID format for Stremio
-      let contentType = 'movie';
-      let contentId = targetImdbId;
-      let videoId: string | undefined;
-      
-      if (season && episode) {
-        contentType = 'series';
-        videoId = `series:${targetImdbId}:${season}:${episode}`;
-      }
-      
-      logger.log(`[VideoPlayer] Fetching subtitles for ${contentType}: ${contentId}${videoId ? ` (${videoId})` : ''}`);
-      
-      const subtitles = await stremioService.getSubtitles(contentType, contentId, videoId);
-      
-      // Remove duplicates based on language
-      const uniqueSubtitles = subtitles.reduce((acc: Subtitle[], current: Subtitle) => {
-        const exists = acc.find((item: Subtitle) => item.lang === current.lang);
+      // Fetch from installed OpenSubtitles v3 addon via Stremio only
+      const stremioType = type === 'series' ? 'series' : 'movie';
+      const stremioVideoId = stremioType === 'series' && season && episode
+        ? `series:${targetImdbId}:${season}:${episode}`
+        : undefined;
+      const stremioResults = await stremioService.getSubtitles(stremioType, targetImdbId, stremioVideoId);
+      const stremioSubs: WyzieSubtitle[] = (stremioResults || []).map(sub => ({
+        id: sub.id || `${sub.lang}-${sub.url}`,
+        url: sub.url,
+        flagUrl: '',
+        format: 'srt',
+        encoding: 'utf-8',
+        media: 'opensubtitles',
+        display: sub.lang || 'Unknown',
+        language: (sub.lang || '').toLowerCase(),
+        isHearingImpaired: false,
+        source: sub.addonName || 'OpenSubtitles v3',
+      }));
+
+      // De-duplicate by language
+      const uniqueSubtitles = stremioSubs.reduce((acc, current) => {
+        const exists = acc.find(item => item.language === current.language);
         if (!exists) {
           acc.push(current);
         }
         return acc;
-      }, [] as Subtitle[]);
-      
-      // Sort by language
-      uniqueSubtitles.sort((a: Subtitle, b: Subtitle) => a.lang.localeCompare(b.lang));
+      }, [] as WyzieSubtitle[]);
+      uniqueSubtitles.sort((a, b) => a.display.localeCompare(b.display));
       setAvailableSubtitles(uniqueSubtitles);
-      
       if (autoSelectEnglish) {
-        const englishSubtitle = uniqueSubtitles.find((sub: Subtitle) =>
-          sub.lang.toLowerCase() === 'eng' ||
-          sub.lang.toLowerCase() === 'en' ||
-          sub.lang.toLowerCase().includes('english')
+        const englishSubtitle = uniqueSubtitles.find(sub =>
+          sub.language.toLowerCase() === 'eng' ||
+          sub.language.toLowerCase() === 'en' ||
+          sub.display.toLowerCase().includes('english')
         );
         if (englishSubtitle) {
-          loadStremioSubtitle(englishSubtitle);
+          loadWyzieSubtitle(englishSubtitle);
           return;
         }
       }
-      
-      if (!autoSelectEnglish && uniqueSubtitles.length > 0) {
+      if (!autoSelectEnglish) {
         setShowSubtitleLanguageModal(true);
       }
     } catch (error) {
-      logger.error('[VideoPlayer] Error fetching subtitles from Stremio addons:', error);
+      logger.error('[VideoPlayer] Error fetching subtitles from OpenSubtitles addon:', error);
     } finally {
       setIsLoadingSubtitleList(false);
     }
   };
 
-  const loadStremioSubtitle = async (subtitle: Subtitle) => {
+  const loadWyzieSubtitle = async (subtitle: WyzieSubtitle) => {
     setShowSubtitleLanguageModal(false);
     setIsLoadingSubtitles(true);
     try {
@@ -966,14 +962,10 @@ const VideoPlayer: React.FC = () => {
       setCustomSubtitles(parsedCues);
       setUseCustomSubtitles(true);
       setSelectedTextTrack(-1);
-      logger.log(`[VideoPlayer] Loaded subtitle: ${subtitle.lang} from ${subtitle.addonName}`);
     } catch (error) {
-      logger.error('[VideoPlayer] Error loading Stremio subtitle:', error);
+      logger.error('[VideoPlayer] Error loading Wyzie subtitle:', error);
     } finally {
-      // Add a small delay to ensure state updates are processed
-      setTimeout(() => {
-        setIsLoadingSubtitles(false);
-      }, 100);
+      setIsLoadingSubtitles(false);
     }
   };
 
@@ -1013,10 +1005,8 @@ const VideoPlayer: React.FC = () => {
       currentTime >= cue.start && currentTime <= cue.end
     );
     const newSubtitle = currentCue ? currentCue.text : '';
-    if (newSubtitle !== currentSubtitle) {
-      setCurrentSubtitle(newSubtitle);
-    }
-  }, [currentTime, customSubtitles, useCustomSubtitles, currentSubtitle]);
+    setCurrentSubtitle(newSubtitle);
+  }, [currentTime, customSubtitles, useCustomSubtitles]);
 
   useEffect(() => {
     loadSubtitleSize();
@@ -1285,17 +1275,15 @@ const VideoPlayer: React.FC = () => {
                 <VLCPlayer
                   ref={vlcRef}
                   style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
-                  source={(() => {
-                    // FORCEFULLY use headers from route params if available - no filtering or modification
-                    const sourceWithHeaders = headers ? {
-                      uri: currentStreamUrl,
-                      headers: headers
-                    } : { uri: currentStreamUrl };
-                    
-                    // HTTP request logging removed
-                    
-                    return sourceWithHeaders;
-                  })()}
+                                    source={(() => {
+                     // FORCEFULLY use headers from route params if available - no filtering or modification
+                     const sourceWithHeaders = headers ? {
+                       uri: currentStreamUrl,
+                       headers: headers
+                     } : { uri: currentStreamUrl };
+                     
+                     return sourceWithHeaders;
+                   })()}
                   paused={paused}
                   onProgress={handleProgress}
                   onLoad={onLoad}
@@ -1388,7 +1376,7 @@ const VideoPlayer: React.FC = () => {
         subtitleSize={subtitleSize}
         subtitleBackground={subtitleBackground}
         fetchAvailableSubtitles={fetchAvailableSubtitles}
-        loadStremioSubtitle={loadStremioSubtitle}
+        loadWyzieSubtitle={loadWyzieSubtitle}
         selectTextTrack={selectTextTrack}
         increaseSubtitleSize={increaseSubtitleSize}
         decreaseSubtitleSize={decreaseSubtitleSize}

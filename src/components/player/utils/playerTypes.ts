@@ -72,3 +72,17 @@ export interface SubtitleCue {
   end: number;
   text: string;
 }
+
+// Add interface for Wyzie subtitle API response
+export interface WyzieSubtitle {
+  id: string;
+  url: string;
+  flagUrl: string;
+  format: string;
+  encoding: string;
+  media: string;
+  display: string;
+  language: string;
+  isHearingImpaired: boolean;
+  source: string;
+} 
