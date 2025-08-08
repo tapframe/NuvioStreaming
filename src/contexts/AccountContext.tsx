@@ -9,6 +9,7 @@ type AccountContextValue = {
   signIn: (email: string, password: string) => Promise<string | null>;
   signUp: (email: string, password: string) => Promise<string | null>;
   signOut: () => Promise<void>;
+  updateProfile: (partial: { avatarUrl?: string; displayName?: string }) => Promise<string | null>;
 };
 
 const AccountContext = createContext<AccountContextValue | undefined>(undefined);
@@ -18,7 +19,7 @@ export const AccountProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Initial session
+    // Initial session (load full profile)
     (async () => {
       const u = await accountService.getCurrentUser();
       setUser(u);
@@ -27,24 +28,22 @@ export const AccountProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (u) {
         await syncService.migrateLocalScopeToUser();
         await syncService.subscribeRealtime();
-        await Promise.all([
-          syncService.fullPull(),
-          syncService.fullPush(),
-        ]);
+        // Pull first to hydrate local state, then push to avoid wiping server with empty local
+        await syncService.fullPull();
+        await syncService.fullPush();
       }
     })();
 
     // Auth state listener
     const { data: subscription } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const u = session?.user ? { id: session.user.id, email: session.user.email ?? undefined } : null;
-      setUser(u);
-      if (u) {
+      const fullUser = session?.user ? await accountService.getCurrentUser() : null;
+      setUser(fullUser);
+      if (fullUser) {
         await syncService.migrateLocalScopeToUser();
         await syncService.subscribeRealtime();
-        await Promise.all([
-          syncService.fullPull(),
-          syncService.fullPush(),
-        ]);
+        // Pull first to hydrate local state, then push to avoid wiping server with empty local
+        await syncService.fullPull();
+        await syncService.fullPush();
       } else {
         syncService.unsubscribeRealtime();
       }
@@ -69,6 +68,15 @@ export const AccountProvider: React.FC<{ children: React.ReactNode }> = ({ child
     signOut: async () => {
       await accountService.signOut();
       setUser(null);
+    },
+    updateProfile: async (partial) => {
+      const err = await accountService.updateProfile(partial);
+      if (!err) {
+        // Refresh user from server to pick updated fields
+        const u = await accountService.getCurrentUser();
+        setUser(u);
+      }
+      return err;
     }
   }), [user, loading]);
 

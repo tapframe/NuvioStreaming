@@ -40,6 +40,7 @@ import ThemeScreen from '../screens/ThemeScreen';
 import ProfilesScreen from '../screens/ProfilesScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import AuthScreen from '../screens/AuthScreen';
+import AccountManageScreen from '../screens/AccountManageScreen';
 import { AccountProvider, useAccount } from '../contexts/AccountContext';
 import PluginsScreen from '../screens/PluginsScreen';
 
@@ -93,6 +94,7 @@ export type RootStackParamList = {
   Credits: { mediaId: string; mediaType: string };
   ShowRatings: { showId: number };
   Account: undefined;
+  AccountManage: undefined;
   Payment: undefined;
   PrivacyPolicy: undefined;
   About: undefined;
@@ -743,6 +745,18 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="MainTabs" 
               component={MainTabs as any} 
               options={{
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen
+              name="AccountManage"
+              component={AccountManageScreen as any}
+              options={{
+                headerShown: false,
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
                 contentStyle: {
                   backgroundColor: currentTheme.colors.darkBackground,
                 },

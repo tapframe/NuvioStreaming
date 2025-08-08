@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, TextInput, Text, TouchableOpacity, StyleSheet, ActivityIndicator, SafeAreaView, KeyboardAvoidingView, Platform, Dimensions, Animated, Easing, Keyboard } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAccount } from '../contexts/AccountContext';
 import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
+import ToastOverlay from '../components/common/ToastOverlay';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
@@ -35,11 +37,10 @@ const AuthScreen: React.FC = () => {
   const ctaTextTranslateY = useRef(new Animated.Value(0)).current;
   const modeAnim = useRef(new Animated.Value(0)).current; // 0 = signin, 1 = signup
   const [switchWidth, setSwitchWidth] = useState(0);
-  const toastOpacity = useRef(new Animated.Value(0)).current;
-  const toastTranslateY = useRef(new Animated.Value(16)).current;
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' | 'info' }>({ visible: false, message: '', type: 'info' });
   const [headerHeight, setHeaderHeight] = useState(0);
   const headerHideAnim = useRef(new Animated.Value(0)).current; // 0 visible, 1 hidden
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
     Animated.parallel([
@@ -101,7 +102,9 @@ const AuthScreen: React.FC = () => {
   useEffect(() => {
     const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const onShow = () => {
+    const onShow = (e: any) => {
+      const kh = e?.endCoordinates?.height ?? 0;
+      setKeyboardHeight(kh);
       Animated.timing(headerHideAnim, {
         toValue: 1,
         duration: 180,
@@ -110,6 +113,7 @@ const AuthScreen: React.FC = () => {
       }).start();
     };
     const onHide = () => {
+      setKeyboardHeight(0);
       Animated.timing(headerHideAnim, {
         toValue: 0,
         duration: 180,
@@ -117,8 +121,8 @@ const AuthScreen: React.FC = () => {
         useNativeDriver: true,
       }).start();
     };
-    const subShow = Keyboard.addListener(showEvt, onShow);
-    const subHide = Keyboard.addListener(hideEvt, onHide);
+    const subShow = Keyboard.addListener(showEvt, onShow as any);
+    const subHide = Keyboard.addListener(hideEvt, onHide as any);
     return () => {
       subShow.remove();
       subHide.remove();
@@ -160,21 +164,15 @@ const AuthScreen: React.FC = () => {
     setLoading(false);
   };
 
+  const handleSkipAuth = async () => {
+    try {
+      await AsyncStorage.setItem('showLoginHintToastOnce', 'true');
+    } catch {}
+    navigation.reset({ index: 0, routes: [{ name: 'MainTabs' as never }] } as any);
+  };
+
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ visible: true, message, type });
-    toastOpacity.setValue(0);
-    toastTranslateY.setValue(16);
-    Animated.parallel([
-      Animated.timing(toastOpacity, { toValue: 1, duration: 160, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      Animated.timing(toastTranslateY, { toValue: 0, duration: 160, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-    ]).start(() => {
-      setTimeout(() => {
-        Animated.parallel([
-          Animated.timing(toastOpacity, { toValue: 0, duration: 180, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
-          Animated.timing(toastTranslateY, { toValue: 16, duration: 180, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
-        ]).start(() => setToast(prev => ({ ...prev, visible: false })));
-      }, 2200);
-    });
   };
 
   return (
@@ -443,24 +441,30 @@ const AuthScreen: React.FC = () => {
                   </Text>
                 </Text>
               </TouchableOpacity>
+
+              {/* Skip sign in */}
+              <TouchableOpacity
+                onPress={handleSkipAuth}
+                activeOpacity={0.7}
+                style={{ marginTop: 10, alignSelf: 'center' }}
+              >
+                <Text style={{ color: currentTheme.colors.textMuted, textAlign: 'center' }}>
+                  Continue without an account
+                </Text>
+              </TouchableOpacity>
             </Animated.View>
 
-            {/* Toast */}
-            {toast.visible && (
-              <Animated.View 
-                pointerEvents="none"
-                style={[styles.toast, {
-                  opacity: toastOpacity,
-                  transform: [{ translateY: toastTranslateY }],
-                  backgroundColor: toast.type === 'success' ? 'rgba(46,160,67,0.95)' : toast.type === 'error' ? 'rgba(229, 62, 62, 0.95)' : 'rgba(99, 102, 241, 0.95)'
-                }]}
-              >
-                <MaterialIcons name={toast.type === 'success' ? 'check-circle' : toast.type === 'error' ? 'error-outline' : 'info-outline'} size={16} color="#fff" />
-                <Text style={styles.toastText}>{toast.message}</Text>
-              </Animated.View>
-            )}
           </View>
         </KeyboardAvoidingView>
+        {/* Screen-level toast overlay so it is not clipped by the card */}
+        <ToastOverlay
+          visible={toast.visible}
+          message={toast.message}
+          type={toast.type}
+          duration={1600}
+          bottomOffset={(keyboardHeight > 0 ? keyboardHeight + 8 : 24)}
+          onHide={() => setToast(prev => ({ ...prev, visible: false }))}
+        />
       </SafeAreaView>
     </View>
   );
@@ -618,23 +622,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16,
     top: 8,
-  },
-  toast: {
-    position: 'absolute',
-    bottom: 24,
-    left: 20,
-    right: 20,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  toastText: {
-    color: '#fff',
-    fontWeight: '600',
-    flex: 1,
   },
   switchModeText: {
     textAlign: 'center',

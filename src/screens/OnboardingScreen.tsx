@@ -23,6 +23,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useTheme } from '../contexts/ThemeContext';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
+import { useAccount } from '../contexts/AccountContext';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -75,6 +76,7 @@ const onboardingData: OnboardingSlide[] = [
 const OnboardingScreen = () => {
   const { currentTheme } = useTheme();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const { user } = useAccount();
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const progressValue = useSharedValue(0);
@@ -95,22 +97,28 @@ const OnboardingScreen = () => {
   };
 
   const handleSkip = () => {
-    handleGetStarted();
+    // Skip login: proceed to app and show a one-time hint toast
+    (async () => {
+      try {
+        await AsyncStorage.setItem('hasCompletedOnboarding', 'true');
+        await AsyncStorage.setItem('showLoginHintToastOnce', 'true');
+      } catch {}
+      navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+    })();
   };
 
   const handleGetStarted = async () => {
     try {
       await AsyncStorage.setItem('hasCompletedOnboarding', 'true');
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'MainTabs' }],
-      });
+      // After onboarding, route to login if no user; otherwise go to app
+      if (!user) {
+        navigation.reset({ index: 0, routes: [{ name: 'Account' }] });
+      } else {
+        navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+      }
     } catch (error) {
       console.error('Error saving onboarding status:', error);
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'MainTabs' }],
-      });
+      navigation.reset({ index: 0, routes: [{ name: user ? 'MainTabs' : 'Account' }] });
     }
   };
 

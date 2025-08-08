@@ -300,14 +300,10 @@ const SettingsScreen: React.FC = () => {
               {user ? (
                 <>
                   <SettingItem
-                    title={user.email || user.id}
-                    description="Signed in"
+                    title={user.displayName || user.email || user.id}
+                    description="Manage account"
                     icon="account-circle"
-                  />
-                  <SettingItem
-                    title="Sign out"
-                    icon="logout"
-                    onPress={signOut}
+                    onPress={() => navigation.navigate('AccountManage')}
                   />
                 </>
               ) : (

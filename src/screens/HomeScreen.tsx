@@ -63,6 +63,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import type { Theme } from '../contexts/ThemeContext';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ToastOverlay from '../components/common/ToastOverlay';
 import FirstTimeWelcome from '../components/FirstTimeWelcome';
 import { imageCacheService } from '../services/imageCacheService';
 
@@ -122,8 +124,10 @@ const HomeScreen = () => {
   const [catalogsLoading, setCatalogsLoading] = useState(true);
   const [loadedCatalogCount, setLoadedCatalogCount] = useState(0);
   const [hasAddons, setHasAddons] = useState<boolean | null>(null);
+  const [hintVisible, setHintVisible] = useState(false);
   const totalCatalogsRef = useRef(0);
   const [visibleCatalogCount, setVisibleCatalogCount] = useState(8); // Moderate number of visible catalogs
+  const insets = useSafeAreaInsets();
   
   const { 
     featuredContent, 
@@ -306,6 +310,24 @@ const HomeScreen = () => {
   useEffect(() => {
     loadCatalogsProgressively();
   }, [lastUpdate, loadCatalogsProgressively]);
+
+  // One-time hint after skipping login in onboarding
+  useEffect(() => {
+    let hideTimer: any;
+    (async () => {
+      try {
+        const flag = await AsyncStorage.getItem('showLoginHintToastOnce');
+        if (flag === 'true') {
+          setHintVisible(true);
+          await AsyncStorage.removeItem('showLoginHintToastOnce');
+          hideTimer = setTimeout(() => setHintVisible(false), 2000);
+        }
+      } catch {}
+    })();
+    return () => {
+      if (hideTimer) clearTimeout(hideTimer);
+    };
+  }, []);
 
   // Create a refresh function for catalogs
   const refreshCatalogs = useCallback(() => {
@@ -677,7 +699,7 @@ const HomeScreen = () => {
     if (isLoading) return null;
     
     return (
-      <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
+      <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}> 
         <StatusBar
           barStyle="light-content"
           backgroundColor="transparent"
@@ -705,6 +727,15 @@ const HomeScreen = () => {
           }}
           disableIntervalMomentum={true}
           scrollEventThrottle={16}
+        />
+        {/* One-time hint toast after skipping sign-in */}
+        <ToastOverlay
+          visible={hintVisible}
+          message="You can sign in anytime from Settings → Account"
+          type="info"
+          duration={1600}
+          bottomOffset={88}
+          onHide={() => setHintVisible(false)}
         />
       </View>
     );
@@ -859,6 +890,22 @@ const styles = StyleSheet.create<any>({
     marginLeft: 8,
     fontSize: 14,
     fontWeight: '600',
+  },
+  toast: {
+    position: 'absolute',
+    bottom: 24,
+    left: 16,
+    right: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    backgroundColor: 'rgba(99, 102, 241, 0.95)',
+    borderRadius: 12,
+  },
+  toastText: {
+    color: '#fff',
+    fontWeight: '600',
+    textAlign: 'center',
+    fontSize: 12,
   },
   loadingContainer: {
     flex: 1,
