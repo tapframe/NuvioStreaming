@@ -28,7 +28,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, { 
   FadeIn, 
   FadeOut, 
-  SlideInRight, 
   useAnimatedStyle, 
   useSharedValue, 
   withTiming,
@@ -505,7 +504,7 @@ const SearchScreen = () => {
   return (
     <Animated.View 
       style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}
-      entering={Platform.OS === 'android' ? SlideInRight.duration(250) : FadeIn.duration(350)}
+      entering={Platform.OS === 'android' ? undefined : FadeIn.duration(350)}
       exiting={Platform.OS === 'android' ? 
         FadeOut.duration(200).withInitialValues({ opacity: 1 }) : 
         FadeOut.duration(250)

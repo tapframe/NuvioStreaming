@@ -844,30 +844,10 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="Search" 
               component={SearchScreen as any} 
               options={{ 
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
-                animationDuration: Platform.OS === 'android' ? 250 : 350,
+                animation: Platform.OS === 'android' ? 'none' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 0 : 350,
                 gestureEnabled: true,
                 gestureDirection: 'horizontal',
-                ...(Platform.OS === 'android' && {
-                  cardStyleInterpolator: ({ current, layouts }: any) => {
-                    return {
-                      cardStyle: {
-                        transform: [
-                          {
-                            translateX: current.progress.interpolate({
-                              inputRange: [0, 1],
-                              outputRange: [layouts.screen.width, 0],
-                            }),
-                          },
-                        ],
-                        opacity: current.progress.interpolate({
-                          inputRange: [0, 0.3, 1],
-                          outputRange: [0, 0.85, 1],
-                        }),
-                      },
-                    };
-                  },
-                }),
                 contentStyle: {
                   backgroundColor: currentTheme.colors.darkBackground,
                 },
