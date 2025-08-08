@@ -112,13 +112,13 @@ const OnboardingScreen = () => {
       await AsyncStorage.setItem('hasCompletedOnboarding', 'true');
       // After onboarding, route to login if no user; otherwise go to app
       if (!user) {
-        navigation.reset({ index: 0, routes: [{ name: 'Account' }] });
+        navigation.reset({ index: 0, routes: [{ name: 'Account', params: { fromOnboarding: true } as any }] });
       } else {
         navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
       }
     } catch (error) {
       console.error('Error saving onboarding status:', error);
-      navigation.reset({ index: 0, routes: [{ name: user ? 'MainTabs' : 'Account' }] });
+      navigation.reset({ index: 0, routes: [{ name: user ? 'MainTabs' : 'Account', params: !user ? ({ fromOnboarding: true } as any) : undefined }] });
     }
   };
 

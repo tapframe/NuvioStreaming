@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAccount } from '../contexts/AccountContext';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import ToastOverlay from '../components/common/ToastOverlay';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,11 +16,15 @@ const AuthScreen: React.FC = () => {
   const { currentTheme } = useTheme();
   const { signIn, signUp } = useAccount();
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+  const fromOnboarding = !!route?.params?.fromOnboarding;
   const insets = useSafeAreaInsets();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -131,7 +135,9 @@ const AuthScreen: React.FC = () => {
 
   const isEmailValid = useMemo(() => /\S+@\S+\.\S+/.test(email.trim()), [email]);
   const isPasswordValid = useMemo(() => password.length >= 6, [password]);
-  const canSubmit = isEmailValid && isPasswordValid;
+  const isConfirmValid = useMemo(() => (mode === 'signin') || confirmPassword.length >= 6, [confirmPassword, mode]);
+  const passwordsMatch = useMemo(() => (mode === 'signin') || confirmPassword === password, [confirmPassword, password, mode]);
+  const canSubmit = isEmailValid && isPasswordValid && (mode === 'signin' || (isConfirmValid && passwordsMatch));
 
   const handleSubmit = async () => {
     if (loading) return;
@@ -144,6 +150,13 @@ const AuthScreen: React.FC = () => {
     }
     if (!isPasswordValid) {
       const msg = 'Password must be at least 6 characters';
+      setError(msg);
+      showToast(msg, 'error');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      return;
+    }
+    if (mode === 'signup' && !passwordsMatch) {
+      const msg = 'Passwords do not match';
       setError(msg);
       showToast(msg, 'error');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
@@ -375,6 +388,45 @@ const AuthScreen: React.FC = () => {
                 </View>
               </View>
 
+              {/* Confirm Password (signup only) */}
+              {mode === 'signup' && (
+                <View style={styles.inputContainer}>
+                  <View style={[styles.inputRow, { 
+                    backgroundColor: Platform.OS === 'android' ? '#1a1a1a' : 'rgba(255,255,255,0.03)', 
+                    borderColor: Platform.OS === 'android' ? '#2a2a2a' : ((passwordsMatch && (isConfirmValid || !confirmPassword)) ? 'rgba(255,255,255,0.08)' : 'rgba(255,107,107,0.4)'),
+                    borderWidth: 1,
+                  }]}>                
+                    <View style={[styles.iconContainer, { backgroundColor: Platform.OS === 'android' ? '#222' : ((passwordsMatch && isConfirmValid) ? 'rgba(46,160,67,0.15)' : 'rgba(255,255,255,0.05)') }]}>                
+                      <MaterialIcons 
+                        name="lock-outline" 
+                        size={18} 
+                        color={Platform.OS === 'android' ? currentTheme.colors.textMuted : ((passwordsMatch && isConfirmValid) ? '#2EA043' : currentTheme.colors.textMuted)} 
+                      />
+                    </View>
+                    <TextInput
+                      placeholder="Confirm password"
+                      placeholderTextColor="rgba(255,255,255,0.4)"
+                      style={[styles.input, { color: currentTheme.colors.white }]}
+                      secureTextEntry={!showConfirm}
+                      value={confirmPassword}
+                      onChangeText={setConfirmPassword}
+                      returnKeyType="done"
+                      onSubmitEditing={handleSubmit}
+                    />
+                    <TouchableOpacity onPress={() => setShowConfirm(p => !p)} style={styles.eyeButton}>
+                      <MaterialIcons 
+                        name={showConfirm ? 'visibility-off' : 'visibility'} 
+                        size={16} 
+                        color={currentTheme.colors.textMuted} 
+                      />
+                    </TouchableOpacity>
+                    {Platform.OS !== 'android' && passwordsMatch && isConfirmValid && (
+                      <MaterialIcons name="check-circle" size={16} color="#2EA043" style={{ marginRight: 12 }} />
+                    )}
+                  </View>
+                </View>
+              )}
+
               {/* Error */}
               {!!error && (
                 <View style={styles.errorRow}>
@@ -442,13 +494,26 @@ const AuthScreen: React.FC = () => {
                 </Text>
               </TouchableOpacity>
 
-              {/* Skip sign in */}
+              {/* Skip sign in - more prominent when coming from onboarding */}
               <TouchableOpacity
                 onPress={handleSkipAuth}
-                activeOpacity={0.7}
-                style={{ marginTop: 10, alignSelf: 'center' }}
+                activeOpacity={0.85}
+                style={[
+                  { marginTop: 12, alignSelf: 'center' },
+                  fromOnboarding && {
+                    marginTop: 18,
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    borderRadius: 10,
+                    backgroundColor: 'rgba(255,255,255,0.06)',
+                  },
+                ]}
               >
-                <Text style={{ color: currentTheme.colors.textMuted, textAlign: 'center' }}>
+                <Text style={{ 
+                  color: fromOnboarding ? currentTheme.colors.white : currentTheme.colors.textMuted, 
+                  textAlign: 'center',
+                  fontWeight: fromOnboarding ? '700' : '500',
+                }}>
                   Continue without an account
                 </Text>
               </TouchableOpacity>
