@@ -124,14 +124,14 @@ const MetadataScreen: React.FC = () => {
     if (dominantColor && dominantColor !== '#1a1a1a' && dominantColor !== null && dominantColor !== currentTheme.colors.darkBackground) {
       // Smoothly transition to the new color
       backgroundColorShared.value = withTiming(dominantColor, {
-        duration: 800, // Longer duration for smoother transition
-        easing: Easing.bezier(0.25, 0.1, 0.25, 1), // Smooth easing curve
+        duration: 300, // Faster appearance
+        easing: Easing.out(Easing.cubic), // Smooth out easing
       });
     } else {
       // Transition back to theme background if needed
       backgroundColorShared.value = withTiming(currentTheme.colors.darkBackground, {
-        duration: 800,
-        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+        duration: 300,
+        easing: Easing.out(Easing.cubic),
       });
     }
   }, [dominantColor, currentTheme.colors.darkBackground]);
