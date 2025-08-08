@@ -14,6 +14,7 @@ import { NuvioHeader } from '../components/NuvioHeader';
 import { Stream } from '../types/streams';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
+import { Toasts } from '@backpackapp-io/react-native-toast';
 
 // Import screens with their proper types
 import HomeScreen from '../screens/HomeScreen';
@@ -1073,6 +1074,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
           </Stack.Navigator>
         </View>
       </PaperProvider>
+      <Toasts />
     </SafeAreaProvider>
   );
 };

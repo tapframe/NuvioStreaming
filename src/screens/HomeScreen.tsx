@@ -64,7 +64,7 @@ import type { Theme } from '../contexts/ThemeContext';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import ToastOverlay from '../components/common/ToastOverlay';
+import { toast, ToastPosition } from '@backpackapp-io/react-native-toast';
 import FirstTimeWelcome from '../components/FirstTimeWelcome';
 import { imageCacheService } from '../services/imageCacheService';
 
@@ -321,6 +321,13 @@ const HomeScreen = () => {
           setHintVisible(true);
           await AsyncStorage.removeItem('showLoginHintToastOnce');
           hideTimer = setTimeout(() => setHintVisible(false), 2000);
+          // Also show a global toast for consistency across screens
+          try {
+            toast('You can sign in anytime from Settings → Account', {
+              duration: 1600,
+              position: ToastPosition.BOTTOM,
+            });
+          } catch {}
         }
       } catch {}
     })();
@@ -728,15 +735,7 @@ const HomeScreen = () => {
           disableIntervalMomentum={true}
           scrollEventThrottle={16}
         />
-        {/* One-time hint toast after skipping sign-in */}
-        <ToastOverlay
-          visible={hintVisible}
-          message="You can sign in anytime from Settings → Account"
-          type="info"
-          duration={1600}
-          bottomOffset={88}
-          onHide={() => setHintVisible(false)}
-        />
+        {/* Toasts are rendered globally at root */}
       </View>
     );
   }, [

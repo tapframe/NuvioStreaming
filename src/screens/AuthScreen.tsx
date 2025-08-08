@@ -7,7 +7,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAccount } from '../contexts/AccountContext';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
-import ToastOverlay from '../components/common/ToastOverlay';
+import { toast } from '@backpackapp-io/react-native-toast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
@@ -41,7 +41,7 @@ const AuthScreen: React.FC = () => {
   const ctaTextTranslateY = useRef(new Animated.Value(0)).current;
   const modeAnim = useRef(new Animated.Value(0)).current; // 0 = signin, 1 = signup
   const [switchWidth, setSwitchWidth] = useState(0);
-  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' | 'info' }>({ visible: false, message: '', type: 'info' });
+  // Legacy local toast state removed in favor of global toast
   const [headerHeight, setHeaderHeight] = useState(0);
   const headerHideAnim = useRef(new Animated.Value(0)).current; // 0 visible, 1 hidden
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -144,21 +144,21 @@ const AuthScreen: React.FC = () => {
     if (!isEmailValid) {
       const msg = 'Enter a valid email address';
       setError(msg);
-      showToast(msg, 'error');
+      toast.error(msg);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       return;
     }
     if (!isPasswordValid) {
       const msg = 'Password must be at least 6 characters';
       setError(msg);
-      showToast(msg, 'error');
+      toast.error(msg);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       return;
     }
     if (mode === 'signup' && !passwordsMatch) {
       const msg = 'Passwords do not match';
       setError(msg);
-      showToast(msg, 'error');
+      toast.error(msg);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       return;
     }
@@ -167,11 +167,11 @@ const AuthScreen: React.FC = () => {
     const err = mode === 'signin' ? await signIn(email.trim(), password) : await signUp(email.trim(), password);
     if (err) {
       setError(err);
-      showToast(err, 'error');
+      toast.error(err);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
     } else {
       const msg = mode === 'signin' ? 'Logged in successfully' : 'Sign up successful';
-      showToast(msg, 'success');
+      toast.success(msg);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     }
     setLoading(false);
@@ -184,9 +184,7 @@ const AuthScreen: React.FC = () => {
     navigation.reset({ index: 0, routes: [{ name: 'MainTabs' as never }] } as any);
   };
 
-  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
-    setToast({ visible: true, message, type });
-  };
+  // showToast helper replaced with direct calls to toast.* API
 
   return (
     <View style={{ flex: 1 }}>
@@ -521,15 +519,7 @@ const AuthScreen: React.FC = () => {
 
           </View>
         </KeyboardAvoidingView>
-        {/* Screen-level toast overlay so it is not clipped by the card */}
-        <ToastOverlay
-          visible={toast.visible}
-          message={toast.message}
-          type={toast.type}
-          duration={1600}
-          bottomOffset={(keyboardHeight > 0 ? keyboardHeight + 8 : 24)}
-          onHide={() => setToast(prev => ({ ...prev, visible: false }))}
-        />
+        {/* Toasts rendered globally in App root */}
       </SafeAreaView>
     </View>
   );
