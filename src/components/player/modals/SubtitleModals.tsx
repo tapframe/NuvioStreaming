@@ -31,6 +31,29 @@ interface SubtitleModalsProps {
   increaseSubtitleSize: () => void;
   decreaseSubtitleSize: () => void;
   toggleSubtitleBackground: () => void;
+  // Customization props
+  subtitleFontFamily?: string;
+  setSubtitleFontFamily: (f?: string) => void;
+  subtitleTextColor: string;
+  setSubtitleTextColor: (c: string) => void;
+  subtitleBgOpacity: number;
+  setSubtitleBgOpacity: (o: number) => void;
+  subtitleTextShadow: boolean;
+  setSubtitleTextShadow: (b: boolean) => void;
+  subtitleOutline: boolean;
+  setSubtitleOutline: (b: boolean) => void;
+  subtitleOutlineColor: string;
+  setSubtitleOutlineColor: (c: string) => void;
+  subtitleOutlineWidth: number;
+  setSubtitleOutlineWidth: (n: number) => void;
+  subtitleAlign: 'center' | 'left' | 'right';
+  setSubtitleAlign: (a: 'center' | 'left' | 'right') => void;
+  subtitleBottomOffset: number;
+  setSubtitleBottomOffset: (n: number) => void;
+  subtitleLetterSpacing: number;
+  setSubtitleLetterSpacing: (n: number) => void;
+  subtitleLineHeightMultiplier: number;
+  setSubtitleLineHeightMultiplier: (n: number) => void;
 }
 
 const { width, height } = Dimensions.get('window');
@@ -56,6 +79,28 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   increaseSubtitleSize,
   decreaseSubtitleSize,
   toggleSubtitleBackground,
+  subtitleFontFamily,
+  setSubtitleFontFamily,
+  subtitleTextColor,
+  setSubtitleTextColor,
+  subtitleBgOpacity,
+  setSubtitleBgOpacity,
+  subtitleTextShadow,
+  setSubtitleTextShadow,
+  subtitleOutline,
+  setSubtitleOutline,
+  subtitleOutlineColor,
+  setSubtitleOutlineColor,
+  subtitleOutlineWidth,
+  setSubtitleOutlineWidth,
+  subtitleAlign,
+  setSubtitleAlign,
+  subtitleBottomOffset,
+  setSubtitleBottomOffset,
+  subtitleLetterSpacing,
+  setSubtitleLetterSpacing,
+  subtitleLineHeightMultiplier,
+  setSubtitleLineHeightMultiplier,
 }) => {
   // Track which specific online subtitle is currently loaded
   const [selectedOnlineSubtitleId, setSelectedOnlineSubtitleId] = React.useState<string | null>(null);
@@ -292,6 +337,118 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                   }} />
                 </TouchableOpacity>
               </View>
+              </View>
+            )}
+
+            {/* Customization Section - Only for custom subtitles */}
+            {useCustomSubtitles && (
+              <View style={{ marginBottom: 30, gap: 10 }}>
+                <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: '600', marginBottom: 10, textTransform: 'uppercase' }}>Appearance</Text>
+                <View style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: 16, gap: 12 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ color: 'white' }}>Text Color</Text>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      {['#FFFFFF', '#FFD700', '#00E5FF', '#FF5C5C', '#00FF88'].map(c => (
+                        <TouchableOpacity key={c} onPress={() => setSubtitleTextColor(c)} style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: c, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' }} />
+                      ))}
+                    </View>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ color: 'white' }}>Align</Text>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      {(['left','center','right'] as const).map(a => (
+                        <TouchableOpacity key={a} onPress={() => setSubtitleAlign(a)} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, backgroundColor: subtitleAlign === a ? 'rgba(255,255,255,0.2)' : 'transparent', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
+                          <Text style={{ color: 'white', textTransform: 'capitalize' }}>{a}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ color: 'white' }}>Bottom Offset</Text>
+                    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                      <TouchableOpacity onPress={() => setSubtitleBottomOffset(Math.max(0, subtitleBottomOffset - 5))} style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+                        <MaterialIcons name="keyboard-arrow-down" color="#fff" size={20} />
+                      </TouchableOpacity>
+                      <Text style={{ color: 'white', width: 40, textAlign: 'center' }}>{subtitleBottomOffset}</Text>
+                      <TouchableOpacity onPress={() => setSubtitleBottomOffset(subtitleBottomOffset + 5)} style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+                        <MaterialIcons name="keyboard-arrow-up" color="#fff" size={20} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ color: 'white' }}>Background Opacity</Text>
+                    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                      <TouchableOpacity onPress={() => setSubtitleBgOpacity(Math.max(0, +(subtitleBgOpacity - 0.1).toFixed(1)))} style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+                        <MaterialIcons name="remove" color="#fff" size={18} />
+                      </TouchableOpacity>
+                      <Text style={{ color: 'white', width: 40, textAlign: 'center' }}>{subtitleBgOpacity.toFixed(1)}</Text>
+                      <TouchableOpacity onPress={() => setSubtitleBgOpacity(Math.min(1, +(subtitleBgOpacity + 0.1).toFixed(1)))} style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+                        <MaterialIcons name="add" color="#fff" size={18} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ color: 'white' }}>Text Shadow</Text>
+                    <TouchableOpacity onPress={() => setSubtitleTextShadow(!subtitleTextShadow)} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, backgroundColor: subtitleTextShadow ? 'rgba(255,255,255,0.2)' : 'transparent', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
+                      <Text style={{ color: 'white' }}>{subtitleTextShadow ? 'On' : 'Off'}</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ color: 'white' }}>Outline</Text>
+                    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                      <TouchableOpacity onPress={() => setSubtitleOutline(!subtitleOutline)} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, backgroundColor: subtitleOutline ? 'rgba(255,255,255,0.2)' : 'transparent', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
+                        <Text style={{ color: 'white' }}>{subtitleOutline ? 'On' : 'Off'}</Text>
+                      </TouchableOpacity>
+                      {['#000000', '#FFFFFF', '#00E5FF', '#FF5C5C'].map(c => (
+                        <TouchableOpacity key={c} onPress={() => setSubtitleOutlineColor(c)} style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: c, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' }} />
+                      ))}
+                    </View>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ color: 'white' }}>Outline Width</Text>
+                    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                      <TouchableOpacity onPress={() => setSubtitleOutlineWidth(Math.max(0, subtitleOutlineWidth - 1))} style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+                        <MaterialIcons name="remove" color="#fff" size={18} />
+                      </TouchableOpacity>
+                      <Text style={{ color: 'white', width: 40, textAlign: 'center' }}>{subtitleOutlineWidth}</Text>
+                      <TouchableOpacity onPress={() => setSubtitleOutlineWidth(subtitleOutlineWidth + 1)} style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+                        <MaterialIcons name="add" color="#fff" size={18} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ color: 'white' }}>Letter Spacing</Text>
+                    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                      <TouchableOpacity onPress={() => setSubtitleLetterSpacing(Math.max(0, +(subtitleLetterSpacing - 0.5).toFixed(1)))} style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+                        <MaterialIcons name="remove" color="#fff" size={18} />
+                      </TouchableOpacity>
+                      <Text style={{ color: 'white', width: 40, textAlign: 'center' }}>{subtitleLetterSpacing.toFixed(1)}</Text>
+                      <TouchableOpacity onPress={() => setSubtitleLetterSpacing(+(subtitleLetterSpacing + 0.5).toFixed(1))} style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+                        <MaterialIcons name="add" color="#fff" size={18} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ color: 'white' }}>Line Height</Text>
+                    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                      <TouchableOpacity onPress={() => setSubtitleLineHeightMultiplier(Math.max(1, +(subtitleLineHeightMultiplier - 0.1).toFixed(1)))} style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+                        <MaterialIcons name="remove" color="#fff" size={18} />
+                      </TouchableOpacity>
+                      <Text style={{ color: 'white', width: 40, textAlign: 'center' }}>{subtitleLineHeightMultiplier.toFixed(1)}</Text>
+                      <TouchableOpacity onPress={() => setSubtitleLineHeightMultiplier(+(subtitleLineHeightMultiplier + 0.1).toFixed(1))} style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+                        <MaterialIcons name="add" color="#fff" size={18} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
               </View>
             )}
 

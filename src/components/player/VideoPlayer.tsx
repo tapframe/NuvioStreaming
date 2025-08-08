@@ -37,6 +37,7 @@ import ResumeOverlay from './modals/ResumeOverlay';
 import PlayerControls from './controls/PlayerControls';
 import CustomSubtitles from './subtitles/CustomSubtitles';
 import { SourcesModal } from './modals/SourcesModal';
+import axios from 'axios';
 import { stremioService } from '../../services/stremioService';
 
 const VideoPlayer: React.FC = () => {
@@ -159,6 +160,18 @@ const VideoPlayer: React.FC = () => {
   const [currentSubtitle, setCurrentSubtitle] = useState<string>('');
   const [subtitleSize, setSubtitleSize] = useState<number>(DEFAULT_SUBTITLE_SIZE);
   const [subtitleBackground, setSubtitleBackground] = useState<boolean>(true);
+  // External subtitle customization
+  const [subtitleFontFamily, setSubtitleFontFamily] = useState<string | undefined>(undefined);
+  const [subtitleTextColor, setSubtitleTextColor] = useState<string>('#FFFFFF');
+  const [subtitleBgOpacity, setSubtitleBgOpacity] = useState<number>(0.7);
+  const [subtitleTextShadow, setSubtitleTextShadow] = useState<boolean>(true);
+  const [subtitleOutline, setSubtitleOutline] = useState<boolean>(false);
+  const [subtitleOutlineColor, setSubtitleOutlineColor] = useState<string>('#000000');
+  const [subtitleOutlineWidth, setSubtitleOutlineWidth] = useState<number>(2);
+  const [subtitleAlign, setSubtitleAlign] = useState<'center' | 'left' | 'right'>('center');
+  const [subtitleBottomOffset, setSubtitleBottomOffset] = useState<number>(20);
+  const [subtitleLetterSpacing, setSubtitleLetterSpacing] = useState<number>(0);
+  const [subtitleLineHeightMultiplier, setSubtitleLineHeightMultiplier] = useState<number>(1.2);
   const [useCustomSubtitles, setUseCustomSubtitles] = useState<boolean>(false);
   const [isLoadingSubtitles, setIsLoadingSubtitles] = useState<boolean>(false);
   const [availableSubtitles, setAvailableSubtitles] = useState<WyzieSubtitle[]>([]);
@@ -953,18 +966,100 @@ const VideoPlayer: React.FC = () => {
   };
 
   const loadWyzieSubtitle = async (subtitle: WyzieSubtitle) => {
+    logger.log(`[VideoPlayer] Subtitle click received: id=${subtitle.id}, lang=${subtitle.language}, url=${subtitle.url}`);
     setShowSubtitleLanguageModal(false);
     setIsLoadingSubtitles(true);
     try {
-      const response = await fetch(subtitle.url);
-      const srtContent = await response.text();
+      logger.log('[VideoPlayer] Fetching subtitle SRT start');
+      let srtContent = '';
+      try {
+        const axiosResp = await axios.get(subtitle.url, {
+          timeout: 10000,
+          headers: {
+            'Accept': 'text/plain, */*',
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Nuvio/1.0'
+          },
+          responseType: 'text',
+          transitional: { clarifyTimeoutError: true }
+        });
+        srtContent = typeof axiosResp.data === 'string' ? axiosResp.data : String(axiosResp.data || '');
+      } catch (axiosErr: any) {
+        logger.warn('[VideoPlayer] Axios subtitle fetch failed, falling back to fetch()', {
+          message: axiosErr?.message,
+          code: axiosErr?.code
+        });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        try {
+          const resp = await fetch(subtitle.url, { signal: controller.signal });
+          srtContent = await resp.text();
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      }
+      logger.log(`[VideoPlayer] Fetching subtitle SRT done, size=${srtContent.length}`);
       const parsedCues = parseSRT(srtContent);
-      setCustomSubtitles(parsedCues);
-      setUseCustomSubtitles(true);
+      logger.log(`[VideoPlayer] Parsed cues count=${parsedCues.length}`);
+
+      // For VLC on iOS: stop spinner early, then clear-apply and micro-seek nudge
+      setIsLoadingSubtitles(false);
+      logger.log('[VideoPlayer] isLoadingSubtitles -> false (early)');
+
+      // Clear existing state
+      setUseCustomSubtitles(false);
+      logger.log('[VideoPlayer] useCustomSubtitles -> false');
+      setCustomSubtitles([]);
+      logger.log('[VideoPlayer] customSubtitles -> []');
       setSelectedTextTrack(-1);
+      logger.log('[VideoPlayer] selectedTextTrack -> -1');
+
+      // Apply immediately
+      setCustomSubtitles(parsedCues);
+      logger.log('[VideoPlayer] customSubtitles <- parsedCues');
+      setUseCustomSubtitles(true);
+      logger.log('[VideoPlayer] useCustomSubtitles -> true');
+      setSelectedTextTrack(-1);
+      logger.log('[VideoPlayer] selectedTextTrack -> -1 (disable native while using custom)');
+
+      // Immediately set current subtitle text
+      try {
+        const cueNow = parsedCues.find(cue => currentTime >= cue.start && currentTime <= cue.end);
+        const textNow = cueNow ? cueNow.text : '';
+        setCurrentSubtitle(textNow);
+        logger.log('[VideoPlayer] currentSubtitle set immediately after apply');
+      } catch (e) {
+        logger.error('[VideoPlayer] Error setting immediate subtitle', e);
+      }
+
+      // VLC micro-seek nudge
+      try {
+        if (vlcRef.current && duration > 0) {
+          const wasPaused = paused;
+          const original = currentTime;
+          const forward = Math.min(original + 0.05, Math.max(duration - 0.1, 0));
+          logger.log('[VideoPlayer] Performing micro-seek nudge', { original, forward });
+          if (wasPaused) setPaused(false);
+          setTimeout(() => {
+            try {
+              // @ts-ignore - VLCPlayer seek method
+              vlcRef.current?.seek(forward);
+              setTimeout(() => {
+                // @ts-ignore
+                vlcRef.current?.seek(original);
+                if (wasPaused) setPaused(true);
+                logger.log('[VideoPlayer] Micro-seek nudge complete');
+              }, 150);
+            } catch (e) {
+              logger.warn('[VideoPlayer] Micro-seek nudge failed', e);
+              if (wasPaused) setPaused(true);
+            }
+          }, 50);
+        }
+      } catch(e) {
+        logger.warn('[VideoPlayer] Outer micro-seek failed', e);
+      }
     } catch (error) {
       logger.error('[VideoPlayer] Error loading Wyzie subtitle:', error);
-    } finally {
       setIsLoadingSubtitles(false);
     }
   };
@@ -1275,7 +1370,7 @@ const VideoPlayer: React.FC = () => {
                 <VLCPlayer
                   ref={vlcRef}
                   style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
-                                    source={(() => {
+                  source={(() => {
                      // FORCEFULLY use headers from route params if available - no filtering or modification
                      const sourceWithHeaders = headers ? {
                        uri: currentStreamUrl,
@@ -1339,6 +1434,17 @@ const VideoPlayer: React.FC = () => {
             subtitleSize={subtitleSize}
             subtitleBackground={subtitleBackground}
             zoomScale={zoomScale}
+            fontFamily={subtitleFontFamily}
+            textColor={subtitleTextColor}
+            backgroundOpacity={subtitleBgOpacity}
+            textShadow={subtitleTextShadow}
+            outline={subtitleOutline}
+            outlineColor={subtitleOutlineColor}
+            outlineWidth={subtitleOutlineWidth}
+            align={subtitleAlign}
+            bottomOffset={subtitleBottomOffset}
+            letterSpacing={subtitleLetterSpacing}
+            lineHeightMultiplier={subtitleLineHeightMultiplier}
           />
 
           <ResumeOverlay
@@ -1381,6 +1487,28 @@ const VideoPlayer: React.FC = () => {
         increaseSubtitleSize={increaseSubtitleSize}
         decreaseSubtitleSize={decreaseSubtitleSize}
         toggleSubtitleBackground={toggleSubtitleBackground}
+        subtitleFontFamily={subtitleFontFamily}
+        setSubtitleFontFamily={setSubtitleFontFamily}
+        subtitleTextColor={subtitleTextColor}
+        setSubtitleTextColor={setSubtitleTextColor}
+        subtitleBgOpacity={subtitleBgOpacity}
+        setSubtitleBgOpacity={setSubtitleBgOpacity}
+        subtitleTextShadow={subtitleTextShadow}
+        setSubtitleTextShadow={setSubtitleTextShadow}
+        subtitleOutline={subtitleOutline}
+        setSubtitleOutline={setSubtitleOutline}
+        subtitleOutlineColor={subtitleOutlineColor}
+        setSubtitleOutlineColor={setSubtitleOutlineColor}
+        subtitleOutlineWidth={subtitleOutlineWidth}
+        setSubtitleOutlineWidth={setSubtitleOutlineWidth}
+        subtitleAlign={subtitleAlign}
+        setSubtitleAlign={setSubtitleAlign}
+        subtitleBottomOffset={subtitleBottomOffset}
+        setSubtitleBottomOffset={setSubtitleBottomOffset}
+        subtitleLetterSpacing={subtitleLetterSpacing}
+        setSubtitleLetterSpacing={setSubtitleLetterSpacing}
+        subtitleLineHeightMultiplier={subtitleLineHeightMultiplier}
+        setSubtitleLineHeightMultiplier={setSubtitleLineHeightMultiplier}
       />
 
       <SourcesModal

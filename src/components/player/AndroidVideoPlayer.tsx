@@ -149,6 +149,18 @@ const AndroidVideoPlayer: React.FC = () => {
   const [customSubtitleVersion, setCustomSubtitleVersion] = useState<number>(0);
   const [subtitleSize, setSubtitleSize] = useState<number>(DEFAULT_SUBTITLE_SIZE);
   const [subtitleBackground, setSubtitleBackground] = useState<boolean>(true);
+  // External subtitle customization
+  const [subtitleFontFamily, setSubtitleFontFamily] = useState<string | undefined>(undefined);
+  const [subtitleTextColor, setSubtitleTextColor] = useState<string>('#FFFFFF');
+  const [subtitleBgOpacity, setSubtitleBgOpacity] = useState<number>(0.7);
+  const [subtitleTextShadow, setSubtitleTextShadow] = useState<boolean>(true);
+  const [subtitleOutline, setSubtitleOutline] = useState<boolean>(false);
+  const [subtitleOutlineColor, setSubtitleOutlineColor] = useState<string>('#000000');
+  const [subtitleOutlineWidth, setSubtitleOutlineWidth] = useState<number>(2);
+  const [subtitleAlign, setSubtitleAlign] = useState<'center' | 'left' | 'right'>('center');
+  const [subtitleBottomOffset, setSubtitleBottomOffset] = useState<number>(20);
+  const [subtitleLetterSpacing, setSubtitleLetterSpacing] = useState<number>(0);
+  const [subtitleLineHeightMultiplier, setSubtitleLineHeightMultiplier] = useState<number>(1.2);
   const [useCustomSubtitles, setUseCustomSubtitles] = useState<boolean>(false);
   const [isLoadingSubtitles, setIsLoadingSubtitles] = useState<boolean>(false);
   const [availableSubtitles, setAvailableSubtitles] = useState<WyzieSubtitle[]>([]);
@@ -1450,6 +1462,17 @@ const AndroidVideoPlayer: React.FC = () => {
             subtitleSize={subtitleSize}
             subtitleBackground={subtitleBackground}
             zoomScale={zoomScale}
+            fontFamily={subtitleFontFamily}
+            textColor={subtitleTextColor}
+            backgroundOpacity={subtitleBgOpacity}
+            textShadow={subtitleTextShadow}
+            outline={subtitleOutline}
+            outlineColor={subtitleOutlineColor}
+            outlineWidth={subtitleOutlineWidth}
+            align={subtitleAlign}
+            bottomOffset={subtitleBottomOffset}
+            letterSpacing={subtitleLetterSpacing}
+            lineHeightMultiplier={subtitleLineHeightMultiplier}
           />
 
           <ResumeOverlay
@@ -1492,6 +1515,28 @@ const AndroidVideoPlayer: React.FC = () => {
         increaseSubtitleSize={increaseSubtitleSize}
         decreaseSubtitleSize={decreaseSubtitleSize}
         toggleSubtitleBackground={toggleSubtitleBackground}
+        subtitleFontFamily={subtitleFontFamily}
+        setSubtitleFontFamily={setSubtitleFontFamily}
+        subtitleTextColor={subtitleTextColor}
+        setSubtitleTextColor={setSubtitleTextColor}
+        subtitleBgOpacity={subtitleBgOpacity}
+        setSubtitleBgOpacity={setSubtitleBgOpacity}
+        subtitleTextShadow={subtitleTextShadow}
+        setSubtitleTextShadow={setSubtitleTextShadow}
+        subtitleOutline={subtitleOutline}
+        setSubtitleOutline={setSubtitleOutline}
+        subtitleOutlineColor={subtitleOutlineColor}
+        setSubtitleOutlineColor={setSubtitleOutlineColor}
+        subtitleOutlineWidth={subtitleOutlineWidth}
+        setSubtitleOutlineWidth={setSubtitleOutlineWidth}
+        subtitleAlign={subtitleAlign}
+        setSubtitleAlign={setSubtitleAlign}
+        subtitleBottomOffset={subtitleBottomOffset}
+        setSubtitleBottomOffset={setSubtitleBottomOffset}
+        subtitleLetterSpacing={subtitleLetterSpacing}
+        setSubtitleLetterSpacing={setSubtitleLetterSpacing}
+        subtitleLineHeightMultiplier={subtitleLineHeightMultiplier}
+        setSubtitleLineHeightMultiplier={setSubtitleLineHeightMultiplier}
       />
       
       <SourcesModal
