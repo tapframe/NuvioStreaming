@@ -14,6 +14,7 @@ class StorageService {
   private static instance: StorageService;
   private readonly WATCH_PROGRESS_KEY = '@watch_progress:';
   private readonly CONTENT_DURATION_KEY = '@content_duration:';
+  private readonly SUBTITLE_SETTINGS_KEY = '@subtitle_settings';
   private watchProgressSubscribers: (() => void)[] = [];
   private notificationDebounceTimer: NodeJS.Timeout | null = null;
   private lastNotificationTime: number = 0;
@@ -418,6 +419,24 @@ class StorageService {
       }
     } catch (error) {
       logger.error('Error merging with Trakt progress:', error);
+    }
+  }
+
+  public async saveSubtitleSettings(settings: Record<string, any>): Promise<void> {
+    try {
+      await AsyncStorage.setItem(this.SUBTITLE_SETTINGS_KEY, JSON.stringify(settings));
+    } catch (error) {
+      logger.error('Error saving subtitle settings:', error);
+    }
+  }
+
+  public async getSubtitleSettings(): Promise<Record<string, any> | null> {
+    try {
+      const data = await AsyncStorage.getItem(this.SUBTITLE_SETTINGS_KEY);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      logger.error('Error loading subtitle settings:', error);
+      return null;
     }
   }
 }

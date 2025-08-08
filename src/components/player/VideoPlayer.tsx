@@ -42,19 +42,23 @@ import { stremioService } from '../../services/stremioService';
 
 const VideoPlayer: React.FC = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'Player'>>();
-  const { streamProvider, uri, headers } = route.params;
+  const { streamProvider, uri, headers, forceVlc } = route.params as any;
   
   // Check if the stream is from Xprime
   const isXprimeStream = streamProvider === 'xprime' || streamProvider === 'Xprime';
   
   // Check if the file format is MKV
-  const isMkvFile = uri && (uri.toLowerCase().includes('.mkv') || uri.toLowerCase().includes('mkv'));
+  const lowerUri = (uri || '').toLowerCase();
+  const contentType = (headers && (headers['Content-Type'] || headers['content-type'])) || '';
+  const isMkvByHeader = typeof contentType === 'string' && contentType.includes('matroska');
+  const isMkvByPath = lowerUri.includes('.mkv') || /[?&]ext=mkv\b/.test(lowerUri) || /format=mkv\b/.test(lowerUri) || /container=mkv\b/.test(lowerUri);
+  const isMkvFile = Boolean(isMkvByHeader || isMkvByPath);
   
   // Use AndroidVideoPlayer for:
   // - Android devices
   // - Xprime streams on any platform
   // - Non-MKV files on iOS
-  if (Platform.OS === 'android' || isXprimeStream || (Platform.OS === 'ios' && !isMkvFile)) {
+  if (Platform.OS === 'android' || isXprimeStream || (Platform.OS === 'ios' && !isMkvFile && !forceVlc)) {
     return <AndroidVideoPlayer />;
   }
 
@@ -161,7 +165,6 @@ const VideoPlayer: React.FC = () => {
   const [subtitleSize, setSubtitleSize] = useState<number>(DEFAULT_SUBTITLE_SIZE);
   const [subtitleBackground, setSubtitleBackground] = useState<boolean>(true);
   // External subtitle customization
-  const [subtitleFontFamily, setSubtitleFontFamily] = useState<string | undefined>(undefined);
   const [subtitleTextColor, setSubtitleTextColor] = useState<string>('#FFFFFF');
   const [subtitleBgOpacity, setSubtitleBgOpacity] = useState<number>(0.7);
   const [subtitleTextShadow, setSubtitleTextShadow] = useState<boolean>(true);
@@ -172,6 +175,7 @@ const VideoPlayer: React.FC = () => {
   const [subtitleBottomOffset, setSubtitleBottomOffset] = useState<number>(20);
   const [subtitleLetterSpacing, setSubtitleLetterSpacing] = useState<number>(0);
   const [subtitleLineHeightMultiplier, setSubtitleLineHeightMultiplier] = useState<number>(1.2);
+  const [subtitleOffsetSec, setSubtitleOffsetSec] = useState<number>(0);
   const [useCustomSubtitles, setUseCustomSubtitles] = useState<boolean>(false);
   const [isLoadingSubtitles, setIsLoadingSubtitles] = useState<boolean>(false);
   const [availableSubtitles, setAvailableSubtitles] = useState<WyzieSubtitle[]>([]);
@@ -907,7 +911,7 @@ const VideoPlayer: React.FC = () => {
     }
   };
 
-  const fetchAvailableSubtitles = async (imdbIdParam?: string, autoSelectEnglish = false) => {
+  const fetchAvailableSubtitles = async (imdbIdParam?: string, autoSelectEnglish = true) => {
     const targetImdbId = imdbIdParam || imdbId;
     if (!targetImdbId) {
       logger.error('[VideoPlayer] No IMDb ID available for subtitle search');
@@ -942,7 +946,19 @@ const VideoPlayer: React.FC = () => {
         }
         return acc;
       }, [] as WyzieSubtitle[]);
-      uniqueSubtitles.sort((a, b) => a.display.localeCompare(b.display));
+      // Sort with English languages first, then alphabetical
+      const isEnglish = (s: WyzieSubtitle) => {
+        const lang = (s.language || '').toLowerCase();
+        const disp = (s.display || '').toLowerCase();
+        return lang === 'en' || lang === 'eng' || /^en([-_]|$)/.test(lang) || disp.includes('english');
+      };
+      uniqueSubtitles.sort((a, b) => {
+        const aIsEn = isEnglish(a);
+        const bIsEn = isEnglish(b);
+        if (aIsEn && !bIsEn) return -1;
+        if (!aIsEn && bIsEn) return 1;
+        return (a.display || '').localeCompare(b.display || '');
+      });
       setAvailableSubtitles(uniqueSubtitles);
       if (autoSelectEnglish) {
         const englishSubtitle = uniqueSubtitles.find(sub =>
@@ -956,6 +972,7 @@ const VideoPlayer: React.FC = () => {
         }
       }
       if (!autoSelectEnglish) {
+        // If no English found and not auto-selecting, still open the modal
         setShowSubtitleLanguageModal(true);
       }
     } catch (error) {
@@ -1023,7 +1040,8 @@ const VideoPlayer: React.FC = () => {
 
       // Immediately set current subtitle text
       try {
-        const cueNow = parsedCues.find(cue => currentTime >= cue.start && currentTime <= cue.end);
+        const adjustedTime = currentTime + (subtitleOffsetSec || 0);
+        const cueNow = parsedCues.find(cue => adjustedTime >= cue.start && adjustedTime <= cue.end);
         const textNow = cueNow ? cueNow.text : '';
         setCurrentSubtitle(textNow);
         logger.log('[VideoPlayer] currentSubtitle set immediately after apply');
@@ -1031,33 +1049,7 @@ const VideoPlayer: React.FC = () => {
         logger.error('[VideoPlayer] Error setting immediate subtitle', e);
       }
 
-      // VLC micro-seek nudge
-      try {
-        if (vlcRef.current && duration > 0) {
-          const wasPaused = paused;
-          const original = currentTime;
-          const forward = Math.min(original + 0.05, Math.max(duration - 0.1, 0));
-          logger.log('[VideoPlayer] Performing micro-seek nudge', { original, forward });
-          if (wasPaused) setPaused(false);
-          setTimeout(() => {
-            try {
-              // @ts-ignore - VLCPlayer seek method
-              vlcRef.current?.seek(forward);
-              setTimeout(() => {
-                // @ts-ignore
-                vlcRef.current?.seek(original);
-                if (wasPaused) setPaused(true);
-                logger.log('[VideoPlayer] Micro-seek nudge complete');
-              }, 150);
-            } catch (e) {
-              logger.warn('[VideoPlayer] Micro-seek nudge failed', e);
-              if (wasPaused) setPaused(true);
-            }
-          }, 50);
-        }
-      } catch(e) {
-        logger.warn('[VideoPlayer] Outer micro-seek failed', e);
-      }
+      // Removed micro-seek nudge
     } catch (error) {
       logger.error('[VideoPlayer] Error loading Wyzie subtitle:', error);
       setIsLoadingSubtitles(false);
@@ -1096,12 +1088,70 @@ const VideoPlayer: React.FC = () => {
       }
       return;
     }
+    const adjustedTime = currentTime + (subtitleOffsetSec || 0);
     const currentCue = customSubtitles.find(cue =>
-      currentTime >= cue.start && currentTime <= cue.end
+      adjustedTime >= cue.start && adjustedTime <= cue.end
     );
     const newSubtitle = currentCue ? currentCue.text : '';
     setCurrentSubtitle(newSubtitle);
-  }, [currentTime, customSubtitles, useCustomSubtitles]);
+  }, [currentTime, customSubtitles, useCustomSubtitles, subtitleOffsetSec]);
+
+  // Load global subtitle settings
+  useEffect(() => {
+    (async () => {
+      try {
+        const saved = await storageService.getSubtitleSettings();
+        if (saved) {
+          if (typeof saved.subtitleSize === 'number') setSubtitleSize(saved.subtitleSize);
+          if (typeof saved.subtitleBackground === 'boolean') setSubtitleBackground(saved.subtitleBackground);
+          if (typeof saved.subtitleTextColor === 'string') setSubtitleTextColor(saved.subtitleTextColor);
+          if (typeof saved.subtitleBgOpacity === 'number') setSubtitleBgOpacity(saved.subtitleBgOpacity);
+          if (typeof saved.subtitleTextShadow === 'boolean') setSubtitleTextShadow(saved.subtitleTextShadow);
+          if (typeof saved.subtitleOutline === 'boolean') setSubtitleOutline(saved.subtitleOutline);
+          if (typeof saved.subtitleOutlineColor === 'string') setSubtitleOutlineColor(saved.subtitleOutlineColor);
+          if (typeof saved.subtitleOutlineWidth === 'number') setSubtitleOutlineWidth(saved.subtitleOutlineWidth);
+          if (typeof saved.subtitleAlign === 'string') setSubtitleAlign(saved.subtitleAlign as 'center' | 'left' | 'right');
+          if (typeof saved.subtitleBottomOffset === 'number') setSubtitleBottomOffset(saved.subtitleBottomOffset);
+          if (typeof saved.subtitleLetterSpacing === 'number') setSubtitleLetterSpacing(saved.subtitleLetterSpacing);
+          if (typeof saved.subtitleLineHeightMultiplier === 'number') setSubtitleLineHeightMultiplier(saved.subtitleLineHeightMultiplier);
+          if (typeof saved.subtitleOffsetSec === 'number') setSubtitleOffsetSec(saved.subtitleOffsetSec);
+        }
+      } catch {}
+    })();
+  }, []);
+
+  // Persist global subtitle settings on change
+  useEffect(() => {
+    storageService.saveSubtitleSettings({
+      subtitleSize,
+      subtitleBackground,
+      subtitleTextColor,
+      subtitleBgOpacity,
+      subtitleTextShadow,
+      subtitleOutline,
+      subtitleOutlineColor,
+      subtitleOutlineWidth,
+      subtitleAlign,
+      subtitleBottomOffset,
+      subtitleLetterSpacing,
+      subtitleLineHeightMultiplier,
+      subtitleOffsetSec,
+    });
+  }, [
+    subtitleSize,
+    subtitleBackground,
+    subtitleTextColor,
+    subtitleBgOpacity,
+    subtitleTextShadow,
+    subtitleOutline,
+    subtitleOutlineColor,
+    subtitleOutlineWidth,
+    subtitleAlign,
+    subtitleBottomOffset,
+    subtitleLetterSpacing,
+    subtitleLineHeightMultiplier,
+    subtitleOffsetSec,
+  ]);
 
   useEffect(() => {
     loadSubtitleSize();
@@ -1434,7 +1484,6 @@ const VideoPlayer: React.FC = () => {
             subtitleSize={subtitleSize}
             subtitleBackground={subtitleBackground}
             zoomScale={zoomScale}
-            fontFamily={subtitleFontFamily}
             textColor={subtitleTextColor}
             backgroundOpacity={subtitleBgOpacity}
             textShadow={subtitleTextShadow}
@@ -1487,8 +1536,6 @@ const VideoPlayer: React.FC = () => {
         increaseSubtitleSize={increaseSubtitleSize}
         decreaseSubtitleSize={decreaseSubtitleSize}
         toggleSubtitleBackground={toggleSubtitleBackground}
-        subtitleFontFamily={subtitleFontFamily}
-        setSubtitleFontFamily={setSubtitleFontFamily}
         subtitleTextColor={subtitleTextColor}
         setSubtitleTextColor={setSubtitleTextColor}
         subtitleBgOpacity={subtitleBgOpacity}
@@ -1509,6 +1556,8 @@ const VideoPlayer: React.FC = () => {
         setSubtitleLetterSpacing={setSubtitleLetterSpacing}
         subtitleLineHeightMultiplier={subtitleLineHeightMultiplier}
         setSubtitleLineHeightMultiplier={setSubtitleLineHeightMultiplier}
+        subtitleOffsetSec={subtitleOffsetSec}
+        setSubtitleOffsetSec={setSubtitleOffsetSec}
       />
 
       <SourcesModal

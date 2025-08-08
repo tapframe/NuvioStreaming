@@ -149,8 +149,10 @@ const AndroidVideoPlayer: React.FC = () => {
   const [customSubtitleVersion, setCustomSubtitleVersion] = useState<number>(0);
   const [subtitleSize, setSubtitleSize] = useState<number>(DEFAULT_SUBTITLE_SIZE);
   const [subtitleBackground, setSubtitleBackground] = useState<boolean>(true);
+  // iOS seeking helpers
+  const iosWasPausedDuringSeekRef = useRef<boolean | null>(null);
+  const wasPlayingBeforeDragRef = useRef<boolean>(false);
   // External subtitle customization
-  const [subtitleFontFamily, setSubtitleFontFamily] = useState<string | undefined>(undefined);
   const [subtitleTextColor, setSubtitleTextColor] = useState<string>('#FFFFFF');
   const [subtitleBgOpacity, setSubtitleBgOpacity] = useState<number>(0.7);
   const [subtitleTextShadow, setSubtitleTextShadow] = useState<boolean>(true);
@@ -161,6 +163,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const [subtitleBottomOffset, setSubtitleBottomOffset] = useState<number>(20);
   const [subtitleLetterSpacing, setSubtitleLetterSpacing] = useState<number>(0);
   const [subtitleLineHeightMultiplier, setSubtitleLineHeightMultiplier] = useState<number>(1.2);
+  const [subtitleOffsetSec, setSubtitleOffsetSec] = useState<number>(0);
   const [useCustomSubtitles, setUseCustomSubtitles] = useState<boolean>(false);
   const [isLoadingSubtitles, setIsLoadingSubtitles] = useState<boolean>(false);
   const [availableSubtitles, setAvailableSubtitles] = useState<WyzieSubtitle[]>([]);
@@ -445,17 +448,23 @@ const AndroidVideoPlayer: React.FC = () => {
       
       isSeeking.current = true;
       setSeekTime(timeInSeconds);
+      if (Platform.OS === 'ios') {
+        iosWasPausedDuringSeekRef.current = paused;
+        if (!paused) setPaused(true);
+      }
       
-      // Clear seek state after seek with longer timeout
+      // Clear seek state handled in onSeek; keep a fallback timeout
       setTimeout(() => {
-        if (isMounted.current) {
+        if (isMounted.current && isSeeking.current) {
           setSeekTime(null);
           isSeeking.current = false;
-          if (DEBUG_MODE) {
-            logger.log(`[AndroidVideoPlayer] Seek completed to ${timeInSeconds.toFixed(2)}s`);
+          if (DEBUG_MODE) logger.log('[AndroidVideoPlayer] Seek fallback timeout cleared seeking state');
+          if (Platform.OS === 'ios' && iosWasPausedDuringSeekRef.current === false) {
+            setPaused(false);
+            iosWasPausedDuringSeekRef.current = null;
+          }
         }
-        }
-      }, 500);
+      }, 1200);
     } else {
       if (DEBUG_MODE) {
         logger.error(`[AndroidVideoPlayer] Seek failed: videoRef=${!!videoRef.current}, duration=${duration}, seeking=${isSeeking.current}`);
@@ -466,10 +475,40 @@ const AndroidVideoPlayer: React.FC = () => {
   // Handle seeking when seekTime changes
   useEffect(() => {
     if (seekTime !== null && videoRef.current && duration > 0) {
-      videoRef.current.seek(seekTime);
+      // Use tolerance on iOS for more reliable seeks
+      if (Platform.OS === 'ios') {
+        try {
+          (videoRef.current as any).seek(seekTime, 1);
+        } catch {
+          videoRef.current.seek(seekTime);
+        }
+      } else {
+        videoRef.current.seek(seekTime);
+      }
     }
   }, [seekTime, duration]);
 
+  const onSeek = (data: any) => {
+    if (DEBUG_MODE) logger.log('[AndroidVideoPlayer] onSeek', data);
+    if (isMounted.current) {
+      setSeekTime(null);
+      isSeeking.current = false;
+      // Resume playback on iOS if we paused for seeking
+      if (Platform.OS === 'ios') {
+        const shouldResume = wasPlayingBeforeDragRef.current || iosWasPausedDuringSeekRef.current === false;
+        if (shouldResume) {
+          logger.log('[AndroidVideoPlayer] onSeek: resuming after drag/seek (iOS)');
+          setPaused(false);
+        } else {
+          logger.log('[AndroidVideoPlayer] onSeek: staying paused (iOS)');
+        }
+        // Reset flags
+        wasPlayingBeforeDragRef.current = false;
+        iosWasPausedDuringSeekRef.current = null;
+      }
+    }
+  };
+  
   // Slider callback functions for React Native Community Slider
   const handleSliderValueChange = (value: number) => {
     if (isDragging && duration > 0) {
@@ -481,6 +520,12 @@ const AndroidVideoPlayer: React.FC = () => {
 
   const handleSlidingStart = () => {
     setIsDragging(true);
+    // On iOS, pause during drag for more reliable seeks
+    if (Platform.OS === 'ios') {
+      wasPlayingBeforeDragRef.current = !paused;
+      if (!paused) setPaused(true);
+      logger.log('[AndroidVideoPlayer] handleSlidingStart: pausing for iOS drag');
+    }
   };
 
   const handleSlidingComplete = (value: number) => {
@@ -891,7 +936,7 @@ const AndroidVideoPlayer: React.FC = () => {
     }
   };
 
-  const fetchAvailableSubtitles = async (imdbIdParam?: string, autoSelectEnglish = false) => {
+  const fetchAvailableSubtitles = async (imdbIdParam?: string, autoSelectEnglish = true) => {
     const targetImdbId = imdbIdParam || imdbId;
     if (!targetImdbId) {
       logger.error('[AndroidVideoPlayer] No IMDb ID available for subtitle search');
@@ -926,7 +971,19 @@ const AndroidVideoPlayer: React.FC = () => {
         }
         return acc;
       }, [] as WyzieSubtitle[]);
-      uniqueSubtitles.sort((a, b) => a.display.localeCompare(b.display));
+      // Sort with English languages first, then alphabetical
+      const isEnglish = (s: WyzieSubtitle) => {
+        const lang = (s.language || '').toLowerCase();
+        const disp = (s.display || '').toLowerCase();
+        return lang === 'en' || lang === 'eng' || /^en([-_]|$)/.test(lang) || disp.includes('english');
+      };
+      uniqueSubtitles.sort((a, b) => {
+        const aIsEn = isEnglish(a);
+        const bIsEn = isEnglish(b);
+        if (aIsEn && !bIsEn) return -1;
+        if (!aIsEn && bIsEn) return 1;
+        return (a.display || '').localeCompare(b.display || '');
+      });
       setAvailableSubtitles(uniqueSubtitles);
       if (autoSelectEnglish) {
         const englishSubtitle = uniqueSubtitles.find(sub => 
@@ -940,6 +997,7 @@ const AndroidVideoPlayer: React.FC = () => {
         }
       }
       if (!autoSelectEnglish) {
+        // If no English found and not auto-selecting, still open the modal
         setShowSubtitleLanguageModal(true);
       }
     } catch (error) {
@@ -1017,7 +1075,8 @@ const AndroidVideoPlayer: React.FC = () => {
 
         // Immediately set current subtitle based on currentTime to avoid waiting for next onProgress
         try {
-          const cueNow = parsedCues.find(cue => currentTime >= cue.start && currentTime <= cue.end);
+          const adjustedTime = currentTime + (subtitleOffsetSec || 0);
+          const cueNow = parsedCues.find(cue => adjustedTime >= cue.start && adjustedTime <= cue.end);
           const textNow = cueNow ? cueNow.text : '';
           setCurrentSubtitle(textNow);
           logger.log('[AndroidVideoPlayer] currentSubtitle set immediately after apply (iOS)');
@@ -1025,36 +1084,7 @@ const AndroidVideoPlayer: React.FC = () => {
           logger.error('[AndroidVideoPlayer] Error setting immediate subtitle', e);
         }
 
-        // Micro-seek nudge to force AVPlayer to refresh rendering
-        try {
-          if (videoRef.current && duration > 0) {
-            const wasPaused = paused;
-            const original = currentTime;
-            const forward = Math.min(original + 0.05, Math.max(duration - 0.1, 0));
-            logger.log('[AndroidVideoPlayer] Performing micro-seek nudge (iOS)', { original, forward });
-            if (wasPaused) {
-              setPaused(false);
-            }
-            // Give state a moment to apply before seeking
-            setTimeout(() => {
-              try {
-                videoRef.current?.seek(forward);
-                setTimeout(() => {
-                  videoRef.current?.seek(original);
-                  if (wasPaused) {
-                    setPaused(true);
-                  }
-                  logger.log('[AndroidVideoPlayer] Micro-seek nudge complete (iOS)');
-                }, 150);
-              } catch (e) {
-                logger.warn('[AndroidVideoPlayer] Inner micro-seek failed (iOS)', e);
-                if (wasPaused) setPaused(true);
-              }
-            }, 50);
-          }
-        } catch(e) {
-          logger.warn('[AndroidVideoPlayer] Outer micro-seek failed (iOS)', e);
-        }
+        // Removed micro-seek nudge on iOS
       } else {
         // Android works immediately
         setCustomSubtitles(parsedCues);
@@ -1066,7 +1096,8 @@ const AndroidVideoPlayer: React.FC = () => {
         setIsLoadingSubtitles(false);
         logger.log('[AndroidVideoPlayer] (Android) isLoadingSubtitles -> false');
         try {
-          const cueNow = parsedCues.find(cue => currentTime >= cue.start && currentTime <= cue.end);
+          const adjustedTime = currentTime + (subtitleOffsetSec || 0);
+          const cueNow = parsedCues.find(cue => adjustedTime >= cue.start && adjustedTime <= cue.end);
           const textNow = cueNow ? cueNow.text : '';
           setCurrentSubtitle(textNow);
           logger.log('[AndroidVideoPlayer] currentSubtitle set immediately after apply (Android)');
@@ -1117,16 +1148,74 @@ const AndroidVideoPlayer: React.FC = () => {
       }
       return;
     }
+    const adjustedTime = currentTime + (subtitleOffsetSec || 0);
     const currentCue = customSubtitles.find(cue => 
-      currentTime >= cue.start && currentTime <= cue.end
+      adjustedTime >= cue.start && adjustedTime <= cue.end
     );
     const newSubtitle = currentCue ? currentCue.text : '';
     setCurrentSubtitle(newSubtitle);
-  }, [currentTime, customSubtitles, useCustomSubtitles]);
+  }, [currentTime, customSubtitles, useCustomSubtitles, subtitleOffsetSec]);
 
   useEffect(() => {
     loadSubtitleSize();
   }, []);
+
+  // Load global subtitle settings
+  useEffect(() => {
+    (async () => {
+      try {
+        const saved = await storageService.getSubtitleSettings();
+        if (saved) {
+          if (typeof saved.subtitleSize === 'number') setSubtitleSize(saved.subtitleSize);
+          if (typeof saved.subtitleBackground === 'boolean') setSubtitleBackground(saved.subtitleBackground);
+          if (typeof saved.subtitleTextColor === 'string') setSubtitleTextColor(saved.subtitleTextColor);
+          if (typeof saved.subtitleBgOpacity === 'number') setSubtitleBgOpacity(saved.subtitleBgOpacity);
+          if (typeof saved.subtitleTextShadow === 'boolean') setSubtitleTextShadow(saved.subtitleTextShadow);
+          if (typeof saved.subtitleOutline === 'boolean') setSubtitleOutline(saved.subtitleOutline);
+          if (typeof saved.subtitleOutlineColor === 'string') setSubtitleOutlineColor(saved.subtitleOutlineColor);
+          if (typeof saved.subtitleOutlineWidth === 'number') setSubtitleOutlineWidth(saved.subtitleOutlineWidth);
+          if (typeof saved.subtitleAlign === 'string') setSubtitleAlign(saved.subtitleAlign as 'center' | 'left' | 'right');
+          if (typeof saved.subtitleBottomOffset === 'number') setSubtitleBottomOffset(saved.subtitleBottomOffset);
+          if (typeof saved.subtitleLetterSpacing === 'number') setSubtitleLetterSpacing(saved.subtitleLetterSpacing);
+          if (typeof saved.subtitleLineHeightMultiplier === 'number') setSubtitleLineHeightMultiplier(saved.subtitleLineHeightMultiplier);
+          if (typeof saved.subtitleOffsetSec === 'number') setSubtitleOffsetSec(saved.subtitleOffsetSec);
+        }
+      } catch {}
+    })();
+  }, []);
+
+  // Persist global subtitle settings on change
+  useEffect(() => {
+    storageService.saveSubtitleSettings({
+      subtitleSize,
+      subtitleBackground,
+      subtitleTextColor,
+      subtitleBgOpacity,
+      subtitleTextShadow,
+      subtitleOutline,
+      subtitleOutlineColor,
+      subtitleOutlineWidth,
+      subtitleAlign,
+      subtitleBottomOffset,
+      subtitleLetterSpacing,
+      subtitleLineHeightMultiplier,
+      subtitleOffsetSec,
+    });
+  }, [
+    subtitleSize,
+    subtitleBackground,
+    subtitleTextColor,
+    subtitleBgOpacity,
+    subtitleTextShadow,
+    subtitleOutline,
+    subtitleOutlineColor,
+    subtitleOutlineWidth,
+    subtitleAlign,
+    subtitleBottomOffset,
+    subtitleLetterSpacing,
+    subtitleLineHeightMultiplier,
+    subtitleOffsetSec,
+  ]);
 
   const increaseSubtitleSize = () => {
     const newSize = Math.min(subtitleSize + 2, 32);
@@ -1396,6 +1485,7 @@ const AndroidVideoPlayer: React.FC = () => {
                     logger.log('[AndroidVideoPlayer] onLoad fired', { duration: e?.duration });
                     onLoad(e);
                   }}
+                  onSeek={onSeek}
                   onEnd={onEnd}
                   onError={(err) => {
                     logger.error('[AndroidVideoPlayer] onError', err);
@@ -1462,7 +1552,6 @@ const AndroidVideoPlayer: React.FC = () => {
             subtitleSize={subtitleSize}
             subtitleBackground={subtitleBackground}
             zoomScale={zoomScale}
-            fontFamily={subtitleFontFamily}
             textColor={subtitleTextColor}
             backgroundOpacity={subtitleBgOpacity}
             textShadow={subtitleTextShadow}
@@ -1515,8 +1604,6 @@ const AndroidVideoPlayer: React.FC = () => {
         increaseSubtitleSize={increaseSubtitleSize}
         decreaseSubtitleSize={decreaseSubtitleSize}
         toggleSubtitleBackground={toggleSubtitleBackground}
-        subtitleFontFamily={subtitleFontFamily}
-        setSubtitleFontFamily={setSubtitleFontFamily}
         subtitleTextColor={subtitleTextColor}
         setSubtitleTextColor={setSubtitleTextColor}
         subtitleBgOpacity={subtitleBgOpacity}
@@ -1537,6 +1624,8 @@ const AndroidVideoPlayer: React.FC = () => {
         setSubtitleLetterSpacing={setSubtitleLetterSpacing}
         subtitleLineHeightMultiplier={subtitleLineHeightMultiplier}
         setSubtitleLineHeightMultiplier={setSubtitleLineHeightMultiplier}
+        subtitleOffsetSec={subtitleOffsetSec}
+        setSubtitleOffsetSec={setSubtitleOffsetSec}
       />
       
       <SourcesModal
