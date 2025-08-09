@@ -71,14 +71,13 @@ class LocalScraperService {
     
     try {
       // Load repository URL
-      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
-      const storedRepoUrl = await AsyncStorage.getItem(`@user:${scope}:${this.REPOSITORY_KEY}`);
+      const storedRepoUrl = await AsyncStorage.getItem(this.REPOSITORY_KEY);
       if (storedRepoUrl) {
         this.repositoryUrl = storedRepoUrl;
       }
 
       // Load installed scrapers
-      const storedScrapers = await AsyncStorage.getItem(`@user:${scope}:${this.STORAGE_KEY}`);
+      const storedScrapers = await AsyncStorage.getItem(this.STORAGE_KEY);
       if (storedScrapers) {
         const scrapers: ScraperInfo[] = JSON.parse(storedScrapers);
         const validScrapers: ScraperInfo[] = [];
@@ -167,8 +166,7 @@ class LocalScraperService {
   // Set repository URL
   async setRepositoryUrl(url: string): Promise<void> {
     this.repositoryUrl = url;
-    const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
-    await AsyncStorage.setItem(`@user:${scope}:${this.REPOSITORY_KEY}`, url);
+    await AsyncStorage.setItem(this.REPOSITORY_KEY, url);
     logger.log('[LocalScraperService] Repository URL set to:', url);
   }
 
@@ -328,9 +326,8 @@ class LocalScraperService {
   // Save installed scrapers to storage
   private async saveInstalledScrapers(): Promise<void> {
     try {
-      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
       const scrapers = Array.from(this.installedScrapers.values());
-      await AsyncStorage.setItem(`@user:${scope}:${this.STORAGE_KEY}`, JSON.stringify(scrapers));
+      await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(scrapers));
     } catch (error) {
       logger.error('[LocalScraperService] Failed to save scrapers:', error);
     }
@@ -702,8 +699,7 @@ class LocalScraperService {
     this.scraperCode.clear();
     
     // Clear from storage
-    const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
-    await AsyncStorage.removeItem(`@user:${scope}:${this.STORAGE_KEY}`);
+    await AsyncStorage.removeItem(this.STORAGE_KEY);
     
     // Clear cached code
     const keys = await AsyncStorage.getAllKeys();
