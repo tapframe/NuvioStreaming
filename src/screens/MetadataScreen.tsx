@@ -30,7 +30,9 @@ import Animated, {
   useSharedValue,
   withTiming,
   runOnJS,
+  runOnUI,
   Easing,
+  interpolateColor,
 } from 'react-native-reanimated';
 import { RouteProp } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -116,30 +118,59 @@ const MetadataScreen: React.FC = () => {
   
   const { dominantColor, loading: colorLoading } = useDominantColor(heroImageUri);
   
-  // Create a shared value for animated background color transitions
-  const backgroundColorShared = useSharedValue(currentTheme.colors.darkBackground);
+  // Create shared values for smooth color interpolation
+  const bgFromColor = useSharedValue(currentTheme.colors.darkBackground);
+  const bgToColor = useSharedValue(currentTheme.colors.darkBackground);
+  const bgProgress = useSharedValue(1);
   
   // Update the shared value when dominant color changes
+  const hasAnimatedInitialColorRef = useRef(false);
   useEffect(() => {
-    if (dominantColor && dominantColor !== '#1a1a1a' && dominantColor !== null && dominantColor !== currentTheme.colors.darkBackground) {
-      // Smoothly transition to the new color
-      backgroundColorShared.value = withTiming(dominantColor, {
-        duration: 300, // Faster appearance
-        easing: Easing.out(Easing.cubic), // Smooth out easing
+    const base = currentTheme.colors.darkBackground;
+    const target = (dominantColor && dominantColor !== '#1a1a1a' && dominantColor !== null)
+      ? dominantColor
+      : base;
+
+    if (!hasAnimatedInitialColorRef.current) {
+      // Initial: animate from base to target smoothly
+      bgFromColor.value = base as any;
+      bgToColor.value = target as any;
+      bgProgress.value = 0;
+      bgProgress.value = withTiming(1, {
+        duration: 420,
+        easing: Easing.bezier(0.16, 1, 0.3, 1),
       });
-    } else {
-      // Transition back to theme background if needed
-      backgroundColorShared.value = withTiming(currentTheme.colors.darkBackground, {
-        duration: 300,
-        easing: Easing.out(Easing.cubic),
-      });
+      hasAnimatedInitialColorRef.current = true;
+      return;
     }
+
+    // Subsequent updates: retarget smoothly from the current on-screen color
+    runOnUI(() => {
+      'worklet';
+      const current = interpolateColor(
+        bgProgress.value,
+        [0, 1],
+        [bgFromColor.value as any, bgToColor.value as any]
+      );
+      bgFromColor.value = current as any;
+      bgToColor.value = target as any;
+      bgProgress.value = 0;
+      bgProgress.value = withTiming(1, {
+        duration: 380,
+        easing: Easing.bezier(0.2, 0, 0, 1),
+      });
+    })();
   }, [dominantColor, currentTheme.colors.darkBackground]);
   
   // Create an animated style for the background color
-  const animatedBackgroundStyle = useAnimatedStyle(() => ({
-    backgroundColor: backgroundColorShared.value,
-  }));
+  const animatedBackgroundStyle = useAnimatedStyle(() => {
+    const color = interpolateColor(
+      bgProgress.value,
+      [0, 1],
+      [bgFromColor.value as any, bgToColor.value as any]
+    );
+    return { backgroundColor: color as any };
+  });
   
   // For compatibility with existing code, maintain the static value as well
   const dynamicBackgroundColor = useMemo(() => {

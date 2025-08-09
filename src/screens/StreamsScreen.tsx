@@ -860,6 +860,7 @@ export const StreamsScreen = () => {
       year: metadata?.year,
       streamProvider: streamProvider,
       streamName: streamName,
+      // Always prefer stream.headers; player will use these for requests
       headers: stream.headers || undefined,
       id,
       type,

@@ -175,6 +175,8 @@ const AndroidVideoPlayer: React.FC = () => {
   const [showSourcesModal, setShowSourcesModal] = useState<boolean>(false);
   const [availableStreams, setAvailableStreams] = useState<{ [providerId: string]: { streams: any[]; addonName: string } }>(passedAvailableStreams || {});
   const [currentStreamUrl, setCurrentStreamUrl] = useState<string>(uri);
+  // Track a single silent retry per source to avoid loops
+  const retryAttemptRef = useRef<number>(0);
   const [isChangingSource, setIsChangingSource] = useState<boolean>(false);
   const [pendingSeek, setPendingSeek] = useState<{ position: number; shouldPlay: boolean } | null>(null);
   const [currentQuality, setCurrentQuality] = useState<string | undefined>(quality);
@@ -781,11 +783,41 @@ const AndroidVideoPlayer: React.FC = () => {
         return;
       }
       
-      // Check for specific AVFoundation server configuration errors
-      const isServerConfigError = error?.error?.code === -11850 || 
-                                 error?.code === -11850 ||
-                                 (error?.error?.localizedDescription && 
-                                  error.error.localizedDescription.includes('server is not correctly configured'));
+      // Detect Xprime provider to enable a one-shot silent retry (warms upstream/cache)
+      const providerName = ((currentStreamProvider || streamProvider || '') as string).toLowerCase();
+      const isXprimeProvider = providerName.includes('xprime');
+
+      // One-shot, silent retry without showing error UI
+      if (isXprimeProvider && retryAttemptRef.current < 1) {
+        retryAttemptRef.current = 1;
+        // Cache-bust to force a fresh fetch and warm upstream
+        const addRetryParam = (url: string) => {
+          const sep = url.includes('?') ? '&' : '?';
+          return `${url}${sep}rn_retry_ts=${Date.now()}`;
+        };
+        const bustedUrl = addRetryParam(currentStreamUrl);
+        logger.warn('[AndroidVideoPlayer] Silent retry for Xprime with cache-busted URL');
+        // Ensure no modal is visible
+        if (errorTimeoutRef.current) {
+          clearTimeout(errorTimeoutRef.current);
+          errorTimeoutRef.current = null;
+        }
+        safeSetState(() => setShowErrorModal(false));
+        // Brief pause to let the player reset
+        setPaused(true);
+        setTimeout(() => {
+          if (!isMounted.current) return;
+          setCurrentStreamUrl(bustedUrl);
+          setPaused(false);
+        }, 120);
+        return; // Do not proceed to show error UI
+      }
+
+      // Check for specific AVFoundation server configuration errors (iOS)
+      const isServerConfigError = error?.error?.code === -11850 ||
+                                  error?.code === -11850 ||
+                                  (error?.error?.localizedDescription &&
+                                   error.error.localizedDescription.includes('server is not correctly configured'));
       
       // Format error details for user display
       let errorMessage = 'An unknown error occurred';
@@ -1488,17 +1520,7 @@ const AndroidVideoPlayer: React.FC = () => {
                 <Video
                   ref={videoRef}
                   style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
-                  source={(() => {
-                    // FORCEFULLY use headers from route params if available - no filtering or modification
-                    const sourceWithHeaders = headers ? {
-                      uri: currentStreamUrl,
-                      headers: headers
-                    } : { uri: currentStreamUrl };
-                    
-                    // HTTP request logging removed; source prepared
-                    
-                    return sourceWithHeaders;
-                  })()}
+                  source={{ uri: currentStreamUrl, headers: headers || {} }}
                   paused={paused}
                   onProgress={handleProgress}
                   onLoad={(e) => {

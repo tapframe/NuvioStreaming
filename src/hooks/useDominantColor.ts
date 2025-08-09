@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getColors } from 'react-native-image-colors';
 import type { ImageColorsResult } from 'react-native-image-colors';
 
@@ -145,12 +145,13 @@ export const preloadDominantColor = async (imageUri: string | null) => {
   console.log('[useDominantColor] Preloading color for URI:', imageUri);
   
   try {
+    // Fast first-pass: prioritize speed to avoid visible delay
     const result = await getColors(imageUri, {
       fallback: '#1a1a1a',
       cache: true,
       key: imageUri,
-      quality: 'high', // Use higher quality for better color extraction
-      pixelSpacing: 3, // Better sampling (Android only)
+      quality: 'low', // Faster extraction
+      pixelSpacing: 5, // Fewer sampled pixels (Android only)
     });
 
     const extractedColor = selectBestColor(result);
@@ -172,10 +173,18 @@ export const useDominantColor = (imageUri: string | null): DominantColorResult =
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const lastSetColorRef = useRef<string | null>(dominantColor);
+
+  const safelySetColor = useCallback((color: string) => {
+    if (lastSetColorRef.current !== color) {
+      lastSetColorRef.current = color;
+      setDominantColor(color);
+    }
+  }, []);
 
   const extractColor = useCallback(async (uri: string) => {
     if (!uri) {
-      setDominantColor('#1a1a1a');
+      safelySetColor('#1a1a1a');
       setLoading(false);
       return;
     }
@@ -183,7 +192,7 @@ export const useDominantColor = (imageUri: string | null): DominantColorResult =
     // Check cache first
     if (colorCache.has(uri)) {
       const cachedColor = colorCache.get(uri)!;
-      setDominantColor(cachedColor);
+      safelySetColor(cachedColor);
       setLoading(false);
       return;
     }
@@ -192,27 +201,48 @@ export const useDominantColor = (imageUri: string | null): DominantColorResult =
       setLoading(true);
       setError(null);
 
-      const result: ImageColorsResult = await getColors(uri, {
+      // 1) Fast first-pass extraction to update UI immediately
+      const fastResult: ImageColorsResult = await getColors(uri, {
         fallback: '#1a1a1a',
         cache: true,
         key: uri,
-        quality: 'high', // Use higher quality for better accuracy
-        pixelSpacing: 3, // Better pixel sampling (Android only)
+        quality: 'low', // Fastest available
+        pixelSpacing: 5,
       });
 
-      const extractedColor = selectBestColor(result);
+      const fastColor = selectBestColor(fastResult);
+      colorCache.set(uri, fastColor); // Cache fast color to avoid flicker
+      safelySetColor(fastColor);
+      setLoading(false);
 
-      // Cache the extracted color for future use
-      colorCache.set(uri, extractedColor);
-      setDominantColor(extractedColor);
+      // 2) Optional high-quality refine in background
+      // Only refine if URI is still the same when this completes
+      Promise.resolve()
+        .then(async () => {
+          const hqResult: ImageColorsResult = await getColors(uri, {
+            fallback: '#1a1a1a',
+            cache: true,
+            key: uri,
+            quality: 'high',
+            pixelSpacing: 3,
+          });
+          const refinedColor = selectBestColor(hqResult);
+          if (refinedColor && refinedColor !== fastColor) {
+            colorCache.set(uri, refinedColor);
+            safelySetColor(refinedColor);
+          }
+        })
+        .catch(() => {
+          // Ignore refine errors silently
+        });
     } catch (err) {
       console.warn('[useDominantColor] Failed to extract color:', err);
       setError(err instanceof Error ? err.message : 'Failed to extract color');
       const fallbackColor = '#1a1a1a';
       colorCache.set(uri, fallbackColor); // Cache fallback to avoid repeated failures
-      setDominantColor(fallbackColor);
+      safelySetColor(fallbackColor);
     } finally {
-      setLoading(false);
+      // loading already set to false after fast pass
     }
   }, []);
 
@@ -220,18 +250,18 @@ export const useDominantColor = (imageUri: string | null): DominantColorResult =
     if (imageUri) {
       // If we have a cached color, use it immediately, but still extract in background for accuracy
       if (colorCache.has(imageUri)) {
-        setDominantColor(colorCache.get(imageUri)!);
+        safelySetColor(colorCache.get(imageUri)!);
         setLoading(false);
       } else {
         // No cache, extract color
         extractColor(imageUri);
       }
     } else {
-      setDominantColor('#1a1a1a');
+      safelySetColor('#1a1a1a');
       setLoading(false);
       setError(null);
     }
-  }, [imageUri, extractColor]);
+  }, [imageUri, extractColor, safelySetColor]);
 
   return {
     dominantColor,
