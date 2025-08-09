@@ -20,7 +20,7 @@ import { tmdbService } from '../../services/tmdbService';
 import { useLibrary } from '../../hooks/useLibrary';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { parseISO, isThisWeek, format, isAfter, isBefore } from 'date-fns';
-import Animated, { FadeIn, FadeInRight } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import { useCalendarData } from '../../hooks/useCalendarData';
 
 const { width } = Dimensions.get('window');
@@ -109,10 +109,7 @@ export const ThisWeekSection = React.memo(() => {
         item.poster);
     
     return (
-      <Animated.View 
-        entering={FadeInRight.delay(index * 50).duration(300)}
-        style={styles.episodeItemContainer}
-      >
+      <View style={styles.episodeItemContainer}>
         <TouchableOpacity
           style={[
             styles.episodeItem,
@@ -129,7 +126,7 @@ export const ThisWeekSection = React.memo(() => {
             source={{ uri: imageUrl }}
             style={styles.poster}
             contentFit="cover"
-              transition={400}
+            transition={0}
           />
           
                         {/* Enhanced gradient overlay */}
@@ -177,12 +174,12 @@ export const ThisWeekSection = React.memo(() => {
           </LinearGradient>
           </View>
         </TouchableOpacity>
-      </Animated.View>
+      </View>
     );
   };
   
   return (
-    <Animated.View entering={FadeIn.duration(300)} style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.titleContainer}>
         <Text style={[styles.title, { color: currentTheme.colors.text }]}>This Week</Text>
@@ -206,7 +203,7 @@ export const ThisWeekSection = React.memo(() => {
         snapToAlignment="start"
         ItemSeparatorComponent={() => <View style={{ width: 16 }} />}
       />
-    </Animated.View>
+    </View>
   );
 });
 

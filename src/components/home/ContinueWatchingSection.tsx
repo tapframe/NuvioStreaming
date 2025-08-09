@@ -3,7 +3,6 @@ import {
   View, 
   Text, 
   StyleSheet, 
-  FlatList, 
   TouchableOpacity, 
   Dimensions,
   AppState,
@@ -11,7 +10,8 @@ import {
   Alert,
   ActivityIndicator
 } from 'react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { FlashList } from '@shopify/flash-list';
+import Animated from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
@@ -568,7 +568,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   }
 
   return (
-    <Animated.View entering={FadeIn.duration(300).delay(150)} style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.titleContainer}>
           <Text style={[styles.title, { color: currentTheme.colors.text }]}>Continue Watching</Text>
@@ -576,7 +576,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         </View>
       </View>
       
-      <FlatList
+      <FlashList
         data={continueWatchingItems}
         renderItem={({ item }) => (
           <TouchableOpacity
@@ -597,7 +597,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                 style={styles.continueWatchingPoster}
                 contentFit="cover"
                 cachePolicy="memory"
-                transition={200}
+                transition={0}
                 placeholder={{ uri: 'https://via.placeholder.com/300x450' }}
                 placeholderContentFit="cover"
                 recyclingKey={item.id}
@@ -605,13 +605,9 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
               
               {/* Delete Indicator Overlay */}
               {deletingItemId === item.id && (
-                <Animated.View 
-                  entering={FadeIn.duration(200)}
-                  exiting={FadeOut.duration(200)}
-                  style={styles.deletingOverlay}
-                >
+                <View style={styles.deletingOverlay}>
                   <ActivityIndicator size="large" color="#FFFFFF" />
-                </Animated.View>
+                </View>
               )}
             </View>
 
@@ -691,12 +687,11 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.wideList}
-        snapToInterval={280 + 16} // Card width + margin
-        decelerationRate="fast"
-        snapToAlignment="start"
         ItemSeparatorComponent={() => <View style={{ width: 16 }} />}
+        onEndReachedThreshold={0.7}
+        onEndReached={() => {}}
       />
-    </Animated.View>
+    </View>
   );
 });
 
@@ -740,7 +735,7 @@ const styles = StyleSheet.create({
     width: 280,
     height: 120,
     flexDirection: 'row',
-    borderRadius: 12,
+    borderRadius: 14,
     overflow: 'hidden',
     elevation: 6,
     shadowOffset: { width: 0, height: 3 },
@@ -756,8 +751,8 @@ const styles = StyleSheet.create({
   continueWatchingPoster: {
     width: '100%',
     height: '100%',
-    borderTopLeftRadius: 12,
-    borderBottomLeftRadius: 12,
+    borderTopLeftRadius: 14,
+    borderBottomLeftRadius: 14,
   },
   deletingOverlay: {
     position: 'absolute',

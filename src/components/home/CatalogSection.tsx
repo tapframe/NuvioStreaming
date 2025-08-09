@@ -1,9 +1,9 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Platform, Dimensions } from 'react-native';
+import React, { useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Dimensions } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeIn } from 'react-native-reanimated';
 import { CatalogContent, StreamingContent } from '../../services/catalogService';
 import { useTheme } from '../../contexts/ThemeContext';
 import ContentItem from './ContentItem';
@@ -56,28 +56,27 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
 
-  const handleContentPress = (id: string, type: string) => {
+  const handleContentPress = useCallback((id: string, type: string) => {
     navigation.navigate('Metadata', { id, type, addonId: catalog.addon });
-  };
+  }, [navigation, catalog.addon]);
 
-  const renderContentItem = ({ item, index }: { item: StreamingContent, index: number }) => {
+  const renderContentItem = useCallback(({ item }: { item: StreamingContent, index: number }) => {
     return (
-      <Animated.View
-        entering={FadeIn.duration(300).delay(100 + (index * 40))}
-      >
-        <ContentItem 
-          item={item} 
-          onPress={handleContentPress}
-        />
-      </Animated.View>
+      <ContentItem 
+        item={item} 
+        onPress={handleContentPress}
+      />
     );
-  };
+  }, [handleContentPress]);
+
+  // Memoize the ItemSeparatorComponent to prevent re-creation
+  const ItemSeparator = useCallback(() => <View style={{ width: 8 }} />, []);
+
+  // Memoize the keyExtractor to prevent re-creation
+  const keyExtractor = useCallback((item: StreamingContent) => `${item.id}-${item.type}`, []);
 
   return (
-    <Animated.View 
-      style={styles.catalogContainer}
-      entering={FadeIn.duration(300).delay(50)}
-    >
+    <View style={styles.catalogContainer}>
       <View style={styles.catalogHeader}>
         <View style={styles.titleContainer}>
           <Text style={[styles.catalogTitle, { color: currentTheme.colors.text }]} numberOfLines={1}>{catalog.name}</Text>
@@ -98,34 +97,19 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
         </TouchableOpacity>
       </View>
       
-      <FlatList
+      <FlashList
         data={catalog.items}
         renderItem={renderContentItem}
-        keyExtractor={(item) => `${item.id}-${item.type}`}
+        keyExtractor={keyExtractor}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={[styles.catalogList, { paddingRight: 16 - posterLayout.partialPosterWidth }]}
-        snapToInterval={POSTER_WIDTH + 8}
-        decelerationRate="fast"
-        snapToAlignment="start"
-        ItemSeparatorComponent={() => <View style={{ width: 8 }} />}
-        initialNumToRender={4}
-        maxToRenderPerBatch={2}
-        windowSize={3}
-        removeClippedSubviews={Platform.OS === 'android'}
-        updateCellsBatchingPeriod={50}
-        getItemLayout={(data, index) => ({
-          length: POSTER_WIDTH + 8,
-          offset: (POSTER_WIDTH + 8) * index,
-          index,
-        })}
-        maintainVisibleContentPosition={{
-          minIndexForVisible: 0
-        }}
-        onEndReachedThreshold={0.5}
+        ItemSeparatorComponent={ItemSeparator}
+        onEndReachedThreshold={0.7}
+        onEndReached={() => {}}
         scrollEventThrottle={16}
       />
-    </Animated.View>
+    </View>
   );
 };
 
@@ -178,4 +162,18 @@ const styles = StyleSheet.create({
   },
 });
 
-export default React.memo(CatalogSection);
+export default React.memo(CatalogSection, (prevProps, nextProps) => {
+  // Only re-render if the catalog data actually changes
+  return (
+    prevProps.catalog.addon === nextProps.catalog.addon &&
+    prevProps.catalog.id === nextProps.catalog.id &&
+    prevProps.catalog.name === nextProps.catalog.name &&
+    prevProps.catalog.items.length === nextProps.catalog.items.length &&
+    // Deep compare the first few items to detect changes
+    prevProps.catalog.items.slice(0, 3).every((item, index) => 
+      nextProps.catalog.items[index] && 
+      item.id === nextProps.catalog.items[index].id &&
+      item.poster === nextProps.catalog.items[index].poster
+    )
+  );
+});

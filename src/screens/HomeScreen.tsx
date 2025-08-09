@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
   ActivityIndicator,
   SafeAreaView,
@@ -18,6 +17,7 @@ import {
   Pressable,
   Alert
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -27,18 +27,7 @@ import { Stream } from '../types/metadata';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image as ExpoImage } from 'expo-image';
-import Animated, { 
-  FadeIn, 
-  FadeOut,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-  useSharedValue,
-  interpolate,
-  Extrapolate,
-  runOnJS,
-  useAnimatedGestureHandler,
-} from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { PanGestureHandler } from 'react-native-gesture-handler';
 import {
   Gesture,
@@ -126,7 +115,7 @@ const HomeScreen = () => {
   const [hasAddons, setHasAddons] = useState<boolean | null>(null);
   const [hintVisible, setHintVisible] = useState(false);
   const totalCatalogsRef = useRef(0);
-  const [visibleCatalogCount, setVisibleCatalogCount] = useState(8); // Moderate number of visible catalogs
+      const [visibleCatalogCount, setVisibleCatalogCount] = useState(5); // Reduced for memory
   const insets = useSafeAreaInsets();
   
   const { 
@@ -199,7 +188,7 @@ const HomeScreen = () => {
                   const metas = await stremioService.getCatalog(manifest, catalog.type, catalog.id, 1);
                   if (metas && metas.length > 0) {
                     // Limit items per catalog to reduce memory usage
-                    const limitedMetas = metas.slice(0, 20); // Moderate limit for better content variety
+                    const limitedMetas = metas.slice(0, 8); // Further reduced for memory
                     
                     const items = limitedMetas.map((meta: any) => ({
                       id: meta.id,
@@ -218,6 +207,8 @@ const HomeScreen = () => {
                       creators: meta.creator,
                       certification: meta.certification
                     }));
+
+                    // Skip prefetching to reduce memory pressure
                     
                     let displayName = catalog.name;
                     const contentType = catalog.type === 'movie' ? 'Movies' : 'TV Shows';
@@ -398,20 +389,8 @@ const HomeScreen = () => {
     };
   }, [currentTheme.colors.darkBackground]);
 
-  // Periodic memory cleanup when many catalogs are loaded
-  useEffect(() => {
-    if (catalogs.filter(c => c).length > 15) {
-      const cleanup = setTimeout(() => {
-         try {
-           ExpoImage.clearMemoryCache();
-         } catch (error) {
-           console.warn('Failed to clear image cache:', error);
-         }
-       }, 60000); // Clean every 60 seconds when many catalogs are loaded
-      
-      return () => clearTimeout(cleanup);
-    }
-  }, [catalogs]);
+  // Removed periodic forced cache clearing to avoid churn under load
+  // useEffect(() => {}, [catalogs]);
 
   // Balanced preload images function
   const preloadImages = useCallback(async (content: StreamingContent[]) => {
@@ -567,10 +546,7 @@ const HomeScreen = () => {
       return data;
     }
 
-    // Normal flow when addons are present
-    if (showHeroSection) {
-      data.push({ type: 'featured', key: 'featured' });
-    }
+    // Normal flow when addons are present (featured moved to ListHeaderComponent)
 
     data.push({ type: 'thisWeek', key: 'thisWeek' });
     data.push({ type: 'continueWatching', key: 'continueWatching' });
@@ -596,51 +572,64 @@ const HomeScreen = () => {
   }, [hasAddons, showHeroSection, catalogs, visibleCatalogCount]);
 
   const handleLoadMoreCatalogs = useCallback(() => {
-    setVisibleCatalogCount(prev => Math.min(prev + 5, catalogs.length));
+    setVisibleCatalogCount(prev => Math.min(prev + 3, catalogs.length));
   }, [catalogs.length]);
+
+  // Add memory cleanup on scroll end
+  const handleScrollEnd = useCallback(() => {
+    // Clear memory cache after scroll settles to free up RAM
+    setTimeout(() => {
+      try {
+        ExpoImage.clearMemoryCache();
+      } catch (error) {
+        // Ignore errors
+      }
+    }, 1000);
+  }, []);
+
+  // Memoize individual section components to prevent re-renders
+  const memoizedFeaturedContent = useMemo(() => (
+    <FeaturedContent
+      key={`featured-${showHeroSection}-${featuredContentSource}`}
+      featuredContent={featuredContent}
+      isSaved={isSaved}
+      handleSaveToLibrary={handleSaveToLibrary}
+    />
+  ), [showHeroSection, featuredContentSource, featuredContent, isSaved, handleSaveToLibrary]);
+
+  const memoizedThisWeekSection = useMemo(() => <ThisWeekSection />, []);
+  const memoizedContinueWatchingSection = useMemo(() => <ContinueWatchingSection ref={continueWatchingRef} />, []);
 
   const renderListItem = useCallback(({ item }: { item: HomeScreenListItem }) => {
     switch (item.type) {
-      case 'featured':
-        return (
-          <FeaturedContent
-            key={`featured-${showHeroSection}-${featuredContentSource}`}
-            featuredContent={featuredContent}
-            isSaved={isSaved}
-            handleSaveToLibrary={handleSaveToLibrary}
-          />
-        );
+      // featured is rendered via ListHeaderComponent to avoid remounts
       case 'thisWeek':
-        return <Animated.View entering={FadeIn.duration(300).delay(100)}><ThisWeekSection /></Animated.View>;
+        return memoizedThisWeekSection;
       case 'continueWatching':
-        return <ContinueWatchingSection ref={continueWatchingRef} />;
+        return memoizedContinueWatchingSection;
       case 'catalog':
         return (
-          <Animated.View entering={FadeIn.duration(300)}>
-            <CatalogSection catalog={item.catalog} />
-          </Animated.View>
+          <CatalogSection catalog={item.catalog} />
         );
       case 'placeholder':
         return (
-          <Animated.View entering={FadeIn.duration(300)}>
-            <View style={styles.catalogPlaceholder}>
-              <View style={styles.placeholderHeader}>
-                <View style={[styles.placeholderTitle, { backgroundColor: currentTheme.colors.elevation1 }]} />
-                <ActivityIndicator size="small" color={currentTheme.colors.primary} />
-              </View>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.placeholderPosters}>
-                {[...Array(3)].map((_, posterIndex) => (
-                  <View
-                    key={posterIndex}
-                    style={[styles.placeholderPoster, { backgroundColor: currentTheme.colors.elevation1 }]}
-                  />
-                ))}
-              </ScrollView>
+          <View style={styles.catalogPlaceholder}>
+            <View style={styles.placeholderHeader}>
+              <View style={[styles.placeholderTitle, { backgroundColor: currentTheme.colors.elevation1 }]} />
+              <ActivityIndicator size="small" color={currentTheme.colors.primary} />
             </View>
-          </Animated.View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.placeholderPosters}>
+              {[...Array(3)].map((_, posterIndex) => (
+                <View
+                  key={posterIndex}
+                  style={[styles.placeholderPoster, { backgroundColor: currentTheme.colors.elevation1 }]}
+                />
+              ))}
+            </ScrollView>
+          </View>
         );
       case 'loadMore':
         return (
@@ -673,16 +662,11 @@ const HomeScreen = () => {
     handleLoadMoreCatalogs
   ]);
 
+  // FlashList: using minimal props per installed version
+
   const ListFooterComponent = useMemo(() => (
     <>
-      {catalogsLoading && loadedCatalogCount > 0 && loadedCatalogCount < totalCatalogsRef.current && (
-        <View style={styles.loadingMoreCatalogs}>
-          <ActivityIndicator size="small" color={currentTheme.colors.primary} />
-          <Text style={[styles.loadingMoreText, { color: currentTheme.colors.textMuted }]}>
-            Loading catalogs... ({loadedCatalogCount}/{totalCatalogsRef.current})
-          </Text>
-        </View>
-      )}
+      {catalogsLoading && loadedCatalogCount > 0 && loadedCatalogCount < totalCatalogsRef.current && null}
       {!catalogsLoading && catalogs.filter(c => c).length === 0 && (
         <View style={[styles.emptyCatalog, { backgroundColor: currentTheme.colors.elevation1 }]}>
           <MaterialIcons name="movie-filter" size={40} color={currentTheme.colors.textDark} />
@@ -712,7 +696,7 @@ const HomeScreen = () => {
           backgroundColor="transparent"
           translucent
         />
-        <FlatList
+        <FlashList
           data={listData}
           renderItem={renderListItem}
           keyExtractor={item => item.key}
@@ -721,19 +705,12 @@ const HomeScreen = () => {
             { paddingTop: Platform.OS === 'ios' ? 100 : 90 }
           ]}
           showsVerticalScrollIndicator={false}
+          ListHeaderComponent={showHeroSection ? memoizedFeaturedContent : null}
           ListFooterComponent={ListFooterComponent}
-          initialNumToRender={4}
-          maxToRenderPerBatch={3}
-          windowSize={7}
-          removeClippedSubviews={Platform.OS === 'android'}
-          onEndReachedThreshold={0.5}
-          updateCellsBatchingPeriod={50}
-          maintainVisibleContentPosition={{
-            minIndexForVisible: 0,
-            autoscrollToTopThreshold: 10
-          }}
-          disableIntervalMomentum={true}
-          scrollEventThrottle={16}
+          onMomentumScrollEnd={handleScrollEnd}
+          onEndReached={handleLoadMoreCatalogs}
+          onEndReachedThreshold={0.6}
+          scrollEventThrottle={32}
         />
         {/* Toasts are rendered globally at root */}
       </View>
@@ -842,7 +819,7 @@ const styles = StyleSheet.create<any>({
   placeholderPoster: {
     width: POSTER_WIDTH,
     aspectRatio: 2/3,
-    borderRadius: 4,
+    borderRadius: 12,
     marginRight: 2,
   },
   emptyCatalog: {

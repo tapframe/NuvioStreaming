@@ -50,12 +50,18 @@ const calculatePosterLayout = (screenWidth: number) => {
 const posterLayout = calculatePosterLayout(width);
 const POSTER_WIDTH = posterLayout.posterWidth;
 
-const ContentItem = React.memo(({ item, onPress }: ContentItemProps) => {
+const PLACEHOLDER_BLURHASH = 'LEHV6nWB2yk8pyo0adR*.7kCMdnj';
+
+const ContentItem = ({ item, onPress }: ContentItemProps) => {
   const [menuVisible, setMenuVisible] = useState(false);
   const [isWatched, setIsWatched] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [shouldLoadImage, setShouldLoadImage] = useState(false);
   const { currentTheme } = useTheme();
+
+  // Intersection observer simulation for lazy loading
+  const itemRef = useRef<View>(null);
 
   const handleLongPress = useCallback(() => {
     setMenuVisible(true);
@@ -88,6 +94,30 @@ const ContentItem = React.memo(({ item, onPress }: ContentItemProps) => {
     setMenuVisible(false);
   }, []);
 
+  // Lazy load images - only load when likely to be visible
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShouldLoadImage(true);
+    }, 100); // Small delay to avoid loading offscreen items
+    
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Get optimized poster URL for smaller tiles
+  const getOptimizedPosterUrl = useCallback((originalUrl: string) => {
+    if (!originalUrl) return 'https://via.placeholder.com/154x231/333/666?text=No+Image';
+    
+    // For TMDB images, use smaller sizes
+    if (originalUrl.includes('image.tmdb.org')) {
+      // Replace any size with w154 (fits 100-130px tiles perfectly)
+      return originalUrl.replace(/\/w\d+\//, '/w154/');
+    }
+    
+    // For other sources, try to add size parameters
+    const separator = originalUrl.includes('?') ? '&' : '?';
+    return `${originalUrl}${separator}w=154&h=231&q=75`;
+  }, []);
+
   return (
     <>
       <View style={styles.itemContainer}>
@@ -98,26 +128,36 @@ const ContentItem = React.memo(({ item, onPress }: ContentItemProps) => {
           onLongPress={handleLongPress}
           delayLongPress={300}
         >
-          <View style={styles.contentItemContainer}>
-            <ExpoImage
-              source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
-              style={styles.poster}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-              transition={200}
-              placeholder={{ uri: 'https://via.placeholder.com/300x450' }}
-              placeholderContentFit="cover"
-              recyclingKey={item.id}
-              onLoad={() => {
-                setImageLoaded(true);
-                setImageError(false);
-              }}
-              onError={() => {
-                setImageError(true);
-                setImageLoaded(false);
-              }}
-              priority="low"
-            />
+          <View ref={itemRef} style={styles.contentItemContainer}>
+            {/* Only load image when shouldLoadImage is true (lazy loading) */}
+            {shouldLoadImage && item.poster ? (
+              <ExpoImage
+                source={{ uri: getOptimizedPosterUrl(item.poster) }}
+                style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1 }]}
+                contentFit="cover"
+                cachePolicy="disk" // Disk-only cache to save RAM
+                transition={0}
+                placeholder={{ blurhash: PLACEHOLDER_BLURHASH } as any}
+                placeholderContentFit="cover"
+                allowDownscaling
+                onLoad={() => {
+                  setImageLoaded(true);
+                  setImageError(false);
+                }}
+                onError={() => {
+                  setImageError(true);
+                  setImageLoaded(false);
+                }}
+                priority="low"
+              />
+            ) : (
+              // Show placeholder until lazy load triggers
+              <View style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, justifyContent: 'center', alignItems: 'center' }]}>
+                <Text style={{ color: currentTheme.colors.textMuted, fontSize: 10, textAlign: 'center' }}>
+                  {item.name.substring(0, 20)}...
+                </Text>
+              </View>
+            )}
             {imageError && (
               <View style={[styles.loadingOverlay, { backgroundColor: currentTheme.colors.elevation1 }]}>
                 <MaterialIcons name="broken-image" size={24} color={currentTheme.colors.textMuted} />
@@ -148,7 +188,7 @@ const ContentItem = React.memo(({ item, onPress }: ContentItemProps) => {
       />
     </>
   );
-});
+};
 
 const styles = StyleSheet.create({
   itemContainer: {
@@ -158,14 +198,14 @@ const styles = StyleSheet.create({
     width: POSTER_WIDTH,
     aspectRatio: 2/3,
     margin: 0,
-    borderRadius: 4,
+    borderRadius: 12,
     overflow: 'hidden',
     position: 'relative',
-    elevation: 6,
+    elevation: Platform.OS === 'android' ? 2 : 0,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
     borderWidth: 0.5,
     borderColor: 'rgba(255,255,255,0.12)',
     marginBottom: 8,
@@ -173,14 +213,14 @@ const styles = StyleSheet.create({
   contentItemContainer: {
     width: '100%',
     height: '100%',
-    borderRadius: 4,
+    borderRadius: 12,
     overflow: 'hidden',
     position: 'relative',
   },
   poster: {
     width: '100%',
     height: '100%',
-    borderRadius: 4,
+    borderRadius: 12,
   },
   loadingOverlay: {
     position: 'absolute',
@@ -214,4 +254,8 @@ const styles = StyleSheet.create({
   }
 });
 
-export default ContentItem;
+export default React.memo(ContentItem, (prev, next) => {
+  // Aggressive memoization - only re-render if ID changes (different item entirely)
+  // This keeps loaded posters stable during fast scrolls
+  return prev.item.id === next.item.id;
+});

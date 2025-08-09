@@ -197,13 +197,16 @@ class CatalogService {
             // Create a promise for each catalog fetch
             const catalogPromise = (async () => {
               try {
-                const addonManifest = await stremioService.getInstalledAddonsAsync();
-                const manifest = addonManifest.find(a => a.id === addon.id);
+                // Hoist manifest list retrieval and find once
+                const addonManifests = await stremioService.getInstalledAddonsAsync();
+                const manifest = addonManifests.find(a => a.id === addon.id);
                 if (!manifest) return null;
 
                 const metas = await stremioService.getCatalog(manifest, catalog.type, catalog.id, 1);
                 if (metas && metas.length > 0) {
-                  const items = metas.map(meta => this.convertMetaToStreamingContent(meta));
+                  // Cap items per catalog to reduce memory and rendering load
+                  const limited = metas.slice(0, 8); // Further reduced for memory
+                  const items = limited.map(meta => this.convertMetaToStreamingContent(meta));
                   
                   // Get potentially custom display name
                   let displayName = await getCatalogDisplayName(addon.id, catalog.type, catalog.id, catalog.name);

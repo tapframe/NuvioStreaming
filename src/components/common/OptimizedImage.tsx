@@ -65,6 +65,7 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [isVisible, setIsVisible] = useState(!lazy);
+  const [recyclingKey] = useState(() => `${Math.random().toString(36).slice(2)}-${Date.now()}`);
   const [optimizedUrl, setOptimizedUrl] = useState<string>('');
   const mountedRef = useRef(true);
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -168,12 +169,15 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   }
 
   return (
-    <ExpoImage
+      <ExpoImage
       source={{ uri: optimizedUrl }}
       style={style}
       contentFit={contentFit}
       transition={transition}
       cachePolicy={cachePolicy}
+        // Use a stable recycling key per component instance to keep textures alive between reuses
+        // This mitigates flicker on fast horizontal scrolls
+        recyclingKey={recyclingKey}
       onLoad={() => {
         setIsLoaded(true);
         onLoad?.();
