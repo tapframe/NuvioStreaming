@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
   ActivityIndicator,
   SafeAreaView,
@@ -12,6 +11,7 @@ import {
   Dimensions,
   Platform,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -127,7 +127,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   item: {
     marginBottom: SPACING.lg,
-    borderRadius: 8,
+    borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: colors.elevation2,
     shadowColor: '#000',
@@ -139,8 +139,8 @@ const createStyles = (colors: any) => StyleSheet.create({
   poster: {
     width: '100%',
     aspectRatio: 2/3,
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
     backgroundColor: colors.elevation3,
   },
   itemContent: {
@@ -564,7 +564,9 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           source={{ uri: item.poster || 'https://via.placeholder.com/300x450/333333/666666?text=No+Image' }}
           style={styles.poster}
           contentFit="cover"
-          transition={200}
+          cachePolicy="disk"
+          transition={0}
+          allowDownscaling
         />
         <View style={styles.itemContent}>
           <Text
@@ -675,7 +677,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
       <Text style={styles.headerTitle}>{displayName || `${type.charAt(0).toUpperCase() + type.slice(1)}s`}</Text>
       
       {items.length > 0 ? (
-        <FlatList
+        <FlashList
           data={items}
           renderItem={renderItem}
           keyExtractor={(item) => `${item.id}-${item.type}`}

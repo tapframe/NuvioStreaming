@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
   useColorScheme,
   useWindowDimensions,
@@ -14,6 +13,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -101,8 +101,9 @@ const TraktItem = React.memo(({ item, width, navigation, currentTheme }: { item:
             source={{ uri: posterUrl }}
             style={styles.poster}
             contentFit="cover"
-            transition={300}
-            recyclingKey={`trakt-item-${item.id}`}
+            cachePolicy="disk"
+            transition={0}
+            allowDownscaling
           />
         ) : (
           <View style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, justifyContent: 'center', alignItems: 'center' }]}>
@@ -712,7 +713,7 @@ const LibraryScreen = () => {
 
       // Show collection folders
       return (
-        <FlatList
+         <FlashList
           data={traktFolders}
           renderItem={({ item }) => renderTraktCollectionFolder({ folder: item })}
           keyExtractor={item => item.id}
@@ -720,10 +721,8 @@ const LibraryScreen = () => {
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
           columnWrapperStyle={styles.columnWrapper}
-          initialNumToRender={6}
-          maxToRenderPerBatch={6}
-          windowSize={5}
-          removeClippedSubviews={Platform.OS === 'android'}
+           onEndReachedThreshold={0.7}
+           onEndReached={() => {}}
         />
       );
     }
@@ -757,7 +756,7 @@ const LibraryScreen = () => {
     }
 
     return (
-      <FlatList
+      <FlashList
         data={folderItems}
         renderItem={({ item }) => renderTraktItem({ item })}
         keyExtractor={(item) => `${item.type}-${item.id}`}
@@ -766,10 +765,8 @@ const LibraryScreen = () => {
         style={styles.traktContainer}
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
         showsVerticalScrollIndicator={false}
-        initialNumToRender={10}
-        maxToRenderPerBatch={10}
-        windowSize={21}
-        removeClippedSubviews={Platform.OS === 'android'}
+        onEndReachedThreshold={0.7}
+        onEndReached={() => {}}
       />
     );
   };
@@ -850,7 +847,7 @@ const LibraryScreen = () => {
     }
 
     return (
-            <FlatList
+            <FlashList
         data={allItems}
         renderItem={({ item }) => {
           if (item.type === 'trakt-folder') {
@@ -863,10 +860,8 @@ const LibraryScreen = () => {
               contentContainerStyle={styles.listContainer}
               showsVerticalScrollIndicator={false}
               columnWrapperStyle={styles.columnWrapper}
-              initialNumToRender={6}
-              maxToRenderPerBatch={6}
-              windowSize={5}
-              removeClippedSubviews={Platform.OS === 'android'}
+              onEndReachedThreshold={0.7}
+              onEndReached={() => {}}
             />
     );
   };
@@ -1031,7 +1026,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   posterContainer: {
-    borderRadius: 8,
+    borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: 'rgba(255,255,255,0.03)',
     aspectRatio: 2/3,
@@ -1043,6 +1038,7 @@ const styles = StyleSheet.create({
   poster: {
     width: '100%',
     height: '100%',
+    borderRadius: 12,
   },
   posterGradient: {
     position: 'absolute',
