@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { Image } from 'expo-image';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { FlashList } from '@shopify/flash-list';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useSettings } from '../../hooks/useSettings';
 import { Episode } from '../../types/metadata';
@@ -635,7 +636,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
         {currentSeasonEpisodes.length > 0 && (
           (settings?.episodeLayoutStyle === 'horizontal') ? (
             // Horizontal Layout (Netflix-style)
-            <FlatList
+            <FlashList
               ref={episodeScrollViewRef as React.RefObject<FlatList<any>>}
               data={currentSeasonEpisodes}
               renderItem={({ item: episode, index }) => (
@@ -663,34 +664,22 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
             />
           ) : (
             // Vertical Layout (Traditional)
-            <View 
-              style={[
-                styles.episodeList,
-                isTablet ? styles.episodeListContentVerticalTablet : styles.episodeListContentVertical
-              ]}
-            >
-              {isTablet ? (
-                <View style={styles.episodeGridVertical}>
-                  {currentSeasonEpisodes.map((episode, index) => (
-                    <Animated.View 
-                      key={episode.id}
-                      entering={FadeIn.duration(300).delay(100 + index * 30)}
-                    >
-                      {renderVerticalEpisodeCard(episode)}
-                    </Animated.View>
-                  ))}
-                </View>
-              ) : (
-                currentSeasonEpisodes.map((episode, index) => (
-                  <Animated.View 
-                    key={episode.id}
-                    entering={FadeIn.duration(300).delay(100 + index * 30)}
-                  >
-                    {renderVerticalEpisodeCard(episode)}
-                  </Animated.View>
-                ))
+            <FlashList
+              ref={episodeScrollViewRef as React.RefObject<FlatList<any>>}
+              data={currentSeasonEpisodes}
+              renderItem={({ item: episode, index }) => (
+                <Animated.View 
+                  key={episode.id}
+                  entering={FadeIn.duration(300).delay(100 + index * 30)}
+                >
+                  {renderVerticalEpisodeCard(episode)}
+                </Animated.View>
               )}
-            </View>
+              keyExtractor={episode => episode.id.toString()}
+              estimatedItemSize={136}
+              contentContainerStyle={isTablet ? styles.episodeListContentVerticalTablet : styles.episodeListContentVertical}
+              numColumns={isTablet ? 2 : 1}
+            />
           )
         )}
       </Animated.View>
@@ -737,6 +726,7 @@ const styles = StyleSheet.create({
   },
   episodeListContentVerticalTablet: {
     paddingHorizontal: 16,
+    paddingBottom: 20,
   },
   episodeGridVertical: {
     flexDirection: 'row',
