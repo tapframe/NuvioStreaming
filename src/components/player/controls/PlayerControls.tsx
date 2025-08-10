@@ -31,6 +31,7 @@ interface PlayerControlsProps {
   cycleAspectRatio: () => void;
   setShowAudioModal: (show: boolean) => void;
   setShowSubtitleModal: (show: boolean) => void;
+  isSubtitleModalOpen?: boolean;
   setShowSourcesModal?: (show: boolean) => void;
   // Slider-specific props
   onSliderValueChange: (value: number) => void;
@@ -65,6 +66,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   cycleAspectRatio,
   setShowAudioModal,
   setShowSubtitleModal,
+  isSubtitleModalOpen,
   setShowSourcesModal,
   onSliderValueChange,
   onSlidingStart,
@@ -182,7 +184,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
               {/* Subtitle Button - Always available for external subtitle search */}
               <TouchableOpacity
                 style={styles.bottomButton}
-                onPress={() => setShowSubtitleModal(true)}
+                onPress={() => setShowSubtitleModal(!isSubtitleModalOpen)}
               >
                 <Ionicons name="text" size={20} color="white" />
                 <Text style={styles.bottomButtonText}>

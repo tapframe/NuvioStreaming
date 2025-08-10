@@ -305,8 +305,8 @@ const ProviderFilter = memo(({
   const styles = React.useMemo(() => createStyles(theme.colors), [theme.colors]);
   
   const renderItem = useCallback(({ item, index }: { item: { id: string; name: string }; index: number }) => (
-    <TouchableOpacity
-        key={item.id}
+    <Animated.View entering={FadeIn.duration(300).delay(index * 75)}>
+      <TouchableOpacity
         style={[
           styles.filterChip,
           selectedProvider === item.id && styles.filterChipSelected
@@ -320,6 +320,7 @@ const ProviderFilter = memo(({
           {item.name}
         </Text>
       </TouchableOpacity>
+    </Animated.View>
   ), [selectedProvider, onSelect, styles]);
 
   return (
@@ -1284,16 +1285,17 @@ export const StreamsScreen = () => {
     const isLoading = false; // If streams are being rendered, they're available and shouldn't be loading
     
     return (
-      <StreamCard 
-        key={`${stream.url}-${index}`}
-        stream={stream} 
-        onPress={() => handleStreamPress(stream)} 
-        index={index}
-        isLoading={isLoading}
-        statusMessage={undefined}
-        theme={currentTheme}
-        showLogos={settings.showScraperLogos}
-      />
+      <Animated.View entering={FadeIn.duration(300).delay(index * 50)}>
+        <StreamCard 
+          stream={stream} 
+          onPress={() => handleStreamPress(stream)} 
+          index={index}
+          isLoading={isLoading}
+          statusMessage={undefined}
+          theme={currentTheme}
+          showLogos={settings.showScraperLogos}
+        />
+      </Animated.View>
     );
   }, [handleStreamPress, currentTheme, settings.showScraperLogos]);
 
@@ -1369,44 +1371,32 @@ export const StreamsScreen = () => {
         </Animated.View>
       )}
 
-      {type === 'series' && currentEpisode && (
+      {type === 'series' && (
         <Animated.View style={[styles.streamsHeroContainer, heroStyle]}>
-          <Animated.View
-            entering={FadeIn.duration(300)}
-            style={StyleSheet.absoluteFill}
-          >
-            <Animated.View 
-              entering={FadeIn.duration(400).delay(100).withInitialValues({
-                transform: [{ scale: 1.05 }]
-              })}
+          <Animated.View entering={FadeIn.duration(300)} style={StyleSheet.absoluteFill}>
+            <Animated.View
+              entering={FadeIn.duration(400).delay(100).withInitialValues({ transform: [{ scale: 1.05 }] })}
               style={StyleSheet.absoluteFill}
             >
-              <ImageBackground
+              <Image
                 source={episodeImage ? { uri: episodeImage } : undefined}
                 style={styles.streamsHeroBackground}
-                fadeDuration={0}
-                resizeMode="cover"
+                contentFit="cover"
+                transition={500}
+              />
+              <LinearGradient
+                colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.7)', colors.darkBackground]}
+                locations={[0, 0.4, 0.6, 0.8, 1]}
+                style={styles.streamsHeroGradient}
               >
-                <LinearGradient
-                  colors={[
-                    'rgba(0,0,0,0)',
-                    'rgba(0,0,0,0.3)',
-                    'rgba(0,0,0,0.5)',
-                    'rgba(0,0,0,0.7)',
-                    colors.darkBackground
-                  ]}
-                  locations={[0, 0.4, 0.6, 0.8, 1]}
-                  style={styles.streamsHeroGradient}
-                >
-                  <View style={styles.streamsHeroContent}>
-                    <View style={styles.streamsHeroInfo}>
-                      <Text style={styles.streamsHeroEpisodeNumber}>
-                        {currentEpisode.episodeString}
-                      </Text>
+                <View style={styles.streamsHeroContent}>
+                  {currentEpisode ? (
+                    <Animated.View entering={FadeIn.duration(400).delay(300)} style={styles.streamsHeroInfo}>
+                      <Text style={styles.streamsHeroEpisodeNumber}>{currentEpisode.episodeString}</Text>
                       <Text style={styles.streamsHeroTitle} numberOfLines={1}>
                         {currentEpisode.name}
                       </Text>
-                      {currentEpisode.overview && (
+                      {!!currentEpisode.overview && (
                         <Text style={styles.streamsHeroOverview} numberOfLines={2}>
                           {currentEpisode.overview}
                         </Text>
@@ -1417,17 +1407,13 @@ export const StreamsScreen = () => {
                         </Text>
                         {currentEpisode.vote_average > 0 && (
                           <View style={styles.streamsHeroRating}>
-                            <Image
-                              source={{ uri: TMDB_LOGO }}
-                              style={styles.tmdbLogo}
-                              contentFit="contain"
-                            />
+                            <Image source={{ uri: TMDB_LOGO }} style={styles.tmdbLogo} contentFit="contain" />
                             <Text style={styles.streamsHeroRatingText}>
                               {currentEpisode.vote_average.toFixed(1)}
                             </Text>
                           </View>
                         )}
-                        {currentEpisode.runtime && (
+                        {!!currentEpisode.runtime && (
                           <View style={styles.streamsHeroRuntime}>
                             <MaterialIcons name="schedule" size={16} color={colors.mediumEmphasis} />
                             <Text style={styles.streamsHeroRuntimeText}>
@@ -1438,10 +1424,13 @@ export const StreamsScreen = () => {
                           </View>
                         )}
                       </View>
-                    </View>
-                  </View>
-                </LinearGradient>
-              </ImageBackground>
+                    </Animated.View>
+                  ) : (
+                    // Placeholder to reserve space and avoid layout shift while loading
+                    <View style={{ width: '100%', height: 120 }} />
+                  )}
+                </View>
+              </LinearGradient>
             </Animated.View>
           </Animated.View>
         </Animated.View>
@@ -1800,7 +1789,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   streamsHeroContainer: {
     width: '100%',
-    height: 220,
+    height: 220, // Fixed height to prevent layout shift
     marginBottom: 0,
     position: 'relative',
     backgroundColor: colors.black,
@@ -1812,7 +1801,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.black,
   },
   streamsHeroGradient: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
     padding: 16,
     paddingBottom: 0,

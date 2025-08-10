@@ -1581,6 +1581,7 @@ const AndroidVideoPlayer: React.FC = () => {
             cycleAspectRatio={cycleAspectRatio}
             setShowAudioModal={setShowAudioModal}
             setShowSubtitleModal={setShowSubtitleModal}
+            isSubtitleModalOpen={showSubtitleModal}
             setShowSourcesModal={setShowSourcesModal}
             onSliderValueChange={handleSliderValueChange}
             onSlidingStart={handleSlidingStart}
