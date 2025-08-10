@@ -280,10 +280,11 @@ class SyncService {
         migrations.push(moveKey(k, `@user:${userId}:stremio-addons`));
       } else if (k === '@user:local:stremio-addon-order') {
         migrations.push(moveKey(k, `@user:${userId}:stremio-addon-order`));
+      // Do NOT migrate local scraper keys; they are device-local and unscoped
       } else if (k === '@user:local:local-scrapers') {
-        migrations.push(moveKey(k, `@user:${userId}:local-scrapers`));
+        // intentionally skip
       } else if (k === '@user:local:scraper-repository-url') {
-        migrations.push(moveKey(k, `@user:${userId}:scraper-repository-url`));
+        // intentionally skip
       } else if (k === '@user:local:stremio-library') {
         migrations.push((async () => {
           const val = (await AsyncStorage.getItem(k)) || '{}';

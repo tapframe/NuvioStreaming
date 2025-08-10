@@ -773,7 +773,8 @@ class StremioService {
       const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
       const settingsJson = (await AsyncStorage.getItem(`@user:${scope}:app_settings`))
         || (await AsyncStorage.getItem('app_settings'));
-      const settings: AppSettings = settingsJson ? JSON.parse(settingsJson) : DEFAULT_SETTINGS;
+      const rawSettings = settingsJson ? JSON.parse(settingsJson) : {};
+      const settings: AppSettings = { ...DEFAULT_SETTINGS, ...rawSettings };
       
       if (settings.enableLocalScrapers) {
         const hasScrapers = await localScraperService.hasScrapers();
