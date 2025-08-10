@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../styles/colors';
 import { useTheme, Theme, DEFAULT_THEMES } from '../contexts/ThemeContext';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { useSettings } from '../hooks/useSettings';
 
 const { width } = Dimensions.get('window');
 
@@ -311,6 +312,7 @@ const ThemeScreen: React.FC = () => {
   } = useTheme();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
+  const { settings, updateSetting } = useSettings();
   
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingTheme, setEditingTheme] = useState<Theme | null>(null);
@@ -524,6 +526,22 @@ const ThemeScreen: React.FC = () => {
           <MaterialIcons name="add" size={20} color="#FFFFFF" />
           <Text style={styles.createButtonText}>Create Custom Theme</Text>
         </TouchableOpacity>
+
+        <Text style={[styles.sectionTitle, { color: currentTheme.colors.textMuted, marginTop: 24 }]}>
+          OPTIONS
+        </Text>
+
+        <View style={styles.optionRow}>
+          <Text style={[styles.optionLabel, { color: currentTheme.colors.text }]}>
+            Use Dominant Color from Artwork
+          </Text>
+          <Switch
+            value={settings.useDominantBackgroundColor}
+            onValueChange={(value) => updateSetting('useDominantBackgroundColor', value)}
+            trackColor={{ false: '#767577', true: currentTheme.colors.primary }}
+            thumbColor={Platform.OS === 'android' ? currentTheme.colors.primary : '#f4f3f4'}
+          />
+        </View>
       </ScrollView>
     </View>
   );
@@ -668,6 +686,19 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 14,
     marginLeft: 8,
+  },
+  optionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+  optionLabel: {
+    fontSize: 14,
   },
   
   // Editor styles

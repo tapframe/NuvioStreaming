@@ -340,7 +340,6 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
         key={episode.id}
         style={[
           styles.episodeCardVertical, 
-          isTablet && styles.episodeCardVerticalTablet, 
           { backgroundColor: currentTheme.colors.elevation2 }
         ]}
         onPress={() => onSelectEpisode(episode)}
@@ -749,10 +748,10 @@ const styles = StyleSheet.create({
     height: 120,
   },
   episodeCardVerticalTablet: {
-    width: '47%',
+    width: '100%',
     flexDirection: 'row',
     height: 140,
-    marginBottom: 0,
+    marginBottom: 16,
   },
   episodeImageContainer: {
     position: 'relative',

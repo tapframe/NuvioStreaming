@@ -33,6 +33,7 @@ import Animated, {
   runOnUI,
   Easing,
   interpolateColor,
+  withSpring,
 } from 'react-native-reanimated';
 import { RouteProp } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -127,7 +128,7 @@ const MetadataScreen: React.FC = () => {
   const hasAnimatedInitialColorRef = useRef(false);
   useEffect(() => {
     const base = currentTheme.colors.darkBackground;
-    const target = (dominantColor && dominantColor !== '#1a1a1a' && dominantColor !== null)
+    const target = (settings.useDominantBackgroundColor && dominantColor && dominantColor !== '#1a1a1a' && dominantColor !== null)
       ? dominantColor
       : base;
 
@@ -136,9 +137,9 @@ const MetadataScreen: React.FC = () => {
       bgFromColor.value = base as any;
       bgToColor.value = target as any;
       bgProgress.value = 0;
-      bgProgress.value = withTiming(1, {
-        duration: 420,
-        easing: Easing.bezier(0.16, 1, 0.3, 1),
+      bgProgress.value = withSpring(1, {
+        damping: 30,
+        stiffness: 90,
       });
       hasAnimatedInitialColorRef.current = true;
       return;
@@ -155,12 +156,12 @@ const MetadataScreen: React.FC = () => {
       bgFromColor.value = current as any;
       bgToColor.value = target as any;
       bgProgress.value = 0;
-      bgProgress.value = withTiming(1, {
-        duration: 380,
-        easing: Easing.bezier(0.2, 0, 0, 1),
+      bgProgress.value = withSpring(1, {
+        damping: 30,
+        stiffness: 90,
       });
     })();
-  }, [dominantColor, currentTheme.colors.darkBackground]);
+  }, [dominantColor, currentTheme.colors.darkBackground, settings.useDominantBackgroundColor]);
   
   // Create an animated style for the background color
   const animatedBackgroundStyle = useAnimatedStyle(() => {
@@ -174,11 +175,11 @@ const MetadataScreen: React.FC = () => {
   
   // For compatibility with existing code, maintain the static value as well
   const dynamicBackgroundColor = useMemo(() => {
-    if (dominantColor && dominantColor !== '#1a1a1a' && dominantColor !== null && dominantColor !== currentTheme.colors.darkBackground) {
+    if (settings.useDominantBackgroundColor && dominantColor && dominantColor !== '#1a1a1a' && dominantColor !== null && dominantColor !== currentTheme.colors.darkBackground) {
       return dominantColor;
     }
     return currentTheme.colors.darkBackground;
-  }, [dominantColor, currentTheme.colors.darkBackground]);
+  }, [dominantColor, currentTheme.colors.darkBackground, settings.useDominantBackgroundColor]);
 
   // Debug logging for color extraction timing
   useEffect(() => {

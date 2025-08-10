@@ -58,6 +58,11 @@ export interface AppSettings {
   // Theme settings
   themeId: string;
   customThemes: CustomThemeDef[];
+  useDominantBackgroundColor: boolean;
+  // Home screen poster customization
+  posterSize: 'small' | 'medium' | 'large'; // Predefined sizes
+  posterBorderRadius: number; // 0-20 range for border radius
+  postersPerRow: number; // 3-6 range for number of posters per row
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -91,6 +96,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   // Theme defaults
   themeId: 'default',
   customThemes: [],
+  useDominantBackgroundColor: true,
+  // Home screen poster defaults
+  posterSize: 'medium',
+  posterBorderRadius: 12,
+  postersPerRow: 4,
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';
