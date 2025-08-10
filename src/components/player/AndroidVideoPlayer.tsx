@@ -367,16 +367,18 @@ const AndroidVideoPlayer: React.FC = () => {
             
             if (progressPercent < 85) {
               setResumePosition(savedProgress.currentTime);
-               setSavedDuration(savedProgress.duration);
-               setInitialPosition(savedProgress.currentTime);
-               initialSeekTargetRef.current = savedProgress.currentTime;
-               logger.log(`[AndroidVideoPlayer] Set resume position to: ${savedProgress.currentTime} of ${savedProgress.duration}`);
-               if (appSettings.alwaysResume) {
+              setSavedDuration(savedProgress.duration);
+              logger.log(`[AndroidVideoPlayer] Set resume position to: ${savedProgress.currentTime} of ${savedProgress.duration}`);
+              if (appSettings.alwaysResume) {
+                // Only prepare auto-resume state and seek when AlwaysResume is enabled
+                setInitialPosition(savedProgress.currentTime);
+                initialSeekTargetRef.current = savedProgress.currentTime;
                 logger.log(`[AndroidVideoPlayer] AlwaysResume enabled. Auto-seeking to ${savedProgress.currentTime}`);
                 seekToTime(savedProgress.currentTime);
               } else {
+                // Do not set initialPosition; start from beginning with no auto-seek
                 setShowResumeOverlay(true);
-                logger.log(`[AndroidVideoPlayer] Showing resume overlay`);
+                logger.log(`[AndroidVideoPlayer] AlwaysResume disabled. Not auto-seeking; overlay shown (if enabled)`);
               }
             } else {
               logger.log(`[AndroidVideoPlayer] Progress too high (${progressPercent.toFixed(1)}%), not showing resume overlay`);
