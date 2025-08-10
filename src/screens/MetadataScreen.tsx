@@ -579,6 +579,7 @@ const MetadataScreen: React.FC = () => {
               setLogoLoadError={assetData.setLogoLoadError}
               groupedEpisodes={groupedEpisodes}
               dynamicBackgroundColor={dynamicBackgroundColor}
+              handleBack={handleBack}
             />
 
             {/* Main Content - Optimized */}

@@ -71,6 +71,7 @@ interface HeroSectionProps {
   setLogoLoadError: (error: boolean) => void;
   groupedEpisodes?: { [seasonNumber: number]: any[] };
   dynamicBackgroundColor?: string;
+  handleBack: () => void;
 }
 
 // Ultra-optimized ActionButtons Component - minimal re-renders
@@ -679,6 +680,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   setLogoLoadError,
   groupedEpisodes,
   dynamicBackgroundColor,
+  handleBack,
 }) => {
   const { currentTheme } = useTheme();
   const { isAuthenticated: isTraktAuthenticated } = useTraktContext();
@@ -924,6 +926,17 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
         />
       )}
 
+      <Animated.View style={styles.backButtonContainer}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+          <MaterialIcons 
+            name="arrow-back" 
+            size={28} 
+            color="#fff" 
+            style={styles.backButtonIcon}
+          />
+        </TouchableOpacity>
+      </Animated.View>
+
       {/* Ultra-light Gradient with subtle dynamic background blend */}
       <LinearGradient
         colors={[
@@ -1024,6 +1037,20 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+  },
+  backButtonContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'android' ? 40 : 50,
+    left: 16,
+    zIndex: 10,
+  },
+  backButton: {
+    padding: 8,
+  },
+  backButtonIcon: {
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 3,
   },
   heroGradient: {
     flex: 1,
