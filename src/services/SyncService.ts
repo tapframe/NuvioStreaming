@@ -120,7 +120,8 @@ class SyncService {
               traktLastSynced: row.trakt_last_synced_ms ?? undefined,
               traktProgress: row.trakt_progress_percent ?? undefined,
             },
-            episodeId || undefined
+            // Ensure we pass through the full remote episode_id as-is; empty string becomes undefined
+            (row.episode_id && row.episode_id.length > 0) ? row.episode_id : undefined
           );
         }
       } catch {}
@@ -373,7 +374,8 @@ class SyncService {
                 traktLastSynced: row.trakt_last_synced_ms ?? undefined,
                 traktProgress: row.trakt_progress_percent ?? undefined,
               },
-              row.episode_id || undefined
+              // Ensure full episode_id is preserved; treat empty as undefined
+              (row.episode_id && row.episode_id.length > 0) ? row.episode_id : undefined
             );
             remoteActiveKeys.add(`${row.media_type}|${row.media_id}|${row.episode_id || ''}`);
           }

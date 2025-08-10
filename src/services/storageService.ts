@@ -378,7 +378,8 @@ class StorageService {
           const parts = key.split(':');
           const type = parts[0];
           const id = parts[1];
-          const episodeId = parts[2] || undefined;
+          // Preserve full episodeId even if it contains additional ':' segments (e.g., "<showId>:<season>:<episode>")
+          const episodeId = parts.length > 2 ? parts.slice(2).join(':') : undefined;
 
           unsynced.push({
             key,

@@ -131,9 +131,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     }
   }, []);
 
-  // Modified loadContinueWatching to be more efficient
+  // Modified loadContinueWatching to render incrementally
   const loadContinueWatching = useCallback(async (isBackgroundRefresh = false) => {
-    // Prevent multiple concurrent refreshes
     if (isRefreshing) return;
 
     if (!isBackgroundRefresh) {
@@ -141,66 +140,65 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     }
     setIsRefreshing(true);
 
+    // Helper to merge a batch of items into state (dedupe by type:id, keep newest)
+    const mergeBatchIntoState = (batch: ContinueWatchingItem[]) => {
+      if (!batch || batch.length === 0) return;
+      setContinueWatchingItems((prev) => {
+        const map = new Map<string, ContinueWatchingItem>();
+        for (const it of prev) {
+          map.set(`${it.type}:${it.id}`, it);
+        }
+        for (const it of batch) {
+          const key = `${it.type}:${it.id}`;
+          const existing = map.get(key);
+          if (!existing || (it.lastUpdated ?? 0) > (existing.lastUpdated ?? 0)) {
+            map.set(key, it);
+          }
+        }
+        const merged = Array.from(map.values());
+        merged.sort((a, b) => (b.lastUpdated ?? 0) - (a.lastUpdated ?? 0));
+        return merged;
+      });
+    };
+
     try {
       const allProgress = await storageService.getAllWatchProgress();
-      
       if (Object.keys(allProgress).length === 0) {
         setContinueWatchingItems([]);
         return;
       }
 
-      const progressItems: ContinueWatchingItem[] = [];
-      const latestEpisodes: Record<string, ContinueWatchingItem> = {};
-      
-      // Group progress items by content ID to batch API calls
+      // Group progress items by content ID
       const contentGroups: Record<string, { type: string; id: string; episodes: Array<{ key: string; episodeId?: string; progress: any; progressPercent: number }> }> = {};
-      
-      // First pass: group by content ID
       for (const key in allProgress) {
         const keyParts = key.split(':');
         const [type, id, ...episodeIdParts] = keyParts;
         const episodeId = episodeIdParts.length > 0 ? episodeIdParts.join(':') : undefined;
         const progress = allProgress[key];
         const progressPercent = (progress.currentTime / progress.duration) * 100;
-        
         // Skip fully watched movies
-        if (type === 'movie' && progressPercent >= 85) {
-          continue;
-        }
-        
+        if (type === 'movie' && progressPercent >= 85) continue;
         const contentKey = `${type}:${id}`;
-        if (!contentGroups[contentKey]) {
-          contentGroups[contentKey] = { type, id, episodes: [] };
-        }
-        
+        if (!contentGroups[contentKey]) contentGroups[contentKey] = { type, id, episodes: [] };
         contentGroups[contentKey].episodes.push({ key, episodeId, progress, progressPercent });
       }
-      
-      // Second pass: process each content group with batched API calls
-      const contentPromises = Object.values(contentGroups).map(async (group) => {
+
+      // Process each content group concurrently, merging results as they arrive
+      const groupPromises = Object.values(contentGroups).map(async (group) => {
         try {
-          // Allow any ID; meta resolution will try Cinemeta first, then other addons
           if (!isSupportedId(group.id)) return;
-          
-          // Get metadata once per content
           const cachedData = await getCachedMetadata(group.type, group.id);
-          if (!cachedData?.basicContent) {
-            return;
-          }
-          
+          if (!cachedData?.basicContent) return;
           const { metadata, basicContent } = cachedData;
-          
-          // Process all episodes for this content
+
+          const batch: ContinueWatchingItem[] = [];
           for (const episode of group.episodes) {
-            const { key, episodeId, progress, progressPercent } = episode;
-            
+            const { episodeId, progress, progressPercent } = episode;
+
             if (group.type === 'series' && progressPercent >= 85) {
-              // Handle next episode logic for completed episodes
               let nextSeason: number | undefined;
               let nextEpisode: number | undefined;
-
               if (episodeId) {
-                // Pattern 1: s1e1
                 const match = episodeId.match(/s(\d+)e(\d+)/i);
                 if (match) {
                   const currentSeason = parseInt(match[1], 10);
@@ -208,7 +206,6 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                   nextSeason = currentSeason;
                   nextEpisode = currentEpisode + 1;
                 } else {
-                  // Pattern 2: id:season:episode
                   const parts = episodeId.split(':');
                   if (parts.length >= 2) {
                     const seasonNum = parseInt(parts[parts.length - 2], 10);
@@ -220,15 +217,12 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                   }
                 }
               }
-
-              // Check if next episode exists and has been released using cached metadata
               if (nextSeason !== undefined && nextEpisode !== undefined && metadata?.videos && Array.isArray(metadata.videos)) {
-                const nextEpisodeVideo = metadata.videos.find((video: any) => 
+                const nextEpisodeVideo = metadata.videos.find((video: any) =>
                   video.season === nextSeason && video.episode === nextEpisode
                 );
-                
                 if (nextEpisodeVideo && isEpisodeReleased(nextEpisodeVideo)) {
-                  const nextEpisodeItem = {
+                  batch.push({
                     ...basicContent,
                     id: group.id,
                     type: group.type,
@@ -237,40 +231,28 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                     season: nextSeason,
                     episode: nextEpisode,
                     episodeTitle: `Episode ${nextEpisode}`,
-                  } as ContinueWatchingItem;
-
-                  // Store in latestEpisodes to ensure single entry per show
-                  const existingLatest = latestEpisodes[group.id];
-                  if (!existingLatest || existingLatest.lastUpdated < nextEpisodeItem.lastUpdated) {
-                    latestEpisodes[group.id] = nextEpisodeItem;
-                  }
+                  } as ContinueWatchingItem);
                 }
               }
               continue;
             }
-            
-            // Handle in-progress episodes
+
             let season: number | undefined;
             let episodeNumber: number | undefined;
             let episodeTitle: string | undefined;
-            
             if (episodeId && group.type === 'series') {
-              // Try different episode ID formats
-              let match = episodeId.match(/s(\d+)e(\d+)/i); // Format: s1e1
+              let match = episodeId.match(/s(\d+)e(\d+)/i);
               if (match) {
                 season = parseInt(match[1], 10);
                 episodeNumber = parseInt(match[2], 10);
                 episodeTitle = `Episode ${episodeNumber}`;
               } else {
-                // Try format: seriesId:season:episode (e.g., tt0108778:4:6)
                 const parts = episodeId.split(':');
                 if (parts.length >= 3) {
-                  const seasonPart = parts[parts.length - 2]; // Second to last part
-                  const episodePart = parts[parts.length - 1]; // Last part
-                  
+                  const seasonPart = parts[parts.length - 2];
+                  const episodePart = parts[parts.length - 1];
                   const seasonNum = parseInt(seasonPart, 10);
                   const episodeNum = parseInt(episodePart, 10);
-                  
                   if (!isNaN(seasonNum) && !isNaN(episodeNum)) {
                     season = seasonNum;
                     episodeNumber = episodeNum;
@@ -279,99 +261,76 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                 }
               }
             }
-            
-            const continueWatchingItem: ContinueWatchingItem = {
+
+            batch.push({
               ...basicContent,
               progress: progressPercent,
               lastUpdated: progress.lastUpdated,
               season,
               episode: episodeNumber,
-              episodeTitle
-            };
-            
-            if (group.type === 'series') {
-              // For series, keep only the latest watched episode for each show
-              if (!latestEpisodes[group.id] || latestEpisodes[group.id].lastUpdated < progress.lastUpdated) {
-                latestEpisodes[group.id] = continueWatchingItem;
-              }
-            } else {
-              // For movies, add to the list directly
-              progressItems.push(continueWatchingItem);
-            }
+              episodeTitle,
+            } as ContinueWatchingItem);
           }
+
+          if (batch.length > 0) mergeBatchIntoState(batch);
         } catch (error) {
           logger.error(`Failed to process content group ${group.type}:${group.id}:`, error);
         }
       });
-      
-      // Wait for all content to be processed
-       await Promise.all(contentPromises);
-      
-      // -------------------- TRAKT HISTORY INTEGRATION --------------------
-      try {
-        const traktService = TraktService.getInstance();
-        const isAuthed = await traktService.isAuthenticated();
-        if (isAuthed) {
+
+      // TRÅKT: fetch history and merge incrementally as well
+      const traktMergePromise = (async () => {
+        try {
+          const traktService = TraktService.getInstance();
+          const isAuthed = await traktService.isAuthenticated();
+          if (!isAuthed) return;
           const historyItems = await traktService.getWatchedEpisodesHistory(1, 200);
           const latestWatchedByShow: Record<string, { season: number; episode: number; watchedAt: number }> = {};
-
           for (const item of historyItems) {
             if (item.type !== 'episode') continue;
             const showImdb = item.show?.ids?.imdb ? `tt${item.show.ids.imdb.replace(/^tt/, '')}` : null;
             if (!showImdb) continue;
-
             const season = item.episode?.season;
             const epNum = item.episode?.number;
             if (season === undefined || epNum === undefined) continue;
             const watchedAt = new Date(item.watched_at).getTime();
-
             const existing = latestWatchedByShow[showImdb];
             if (!existing || existing.watchedAt < watchedAt) {
               latestWatchedByShow[showImdb] = { season, episode: epNum, watchedAt };
             }
           }
 
-          // Process Trakt shows in batches using cached metadata
-          const traktPromises = Object.entries(latestWatchedByShow).map(async ([showId, info]) => {
+          const perShowPromises = Object.entries(latestWatchedByShow).map(async ([showId, info]) => {
             try {
               const nextEpisode = info.episode + 1;
-              
-              // Use cached metadata to validate next episode exists
               const cachedData = await getCachedMetadata('series', showId);
               if (!cachedData?.basicContent) return;
-              
               const { metadata, basicContent } = cachedData;
               let nextEpisodeVideo = null;
-              
               if (metadata?.videos && Array.isArray(metadata.videos)) {
-                nextEpisodeVideo = metadata.videos.find((video: any) => 
+                nextEpisodeVideo = metadata.videos.find((video: any) =>
                   video.season === info.season && video.episode === nextEpisode
                 );
               }
-              
               if (nextEpisodeVideo && isEpisodeReleased(nextEpisodeVideo)) {
-                const placeholder: ContinueWatchingItem = {
-                  ...basicContent,
-                  id: showId,
-                  type: 'series',
-                  progress: 0,
-                  lastUpdated: info.watchedAt,
-                  season: info.season,
-                  episode: nextEpisode,
-                  episodeTitle: `Episode ${nextEpisode}`,
-                } as ContinueWatchingItem;
-
-                const existing = latestEpisodes[showId];
-                if (!existing || existing.lastUpdated < info.watchedAt) {
-                  latestEpisodes[showId] = placeholder;
-                }
+                mergeBatchIntoState([
+                  {
+                    ...basicContent,
+                    id: showId,
+                    type: 'series',
+                    progress: 0,
+                    lastUpdated: info.watchedAt,
+                    season: info.season,
+                    episode: nextEpisode,
+                    episodeTitle: `Episode ${nextEpisode}`,
+                  } as ContinueWatchingItem,
+                ]);
               }
 
               // Persist "watched" progress for the episode that Trakt reported
               const watchedEpisodeId = `${showId}:${info.season}:${info.episode}`;
               const existingProgress = allProgress[`series:${showId}:${watchedEpisodeId}`];
               const existingPercent = existingProgress ? (existingProgress.currentTime / existingProgress.duration) * 100 : 0;
-
               if (!existingProgress || existingPercent < 85) {
                 await storageService.setWatchProgress(
                   showId,
@@ -390,21 +349,14 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
               logger.error('Failed to build placeholder from history:', err);
             }
           });
-          
-          await Promise.all(traktPromises);
+          await Promise.allSettled(perShowPromises);
+        } catch (err) {
+          logger.error('Error merging Trakt history:', err);
         }
-      } catch (err) {
-        logger.error('Error merging Trakt history:', err);
-      }
-      
-      // Add the latest episodes for each series to the items list
-      progressItems.push(...Object.values(latestEpisodes));
-      
-      // Sort by last updated time (most recent first)
-      progressItems.sort((a, b) => b.lastUpdated - a.lastUpdated);
-      
-      // Show all continue watching items (no limit)
-      setContinueWatchingItems(progressItems);
+      })();
+
+      // Wait for all groups and trakt merge to settle, then finalize loading state
+      await Promise.allSettled([...groupPromises, traktMergePromise]);
     } catch (error) {
       logger.error('Failed to load continue watching items:', error);
     } finally {
