@@ -41,11 +41,14 @@ import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 
-const { width } = Dimensions.get('window');
-const HORIZONTAL_ITEM_WIDTH = width * 0.3;
+const { width, height } = Dimensions.get('window');
+const isTablet = width >= 768;
+
+// Tablet-optimized poster sizes
+const HORIZONTAL_ITEM_WIDTH = isTablet ? width * 0.18 : width * 0.3;
 const HORIZONTAL_POSTER_HEIGHT = HORIZONTAL_ITEM_WIDTH * 1.5;
-const POSTER_WIDTH = 90;
-const POSTER_HEIGHT = 135;
+const POSTER_WIDTH = isTablet ? 70 : 90;
+const POSTER_HEIGHT = isTablet ? 105 : 135;
 const RECENT_SEARCHES_KEY = 'recent_searches';
 const MAX_RECENT_SEARCHES = 10;
 
@@ -740,30 +743,30 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollViewContent: {
-    paddingBottom: 20,
+    paddingBottom: isTablet ? 120 : 100, // Extra padding for tablet bottom nav
     paddingHorizontal: 0,
   },
   carouselContainer: {
-    marginBottom: 24,
+    marginBottom: isTablet ? 32 : 24,
   },
   carouselTitle: {
-    fontSize: 18,
+    fontSize: isTablet ? 20 : 18,
     fontWeight: '700',
-    marginBottom: 12,
+    marginBottom: isTablet ? 16 : 12,
     paddingHorizontal: 16,
   },
   horizontalListContent: {
-    paddingHorizontal: 12,
-    paddingRight: 8,
+    paddingHorizontal: isTablet ? 16 : 12,
+    paddingRight: isTablet ? 12 : 8,
   },
   horizontalItem: {
     width: HORIZONTAL_ITEM_WIDTH,
-    marginRight: 12,
+    marginRight: isTablet ? 16 : 12,
   },
   horizontalItemPosterContainer: {
     width: HORIZONTAL_ITEM_WIDTH,
     height: HORIZONTAL_POSTER_HEIGHT,
-    borderRadius: 8,
+    borderRadius: 16,
     overflow: 'hidden',
     marginBottom: 8,
     borderWidth: 1,
@@ -773,27 +776,27 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   horizontalItemTitle: {
-    fontSize: 14,
+    fontSize: isTablet ? 12 : 14,
     fontWeight: '600',
-    lineHeight: 18,
+    lineHeight: isTablet ? 16 : 18,
     textAlign: 'left',
   },
   yearText: {
-    fontSize: 12,
+    fontSize: isTablet ? 10 : 12,
     marginTop: 2,
   },
   recentSearchesContainer: {
     paddingHorizontal: 16,
-    paddingBottom: 16,
-    paddingTop: 8,
+    paddingBottom: isTablet ? 24 : 16,
+    paddingTop: isTablet ? 12 : 8,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.05)',
-    marginBottom: 8,
+    marginBottom: isTablet ? 16 : 8,
   },
   recentSearchItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: isTablet ? 12 : 10,
     paddingHorizontal: 16,
     marginVertical: 1,
   },
@@ -820,7 +823,8 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: isTablet ? 64 : 32,
+    paddingBottom: isTablet ? 120 : 100,
   },
   emptyText: {
     fontSize: 18,
@@ -847,7 +851,7 @@ const styles = StyleSheet.create({
   skeletonPoster: {
     width: POSTER_WIDTH,
     height: POSTER_HEIGHT,
-    borderRadius: 8,
+    borderRadius: 12,
   },
   skeletonItemDetails: {
     flex: 1,
@@ -886,7 +890,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   itemTypeText: {
-    fontSize: 8,
+    fontSize: isTablet ? 7 : 8,
     fontWeight: '700',
   },
   ratingContainer: {
@@ -901,7 +905,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   ratingText: {
-    fontSize: 10,
+    fontSize: isTablet ? 9 : 10,
     fontWeight: '700',
     marginLeft: 2,
   },
@@ -935,4 +939,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default SearchScreen; 
+export default SearchScreen;

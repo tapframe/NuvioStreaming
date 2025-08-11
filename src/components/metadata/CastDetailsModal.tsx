@@ -32,8 +32,9 @@ interface CastDetailsModalProps {
 }
 
 const { width, height } = Dimensions.get('window');
-const MODAL_WIDTH = Math.min(width - 40, 400);
-const MODAL_HEIGHT = height * 0.7;
+const isTablet = width >= 768;
+const MODAL_WIDTH = isTablet ? Math.min(width * 0.8, 800) : Math.min(width - 40, 400);
+const MODAL_HEIGHT = isTablet ? Math.min(height * 0.85, 700) : height * 0.7;
 
 interface PersonDetails {
   id: number;
@@ -165,7 +166,7 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
             width: MODAL_WIDTH,
             height: MODAL_HEIGHT,
             overflow: 'hidden',
-            borderRadius: 24,
+            borderRadius: isTablet ? 32 : 24,
             backgroundColor: Platform.OS === 'android' 
               ? 'rgba(20, 20, 20, 0.95)' 
               : 'transparent',
@@ -199,23 +200,23 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
         <LinearGradient
           colors={[
             currentTheme.colors.primary + 'DD',
-            currentTheme.colors.primaryVariant + 'CC',
+            currentTheme.colors.primary + 'AA',
           ]}
           style={{
-            padding: 20,
-            paddingTop: 24,
+            padding: isTablet ? 24 : 20,
+            paddingTop: isTablet ? 28 : 24,
           }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <View style={{
-              width: 60,
-              height: 60,
-              borderRadius: 30,
+              width: isTablet ? 80 : 60,
+              height: isTablet ? 80 : 60,
+              borderRadius: isTablet ? 40 : 30,
               overflow: 'hidden',
-              marginRight: 16,
+              marginRight: isTablet ? 20 : 16,
               backgroundColor: 'rgba(255, 255, 255, 0.1)',
             }}>
-              {castMember.profile_path ? (
+              {castMember?.profile_path ? (
                 <Image
                   source={{
                     uri: `https://image.tmdb.org/t/p/w185${castMember.profile_path}`,
@@ -232,10 +233,10 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
                 }}>
                   <Text style={{
                     color: '#fff',
-                    fontSize: 18,
+                    fontSize: isTablet ? 22 : 18,
                     fontWeight: '700',
                   }}>
-                    {castMember.name.split(' ').reduce((prev: string, current: string) => prev + current[0], '').substring(0, 2)}
+                    {castMember?.name?.split(' ').reduce((prev: string, current: string) => prev + current[0], '').substring(0, 2)}
                   </Text>
                 </View>
               )}
@@ -244,16 +245,16 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
             <View style={{ flex: 1 }}>
               <Text style={{
                 color: '#fff',
-                fontSize: 18,
+                fontSize: isTablet ? 22 : 18,
                 fontWeight: '800',
                 marginBottom: 4,
               }} numberOfLines={2}>
-                {castMember.name}
+                {castMember?.name}
               </Text>
-              {castMember.character && (
+              {castMember?.character && (
                 <Text style={{
                   color: 'rgba(255, 255, 255, 0.8)',
-                  fontSize: 14,
+                  fontSize: isTablet ? 16 : 14,
                   fontWeight: '500',
                 }} numberOfLines={2}>
                   as {castMember.character}
@@ -263,9 +264,9 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
 
             <TouchableOpacity
               style={{
-                width: 36,
-                height: 36,
-                borderRadius: 18,
+                width: isTablet ? 44 : 36,
+                height: isTablet ? 44 : 36,
+                borderRadius: isTablet ? 22 : 18,
                 backgroundColor: 'rgba(255, 255, 255, 0.2)',
                 justifyContent: 'center',
                 alignItems: 'center',
@@ -273,7 +274,7 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
               onPress={handleClose}
               activeOpacity={0.7}
             >
-              <MaterialIcons name="close" size={20} color="#fff" />
+              <MaterialIcons name="close" size={isTablet ? 24 : 20} color="#fff" />
             </TouchableOpacity>
           </View>
         </LinearGradient>
@@ -281,7 +282,7 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
         {/* Content */}
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ padding: 20 }}
+          contentContainerStyle={{ padding: isTablet ? 28 : 20 }}
           showsVerticalScrollIndicator={false}
         >
           {loading ? (
@@ -405,16 +406,16 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
                 <View style={{ marginBottom: 20 }}>
                   <Text style={{
                     color: '#fff',
-                    fontSize: 16,
+                    fontSize: isTablet ? 20 : 16,
                     fontWeight: '700',
-                    marginBottom: 12,
+                    marginBottom: isTablet ? 16 : 12,
                   }}>
                     Biography
                   </Text>
                   <Text style={{
                     color: 'rgba(255, 255, 255, 0.9)',
-                    fontSize: 14,
-                    lineHeight: 20,
+                    fontSize: isTablet ? 16 : 14,
+                    lineHeight: isTablet ? 24 : 20,
                     fontWeight: '400',
                   }}>
                     {personDetails.biography}
@@ -427,16 +428,16 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
                 <View>
                   <Text style={{
                     color: '#fff',
-                    fontSize: 16,
+                    fontSize: isTablet ? 20 : 16,
                     fontWeight: '700',
-                    marginBottom: 12,
+                    marginBottom: isTablet ? 16 : 12,
                   }}>
                     Also Known As
                   </Text>
                   <Text style={{
                     color: 'rgba(255, 255, 255, 0.8)',
-                    fontSize: 14,
-                    lineHeight: 20,
+                    fontSize: isTablet ? 16 : 14,
+                    lineHeight: isTablet ? 24 : 20,
                   }}>
                     {personDetails.also_known_as.slice(0, 4).join(' • ')}
                   </Text>
