@@ -66,6 +66,20 @@ interface TraktFolder {
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
+// Compute responsive grid layout (more columns on tablets)
+function getGridLayout(screenWidth: number): { numColumns: number; itemWidth: number } {
+  const horizontalPadding = 24; // matches listContainer padding (approx)
+  const gutter = 16; // space between items (via space-between + marginBottom)
+  let numColumns = 2;
+  if (screenWidth >= 1200) numColumns = 5;
+  else if (screenWidth >= 1000) numColumns = 4;
+  else if (screenWidth >= 700) numColumns = 3;
+  else numColumns = 2;
+  const available = screenWidth - horizontalPadding - (numColumns - 1) * gutter;
+  const itemWidth = Math.floor(available / numColumns);
+  return { numColumns, itemWidth };
+}
+
 const TraktItem = React.memo(({ item, width, navigation, currentTheme }: { item: TraktDisplayItem; width: number; navigation: any; currentTheme: any }) => {
   const [posterUrl, setPosterUrl] = useState<string | null>(null);
 
@@ -146,7 +160,7 @@ const TraktItem = React.memo(({ item, width, navigation, currentTheme }: { item:
 const SkeletonLoader = () => {
   const pulseAnim = React.useRef(new RNAnimated.Value(0)).current;
   const { width } = useWindowDimensions();
-  const itemWidth = (width - 48) / 2;
+  const { numColumns, itemWidth } = getGridLayout(width);
   const { currentTheme } = useTheme();
 
   React.useEffect(() => {
@@ -190,10 +204,12 @@ const SkeletonLoader = () => {
     </View>
   );
 
+  // Render enough skeletons for at least two rows
+  const skeletonCount = numColumns * 2;
   return (
     <View style={styles.skeletonContainer}>
-      {[...Array(6)].map((_, index) => (
-        <View key={index} style={{ width: itemWidth, margin: 8 }}>
+      {Array.from({ length: skeletonCount }).map((_, index) => (
+        <View key={index} style={{ width: itemWidth, marginBottom: 16 }}>
           {renderSkeletonItem()}
         </View>
       ))}
@@ -205,6 +221,7 @@ const LibraryScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const isDarkMode = useColorScheme() === 'dark';
   const { width } = useWindowDimensions();
+  const { numColumns, itemWidth } = useMemo(() => getGridLayout(width), [width]);
   const [loading, setLoading] = useState(true);
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
   const [filter, setFilter] = useState<'all' | 'movies' | 'series'>('all');
@@ -328,8 +345,6 @@ const LibraryScreen = () => {
     // Only return folders that have content
     return folders.filter(folder => folder.itemCount > 0);
   }, [traktAuthenticated, watchedMovies, watchedShows, watchlistMovies, watchlistShows, collectionMovies, collectionShows, continueWatching, ratedContent]);
-
-  const itemWidth = (width - 48) / 2; // 2 items per row with padding
 
   const renderItem = ({ item }: { item: LibraryItem }) => (
     <TouchableOpacity
@@ -717,7 +732,7 @@ const LibraryScreen = () => {
           data={traktFolders}
           renderItem={({ item }) => renderTraktCollectionFolder({ folder: item })}
           keyExtractor={item => item.id}
-          numColumns={2}
+          numColumns={numColumns}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
           columnWrapperStyle={styles.columnWrapper}
@@ -760,7 +775,7 @@ const LibraryScreen = () => {
         data={folderItems}
         renderItem={({ item }) => renderTraktItem({ item })}
         keyExtractor={(item) => `${item.type}-${item.id}`}
-        numColumns={2}
+        numColumns={numColumns}
         columnWrapperStyle={styles.row}
         style={styles.traktContainer}
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
@@ -856,7 +871,7 @@ const LibraryScreen = () => {
           return renderItem({ item: item as LibraryItem });
         }}
               keyExtractor={item => item.id}
-              numColumns={2}
+              numColumns={numColumns}
               contentContainerStyle={styles.listContainer}
               showsVerticalScrollIndicator={false}
               columnWrapperStyle={styles.columnWrapper}

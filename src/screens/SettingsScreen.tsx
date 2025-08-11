@@ -31,34 +31,53 @@ import { catalogService } from '../services/catalogService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
+const isTablet = width >= 768;
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
+
+// Settings categories for tablet sidebar
+const SETTINGS_CATEGORIES = [
+  { id: 'account', title: 'Account', icon: 'account-circle' },
+  { id: 'content', title: 'Content & Discovery', icon: 'explore' },
+  { id: 'appearance', title: 'Appearance', icon: 'palette' },
+  { id: 'integrations', title: 'Integrations', icon: 'extension' },
+  { id: 'playback', title: 'Playback', icon: 'play-circle-outline' },
+  { id: 'about', title: 'About', icon: 'info-outline' },
+  { id: 'developer', title: 'Developer', icon: 'code' },
+  { id: 'cache', title: 'Cache', icon: 'cached' },
+];
 
 // Card component with minimalistic style
 interface SettingsCardProps {
   children: React.ReactNode;
   title?: string;
+  isTablet?: boolean;
 }
 
-const SettingsCard: React.FC<SettingsCardProps> = ({ children, title }) => {
+const SettingsCard: React.FC<SettingsCardProps> = ({ children, title, isTablet = false }) => {
   const { currentTheme } = useTheme();
   
   return (
     <View 
-      style={[styles.cardContainer]}
+      style={[
+        styles.cardContainer,
+        isTablet && styles.tabletCardContainer
+      ]}
     >
       {title && (
         <Text style={[
           styles.cardTitle,
-          { color: currentTheme.colors.mediumEmphasis }
+          { color: currentTheme.colors.mediumEmphasis },
+          isTablet && styles.tabletCardTitle
         ]}>
           {title}
         </Text>
       )}
       <View style={[
         styles.card,
-        { backgroundColor: currentTheme.colors.elevation1 }
+        { backgroundColor: currentTheme.colors.elevation1 },
+        isTablet && styles.tabletCard
       ]}>
         {children}
       </View>
@@ -74,6 +93,7 @@ interface SettingItemProps {
   isLast?: boolean;
   onPress?: () => void;
   badge?: string | number;
+  isTablet?: boolean;
 }
 
 const SettingItem: React.FC<SettingItemProps> = ({
@@ -83,7 +103,8 @@ const SettingItem: React.FC<SettingItemProps> = ({
   renderControl,
   isLast = false,
   onPress,
-  badge
+  badge,
+  isTablet = false
 }) => {
   const { currentTheme } = useTheme();
   
@@ -94,22 +115,36 @@ const SettingItem: React.FC<SettingItemProps> = ({
       style={[
         styles.settingItem, 
         !isLast && styles.settingItemBorder,
-        { borderBottomColor: currentTheme.colors.elevation2 }
+        { borderBottomColor: currentTheme.colors.elevation2 },
+        isTablet && styles.tabletSettingItem
       ]}
     >
       <View style={[
         styles.settingIconContainer,
-        { backgroundColor: currentTheme.colors.elevation2 }
+        { backgroundColor: currentTheme.colors.elevation2 },
+        isTablet && styles.tabletSettingIconContainer
       ]}>
-        <MaterialIcons name={icon} size={20} color={currentTheme.colors.primary} />
+        <MaterialIcons 
+          name={icon} 
+          size={isTablet ? 24 : 20} 
+          color={currentTheme.colors.primary} 
+        />
       </View>
       <View style={styles.settingContent}>
         <View style={styles.settingTextContainer}>
-          <Text style={[styles.settingTitle, { color: currentTheme.colors.highEmphasis }]}>
+          <Text style={[
+            styles.settingTitle, 
+            { color: currentTheme.colors.highEmphasis },
+            isTablet && styles.tabletSettingTitle
+          ]}>
             {title}
           </Text>
           {description && (
-            <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]} numberOfLines={1}>
+            <Text style={[
+              styles.settingDescription, 
+              { color: currentTheme.colors.mediumEmphasis },
+              isTablet && styles.tabletSettingDescription
+            ]} numberOfLines={1}>
               {description}
             </Text>
           )}
@@ -129,6 +164,62 @@ const SettingItem: React.FC<SettingItemProps> = ({
   );
 };
 
+// Tablet Sidebar Component
+interface SidebarProps {
+  selectedCategory: string;
+  onCategorySelect: (category: string) => void;
+  currentTheme: any;
+  categories: typeof SETTINGS_CATEGORIES;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, currentTheme, categories }) => {
+  return (
+    <View style={[styles.sidebar, { backgroundColor: currentTheme.colors.elevation1 }]}>
+      <View style={styles.sidebarHeader}>
+        <Text style={[styles.sidebarTitle, { color: currentTheme.colors.highEmphasis }]}>
+          Settings
+        </Text>
+      </View>
+      
+      <ScrollView style={styles.sidebarContent} showsVerticalScrollIndicator={false}>
+        {categories.map((category) => (
+          <TouchableOpacity
+            key={category.id}
+            style={[
+              styles.sidebarItem,
+              selectedCategory === category.id && [
+                styles.sidebarItemActive,
+                { backgroundColor: `${currentTheme.colors.primary}15` }
+              ]
+            ]}
+            onPress={() => onCategorySelect(category.id)}
+          >
+            <MaterialIcons
+              name={category.icon}
+              size={22}
+              color={
+                selectedCategory === category.id 
+                  ? currentTheme.colors.primary 
+                  : currentTheme.colors.mediumEmphasis
+              }
+            />
+            <Text style={[
+              styles.sidebarItemText,
+              {
+                color: selectedCategory === category.id 
+                  ? currentTheme.colors.primary 
+                  : currentTheme.colors.mediumEmphasis
+              }
+            ]}>
+              {category.title}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
+};
+
 const SettingsScreen: React.FC = () => {
   const { settings, updateSetting } = useSettings();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
@@ -137,6 +228,9 @@ const SettingsScreen: React.FC = () => {
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
   const { user, signOut } = useAccount();
+  
+  // Tablet-specific state
+  const [selectedCategory, setSelectedCategory] = useState('account');
   
   // Add a useEffect to check authentication status on focus
   useEffect(() => {
@@ -267,15 +361,328 @@ const SettingsScreen: React.FC = () => {
   const ChevronRight = () => (
     <MaterialIcons 
       name="chevron-right" 
-      size={20} 
+      size={isTablet ? 24 : 20} 
       color={currentTheme.colors.mediumEmphasis}
     />
   );
+
+  // Filter categories based on conditions
+  const visibleCategories = SETTINGS_CATEGORIES.filter(category => {
+    if (category.id === 'developer' && !__DEV__) return false;
+    if (category.id === 'cache' && !mdblistKeySet) return false;
+    return true;
+  });
+
+  const renderCategoryContent = (categoryId: string) => {
+    switch (categoryId) {
+      case 'account':
+        return (
+          <SettingsCard title="ACCOUNT" isTablet={isTablet}>
+            {user ? (
+              <>
+                <SettingItem
+                  title={user.displayName || user.email || user.id}
+                  description="Manage account"
+                  icon="account-circle"
+                  onPress={() => navigation.navigate('AccountManage')}
+                  isTablet={isTablet}
+                />
+              </>
+            ) : (
+              <SettingItem
+                title="Sign in / Create account"
+                description="Sync across devices"
+                icon="login"
+                onPress={() => navigation.navigate('Account')}
+                isTablet={isTablet}
+              />
+            )}
+            <SettingItem
+              title="Trakt"
+              description={isAuthenticated ? `@${userProfile?.username || 'User'}` : "Sign in to sync"}
+              icon="person"
+              renderControl={ChevronRight}
+              onPress={() => navigation.navigate('TraktSettings')}
+              isTablet={isTablet}
+            />
+            {isAuthenticated && (
+              <SettingItem
+                title="Profiles"
+                description="Manage multiple users"
+                icon="people"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('ProfilesSettings')}
+                isLast={true}
+                isTablet={isTablet}
+              />
+            )}
+          </SettingsCard>
+        );
+
+      case 'content':
+        return (
+          <SettingsCard title="CONTENT & DISCOVERY" isTablet={isTablet}>
+            <SettingItem
+              title="Addons"
+              description={`${addonCount} installed`}
+              icon="extension"
+              renderControl={ChevronRight}
+              onPress={() => navigation.navigate('Addons')}
+              isTablet={isTablet}
+            />
+            <SettingItem
+              title="Plugins"
+              description="Manage plugins and repositories"
+              icon="code"
+              renderControl={ChevronRight}
+              onPress={() => navigation.navigate('ScraperSettings')}
+              isTablet={isTablet}
+            />
+            <SettingItem
+              title="Catalogs"
+              description={`${catalogCount} active`}
+              icon="view-list"
+              renderControl={ChevronRight}
+              onPress={() => navigation.navigate('CatalogSettings')}
+              isTablet={isTablet}
+            />
+            <SettingItem
+              title="Home Screen"
+              description="Layout and content"
+              icon="home"
+              renderControl={ChevronRight}
+              onPress={() => navigation.navigate('HomeScreenSettings')}
+              isLast={true}
+              isTablet={isTablet}
+            />
+          </SettingsCard>
+        );
+
+      case 'appearance':
+        return (
+          <SettingsCard title="APPEARANCE" isTablet={isTablet}>
+            <SettingItem
+              title="Theme"
+              description={currentTheme.name}
+              icon="palette"
+              renderControl={ChevronRight}
+              onPress={() => navigation.navigate('ThemeSettings')}
+              isTablet={isTablet}
+            />
+            <SettingItem
+              title="Episode Layout"
+              description={settings?.episodeLayoutStyle === 'horizontal' ? 'Horizontal' : 'Vertical'}
+              icon="view-module"
+              renderControl={() => (
+                <CustomSwitch
+                  value={settings?.episodeLayoutStyle === 'horizontal'}
+                  onValueChange={(value) => updateSetting('episodeLayoutStyle', value ? 'horizontal' : 'vertical')}
+                />
+              )}
+              isLast={true}
+              isTablet={isTablet}
+            />
+          </SettingsCard>
+        );
+
+      case 'integrations':
+        return (
+          <SettingsCard title="INTEGRATIONS" isTablet={isTablet}>
+            <SettingItem
+              title="MDBList"
+              description={mdblistKeySet ? "Connected" : "Enable to add ratings & reviews"}
+              icon="star"
+              renderControl={ChevronRight}
+              onPress={() => navigation.navigate('MDBListSettings')}
+              isTablet={isTablet}
+            />
+            <SettingItem
+              title="TMDB"
+              description="Metadata provider"
+              icon="movie"
+              renderControl={ChevronRight}
+              onPress={() => navigation.navigate('TMDBSettings')}
+              isTablet={isTablet}
+            />
+            <SettingItem
+              title="Media Sources"
+              description="Logo & image preferences"
+              icon="image"
+              renderControl={ChevronRight}
+              onPress={() => navigation.navigate('LogoSourceSettings')}
+              isLast={true}
+              isTablet={isTablet}
+            />
+          </SettingsCard>
+        );
+
+      case 'playback':
+        return (
+          <SettingsCard title="PLAYBACK" isTablet={isTablet}>
+            <SettingItem
+              title="Video Player"
+              description={Platform.OS === 'ios' 
+                ? (settings?.preferredPlayer === 'internal' ? 'Built-in' : settings?.preferredPlayer?.toUpperCase() || 'Built-in')
+                : (settings?.useExternalPlayer ? 'External' : 'Built-in')
+              }
+              icon="play-circle-outline"
+              renderControl={ChevronRight}
+              onPress={() => navigation.navigate('PlayerSettings')}
+              isTablet={isTablet}
+            />
+            <SettingItem
+              title="Notifications"
+              description="Episode reminders"
+              icon="notifications-none"
+              renderControl={ChevronRight}
+              onPress={() => navigation.navigate('NotificationSettings')}
+              isLast={true}
+              isTablet={isTablet}
+            />
+          </SettingsCard>
+        );
+
+      case 'about':
+        return (
+          <SettingsCard title="ABOUT" isTablet={isTablet}>
+            <SettingItem
+              title="Privacy Policy"
+              icon="lock"
+              onPress={() => Linking.openURL('https://github.com/Stremio/stremio-expo/blob/main/PRIVACY_POLICY.md')}
+              renderControl={ChevronRight}
+              isTablet={isTablet}
+            />
+            <SettingItem
+              title="Report Issue"
+              icon="bug-report"
+              onPress={() => Sentry.showFeedbackWidget()}
+              renderControl={ChevronRight}
+              isTablet={isTablet}
+            />
+            <SettingItem
+              title="Version"
+              description="1.0.0"
+              icon="info-outline"
+              isLast={true}
+              isTablet={isTablet}
+            />
+          </SettingsCard>
+        );
+
+      case 'developer':
+        return __DEV__ ? (
+          <SettingsCard title="DEVELOPER" isTablet={isTablet}>
+            <SettingItem
+              title="Test Onboarding"
+              icon="play-circle-outline"
+              onPress={() => navigation.navigate('Onboarding')}
+              renderControl={ChevronRight}
+              isTablet={isTablet}
+            />
+            <SettingItem
+              title="Reset Onboarding"
+              icon="refresh"
+              onPress={async () => {
+                try {
+                  await AsyncStorage.removeItem('hasCompletedOnboarding');
+                  Alert.alert('Success', 'Onboarding has been reset. Restart the app to see the onboarding flow.');
+                } catch (error) {
+                  Alert.alert('Error', 'Failed to reset onboarding.');
+                }
+              }}
+              renderControl={ChevronRight}
+              isTablet={isTablet}
+            />
+            <SettingItem
+              title="Clear All Data"
+              icon="delete-forever"
+              onPress={() => {
+                Alert.alert(
+                  'Clear All Data',
+                  'This will reset all settings and clear all cached data. Are you sure?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Clear',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          await AsyncStorage.clear();
+                          Alert.alert('Success', 'All data cleared. Please restart the app.');
+                        } catch (error) {
+                          Alert.alert('Error', 'Failed to clear data.');
+                        }
+                      }
+                    }
+                  ]
+                );
+              }}
+              isLast={true}
+              isTablet={isTablet}
+            />
+          </SettingsCard>
+        ) : null;
+
+      case 'cache':
+        return mdblistKeySet ? (
+          <SettingsCard title="CACHE MANAGEMENT" isTablet={isTablet}>
+            <SettingItem
+              title="Clear MDBList Cache"
+              icon="cached"
+              onPress={handleClearMDBListCache}
+              isLast={true}
+              isTablet={isTablet}
+            />
+          </SettingsCard>
+        ) : null;
+
+      default:
+        return null;
+    }
+  };
 
   const headerBaseHeight = Platform.OS === 'android' ? 80 : 60;
   const topSpacing = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top;
   const headerHeight = headerBaseHeight + topSpacing;
 
+  if (isTablet) {
+    return (
+      <View style={[
+        styles.container,
+        { backgroundColor: currentTheme.colors.darkBackground }
+      ]}>
+        <StatusBar barStyle={'light-content'} />
+        <View style={styles.tabletContainer}>
+          <Sidebar
+            selectedCategory={selectedCategory}
+            onCategorySelect={setSelectedCategory}
+            currentTheme={currentTheme}
+            categories={visibleCategories}
+          />
+          
+          <View style={styles.tabletContent}>
+            <ScrollView 
+              style={styles.tabletScrollView}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.tabletScrollContent}
+            >
+              {renderCategoryContent(selectedCategory)}
+              
+              {selectedCategory === 'about' && (
+                <View style={styles.footer}>
+                  <Text style={[styles.footerText, { color: currentTheme.colors.mediumEmphasis }]}>
+                    Made with ❤️ by the Nuvio team
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  // Mobile Layout (original)
   return (
     <View style={[
       styles.container,
@@ -295,232 +702,14 @@ const SettingsScreen: React.FC = () => {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
           >
-            {/* Account Section */}
-            <SettingsCard title="ACCOUNT">
-              {user ? (
-                <>
-                  <SettingItem
-                    title={user.displayName || user.email || user.id}
-                    description="Manage account"
-                    icon="account-circle"
-                    onPress={() => navigation.navigate('AccountManage')}
-                  />
-                </>
-              ) : (
-                <SettingItem
-                  title="Sign in / Create account"
-                  description="Sync across devices"
-                  icon="login"
-                  onPress={() => navigation.navigate('Account')}
-                />
-              )}
-              <SettingItem
-                title="Trakt"
-                description={isAuthenticated ? `@${userProfile?.username || 'User'}` : "Sign in to sync"}
-                icon="person"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('TraktSettings')}
-              />
-              {isAuthenticated && (
-                <SettingItem
-                  title="Profiles"
-                  description="Manage multiple users"
-                  icon="people"
-                  renderControl={ChevronRight}
-                  onPress={() => navigation.navigate('ProfilesSettings')}
-                  isLast={true}
-                />
-              )}
-            </SettingsCard>
-
-            {/* Content & Discovery */}
-            <SettingsCard title="CONTENT & DISCOVERY">
-              <SettingItem
-                title="Addons"
-                description={`${addonCount} installed`}
-                icon="extension"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('Addons')}
-              />
-              <SettingItem
-                title="Plugins"
-                description="Manage plugins and repositories"
-                icon="code"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('ScraperSettings')}
-              />
-              <SettingItem
-                title="Catalogs"
-                description={`${catalogCount} active`}
-                icon="view-list"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('CatalogSettings')}
-              />
-              <SettingItem
-                title="Home Screen"
-                description="Layout and content"
-                icon="home"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('HomeScreenSettings')}
-                isLast={true}
-              />
-            </SettingsCard>
-
-            {/* Appearance & Interface */}
-            <SettingsCard title="APPEARANCE">
-              <SettingItem
-                title="Theme"
-                description={currentTheme.name}
-                icon="palette"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('ThemeSettings')}
-              />
-              <SettingItem
-                title="Episode Layout"
-                description={settings?.episodeLayoutStyle === 'horizontal' ? 'Horizontal' : 'Vertical'}
-                icon="view-module"
-                renderControl={() => (
-                  <CustomSwitch
-                    value={settings?.episodeLayoutStyle === 'horizontal'}
-                    onValueChange={(value) => updateSetting('episodeLayoutStyle', value ? 'horizontal' : 'vertical')}
-                  />
-                )}
-                isLast={true}
-              />
-            </SettingsCard>
-
-            {/* Integrations */}
-            <SettingsCard title="INTEGRATIONS">
-              <SettingItem
-                title="MDBList"
-                description={mdblistKeySet ? "Connected" : "Enable to add ratings & reviews"}
-                icon="star"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('MDBListSettings')}
-              />
-              <SettingItem
-                title="TMDB"
-                description="Metadata provider"
-                icon="movie"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('TMDBSettings')}
-              />
-              <SettingItem
-                title="Media Sources"
-                description="Logo & image preferences"
-                icon="image"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('LogoSourceSettings')}
-                isLast={true}
-              />
-            </SettingsCard>
-
-            {/* Playback & Experience */}
-            <SettingsCard title="PLAYBACK">
-              <SettingItem
-                title="Video Player"
-                description={Platform.OS === 'ios' 
-                  ? (settings?.preferredPlayer === 'internal' ? 'Built-in' : settings?.preferredPlayer?.toUpperCase() || 'Built-in')
-                  : (settings?.useExternalPlayer ? 'External' : 'Built-in')
-                }
-                icon="play-circle-outline"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('PlayerSettings')}
-              />
-              <SettingItem
-                title="Notifications"
-                description="Episode reminders"
-                icon="notifications-none"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('NotificationSettings')}
-                isLast={true}
-              />
-            </SettingsCard>
-
-            {/* About & Support */}
-            <SettingsCard title="ABOUT">
-              <SettingItem
-                title="Privacy Policy"
-                icon="lock"
-                onPress={() => Linking.openURL('https://github.com/Stremio/stremio-expo/blob/main/PRIVACY_POLICY.md')}
-                renderControl={ChevronRight}
-              />
-              <SettingItem
-                title="Report Issue"
-                icon="bug-report"
-                onPress={() => Sentry.showFeedbackWidget()}
-                renderControl={ChevronRight}
-              />
-              <SettingItem
-                title="Version"
-                description="1.0.0"
-                icon="info-outline"
-                isLast={true}
-              />
-            </SettingsCard>
-
-            {/* Developer Options - Only show in development */}
-            {__DEV__ && (
-              <SettingsCard title="DEVELOPER">
-                <SettingItem
-                  title="Test Onboarding"
-                  icon="play-circle-outline"
-                  onPress={() => navigation.navigate('Onboarding')}
-                  renderControl={ChevronRight}
-                />
-                <SettingItem
-                  title="Reset Onboarding"
-                  icon="refresh"
-                  onPress={async () => {
-                    try {
-                      await AsyncStorage.removeItem('hasCompletedOnboarding');
-                      Alert.alert('Success', 'Onboarding has been reset. Restart the app to see the onboarding flow.');
-                    } catch (error) {
-                      Alert.alert('Error', 'Failed to reset onboarding.');
-                    }
-                  }}
-                  renderControl={ChevronRight}
-                />
-                <SettingItem
-                  title="Clear All Data"
-                  icon="delete-forever"
-                  onPress={() => {
-                    Alert.alert(
-                      'Clear All Data',
-                      'This will reset all settings and clear all cached data. Are you sure?',
-                      [
-                        { text: 'Cancel', style: 'cancel' },
-                        {
-                          text: 'Clear',
-                          style: 'destructive',
-                          onPress: async () => {
-                            try {
-                              await AsyncStorage.clear();
-                              Alert.alert('Success', 'All data cleared. Please restart the app.');
-                            } catch (error) {
-                              Alert.alert('Error', 'Failed to clear data.');
-                            }
-                          }
-                        }
-                      ]
-                    );
-                  }}
-                  isLast={true}
-                />
-              </SettingsCard>
-            )}
-
-            {/* Cache Management - Only show if MDBList is connected */}
-            {mdblistKeySet && (
-              <SettingsCard title="CACHE MANAGEMENT">
-                <SettingItem
-                  title="Clear MDBList Cache"
-                  icon="cached"
-                  onPress={handleClearMDBListCache}
-                  isLast={true}
-                />
-              </SettingsCard>
-            )}
+            {renderCategoryContent('account')}
+            {renderCategoryContent('content')}
+            {renderCategoryContent('appearance')}
+            {renderCategoryContent('integrations')}
+            {renderCategoryContent('playback')}
+            {renderCategoryContent('about')}
+            {renderCategoryContent('developer')}
+            {renderCategoryContent('cache')}
 
             <View style={styles.footer}>
               <Text style={[styles.footerText, { color: currentTheme.colors.mediumEmphasis }]}>
@@ -538,6 +727,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  // Mobile styles
   header: {
     paddingHorizontal: Math.max(1, width * 0.05),
     flexDirection: 'row',
@@ -566,9 +756,68 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingBottom: 90,
   },
+  
+  // Tablet-specific styles
+  tabletContainer: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  sidebar: {
+    width: 280,
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(255,255,255,0.1)',
+  },
+  sidebarHeader: {
+    padding: 24,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 24 : 48,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  sidebarTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  sidebarContent: {
+    flex: 1,
+    paddingTop: 16,
+  },
+  sidebarItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    marginHorizontal: 12,
+    marginVertical: 2,
+    borderRadius: 12,
+  },
+  sidebarItemActive: {
+    borderRadius: 12,
+  },
+  sidebarItemText: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 16,
+  },
+  tabletContent: {
+    flex: 1,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 24 : 48,
+  },
+  tabletScrollView: {
+    flex: 1,
+    paddingHorizontal: 32,
+  },
+  tabletScrollContent: {
+    paddingBottom: 32,
+  },
+  
+  // Common card styles
   cardContainer: {
     width: '100%',
     marginBottom: 20,
+  },
+  tabletCardContainer: {
+    marginBottom: 32,
   },
   cardTitle: {
     fontSize: 13,
@@ -576,6 +825,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     marginLeft: Math.max(12, width * 0.04),
     marginBottom: 8,
+  },
+  tabletCardTitle: {
+    fontSize: 14,
+    marginLeft: 0,
+    marginBottom: 12,
   },
   card: {
     marginHorizontal: Math.max(12, width * 0.04),
@@ -586,7 +840,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    width: undefined, // Let it fill the container width
+    width: undefined,
+  },
+  tabletCard: {
+    marginHorizontal: 0,
+    borderRadius: 20,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
   },
   settingItem: {
     flexDirection: 'row',
@@ -596,6 +857,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     minHeight: Math.max(54, width * 0.14),
     width: '100%',
+  },
+  tabletSettingItem: {
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    minHeight: 70,
   },
   settingItemBorder: {
     // Border styling handled directly in the component with borderBottomWidth
@@ -607,6 +873,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  tabletSettingIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    marginRight: 20,
   },
   settingContent: {
     flex: 1,
@@ -621,9 +893,18 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginBottom: 3,
   },
+  tabletSettingTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
   settingDescription: {
     fontSize: Math.min(14, width * 0.037),
     opacity: 0.8,
+  },
+  tabletSettingDescription: {
+    fontSize: 16,
+    opacity: 0.7,
   },
   settingControl: {
     justifyContent: 'center',
