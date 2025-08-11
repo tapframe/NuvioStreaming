@@ -45,6 +45,9 @@ const imageCache: Record<string, boolean> = {};
 
 const { width, height } = Dimensions.get('window');
 
+// Utility to determine if device is tablet-sized
+const isTablet = width >= 768;
+
 const NoFeaturedContent = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
@@ -447,131 +450,279 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
     return <NoFeaturedContent />;
   }
 
-  return (
-    <Animated.View
-      entering={FadeIn.duration(400).easing(Easing.out(Easing.cubic))}
-    >
-      <TouchableOpacity
-        activeOpacity={0.95}
-        onPress={() => {
-          navigation.navigate('Metadata', {
-            id: featuredContent.id,
-            type: featuredContent.type
-          });
-        }}
-        style={styles.featuredContainer as ViewStyle}
+  if (isTablet) {
+    // Tablet layout: full-width image with overlaid content
+    return (
+      <Animated.View
+        entering={FadeIn.duration(400).easing(Easing.out(Easing.cubic))}
+        style={[styles.tabletContainer as ViewStyle]}
       >
-        <Animated.View style={[styles.imageContainer, posterAnimatedStyle]}>
-          <ImageBackground
-            source={{ uri: bannerUrl || featuredContent.poster }}
-            style={styles.featuredImage as ViewStyle}
-            resizeMode="cover"
-          >
-            {/* Subtle content overlay for better readability */}
-            <Animated.View style={[styles.contentOverlay, overlayAnimatedStyle]} />
-
-            <LinearGradient
-              colors={[
-                'rgba(0,0,0,0.1)',
-                'rgba(0,0,0,0.2)',
-                'rgba(0,0,0,0.4)',
-                'rgba(0,0,0,0.8)',
-                currentTheme.colors.darkBackground,
-              ]}
-              locations={[0, 0.2, 0.5, 0.8, 1]}
-              style={styles.featuredGradient as ViewStyle}
+        <TouchableOpacity
+          activeOpacity={0.95}
+          onPress={() => {
+            navigation.navigate('Metadata', {
+              id: featuredContent.id,
+              type: featuredContent.type
+            });
+          }}
+          style={styles.tabletFullContainer as ViewStyle}
+        >
+          <Animated.View style={[styles.tabletImageWrapper, posterAnimatedStyle]}>
+            <ImageBackground
+              source={{ uri: bannerUrl || featuredContent.poster }}
+              style={styles.tabletImage as ViewStyle}
+              resizeMode="cover"
             >
-              <Animated.View
-                style={[styles.featuredContentContainer as ViewStyle, contentAnimatedStyle]}
-              >
-                {logoUrl && !logoLoadError ? (
-                  <Animated.View style={logoAnimatedStyle}>
-                    <ExpoImage
-                      source={{ uri: logoUrl }}
-                      style={styles.featuredLogo as ImageStyle}
-                      contentFit="contain"
-                      cachePolicy="memory"
-                      transition={300}
-                      recyclingKey={`logo-${featuredContent.id}`}
-                      onError={onLogoLoadError}
-                    />
-                  </Animated.View>
-                ) : (
-                  <Text style={[styles.featuredTitleText as TextStyle, { color: currentTheme.colors.highEmphasis }]}>
-                    {featuredContent.name}
-                  </Text>
+              <Animated.View style={[styles.contentOverlay, overlayAnimatedStyle]} />
+              <LinearGradient
+                colors={[
+                  'transparent',
+                  'transparent', 
+                  'rgba(0,0,0,0.3)',
+                  'rgba(0,0,0,0.7)',
+                  'rgba(0,0,0,0.95)'
+                ]}
+                locations={[0, 0.3, 0.6, 0.8, 1]}
+                style={styles.tabletImageGradient as ViewStyle}
+              />
+            </ImageBackground>
+          </Animated.View>
+        </TouchableOpacity>
+
+        <Animated.View style={[styles.tabletOverlayContent as ViewStyle, contentAnimatedStyle]}>
+          {logoUrl && !logoLoadError ? (
+            <Animated.View style={logoAnimatedStyle}>
+              <ExpoImage
+                source={{ uri: logoUrl }}
+                style={styles.tabletLogo as ImageStyle}
+                contentFit="contain"
+                cachePolicy="memory"
+                transition={300}
+                recyclingKey={`logo-${featuredContent.id}`}
+                onError={onLogoLoadError}
+              />
+            </Animated.View>
+          ) : (
+            <Text style={[styles.tabletTitle as TextStyle, { color: currentTheme.colors.white }]}>
+              {featuredContent.name}
+            </Text>
+          )}
+
+          <View style={styles.tabletGenreContainer as ViewStyle}>
+            {featuredContent.genres?.slice(0, 4).map((genre, index, array) => (
+              <React.Fragment key={index}>
+                <Text style={[styles.tabletGenreText as TextStyle, { color: currentTheme.colors.white }]}>
+                  {genre}
+                </Text>
+                {index < array.length - 1 && (
+                  <Text style={[styles.tabletGenreDot as TextStyle, { color: currentTheme.colors.white }]}>•</Text>
                 )}
-                <View style={styles.genreContainer as ViewStyle}>
-                  {featuredContent.genres?.slice(0, 3).map((genre, index, array) => (
-                    <React.Fragment key={index}>
-                      <Text style={[styles.genreText as TextStyle, { color: currentTheme.colors.white }]}>
-                        {genre}
-                      </Text>
-                      {index < array.length - 1 && (
-                        <Text style={[styles.genreDot as TextStyle, { color: currentTheme.colors.white }]}>•</Text>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </View>
-              </Animated.View>
+              </React.Fragment>
+            ))}
+          </View>
 
-              <Animated.View style={[styles.featuredButtons as ViewStyle, buttonsAnimatedStyle]}>
-                <TouchableOpacity
-                  style={styles.myListButton as ViewStyle}
-                  onPress={handleSaveToLibrary}
-                  activeOpacity={0.7}
-                >
-                  <MaterialIcons
-                    name={isSaved ? "bookmark" : "bookmark-border"}
-                    size={24}
-                    color={currentTheme.colors.white}
-                  />
-                  <Text style={[styles.myListButtonText as TextStyle, { color: currentTheme.colors.white }]}>
-                    {isSaved ? "Saved" : "Save"}
-                  </Text>
-                </TouchableOpacity>
+          {featuredContent.description && (
+            <Text style={[styles.tabletDescription as TextStyle, { color: currentTheme.colors.white }]} numberOfLines={3}>
+              {featuredContent.description}
+            </Text>
+          )}
 
-                <TouchableOpacity
-                  style={[styles.playButton as ViewStyle, { backgroundColor: currentTheme.colors.white }]}
-                  onPress={() => {
-                    if (featuredContent) {
-                      navigation.navigate('Streams', {
-                        id: featuredContent.id,
-                        type: featuredContent.type
-                      });
-                    }
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <MaterialIcons name="play-arrow" size={24} color={currentTheme.colors.black} />
-                  <Text style={[styles.playButtonText as TextStyle, { color: currentTheme.colors.black }]}>
-                    Play
-                  </Text>
-                </TouchableOpacity>
+          <Animated.View style={[styles.tabletButtons as ViewStyle, buttonsAnimatedStyle]}>
+            <TouchableOpacity
+              style={[styles.tabletPlayButton as ViewStyle, { backgroundColor: currentTheme.colors.white }]}
+              onPress={() => {
+                if (featuredContent) {
+                  navigation.navigate('Streams', {
+                    id: featuredContent.id,
+                    type: featuredContent.type
+                  });
+                }
+              }}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons name="play-arrow" size={28} color={currentTheme.colors.black} />
+              <Text style={[styles.tabletPlayButtonText as TextStyle, { color: currentTheme.colors.black }]}>
+                Play Now
+              </Text>
+            </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.infoButton as ViewStyle}
-                  onPress={handleInfoPress}
-                  activeOpacity={0.7}
-                >
-                  <MaterialIcons name="info-outline" size={24} color={currentTheme.colors.white} />
-                  <Text style={[styles.infoButtonText as TextStyle, { color: currentTheme.colors.white }]}>
-                    Info
-                  </Text>
-                </TouchableOpacity>
-              </Animated.View>
-            </LinearGradient>
-          </ImageBackground>
+            <TouchableOpacity
+              style={[styles.tabletSecondaryButton as ViewStyle, { backgroundColor: 'rgba(255,255,255,0.2)', borderColor: 'rgba(255,255,255,0.3)' }]}
+              onPress={handleSaveToLibrary}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons
+                name={isSaved ? "bookmark" : "bookmark-border"}
+                size={20}
+                color={currentTheme.colors.white}
+              />
+              <Text style={[styles.tabletSecondaryButtonText as TextStyle, { color: currentTheme.colors.white }]}>
+                {isSaved ? "Saved" : "My List"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.tabletSecondaryButton as ViewStyle, { backgroundColor: 'rgba(255,255,255,0.15)', borderColor: 'rgba(255,255,255,0.3)' }]}
+              onPress={handleInfoPress}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons name="info-outline" size={20} color={currentTheme.colors.white} />
+              <Text style={[styles.tabletSecondaryButtonText as TextStyle, { color: currentTheme.colors.white }]}>
+                More Info
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
         </Animated.View>
-      </TouchableOpacity>
-    </Animated.View>
-  );
+        
+        {/* Bottom fade to blend with background */}
+        <LinearGradient
+          colors={[
+            'transparent',
+            currentTheme.colors.darkBackground
+          ]}
+          locations={[0, 1]}
+          style={styles.tabletBottomFade as ViewStyle}
+          pointerEvents="none"
+        />
+      </Animated.View>
+    );
+  } else {
+    // Phone layout: original vertical stack
+    return (
+      <Animated.View
+        entering={FadeIn.duration(400).easing(Easing.out(Easing.cubic))}
+      >
+        <TouchableOpacity
+          activeOpacity={0.95}
+          onPress={() => {
+            navigation.navigate('Metadata', {
+              id: featuredContent.id,
+              type: featuredContent.type
+            });
+          }}
+          style={styles.featuredContainer as ViewStyle}
+        >
+          <Animated.View style={[styles.imageContainer, posterAnimatedStyle]}>
+            <ImageBackground
+              source={{ uri: bannerUrl || featuredContent.poster }}
+              style={styles.featuredImage as ViewStyle}
+              resizeMode="cover"
+            >
+              <Animated.View style={[styles.contentOverlay, overlayAnimatedStyle]} />
+              <LinearGradient
+                colors={[
+                  'rgba(0,0,0,0.1)',
+                  'rgba(0,0,0,0.2)',
+                  'rgba(0,0,0,0.4)',
+                  'rgba(0,0,0,0.8)',
+                  currentTheme.colors.darkBackground,
+                ]}
+                locations={[0, 0.2, 0.5, 0.8, 1]}
+                style={styles.featuredGradient as ViewStyle}
+              >
+                <Animated.View
+                  style={[styles.featuredContentContainer as ViewStyle, contentAnimatedStyle]}
+                >
+                  {logoUrl && !logoLoadError ? (
+                    <Animated.View style={logoAnimatedStyle}>
+                      <ExpoImage
+                        source={{ uri: logoUrl }}
+                        style={styles.featuredLogo as ImageStyle}
+                        contentFit="contain"
+                        cachePolicy="memory"
+                        transition={300}
+                        recyclingKey={`logo-${featuredContent.id}`}
+                        onError={onLogoLoadError}
+                      />
+                    </Animated.View>
+                  ) : (
+                    <Text style={[styles.featuredTitleText as TextStyle, { color: currentTheme.colors.highEmphasis }]}>
+                      {featuredContent.name}
+                    </Text>
+                  )}
+                  <View style={styles.genreContainer as ViewStyle}>
+                    {featuredContent.genres?.slice(0, 3).map((genre, index, array) => (
+                      <React.Fragment key={index}>
+                        <Text style={[styles.genreText as TextStyle, { color: currentTheme.colors.white }]}>
+                          {genre}
+                        </Text>
+                        {index < array.length - 1 && (
+                          <Text style={[styles.genreDot as TextStyle, { color: currentTheme.colors.white }]}>•</Text>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </View>
+                </Animated.View>
+
+                <Animated.View style={[styles.featuredButtons as ViewStyle, buttonsAnimatedStyle]}>
+                  <TouchableOpacity
+                    style={styles.myListButton as ViewStyle}
+                    onPress={handleSaveToLibrary}
+                    activeOpacity={0.7}
+                  >
+                    <MaterialIcons
+                      name={isSaved ? "bookmark" : "bookmark-border"}
+                      size={24}
+                      color={currentTheme.colors.white}
+                    />
+                    <Text style={[styles.myListButtonText as TextStyle, { color: currentTheme.colors.white }]}>
+                      {isSaved ? "Saved" : "Save"}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.playButton as ViewStyle, { backgroundColor: currentTheme.colors.white }]}
+                    onPress={() => {
+                      if (featuredContent) {
+                        navigation.navigate('Streams', {
+                          id: featuredContent.id,
+                          type: featuredContent.type
+                        });
+                      }
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <MaterialIcons name="play-arrow" size={24} color={currentTheme.colors.black} />
+                    <Text style={[styles.playButtonText as TextStyle, { color: currentTheme.colors.black }]}>
+                      Play
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.infoButton as ViewStyle}
+                    onPress={handleInfoPress}
+                    activeOpacity={0.7}
+                  >
+                    <MaterialIcons name="info-outline" size={24} color={currentTheme.colors.white} />
+                    <Text style={[styles.infoButtonText as TextStyle, { color: currentTheme.colors.white }]}>
+                      Info
+                    </Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              </LinearGradient>
+            </ImageBackground>
+          </Animated.View>
+        </TouchableOpacity>
+        
+        {/* Bottom fade to blend with background */}
+        <LinearGradient
+          colors={[
+            'transparent',
+            currentTheme.colors.darkBackground
+          ]}
+          locations={[0, 1]}
+          style={styles.phoneBottomFade as ViewStyle}
+          pointerEvents="none"
+        />
+      </Animated.View>
+    );
+  }
 };
 
 const styles = StyleSheet.create({
   featuredContainer: {
     width: '100%',
-    height: height * 0.55, // Slightly taller for better proportions
+    height: height * 0.55,
     marginTop: 0,
     marginBottom: 12,
     position: 'relative',
@@ -622,10 +773,12 @@ const styles = StyleSheet.create({
     paddingTop: 40,
   },
   featuredLogo: {
-    width: width * 0.7,
-    height: 100,
+    width: width * 0.8,
+    height: 120,
     marginBottom: 0,
     alignSelf: 'center',
+    minWidth: 250,
+    minHeight: 80,
   },
   featuredTitleText: {
     fontSize: 28,
@@ -713,6 +866,158 @@ const styles = StyleSheet.create({
   infoButtonText: {
     fontSize: 12,
     fontWeight: '500',
+  },
+  // Tablet-specific styles
+  tabletContainer: {
+    width: '100%',
+    height: height * 0.7,
+    position: 'relative',
+    marginTop: 0,
+    marginBottom: 12,
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  tabletFullContainer: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+  },
+  tabletImageWrapper: {
+    width: '100%',
+    height: '100%',
+  },
+  tabletImage: {
+    width: '100%',
+    height: '100%',
+    transform: [{ scale: 1.02 }],
+  },
+  tabletImageGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  tabletOverlayContent: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 40,
+    paddingBottom: 50,
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  tabletBottomFade: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 40,
+    zIndex: 11,
+    pointerEvents: 'none',
+  },
+  phoneBottomFade: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 30,
+    zIndex: 11,
+    pointerEvents: 'none',
+  },
+  tabletLogo: {
+    width: width * 0.32,
+    height: 120,
+    marginBottom: 16,
+    alignSelf: 'center',
+    minWidth: 200,
+    minHeight: 80,
+  },
+  tabletTitle: {
+    fontSize: 36,
+    fontWeight: '900',
+    marginBottom: 16,
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+    lineHeight: 42,
+  },
+  tabletGenreContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabletGenreText: {
+    fontSize: 16,
+    fontWeight: '500',
+    opacity: 0.9,
+    marginRight: 8,
+  },
+  tabletGenreDot: {
+    fontSize: 16,
+    fontWeight: '500',
+    opacity: 0.6,
+    marginRight: 8,
+  },
+  tabletDescription: {
+    fontSize: 16,
+    lineHeight: 24,
+    opacity: 0.85,
+    marginBottom: 28,
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  tabletButtons: {
+    flexDirection: 'row',
+    gap: 16,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tabletPlayButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 30,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    minWidth: 160,
+  },
+  tabletPlayButtonText: {
+    fontWeight: '700',
+    marginLeft: 12,
+    fontSize: 18,
+  },
+  tabletSecondaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    borderWidth: 1,
+    gap: 6,
+    minWidth: 120,
+  },
+  tabletSecondaryButtonText: {
+    fontWeight: '600',
+    fontSize: 16,
   },
   contentOverlay: {
     position: 'absolute',
