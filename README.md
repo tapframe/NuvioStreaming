@@ -1,4 +1,4 @@
-# Nuvio Streaming App
+#  Nuvio Streaming App
 
 <p align="center">
   <img src="assets/titlelogo.png" alt="Nuvio Logo" width="300"/>
@@ -8,10 +8,14 @@
   A modern streaming app built with React Native and Expo, featuring Stremio addon integration, Trakt synchronization, and a beautiful user interface.
 </p>
 
+---
+
 ## ⚠️ Alpha Testing
 This app is currently in alpha testing. Please report any bugs or issues you encounter.
 
-[Download Latest Release](https://github.com/tapframe/NuvioStreaming/releases/latest)
+[Download Latest Release](https://github.com/tapframe/NuvioStreaming/tags)
+
+---
 
 ## ✨ Key Features 
 
@@ -48,6 +52,8 @@ This app is currently in alpha testing. Please report any bugs or issues you enc
 - **Customization:** Theme options and display preferences
 - **Cross-Platform:** Works on both iOS and Android
 
+---
+
 ## 📸 Screenshots
 
 | Home & Continue Watching | Discover & Browse | Search & Details |
@@ -55,6 +61,18 @@ This app is currently in alpha testing. Please report any bugs or issues you enc
 | ![Home](src/assets/home.jpg) | ![Discover](src/assets/discover.jpg) | ![Search](src/assets/search.jpg) |
 | **Content Details** | **Episodes & Seasons** | **Ratings & Info** |
 | ![Metadata](src/assets/metadascreen.jpg) | ![Seasons](src/assets/seasonandepisode.jpg) | ![Rating](src/assets/ratingscreen.jpg) |
+
+---
+
+## 🧰 Tools & Technologies
+
+<p align="left">
+  <a href="https://skillicons.dev">
+    <img src="https://skillicons.dev/icons?i=react,typescript,nodejs,expo,github,githubactions&theme=light&perline=6" />
+  </a>
+</p>
+
+---
 
 ## 🚀 Getting Started
 
@@ -93,6 +111,8 @@ This app is currently in alpha testing. Please report any bugs or issues you enc
      npx expo run:ios
      ```
 
+---
+
 ## 🤝 Contributing
 
 We welcome contributions! Here's how you can help:
@@ -103,6 +123,8 @@ We welcome contributions! Here's how you can help:
 4. Push to the branch 
 5. Open a Pull Request
 
+---
+
 ## 🐛 Bug Reports & Feature Requests
 
 Found a bug or have an idea? Please open an [issue](https://github.com/tapframe/NuvioStreaming/issues) with:
@@ -111,13 +133,35 @@ Found a bug or have an idea? Please open an [issue](https://github.com/tapframe/
 - Expected behavior
 - Screenshots if applicable
 
-## 📝 Changelog
+---
 
-See [CHANGELOG.md](CHANGELOG.md) for release history and changes.
+## 💬 Feedback
+
+![Feedback](https://github.com/user-attachments/assets/9f7dfe73-f11d-41fe-996c-072de0f6853b)
+
+---
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+[![GNU GPLv3 Image](https://www.gnu.org/graphics/gplv3-127x51.png)](http://www.gnu.org/licenses/gpl-3.0.en.html)
+
+This application is **free software**: you can use, study, share, and modify it as you wish.
+
+It is distributed under the terms of the [GNU General Public License](https://www.gnu.org/licenses/gpl.html) version 3 or later, published by the Free Software Foundation.
+
+---
+
+## ⚖️ DMCA Disclaimer
+
+We hereby issue this notice to clarify that this application functions similarly to a standard web browser by fetching video files from the internet.
+
+- **No content is hosted by this repository or the Nuvio application.**
+- Any content accessed is hosted by third-party websites.
+- Users are solely responsible for their usage and must comply with their local laws.
+
+If you believe content is violating copyright laws, please contact the **actual file hosts**, **not** the developers of this repository or the Nuvio app.
+
+---
 
 ## 🙏 Acknowledgments
 
@@ -129,6 +173,4 @@ Built with help from the amazing communities behind:
 
 ---
 
-<p align="center">
-  <em>Happy Streaming! 🎬</em>
-</p> 
+**Thank You for using Nuvio!** 
