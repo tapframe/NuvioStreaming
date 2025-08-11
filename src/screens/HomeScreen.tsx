@@ -41,6 +41,7 @@ import * as Haptics from 'expo-haptics';
 import { tmdbService } from '../services/tmdbService';
 import { logger } from '../utils/logger';
 import { storageService } from '../services/storageService';
+import { getCatalogDisplayName, clearCustomNameCache } from '../utils/catalogNameUtils';
 import { useHomeCatalogs } from '../hooks/useHomeCatalogs';
 import { useFeaturedContent } from '../hooks/useFeaturedContent';
 import { useSettings, settingsEmitter } from '../hooks/useSettings';
@@ -188,7 +189,7 @@ const HomeScreen = () => {
                   const metas = await stremioService.getCatalog(manifest, catalog.type, catalog.id, 1);
                   if (metas && metas.length > 0) {
                     // Limit items per catalog to reduce memory usage
-                    const limitedMetas = metas.slice(0, 8); // Further reduced for memory
+                    const limitedMetas = metas.slice(0, 30);
                     
                     const items = limitedMetas.map((meta: any) => ({
                       id: meta.id,
@@ -209,11 +210,27 @@ const HomeScreen = () => {
                     }));
 
                     // Skip prefetching to reduce memory pressure
-                    
-                    let displayName = catalog.name;
-                    const contentType = catalog.type === 'movie' ? 'Movies' : 'TV Shows';
-                    if (!displayName.toLowerCase().includes(contentType.toLowerCase())) {
-                      displayName = `${displayName} ${contentType}`;
+                    // Resolve custom display name; if custom exists, use as-is
+                    const originalName = catalog.name || catalog.id;
+                    let displayName = await getCatalogDisplayName(addon.id, catalog.type, catalog.id, originalName);
+                    const isCustom = displayName !== originalName;
+
+                    if (!isCustom) {
+                      // De-duplicate repeated words (case-insensitive)
+                      const words = displayName.split(' ').filter(Boolean);
+                      const uniqueWords: string[] = [];
+                      const seen = new Set<string>();
+                      for (const w of words) {
+                        const lw = w.toLowerCase();
+                        if (!seen.has(lw)) { uniqueWords.push(w); seen.add(lw); }
+                      }
+                      displayName = uniqueWords.join(' ');
+
+                      // Append content type if not present
+                      const contentType = catalog.type === 'movie' ? 'Movies' : 'TV Shows';
+                      if (!displayName.toLowerCase().includes(contentType.toLowerCase())) {
+                        displayName = `${displayName} ${contentType}`;
+                      }
                     }
                     
                     const catalogContent = {

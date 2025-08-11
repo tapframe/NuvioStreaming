@@ -23,6 +23,7 @@ import { stremioService } from '../services/stremioService';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useCatalogContext } from '../contexts/CatalogContext';
 import { logger } from '../utils/logger';
+import { clearCustomNameCache } from '../utils/catalogNameUtils';
 import { BlurView } from 'expo-blur';
 
 interface CatalogSetting {
@@ -133,6 +134,17 @@ const createStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+    hintRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+    },
+    hintText: {
+      fontSize: 12,
+      color: colors.mediumGray,
+    },
   enabledCount: {
     fontSize: 15,
     color: colors.mediumGray,
@@ -250,6 +262,26 @@ const CatalogSettingsScreen = () => {
             const settingKey = `${addon.id}:${catalog.type}:${catalog.id}`;
             let displayName = catalog.name || catalog.id;
             const catalogType = catalog.type === 'movie' ? 'Movies' : catalog.type === 'series' ? 'TV Shows' : catalog.type.charAt(0).toUpperCase() + catalog.type.slice(1);
+
+            // Clean duplicate words within the catalog name (e.g., "Popular Popular")
+            if (displayName) {
+              const words = displayName.split(' ').filter(Boolean);
+              const uniqueWords: string[] = [];
+              const seen = new Set<string>();
+              for (const w of words) {
+                const lw = w.toLowerCase();
+                if (!seen.has(lw)) {
+                  uniqueWords.push(w);
+                  seen.add(lw);
+                }
+              }
+              displayName = uniqueWords.join(' ');
+            }
+
+            // Append content type if not already present (case-insensitive)
+            if (!displayName.toLowerCase().includes(catalogType.toLowerCase())) {
+              displayName = `${displayName} ${catalogType}`.trim();
+            }
             
             uniqueCatalogs.set(settingKey, {
               addonId: addon.id,
@@ -379,9 +411,13 @@ const CatalogSettingsScreen = () => {
       }
       
       await AsyncStorage.setItem(CATALOG_CUSTOM_NAMES_KEY, JSON.stringify(customNames));
+      // Clear in-memory cache so new name is used immediately
+      try { clearCustomNameCache(); } catch {}
 
       // --- Reload settings to reflect the change --- 
       await loadSettings(); 
+      // Also trigger home/catalog consumers to refresh
+      try { refreshCatalogs(); } catch {}
       // --- No need to manually update local state anymore --- 
 
     } catch (error) {
@@ -459,7 +495,13 @@ const CatalogSettingsScreen = () => {
                 </View>
               </TouchableOpacity>
               
-              {group.expanded && group.catalogs.map((setting, index) => (
+              {group.expanded && (
+                <>
+                  <View style={styles.hintRow}>
+                    <MaterialIcons name="edit" size={14} color={colors.mediumGray} />
+                    <Text style={styles.hintText}>Long-press a catalog to rename</Text>
+                  </View>
+                  {group.catalogs.map((setting, index) => (
                 <Pressable 
                   key={`${setting.addonId}:${setting.type}:${setting.catalogId}`}
                   onLongPress={() => handleLongPress(setting)} // Added long press handler
@@ -484,7 +526,9 @@ const CatalogSettingsScreen = () => {
                     ios_backgroundColor="#505050"
                   />
                 </Pressable>
-              ))}
+                  ))}
+                </>
+              )}
             </View>
           </View>
         ))}

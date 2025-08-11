@@ -406,9 +406,39 @@ class SyncService {
           .eq('user_id', userId)
           .single();
         if (us) {
-          await AsyncStorage.setItem(`@user:${userId}:app_settings`, JSON.stringify(us.app_settings || {}));
-          await AsyncStorage.setItem('app_settings', JSON.stringify(us.app_settings || {}));
-          await storageService.saveSubtitleSettings(us.subtitle_settings || {});
+          // Merge remote settings with existing local settings, preferring remote values
+          // but preserving any local-only keys (e.g., newly added client-side settings
+          // not yet present on the server). This avoids losing local preferences on restart.
+          try {
+            const localScopedJson = (await AsyncStorage.getItem(`@user:${userId}:app_settings`)) || '{}';
+            const localLegacyJson = (await AsyncStorage.getItem('app_settings')) || '{}';
+            // Prefer scoped local if available; fall back to legacy
+            let localSettings: Record<string, any> = {};
+            try { localSettings = JSON.parse(localScopedJson); } catch {}
+            if (!localSettings || Object.keys(localSettings).length === 0) {
+              try { localSettings = JSON.parse(localLegacyJson); } catch { localSettings = {}; }
+            }
+
+            const remoteRaw: Record<string, any> = (us.app_settings || {}) as Record<string, any>;
+            // Exclude episodeLayoutStyle from remote to keep it local-only
+            const { episodeLayoutStyle: _remoteEpisodeLayoutStyle, ...remoteSettingsSansLocalOnly } = remoteRaw || {};
+            // Merge: start from local, override with remote (sans excluded keys)
+            const mergedSettings = { ...(localSettings || {}), ...(remoteSettingsSansLocalOnly || {}) };
+
+            await AsyncStorage.setItem(`@user:${userId}:app_settings`, JSON.stringify(mergedSettings));
+            await AsyncStorage.setItem('app_settings', JSON.stringify(mergedSettings));
+            await storageService.saveSubtitleSettings(us.subtitle_settings || {});
+            // Notify listeners that settings changed due to sync
+            try { settingsEmitter.emit(); } catch {}
+          } catch (e) {
+            // Fallback to writing remote settings as-is if merge fails
+            const remoteRaw: Record<string, any> = (us.app_settings || {}) as Record<string, any>;
+            const { episodeLayoutStyle: _remoteEpisodeLayoutStyle, ...remoteSettingsSansLocalOnly } = remoteRaw || {};
+            await AsyncStorage.setItem(`@user:${userId}:app_settings`, JSON.stringify(remoteSettingsSansLocalOnly));
+            await AsyncStorage.setItem('app_settings', JSON.stringify(remoteSettingsSansLocalOnly));
+            await storageService.saveSubtitleSettings(us.subtitle_settings || {});
+            try { settingsEmitter.emit(); } catch {}
+          }
         }
       })(),
       this.pullAddonsSnapshot(userId),
@@ -697,7 +727,9 @@ class SyncService {
       (await AsyncStorage.getItem(`@user:${scope}:app_settings`)) ||
       (await AsyncStorage.getItem('app_settings')) ||
       '{}';
-    const appSettings = JSON.parse(appSettingsJson);
+    const parsed = JSON.parse(appSettingsJson) as Record<string, any>;
+    // Exclude local-only settings from push
+    const { episodeLayoutStyle: _localEpisodeLayoutStyle, ...appSettings } = parsed || {};
     const subtitleSettings = (await storageService.getSubtitleSettings()) || {};
     const { error } = await supabase.from('user_settings').upsert({
       user_id: userId,

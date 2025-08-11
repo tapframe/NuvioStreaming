@@ -205,29 +205,33 @@ class CatalogService {
                 const metas = await stremioService.getCatalog(manifest, catalog.type, catalog.id, 1);
                 if (metas && metas.length > 0) {
                   // Cap items per catalog to reduce memory and rendering load
-                  const limited = metas.slice(0, 8); // Further reduced for memory
+                  const limited = metas.slice(0, 12);
                   const items = limited.map(meta => this.convertMetaToStreamingContent(meta));
                   
-                  // Get potentially custom display name
-                  let displayName = await getCatalogDisplayName(addon.id, catalog.type, catalog.id, catalog.name);
-                  
-                  // Remove duplicate words and clean up the name (case-insensitive)
-                  const words = displayName.split(' ');
-                  const uniqueWords = [];
-                  const seenWords = new Set();
-                  for (const word of words) {
-                    const lowerWord = word.toLowerCase();
-                    if (!seenWords.has(lowerWord)) {
-                      uniqueWords.push(word); 
-                      seenWords.add(lowerWord);
+                  // Get potentially custom display name; if customized, respect it as-is
+                  const originalName = catalog.name || catalog.id;
+                  let displayName = await getCatalogDisplayName(addon.id, catalog.type, catalog.id, originalName);
+                  const isCustom = displayName !== originalName;
+
+                  if (!isCustom) {
+                    // Remove duplicate words and clean up the name (case-insensitive)
+                    const words = displayName.split(' ');
+                    const uniqueWords: string[] = [];
+                    const seenWords = new Set<string>();
+                    for (const word of words) {
+                      const lowerWord = word.toLowerCase();
+                      if (!seenWords.has(lowerWord)) {
+                        uniqueWords.push(word);
+                        seenWords.add(lowerWord);
+                      }
                     }
-                  }
-                  displayName = uniqueWords.join(' ');
-                  
-                  // Add content type if not present
-                  const contentType = catalog.type === 'movie' ? 'Movies' : 'TV Shows';
-                  if (!displayName.toLowerCase().includes(contentType.toLowerCase())) {
-                    displayName = `${displayName} ${contentType}`;
+                    displayName = uniqueWords.join(' ');
+
+                    // Add content type if not present
+                    const contentType = catalog.type === 'movie' ? 'Movies' : 'TV Shows';
+                    if (!displayName.toLowerCase().includes(contentType.toLowerCase())) {
+                      displayName = `${displayName} ${contentType}`;
+                    }
                   }
                   
                   return {
