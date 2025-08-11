@@ -31,6 +31,7 @@ import { logger } from '../../utils/logger';
 import { TMDBService } from '../../services/tmdbService';
 
 const { width, height } = Dimensions.get('window');
+const isTablet = width >= 768;
 
 // Ultra-optimized animation constants
 const PARALLAX_FACTOR = 0.3;
@@ -240,9 +241,9 @@ const ActionButtons = memo(({
   }, [isWatched, playButtonText, type, watchProgress, groupedEpisodes]);
 
   return (
-    <Animated.View style={[styles.actionButtons, animatedStyle]}>
+    <Animated.View style={[isTablet ? styles.tabletActionButtons : styles.actionButtons, animatedStyle]}>
       <TouchableOpacity
-        style={playButtonStyle}
+        style={[playButtonStyle, isTablet && styles.tabletPlayButton]}
         onPress={handleShowStreams}
         activeOpacity={0.85}
       >
@@ -253,14 +254,14 @@ const ActionButtons = memo(({
             }
             return playButtonText === 'Resume' ? 'play-circle-outline' : 'play-arrow';
           })()} 
-          size={24} 
+          size={isTablet ? 28 : 24} 
           color={isWatched && type === 'movie' ? "#fff" : "#000"} 
         />
-        <Text style={playButtonTextStyle}>{finalPlayButtonText}</Text>
+        <Text style={[playButtonTextStyle, isTablet && styles.tabletPlayButtonText]}>{finalPlayButtonText}</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[styles.actionButton, styles.infoButton]}
+        style={[styles.actionButton, styles.infoButton, isTablet && styles.tabletInfoButton]}
         onPress={toggleLibrary}
         activeOpacity={0.85}
       >
@@ -271,17 +272,17 @@ const ActionButtons = memo(({
         )}
         <MaterialIcons
           name={inLibrary ? 'bookmark' : 'bookmark-border'}
-          size={24}
+          size={isTablet ? 28 : 24}
           color={currentTheme.colors.white}
         />
-        <Text style={styles.infoButtonText}>
+        <Text style={[styles.infoButtonText, isTablet && styles.tabletInfoButtonText]}>
           {inLibrary ? 'Saved' : 'Save'}
         </Text>
       </TouchableOpacity>
 
       {type === 'series' && (
         <TouchableOpacity
-          style={styles.iconButton}
+          style={[styles.iconButton, isTablet && styles.tabletIconButton]}
           onPress={handleRatingsPress}
           activeOpacity={0.85}
         >
@@ -292,7 +293,7 @@ const ActionButtons = memo(({
           )}
           <MaterialIcons 
             name="assessment" 
-            size={24} 
+            size={isTablet ? 28 : 24} 
             color={currentTheme.colors.white}
           />
         </TouchableOpacity>
@@ -534,9 +535,9 @@ const WatchProgressDisplay = memo(({
   const isCompleted = progressData.isWatched || progressData.progressPercent >= 85;
 
   return (
-    <Animated.View style={[styles.watchProgressContainer, animatedStyle]}>
+    <Animated.View style={[isTablet ? styles.tabletWatchProgressContainer : styles.watchProgressContainer, animatedStyle]}>
       {/* Glass morphism background with entrance animation */}
-      <Animated.View style={[styles.progressGlassBackground, progressBoxAnimatedStyle]}>
+      <Animated.View style={[isTablet ? styles.tabletProgressGlassBackground : styles.progressGlassBackground, progressBoxAnimatedStyle]}>
         {Platform.OS === 'ios' ? (
           <ExpoBlurView intensity={20} style={styles.blurBackground} tint="dark" />
         ) : (
@@ -580,9 +581,9 @@ const WatchProgressDisplay = memo(({
         {/* Enhanced text container with better typography */}
         <View style={styles.watchProgressTextContainer}>
           <View style={styles.progressInfoMain}>
-            <Text style={[styles.watchProgressMainText, { 
+            <Text style={[isTablet ? styles.tabletWatchProgressMainText : styles.watchProgressMainText, { 
               color: isCompleted ? '#00ff88' : currentTheme.colors.white,
-              fontSize: isCompleted ? 13 : 12,
+              fontSize: isCompleted ? (isTablet ? 15 : 13) : (isTablet ? 14 : 12),
               fontWeight: isCompleted ? '700' : '600'
             }]}>
               {progressData.displayText}
@@ -590,7 +591,7 @@ const WatchProgressDisplay = memo(({
             
       </View>
           
-          <Text style={[styles.watchProgressSubText, { 
+          <Text style={[isTablet ? styles.tabletWatchProgressSubText : styles.watchProgressSubText, { 
             color: isCompleted ? 'rgba(0,255,136,0.7)' : currentTheme.colors.textMuted,
           }]}>
             {progressData.episodeInfo} • Last watched {progressData.formattedTime}
@@ -839,11 +840,11 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
         entering={FadeIn.duration(400).delay(200 + index * 100)}
         style={{ flexDirection: 'row', alignItems: 'center' }}
       >
-        <Text style={[styles.genreText, { color: themeColors.text }]}>
+        <Text style={[isTablet ? styles.tabletGenreText : styles.genreText, { color: themeColors.text }]}>
           {genreName}
         </Text>
         {index < array.length - 1 && (
-          <Text style={[styles.genreDot, { color: themeColors.text }]}>•</Text>
+          <Text style={[isTablet ? styles.tabletGenreDot : styles.genreDot, { color: themeColors.text }]}>•</Text>
         )}
       </Animated.View>
     ));
@@ -966,14 +967,14 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
           style={styles.bottomFadeGradient}
           pointerEvents="none"
         />
-        <View style={styles.heroContent}>
+        <View style={[styles.heroContent, isTablet && { maxWidth: 800, alignSelf: 'center' }]}>
           {/* Optimized Title/Logo */}
           <View style={styles.logoContainer}>
             <Animated.View style={[styles.titleLogoContainer, logoAnimatedStyle]}>
               {shouldLoadSecondaryData && metadata.logo && !logoLoadError ? (
                 <Image
                   source={{ uri: metadata.logo }}
-                  style={styles.titleLogo}
+                  style={isTablet ? styles.tabletTitleLogo : styles.titleLogo}
                   contentFit="contain"
                   transition={150}
                   onError={() => {
@@ -981,7 +982,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
                   }}
                 />
               ) : (
-                <Text style={[styles.heroTitle, { color: themeColors.highEmphasis }]}>
+                <Text style={[isTablet ? styles.tabletHeroTitle : styles.heroTitle, { color: themeColors.highEmphasis }]}>
                   {metadata.name}
                 </Text>
               )}
@@ -999,7 +1000,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
 
           {/* Optimized genre display with lazy loading */}
           {shouldLoadSecondaryData && genreElements && (
-            <View style={styles.genreContainer}>
+            <View style={isTablet ? styles.tabletGenreContainer : styles.genreContainer}>
               {genreElements}
             </View>
           )}
@@ -1041,7 +1042,7 @@ const styles = StyleSheet.create({
   backButtonContainer: {
     position: 'absolute',
     top: Platform.OS === 'android' ? 40 : 50,
-    left: 16,
+    left: isTablet ? 32 : 16,
     zIndex: 10,
   },
   backButton: {
@@ -1066,9 +1067,9 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   heroContent: {
-    padding: 16,
-    paddingTop: 8,
-    paddingBottom: 8,
+    padding: isTablet ? 32 : 16,
+    paddingTop: isTablet ? 16 : 8,
+    paddingBottom: isTablet ? 16 : 8,
     position: 'relative',
     zIndex: 2,
   },
@@ -1077,16 +1078,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: '100%',
     marginBottom: 4,
+    flex: 0,
+    display: 'flex',
+    maxWidth: isTablet ? 600 : '100%',
+    alignSelf: 'center',
   },
   titleLogoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
+    flex: 0,
+    display: 'flex',
+    maxWidth: isTablet ? 600 : '100%',
+    alignSelf: 'center',
   },
   titleLogo: {
     width: width * 0.75,
     height: 90,
     alignSelf: 'center',
+    textAlign: 'center',
   },
   heroTitle: {
     fontSize: 26,
@@ -1106,6 +1116,8 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginBottom: 14,
     gap: 6,
+    maxWidth: isTablet ? 600 : '100%',
+    alignSelf: 'center',
   },
   genreText: {
     fontSize: 12,
@@ -1125,6 +1137,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: '100%',
     position: 'relative',
+    maxWidth: isTablet ? 600 : '100%',
+    alignSelf: 'center',
   },
   actionButton: {
     flexDirection: 'row',
@@ -1177,6 +1191,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minHeight: 36,
     position: 'relative',
+    maxWidth: isTablet ? 600 : '100%',
+    alignSelf: 'center',
   },
   progressGlassBackground: {
     width: '75%',
@@ -1441,6 +1457,112 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  
+  // Tablet-specific styles
+  tabletActionButtons: {
+    flexDirection: 'row',
+    gap: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    position: 'relative',
+    maxWidth: 600,
+    alignSelf: 'center',
+  },
+  tabletPlayButton: {
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 32,
+    minWidth: 180,
+  },
+  tabletPlayButtonText: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginLeft: 8,
+  },
+  tabletInfoButton: {
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 28,
+    minWidth: 140,
+  },
+  tabletInfoButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  tabletIconButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  tabletHeroTitle: {
+    fontSize: 36,
+    fontWeight: '900',
+    marginBottom: 12,
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+    letterSpacing: -0.5,
+    textAlign: 'center',
+    lineHeight: 42,
+  },
+  tabletTitleLogo: {
+    width: width * 0.5,
+    height: 120,
+    alignSelf: 'center',
+    maxWidth: 400,
+    textAlign: 'center',
+  },
+  tabletGenreContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 20,
+    gap: 8,
+  },
+  tabletGenreText: {
+    fontSize: 16,
+    fontWeight: '500',
+    opacity: 0.9,
+  },
+  tabletGenreDot: {
+    fontSize: 16,
+    fontWeight: '500',
+    opacity: 0.6,
+    marginHorizontal: 4,
+  },
+  tabletWatchProgressContainer: {
+    marginTop: 8,
+    marginBottom: 8,
+    width: '100%',
+    alignItems: 'center',
+    minHeight: 44,
+    position: 'relative',
+  },
+  tabletProgressGlassBackground: {
+     width: '60%',
+     maxWidth: 500,
+     backgroundColor: 'rgba(255,255,255,0.08)',
+     borderRadius: 16,
+     padding: 12,
+     borderWidth: 1,
+     borderColor: 'rgba(255,255,255,0.1)',
+     overflow: 'hidden',
+   },
+   tabletWatchProgressMainText: {
+     fontSize: 14,
+     fontWeight: '600',
+     textAlign: 'center',
+   },
+   tabletWatchProgressSubText: {
+     fontSize: 12,
+     textAlign: 'center',
+     opacity: 0.8,
+     marginBottom: 1,
+   },
 });
 
 export default HeroSection;

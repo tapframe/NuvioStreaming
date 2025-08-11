@@ -730,6 +730,10 @@ const PluginsScreen: React.FC = () => {
                             <View style={[styles.availableIndicator, { backgroundColor: colors.mediumGray }]}>
                               <Text style={styles.availableIndicatorText}>Disabled</Text>
                             </View>
+                          ) : scraper.disabledPlatforms && scraper.disabledPlatforms.includes(Platform.OS as 'ios' | 'android') ? (
+                            <View style={[styles.availableIndicator, { backgroundColor: '#ff9500' }]}>
+                              <Text style={styles.availableIndicatorText}>Platform Disabled</Text>
+                            </View>
                           ) : !scraper.enabled && (
                             <View style={styles.availableIndicator}>
                               <Text style={styles.availableIndicatorText}>Available</Text>
@@ -758,8 +762,8 @@ const PluginsScreen: React.FC = () => {
                            onValueChange={(enabled) => handleToggleScraper(scraper.id, enabled)}
                            trackColor={{ false: colors.elevation3, true: colors.primary }}
                            thumbColor={scraper.enabled && settings.enableLocalScrapers ? colors.white : '#f4f3f4'}
-                           disabled={!settings.enableLocalScrapers || scraper.manifestEnabled === false}
-                           style={{ opacity: (!settings.enableLocalScrapers || scraper.manifestEnabled === false) ? 0.5 : 1 }}
+                           disabled={!settings.enableLocalScrapers || scraper.manifestEnabled === false || (scraper.disabledPlatforms && scraper.disabledPlatforms.includes(Platform.OS as 'ios' | 'android'))}
+                           style={{ opacity: (!settings.enableLocalScrapers || scraper.manifestEnabled === false || (scraper.disabledPlatforms && scraper.disabledPlatforms.includes(Platform.OS as 'ios' | 'android'))) ? 0.5 : 1 }}
                          />
                    </View>
                  );

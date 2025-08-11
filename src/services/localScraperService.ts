@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import { Platform } from 'react-native';
 import { logger } from '../utils/logger';
 import { Stream } from '../types/streams';
 import { cacheService } from './cacheService';
@@ -24,6 +25,8 @@ export interface ScraperInfo {
   logo?: string;
   contentLanguage?: string[];
   manifestEnabled?: boolean; // Whether the scraper is enabled in the manifest
+  supportedPlatforms?: ('ios' | 'android')[]; // Platforms where this scraper is supported
+  disabledPlatforms?: ('ios' | 'android')[]; // Platforms where this scraper is disabled
 }
 
 export interface LocalScraperResult {
@@ -181,6 +184,26 @@ class LocalScraperService {
     return this.repositoryName || 'Plugins';
   }
 
+  // Check if a scraper is compatible with the current platform
+  private isPlatformCompatible(scraper: ScraperInfo): boolean {
+    const currentPlatform = Platform.OS as 'ios' | 'android';
+    
+    // If disabledPlatforms is specified and includes current platform, scraper is not compatible
+    if (scraper.disabledPlatforms && scraper.disabledPlatforms.includes(currentPlatform)) {
+      logger.log(`[LocalScraperService] Scraper ${scraper.name} is disabled on ${currentPlatform}`);
+      return false;
+    }
+    
+    // If supportedPlatforms is specified and doesn't include current platform, scraper is not compatible
+    if (scraper.supportedPlatforms && !scraper.supportedPlatforms.includes(currentPlatform)) {
+      logger.log(`[LocalScraperService] Scraper ${scraper.name} is not supported on ${currentPlatform}`);
+      return false;
+    }
+    
+    // If neither supportedPlatforms nor disabledPlatforms is specified, or current platform is supported
+    return true;
+  }
+
   // Fetch and install scrapers from repository
   async refreshRepository(): Promise<void> {
     await this.ensureInitialized();
@@ -244,7 +267,21 @@ class LocalScraperService {
       
       // Download and install each scraper from manifest
       for (const scraperInfo of manifest.scrapers) {
-        await this.downloadScraper(scraperInfo);
+        const isPlatformCompatible = this.isPlatformCompatible(scraperInfo);
+        
+        if (isPlatformCompatible) {
+          // Download/update the scraper (downloadScraper handles force disabling based on manifest.enabled)
+          await this.downloadScraper(scraperInfo);
+        } else {
+          logger.log('[LocalScraperService] Skipping platform-incompatible scraper:', scraperInfo.name);
+          // Remove if it was previously installed but is now platform-incompatible
+          if (this.installedScrapers.has(scraperInfo.id)) {
+            logger.log('[LocalScraperService] Removing platform-incompatible scraper:', scraperInfo.name);
+            this.installedScrapers.delete(scraperInfo.id);
+            this.scraperCode.delete(scraperInfo.id);
+            await AsyncStorage.removeItem(`scraper-code-${scraperInfo.id}`);
+          }
+        }
       }
       
       await this.saveInstalledScrapers();
@@ -269,9 +306,18 @@ class LocalScraperService {
       const scraperCode = response.data;
       
       // Store scraper info and code
+      const existingScraper = this.installedScrapers.get(scraperInfo.id);
+      const isPlatformCompatible = this.isPlatformCompatible(scraperInfo);
+      
       const updatedScraperInfo = {
         ...scraperInfo,
-        enabled: this.installedScrapers.get(scraperInfo.id)?.enabled ?? true // Preserve enabled state
+        // Store the manifest's enabled state separately
+        manifestEnabled: scraperInfo.enabled,
+        // Force disable if:
+        // 1. Manifest says enabled: false (globally disabled)
+        // 2. Platform incompatible
+        // Otherwise, preserve user's enabled state or default to false
+        enabled: scraperInfo.enabled && isPlatformCompatible ? (existingScraper?.enabled ?? false) : false
       };
       
       // Ensure contentLanguage is an array (migration for older scrapers)
@@ -370,22 +416,24 @@ class LocalScraperService {
         this.repositoryName = manifest.name;
       }
       
-      // Return scrapers from manifest, respecting manifest's enabled field
-      const availableScrapers = manifest.scrapers.map(scraperInfo => {
-        const installedScraper = this.installedScrapers.get(scraperInfo.id);
-        
-        // Create a copy with manifest data
-        const scraperWithManifestData = {
-          ...scraperInfo,
-          // Store the manifest's enabled state separately
-          manifestEnabled: scraperInfo.enabled,
-          // If manifest says enabled: false, scraper cannot be enabled
-          // If manifest says enabled: true, use installed state or default to false
-          enabled: scraperInfo.enabled ? (installedScraper?.enabled ?? false) : false
-        };
-        
-        return scraperWithManifestData;
-      });
+      // Return scrapers from manifest, respecting manifest's enabled field and platform compatibility
+      const availableScrapers = manifest.scrapers
+        .filter(scraperInfo => this.isPlatformCompatible(scraperInfo))
+        .map(scraperInfo => {
+          const installedScraper = this.installedScrapers.get(scraperInfo.id);
+          
+          // Create a copy with manifest data
+          const scraperWithManifestData = {
+            ...scraperInfo,
+            // Store the manifest's enabled state separately
+            manifestEnabled: scraperInfo.enabled,
+            // If manifest says enabled: false, scraper cannot be enabled
+            // If manifest says enabled: true, use installed state or default to false
+            enabled: scraperInfo.enabled ? (installedScraper?.enabled ?? false) : false
+          };
+          
+          return scraperWithManifestData;
+        });
       
       logger.log('[LocalScraperService] Found', availableScrapers.length, 'available scrapers in repository');
        
@@ -409,6 +457,12 @@ class LocalScraperService {
     
     const scraper = this.installedScrapers.get(scraperId);
     if (scraper) {
+      // Prevent enabling if manifest has disabled it or if platform-incompatible
+      if (enabled && (scraper.manifestEnabled === false || !this.isPlatformCompatible(scraper))) {
+        logger.log('[LocalScraperService] Cannot enable scraper', scraperId, '- disabled in manifest or platform-incompatible');
+        return;
+      }
+      
       scraper.enabled = enabled;
       this.installedScrapers.set(scraperId, scraper);
       await this.saveInstalledScrapers();

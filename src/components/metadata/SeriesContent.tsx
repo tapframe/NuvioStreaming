@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { Image } from 'expo-image';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, FlashListRef } from '@shopify/flash-list';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useSettings } from '../../hooks/useSettings';
 import { Episode } from '../../types/metadata';
@@ -47,7 +47,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   
   // Add refs for the scroll views
   const seasonScrollViewRef = useRef<ScrollView | null>(null);
-  const episodeScrollViewRef = useRef<ScrollView | null>(null);
+  const episodeScrollViewRef = useRef<FlashListRef<Episode>>(null);
   
 
 
@@ -224,15 +224,19 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
     const seasons = Object.keys(groupedEpisodes).map(Number).sort((a, b) => a - b);
     
     return (
-      <View style={styles.seasonSelectorWrapper}>
-        <Text style={[styles.seasonSelectorTitle, { color: currentTheme.colors.highEmphasis }]}>Seasons</Text>
+      <View style={[styles.seasonSelectorWrapper, isTablet && styles.seasonSelectorWrapperTablet]}>
+        <Text style={[
+          styles.seasonSelectorTitle,
+          isTablet && styles.seasonSelectorTitleTablet,
+          { color: currentTheme.colors.highEmphasis }
+        ]}>Seasons</Text>
         <FlatList
           ref={seasonScrollViewRef as React.RefObject<FlatList<any>>}
           data={seasons}
           horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.seasonSelectorContainer}
-          contentContainerStyle={styles.seasonSelectorContent}
+          contentContainerStyle={[styles.seasonSelectorContent, isTablet && styles.seasonSelectorContentTablet]}
           initialNumToRender={5}
           maxToRenderPerBatch={5}
           windowSize={3}
@@ -251,18 +255,23 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                 key={season}
                 style={[
                   styles.seasonButton,
+                  isTablet && styles.seasonButtonTablet,
                   selectedSeason === season && [styles.selectedSeasonButton, { borderColor: currentTheme.colors.primary }]
                 ]}
                 onPress={() => onSeasonChange(season)}
               >
-                <View style={styles.seasonPosterContainer}>
+                <View style={[styles.seasonPosterContainer, isTablet && styles.seasonPosterContainerTablet]}>
                   <Image
                     source={{ uri: seasonPoster }}
                     style={styles.seasonPoster}
                     contentFit="cover"
                   />
                   {selectedSeason === season && (
-                    <View style={[styles.selectedSeasonIndicator, { backgroundColor: currentTheme.colors.primary }]} />
+                    <View style={[
+                      styles.selectedSeasonIndicator,
+                      isTablet && styles.selectedSeasonIndicatorTablet,
+                      { backgroundColor: currentTheme.colors.primary }
+                    ]} />
                   )}
                   {/* Show episode count badge, including when there are no episodes */}
                   <View style={[styles.episodeCountBadge, { backgroundColor: currentTheme.colors.elevation2 }]}>
@@ -274,8 +283,13 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                 <Text 
                   style={[
                     styles.seasonButtonText,
+                    isTablet && styles.seasonButtonTextTablet,
                     { color: currentTheme.colors.mediumEmphasis },
-                    selectedSeason === season && [styles.selectedSeasonButtonText, { color: currentTheme.colors.primary }]
+                    selectedSeason === season && [
+                      styles.selectedSeasonButtonText,
+                      isTablet && styles.selectedSeasonButtonTextTablet,
+                      { color: currentTheme.colors.primary }
+                    ]
                   ]}
                 >
                   Season {season}
@@ -536,19 +550,19 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
           style={styles.episodeGradient}
         >
           {/* Content Container */}
-          <View style={styles.episodeContent}>
+          <View style={[styles.episodeContent, isTablet && styles.episodeContentTablet]}>
             {/* Episode Number Badge */}
-            <View style={styles.episodeNumberBadgeHorizontal}>
-            <Text style={styles.episodeNumberHorizontal}>{episodeString}</Text>
+            <View style={[styles.episodeNumberBadgeHorizontal, isTablet && styles.episodeNumberBadgeHorizontalTablet]}>
+            <Text style={[styles.episodeNumberHorizontal, isTablet && styles.episodeNumberHorizontalTablet]}>{episodeString}</Text>
             </View>
             
             {/* Episode Title */}
-            <Text style={styles.episodeTitleHorizontal} numberOfLines={2}>
+            <Text style={[styles.episodeTitleHorizontal, isTablet && styles.episodeTitleHorizontalTablet]} numberOfLines={2}>
               {episode.name}
             </Text>
             
             {/* Episode Description */}
-            <Text style={styles.episodeDescriptionHorizontal} numberOfLines={3}>
+            <Text style={[styles.episodeDescriptionHorizontal, isTablet && styles.episodeDescriptionHorizontalTablet]} numberOfLines={3}>
               {episode.overview || 'No description available'}
             </Text>
             
@@ -636,7 +650,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
           (settings?.episodeLayoutStyle === 'horizontal') ? (
             // Horizontal Layout (Netflix-style)
             <FlashList
-              ref={episodeScrollViewRef as React.RefObject<FlatList<any>>}
+              ref={episodeScrollViewRef}
               data={currentSeasonEpisodes}
               renderItem={({ item: episode, index }) => (
                 <Animated.View
@@ -653,18 +667,12 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               keyExtractor={episode => episode.id.toString()}
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.episodeListContentHorizontal}
-              decelerationRate="fast"
-              snapToInterval={isTablet ? width * 0.4 + 16 : width * 0.85 + 16}
-              snapToAlignment="start"
-              initialNumToRender={3}
-              maxToRenderPerBatch={3}
-              windowSize={5}
+              contentContainerStyle={isTablet ? styles.episodeListContentHorizontalTablet : styles.episodeListContentHorizontal}
             />
           ) : (
             // Vertical Layout (Traditional)
             <FlashList
-              ref={episodeScrollViewRef as React.RefObject<FlatList<any>>}
+              ref={episodeScrollViewRef}
               data={currentSeasonEpisodes}
               renderItem={({ item: episode, index }) => (
                 <Animated.View 
@@ -675,9 +683,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                 </Animated.View>
               )}
               keyExtractor={episode => episode.id.toString()}
-              estimatedItemSize={136}
               contentContainerStyle={isTablet ? styles.episodeListContentVerticalTablet : styles.episodeListContentVertical}
-              numColumns={isTablet ? 2 : 1}
             />
           )
         )}
@@ -750,7 +756,7 @@ const styles = StyleSheet.create({
   episodeCardVerticalTablet: {
     width: '100%',
     flexDirection: 'row',
-    height: 140,
+    height: 160,
     marginBottom: 16,
   },
   episodeImageContainer: {
@@ -759,8 +765,8 @@ const styles = StyleSheet.create({
     height: 120,
   },
   episodeImageContainerTablet: {
-    width: 140,
-    height: 140,
+    width: 160,
+    height: 160,
   },
   episodeImage: {
     width: '100%',
@@ -891,12 +897,17 @@ const styles = StyleSheet.create({
     paddingLeft: 16,
     paddingRight: 16,
   },
+  episodeListContentHorizontalTablet: {
+    paddingLeft: 24,
+    paddingRight: 24,
+  },
   episodeCardWrapperHorizontal: {
-    width: Dimensions.get('window').width * 0.85,
+    width: Dimensions.get('window').width * 0.75,
     marginRight: 16,
   },
   episodeCardWrapperHorizontalTablet: {
     width: Dimensions.get('window').width * 0.4,
+    marginRight: 20,
   },
   episodeCardHorizontal: {
     borderRadius: 16,
@@ -914,7 +925,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   episodeCardHorizontalTablet: {
-    height: 180,
+    height: 260,
+    borderRadius: 20,
+    elevation: 12,
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
   },
   episodeBackgroundImage: {
     width: '100%',
@@ -934,6 +949,10 @@ const styles = StyleSheet.create({
     padding: 12,
     paddingBottom: 16,
   },
+  episodeContentTablet: {
+    padding: 16,
+    paddingBottom: 20,
+  },
   episodeNumberBadgeHorizontal: {
     backgroundColor: 'rgba(0,0,0,0.4)',
     paddingHorizontal: 6,
@@ -942,11 +961,27 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     alignSelf: 'flex-start',
   },
+  episodeNumberBadgeHorizontalTablet: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginBottom: 8,
+    alignSelf: 'flex-start',
+  },
   episodeNumberHorizontal: {
     color: 'rgba(255,255,255,0.8)',
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  episodeNumberHorizontalTablet: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.0,
     textTransform: 'uppercase',
     marginBottom: 2,
   },
@@ -958,12 +993,27 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     lineHeight: 18,
   },
+  episodeTitleHorizontalTablet: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+    marginBottom: 6,
+    lineHeight: 22,
+  },
   episodeDescriptionHorizontal: {
     color: 'rgba(255,255,255,0.85)',
     fontSize: 12,
     lineHeight: 16,
     marginBottom: 8,
     opacity: 0.9,
+  },
+  episodeDescriptionHorizontalTablet: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 14,
+    lineHeight: 18,
+    marginBottom: 10,
+    opacity: 0.95,
   },
   episodeMetadataRowHorizontal: {
     flexDirection: 'row',
@@ -1027,10 +1077,19 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     paddingHorizontal: 16,
   },
+  seasonSelectorWrapperTablet: {
+    marginBottom: 24,
+    paddingHorizontal: 24,
+  },
   seasonSelectorTitle: {
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 12,
+  },
+  seasonSelectorTitleTablet: {
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 16,
   },
   seasonSelectorContainer: {
     flexGrow: 0,
@@ -1038,10 +1097,18 @@ const styles = StyleSheet.create({
   seasonSelectorContent: {
     paddingBottom: 8,
   },
+  seasonSelectorContentTablet: {
+    paddingBottom: 12,
+  },
   seasonButton: {
     alignItems: 'center',
     marginRight: 16,
     width: 100,
+  },
+  seasonButtonTablet: {
+    alignItems: 'center',
+    marginRight: 20,
+    width: 120,
   },
   selectedSeasonButton: {
     opacity: 1,
@@ -1054,6 +1121,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 8,
   },
+  seasonPosterContainerTablet: {
+    position: 'relative',
+    width: 120,
+    height: 180,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
   seasonPoster: {
     width: '100%',
     height: '100%',
@@ -1065,12 +1140,26 @@ const styles = StyleSheet.create({
     right: 0,
     height: 4,
   },
+  selectedSeasonIndicatorTablet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 6,
+  },
   seasonButtonText: {
     fontSize: 14,
     fontWeight: '500',
   },
+  seasonButtonTextTablet: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
   selectedSeasonButtonText: {
     fontWeight: '700',
+  },
+  selectedSeasonButtonTextTablet: {
+    fontWeight: '800',
   },
   episodeCountBadge: {
     position: 'absolute',
