@@ -15,8 +15,11 @@ const { width } = Dimensions.get('window');
 
 // Dynamic poster calculation based on screen width - show 1/4 of next poster
 const calculatePosterLayout = (screenWidth: number) => {
-  const MIN_POSTER_WIDTH = 100; // Reduced minimum for more posters
-  const MAX_POSTER_WIDTH = 130; // Reduced maximum for more posters
+  // Detect if device is a tablet (width >= 768px is common tablet breakpoint)
+  const isTablet = screenWidth >= 768;
+  
+  const MIN_POSTER_WIDTH = isTablet ? 140 : 100; // Bigger minimum for tablets
+  const MAX_POSTER_WIDTH = isTablet ? 180 : 130; // Bigger maximum for tablets
   const LEFT_PADDING = 16; // Left padding
   const SPACING = 8; // Space between posters
   
@@ -24,7 +27,7 @@ const calculatePosterLayout = (screenWidth: number) => {
   const availableWidth = screenWidth - LEFT_PADDING;
   
   // Try different numbers of full posters to find the best fit
-  let bestLayout = { numFullPosters: 3, posterWidth: 120 };
+  let bestLayout = { numFullPosters: 3, posterWidth: isTablet ? 160 : 120 };
   
   for (let n = 3; n <= 6; n++) {
     // Calculate poster width needed for N full posters + 0.25 partial poster
