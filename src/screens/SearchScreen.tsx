@@ -40,9 +40,11 @@ import { logger } from '../utils/logger';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
+import DogLoadingSpinner from '../components/common/DogLoadingSpinner';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
+const TAB_BAR_HEIGHT = 85;
 
 // Tablet-optimized poster sizes
 const HORIZONTAL_ITEM_WIDTH = isTablet ? width * 0.18 : width * 0.3;
@@ -582,7 +584,13 @@ const SearchScreen = () => {
         {/* Content Container */}
         <View style={[styles.contentContainer, { backgroundColor: currentTheme.colors.darkBackground }]}>
           {searching ? (
-            <SimpleSearchAnimation />
+            <View style={styles.loadingOverlay} pointerEvents="none">
+              <DogLoadingSpinner 
+                size="large" 
+                offsetY={-60}
+                source={require('../../assets/Progress of loading hand.lottie')} 
+              />
+            </View>
           ) : query.trim().length === 1 ? (
             <Animated.View 
               style={styles.emptyContainer}
@@ -814,6 +822,16 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 5,
   },
   loadingText: {
     marginTop: 16,

@@ -48,6 +48,7 @@ import { useSettings, settingsEmitter } from '../hooks/useSettings';
 import FeaturedContent from '../components/home/FeaturedContent';
 import CatalogSection from '../components/home/CatalogSection';
 import { SkeletonFeatured } from '../components/home/SkeletonLoaders';
+import DogLoadingSpinner from '../components/common/DogLoadingSpinner';
 import homeStyles, { sharedStyles } from '../styles/homeStyles';
 import { useTheme } from '../contexts/ThemeContext';
 import type { Theme } from '../contexts/ThemeContext';
@@ -92,7 +93,7 @@ const SkeletonCatalog = React.memo(() => {
   return (
     <View style={styles.catalogContainer}>
       <View style={styles.loadingPlaceholder}>
-        <ActivityIndicator size="small" color={currentTheme.colors.primary} />
+        <DogLoadingSpinner size="small" text="" />
       </View>
     </View>
   );
@@ -545,8 +546,7 @@ const HomeScreen = () => {
             translucent
           />
           <View style={styles.loadingMainContainer}>
-            <ActivityIndicator size="large" color={currentTheme.colors.primary} />
-            <Text style={[styles.loadingText, { color: currentTheme.colors.textMuted }]}>Loading your content...</Text>
+            <DogLoadingSpinner size="large" offsetY={-20} />
           </View>
         </View>
       );
@@ -633,7 +633,7 @@ const HomeScreen = () => {
           <View style={styles.catalogPlaceholder}>
             <View style={styles.placeholderHeader}>
               <View style={[styles.placeholderTitle, { backgroundColor: currentTheme.colors.elevation1 }]} />
-              <ActivityIndicator size="small" color={currentTheme.colors.primary} />
+              <DogLoadingSpinner size="small" text="" />
             </View>
             <ScrollView
               horizontal
@@ -793,7 +793,7 @@ const styles = StyleSheet.create<any>({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingBottom: 90,
+    // Ensure perfect centering
   },
   loadingText: {
     marginTop: 12,
