@@ -840,6 +840,18 @@ export const StreamsScreen = () => {
     const streamName = stream.name || stream.title || 'Unnamed Stream';
     const streamProvider = stream.addonId || stream.addonName || stream.name;
     
+    // Determine if we should force VLC on iOS based on provider-declared formats (e.g., MKV)
+    let forceVlc = false;
+    try {
+      const providerId = stream.addonId || (stream as any).addon;
+      if (Platform.OS === 'ios' && providerId) {
+        forceVlc = await localScraperService.supportsFormat(providerId, 'mkv');
+        logger.log(`[StreamsScreen] Provider '${providerId}' MKV support -> ${forceVlc}`);
+      }
+    } catch (e) {
+      logger.warn('[StreamsScreen] MKV support detection failed:', e);
+    }
+
     // Add pre-navigation orientation lock to reduce glitch
     try {
       await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
@@ -863,6 +875,8 @@ export const StreamsScreen = () => {
       streamName: streamName,
       // Always prefer stream.headers; player will use these for requests
       headers: stream.headers || undefined,
+      // Force VLC for providers that declare MKV format support on iOS
+      forceVlc,
       id,
       type,
       episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined,
@@ -877,6 +891,21 @@ export const StreamsScreen = () => {
   const handleStreamPress = useCallback(async (stream: Stream) => {
     try {
       if (stream.url) {
+        // If provider declares MKV support, force the in-app VLC-based player on iOS
+        try {
+          const providerId = stream.addonId || (stream as any).addon;
+          if (Platform.OS === 'ios' && providerId) {
+            const providerRequiresVlc = await localScraperService.supportsFormat(providerId, 'mkv');
+            if (providerRequiresVlc) {
+              logger.log(`[StreamsScreen] Forcing in-app VLC for provider '${providerId}' on iOS due to MKV support`);
+              navigateToPlayer(stream);
+              return;
+            }
+          }
+        } catch (err) {
+          logger.warn('[StreamsScreen] MKV pre-check failed:', err);
+        }
+
         logger.log('handleStreamPress called with stream:', {
           url: stream.url,
           behaviorHints: stream.behaviorHints,

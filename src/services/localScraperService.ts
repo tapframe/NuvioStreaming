@@ -27,6 +27,10 @@ export interface ScraperInfo {
   manifestEnabled?: boolean; // Whether the scraper is enabled in the manifest
   supportedPlatforms?: ('ios' | 'android')[]; // Platforms where this scraper is supported
   disabledPlatforms?: ('ios' | 'android')[]; // Platforms where this scraper is disabled
+  // Optional list of supported output formats for this provider (e.g., ["mkv", "mp4"]).
+  // We support both `formats` and `supportedFormats` keys for manifest flexibility.
+  formats?: string[];
+  supportedFormats?: string[];
 }
 
 export interface LocalScraperResult {
@@ -102,6 +106,16 @@ class LocalScraperService {
           // Ensure supportedTypes is an array (migration for older scrapers)
           if (!scraper.supportedTypes || !Array.isArray(scraper.supportedTypes)) {
             scraper.supportedTypes = ['movie', 'tv']; // Default to both types
+          }
+          // Normalize formats fields (support both `formats` and `supportedFormats`)
+          if (typeof (scraper as any).formats === 'string') {
+            scraper.formats = [(scraper as any).formats as unknown as string];
+          }
+          if (typeof (scraper as any).supportedFormats === 'string') {
+            scraper.supportedFormats = [(scraper as any).supportedFormats as unknown as string];
+          }
+          if (!scraper.supportedFormats && scraper.formats) {
+            scraper.supportedFormats = scraper.formats;
           }
           
           // Ensure other required fields have defaults
@@ -331,6 +345,16 @@ class LocalScraperService {
       if (!updatedScraperInfo.supportedTypes || !Array.isArray(updatedScraperInfo.supportedTypes)) {
         updatedScraperInfo.supportedTypes = ['movie', 'tv']; // Default to both types
       }
+      // Normalize formats fields (support both `formats` and `supportedFormats`)
+      if (typeof (updatedScraperInfo as any).formats === 'string') {
+        updatedScraperInfo.formats = [(updatedScraperInfo as any).formats as unknown as string];
+      }
+      if (typeof (updatedScraperInfo as any).supportedFormats === 'string') {
+        updatedScraperInfo.supportedFormats = [(updatedScraperInfo as any).supportedFormats as unknown as string];
+      }
+      if (!updatedScraperInfo.supportedFormats && updatedScraperInfo.formats) {
+        updatedScraperInfo.supportedFormats = updatedScraperInfo.formats;
+      }
       
       this.installedScrapers.set(scraperInfo.id, updatedScraperInfo);
       
@@ -431,6 +455,18 @@ class LocalScraperService {
             // If manifest says enabled: true, use installed state or default to false
             enabled: scraperInfo.enabled ? (installedScraper?.enabled ?? false) : false
           };
+
+          // Normalize formats fields (support both `formats` and `supportedFormats`)
+          const anyScraper: any = scraperWithManifestData as any;
+          if (typeof anyScraper.formats === 'string') {
+            anyScraper.formats = [anyScraper.formats];
+          }
+          if (typeof anyScraper.supportedFormats === 'string') {
+            anyScraper.supportedFormats = [anyScraper.supportedFormats];
+          }
+          if (!anyScraper.supportedFormats && anyScraper.formats) {
+            anyScraper.supportedFormats = anyScraper.formats;
+          }
           
           return scraperWithManifestData;
         });
@@ -448,6 +484,25 @@ class LocalScraperService {
       logger.error('[LocalScraperService] Failed to fetch available scrapers from manifest:', error);
       // Fallback to installed scrapers if manifest fetch fails
       return this.getInstalledScrapers();
+    }
+  }
+
+  // Check if a given scraper declares support for a specific format (e.g., 'mkv')
+  async supportsFormat(scraperId: string, format: string): Promise<boolean> {
+    await this.ensureInitialized();
+    try {
+      const available = await this.getAvailableScrapers();
+      const info = available.find(s => s.id === scraperId);
+      if (!info) return false;
+      const formats = (info.supportedFormats || info.formats || [])
+        .filter(Boolean)
+        .map(f => (typeof f === 'string' ? f.toLowerCase() : String(f).toLowerCase()));
+      const supported = formats.includes((format || '').toLowerCase());
+      logger.log(`[LocalScraperService] supportsFormat('${scraperId}', '${format}') -> ${supported}. Formats: ${JSON.stringify(formats)}`);
+      return supported;
+    } catch (e) {
+      logger.warn(`[LocalScraperService] supportsFormat('${scraperId}', '${format}') failed`, e);
+      return false;
     }
   }
 
