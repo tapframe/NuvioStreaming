@@ -172,9 +172,12 @@ class StorageService {
       // Do not resurrect if tombstone exists and is newer than this progress
       try {
         const tombstones = await this.getWatchProgressTombstones();
-        const tombKey = this.buildWpKeyString(id, type, episodeId);
-        const tombAt = tombstones[tombKey];
-        if (tombAt && (progress.lastUpdated == null || progress.lastUpdated <= tombAt)) {
+        const exactKey = this.buildWpKeyString(id, type, episodeId);
+        const baseKey = this.buildWpKeyString(id, type, undefined);
+        const exactTombAt = tombstones[exactKey];
+        const baseTombAt = tombstones[baseKey];
+        const newestTombAt = Math.max(exactTombAt || 0, baseTombAt || 0);
+        if (newestTombAt && (progress.lastUpdated == null || progress.lastUpdated <= newestTombAt)) {
           return;
         }
       } catch {}
@@ -355,6 +358,7 @@ class StorageService {
   }>> {
     try {
       const allProgress = await this.getAllWatchProgress();
+      const tombstones = await this.getWatchProgressTombstones();
       const unsynced: Array<{
         key: string;
         id: string;
@@ -364,10 +368,13 @@ class StorageService {
       }> = [];
 
       for (const [key, progress] of Object.entries(allProgress)) {
-        // Skip if tombstoned and tombstone is newer
-        const tombstones = await this.getWatchProgressTombstones();
-        const tombAt = tombstones[key];
-        if (tombAt && (progress.lastUpdated == null || progress.lastUpdated <= tombAt)) {
+        // Skip if tombstoned (either exact entry or base content) and tombstone is newer
+        const parts = key.split(':');
+        const baseKey = `${parts[0]}:${parts[1]}`;
+        const exactTombAt = tombstones[key];
+        const baseTombAt = tombstones[baseKey];
+        const newestTombAt = Math.max(exactTombAt || 0, baseTombAt || 0);
+        if (newestTombAt && (progress.lastUpdated == null || progress.lastUpdated <= newestTombAt)) {
           continue;
         }
         // Check if needs sync (either never synced or local progress is newer)
@@ -395,6 +402,35 @@ class StorageService {
     } catch (error) {
       logger.error('Error getting unsynced progress:', error);
       return [];
+    }
+  }
+
+  /**
+   * Remove all watch progress entries for a given content id and type.
+   * Optionally add a base tombstone to prevent reappearance.
+   */
+  public async removeAllWatchProgressForContent(
+    id: string,
+    type: string,
+    options?: { addBaseTombstone?: boolean }
+  ): Promise<void> {
+    try {
+      const all = await this.getAllWatchProgress();
+      const prefix = `${type}:${id}`;
+      const removals: Array<Promise<void>> = [];
+      for (const key of Object.keys(all)) {
+        if (key === prefix || key.startsWith(`${prefix}:`)) {
+          // Compute episodeId if present
+          const episodeId = key.length > prefix.length + 1 ? key.slice(prefix.length + 1) : undefined;
+          removals.push(this.removeWatchProgress(id, type, episodeId));
+        }
+      }
+      await Promise.allSettled(removals);
+      if (options?.addBaseTombstone) {
+        await this.addWatchProgressTombstone(id, type);
+      }
+    } catch (error) {
+      logger.error('Error removing all watch progress for content:', error);
     }
   }
 

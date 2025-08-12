@@ -475,14 +475,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
               // Trigger haptic feedback for confirmation
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               
-              // Remove the watch progress
-              await storageService.removeWatchProgress(
-                item.id, 
-                item.type, 
-                item.type === 'series' && item.season && item.episode 
-                  ? `${item.season}:${item.episode}` 
-                  : undefined
-              );
+              // Remove all watch progress for this content (all episodes if series)
+              await storageService.removeAllWatchProgressForContent(item.id, item.type, { addBaseTombstone: true });
               
               // Also remove from Trakt playback queue if authenticated
               const traktService = TraktService.getInstance();
@@ -491,18 +485,13 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                 await traktService.deletePlaybackForContent(
                   item.id,
                   item.type as 'movie' | 'series',
-                  item.season,
-                  item.episode
+                  undefined,
+                  undefined
                 );
               }
               
               // Update the list by filtering out the deleted item
-              setContinueWatchingItems(prev => 
-                prev.filter(i => i.id !== item.id || 
-                  (i.type === 'series' && item.type === 'series' && 
-                   (i.season !== item.season || i.episode !== item.episode))
-                )
-              );
+              setContinueWatchingItems(prev => prev.filter(i => i.id !== item.id));
             } catch (error) {
               logger.error('Failed to remove watch progress:', error);
             } finally {
