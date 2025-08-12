@@ -51,6 +51,7 @@ interface GroupedCatalogs {
 
 const CATALOG_SETTINGS_KEY = 'catalog_settings';
 const CATALOG_CUSTOM_NAMES_KEY = 'catalog_custom_names';
+const CATALOG_MOBILE_COLUMNS_KEY = 'catalog_mobile_columns';
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
 // Create a styles creator function that accepts the theme colors
@@ -133,6 +134,33 @@ const createStyles = (colors: any) => StyleSheet.create({
   groupHeaderRight: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  optionChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'transparent',
+  },
+  optionChipSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  optionChipText: {
+    color: colors.mediumGray,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  optionChipTextSelected: {
+    color: colors.white,
   },
     hintRow: {
       flexDirection: 'row',
@@ -224,6 +252,7 @@ const CatalogSettingsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState<CatalogSetting[]>([]);
   const [groupedSettings, setGroupedSettings] = useState<GroupedCatalogs>({});
+  const [mobileColumns, setMobileColumns] = useState<'auto' | 2 | 3>('auto');
   const navigation = useNavigation();
   const { refreshCatalogs } = useCatalogContext();
   const { currentTheme } = useTheme();
@@ -320,6 +349,16 @@ const CatalogSettingsScreen = () => {
       
       setSettings(availableCatalogs);
       setGroupedSettings(grouped);
+
+      // Load mobile columns preference (phones only)
+      try {
+        const pref = await AsyncStorage.getItem(CATALOG_MOBILE_COLUMNS_KEY);
+        if (pref === '2') setMobileColumns(2);
+        else if (pref === '3') setMobileColumns(3);
+        else setMobileColumns('auto');
+      } catch (e) {
+        // ignore
+      }
     } catch (error) {
       logger.error('Failed to load catalog settings:', error);
     } finally {
@@ -470,6 +509,62 @@ const CatalogSettingsScreen = () => {
       <Text style={styles.headerTitle}>Catalogs</Text>
       
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        {/* Layout (Mobile only) */}
+        {Platform.OS && (
+          <View style={styles.addonSection}>
+            <Text style={styles.addonTitle}>LAYOUT CATALOGSCREEN (PHONE)</Text>
+            <View style={styles.card}>
+              <View style={styles.groupHeader}>
+                <Text style={styles.groupTitle}>Posters per row</Text>
+                <View style={styles.groupHeaderRight} />
+              </View>
+              {/* Only show on phones (approx width < 600) */}
+              <View style={styles.optionRow}>
+                <TouchableOpacity
+                  style={[styles.optionChip, mobileColumns === 'auto' && styles.optionChipSelected]}
+                  onPress={async () => {
+                    try {
+                      await AsyncStorage.setItem(CATALOG_MOBILE_COLUMNS_KEY, 'auto');
+                      setMobileColumns('auto');
+                    } catch {}
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.optionChipText, mobileColumns === 'auto' && styles.optionChipTextSelected]}>Auto</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.optionChip, mobileColumns === 2 && styles.optionChipSelected]}
+                  onPress={async () => {
+                    try {
+                      await AsyncStorage.setItem(CATALOG_MOBILE_COLUMNS_KEY, '2');
+                      setMobileColumns(2);
+                    } catch {}
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.optionChipText, mobileColumns === 2 && styles.optionChipTextSelected]}>2</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.optionChip, mobileColumns === 3 && styles.optionChipSelected]}
+                  onPress={async () => {
+                    try {
+                      await AsyncStorage.setItem(CATALOG_MOBILE_COLUMNS_KEY, '3');
+                      setMobileColumns(3);
+                    } catch {}
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.optionChipText, mobileColumns === 3 && styles.optionChipTextSelected]}>3</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.hintRow}>
+                <MaterialIcons name="info-outline" size={14} color={colors.mediumGray} />
+                <Text style={styles.hintText}>Applies to phones only. Tablets keep adaptive layout.</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
         {Object.entries(groupedSettings).map(([addonId, group]) => (
           <View key={addonId} style={styles.addonSection}>
             <Text style={styles.addonTitle}>

@@ -21,6 +21,7 @@ import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { logger } from '../utils/logger';
 import { useCustomCatalogNames } from '../hooks/useCustomCatalogNames';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { catalogService, DataSource, StreamingContent } from '../services/catalogService';
 
 type CatalogScreenProps = {
@@ -143,20 +144,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderTopRightRadius: 12,
     backgroundColor: colors.elevation3,
   },
-  itemContent: {
-    padding: SPACING.sm,
-  },
-  title: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.white,
-    lineHeight: 18,
-  },
-  releaseInfo: {
-    fontSize: 12,
-    marginTop: SPACING.xs,
-    color: colors.mediumGray,
-  },
+  // removed bottom text container; keep spacing via item margin only
   footer: {
     padding: SPACING.lg,
     alignItems: 'center',
@@ -223,19 +211,33 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
       ...calculateCatalogLayout(width)
     };
   });
+  const [mobileColumnsPref, setMobileColumnsPref] = useState<'auto' | 2 | 3>('auto');
   const { currentTheme } = useTheme();
   const colors = currentTheme.colors;
   const styles = createStyles(colors);
   const isDarkMode = true;
   const isInitialRender = React.useRef(true);
 
+  // Load mobile columns preference (phones only)
+  useEffect(() => {
+    (async () => {
+      try {
+        const pref = await AsyncStorage.getItem('catalog_mobile_columns');
+        if (pref === '2') setMobileColumnsPref(2);
+        else if (pref === '3') setMobileColumnsPref(3);
+        else setMobileColumnsPref('auto');
+      } catch {}
+    })();
+  }, []);
+
   // Handle screen dimension changes
   useEffect(() => {
     const subscription = Dimensions.addEventListener('change', ({ window }) => {
-      setScreenData({
+      const base = calculateCatalogLayout(window.width);
+      setScreenData(prev => ({
         width: window.width,
-        ...calculateCatalogLayout(window.width)
-      });
+        ...base
+      }));
     });
 
     return () => subscription?.remove();
@@ -542,9 +544,26 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
     }
   }, [loading, paginating, hasMore, page, loadItems, refreshing]);
 
+  const effectiveNumColumns = React.useMemo(() => {
+    const isPhone = screenData.width < 600; // basic breakpoint; tablets generally above this
+    if (!isPhone || mobileColumnsPref === 'auto') return screenData.numColumns;
+    // clamp to 2 or 3 on phones
+    return mobileColumnsPref === 2 ? 2 : 3;
+  }, [screenData.width, screenData.numColumns, mobileColumnsPref]);
+
+  const effectiveItemWidth = React.useMemo(() => {
+    if (effectiveNumColumns === screenData.numColumns) return screenData.itemWidth;
+    // recompute width for custom columns on mobile to maintain spacing roughly similar
+    const HORIZONTAL_PADDING = 16 * 2; // SPACING.lg * 2
+    const ITEM_SPACING = 8; // SPACING.sm
+    const availableWidth = screenData.width - HORIZONTAL_PADDING;
+    const totalSpacing = ITEM_SPACING * (effectiveNumColumns - 1);
+    return (availableWidth - totalSpacing) / effectiveNumColumns;
+  }, [effectiveNumColumns, screenData.width, screenData.itemWidth]);
+
   const renderItem = useCallback(({ item, index }: { item: Meta; index: number }) => {
     // Calculate if this is the last item in a row
-    const isLastInRow = (index + 1) % screenData.numColumns === 0;
+    const isLastInRow = (index + 1) % effectiveNumColumns === 0;
     // For proper spacing
     const rightMargin = isLastInRow ? 0 : SPACING.sm;
     
@@ -554,7 +573,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           styles.item,
           { 
             marginRight: rightMargin,
-            width: screenData.itemWidth
+            width: effectiveItemWidth
           }
         ]}
         onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type, addonId })}
@@ -568,22 +587,9 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           transition={0}
           allowDownscaling
         />
-        <View style={styles.itemContent}>
-          <Text
-            style={styles.title}
-            numberOfLines={2}
-          >
-            {item.name}
-          </Text>
-          {item.releaseInfo && (
-            <Text style={styles.releaseInfo}>
-              {item.releaseInfo}
-            </Text>
-          )}
-        </View>
       </TouchableOpacity>
     );
-  }, [navigation, styles, screenData.numColumns, screenData.itemWidth]);
+  }, [navigation, styles, effectiveNumColumns, effectiveItemWidth]);
 
   const renderEmptyState = () => (
     <View style={styles.centered}>
@@ -681,8 +687,8 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           data={items}
           renderItem={renderItem}
           keyExtractor={(item) => `${item.id}-${item.type}`}
-          numColumns={screenData.numColumns}
-          key={screenData.numColumns}
+          numColumns={effectiveNumColumns}
+          key={effectiveNumColumns}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
