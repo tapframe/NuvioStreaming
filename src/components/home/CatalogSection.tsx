@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { CatalogContent, StreamingContent } from '../../services/catalogService';
 import { useTheme } from '../../contexts/ThemeContext';
 import ContentItem from './ContentItem';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 
 interface CatalogSectionProps {
@@ -76,7 +77,7 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
   const keyExtractor = useCallback((item: StreamingContent) => `${item.id}-${item.type}`, []);
 
   return (
-    <View style={styles.catalogContainer}>
+    <Animated.View style={styles.catalogContainer} entering={FadeIn.duration(350)}>
       <View style={styles.catalogHeader}>
         <View style={styles.titleContainer}>
           <Text style={[styles.catalogTitle, { color: currentTheme.colors.text }]} numberOfLines={1}>{catalog.name}</Text>
@@ -109,7 +110,7 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
         onEndReached={() => {}}
         scrollEventThrottle={16}
       />
-    </View>
+    </Animated.View>
   );
 };
 

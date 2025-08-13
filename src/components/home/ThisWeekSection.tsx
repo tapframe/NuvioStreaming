@@ -20,7 +20,7 @@ import { tmdbService } from '../../services/tmdbService';
 import { useLibrary } from '../../hooks/useLibrary';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { parseISO, isThisWeek, format, isAfter, isBefore } from 'date-fns';
-import Animated from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { useCalendarData } from '../../hooks/useCalendarData';
 
 const { width } = Dimensions.get('window');
@@ -179,7 +179,7 @@ export const ThisWeekSection = React.memo(() => {
   };
   
   return (
-    <View style={styles.container}>
+    <Animated.View style={styles.container} entering={FadeIn.duration(350)}>
       <View style={styles.header}>
         <View style={styles.titleContainer}>
         <Text style={[styles.title, { color: currentTheme.colors.text }]}>This Week</Text>
@@ -203,7 +203,7 @@ export const ThisWeekSection = React.memo(() => {
         snapToAlignment="start"
         ItemSeparatorComponent={() => <View style={{ width: 16 }} />}
       />
-    </View>
+    </Animated.View>
   );
 });
 

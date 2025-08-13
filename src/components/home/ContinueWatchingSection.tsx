@@ -11,7 +11,7 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
-import Animated from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
@@ -509,7 +509,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   }
 
   return (
-    <View style={styles.container}>
+    <Animated.View style={styles.container} entering={FadeIn.duration(350)}>
       <View style={styles.header}>
         <View style={styles.titleContainer}>
           <Text style={[styles.title, { color: currentTheme.colors.text }]}>Continue Watching</Text>
@@ -632,7 +632,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         onEndReachedThreshold={0.7}
         onEndReached={() => {}}
       />
-    </View>
+    </Animated.View>
   );
 });
 

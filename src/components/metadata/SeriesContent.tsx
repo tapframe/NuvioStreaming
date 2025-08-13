@@ -654,7 +654,6 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               data={currentSeasonEpisodes}
               renderItem={({ item: episode, index }) => (
                 <Animated.View
-                  key={episode.id}
                   entering={FadeIn.duration(300).delay(100 + index * 30)}
                   style={[
                     styles.episodeCardWrapperHorizontal,
@@ -668,6 +667,14 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={isTablet ? styles.episodeListContentHorizontalTablet : styles.episodeListContentHorizontal}
+              estimatedItemSize={(isTablet ? width * 0.4 : width * 0.75) + (isTablet ? 20 : 16)}
+              overrideItemLayout={(layout, _item, _index) => {
+                const cardWidth = isTablet ? width * 0.4 : width * 0.75;
+                const margin = isTablet ? 20 : 16;
+                layout.size = cardWidth + margin;
+                layout.span = 1;
+              }}
+              removeClippedSubviews
             />
           ) : (
             // Vertical Layout (Traditional)
@@ -676,7 +683,6 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               data={currentSeasonEpisodes}
               renderItem={({ item: episode, index }) => (
                 <Animated.View 
-                  key={episode.id}
                   entering={FadeIn.duration(300).delay(100 + index * 30)}
                 >
                   {renderVerticalEpisodeCard(episode)}
@@ -684,6 +690,14 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               )}
               keyExtractor={episode => episode.id.toString()}
               contentContainerStyle={isTablet ? styles.episodeListContentVerticalTablet : styles.episodeListContentVertical}
+              estimatedItemSize={isTablet ? 160 + 16 : 120 + 16}
+              overrideItemLayout={(layout, _item, _index) => {
+                // height along main axis for vertical list
+                const itemHeight = (isTablet ? 160 : 120) + 16; // card height + marginBottom
+                layout.size = itemHeight;
+                layout.span = 1;
+              }}
+              removeClippedSubviews
             />
           )
         )}

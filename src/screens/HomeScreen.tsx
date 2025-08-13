@@ -621,19 +621,22 @@ const HomeScreen = () => {
   const memoizedThisWeekSection = useMemo(() => <ThisWeekSection />, []);
   const memoizedContinueWatchingSection = useMemo(() => <ContinueWatchingSection ref={continueWatchingRef} />, []);
 
-  const renderListItem = useCallback(({ item }: { item: HomeScreenListItem }) => {
+  const renderListItem = useCallback(({ item, index }: { item: HomeScreenListItem, index: number }) => {
+    const wrapper = (child: React.ReactNode) => (
+      <Animated.View entering={FadeIn.duration(350).delay(Math.min(index * 70, 700))}>
+        {child}
+      </Animated.View>
+    );
     switch (item.type) {
       // featured is rendered via ListHeaderComponent to avoid remounts
       case 'thisWeek':
-        return memoizedThisWeekSection;
+        return wrapper(memoizedThisWeekSection);
       case 'continueWatching':
-        return memoizedContinueWatchingSection;
+        return wrapper(memoizedContinueWatchingSection);
       case 'catalog':
-        return (
-          <CatalogSection catalog={item.catalog} />
-        );
+        return wrapper(<CatalogSection catalog={item.catalog} />);
       case 'placeholder':
-        return (
+        return wrapper(
           <View style={styles.catalogPlaceholder}>
             <View style={styles.placeholderHeader}>
               <View style={[styles.placeholderTitle, { backgroundColor: currentTheme.colors.elevation1 }]} />
@@ -669,7 +672,7 @@ const HomeScreen = () => {
           </Animated.View>
         );
       case 'welcome':
-        return <FirstTimeWelcome />;
+        return wrapper(<FirstTimeWelcome />);
       default:
         return null;
     }
