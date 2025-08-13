@@ -840,7 +840,7 @@ export const StreamsScreen = () => {
     );
   }, [selectedEpisode, groupedEpisodes, id]);
 
-  const navigateToPlayer = useCallback(async (stream: Stream) => {
+  const navigateToPlayer = useCallback(async (stream: Stream, options?: { forceVlc?: boolean; headers?: Record<string, string> }) => {
     // Prepare available streams for the change source feature
     const streamsToPass = type === 'series' ? episodeStreams : groupedStreams;
     
@@ -849,10 +849,10 @@ export const StreamsScreen = () => {
     const streamProvider = stream.addonId || stream.addonName || stream.name;
     
     // Determine if we should force VLC on iOS based on provider-declared formats (e.g., MKV)
-    let forceVlc = false;
+    let forceVlc = !!options?.forceVlc;
     try {
       const providerId = stream.addonId || (stream as any).addon;
-      if (Platform.OS === 'ios' && providerId) {
+      if (Platform.OS === 'ios' && providerId && !forceVlc) {
         forceVlc = await localScraperService.supportsFormat(providerId, 'mkv');
         logger.log(`[StreamsScreen] Provider '${providerId}' MKV support -> ${forceVlc}`);
       }
@@ -882,7 +882,7 @@ export const StreamsScreen = () => {
       streamProvider: streamProvider,
       streamName: streamName,
       // Always prefer stream.headers; player will use these for requests
-      headers: stream.headers || undefined,
+      headers: options?.headers || stream.headers || undefined,
       // Force VLC for providers that declare MKV format support on iOS
       forceVlc,
       id,
@@ -912,6 +912,47 @@ export const StreamsScreen = () => {
           }
         } catch (err) {
           logger.warn('[StreamsScreen] MKV pre-check failed:', err);
+        }
+
+        // On iOS, for installed addons where URL may not include .mkv, send a HEAD request
+        // to detect MKV via Content-Type before opening the player
+        if (Platform.OS === 'ios') {
+          const lowerUrl = (stream.url || '').toLowerCase();
+          const isMkvByPath = lowerUrl.includes('.mkv') || /[?&]ext=mkv\b/.test(lowerUrl) || /format=mkv\b/.test(lowerUrl) || /container=mkv\b/.test(lowerUrl);
+          const isHttp = lowerUrl.startsWith('http://') || lowerUrl.startsWith('https://');
+          if (!isMkvByPath && isHttp) {
+            try {
+              const mkvDetected = await (async () => {
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 4000);
+                try {
+                  const res = await fetch(stream.url, {
+                    method: 'HEAD',
+                    // Pass along any known headers to improve odds of correct response
+                    headers: (stream.headers as any) || undefined,
+                    signal: controller.signal as any,
+                  } as any);
+                  const contentType = res.headers.get('content-type') || '';
+                  return typeof contentType === 'string' && /matroska|x-matroska/i.test(contentType);
+                } catch (_e) {
+                  return false;
+                } finally {
+                  clearTimeout(timeout);
+                }
+              })();
+              if (mkvDetected) {
+                const mergedHeaders = {
+                  ...(stream.headers || {}),
+                  'Content-Type': 'video/x-matroska',
+                } as Record<string, string>;
+                logger.log('[StreamsScreen] HEAD detected MKV via Content-Type, forcing in-app VLC on iOS');
+                navigateToPlayer(stream, { forceVlc: true, headers: mergedHeaders });
+                return;
+              }
+            } catch (e) {
+              logger.warn('[StreamsScreen] HEAD MKV detection failed:', e);
+            }
+          }
         }
 
         logger.log('handleStreamPress called with stream:', {
