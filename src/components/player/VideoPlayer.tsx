@@ -220,6 +220,9 @@ const VideoPlayer: React.FC = () => {
   // Next episode button state
   const [showNextEpisodeButton, setShowNextEpisodeButton] = useState(false);
   const [isLoadingNextEpisode, setIsLoadingNextEpisode] = useState(false);
+  const [nextLoadingProvider, setNextLoadingProvider] = useState<string | null>(null);
+  const [nextLoadingQuality, setNextLoadingQuality] = useState<string | null>(null);
+  const [nextLoadingTitle, setNextLoadingTitle] = useState<string | null>(null);
   const nextEpisodeButtonOpacity = useRef(new Animated.Value(0)).current;
   const nextEpisodeButtonScale = useRef(new Animated.Value(0.8)).current;
 
@@ -1211,6 +1214,12 @@ const VideoPlayer: React.FC = () => {
           bestStream = sortedStreams[0];
           streamFound = true;
           hasNavigated = true;
+
+          // Update loading details for the chip
+          const qualityText = (bestStream.title?.match(/(\d+)p/) || [])[1] || null;
+          setNextLoadingProvider(addonName || addonId || null);
+          setNextLoadingQuality(qualityText);
+          setNextLoadingTitle(bestStream.name || bestStream.title || null);
           
           logger.log('[VideoPlayer] Found stream for next episode:', bestStream);
           
@@ -1920,6 +1929,13 @@ const VideoPlayer: React.FC = () => {
                     S{nextEpisode.season_number}E{nextEpisode.episode_number}
                     {nextEpisode.name ? `: ${nextEpisode.name}` : ''}
                   </Text>
+                  {isLoadingNextEpisode && (
+                    <Text style={{ color: '#333333', fontSize: 11, marginTop: 2 }} numberOfLines={1}>
+                      {nextLoadingProvider ? `${nextLoadingProvider}` : 'Finding source…'}
+                      {nextLoadingQuality ? ` • ${nextLoadingQuality}p` : ''}
+                      {nextLoadingTitle ? ` • ${nextLoadingTitle}` : ''}
+                    </Text>
+                  )}
                 </View>
               </TouchableOpacity>
             </Animated.View>
