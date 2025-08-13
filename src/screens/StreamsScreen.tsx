@@ -604,17 +604,23 @@ export const StreamsScreen = () => {
       filterOpacity.value = withTiming(0, { duration: 100 });
     };
     cleanup();
-    
-    // For series episodes, always replace current screen with metadata screen
+
     if (type === 'series') {
-      // Immediate navigation for series
-      navigation.replace('Metadata', {
-        id: id,
-        type: type
+      // Reset stack to ensure there is always a screen to go back to from Metadata
+      (navigation as any).reset({
+        index: 1,
+        routes: [
+          { name: 'MainTabs' },
+          { name: 'Metadata', params: { id, type } }
+        ]
       });
-    } else {
-      // Immediate navigation for movies
+      return;
+    }
+
+    if (navigation.canGoBack()) {
       navigation.goBack();
+    } else {
+      (navigation as any).navigate('MainTabs');
     }
   }, [navigation, headerOpacity, heroScale, filterOpacity, type, id]);
 
