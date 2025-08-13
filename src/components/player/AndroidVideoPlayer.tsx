@@ -780,7 +780,21 @@ const AndroidVideoPlayer: React.FC = () => {
         }, 50);
       }
       disableImmersiveMode();
-      navigation.goBack();
+      
+      // For series, reset to streams screen for current episode to ensure no hidden players remain on the stack
+      if (type === 'series' && id && episodeId) {
+        (navigation as any).reset({
+          index: 0,
+          routes: [
+            {
+              name: 'Streams',
+              params: { id, type: 'series', episodeId }
+            }
+          ]
+        });
+      } else {
+        navigation.goBack();
+      }
     }).catch(() => {
       // Fallback: still try to restore portrait then navigate
       if (Platform.OS === 'ios') {
@@ -789,7 +803,21 @@ const AndroidVideoPlayer: React.FC = () => {
         }, 50);
       }
       disableImmersiveMode();
-      navigation.goBack();
+      
+      // For series, reset to streams screen for current episode to ensure no hidden players remain on the stack
+      if (type === 'series' && id && episodeId) {
+        (navigation as any).reset({
+          index: 0,
+          routes: [
+            {
+              name: 'Streams',
+              params: { id, type: 'series', episodeId }
+            }
+          ]
+        });
+      } else {
+        navigation.goBack();
+      }
     });
 
     // Send Trakt sync in background (don't await)
@@ -1249,11 +1277,24 @@ const AndroidVideoPlayer: React.FC = () => {
       
       streamAddons.forEach((addon: any) => expectedProviders.add(addon.id));
       
+      // Collect all streams from all providers for the sources modal
+      const allStreams: { [providerId: string]: { streams: any[]; addonName: string } } = {};
+      let hasNavigated = false;
+      
       // Fetch streams for next episode
       await stremioService.getStreams('series', nextEpisodeId, (streams: any, addonId: any, addonName: any, error: any) => {
         completedProviders++;
         
-        if (!streamFound && streams && streams.length > 0) {
+        // Always collect streams from this provider for sources modal (even after navigation)
+        if (streams && streams.length > 0) {
+          allStreams[addonId] = {
+            streams: streams,
+            addonName: addonName || addonId
+          };
+        }
+        
+        // Navigate with first good stream found, but continue collecting streams in background
+        if (!hasNavigated && !streamFound && streams && streams.length > 0) {
           // Sort streams by quality and cache status (prefer cached/debrid streams)
           const sortedStreams = streams.sort((a: any, b: any) => {
             const aQuality = parseInt(a.title?.match(/(\d+)p/)?.[1] || '0', 10);
@@ -1271,30 +1312,36 @@ const AndroidVideoPlayer: React.FC = () => {
           
           bestStream = sortedStreams[0];
           streamFound = true;
+          hasNavigated = true;
           
           logger.log('[AndroidVideoPlayer] Found stream for next episode:', bestStream);
           
-          // Navigate to next episode immediately with best stream
-          (navigation as any).replace('Player', {
-            uri: bestStream.url,
-            title: metadata?.name || '',
-            episodeTitle: nextEpisode.name,
-            season: nextEpisode.season_number,
-            episode: nextEpisode.episode_number,
-            quality: (bestStream.title?.match(/(\d+)p/) || [])[1] || undefined,
-            year: metadata?.year,
-            streamProvider: addonName,
-            streamName: bestStream.name || bestStream.title,
-            headers: bestStream.headers || undefined,
-            forceVlc: false,
-            id,
-            type: 'series',
-            episodeId: nextEpisodeId,
-            imdbId: imdbId ?? undefined,
-            backdrop: backdrop || undefined,
-          });
-          
-          setIsLoadingNextEpisode(false);
+          // Pause current playback to ensure no background player remains active
+          setPaused(true);
+
+          // Start navigation immediately but let stream fetching continue in background
+          setTimeout(() => {
+            (navigation as any).replace('Player', {
+              uri: bestStream.url,
+              title: metadata?.name || '',
+              episodeTitle: nextEpisode.name,
+              season: nextEpisode.season_number,
+              episode: nextEpisode.episode_number,
+              quality: (bestStream.title?.match(/(\d+)p/) || [])[1] || undefined,
+              year: metadata?.year,
+              streamProvider: addonName,
+              streamName: bestStream.name || bestStream.title,
+              headers: bestStream.headers || undefined,
+              forceVlc: false,
+              id,
+              type: 'series',
+              episodeId: nextEpisodeId,
+              imdbId: imdbId ?? undefined,
+              backdrop: backdrop || undefined,
+              availableStreams: allStreams, // Pass current available streams (more will be added)
+            });
+            setIsLoadingNextEpisode(false);
+          }, 100); // Small delay to ensure smooth transition
         }
         
         // If we've checked all providers and no stream found
