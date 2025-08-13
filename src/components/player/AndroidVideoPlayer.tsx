@@ -781,15 +781,12 @@ const AndroidVideoPlayer: React.FC = () => {
       }
       disableImmersiveMode();
       
-      // For series, reset to streams screen for current episode to ensure no hidden players remain on the stack
+      // For series, hard reset to a single Streams route to avoid stacking multiple modals/pages
       if (type === 'series' && id && episodeId) {
         (navigation as any).reset({
           index: 0,
           routes: [
-            {
-              name: 'Streams',
-              params: { id, type: 'series', episodeId }
-            }
+            { name: 'Streams', params: { id, type: 'series', episodeId } }
           ]
         });
       } else {
@@ -804,15 +801,12 @@ const AndroidVideoPlayer: React.FC = () => {
       }
       disableImmersiveMode();
       
-      // For series, reset to streams screen for current episode to ensure no hidden players remain on the stack
+      // For series, hard reset to a single Streams route to avoid stacking multiple modals/pages
       if (type === 'series' && id && episodeId) {
         (navigation as any).reset({
           index: 0,
           routes: [
-            {
-              name: 'Streams',
-              params: { id, type: 'series', episodeId }
-            }
+            { name: 'Streams', params: { id, type: 'series', episodeId } }
           ]
         });
       } else {
@@ -1418,7 +1412,7 @@ const AndroidVideoPlayer: React.FC = () => {
 
   // Handle next episode button visibility based on current time and next episode availability
   useEffect(() => {
-    if ((type as any) !== 'series' || !nextEpisode || duration <= 0 || isLoadingNextEpisode) {
+    if ((type as any) !== 'series' || !nextEpisode || duration <= 0) {
       if (showNextEpisodeButton) {
         // Hide button with animation
         Animated.parallel([
@@ -1439,9 +1433,9 @@ const AndroidVideoPlayer: React.FC = () => {
       return;
     }
 
-    // Show button when 2.5 minutes (150 seconds) remain
+    // Show button when 1 minute (60 seconds) remains
     const timeRemaining = duration - currentTime;
-    const shouldShowButton = timeRemaining <= 150 && timeRemaining > 10; // Hide in last 10 seconds
+    const shouldShowButton = timeRemaining <= 60 && timeRemaining > 10; // Hide in last 10 seconds
 
     if (shouldShowButton && !showNextEpisodeButton) {
       setShowNextEpisodeButton(true);
@@ -1474,7 +1468,7 @@ const AndroidVideoPlayer: React.FC = () => {
         setShowNextEpisodeButton(false);
       });
     }
-  }, [type, nextEpisode, duration, currentTime, showNextEpisodeButton, isLoadingNextEpisode]);
+  }, [type, nextEpisode, duration, currentTime, showNextEpisodeButton]);
 
   useEffect(() => {
     isMounted.current = true;
@@ -1980,11 +1974,11 @@ const AndroidVideoPlayer: React.FC = () => {
 
           {/* Next Episode Button */}
           {showNextEpisodeButton && nextEpisode && (
-            <Animated.View
+            <Animated.View 
               style={{
                 position: 'absolute',
                 bottom: 80 + insets.bottom,
-                right: 24 + insets.right,
+                right: 8 + insets.right,
                 opacity: nextEpisodeButtonOpacity,
                 transform: [{ scale: nextEpisodeButtonScale }],
               }}
@@ -1992,9 +1986,9 @@ const AndroidVideoPlayer: React.FC = () => {
               <TouchableOpacity
                 style={{
                   backgroundColor: 'rgba(255,255,255,0.95)',
-                  borderRadius: 25,
-                  paddingHorizontal: 20,
-                  paddingVertical: 12,
+                  borderRadius: 18,
+                  paddingHorizontal: 14,
+                  paddingVertical: 8,
                   flexDirection: 'row',
                   alignItems: 'center',
                   shadowColor: '#000',
@@ -2004,19 +1998,18 @@ const AndroidVideoPlayer: React.FC = () => {
                   elevation: 8,
                 }}
                 onPress={handlePlayNextEpisode}
-                disabled={isLoadingNextEpisode}
                 activeOpacity={0.8}
               >
                 {isLoadingNextEpisode ? (
                   <ActivityIndicator size="small" color="#000000" style={{ marginRight: 8 }} />
                 ) : (
-                  <MaterialIcons name="skip-next" size={20} color="#000000" style={{ marginRight: 8 }} />
+                  <MaterialIcons name="skip-next" size={18} color="#000000" style={{ marginRight: 8 }} />
                 )}
                 <View>
-                  <Text style={{ color: '#000000', fontSize: 12, fontWeight: '600', opacity: 0.7 }}>
-                    {isLoadingNextEpisode ? 'Loading...' : 'Up Next'}
+                  <Text style={{ color: '#000000', fontSize: 11, fontWeight: '700', opacity: 0.8 }}>
+                    {isLoadingNextEpisode ? 'Loading next episode…' : 'Up next'}
                   </Text>
-                  <Text style={{ color: '#000000', fontSize: 14, fontWeight: '700' }} numberOfLines={1}>
+                  <Text style={{ color: '#000000', fontSize: 13, fontWeight: '700' }} numberOfLines={1}>
                     S{nextEpisode.season_number}E{nextEpisode.episode_number}
                     {nextEpisode.name ? `: ${nextEpisode.name}` : ''}
                   </Text>

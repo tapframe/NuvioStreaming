@@ -16,6 +16,7 @@ import {
   Linking,
   Clipboard,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -349,6 +350,7 @@ const ProviderFilter = memo(({
 });
 
 export const StreamsScreen = () => {
+  const insets = useSafeAreaInsets();
   const route = useRoute<RouteProp<RootStackParamList, 'Streams'>>();
   const navigation = useNavigation<RootStackNavigationProp>();
   const { id, type, episodeId, episodeThumbnail } = route.params;
@@ -1381,7 +1383,10 @@ export const StreamsScreen = () => {
         style={[styles.backButtonContainer]}
       >
         <TouchableOpacity 
-          style={styles.backButton}
+          style={[
+            styles.backButton,
+            Platform.OS === 'ios' ? { paddingTop: Math.max(insets.top, 12) + 6 } : null
+          ]}
           onPress={handleBack}
           activeOpacity={0.7}
         >
