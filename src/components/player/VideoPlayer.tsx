@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { View, TouchableOpacity, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, Image, StyleSheet, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { VLCPlayer } from 'react-native-vlc-media-player';
@@ -217,6 +217,12 @@ const VideoPlayer: React.FC = () => {
   const pauseOverlayOpacity = useRef(new Animated.Value(0)).current;
   const pauseOverlayTranslateY = useRef(new Animated.Value(12)).current;
 
+  // Next episode button state
+  const [showNextEpisodeButton, setShowNextEpisodeButton] = useState(false);
+  const [isLoadingNextEpisode, setIsLoadingNextEpisode] = useState(false);
+  const nextEpisodeButtonOpacity = useRef(new Animated.Value(0)).current;
+  const nextEpisodeButtonScale = useRef(new Animated.Value(0.8)).current;
+
   // Get metadata to access logo (only if we have a valid id)
   const shouldLoadMetadata = Boolean(id && type);
   const metadataResult = useMetadata({
@@ -251,6 +257,31 @@ const VideoPlayer: React.FC = () => {
       return '';
     }
   })();
+
+  // Find next episode for series
+  const nextEpisode = useMemo(() => {
+    try {
+      if (type !== 'series' || !season || !episode) return null;
+      const allEpisodes = Object.values(groupedEpisodes || {}).flat() as any[];
+      if (!allEpisodes || allEpisodes.length === 0) return null;
+      
+      // First try next episode in same season
+      let nextEp = allEpisodes.find((ep: any) => 
+        ep.season_number === season && ep.episode_number === episode + 1
+      );
+      
+      // If not found, try first episode of next season
+      if (!nextEp) {
+        nextEp = allEpisodes.find((ep: any) => 
+          ep.season_number === season + 1 && ep.episode_number === 1
+        );
+      }
+      
+      return nextEp;
+    } catch {
+      return null;
+    }
+  }, [type, season, episode, groupedEpisodes]);
 
   // Small offset (in seconds) used to avoid seeking to the *exact* end of the
   // file which triggers the `onEnd` callback and causes playback to restart.
@@ -1106,6 +1137,105 @@ const VideoPlayer: React.FC = () => {
     }
   };
 
+  // Handle next episode button press
+  const handlePlayNextEpisode = useCallback(async () => {
+    if (!nextEpisode || !id || isLoadingNextEpisode) return;
+
+    setIsLoadingNextEpisode(true);
+    
+    try {
+      logger.log('[VideoPlayer] Loading next episode:', nextEpisode);
+      
+      // Create episode ID for next episode using stremioId if available, otherwise construct it
+      const nextEpisodeId = nextEpisode.stremioId || `${id}:${nextEpisode.season_number}:${nextEpisode.episode_number}`;
+      
+      logger.log('[VideoPlayer] Fetching streams for next episode:', nextEpisodeId);
+      
+      // Import stremio service 
+      const stremioService = require('../../services/stremioService').default;
+      
+      let bestStream: any = null;
+      let streamFound = false;
+      let completedProviders = 0;
+      const expectedProviders = new Set<string>();
+      
+      // Get installed addons to know how many providers to expect
+      const installedAddons = stremioService.getInstalledAddons();
+      const streamAddons = installedAddons.filter((addon: any) => 
+        addon.resources && addon.resources.includes('stream')
+      );
+      
+      streamAddons.forEach((addon: any) => expectedProviders.add(addon.id));
+      
+      // Fetch streams for next episode
+      await stremioService.getStreams('series', nextEpisodeId, (streams: any, addonId: any, addonName: any, error: any) => {
+        completedProviders++;
+        
+        if (!streamFound && streams && streams.length > 0) {
+          // Sort streams by quality and cache status (prefer cached/debrid streams)
+          const sortedStreams = streams.sort((a: any, b: any) => {
+            const aQuality = parseInt(a.title?.match(/(\d+)p/)?.[1] || '0', 10);
+            const bQuality = parseInt(b.title?.match(/(\d+)p/)?.[1] || '0', 10);
+            const aCached = a.behaviorHints?.cached || false;
+            const bCached = b.behaviorHints?.cached || false;
+            
+            // Prioritize cached streams first
+            if (aCached !== bCached) {
+              return aCached ? -1 : 1;
+            }
+            // Then sort by quality (higher quality first)
+            return bQuality - aQuality;
+          });
+          
+          bestStream = sortedStreams[0];
+          streamFound = true;
+          
+          logger.log('[VideoPlayer] Found stream for next episode:', bestStream);
+          
+          // Navigate to next episode immediately with best stream
+          navigation.replace('Player', {
+            uri: bestStream.url,
+            title: metadata?.name || '',
+            episodeTitle: nextEpisode.name,
+            season: nextEpisode.season_number,
+            episode: nextEpisode.episode_number,
+            quality: (bestStream.title?.match(/(\d+)p/) || [])[1] || undefined,
+            year: metadata?.year,
+            streamProvider: addonName,
+            streamName: bestStream.name || bestStream.title,
+            headers: bestStream.headers || undefined,
+            forceVlc: false,
+            id,
+            type: 'series',
+            episodeId: nextEpisodeId,
+            imdbId: imdbId ?? undefined,
+            backdrop: backdrop || undefined,
+          });
+          
+          setIsLoadingNextEpisode(false);
+        }
+        
+        // If we've checked all providers and no stream found
+        if (completedProviders >= expectedProviders.size && !streamFound) {
+          logger.warn('[VideoPlayer] No streams found for next episode after checking all providers');
+          setIsLoadingNextEpisode(false);
+        }
+      });
+      
+      // Fallback timeout in case providers don't respond
+      setTimeout(() => {
+        if (!streamFound) {
+          logger.warn('[VideoPlayer] Timeout: No streams found for next episode');
+          setIsLoadingNextEpisode(false);
+        }
+      }, 8000);
+      
+    } catch (error) {
+      logger.error('[VideoPlayer] Error loading next episode:', error);
+      setIsLoadingNextEpisode(false);
+    }
+  }, [nextEpisode, id, isLoadingNextEpisode, navigation, metadata, imdbId, backdrop]);
+
   // Handle paused overlay after 5 seconds of being paused
   useEffect(() => {
     if (paused) {
@@ -1156,6 +1286,66 @@ const VideoPlayer: React.FC = () => {
       }
     };
   }, [paused]);
+
+  // Handle next episode button visibility based on current time and next episode availability
+  useEffect(() => {
+    if (type !== 'series' || !nextEpisode || duration <= 0 || isLoadingNextEpisode) {
+      if (showNextEpisodeButton) {
+        // Hide button with animation
+        Animated.parallel([
+          Animated.timing(nextEpisodeButtonOpacity, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(nextEpisodeButtonScale, {
+            toValue: 0.8,
+            duration: 200,
+            useNativeDriver: true,
+          })
+        ]).start(() => {
+          setShowNextEpisodeButton(false);
+        });
+      }
+      return;
+    }
+
+    // Show button when 2.5 minutes (150 seconds) remain
+    const timeRemaining = duration - currentTime;
+    const shouldShowButton = timeRemaining <= 150 && timeRemaining > 10; // Hide in last 10 seconds
+
+    if (shouldShowButton && !showNextEpisodeButton) {
+      setShowNextEpisodeButton(true);
+      Animated.parallel([
+        Animated.timing(nextEpisodeButtonOpacity, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.spring(nextEpisodeButtonScale, {
+          toValue: 1,
+          tension: 100,
+          friction: 8,
+          useNativeDriver: true,
+        })
+      ]).start();
+    } else if (!shouldShowButton && showNextEpisodeButton) {
+      Animated.parallel([
+        Animated.timing(nextEpisodeButtonOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(nextEpisodeButtonScale, {
+          toValue: 0.8,
+          duration: 200,
+          useNativeDriver: true,
+        })
+      ]).start(() => {
+        setShowNextEpisodeButton(false);
+      });
+    }
+  }, [type, nextEpisode, duration, currentTime, showNextEpisodeButton, isLoadingNextEpisode]);
 
   useEffect(() => {
     isMounted.current = true;
@@ -1659,6 +1849,53 @@ const VideoPlayer: React.FC = () => {
                   </Text>
                 )}
               </Animated.View>
+            </Animated.View>
+          )}
+
+          {/* Next Episode Button */}
+          {showNextEpisodeButton && nextEpisode && (
+            <Animated.View
+              style={{
+                position: 'absolute',
+                bottom: 80 + insets.bottom,
+                right: 24 + insets.right,
+                opacity: nextEpisodeButtonOpacity,
+                transform: [{ scale: nextEpisodeButtonScale }],
+              }}
+            >
+              <TouchableOpacity
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.95)',
+                  borderRadius: 25,
+                  paddingHorizontal: 20,
+                  paddingVertical: 12,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 8,
+                  elevation: 8,
+                }}
+                onPress={handlePlayNextEpisode}
+                disabled={isLoadingNextEpisode}
+                activeOpacity={0.8}
+              >
+                {isLoadingNextEpisode ? (
+                  <ActivityIndicator size="small" color="#000000" style={{ marginRight: 8 }} />
+                ) : (
+                  <MaterialIcons name="skip-next" size={20} color="#000000" style={{ marginRight: 8 }} />
+                )}
+                <View>
+                  <Text style={{ color: '#000000', fontSize: 12, fontWeight: '600', opacity: 0.7 }}>
+                    {isLoadingNextEpisode ? 'Loading...' : 'Up Next'}
+                  </Text>
+                  <Text style={{ color: '#000000', fontSize: 14, fontWeight: '700' }} numberOfLines={1}>
+                    S{nextEpisode.season_number}E{nextEpisode.episode_number}
+                    {nextEpisode.name ? `: ${nextEpisode.name}` : ''}
+                  </Text>
+                </View>
+              </TouchableOpacity>
             </Animated.View>
           )}
 
