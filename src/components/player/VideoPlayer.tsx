@@ -223,7 +223,7 @@ const VideoPlayer: React.FC = () => {
     id: id || 'placeholder',
     type: type || 'movie'
   });
-  const { metadata, loading: metadataLoading } = shouldLoadMetadata ? metadataResult : { metadata: null, loading: false };
+  const { metadata, loading: metadataLoading, groupedEpisodes } = shouldLoadMetadata ? (metadataResult as any) : { metadata: null, loading: false, groupedEpisodes: {} };
   const { settings } = useSettings();
 
   // Logo animation values
@@ -233,6 +233,24 @@ const VideoPlayer: React.FC = () => {
 
   // Check if we have a logo to show
   const hasLogo = metadata && metadata.logo && !metadataLoading;
+  // Resolve current episode description for series
+  const currentEpisodeDescription = (() => {
+    try {
+      if (type !== 'series') return '';
+      const allEpisodes = Object.values(groupedEpisodes || {}).flat() as any[];
+      if (!allEpisodes || allEpisodes.length === 0) return '';
+      let match: any | null = null;
+      if (episodeId) {
+        match = allEpisodes.find(ep => ep?.stremioId === episodeId || String(ep?.id) === String(episodeId));
+      }
+      if (!match && season && episode) {
+        match = allEpisodes.find(ep => ep?.season_number === season && ep?.episode_number === episode);
+      }
+      return (match?.overview || '').trim();
+    } catch {
+      return '';
+    }
+  })();
 
   // Small offset (in seconds) used to avoid seeking to the *exact* end of the
   // file which triggers the `onEnd` callback and causes playback to restart.
@@ -1616,9 +1634,9 @@ const VideoPlayer: React.FC = () => {
               />
               <Animated.View style={{
                 position: 'absolute',
-                left: 24 + (Platform.OS === 'ios' ? insets.left : 0),
-                right: 24 + (Platform.OS === 'ios' ? insets.right : 0),
-                bottom: 110 + (Platform.OS === 'ios' ? insets.bottom : 0),
+                left: 24 + insets.left,
+                right: 24 + insets.right,
+                bottom: 110 + insets.bottom,
                 transform: [{ translateY: pauseOverlayTranslateY }]
               }}>
                 <Text style={{ color: '#B8B8B8', fontSize: 18, marginBottom: 8 }}>You're watching</Text>
@@ -1635,9 +1653,9 @@ const VideoPlayer: React.FC = () => {
                     {episodeTitle}
                   </Text>
                 )}
-                {!!metadata?.description && (
+                {(currentEpisodeDescription || metadata?.description) && (
                   <Text style={{ color: '#D6D6D6', fontSize: 18, lineHeight: 24 }} numberOfLines={3}>
-                    {metadata.description}
+                    {type === 'series' ? (currentEpisodeDescription || metadata?.description || '') : (metadata?.description || '')}
                   </Text>
                 )}
               </Animated.View>
