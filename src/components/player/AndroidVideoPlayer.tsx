@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, TouchableOpacity, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, Image, StyleSheet, Modal } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Video, { VideoRef, SelectedTrack, SelectedTrackType, BufferingStrategyType } from 'react-native-video';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
@@ -51,6 +52,7 @@ const getVideoResizeMode = (resizeMode: ResizeModeType) => {
 
 const AndroidVideoPlayer: React.FC = () => {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const route = useRoute<RouteProp<RootStackParamList, 'Player'>>();
   
   const {
@@ -188,6 +190,12 @@ const AndroidVideoPlayer: React.FC = () => {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string>('');
   const errorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Pause overlay state
+  const [showPauseOverlay, setShowPauseOverlay] = useState(false);
+  const pauseOverlayTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pauseOverlayOpacity = useRef(new Animated.Value(0)).current;
+  const pauseOverlayTranslateY = useRef(new Animated.Value(12)).current;
   // Get metadata to access logo (only if we have a valid id)
   const shouldLoadMetadata = Boolean(id && type);
   const metadataResult = useMetadata({ id: id || 'placeholder', type: (type as any) });
@@ -715,10 +723,21 @@ const AndroidVideoPlayer: React.FC = () => {
     
     // Navigate immediately without delay
     ScreenOrientation.unlockAsync().then(() => {
+      // On iOS, explicitly return to portrait to avoid sticking in landscape
+      if (Platform.OS === 'ios') {
+        setTimeout(() => {
+          ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+        }, 50);
+      }
       disableImmersiveMode();
       navigation.goBack();
     }).catch(() => {
-      // Fallback: navigate even if orientation unlock fails
+      // Fallback: still try to restore portrait then navigate
+      if (Platform.OS === 'ios') {
+        setTimeout(() => {
+          ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+        }, 50);
+      }
       disableImmersiveMode();
       navigation.goBack();
     });
@@ -1149,6 +1168,57 @@ const AndroidVideoPlayer: React.FC = () => {
       }
     }
   };
+
+  // Handle paused overlay after 5 seconds of being paused
+  useEffect(() => {
+    if (paused) {
+      if (pauseOverlayTimerRef.current) {
+        clearTimeout(pauseOverlayTimerRef.current);
+      }
+      pauseOverlayTimerRef.current = setTimeout(() => {
+        setShowPauseOverlay(true);
+        pauseOverlayOpacity.setValue(0);
+        pauseOverlayTranslateY.setValue(12);
+        Animated.parallel([
+          Animated.timing(pauseOverlayOpacity, {
+            toValue: 1,
+            duration: 550,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pauseOverlayTranslateY, {
+            toValue: 0,
+            duration: 450,
+            useNativeDriver: true,
+          })
+        ]).start();
+      }, 5000);
+    } else {
+      if (pauseOverlayTimerRef.current) {
+        clearTimeout(pauseOverlayTimerRef.current);
+        pauseOverlayTimerRef.current = null;
+      }
+      if (showPauseOverlay) {
+        Animated.parallel([
+          Animated.timing(pauseOverlayOpacity, {
+            toValue: 0,
+            duration: 220,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pauseOverlayTranslateY, {
+            toValue: 8,
+            duration: 220,
+            useNativeDriver: true,
+          })
+        ]).start(() => setShowPauseOverlay(false));
+      }
+    }
+    return () => {
+      if (pauseOverlayTimerRef.current) {
+        clearTimeout(pauseOverlayTimerRef.current);
+        pauseOverlayTimerRef.current = null;
+      }
+    };
+  }, [paused]);
 
   useEffect(() => {
     isMounted.current = true;
@@ -1589,6 +1659,68 @@ const AndroidVideoPlayer: React.FC = () => {
             buffered={buffered}
             formatTime={formatTime}
           />
+
+          {showPauseOverlay && (
+            <Animated.View 
+              pointerEvents="none"
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                opacity: pauseOverlayOpacity,
+              }}
+            >
+              {/* Strong horizontal fade from left side */}
+              <View style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: screenDimensions.width * 0.7 }}>
+                <LinearGradient
+                  start={{ x: 0, y: 0.5 }}
+                  end={{ x: 1, y: 0.5 }}
+                  colors={[ 'rgba(0,0,0,0.85)', 'rgba(0,0,0,0.0)' ]}
+                  locations={[0, 1]}
+                  style={StyleSheet.absoluteFill}
+                />
+              </View>
+              <LinearGradient
+                colors={[
+                  'rgba(0,0,0,0.6)',
+                  'rgba(0,0,0,0.4)',
+                  'rgba(0,0,0,0.2)',
+                  'rgba(0,0,0,0.0)'
+                ]}
+                locations={[0, 0.3, 0.6, 1]}
+                style={StyleSheet.absoluteFill}
+              />
+              <Animated.View style={{
+                position: 'absolute',
+                left: 24 + (Platform.OS === 'ios' ? insets.left : 0),
+                right: 24 + (Platform.OS === 'ios' ? insets.right : 0),
+                bottom: 110 + (Platform.OS === 'ios' ? insets.bottom : 0),
+                transform: [{ translateY: pauseOverlayTranslateY }]
+              }}>
+                <Text style={{ color: '#B8B8B8', fontSize: 18, marginBottom: 8 }}>You're watching</Text>
+                <Text style={{ color: '#FFFFFF', fontSize: 48, fontWeight: '800', marginBottom: 10 }} numberOfLines={1}>
+                  {title}
+                </Text>
+                {!!year && (
+                  <Text style={{ color: '#CCCCCC', fontSize: 18, marginBottom: 8 }} numberOfLines={1}>
+                    {`${year}${type === 'series' && season && episode ? ` • S${season}E${episode}` : ''}`}
+                  </Text>
+                )}
+                {!!episodeTitle && (
+                  <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '600', marginBottom: 8 }} numberOfLines={1}>
+                    {episodeTitle}
+                  </Text>
+                )}
+                {!!metadata?.description && (
+                  <Text style={{ color: '#D6D6D6', fontSize: 18, lineHeight: 24 }} numberOfLines={3}>
+                    {metadata.description}
+                  </Text>
+                )}
+              </Animated.View>
+            </Animated.View>
+          )}
           
           <CustomSubtitles
             key={customSubtitleVersion}

@@ -374,6 +374,10 @@ const HomeScreen = () => {
         // For iOS specifically
         if (Platform.OS === 'ios') {
           StatusBar.setHidden(false);
+          // Ensure portrait when coming back to Home on iOS
+          try {
+            ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+          } catch {}
         }
       };
       

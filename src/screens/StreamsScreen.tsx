@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 
 import * as ScreenOrientation from 'expo-screen-orientation';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { RouteProp } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -1046,6 +1046,16 @@ export const StreamsScreen = () => {
       navigateToPlayer(stream);
     }
   }, [settings.preferredPlayer, settings.useExternalPlayer, navigateToPlayer]);
+
+  // Ensure portrait when returning to this screen on iOS
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS === 'ios') {
+        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+      }
+      return () => {};
+    }, [])
+  );
 
   // Autoplay effect - triggers immediately when streams are available and autoplay is enabled
   useEffect(() => {
