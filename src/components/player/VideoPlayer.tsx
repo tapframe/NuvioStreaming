@@ -828,37 +828,19 @@ const VideoPlayer: React.FC = () => {
 
       // Navigate back with proper handling for fullscreen modal
       try {
-        // On iOS, ensure Streams shows the CURRENT episode as modal by navigating directly
-        if (Platform.OS === 'ios') {
-          if (type === 'series' && id && episodeId) {
-            // Ensure modal by restoring MainTabs -> Metadata -> Streams
-            (navigation as any).reset({
-              index: 2,
-              routes: [
-                { name: 'MainTabs' },
-                { name: 'Metadata', params: { id, type } },
-                { name: 'Streams', params: { id, type: 'series', episodeId, fromPlayer: true } }
-              ]
-            });
-          } else if (navigation.canGoBack()) {
-            navigation.goBack();
-          } else {
-            navigation.navigate('MainTabs');
-          }
+        // For series, hard reset to a single Streams route to avoid stacking multiple modals/pages
+        if (type === 'series' && id && episodeId) {
+          (navigation as any).reset({
+            index: 0,
+            routes: [
+              { name: 'Streams', params: { id, type: 'series', episodeId, fromPlayer: true } }
+            ]
+          });
+        } else if (navigation.canGoBack()) {
+          navigation.goBack();
         } else {
-          // Android: hard reset to avoid stacking multiple pages/modals
-          if (type === 'series' && id && episodeId) {
-            (navigation as any).reset({
-              index: 0,
-              routes: [
-                { name: 'Streams', params: { id, type: 'series', episodeId, fromPlayer: true } }
-              ]
-            });
-          } else if (navigation.canGoBack()) {
-            navigation.goBack();
-          } else {
-            navigation.navigate('MainTabs');
-          }
+          // Fallback: navigate to main tabs if can't go back
+          navigation.navigate('MainTabs');
         }
         logger.log('[VideoPlayer] Navigation completed');
       } catch (navError) {

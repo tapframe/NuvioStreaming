@@ -784,34 +784,16 @@ const AndroidVideoPlayer: React.FC = () => {
       }
       disableImmersiveMode();
       
-      if (Platform.OS === 'ios') {
-        // iOS: rebuild stack so Streams is presented as modal above Metadata
-        if (type === 'series' && id && episodeId) {
-          (navigation as any).reset({
-            index: 2,
-            routes: [
-              { name: 'MainTabs' },
-              { name: 'Metadata', params: { id, type } },
-              { name: 'Streams', params: { id, type: 'series', episodeId, fromPlayer: true } }
-            ]
-          });
-        } else if ((navigation as any).canGoBack()) {
-          (navigation as any).goBack();
-        } else {
-          (navigation as any).navigate('MainTabs');
-        }
+      // For series, hard reset to a single Streams route to avoid stacking multiple modals/pages
+      if (type === 'series' && id && episodeId) {
+        (navigation as any).reset({
+          index: 0,
+          routes: [
+            { name: 'Streams', params: { id, type: 'series', episodeId, fromPlayer: true } }
+          ]
+        });
       } else {
-        // Android: hard reset to avoid stacking multiple pages/modals
-        if (type === 'series' && id && episodeId) {
-          (navigation as any).reset({
-            index: 0,
-            routes: [
-              { name: 'Streams', params: { id, type: 'series', episodeId, fromPlayer: true } }
-            ]
-          });
-        } else {
-          (navigation as any).goBack();
-        }
+        navigation.goBack();
       }
     }).catch(() => {
       // Fallback: still try to restore portrait then navigate
@@ -822,34 +804,16 @@ const AndroidVideoPlayer: React.FC = () => {
       }
       disableImmersiveMode();
       
-      if (Platform.OS === 'ios') {
-        // iOS: rebuild stack so Streams is presented as modal above Metadata
-        if (type === 'series' && id && episodeId) {
-          (navigation as any).reset({
-            index: 2,
-            routes: [
-              { name: 'MainTabs' },
-              { name: 'Metadata', params: { id, type } },
-              { name: 'Streams', params: { id, type: 'series', episodeId, fromPlayer: true } }
-            ]
-          });
-        } else if ((navigation as any).canGoBack()) {
-          (navigation as any).goBack();
-        } else {
-          (navigation as any).navigate('MainTabs');
-        }
+      // For series, hard reset to a single Streams route to avoid stacking multiple modals/pages
+      if (type === 'series' && id && episodeId) {
+        (navigation as any).reset({
+          index: 0,
+          routes: [
+            { name: 'Streams', params: { id, type: 'series', episodeId, fromPlayer: true } }
+          ]
+        });
       } else {
-        // Android: hard reset to avoid stacking multiple pages/modals
-        if (type === 'series' && id && episodeId) {
-          (navigation as any).reset({
-            index: 0,
-            routes: [
-              { name: 'Streams', params: { id, type: 'series', episodeId, fromPlayer: true } }
-            ]
-          });
-        } else {
-          (navigation as any).goBack();
-        }
+        navigation.goBack();
       }
     });
 
