@@ -1435,7 +1435,7 @@ export const StreamsScreen = () => {
         <TouchableOpacity 
           style={[
             styles.backButton,
-            Platform.OS === 'ios' ? { marginTop: 20 } : null
+            Platform.OS === 'ios' ? { paddingTop: Math.max(insets.top, 12) + 6 } : null
           ]}
           onPress={handleBack}
           activeOpacity={0.7}
@@ -1665,7 +1665,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 9999,
+    zIndex: 2,
     pointerEvents: 'box-none',
   },
   backButton: {
@@ -1673,7 +1673,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     padding: 14,
-    paddingTop: 0,
+    paddingTop: Platform.OS === 'android' ? 45 : 15,
   },
   backButtonText: {
     color: colors.highEmphasis,
