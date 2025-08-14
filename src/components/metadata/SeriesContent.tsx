@@ -650,6 +650,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
           (settings?.episodeLayoutStyle === 'horizontal') ? (
             // Horizontal Layout (Netflix-style)
             <FlashList
+              key={`episodes-${settings?.episodeLayoutStyle}-${selectedSeason}`}
               ref={episodeScrollViewRef}
               data={currentSeasonEpisodes}
               renderItem={({ item: episode, index }) => (
@@ -679,6 +680,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
           ) : (
             // Vertical Layout (Traditional)
             <FlashList
+              key={`episodes-${settings?.episodeLayoutStyle}-${selectedSeason}`}
               ref={episodeScrollViewRef}
               data={currentSeasonEpisodes}
               renderItem={({ item: episode, index }) => (

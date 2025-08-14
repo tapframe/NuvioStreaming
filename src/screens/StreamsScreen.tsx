@@ -353,7 +353,7 @@ export const StreamsScreen = () => {
   const insets = useSafeAreaInsets();
   const route = useRoute<RouteProp<RootStackParamList, 'Streams'>>();
   const navigation = useNavigation<RootStackNavigationProp>();
-  const { id, type, episodeId, episodeThumbnail } = route.params;
+  const { id, type, episodeId, episodeThumbnail, fromPlayer } = route.params;
   const { settings } = useSettings();
   const { currentTheme } = useTheme();
   const { colors } = currentTheme;
@@ -565,17 +565,20 @@ export const StreamsScreen = () => {
   
           // Reset autoplay state when content changes
           setAutoplayTriggered(false);
-          if (settings.autoplayBestStream) {
+          if (settings.autoplayBestStream && !fromPlayer) {
             setIsAutoplayWaiting(true);
             logger.log('🔄 Autoplay enabled, waiting for best stream...');
           } else {
             setIsAutoplayWaiting(false);
+            if (fromPlayer) {
+              logger.log('🚫 Autoplay disabled: returning from player');
+            }
           }
       }
     };
 
     checkProviders();
-  }, [type, id, episodeId, settings.autoplayBestStream]);
+  }, [type, id, episodeId, settings.autoplayBestStream, fromPlayer]);
 
   React.useEffect(() => {
     // Trigger entrance animations
@@ -1432,7 +1435,7 @@ export const StreamsScreen = () => {
         <TouchableOpacity 
           style={[
             styles.backButton,
-            Platform.OS === 'ios' ? { paddingTop: Math.max(insets.top, 12) + 6 } : null
+            Platform.OS === 'ios' ? { marginTop: 20 } : null
           ]}
           onPress={handleBack}
           activeOpacity={0.7}
@@ -1662,7 +1665,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 2,
+    zIndex: 9999,
     pointerEvents: 'box-none',
   },
   backButton: {
@@ -1670,7 +1673,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     padding: 14,
-    paddingTop: Platform.OS === 'android' ? 45 : 15,
+    paddingTop: 0,
   },
   backButtonText: {
     color: colors.highEmphasis,

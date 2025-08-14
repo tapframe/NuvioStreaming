@@ -61,6 +61,7 @@ class LocalScraperService {
   private repositoryUrl: string = '';
   private repositoryName: string = '';
   private initialized: boolean = false;
+  private scraperSettingsCache: Record<string, any> | null = null;
 
   private constructor() {
     this.initialize();
@@ -409,6 +410,38 @@ class LocalScraperService {
     return Array.from(this.installedScrapers.values());
   }
 
+  // Per-scraper settings storage
+  async getScraperSettings(scraperId: string): Promise<Record<string, any>> {
+    await this.ensureInitialized();
+    try {
+      if (!this.scraperSettingsCache) {
+        const raw = await AsyncStorage.getItem(this.SCRAPER_SETTINGS_KEY);
+        this.scraperSettingsCache = raw ? JSON.parse(raw) : {};
+      }
+      const cache = this.scraperSettingsCache || {};
+      return cache[scraperId] || {};
+    } catch (error) {
+      logger.warn('[LocalScraperService] Failed to get scraper settings for', scraperId, error);
+      return {};
+    }
+  }
+
+  async setScraperSettings(scraperId: string, settings: Record<string, any>): Promise<void> {
+    await this.ensureInitialized();
+    try {
+      if (!this.scraperSettingsCache) {
+        const raw = await AsyncStorage.getItem(this.SCRAPER_SETTINGS_KEY);
+        this.scraperSettingsCache = raw ? JSON.parse(raw) : {};
+      }
+      const cache = this.scraperSettingsCache || {};
+      cache[scraperId] = settings || {};
+      this.scraperSettingsCache = cache;
+      await AsyncStorage.setItem(this.SCRAPER_SETTINGS_KEY, JSON.stringify(cache));
+    } catch (error) {
+      logger.error('[LocalScraperService] Failed to set scraper settings for', scraperId, error);
+    }
+  }
+
   // Get available scrapers from manifest.json (for display in settings)
   async getAvailableScrapers(): Promise<ScraperInfo[]> {
     if (!this.repositoryUrl) {
@@ -568,12 +601,17 @@ class LocalScraperService {
       
       logger.log('[LocalScraperService] Executing scraper:', scraper.name);
       
+      // Load per-scraper settings
+      const scraperSettings = await this.getScraperSettings(scraper.id);
+      
       // Create a sandboxed execution environment
       const results = await this.executeSandboxed(code, {
         tmdbId,
         mediaType: type,
         season,
-        episode
+        episode,
+        scraperId: scraper.id,
+        settings: scraperSettings
       });
       
       // Convert results to Nuvio Stream format
@@ -601,6 +639,11 @@ class LocalScraperService {
       const settingsData = await AsyncStorage.getItem('app_settings');
       const settings = settingsData ? JSON.parse(settingsData) : {};
       const urlValidationEnabled = settings.enableScraperUrlValidation ?? true;
+      
+      // Load per-scraper settings for this run
+      const allScraperSettingsRaw = await AsyncStorage.getItem(this.SCRAPER_SETTINGS_KEY);
+      const allScraperSettings = allScraperSettingsRaw ? JSON.parse(allScraperSettingsRaw) : {};
+      const perScraperSettings = (params && params.scraperId && allScraperSettings[params.scraperId]) ? allScraperSettings[params.scraperId] : (params?.settings || {});
       
       // Create a limited global context
       const moduleExports = {};
@@ -683,7 +726,10 @@ class LocalScraperService {
         exports: moduleExports,
         global: {}, // Empty global object
         // URL validation setting
-        URL_VALIDATION_ENABLED: urlValidationEnabled
+        URL_VALIDATION_ENABLED: urlValidationEnabled,
+        // Expose per-scraper settings to the plugin code
+        SCRAPER_SETTINGS: perScraperSettings,
+        SCRAPER_ID: params?.scraperId
       };
       
       // Execute the scraper code without timeout

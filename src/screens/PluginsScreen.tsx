@@ -368,6 +368,21 @@ const PluginsScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasRepository, setHasRepository] = useState(false);
+  const [showboxCookie, setShowboxCookie] = useState<string>('');
+  const [showboxRegion, setShowboxRegion] = useState<string>('');
+  const regionOptions = [
+    { value: 'USA7', label: 'US East' },
+    { value: 'USA6', label: 'US West' },
+    { value: 'USA5', label: 'US Middle' },
+    { value: 'UK3', label: 'United Kingdom' },
+    { value: 'CA1', label: 'Canada' },
+    { value: 'FR1', label: 'France' },
+    { value: 'DE2', label: 'Germany' },
+    { value: 'HK1', label: 'Hong Kong' },
+    { value: 'IN1', label: 'India' },
+    { value: 'AU1', label: 'Australia' },
+    { value: 'SZ', label: 'China' },
+  ];
 
   useEffect(() => {
     loadScrapers();
@@ -378,6 +393,13 @@ const PluginsScreen: React.FC = () => {
     try {
       const scrapers = await localScraperService.getAvailableScrapers();
       setInstalledScrapers(scrapers);
+      // preload showbox settings if present
+      const sb = scrapers.find(s => s.id === 'showboxog');
+      if (sb) {
+        const s = await localScraperService.getScraperSettings('showboxog');
+        setShowboxCookie(s.cookie || '');
+        setShowboxRegion(s.region || '');
+      }
     } catch (error) {
       logger.error('[ScraperSettings] Failed to load scrapers:', error);
     }
@@ -706,66 +728,117 @@ const PluginsScreen: React.FC = () => {
              </View>
            ) : (
              <View style={styles.scrapersContainer}>
-               {installedScrapers.map((scraper) => {
-                 // Check if scraper is actually installed (has cached code)
-                 const isInstalled = localScraperService.getInstalledScrapers().then(installed => 
-                   installed.some(s => s.id === scraper.id)
-                 );
-                 
-                 return (
-                   <View key={scraper.id} style={[styles.scraperItem, !settings.enableLocalScrapers && styles.disabledContainer]}>
-                     {scraper.logo ? (
-                       <Image
-                         source={{ uri: scraper.logo }}
-                         style={[styles.scraperLogo, !settings.enableLocalScrapers && styles.disabledImage]}
-                         resizeMode="contain"
-                       />
-                     ) : (
-                       <View style={[styles.scraperLogo, !settings.enableLocalScrapers && styles.disabledContainer]} />
-                     )}
-                     <View style={styles.scraperInfo}>
-                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                          <Text style={[styles.scraperName, !settings.enableLocalScrapers && styles.disabledText]}>{scraper.name}</Text>
-                          {scraper.manifestEnabled === false ? (
-                            <View style={[styles.availableIndicator, { backgroundColor: colors.mediumGray }]}>
-                              <Text style={styles.availableIndicatorText}>Disabled</Text>
-                            </View>
-                          ) : scraper.disabledPlatforms && scraper.disabledPlatforms.includes(Platform.OS as 'ios' | 'android') ? (
-                            <View style={[styles.availableIndicator, { backgroundColor: '#ff9500' }]}>
-                              <Text style={styles.availableIndicatorText}>Platform Disabled</Text>
-                            </View>
-                          ) : !scraper.enabled && (
-                            <View style={styles.availableIndicator}>
-                              <Text style={styles.availableIndicatorText}>Available</Text>
-                            </View>
-                          )}
+                {installedScrapers.map((scraper) => {
+                                  return (
+                    <View key={scraper.id} style={[styles.scraperItem, !settings.enableLocalScrapers && styles.disabledContainer]}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%' }}>
+                        {scraper.logo ? (
+                          <Image
+                            source={{ uri: scraper.logo }}
+                            style={[styles.scraperLogo, !settings.enableLocalScrapers && styles.disabledImage]}
+                            resizeMode="contain"
+                          />
+                        ) : (
+                          <View style={[styles.scraperLogo, !settings.enableLocalScrapers && styles.disabledContainer]} />
+                        )}
+                        <View style={styles.scraperInfo}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                             <Text style={[styles.scraperName, !settings.enableLocalScrapers && styles.disabledText]}>{scraper.name}</Text>
+                             {scraper.manifestEnabled === false ? (
+                               <View style={[styles.availableIndicator, { backgroundColor: colors.mediumGray }]}>
+                                 <Text style={styles.availableIndicatorText}>Disabled</Text>
+                               </View>
+                             ) : scraper.disabledPlatforms && scraper.disabledPlatforms.includes(Platform.OS as 'ios' | 'android') ? (
+                               <View style={[styles.availableIndicator, { backgroundColor: '#ff9500' }]}>
+                                 <Text style={styles.availableIndicatorText}>Platform Disabled</Text>
+                               </View>
+                             ) : !scraper.enabled && (
+                               <View style={styles.availableIndicator}>
+                                 <Text style={styles.availableIndicatorText}>Available</Text>
+                               </View>
+                             )}
+                           </View>
+                          <Text style={[styles.scraperDescription, !settings.enableLocalScrapers && styles.disabledText]}>{scraper.description}</Text>
+                          <View style={styles.scraperMeta}>
+                            <Text style={[styles.scraperVersion, !settings.enableLocalScrapers && styles.disabledText]}>v{scraper.version}</Text>
+                            <Text style={[styles.scraperDot, !settings.enableLocalScrapers && styles.disabledText]}>•</Text>
+                            <Text style={[styles.scraperTypes, !settings.enableLocalScrapers && styles.disabledText]}>
+                              {scraper.supportedTypes && Array.isArray(scraper.supportedTypes) ? scraper.supportedTypes.join(', ') : 'Unknown'}
+                            </Text>
+                            {scraper.contentLanguage && Array.isArray(scraper.contentLanguage) && scraper.contentLanguage.length > 0 && (
+                              <>
+                                <Text style={[styles.scraperDot, !settings.enableLocalScrapers && styles.disabledText]}>•</Text>
+                                <Text style={[styles.scraperLanguage, !settings.enableLocalScrapers && styles.disabledText]}>
+                                  {scraper.contentLanguage.map(lang => lang.toUpperCase()).join(', ')}
+                                </Text>
+                              </>
+                            )}
+                          </View>
                         </View>
-                       <Text style={[styles.scraperDescription, !settings.enableLocalScrapers && styles.disabledText]}>{scraper.description}</Text>
-                       <View style={styles.scraperMeta}>
-                         <Text style={[styles.scraperVersion, !settings.enableLocalScrapers && styles.disabledText]}>v{scraper.version}</Text>
-                         <Text style={[styles.scraperDot, !settings.enableLocalScrapers && styles.disabledText]}>•</Text>
-                         <Text style={[styles.scraperTypes, !settings.enableLocalScrapers && styles.disabledText]}>
-                           {scraper.supportedTypes && Array.isArray(scraper.supportedTypes) ? scraper.supportedTypes.join(', ') : 'Unknown'}
-                         </Text>
-                         {scraper.contentLanguage && Array.isArray(scraper.contentLanguage) && scraper.contentLanguage.length > 0 && (
-                           <>
-                             <Text style={[styles.scraperDot, !settings.enableLocalScrapers && styles.disabledText]}>•</Text>
-                             <Text style={[styles.scraperLanguage, !settings.enableLocalScrapers && styles.disabledText]}>
-                               {scraper.contentLanguage.map(lang => lang.toUpperCase()).join(', ')}
-                             </Text>
-                           </>
-                         )}
-                       </View>
+                        <Switch
+                              value={scraper.enabled && settings.enableLocalScrapers}
+                              onValueChange={(enabled) => handleToggleScraper(scraper.id, enabled)}
+                              trackColor={{ false: colors.elevation3, true: colors.primary }}
+                              thumbColor={scraper.enabled && settings.enableLocalScrapers ? colors.white : '#f4f3f4'}
+                              disabled={!settings.enableLocalScrapers || scraper.manifestEnabled === false || (scraper.disabledPlatforms && scraper.disabledPlatforms.includes(Platform.OS as 'ios' | 'android'))}
+                              style={{ opacity: (!settings.enableLocalScrapers || scraper.manifestEnabled === false || (scraper.disabledPlatforms && scraper.disabledPlatforms.includes(Platform.OS as 'ios' | 'android'))) ? 0.5 : 1 }}
+                            />
+                      </View>
+                       {scraper.id === 'showboxog' && settings.enableLocalScrapers && (
+                         <View style={{ marginTop: 16, width: '100%', paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.elevation3 }}>
+                           <Text style={[styles.settingTitle, { marginBottom: 8 }]}>ShowBox Cookie</Text>
+                           <TextInput
+                             style={[styles.textInput, { marginBottom: 12 }]}
+                             value={showboxCookie}
+                             onChangeText={setShowboxCookie}
+                             placeholder="Paste FebBox ui cookie value"
+                             placeholderTextColor={colors.mediumGray}
+                             autoCapitalize="none"
+                             autoCorrect={false}
+                             multiline={true}
+                             numberOfLines={3}
+                           />
+                           <Text style={[styles.settingTitle, { marginBottom: 8 }]}>Region</Text>
+                           <View style={[styles.qualityChipsContainer, { marginBottom: 16 }]}>
+                             {regionOptions.map(opt => {
+                               const selected = showboxRegion === opt.value;
+                               return (
+                                 <TouchableOpacity
+                                   key={opt.value}
+                                   style={[styles.qualityChip, selected && styles.qualityChipSelected]}
+                                   onPress={() => setShowboxRegion(opt.value)}
+                                 >
+                                   <Text style={[styles.qualityChipText, selected && styles.qualityChipTextSelected]}>
+                                     {opt.label}
+                                   </Text>
+                                 </TouchableOpacity>
+                               );
+                             })}
+                           </View>
+                           <View style={styles.buttonRow}>
+                             <TouchableOpacity
+                               style={[styles.button, styles.primaryButton]}
+                               onPress={async () => {
+                                 await localScraperService.setScraperSettings('showboxog', { cookie: showboxCookie, region: showboxRegion });
+                                 Alert.alert('Saved', 'ShowBox settings updated');
+                               }}
+                             >
+                               <Text style={styles.buttonText}>Save</Text>
+                             </TouchableOpacity>
+                             <TouchableOpacity
+                               style={[styles.button, styles.secondaryButton]}
+                               onPress={async () => {
+                                 setShowboxCookie('');
+                                 setShowboxRegion('');
+                                 await localScraperService.setScraperSettings('showboxog', {});
+                               }}
+                             >
+                               <Text style={styles.secondaryButtonText}>Clear</Text>
+                             </TouchableOpacity>
+                           </View>
+                         </View>
+                       )}
                      </View>
-                     <Switch
-                           value={scraper.enabled && settings.enableLocalScrapers}
-                           onValueChange={(enabled) => handleToggleScraper(scraper.id, enabled)}
-                           trackColor={{ false: colors.elevation3, true: colors.primary }}
-                           thumbColor={scraper.enabled && settings.enableLocalScrapers ? colors.white : '#f4f3f4'}
-                           disabled={!settings.enableLocalScrapers || scraper.manifestEnabled === false || (scraper.disabledPlatforms && scraper.disabledPlatforms.includes(Platform.OS as 'ios' | 'android'))}
-                           style={{ opacity: (!settings.enableLocalScrapers || scraper.manifestEnabled === false || (scraper.disabledPlatforms && scraper.disabledPlatforms.includes(Platform.OS as 'ios' | 'android'))) ? 0.5 : 1 }}
-                         />
-                   </View>
                  );
                })}
              </View>

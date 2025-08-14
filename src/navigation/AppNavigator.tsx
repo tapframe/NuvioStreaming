@@ -65,6 +65,7 @@ export type RootStackParamList = {
     type: string;
     episodeId?: string;
     episodeThumbnail?: string;
+    fromPlayer?: boolean;
   };
   VideoPlayer: { 
     id: string; 
