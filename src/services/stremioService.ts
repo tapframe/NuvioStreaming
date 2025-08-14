@@ -301,40 +301,23 @@ class StremioService {
         }
       }
       
-      // Load addon order if exists
-      const storedOrder = await AsyncStorage.getItem(`@user:${scope}:${this.ADDON_ORDER_KEY}`);
+      // Load addon order if exists (scoped first, then legacy, then @user:local for migration safety)
+      let storedOrder = await AsyncStorage.getItem(`@user:${scope}:${this.ADDON_ORDER_KEY}`);
+      if (!storedOrder) storedOrder = await AsyncStorage.getItem(this.ADDON_ORDER_KEY);
+      if (!storedOrder) storedOrder = await AsyncStorage.getItem(`@user:local:${this.ADDON_ORDER_KEY}`);
       if (storedOrder) {
         this.addonOrder = JSON.parse(storedOrder);
         // Filter out any ids that aren't in installedAddons
         this.addonOrder = this.addonOrder.filter(id => this.installedAddons.has(id));
       }
       
-      // Ensure Cinemeta is first in the order
-      if (!this.addonOrder.includes(cinemetaId)) {
-        this.addonOrder.unshift(cinemetaId);
-      } else {
-        // Move Cinemeta to the front if it's not already there
-        const cinemetaIndex = this.addonOrder.indexOf(cinemetaId);
-        if (cinemetaIndex > 0) {
-          this.addonOrder.splice(cinemetaIndex, 1);
-          this.addonOrder.unshift(cinemetaId);
-        }
+      // Ensure required pre-installed addons are present without forcing their position
+      if (!this.addonOrder.includes(cinemetaId) && this.installedAddons.has(cinemetaId)) {
+        this.addonOrder.push(cinemetaId);
       }
-
-      // Ensure OpenSubtitles v3 is present right after Cinemeta (if not already ordered)
-      const ensureOpensubsPosition = () => {
-        const idx = this.addonOrder.indexOf(opensubsId);
-        const cinIdx = this.addonOrder.indexOf(cinemetaId);
-        if (idx === -1) {
-          // Insert after Cinemeta
-          this.addonOrder.splice(cinIdx + 1, 0, opensubsId);
-        } else if (idx <= cinIdx) {
-          // Move it to right after Cinemeta
-          this.addonOrder.splice(idx, 1);
-          this.addonOrder.splice(cinIdx + 1, 0, opensubsId);
-        }
-      };
-      ensureOpensubsPosition();
+      if (!this.addonOrder.includes(opensubsId) && this.installedAddons.has(opensubsId)) {
+        this.addonOrder.push(opensubsId);
+      }
       
       // Add any missing addons to the order
       const installedIds = Array.from(this.installedAddons.keys());
@@ -399,7 +382,11 @@ class StremioService {
   private async saveAddonOrder(): Promise<void> {
     try {
       const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
-      await AsyncStorage.setItem(`@user:${scope}:${this.ADDON_ORDER_KEY}`, JSON.stringify(this.addonOrder));
+      // Write to both scoped and legacy keys for compatibility
+      await Promise.all([
+        AsyncStorage.setItem(`@user:${scope}:${this.ADDON_ORDER_KEY}`, JSON.stringify(this.addonOrder)),
+        AsyncStorage.setItem(this.ADDON_ORDER_KEY, JSON.stringify(this.addonOrder)),
+      ]);
     } catch (error) {
       logger.error('Failed to save addon order:', error);
     }
@@ -446,6 +433,7 @@ class StremioService {
       
       await this.saveInstalledAddons();
       await this.saveAddonOrder();
+      try { (require('./SyncService').syncService as any).pushAddons?.(); } catch {}
       // Emit an event that an addon was added
       addonEmitter.emit(ADDON_EVENTS.ADDON_ADDED, manifest.id);
     } else {
@@ -466,6 +454,7 @@ class StremioService {
       this.addonOrder = this.addonOrder.filter(addonId => addonId !== id);
       this.saveInstalledAddons();
       this.saveAddonOrder();
+      try { (require('./SyncService').syncService as any).pushAddons?.(); } catch {}
       // Emit an event that an addon was removed
       addonEmitter.emit(ADDON_EVENTS.ADDON_REMOVED, id);
     }
@@ -1238,6 +1227,8 @@ class StremioService {
       [this.addonOrder[index - 1], this.addonOrder[index]] = 
         [this.addonOrder[index], this.addonOrder[index - 1]];
       this.saveAddonOrder();
+      // Immediately push to server to avoid resets on restart
+      try { (require('./SyncService').syncService as any).pushAddons?.(); } catch {}
       // Emit an event that the order has changed
       addonEmitter.emit(ADDON_EVENTS.ORDER_CHANGED);
       return true;
@@ -1252,6 +1243,8 @@ class StremioService {
       [this.addonOrder[index], this.addonOrder[index + 1]] = 
         [this.addonOrder[index + 1], this.addonOrder[index]];
       this.saveAddonOrder();
+      // Immediately push to server to avoid resets on restart
+      try { (require('./SyncService').syncService as any).pushAddons?.(); } catch {}
       // Emit an event that the order has changed
       addonEmitter.emit(ADDON_EVENTS.ORDER_CHANGED);
       return true;

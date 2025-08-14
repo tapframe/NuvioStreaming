@@ -612,7 +612,7 @@ class SyncService {
     try { map.set('org.stremio.opensubtitlesv3', await stremioService.getManifest('https://opensubtitles-v3.strem.io/manifest.json')); } catch {}
 
     (stremioService as any).installedAddons = map;
-    const order = (addons as any[]).map(a => a.addon_id);
+    let order = (addons as any[]).map(a => a.addon_id);
     const ensureFront = (arr: string[], id: string) => {
       const idx = arr.indexOf(id);
       if (idx === -1) arr.unshift(id);
@@ -620,11 +620,42 @@ class SyncService {
     };
     ensureFront(order, 'com.linvo.cinemeta');
     ensureFront(order, 'org.stremio.opensubtitlesv3');
-    // Keep order strictly from server after preinstalled
-    // Do not append missing local-only ids to avoid resurrecting removed addons
+    // Prefer local order if it exists; otherwise use remote
+    try {
+      const userScope = `@user:${userId}:stremio-addon-order`;
+      const [localScopedOrder, localLegacyOrder, localGuestOrder] = await Promise.all([
+        AsyncStorage.getItem(userScope),
+        AsyncStorage.getItem('stremio-addon-order'),
+        AsyncStorage.getItem('@user:local:stremio-addon-order'),
+      ]);
+      const localOrderRaw = localScopedOrder || localLegacyOrder || localGuestOrder;
+      if (localOrderRaw) {
+        const localOrder = JSON.parse(localOrderRaw) as string[];
+        // Filter to only installed ids
+        const localFiltered = localOrder.filter(id => map.has(id));
+        if (localFiltered.length > 0) {
+          order = localFiltered;
+        }
+      }
+    } catch {}
+
     (stremioService as any).addonOrder = order;
     await (stremioService as any).saveInstalledAddons();
     await (stremioService as any).saveAddonOrder();
+    // Push merged order to server to preserve across devices
+    try {
+      const rows = order.map((addonId: string, idx: number) => ({
+        user_id: userId,
+        addon_id: addonId,
+        position: idx,
+      }));
+      const { error } = await supabase
+        .from('installed_addons')
+        .upsert(rows, { onConflict: 'user_id,addon_id' });
+      if (error) logger.warn('[SyncService] push merged addon order error', error);
+    } catch (e) {
+      logger.warn('[SyncService] push merged addon order exception', e);
+    }
   }
 
   async pushWatchProgress(): Promise<void> {

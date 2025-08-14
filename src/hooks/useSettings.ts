@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { syncService } from '../services/SyncService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Simple event emitter for settings changes
@@ -122,12 +123,40 @@ export const useSettings = () => {
   const loadSettings = async () => {
     try {
       const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
-      const storedSettings = await AsyncStorage.getItem(`@user:${scope}:${SETTINGS_STORAGE_KEY}`);
-      if (storedSettings) {
-        const parsedSettings = JSON.parse(storedSettings);
-        // Merge with defaults to ensure all properties exist
-        setSettings({ ...DEFAULT_SETTINGS, ...parsedSettings });
+      const scopedKey = `@user:${scope}:${SETTINGS_STORAGE_KEY}`;
+      const [scopedJson, legacyJson] = await Promise.all([
+        AsyncStorage.getItem(scopedKey),
+        AsyncStorage.getItem(SETTINGS_STORAGE_KEY),
+      ]);
+      const parsedScoped = scopedJson ? JSON.parse(scopedJson) : null;
+      const parsedLegacy = legacyJson ? JSON.parse(legacyJson) : null;
+
+      let merged = parsedScoped || parsedLegacy;
+
+      // Fallback: scan any existing user-scoped settings if current scope not set yet
+      if (!merged) {
+        try {
+          const allKeys = await AsyncStorage.getAllKeys();
+          const candidateKeys = (allKeys || []).filter(k => k.endsWith(`:${SETTINGS_STORAGE_KEY}`));
+          if (candidateKeys.length > 0) {
+            const pairs = await AsyncStorage.multiGet(candidateKeys);
+            for (const [, value] of pairs) {
+              if (value) {
+                try {
+                  const candidate = JSON.parse(value);
+                  if (candidate && typeof candidate === 'object') {
+                    merged = candidate;
+                    break;
+                  }
+                } catch {}
+              }
+            }
+          }
+        } catch {}
       }
+
+      if (merged) setSettings({ ...DEFAULT_SETTINGS, ...merged });
+      else setSettings(DEFAULT_SETTINGS);
     } catch (error) {
       console.error('Failed to load settings:', error);
       // Fallback to default settings on error
@@ -143,7 +172,14 @@ export const useSettings = () => {
     const newSettings = { ...settings, [key]: value };
     try {
       const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
-      await AsyncStorage.setItem(`@user:${scope}:${SETTINGS_STORAGE_KEY}`, JSON.stringify(newSettings));
+      const scopedKey = `@user:${scope}:${SETTINGS_STORAGE_KEY}`;
+      // Write to both scoped key (multi-user aware) and legacy key for backward compatibility
+      await Promise.all([
+        AsyncStorage.setItem(scopedKey, JSON.stringify(newSettings)),
+        AsyncStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings)),
+      ]);
+      // Ensure a current scope exists to avoid future loads missing the chosen scope
+      await AsyncStorage.setItem('@user:current', scope);
       setSettings(newSettings);
       console.log(`Setting updated: ${key}`, value);
       
@@ -152,6 +188,9 @@ export const useSettings = () => {
         console.log('Emitting settings change event');
         settingsEmitter.emit();
       }
+
+      // If authenticated, push settings to server to prevent overwrite on next pull
+      try { syncService.pushSettings(); } catch {}
     } catch (error) {
       console.error('Failed to save settings:', error);
     }

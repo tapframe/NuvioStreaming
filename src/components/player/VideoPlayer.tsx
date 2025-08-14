@@ -1346,7 +1346,7 @@ const VideoPlayer: React.FC = () => {
     if (type !== 'series' || !nextEpisode || duration <= 0) {
       if (showNextEpisodeButton) {
         // Hide button with animation
-        Animated.parallel([
+fi        Animated.parallel([
           Animated.timing(nextEpisodeButtonOpacity, {
             toValue: 0,
             duration: 200,
