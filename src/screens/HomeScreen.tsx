@@ -252,7 +252,14 @@ const HomeScreen = () => {
                 } catch (error) {
                   console.error(`[HomeScreen] Failed to load ${catalog.name} from ${addon.name}:`, error);
                 } finally {
-                  setLoadedCatalogCount(prev => prev + 1);
+                  setLoadedCatalogCount(prev => {
+                    const next = prev + 1;
+                    // Exit loading screen as soon as first catalog finishes
+                    if (prev === 0) {
+                      setCatalogsLoading(false);
+                    }
+                    return next;
+                  });
                 }
               };
               
@@ -268,29 +275,8 @@ const HomeScreen = () => {
       // Initialize catalogs array with proper length
       setCatalogs(new Array(catalogIndex).fill(null));
       
-      // Start processing the catalog queue
+      // Start processing the catalog queue (parallel fetching continues in background)
       processCatalogQueue();
-      
-      // Wait for all catalogs to load with a timeout
-      const checkAllLoaded = () => {
-        return new Promise<void>((resolve) => {
-          const interval = setInterval(() => {
-            if (loadedCatalogCount >= catalogIndex || catalogQueue.length === 0) {
-              clearInterval(interval);
-              resolve();
-            }
-          }, 100);
-          
-          // Timeout after 30 seconds
-          setTimeout(() => {
-            clearInterval(interval);
-            resolve();
-          }, 30000);
-        });
-      };
-      
-      await checkAllLoaded();
-      setCatalogsLoading(false);
     } catch (error) {
       console.error('[HomeScreen] Error in progressive catalog loading:', error);
       setCatalogsLoading(false);
@@ -299,10 +285,12 @@ const HomeScreen = () => {
 
   // Only count feature section as loading if it's enabled in settings
   // For catalogs, we show them progressively, so loading should be false as soon as we have any content
-  const isLoading = useMemo(() => 
-    (showHeroSection ? featuredLoading : false) || (catalogsLoading && loadedCatalogCount === 0),
-    [showHeroSection, featuredLoading, catalogsLoading, loadedCatalogCount]
-  );
+  const isLoading = useMemo(() => {
+    // Exit loading as soon as at least one catalog is ready, regardless of featured
+    if (loadedCatalogCount > 0) return false;
+    const heroLoading = showHeroSection ? featuredLoading : false;
+    return heroLoading && (catalogsLoading && loadedCatalogCount === 0);
+  }, [showHeroSection, featuredLoading, catalogsLoading, loadedCatalogCount]);
 
   // React to settings changes
   useEffect(() => {
