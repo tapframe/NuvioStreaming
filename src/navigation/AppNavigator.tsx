@@ -15,6 +15,7 @@ import { Stream } from '../types/streams';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { Toasts } from '@backpackapp-io/react-native-toast';
+import { PostHogProvider } from 'posthog-react-native';
 
 // Import screens with their proper types
 import HomeScreen from '../screens/HomeScreen';
@@ -1062,9 +1063,16 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
 };
 
 const AppNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootStackParamList }) => (
-  <AccountProvider>
-    <InnerNavigator initialRouteName={initialRouteName} />
-  </AccountProvider>
+  <PostHogProvider 
+    apiKey="phc_sk6THCtV3thEAn6cTaA9kL2cHuKDBnlYiSL40ywdS6C" 
+    options={{
+      host: "https://us.i.posthog.com",
+    }}
+  >
+    <AccountProvider>
+      <InnerNavigator initialRouteName={initialRouteName} />
+    </AccountProvider>
+  </PostHogProvider>
 );
 
 export default AppNavigator;

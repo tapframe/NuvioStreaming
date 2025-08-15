@@ -46,7 +46,12 @@
       ],
       "package": "com.nuvio.app",
       "versionCode": 1,
-      "architectures": ["arm64-v8a", "armeabi-v7a", "x86", "x86_64"]
+      "architectures": [
+        "arm64-v8a",
+        "armeabi-v7a",
+        "x86",
+        "x86_64"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -65,7 +70,8 @@
           "project": "react-native",
           "organization": "tapframe"
         }
-      ]
+      ],
+      "expo-localization"
     ]
   }
 }
