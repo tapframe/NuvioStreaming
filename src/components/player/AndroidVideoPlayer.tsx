@@ -784,11 +784,13 @@ const AndroidVideoPlayer: React.FC = () => {
       }
       disableImmersiveMode();
       
-      // For series, hard reset to a single Streams route to avoid stacking multiple modals/pages
+      // For series, hard reset to maintain proper navigation stack with MetadataScreen
       if (type === 'series' && id && episodeId) {
         (navigation as any).reset({
-          index: 0,
+          index: 1,
           routes: [
+            { name: 'MainTabs' },
+            { name: 'Metadata', params: { id, type } },
             { name: 'Streams', params: { id, type: 'series', episodeId, fromPlayer: true } }
           ]
         });
@@ -804,11 +806,13 @@ const AndroidVideoPlayer: React.FC = () => {
       }
       disableImmersiveMode();
       
-      // For series, hard reset to a single Streams route to avoid stacking multiple modals/pages
+      // For series, hard reset to maintain proper navigation stack with MetadataScreen
       if (type === 'series' && id && episodeId) {
         (navigation as any).reset({
-          index: 0,
+          index: 1,
           routes: [
+            { name: 'MainTabs' },
+            { name: 'Metadata', params: { id, type } },
             { name: 'Streams', params: { id, type: 'series', episodeId, fromPlayer: true } }
           ]
         });
