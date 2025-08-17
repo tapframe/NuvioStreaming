@@ -206,25 +206,61 @@ const CastMoviesScreen: React.FC = () => {
   }, [displayLimit, filteredAndSortedMovies.length, isLoadingMore]);
 
   const handleMoviePress = async (movie: CastMovie) => {
+    console.log('=== CastMoviesScreen: Movie Press ===');
+    console.log('Movie data:', {
+      id: movie.id,
+      title: movie.title,
+      media_type: movie.media_type,
+      release_date: movie.release_date,
+      character: movie.character,
+      popularity: movie.popularity,
+      vote_average: movie.vote_average,
+      isUpcoming: movie.isUpcoming
+    });
+    
     try {
+      console.log('Attempting to get Stremio ID for:', movie.media_type, movie.id.toString());
+      
       // Get Stremio ID using catalogService
       const stremioId = await catalogService.getStremioId(movie.media_type, movie.id.toString());
       
+      console.log('Stremio ID result:', stremioId);
+      
       if (stremioId) {
+        console.log('Successfully found Stremio ID, navigating to Metadata with:', {
+          id: stremioId,
+          type: movie.media_type
+        });
+        
+        // Convert TMDB media type to Stremio media type
+        const stremioType = movie.media_type === 'tv' ? 'series' : movie.media_type;
+        
+        console.log('Navigating with Stremio type conversion:', {
+          originalType: movie.media_type,
+          stremioType: stremioType,
+          id: stremioId
+        });
+        
         navigation.dispatch(
           StackActions.push('Metadata', { 
             id: stremioId, 
-            type: movie.media_type 
+            type: stremioType 
           })
         );
       } else {
+        console.warn('Stremio ID is null/undefined for movie:', movie.title);
         throw new Error('Could not find Stremio ID');
       }
-    } catch (error) {
-      console.error('Error navigating to movie:', error);
+    } catch (error: any) {
+      console.error('=== Error in handleMoviePress ===');
+      console.error('Movie:', movie.title);
+      console.error('Error details:', error);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+      
       Alert.alert(
         'Error',
-        'Unable to load this content. Please try again later.',
+        `Unable to load "${movie.title}". Please try again later.`,
         [{ text: 'OK' }]
       );
     }

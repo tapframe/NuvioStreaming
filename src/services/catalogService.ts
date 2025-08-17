@@ -122,7 +122,7 @@ class CatalogService {
       if (storedLibrary) {
         this.library = JSON.parse(storedLibrary);
       }
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Failed to load library:', error);
     }
   }
@@ -133,7 +133,7 @@ class CatalogService {
       const scopedKey = `@user:${scope}:stremio-library`;
       await AsyncStorage.setItem(scopedKey, JSON.stringify(this.library));
       await AsyncStorage.setItem(this.LEGACY_LIBRARY_KEY, JSON.stringify(this.library));
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Failed to save library:', error);
     }
   }
@@ -144,7 +144,7 @@ class CatalogService {
       if (storedRecentContent) {
         this.recentContent = JSON.parse(storedRecentContent);
       }
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Failed to load recent content:', error);
     }
   }
@@ -152,7 +152,7 @@ class CatalogService {
   private async saveRecentContent(): Promise<void> {
     try {
       await AsyncStorage.setItem(this.RECENT_CONTENT_KEY, JSON.stringify(this.recentContent));
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Failed to save recent content:', error);
     }
   }
@@ -838,21 +838,66 @@ class CatalogService {
   }
 
   async getStremioId(type: string, tmdbId: string): Promise<string | null> {
+    console.log('=== CatalogService.getStremioId ===');
+    console.log('Input type:', type);
+    console.log('Input tmdbId:', tmdbId);
+    
     try {
       // For movies, use the tt prefix with IMDb ID
       if (type === 'movie') {
+        console.log('Processing movie - fetching TMDB details...');
         const tmdbService = TMDBService.getInstance();
         const movieDetails = await tmdbService.getMovieDetails(tmdbId);
+        
+        console.log('Movie details result:', {
+          id: movieDetails?.id,
+          title: movieDetails?.title,
+          imdb_id: movieDetails?.imdb_id,
+          hasImdbId: !!movieDetails?.imdb_id
+        });
+        
         if (movieDetails?.imdb_id) {
+          console.log('Successfully found IMDb ID:', movieDetails.imdb_id);
           return movieDetails.imdb_id;
+        } else {
+          console.warn('No IMDb ID found for movie:', tmdbId);
+          return null;
         }
       }
-      // For TV shows, use the kitsu prefix
-      else if (type === 'series') {
-        return `kitsu:${tmdbId}`;
+      // For TV shows, get the IMDb ID like movies
+      else if (type === 'tv' || type === 'series') {
+        console.log('Processing TV show - fetching TMDB details for IMDb ID...');
+        const tmdbService = TMDBService.getInstance();
+        
+        // Get TV show external IDs to find IMDb ID
+        const externalIds = await tmdbService.getShowExternalIds(parseInt(tmdbId));
+        
+        console.log('TV show external IDs result:', {
+          tmdbId: tmdbId,
+          imdb_id: externalIds?.imdb_id,
+          hasImdbId: !!externalIds?.imdb_id
+        });
+        
+        if (externalIds?.imdb_id) {
+          console.log('Successfully found IMDb ID for TV show:', externalIds.imdb_id);
+          return externalIds.imdb_id;
+        } else {
+          console.warn('No IMDb ID found for TV show, falling back to kitsu format:', tmdbId);
+          const fallbackId = `kitsu:${tmdbId}`;
+          console.log('Generated fallback Stremio ID for TV:', fallbackId);
+          return fallbackId;
+        }
       }
-      return null;
-    } catch (error) {
+      else {
+        console.warn('Unknown type provided:', type);
+        return null;
+      }
+    } catch (error: any) {
+      console.error('=== Error in getStremioId ===');
+      console.error('Type:', type);
+      console.error('TMDB ID:', tmdbId);
+      console.error('Error details:', error);
+      console.error('Error message:', error.message);
       logger.error('Error getting Stremio ID:', error);
       return null;
     }
