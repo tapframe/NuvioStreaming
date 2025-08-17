@@ -216,6 +216,8 @@ const VideoPlayer: React.FC = () => {
   const pauseOverlayTimerRef = useRef<NodeJS.Timeout | null>(null);
   const pauseOverlayOpacity = useRef(new Animated.Value(0)).current;
   const pauseOverlayTranslateY = useRef(new Animated.Value(12)).current;
+  const metadataOpacity = useRef(new Animated.Value(1)).current;
+  const metadataScale = useRef(new Animated.Value(1)).current;
 
   // Next episode button state
   const [showNextEpisodeButton, setShowNextEpisodeButton] = useState(false);
@@ -226,13 +228,19 @@ const VideoPlayer: React.FC = () => {
   const nextEpisodeButtonOpacity = useRef(new Animated.Value(0)).current;
   const nextEpisodeButtonScale = useRef(new Animated.Value(0.8)).current;
 
+  // Cast display state
+  const [selectedCastMember, setSelectedCastMember] = useState<any>(null);
+  const [showCastDetails, setShowCastDetails] = useState(false);
+  const castDetailsOpacity = useRef(new Animated.Value(0)).current;
+  const castDetailsScale = useRef(new Animated.Value(0.95)).current;
+
   // Get metadata to access logo (only if we have a valid id)
   const shouldLoadMetadata = Boolean(id && type);
   const metadataResult = useMetadata({
     id: id || 'placeholder',
     type: type || 'movie'
   });
-  const { metadata, loading: metadataLoading, groupedEpisodes } = shouldLoadMetadata ? (metadataResult as any) : { metadata: null, loading: false, groupedEpisodes: {} };
+  const { metadata, loading: metadataLoading, groupedEpisodes, cast, loadCast } = shouldLoadMetadata ? (metadataResult as any) : { metadata: null, loading: false, groupedEpisodes: {}, cast: [], loadCast: () => {} };
   const { settings } = useSettings();
 
   // Logo animation values
@@ -1275,6 +1283,34 @@ const VideoPlayer: React.FC = () => {
   // Function to hide pause overlay and show controls
   const hidePauseOverlay = useCallback(() => {
     if (showPauseOverlay) {
+      // Reset cast details state when hiding overlay
+      if (showCastDetails) {
+        Animated.parallel([
+          Animated.timing(castDetailsOpacity, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(castDetailsScale, {
+            toValue: 0.95,
+            duration: 200,
+            useNativeDriver: true,
+          })
+        ]).start(() => {
+          setShowCastDetails(false);
+          setSelectedCastMember(null);
+          // Reset metadata animations
+          metadataOpacity.setValue(1);
+          metadataScale.setValue(1);
+        });
+      } else {
+        setShowCastDetails(false);
+        setSelectedCastMember(null);
+        // Reset metadata animations
+        metadataOpacity.setValue(1);
+        metadataScale.setValue(1);
+      }
+      
       Animated.parallel([
         Animated.timing(pauseOverlayOpacity, {
           toValue: 0,
@@ -1342,7 +1378,7 @@ const VideoPlayer: React.FC = () => {
         pauseOverlayTimerRef.current = null;
       }
     };
-  }, [paused, hidePauseOverlay]);
+  }, [paused]);
 
   // Handle next episode button visibility based on current time and next episode availability
   useEffect(() => {
@@ -1893,27 +1929,256 @@ const VideoPlayer: React.FC = () => {
                   position: 'absolute',
                   left: 24 + insets.left,
                   right: 24 + insets.right,
+                  top: 24 + insets.top,
                   bottom: 110 + insets.bottom,
                   transform: [{ translateY: pauseOverlayTranslateY }]
                 }}>
-                  <Text style={{ color: '#B8B8B8', fontSize: 18, marginBottom: 8 }}>You're watching</Text>
-                  <Text style={{ color: '#FFFFFF', fontSize: 48, fontWeight: '800', marginBottom: 10 }} numberOfLines={1}>
-                    {title}
-                  </Text>
-                  {!!year && (
-                    <Text style={{ color: '#CCCCCC', fontSize: 18, marginBottom: 8 }} numberOfLines={1}>
-                      {`${year}${type === 'series' && season && episode ? ` • S${season}E${episode}` : ''}`}
-                    </Text>
-                  )}
-                  {!!episodeTitle && (
-                    <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '600', marginBottom: 8 }} numberOfLines={1}>
-                      {episodeTitle}
-                    </Text>
-                  )}
-                  {(currentEpisodeDescription || metadata?.description) && (
-                    <Text style={{ color: '#D6D6D6', fontSize: 18, lineHeight: 24 }} numberOfLines={3}>
-                      {type === 'series' ? (currentEpisodeDescription || metadata?.description || '') : (metadata?.description || '')}
-                    </Text>
+                  {showCastDetails && selectedCastMember ? (
+                    // Cast Detail View with fade transition
+                    <Animated.View 
+                      style={{ 
+                        flex: 1, 
+                        justifyContent: 'center',
+                        opacity: castDetailsOpacity,
+                        transform: [{ 
+                          scale: castDetailsScale
+                        }]
+                      }}
+                    >
+                      <View style={{ 
+                        alignItems: 'flex-start',
+                        paddingBottom: screenDimensions.height * 0.1 
+                      }}>
+                        <TouchableOpacity 
+                          style={{ 
+                            flexDirection: 'row', 
+                            alignItems: 'center', 
+                            marginBottom: 24,
+                            paddingVertical: 8,
+                            paddingHorizontal: 4
+                          }}
+                          onPress={() => {
+                            // Animate cast details out, then metadata back in
+                            Animated.parallel([
+                              Animated.timing(castDetailsOpacity, {
+                                toValue: 0,
+                                duration: 250,
+                                useNativeDriver: true,
+                              }),
+                              Animated.timing(castDetailsScale, {
+                                toValue: 0.95,
+                                duration: 250,
+                                useNativeDriver: true,
+                              })
+                            ]).start(() => {
+                              setShowCastDetails(false);
+                              setSelectedCastMember(null);
+                              // Animate metadata back in
+                              Animated.parallel([
+                                Animated.timing(metadataOpacity, {
+                                  toValue: 1,
+                                  duration: 400,
+                                  useNativeDriver: true,
+                                }),
+                                Animated.spring(metadataScale, {
+                                  toValue: 1,
+                                  tension: 80,
+                                  friction: 8,
+                                  useNativeDriver: true,
+                                })
+                              ]).start();
+                            });
+                          }}
+                        >
+                          <MaterialIcons name="arrow-back" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                          <Text style={{ 
+                            color: '#B8B8B8', 
+                            fontSize: Math.min(14, screenDimensions.width * 0.02) 
+                          }}>Back to details</Text>
+                        </TouchableOpacity>
+                        
+                        <View style={{ 
+                          flexDirection: 'row', 
+                          alignItems: 'flex-start',
+                          width: '100%'
+                        }}>
+                          {selectedCastMember.profile_path && (
+                            <View style={{
+                              marginRight: 20,
+                              shadowColor: '#000',
+                              shadowOffset: { width: 0, height: 4 },
+                              shadowOpacity: 0.3,
+                              shadowRadius: 8,
+                              elevation: 5,
+                            }}>
+                              <Image
+                                source={{ uri: `https://image.tmdb.org/t/p/w300${selectedCastMember.profile_path}` }}
+                                style={{
+                                  width: Math.min(120, screenDimensions.width * 0.18),
+                                  height: Math.min(180, screenDimensions.width * 0.27), // Proper aspect ratio 2:3
+                                  borderRadius: 12,
+                                  backgroundColor: 'rgba(255,255,255,0.1)'
+                                }}
+                                resizeMode="cover"
+                              />
+                            </View>
+                          )}
+                          <View style={{ 
+                            flex: 1,
+                            paddingTop: 8
+                          }}>
+                            <Text style={{ 
+                              color: '#FFFFFF', 
+                              fontSize: Math.min(32, screenDimensions.width * 0.045), 
+                              fontWeight: '800', 
+                              marginBottom: 8,
+                              lineHeight: Math.min(38, screenDimensions.width * 0.05)
+                            }} numberOfLines={2}>
+                              {selectedCastMember.name}
+                            </Text>
+                            {selectedCastMember.character && (
+                              <Text style={{ 
+                                color: '#CCCCCC', 
+                                fontSize: Math.min(16, screenDimensions.width * 0.022), 
+                                marginBottom: 8,
+                                fontWeight: '500',
+                                fontStyle: 'italic'
+                              }} numberOfLines={2}>
+                                as {selectedCastMember.character}
+                              </Text>
+                            )}
+                            
+                            {/* Biography if available */}
+                            {selectedCastMember.biography && (
+                              <Text style={{ 
+                                color: '#D6D6D6', 
+                                fontSize: Math.min(14, screenDimensions.width * 0.019), 
+                                lineHeight: Math.min(20, screenDimensions.width * 0.026),
+                                marginTop: 16,
+                                opacity: 0.9
+                              }} numberOfLines={4}>
+                                {selectedCastMember.biography}
+                              </Text>
+                            )}
+                          </View>
+                        </View>
+                      </View>
+                    </Animated.View>
+                  ) : (
+                    // Default Metadata View
+                    <Animated.View style={{ 
+                      flex: 1, 
+                      justifyContent: 'space-between',
+                      opacity: metadataOpacity,
+                      transform: [{ scale: metadataScale }]
+                    }}>
+                      <View>
+                        <Text style={{ 
+                          color: '#B8B8B8', 
+                          fontSize: Math.min(18, screenDimensions.width * 0.025), 
+                          marginBottom: 8 
+                        }}>You're watching</Text>
+                        <Text style={{ 
+                          color: '#FFFFFF', 
+                          fontSize: Math.min(48, screenDimensions.width * 0.06), 
+                          fontWeight: '800', 
+                          marginBottom: 10 
+                        }} numberOfLines={2}>
+                          {title}
+                        </Text>
+                        {!!year && (
+                          <Text style={{ 
+                            color: '#CCCCCC', 
+                            fontSize: Math.min(18, screenDimensions.width * 0.025), 
+                            marginBottom: 8 
+                          }} numberOfLines={1}>
+                            {`${year}${type === 'series' && season && episode ? ` • S${season}E${episode}` : ''}`}
+                          </Text>
+                        )}
+                        {!!episodeTitle && (
+                          <Text style={{ 
+                            color: '#FFFFFF', 
+                            fontSize: Math.min(20, screenDimensions.width * 0.03), 
+                            fontWeight: '600', 
+                            marginBottom: 8 
+                          }} numberOfLines={2}>
+                            {episodeTitle}
+                          </Text>
+                        )}
+                        {(currentEpisodeDescription || metadata?.description) && (
+                          <Text style={{ 
+                            color: '#D6D6D6', 
+                            fontSize: Math.min(18, screenDimensions.width * 0.025), 
+                            lineHeight: Math.min(24, screenDimensions.width * 0.03) 
+                          }} numberOfLines={3}>
+                            {type === 'series' ? (currentEpisodeDescription || metadata?.description || '') : (metadata?.description || '')}
+                          </Text>
+                        )}
+                        {cast && cast.length > 0 && (
+                          <View style={{ marginTop: 16 }}>
+                            <Text style={{ 
+                              color: '#B8B8B8', 
+                              fontSize: Math.min(16, screenDimensions.width * 0.022), 
+                              marginBottom: 8 
+                            }}>Cast</Text>
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                              {cast.slice(0, 6).map((castMember: any, index: number) => (
+                                <TouchableOpacity
+                                  key={castMember.id || index}
+                                  style={{
+                                    backgroundColor: 'rgba(255,255,255,0.1)',
+                                    borderRadius: 12,
+                                    paddingHorizontal: Math.min(12, screenDimensions.width * 0.015),
+                                    paddingVertical: Math.min(6, screenDimensions.height * 0.008),
+                                    marginRight: 8,
+                                    marginBottom: 8,
+                                  }}
+                                                                  onPress={() => {
+                                  setSelectedCastMember(castMember);
+                                  // Animate metadata out, then cast details in
+                                  Animated.parallel([
+                                    Animated.timing(metadataOpacity, {
+                                      toValue: 0,
+                                      duration: 250,
+                                      useNativeDriver: true,
+                                    }),
+                                    Animated.timing(metadataScale, {
+                                      toValue: 0.95,
+                                      duration: 250,
+                                      useNativeDriver: true,
+                                    })
+                                  ]).start(() => {
+                                    setShowCastDetails(true);
+                                    // Animate cast details in
+                                    Animated.parallel([
+                                      Animated.timing(castDetailsOpacity, {
+                                        toValue: 1,
+                                        duration: 400,
+                                        useNativeDriver: true,
+                                      }),
+                                      Animated.spring(castDetailsScale, {
+                                        toValue: 1,
+                                        tension: 80,
+                                        friction: 8,
+                                        useNativeDriver: true,
+                                      })
+                                    ]).start();
+                                  });
+                                }}
+                                >
+                                  <Text style={{ 
+                                    color: '#FFFFFF', 
+                                    fontSize: Math.min(14, screenDimensions.width * 0.018) 
+                                  }}>
+                                    {castMember.name}
+                                  </Text>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                          </View>
+                        )}
+                      </View>
+                    </Animated.View>
                   )}
                 </Animated.View>
               </Animated.View>
