@@ -1372,6 +1372,40 @@ const AndroidVideoPlayer: React.FC = () => {
     }
   }, [nextEpisode, id, isLoadingNextEpisode, navigation, metadata, imdbId, backdrop]);
 
+  // Function to hide pause overlay and show controls
+  const hidePauseOverlay = useCallback(() => {
+    if (showPauseOverlay) {
+      Animated.parallel([
+        Animated.timing(pauseOverlayOpacity, {
+          toValue: 0,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pauseOverlayTranslateY, {
+          toValue: 8,
+          duration: 220,
+          useNativeDriver: true,
+        })
+      ]).start(() => setShowPauseOverlay(false));
+      
+      // Show controls when overlay is touched
+      if (!showControls) {
+        setShowControls(true);
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+        
+        // Auto-hide controls after 5 seconds
+        if (controlsTimeout.current) {
+          clearTimeout(controlsTimeout.current);
+        }
+        controlsTimeout.current = setTimeout(hideControls, 5000);
+      }
+    }
+  }, [showPauseOverlay, pauseOverlayOpacity, pauseOverlayTranslateY, showControls, fadeAnim, controlsTimeout, hideControls]);
+
   // Handle paused overlay after 5 seconds of being paused
   useEffect(() => {
     if (paused) {
@@ -1400,20 +1434,7 @@ const AndroidVideoPlayer: React.FC = () => {
         clearTimeout(pauseOverlayTimerRef.current);
         pauseOverlayTimerRef.current = null;
       }
-      if (showPauseOverlay) {
-        Animated.parallel([
-          Animated.timing(pauseOverlayOpacity, {
-            toValue: 0,
-            duration: 220,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pauseOverlayTranslateY, {
-            toValue: 8,
-            duration: 220,
-            useNativeDriver: true,
-          })
-        ]).start(() => setShowPauseOverlay(false));
-      }
+      hidePauseOverlay();
     }
     return () => {
       if (pauseOverlayTimerRef.current) {
@@ -1421,7 +1442,7 @@ const AndroidVideoPlayer: React.FC = () => {
         pauseOverlayTimerRef.current = null;
       }
     };
-  }, [paused]);
+  }, [paused, hidePauseOverlay]);
 
   // Handle next episode button visibility based on current time and next episode availability
   useEffect(() => {
@@ -1924,65 +1945,76 @@ const AndroidVideoPlayer: React.FC = () => {
           />
 
           {showPauseOverlay && (
-            <Animated.View 
-              pointerEvents="none"
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={hidePauseOverlay}
               style={{
                 position: 'absolute',
                 top: 0,
                 left: 0,
                 right: 0,
                 bottom: 0,
-                opacity: pauseOverlayOpacity,
               }}
             >
-              {/* Strong horizontal fade from left side */}
-              <View style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: screenDimensions.width * 0.7 }}>
+              <Animated.View 
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  opacity: pauseOverlayOpacity,
+                }}
+              >
+                {/* Strong horizontal fade from left side */}
+                <View style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: screenDimensions.width * 0.7 }}>
+                  <LinearGradient
+                    start={{ x: 0, y: 0.5 }}
+                    end={{ x: 1, y: 0.5 }}
+                    colors={[ 'rgba(0,0,0,0.85)', 'rgba(0,0,0,0.0)' ]}
+                    locations={[0, 1]}
+                    style={StyleSheet.absoluteFill}
+                  />
+                </View>
                 <LinearGradient
-                  start={{ x: 0, y: 0.5 }}
-                  end={{ x: 1, y: 0.5 }}
-                  colors={[ 'rgba(0,0,0,0.85)', 'rgba(0,0,0,0.0)' ]}
-                  locations={[0, 1]}
+                  colors={[
+                    'rgba(0,0,0,0.6)',
+                    'rgba(0,0,0,0.4)',
+                    'rgba(0,0,0,0.2)',
+                    'rgba(0,0,0,0.0)'
+                  ]}
+                  locations={[0, 0.3, 0.6, 1]}
                   style={StyleSheet.absoluteFill}
                 />
-              </View>
-              <LinearGradient
-                colors={[
-                  'rgba(0,0,0,0.6)',
-                  'rgba(0,0,0,0.4)',
-                  'rgba(0,0,0,0.2)',
-                  'rgba(0,0,0,0.0)'
-                ]}
-                locations={[0, 0.3, 0.6, 1]}
-                style={StyleSheet.absoluteFill}
-              />
-              <Animated.View style={{
-                position: 'absolute',
-                left: 24 + insets.left,
-                right: 24 + insets.right,
-                bottom: 110 + insets.bottom,
-                transform: [{ translateY: pauseOverlayTranslateY }]
-              }}>
-                <Text style={{ color: '#B8B8B8', fontSize: 18, marginBottom: 8 }}>You're watching</Text>
-                <Text style={{ color: '#FFFFFF', fontSize: 48, fontWeight: '800', marginBottom: 10 }} numberOfLines={1}>
-                  {title}
-                </Text>
-                {!!year && (
-                  <Text style={{ color: '#CCCCCC', fontSize: 18, marginBottom: 8 }} numberOfLines={1}>
-                    {`${year}${type === 'series' && season && episode ? ` • S${season}E${episode}` : ''}`}
+                <Animated.View style={{
+                  position: 'absolute',
+                  left: 24 + insets.left,
+                  right: 24 + insets.right,
+                  bottom: 110 + insets.bottom,
+                  transform: [{ translateY: pauseOverlayTranslateY }]
+                }}>
+                  <Text style={{ color: '#B8B8B8', fontSize: 18, marginBottom: 8 }}>You're watching</Text>
+                  <Text style={{ color: '#FFFFFF', fontSize: 48, fontWeight: '800', marginBottom: 10 }} numberOfLines={1}>
+                    {title}
                   </Text>
-                )}
-                {!!episodeTitle && (
-                  <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '600', marginBottom: 8 }} numberOfLines={1}>
-                    {episodeTitle}
-                  </Text>
-                )}
-                {(currentEpisodeDescription || metadata?.description) && (
-                  <Text style={{ color: '#D6D6D6', fontSize: 18, lineHeight: 24 }} numberOfLines={3}>
-                    {(type as any) === 'series' ? (currentEpisodeDescription || metadata?.description || '') : (metadata?.description || '')}
-                  </Text>
-                )}
+                  {!!year && (
+                    <Text style={{ color: '#CCCCCC', fontSize: 18, marginBottom: 8 }} numberOfLines={1}>
+                      {`${year}${type === 'series' && season && episode ? ` • S${season}E${episode}` : ''}`}
+                    </Text>
+                  )}
+                  {!!episodeTitle && (
+                    <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '600', marginBottom: 8 }} numberOfLines={1}>
+                      {episodeTitle}
+                    </Text>
+                  )}
+                  {(currentEpisodeDescription || metadata?.description) && (
+                    <Text style={{ color: '#D6D6D6', fontSize: 18, lineHeight: 24 }} numberOfLines={3}>
+                      {(type as any) === 'series' ? (currentEpisodeDescription || metadata?.description || '') : (metadata?.description || '')}
+                    </Text>
+                  )}
+                </Animated.View>
               </Animated.View>
-            </Animated.View>
+            </TouchableOpacity>
           )}
 
           {/* Next Episode Button */}

@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Platform } from 'react-native';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { Platform, Animated, TouchableWithoutFeedback, View } from 'react-native';
 import Video, { VideoRef, SelectedTrack, BufferingStrategyType, ResizeMode } from 'react-native-video';
 
 interface VideoPlayerProps {
