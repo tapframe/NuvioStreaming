@@ -45,6 +45,7 @@ import AuthScreen from '../screens/AuthScreen';
 import AccountManageScreen from '../screens/AccountManageScreen';
 import { AccountProvider, useAccount } from '../contexts/AccountContext';
 import PluginsScreen from '../screens/PluginsScreen';
+import CastMoviesScreen from '../screens/CastMoviesScreen';
 
 // Stack navigator types
 export type RootStackParamList = {
@@ -115,6 +116,14 @@ export type RootStackParamList = {
   ThemeSettings: undefined;
   ProfilesSettings: undefined;
   ScraperSettings: undefined;
+  CastMovies: {
+    castMember: {
+      id: number;
+      name: string;
+      profile_path: string | null;
+      character?: string;
+    };
+  };
 };
 
 export type RootStackNavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -1042,6 +1051,21 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             <Stack.Screen 
               name="ScraperSettings" 
               component={PluginsScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="CastMovies" 
+              component={CastMoviesScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,

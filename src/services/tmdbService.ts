@@ -476,6 +476,57 @@ export class TMDBService {
   }
 
   /**
+   * Get person's movie credits (cast and crew)
+   */
+  async getPersonMovieCredits(personId: number) {
+    try {
+      const response = await axios.get(`${BASE_URL}/person/${personId}/movie_credits`, {
+        headers: await this.getHeaders(),
+        params: await this.getParams({
+          language: 'en-US',
+        }),
+      });
+      return response.data;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Get person's TV credits (cast and crew)
+   */
+  async getPersonTvCredits(personId: number) {
+    try {
+      const response = await axios.get(`${BASE_URL}/person/${personId}/tv_credits`, {
+        headers: await this.getHeaders(),
+        params: await this.getParams({
+          language: 'en-US',
+        }),
+      });
+      return response.data;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Get person's combined credits (movies and TV)
+   */
+  async getPersonCombinedCredits(personId: number) {
+    try {
+      const response = await axios.get(`${BASE_URL}/person/${personId}/combined_credits`, {
+        headers: await this.getHeaders(),
+        params: await this.getParams({
+          language: 'en-US',
+        }),
+      });
+      return response.data;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
    * Get external IDs for a TV show (including IMDb ID)
    */
   async getShowExternalIds(tmdbId: number): Promise<{ imdb_id: string | null } | null> {

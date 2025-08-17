@@ -24,6 +24,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Cast } from '../../types/cast';
 import { tmdbService } from '../../services/tmdbService';
+import { useNavigation } from '@react-navigation/native';
+import { NavigationProp } from '@react-navigation/native';
+import { RootStackParamList } from '../../navigation/AppNavigator';
 
 interface CastDetailsModalProps {
   visible: boolean;
@@ -53,6 +56,7 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
   castMember,
 }) => {
   const { currentTheme } = useTheme();
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const [personDetails, setPersonDetails] = useState<PersonDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
@@ -103,6 +107,16 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
     modalScale.value = withTiming(0.9, { duration: 200 }, () => {
       runOnJS(onClose)();
     });
+  };
+
+  const handleViewMovies = () => {
+    if (castMember) {
+      handleClose();
+      // Navigate after modal is closed
+      setTimeout(() => {
+        navigation.navigate('CastMovies', { castMember });
+      }, 300);
+    }
   };
 
   const formatDate = (dateString: string | null) => {
@@ -197,24 +211,21 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
     return (
       <>
         {/* Header */}
-        <LinearGradient
-          colors={[
-            currentTheme.colors.primary + 'DD',
-            currentTheme.colors.primary + 'AA',
-          ]}
-          style={{
-            padding: isTablet ? 24 : 20,
-            paddingTop: isTablet ? 28 : 24,
-          }}
-        >
+        <View style={{
+          padding: isTablet ? 24 : 20,
+          paddingTop: isTablet ? 28 : 24,
+          backgroundColor: 'rgba(0, 0, 0, 0.4)',
+          borderBottomWidth: 1,
+          borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+        }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <View style={{
-              width: isTablet ? 80 : 60,
-              height: isTablet ? 80 : 60,
-              borderRadius: isTablet ? 40 : 30,
+              width: isTablet ? 72 : 56,
+              height: isTablet ? 72 : 56,
+              borderRadius: isTablet ? 36 : 28,
               overflow: 'hidden',
-              marginRight: isTablet ? 20 : 16,
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              marginRight: isTablet ? 16 : 12,
+              backgroundColor: 'rgba(255, 255, 255, 0.08)',
             }}>
               {castMember?.profile_path ? (
                 <Image
@@ -232,9 +243,9 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
                   justifyContent: 'center',
                 }}>
                   <Text style={{
-                    color: '#fff',
-                    fontSize: isTablet ? 22 : 18,
-                    fontWeight: '700',
+                    color: 'rgba(255, 255, 255, 0.6)',
+                    fontSize: isTablet ? 20 : 16,
+                    fontWeight: '600',
                   }}>
                     {castMember?.name?.split(' ').reduce((prev: string, current: string) => prev + current[0], '').substring(0, 2)}
                   </Text>
@@ -245,16 +256,16 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
             <View style={{ flex: 1 }}>
               <Text style={{
                 color: '#fff',
-                fontSize: isTablet ? 22 : 18,
-                fontWeight: '800',
-                marginBottom: 4,
+                fontSize: isTablet ? 20 : 17,
+                fontWeight: '700',
+                marginBottom: 3,
               }} numberOfLines={2}>
                 {castMember?.name}
               </Text>
               {castMember?.character && (
                 <Text style={{
-                  color: 'rgba(255, 255, 255, 0.8)',
-                  fontSize: isTablet ? 16 : 14,
+                  color: 'rgba(255, 255, 255, 0.6)',
+                  fontSize: isTablet ? 14 : 13,
                   fontWeight: '500',
                 }} numberOfLines={2}>
                   as {castMember.character}
@@ -264,25 +275,25 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
 
             <TouchableOpacity
               style={{
-                width: isTablet ? 44 : 36,
-                height: isTablet ? 44 : 36,
-                borderRadius: isTablet ? 22 : 18,
-                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                width: isTablet ? 36 : 32,
+                height: isTablet ? 36 : 32,
+                borderRadius: isTablet ? 18 : 16,
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
                 justifyContent: 'center',
                 alignItems: 'center',
               }}
               onPress={handleClose}
               activeOpacity={0.7}
             >
-              <MaterialIcons name="close" size={isTablet ? 24 : 20} color="#fff" />
+              <MaterialIcons name="close" size={isTablet ? 20 : 18} color="rgba(255, 255, 255, 0.8)" />
             </TouchableOpacity>
           </View>
-        </LinearGradient>
+        </View>
 
         {/* Content */}
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ padding: isTablet ? 28 : 20 }}
+          contentContainerStyle={{ padding: isTablet ? 24 : 18 }}
           showsVerticalScrollIndicator={false}
         >
           {loading ? (
@@ -302,58 +313,33 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
             </View>
           ) : (
             <View>
-              {/* Quick Info */}
-              {(personDetails?.known_for_department || personDetails?.birthday || personDetails?.place_of_birth) && (
+              {/* Basic Info */}
+              {(personDetails?.birthday || personDetails?.place_of_birth) && (
                 <View style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  borderRadius: 16,
+                  backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                  borderRadius: 12,
                   padding: 16,
                   marginBottom: 20,
+                  borderWidth: 1,
+                  borderColor: 'rgba(255, 255, 255, 0.06)',
                 }}>
-                  {personDetails?.known_for_department && (
-                    <View style={{ 
-                      flexDirection: 'row', 
-                      alignItems: 'center',
-                      marginBottom: personDetails?.birthday || personDetails?.place_of_birth ? 12 : 0
-                    }}>
-                      <MaterialIcons name="work" size={16} color={currentTheme.colors.primary} />
-                      <Text style={{
-                        color: 'rgba(255, 255, 255, 0.7)',
-                        fontSize: 12,
-                        marginLeft: 8,
-                        marginRight: 12,
-                      }}>
-                        Department
-                      </Text>
-                      <Text style={{
-                        color: '#fff',
-                        fontSize: 14,
-                        fontWeight: '600',
-                      }}>
-                        {personDetails.known_for_department}
-                      </Text>
-                    </View>
-                  )}
-
                   {personDetails?.birthday && (
                     <View style={{ 
                       flexDirection: 'row', 
                       alignItems: 'center',
-                      marginBottom: personDetails?.place_of_birth ? 12 : 0
+                      marginBottom: personDetails?.place_of_birth ? 10 : 0
                     }}>
-                      <MaterialIcons name="cake" size={16} color="#22C55E" />
+                      <View style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: 3,
+                        backgroundColor: 'rgba(255, 255, 255, 0.4)',
+                        marginRight: 12,
+                      }} />
                       <Text style={{
                         color: 'rgba(255, 255, 255, 0.7)',
-                        fontSize: 12,
-                        marginLeft: 8,
-                        marginRight: 12,
-                      }}>
-                        Age
-                      </Text>
-                      <Text style={{
-                        color: '#fff',
-                        fontSize: 14,
-                        fontWeight: '600',
+                        fontSize: 13,
+                        fontWeight: '500',
                       }}>
                         {calculateAge(personDetails.birthday)} years old
                       </Text>
@@ -362,60 +348,61 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
 
                   {personDetails?.place_of_birth && (
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <MaterialIcons name="place" size={16} color="#F59E0B" />
+                      <View style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: 3,
+                        backgroundColor: 'rgba(255, 255, 255, 0.4)',
+                        marginRight: 12,
+                      }} />
                       <Text style={{
                         color: 'rgba(255, 255, 255, 0.7)',
-                        fontSize: 12,
-                        marginLeft: 8,
-                        marginRight: 12,
-                      }}>
-                        Born in
-                      </Text>
-                      <Text style={{
-                        color: '#fff',
-                        fontSize: 14,
-                        fontWeight: '600',
+                        fontSize: 13,
+                        fontWeight: '500',
                         flex: 1,
                       }}>
-                        {personDetails.place_of_birth}
-                      </Text>
-                    </View>
-                  )}
-
-                  {personDetails?.birthday && (
-                    <View style={{
-                      marginTop: 12,
-                      paddingTop: 12,
-                      borderTopWidth: 1,
-                      borderTopColor: 'rgba(255, 255, 255, 0.1)',
-                    }}>
-                      <Text style={{
-                        color: 'rgba(255, 255, 255, 0.7)',
-                        fontSize: 12,
-                        marginBottom: 4,
-                      }}>
-                        Born on {formatDate(personDetails.birthday)}
+                        Born in {personDetails.place_of_birth}
                       </Text>
                     </View>
                   )}
                 </View>
               )}
 
+              {/* View Movies Button */}
+              <TouchableOpacity
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                  borderRadius: 10,
+                  paddingVertical: 12,
+                  paddingHorizontal: 16,
+                  marginBottom: 20,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 1,
+                  borderColor: 'rgba(255, 255, 255, 0.12)',
+                }}
+                onPress={handleViewMovies}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons name="movie" size={18} color="rgba(255, 255, 255, 0.9)" style={{ marginRight: 8 }} />
+                <Text style={{
+                  color: 'rgba(255, 255, 255, 0.9)',
+                  fontSize: 15,
+                  fontWeight: '600',
+                  letterSpacing: 0.3,
+                }}>
+                  View Filmography
+                </Text>
+              </TouchableOpacity>
+
               {/* Biography */}
               {personDetails?.biography && (
                 <View style={{ marginBottom: 20 }}>
                   <Text style={{
-                    color: '#fff',
-                    fontSize: isTablet ? 20 : 16,
-                    fontWeight: '700',
-                    marginBottom: isTablet ? 16 : 12,
-                  }}>
-                    Biography
-                  </Text>
-                  <Text style={{
-                    color: 'rgba(255, 255, 255, 0.9)',
-                    fontSize: isTablet ? 16 : 14,
-                    lineHeight: isTablet ? 24 : 20,
+                    color: 'rgba(255, 255, 255, 0.8)',
+                    fontSize: isTablet ? 15 : 14,
+                    lineHeight: isTablet ? 22 : 20,
                     fontWeight: '400',
                   }}>
                     {personDetails.biography}
@@ -423,42 +410,49 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
                 </View>
               )}
 
-              {/* Also Known As - Compact */}
+              {/* Also Known As - Minimalistic */}
               {personDetails?.also_known_as && personDetails.also_known_as.length > 0 && (
-                <View>
+                <View style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                  borderRadius: 8,
+                  padding: 12,
+                  marginBottom: 16,
+                }}>
                   <Text style={{
-                    color: '#fff',
-                    fontSize: isTablet ? 20 : 16,
-                    fontWeight: '700',
-                    marginBottom: isTablet ? 16 : 12,
+                    color: 'rgba(255, 255, 255, 0.5)',
+                    fontSize: 11,
+                    fontWeight: '600',
+                    marginBottom: 6,
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
                   }}>
                     Also Known As
                   </Text>
                   <Text style={{
-                    color: 'rgba(255, 255, 255, 0.8)',
-                    fontSize: isTablet ? 16 : 14,
-                    lineHeight: isTablet ? 24 : 20,
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    fontSize: isTablet ? 14 : 13,
+                    lineHeight: isTablet ? 20 : 18,
+                    fontWeight: '500',
                   }}>
-                    {personDetails.also_known_as.slice(0, 4).join(' • ')}
+                    {personDetails.also_known_as.slice(0, 3).join(' • ')}
                   </Text>
                 </View>
               )}
 
               {/* No details available */}
-              {!loading && !personDetails?.biography && !personDetails?.birthday && !personDetails?.place_of_birth && (
+              {!loading && !personDetails?.biography && !personDetails?.birthday && !personDetails?.place_of_birth && !personDetails?.also_known_as?.length && (
                 <View style={{
                   alignItems: 'center',
                   justifyContent: 'center',
-                  paddingVertical: 40,
+                  paddingVertical: 32,
                 }}>
-                  <MaterialIcons name="info" size={32} color="rgba(255, 255, 255, 0.3)" />
                   <Text style={{
-                    color: 'rgba(255, 255, 255, 0.7)',
-                    fontSize: 14,
-                    marginTop: 12,
+                    color: 'rgba(255, 255, 255, 0.5)',
+                    fontSize: 13,
                     textAlign: 'center',
+                    fontWeight: '500',
                   }}>
-                    No additional details available
+                    No additional information available
                   </Text>
                 </View>
               )}
