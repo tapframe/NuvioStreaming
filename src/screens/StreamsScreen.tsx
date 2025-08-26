@@ -171,11 +171,13 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
     };
   }, [stream.addonId, stream.addon]);
   
+  const isDebrid = streamInfo.isDebrid;
   return (
     <TouchableOpacity 
         style={[
           styles.streamCard, 
-          isLoading && styles.streamCardLoading
+          isLoading && styles.streamCardLoading,
+          isDebrid && styles.streamCardHighlighted
         ]} 
         onPress={onPress}
         onLongPress={handleLongPress}
@@ -239,8 +241,8 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
         <View style={styles.streamAction}>
           <MaterialIcons 
             name="play-arrow" 
-            size={24} 
-            color={theme.colors.primary} 
+            size={22} 
+            color={theme.colors.white} 
           />
         </View>
       </TouchableOpacity>
@@ -1672,8 +1674,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    padding: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     paddingTop: Platform.OS === 'android' ? 45 : 15,
+    backgroundColor: 'transparent',
   },
   backButtonText: {
     color: colors.highEmphasis,
@@ -1683,39 +1687,38 @@ const createStyles = (colors: any) => StyleSheet.create({
   streamsMainContent: {
     flex: 1,
     backgroundColor: colors.darkBackground,
-    paddingTop: 20,
+    paddingTop: 12,
     zIndex: 1,
   },
   streamsMainContentMovie: {
     paddingTop: Platform.OS === 'android' ? 10 : 15,
   },
   filterContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingHorizontal: 12,
+    paddingBottom: 8,
   },
   filterScroll: {
     flexGrow: 0,
   },
   filterChip: {
-    backgroundColor: 'transparent',
-    paddingHorizontal: 16,
+    backgroundColor: colors.elevation2,
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 16,
     marginRight: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
   },
   filterChipSelected: {
     backgroundColor: colors.primary,
-    borderColor: colors.primary,
   },
   filterChipText: {
-    color: colors.mediumEmphasis,
-    fontWeight: '500',
+    color: colors.highEmphasis,
+    fontWeight: '600',
+    letterSpacing: 0.1,
   },
   filterChipTextSelected: {
     color: colors.white,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   streamsContent: {
     flex: 1,
@@ -1723,8 +1726,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     zIndex: 2,
   },
   streamsContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingHorizontal: 12,
+    paddingBottom: 20,
     width: '100%',
   },
   streamGroup: {
@@ -1733,24 +1736,29 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   streamGroupTitle: {
     color: colors.highEmphasis,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
-    marginBottom: 8,
+    marginBottom: 6,
     marginTop: 0,
+    opacity: 0.9,
     backgroundColor: 'transparent',
   },
   streamCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    padding: 16,
-    borderRadius: 10,
-    marginBottom: 12,
-    minHeight: 70,
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 10,
+    minHeight: 68,
     backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.cardHighlight,
+    borderWidth: 0,
     width: '100%',
     zIndex: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   scraperLogoContainer: {
     width: 32,
@@ -1768,6 +1776,10 @@ const createStyles = (colors: any) => StyleSheet.create({
   streamCardLoading: {
     opacity: 0.7,
   },
+  streamCardHighlighted: {
+    backgroundColor: colors.elevation2,
+    shadowOpacity: 0.18,
+  },
   streamDetails: {
     flex: 1,
   },
@@ -1784,13 +1796,14 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   streamName: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
     marginBottom: 2,
     lineHeight: 20,
     color: colors.highEmphasis,
+    letterSpacing: 0.1,
   },
   streamAddonName: {
-    fontSize: 13,
+    fontSize: 12,
     lineHeight: 18,
     color: colors.mediumEmphasis,
     marginBottom: 6,
@@ -1803,17 +1816,18 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
   },
   chip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 4,
-    marginRight: 4,
-    marginBottom: 4,
-    backgroundColor: colors.surfaceVariant,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    marginRight: 6,
+    marginBottom: 6,
+    backgroundColor: colors.elevation2,
   },
   chipText: {
     color: colors.highEmphasis,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
+    letterSpacing: 0.2,
   },
   progressContainer: {
     height: 20,
@@ -1833,10 +1847,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginLeft: 8,
   },
   streamAction: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.card,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -2063,7 +2077,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     zIndex: 9999,
   },
   sectionHeaderContainer: {
-    padding: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   sectionHeaderContent: {
     flexDirection: 'row',

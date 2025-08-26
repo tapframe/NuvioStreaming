@@ -80,7 +80,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   selectedHeroCatalogs: [], // Empty array means all catalogs are selected
   logoSourcePreference: 'metahub', // Default to Metahub as first source
   tmdbLanguagePreference: 'en', // Default to English
-  episodeLayoutStyle: 'horizontal', // Default to the new horizontal layout
+  episodeLayoutStyle: 'vertical', // Default to vertical layout for new installs
   autoplayBestStream: false, // Disabled by default for user choice
   // Local scraper defaults
   scraperRepositoryUrl: '',
