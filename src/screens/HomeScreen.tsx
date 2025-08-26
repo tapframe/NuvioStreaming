@@ -603,6 +603,7 @@ const HomeScreen = () => {
       featuredContent={featuredContent}
       isSaved={isSaved}
       handleSaveToLibrary={handleSaveToLibrary}
+      loading={featuredLoading}
     />
   ), [showHeroSection, featuredContentSource, featuredContent, isSaved, handleSaveToLibrary]);
 
@@ -714,7 +715,7 @@ const HomeScreen = () => {
           keyExtractor={item => item.key}
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingTop: Platform.OS === 'ios' ? 100 : 90 }
+            { paddingTop: insets.top }
           ]}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={showHeroSection ? memoizedFeaturedContent : null}

@@ -38,6 +38,7 @@ interface FeaturedContentProps {
   featuredContent: StreamingContent | null;
   isSaved: boolean;
   handleSaveToLibrary: () => void;
+  loading?: boolean;
 }
 
 // Cache to store preloaded images
@@ -122,7 +123,7 @@ const NoFeaturedContent = () => {
   );
 };
 
-const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: FeaturedContentProps) => {
+const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loading }: FeaturedContentProps) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
@@ -184,8 +185,18 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
       // Simplified validation to reduce CPU overhead
       if (!url || typeof url !== 'string') return false;
 
-      // Use our optimized cache service instead of direct prefetch
-      await imageCacheService.getCachedImageUrl(url);
+      // Add timeout guard to prevent hanging preloads
+      const timeout = new Promise<never>((_, reject) => {
+        const t = setTimeout(() => {
+          clearTimeout(t as any);
+          reject(new Error('preload-timeout'));
+        }, 1500);
+      });
+
+      await Promise.race([
+        imageCacheService.getCachedImageUrl(url),
+        timeout,
+      ]);
       imageCache[url] = true;
       return true;
     } catch (error) {
@@ -446,7 +457,13 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary }: Feat
     }
   };
 
+  // Show skeleton while loading to avoid empty state flash and sluggish feel
+  if (loading) {
+    return <SkeletonFeatured />;
+  }
+
   if (!featuredContent) {
+    // Suppress empty state while loading to avoid flash on startup/hydration
     return <NoFeaturedContent />;
   }
 

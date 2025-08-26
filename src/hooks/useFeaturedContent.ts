@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StreamingContent, catalogService } from '../services/catalogService';
 import { tmdbService } from '../services/tmdbService';
 import { logger } from '../utils/logger';
@@ -22,6 +23,7 @@ const persistentStore = {
 
 // Cache timeout in milliseconds (e.g., 5 minutes)
 const CACHE_TIMEOUT = 5 * 60 * 1000;
+const STORAGE_KEY = 'featured_content_cache_v1';
 
 export function useFeaturedContent() {
   const [featuredContent, setFeaturedContent] = useState<StreamingContent | null>(persistentStore.featuredContent);
@@ -167,6 +169,22 @@ export function useFeaturedContent() {
 
       if (signal.aborted) return;
 
+      // Safety guard: if nothing came back within a reasonable time, stop loading
+      if (!formattedContent || formattedContent.length === 0) {
+        // Fall back to any cached featured item so UI can render something
+        const cachedJson = await AsyncStorage.getItem(STORAGE_KEY).catch(() => null);
+        if (cachedJson) {
+          try {
+            const parsed = JSON.parse(cachedJson);
+            if (parsed?.featuredContent) {
+              formattedContent = Array.isArray(parsed.allFeaturedContent) && parsed.allFeaturedContent.length > 0
+                ? parsed.allFeaturedContent
+                : [parsed.featuredContent];
+            }
+          } catch {}
+        }
+      }
+
       // Update persistent store with the new data
       persistentStore.allFeaturedContent = formattedContent;
       persistentStore.lastFetchTime = now;
@@ -178,9 +196,22 @@ export function useFeaturedContent() {
         persistentStore.featuredContent = formattedContent[0];
         setFeaturedContent(formattedContent[0]); 
         currentIndexRef.current = 0;
+        // Persist cache for fast startup
+        try {
+          await AsyncStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify({
+              ts: now,
+              featuredContent: formattedContent[0],
+              allFeaturedContent: formattedContent,
+            })
+          );
+        } catch {}
       } else {
         persistentStore.featuredContent = null;
         setFeaturedContent(null);
+        // Clear persisted cache on empty
+        try { await AsyncStorage.removeItem(STORAGE_KEY); } catch {}
       }
     } catch (error) {
       if (signal.aborted) {
@@ -196,6 +227,29 @@ export function useFeaturedContent() {
       }
     }
   }, [cleanup, genreMap, loadingGenres, contentSource, selectedCatalogs]);
+
+  // Hydrate from persisted cache immediately for instant render
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const json = await AsyncStorage.getItem(STORAGE_KEY);
+        if (!json) return;
+        const parsed = JSON.parse(json);
+        if (cancelled) return;
+        if (parsed?.featuredContent) {
+          persistentStore.featuredContent = parsed.featuredContent;
+          persistentStore.allFeaturedContent = Array.isArray(parsed.allFeaturedContent) ? parsed.allFeaturedContent : [];
+          persistentStore.lastFetchTime = typeof parsed.ts === 'number' ? parsed.ts : Date.now();
+          persistentStore.isFirstLoad = false;
+          setFeaturedContent(parsed.featuredContent);
+          setAllFeaturedContent(persistentStore.allFeaturedContent);
+          setLoading(false);
+        }
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Check for settings changes, including during app restart
   useEffect(() => {

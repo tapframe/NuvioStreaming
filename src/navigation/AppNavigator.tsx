@@ -10,7 +10,6 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { colors } from '../styles/colors';
-import { NuvioHeader } from '../components/NuvioHeader';
 import { Stream } from '../types/streams';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
@@ -587,8 +586,7 @@ const MainTabs = () => {
               ],
             },
           }),
-          header: () => (route.name === 'Home' ? <NuvioHeader /> : null),
-          headerShown: route.name === 'Home',
+          headerShown: false,
           tabBarShowLabel: false,
           tabBarStyle: {
             position: 'absolute',
