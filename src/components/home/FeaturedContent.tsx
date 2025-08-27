@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -175,6 +175,13 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
   const overlayAnimatedStyle = useAnimatedStyle(() => ({
     opacity: overlayOpacity.value,
   }));
+
+  // Stable hero height for tablets to prevent layout jumps; keep hooks unconditional
+  const tabletHeroHeight = useMemo(() => {
+    const aspectBased = width * 0.56; // ~16:9 visual
+    const screenBased = height * 0.62;
+    return Math.min(screenBased, aspectBased);
+  }, [width, height, featuredContent?.id]);
 
   // Preload the image
   const preloadImage = async (url: string): Promise<boolean> => {
@@ -472,7 +479,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
     return (
       <Animated.View
         entering={FadeIn.duration(400).easing(Easing.out(Easing.cubic))}
-        style={[styles.tabletContainer as ViewStyle]}
+        style={[styles.tabletContainer as ViewStyle, { height: tabletHeroHeight }]}
       >
         <TouchableOpacity
           activeOpacity={0.95}

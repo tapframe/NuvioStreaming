@@ -58,6 +58,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast, ToastPosition } from '@backpackapp-io/react-native-toast';
 import FirstTimeWelcome from '../components/FirstTimeWelcome';
 import { imageCacheService } from '../services/imageCacheService';
+import { HeaderVisibility } from '../contexts/HeaderVisibility';
 
 // Constants
 const CATALOG_SETTINGS_KEY = 'catalog_settings';
@@ -609,6 +610,15 @@ const HomeScreen = () => {
 
   const memoizedThisWeekSection = useMemo(() => <ThisWeekSection />, []);
   const memoizedContinueWatchingSection = useMemo(() => <ContinueWatchingSection ref={continueWatchingRef} />, []);
+  // Track scroll direction manually for reliable behavior across platforms
+  const lastScrollYRef = useRef(0);
+  const lastToggleRef = useRef(0);
+  const toggleHeader = useCallback((hide: boolean) => {
+    const now = Date.now();
+    if (now - lastToggleRef.current < 120) return; // debounce
+    lastToggleRef.current = now;
+    HeaderVisibility.setHidden(hide);
+  }, []);
 
   const renderListItem = useCallback(({ item, index }: { item: HomeScreenListItem, index: number }) => {
     const wrapper = (child: React.ReactNode) => (
@@ -724,6 +734,21 @@ const HomeScreen = () => {
           onEndReached={handleLoadMoreCatalogs}
           onEndReachedThreshold={0.6}
           scrollEventThrottle={32}
+          onScroll={event => {
+            const y = event.nativeEvent.contentOffset.y;
+            const dy = y - lastScrollYRef.current;
+            lastScrollYRef.current = y;
+            if (y <= 10) {
+              toggleHeader(false);
+              return;
+            }
+            // Threshold to avoid jitter
+            if (dy > 6) {
+              toggleHeader(true); // scrolling down
+            } else if (dy < -6) {
+              toggleHeader(false); // scrolling up
+            }
+          }}
         />
         {/* Toasts are rendered globally at root */}
       </View>

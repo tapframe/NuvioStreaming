@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { NavigationContainer, DefaultTheme as NavigationDefaultTheme, DarkTheme as NavigationDarkTheme, Theme, NavigationProp } from '@react-navigation/native';
 import { createNativeStackNavigator, NativeStackNavigationOptions, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createBottomTabNavigator, BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { useColorScheme, Platform, Animated, StatusBar, TouchableOpacity, View, Text, AppState, Easing } from 'react-native';
+import { useColorScheme, Platform, Animated, StatusBar, TouchableOpacity, View, Text, AppState, Easing, Dimensions } from 'react-native';
 import { PaperProvider, MD3DarkTheme, MD3LightTheme, adaptNavigationTheme } from 'react-native-paper';
 import type { MD3Theme } from 'react-native-paper';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
@@ -10,8 +10,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { colors } from '../styles/colors';
+import { HeaderVisibility } from '../contexts/HeaderVisibility';
 import { Stream } from '../types/streams';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { Toasts } from '@backpackapp-io/react-native-toast';
 import { PostHogProvider } from 'posthog-react-native';
@@ -356,6 +357,8 @@ const TabIcon = React.memo(({ focused, color, iconName }: {
 
 // Update the TabScreenWrapper component with fixed layout dimensions
 const TabScreenWrapper: React.FC<{children: React.ReactNode}> = ({ children }) => {
+  const isTablet = Dimensions.get('window').width >= 768;
+  const insets = useSafeAreaInsets();
   // Force consistent status bar settings
   useEffect(() => {
     const applyStatusBarConfig = () => {
@@ -390,7 +393,7 @@ const TabScreenWrapper: React.FC<{children: React.ReactNode}> = ({ children }) =
     }}>
       {/* Reserve consistent space for the header area on all screens */}
       <View style={{ 
-        height: Platform.OS === 'android' ? 80 : 60, 
+        height: isTablet ? (insets.top + 64) : (Platform.OS === 'android' ? 80 : 60), 
         width: '100%', 
         backgroundColor: colors.darkBackground,
         position: 'absolute',
@@ -416,8 +419,116 @@ const WrappedScreen: React.FC<{Screen: React.ComponentType<any>}> = ({ Screen })
 // Tab Navigator
 const MainTabs = () => {
   const { currentTheme } = useTheme();
+  const isTablet = Dimensions.get('window').width >= 768;
+  const insets = useSafeAreaInsets();
+  const isIosTablet = Platform.OS === 'ios' && isTablet;
+  const [hidden, setHidden] = React.useState(HeaderVisibility.isHidden());
+  React.useEffect(() => HeaderVisibility.subscribe(setHidden), []);
+  // Smooth animate header hide/show
+  const headerAnim = React.useRef(new Animated.Value(0)).current; // 0: shown, 1: hidden
+  React.useEffect(() => {
+    Animated.timing(headerAnim, {
+      toValue: hidden ? 1 : 0,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [hidden, headerAnim]);
+  const translateY = headerAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -70] });
+  const fade = headerAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
   
   const renderTabBar = (props: BottomTabBarProps) => {
+    if (isTablet) {
+      // Top floating, text-only pill nav for tablets
+      return (
+        <Animated.View
+        style={[{
+          position: 'absolute',
+          top: insets.top + 12,
+          left: 0,
+          right: 0,
+          alignItems: 'center',
+          backgroundColor: 'transparent',
+          zIndex: 100,
+        }, {
+          transform: [{ translateY }],
+          opacity: fade,
+        }]}>
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            borderRadius: 28,
+            overflow: 'hidden',
+            padding: 4,
+            position: 'relative',
+            backgroundColor: isIosTablet ? 'transparent' : 'rgba(0,0,0,0.7)'
+          }}>
+            {isIosTablet && (
+              <BlurView
+                tint="dark"
+                intensity={75}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  borderRadius: 28,
+                }}
+              />
+            )}
+            {props.state.routes.map((route, index) => {
+              const { options } = props.descriptors[route.key];
+              const label =
+                options.tabBarLabel !== undefined
+                  ? options.tabBarLabel
+                  : options.title !== undefined
+                  ? options.title
+                  : route.name;
+
+              const isFocused = props.state.index === index;
+
+              const onPress = () => {
+                const event = props.navigation.emit({
+                  type: 'tabPress',
+                  target: route.key,
+                  canPreventDefault: true,
+                });
+                if (!isFocused && !event.defaultPrevented) {
+                  props.navigation.navigate(route.name);
+                }
+              };
+
+              return (
+                <TouchableOpacity
+                  key={route.key}
+                  activeOpacity={0.8}
+                  onPress={onPress}
+                  style={{
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    marginHorizontal: 2,
+                    borderRadius: 24,
+                    backgroundColor: isFocused ? 'rgba(255,255,255,0.12)' : 'transparent',
+                  }}
+                >
+                  <Text style={{
+                    color: isFocused ? currentTheme.colors.primary : currentTheme.colors.white,
+                    fontWeight: '700',
+                    fontSize: 14,
+                    letterSpacing: 0.2,
+                  }}>
+                    {typeof label === 'string' ? label : ''}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </Animated.View>
+      );
+    }
+
+    // Default bottom tab for phones
     return (
       <View style={{ 
         position: 'absolute', 
