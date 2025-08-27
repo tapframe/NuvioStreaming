@@ -10,8 +10,8 @@
 
 ---
 
-## ⚠️ Alpha Testing
-This app is currently in alpha testing. Please report any bugs or issues you encounter.
+## ⚠️ Beta Testing
+This app is currently in Beta testing. Please report any bugs or issues you encounter.
 
 [Download Latest Release](https://github.com/tapframe/NuvioStreaming/tags)
 

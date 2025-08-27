@@ -2359,6 +2359,7 @@ const VideoPlayer: React.FC = () => {
         visible={showErrorModal}
         transparent
         animationType="fade"
+        supportedOrientations={["landscape", "landscape-left", "landscape-right", "portrait"]}
         onRequestClose={handleErrorExit}
       >
         <View style={{
