@@ -1,46 +1,63 @@
 {
   "name": "Tapframe's Repo",
-  "subtitle": "",
-  "localizedDescription": "",
+  "subtitle": "A source for all of my apps",
+  "description": "Welcome to my source! Here you'll find all of my apps.",
   "iconURL": "https://github.com/tapframe/NuvioStreaming/blob/main/assets/android/playstore-icon.png?raw=true",
-  "tintColor": "#04dcfc",
-  "category": "other",
-  "screenshots": {
-    "iphone": [
-      "https://github.com/tapframe/NuvioStreaming/blob/main/screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.08.32-portrait.png?raw=true",
-      "https://github.com/tapframe/NuvioStreaming/blob/main/screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.09.43-portrait.png?raw=true",
-      "https://github.com/tapframe/NuvioStreaming/blob/main/screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.10.14-portrait.png?raw=true",
-      {
-        "imageURL": "https://github.com/tapframe/NuvioStreaming/blob/main/screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.13.36-landscape.png?raw=true",
-        "width": 2796,
-        "height": 1419
-      }
-    ],
-    "ipad": [
-      "https://github.com/tapframe/NuvioStreaming/blob/main/screesnhots/ipad/Simulator%20Screenshot%20-%20iPad%20Pro%2013-inch%20(M4)%20-%202025-08-27%20at%2021.19.59-portrait.png?raw=true",
-      "https://github.com/tapframe/NuvioStreaming/blob/main/screesnhots/ipad/Simulator%20Screenshot%20-%20iPad%20Pro%2013-inch%20(M4)%20-%202025-08-27%20at%2021.20.50-portrait.png?raw=true"
-    ]
-  },
-  "versions": [
-    {
-      "downloadURL": "https://github.com/tapframe/NuvioStreaming/blob/main/releases/download/0.6.0-beta.4/Beta_0_6_0_4.ipa",
-      "size": 29700000,
-      "version": "1.0.0",
-      "buildVersion": null,
-      "date": "2025-08-27T04:23:00+05:30",
-      "localizedDescription": null,
-      "minOSVersion": null
-    }
+  "website": "",
+  "patreonURL": "",
+  "tintColor": "#6156e2",
+  "featuredApps": [
+    "com.nuvio.app"
   ],
-  "appPermissions": {
-    "entitlements": [
-      "com.nuvio.app"
-    ],
-    "privacy": {
-      "NSLocalNetworkUsageDescription": "App uses the local network to discover and connect to devices.",
-      "NSMicrophoneUsageDescription": "This app does not require microphone access."
+  "apps": [
+    {
+      "name": "Nuvio",
+      "bundleIdentifier": "com.nuvio.app",
+      "marketplaceID": "",
+      "developerName": "Tapframe",
+      "subtitle": "",
+      "localizedDescription": "",
+      "iconURL": "https://github.com/tapframe/NuvioStreaming/blob/main/assets/android/playstore-icon.png?raw=true",
+      "tintColor": "#04dcfc",
+      "category": "other",
+      "screenshots": {
+        "iphone": [
+          "https://github.com/tapframe/NuvioStreaming/blob/main/screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.08.32-portrait.png?raw=true",
+          "https://github.com/tapframe/NuvioStreaming/blob/main/screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.09.43-portrait.png?raw=true",
+          "https://github.com/tapframe/NuvioStreaming/blob/main/screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.10.14-portrait.png?raw=true",
+          {
+            "imageURL": "https://github.com/tapframe/NuvioStreaming/blob/main/screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.13.36-landscape.png?raw=true",
+            "width": 2796,
+            "height": 1419
+          }
+        ],
+        "ipad": [
+          "https://github.com/tapframe/NuvioStreaming/blob/main/screesnhots/ipad/Simulator%20Screenshot%20-%20iPad%20Pro%2013-inch%20(M4)%20-%202025-08-27%20at%2021.19.59-portrait.png?raw=true",
+          "https://github.com/tapframe/NuvioStreaming/blob/main/screesnhots/ipad/Simulator%20Screenshot%20-%20iPad%20Pro%2013-inch%20(M4)%20-%202025-08-27%20at%2021.20.50-portrait.png?raw=true"
+        ]
+      },
+      "versions": [
+        {
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/0.6.0-beta.4/Beta_0_6_0_4.ipa",
+          "size": 29700000,
+          "version": "1.0.0",
+          "buildVersion": null,
+          "date": "2025-08-27T04:23:00+05:30",
+          "localizedDescription": null,
+          "minOSVersion": null
+        }
+      ],
+      "appPermissions": {
+        "entitlements": [
+          "com.nuvio.app"
+        ],
+        "privacy": {
+          "NSLocalNetworkUsageDescription": "App uses the local network to discover and connect to devices.",
+          "NSMicrophoneUsageDescription": "This app does not require microphone access."
+        }
+      },
+      "patreon": {},
+      "news": []
     }
-  },
-  "patreon": {},
-  "news": []
+  ]
 }
