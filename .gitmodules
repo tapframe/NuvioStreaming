@@ -1,0 +1,3 @@
+[submodule "local-scrapers-repo"]
+	path = local-scrapers-repo
+	url = https://github.com/tapframe/nuvio-providers.git
