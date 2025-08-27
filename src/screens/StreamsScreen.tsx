@@ -15,6 +15,7 @@ import {
   Dimensions,
   Linking,
   Clipboard,
+  Image as RNImage,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -1343,6 +1344,20 @@ export const StreamsScreen = () => {
     }
     return metadata?.poster || null;
   }, [currentEpisode, metadata, episodeThumbnail]);
+
+  // Prefetch hero/backdrop and title logo when StreamsScreen opens
+  useEffect(() => {
+    const urls: string[] = [];
+    if (episodeImage && typeof episodeImage === 'string') urls.push(episodeImage);
+    if (bannerImage && typeof bannerImage === 'string') urls.push(bannerImage);
+    if (metadata && (metadata as any).logo && typeof (metadata as any).logo === 'string') {
+      urls.push((metadata as any).logo as string);
+    }
+    // Deduplicate and prefetch
+    Array.from(new Set(urls)).forEach(u => {
+      RNImage.prefetch(u).catch(() => {});
+    });
+  }, [episodeImage, bannerImage, metadata]);
 
   const isLoading = type === 'series' ? loadingEpisodeStreams : loadingStreams;
   const streams = type === 'series' ? episodeStreams : groupedStreams;

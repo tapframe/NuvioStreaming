@@ -228,6 +228,20 @@ const AndroidVideoPlayer: React.FC = () => {
   // Check if we have a logo to show
   const hasLogo = metadata && metadata.logo && !metadataLoading;
 
+  // Prefetch backdrop and title logo for faster loading screen appearance
+  useEffect(() => {
+    if (backdrop && typeof backdrop === 'string') {
+      Image.prefetch(backdrop).catch(() => {});
+    }
+  }, [backdrop]);
+
+  useEffect(() => {
+    const logoUrl = (metadata && (metadata as any).logo) as string | undefined;
+    if (logoUrl && typeof logoUrl === 'string') {
+      Image.prefetch(logoUrl).catch(() => {});
+    }
+  }, [metadata]);
+
   // Resolve current episode description for series
   const currentEpisodeDescription = (() => {
     try {
@@ -1827,6 +1841,7 @@ const AndroidVideoPlayer: React.FC = () => {
         
         <View style={styles.openingContent}>
           {hasLogo ? (
+            <>
             <Animated.View style={{
               transform: [
                 { scale: Animated.multiply(logoScaleAnim, pulseAnim) }
@@ -1843,9 +1858,26 @@ const AndroidVideoPlayer: React.FC = () => {
                 }}
               />
             </Animated.View>
+            <Text style={{
+              color: '#B8B8B8',
+              fontSize: 12,
+              marginTop: 8,
+              opacity: 0.9
+            }} numberOfLines={1}>
+              {`Via ${(currentStreamProvider || streamProvider || '').toString().toUpperCase()}${(currentQuality || quality) ? ` • ${(currentQuality || quality)}p` : ''}`}
+            </Text>
+            </>
           ) : (
             <>
           <ActivityIndicator size="large" color="#E50914" />
+              <Text style={{
+                color: '#B8B8B8',
+                fontSize: 12,
+                marginTop: 12,
+                opacity: 0.9
+              }} numberOfLines={1}>
+                {`Via ${(currentStreamProvider || streamProvider || '').toString().toUpperCase()}${(currentQuality || quality) ? ` • ${(currentQuality || quality)}p` : ''}`}
+              </Text>
             </>
           )}
         </View>
