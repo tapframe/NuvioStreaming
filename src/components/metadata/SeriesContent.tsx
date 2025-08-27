@@ -44,6 +44,8 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   const isTablet = width > 768;
   const isDarkMode = useColorScheme() === 'dark';
   const [episodeProgress, setEpisodeProgress] = useState<{ [key: string]: { currentTime: number; duration: number; lastUpdated: number } }>({});
+  // Delay item entering animations to avoid FlashList initial layout glitches
+  const [enableItemAnimations, setEnableItemAnimations] = useState(false);
   
   // Add refs for the scroll views
   const seasonScrollViewRef = useRef<ScrollView | null>(null);
@@ -159,6 +161,12 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   useEffect(() => {
     loadEpisodesProgress();
   }, [episodes, metadata?.id]);
+
+  // Enable item animations shortly after mount to avoid initial overlap/glitch
+  useEffect(() => {
+    const timer = setTimeout(() => setEnableItemAnimations(true), 200);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Refresh watch progress when screen comes into focus
   useFocusEffect(
@@ -655,7 +663,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               data={currentSeasonEpisodes}
               renderItem={({ item: episode, index }) => (
                 <Animated.View
-                  entering={FadeIn.duration(300).delay(100 + index * 30)}
+                  entering={enableItemAnimations ? FadeIn.duration(300).delay(100 + index * 30) : undefined as any}
                   style={[
                     styles.episodeCardWrapperHorizontal,
                     isTablet && styles.episodeCardWrapperHorizontalTablet
@@ -669,6 +677,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={isTablet ? styles.episodeListContentHorizontalTablet : styles.episodeListContentHorizontal}
               estimatedItemSize={(isTablet ? width * 0.4 : width * 0.75) + (isTablet ? 20 : 16)}
+              estimatedListSize={{ width: Dimensions.get('window').width, height: isTablet ? 260 + 24 : 200 + 20 }}
               overrideItemLayout={(layout, _item, _index) => {
                 const cardWidth = isTablet ? width * 0.4 : width * 0.75;
                 const margin = isTablet ? 20 : 16;
@@ -685,7 +694,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               data={currentSeasonEpisodes}
               renderItem={({ item: episode, index }) => (
                 <Animated.View 
-                  entering={FadeIn.duration(300).delay(100 + index * 30)}
+                  entering={enableItemAnimations ? FadeIn.duration(300).delay(100 + index * 30) : undefined as any}
                 >
                   {renderVerticalEpisodeCard(episode)}
                 </Animated.View>
@@ -693,6 +702,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               keyExtractor={episode => episode.id.toString()}
               contentContainerStyle={isTablet ? styles.episodeListContentVerticalTablet : styles.episodeListContentVertical}
               estimatedItemSize={isTablet ? 160 + 16 : 120 + 16}
+              estimatedListSize={{ width: Dimensions.get('window').width, height: isTablet ? 160 + 16 : 120 + 16 }}
               overrideItemLayout={(layout, _item, _index) => {
                 // height along main axis for vertical list
                 const itemHeight = (isTablet ? 160 : 120) + 16; // card height + marginBottom
