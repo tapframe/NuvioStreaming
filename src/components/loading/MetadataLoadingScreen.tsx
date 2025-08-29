@@ -6,6 +6,7 @@ import {
   Dimensions,
   Animated,
   StatusBar,
+  Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,8 +26,37 @@ export const MetadataLoadingScreen: React.FC<MetadataLoadingScreenProps> = ({
   // Animation values - removed fadeAnim since parent handles transitions
   const pulseAnim = useRef(new Animated.Value(0.3)).current;
   const shimmerAnim = useRef(new Animated.Value(0)).current;
+  
+  // Scene transition animation values (matching tab navigator)
+  const sceneOpacity = useRef(new Animated.Value(0)).current;
+  const sceneScale = useRef(new Animated.Value(0.95)).current;
+  const sceneTranslateY = useRef(new Animated.Value(8)).current;
 
   useEffect(() => {
+    // Scene entrance animation (matching tab navigator)
+    const sceneAnimation = Animated.parallel([
+      Animated.timing(sceneOpacity, {
+        toValue: 1,
+        duration: 200,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
+        useNativeDriver: true,
+      }),
+      Animated.timing(sceneScale, {
+        toValue: 1,
+        duration: 200,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
+        useNativeDriver: true,
+      }),
+      Animated.timing(sceneTranslateY, {
+        toValue: 0,
+        duration: 200,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
+        useNativeDriver: true,
+      }),
+    ]);
+
+    sceneAnimation.start();
+
     // Continuous pulse animation for skeleton elements
     const pulseAnimation = Animated.loop(
       Animated.sequence([
@@ -56,6 +86,7 @@ export const MetadataLoadingScreen: React.FC<MetadataLoadingScreenProps> = ({
     shimmerAnimation.start();
 
     return () => {
+      sceneAnimation.stop();
       pulseAnimation.stop();
       shimmerAnimation.stop();
     };
@@ -130,7 +161,18 @@ export const MetadataLoadingScreen: React.FC<MetadataLoadingScreenProps> = ({
         barStyle="light-content"
       />
       
-      <View style={styles.content}>
+      <Animated.View 
+        style={[
+          styles.content,
+          {
+            opacity: sceneOpacity,
+            transform: [
+              { scale: sceneScale },
+              { translateY: sceneTranslateY }
+            ],
+          }
+        ]}
+      >
         {/* Hero Skeleton */}
         <View style={styles.heroSection}>
           <SkeletonElement 
@@ -219,7 +261,7 @@ export const MetadataLoadingScreen: React.FC<MetadataLoadingScreenProps> = ({
             </View>
           )}
         </View>
-      </View>
+      </Animated.View>
     </SafeAreaView>
   );
 };

@@ -15,13 +15,13 @@ const SplashScreen = ({ onFinish }: SplashScreenProps) => {
     const timer = setTimeout(() => {
       Animated.timing(fadeAnim, {
         toValue: 0,
-        duration: 800,
+        duration: 400,
         useNativeDriver: true,
       }).start(() => {
         // Call onFinish when animation completes
         onFinish();
       });
-    }, 1500); // Show splash for 1.5 seconds
+    }, 300); // Show splash for 0.8 seconds
 
     return () => clearTimeout(timer);
   }, [fadeAnim, onFinish]);
@@ -56,4 +56,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default SplashScreen; 
+export default SplashScreen;
