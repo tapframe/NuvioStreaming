@@ -49,6 +49,8 @@ import { useMetadataAnimations } from '../hooks/useMetadataAnimations';
 import { useMetadataAssets } from '../hooks/useMetadataAssets';
 import { useWatchProgress } from '../hooks/useWatchProgress';
 import { TraktService, TraktPlaybackItem } from '../services/traktService';
+import { tmdbService } from '../services/tmdbService';
+import { catalogService } from '../services/catalogService';
 
 const { height } = Dimensions.get('window');
 
@@ -76,6 +78,8 @@ const MetadataScreen: React.FC = () => {
   const [selectedCastMember, setSelectedCastMember] = useState<any>(null);
   const [shouldLoadSecondaryData, setShouldLoadSecondaryData] = useState(false);
   const [isScreenFocused, setIsScreenFocused] = useState(true);
+  const [currentMetadataSource, setCurrentMetadataSource] = useState<string>(addonId || 'auto');
+  const [loadingMetadataSource, setLoadingMetadataSource] = useState(false);
   const transitionOpacity = useSharedValue(1);
   const interactionComplete = useRef(false);
 
@@ -463,6 +467,71 @@ const MetadataScreen: React.FC = () => {
     setShowCastModal(true);
   }, [isScreenFocused]);
 
+  const handleMetadataSourceChange = useCallback(async (sourceId: string, sourceType: 'addon' | 'tmdb') => {
+    if (!isScreenFocused) return;
+    
+    setCurrentMetadataSource(sourceId);
+    setLoadingMetadataSource(true);
+    
+    // Reload metadata with the new source
+    try {
+      let newMetadata = null;
+      
+      if (sourceType === 'tmdb') {
+        // Load from TMDB
+        if (id.startsWith('tt')) {
+          // Convert IMDB ID to TMDB ID first
+          const tmdbId = await tmdbService.findTMDBIdByIMDB(id);
+          if (tmdbId) {
+            if (type === 'movie') {
+              const movieDetails = await tmdbService.getMovieDetails(tmdbId.toString());
+              if (movieDetails) {
+                newMetadata = {
+                  id: id,
+                  type: 'movie',
+                  name: movieDetails.title,
+                  poster: tmdbService.getImageUrl(movieDetails.poster_path) || '',
+                  banner: tmdbService.getImageUrl(movieDetails.backdrop_path) || '',
+                  description: movieDetails.overview || '',
+                  year: movieDetails.release_date ? parseInt(movieDetails.release_date.substring(0, 4)) : undefined,
+                  genres: movieDetails.genres?.map((g: { name: string }) => g.name) || [],
+                  inLibrary: metadata?.inLibrary || false,
+                };
+              }
+            } else if (type === 'series') {
+              const showDetails = await tmdbService.getTVShowDetails(tmdbId);
+              if (showDetails) {
+                newMetadata = {
+                  id: id,
+                  type: 'series',
+                  name: showDetails.name,
+                  poster: tmdbService.getImageUrl(showDetails.poster_path) || '',
+                  banner: tmdbService.getImageUrl(showDetails.backdrop_path) || '',
+                  description: showDetails.overview || '',
+                  year: showDetails.first_air_date ? parseInt(showDetails.first_air_date.substring(0, 4)) : undefined,
+                  genres: showDetails.genres?.map((g: { name: string }) => g.name) || [],
+                  inLibrary: metadata?.inLibrary || false,
+                };
+              }
+            }
+          }
+        }
+      } else {
+        // Load from addon or auto
+        const addonIdToUse = sourceId === 'auto' ? undefined : sourceId;
+        newMetadata = await catalogService.getEnhancedContentDetails(type, id, addonIdToUse);
+      }
+      
+      if (newMetadata) {
+        setMetadata(newMetadata);
+      }
+    } catch (error) {
+      console.error('[MetadataScreen] Failed to reload metadata with new source:', error);
+    } finally {
+      setLoadingMetadataSource(false);
+    }
+  }, [isScreenFocused, id, type, metadata, tmdbService, catalogService, setMetadata]);
+
   // Ultra-optimized animated styles - minimal calculations with conditional updates
   const containerStyle = useAnimatedStyle(() => ({
     opacity: isScreenFocused ? animations.screenOpacity.value : 0.8,
@@ -589,6 +658,10 @@ const MetadataScreen: React.FC = () => {
                 metadata={metadata}
                 imdbId={imdbId}
                 type={type as 'movie' | 'series'}
+                contentId={id}
+                currentMetadataSource={currentMetadataSource}
+                onMetadataSourceChange={handleMetadataSourceChange}
+                loadingMetadata={loadingMetadataSource}
                 renderRatings={() => imdbId && shouldLoadSecondaryData ? (
                   <MemoizedRatingsSection imdbId={imdbId} type={type === 'series' ? 'show' : 'movie'} />
                 ) : null}

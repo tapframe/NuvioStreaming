@@ -4,36 +4,72 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import Animated, {
-  Layout,
-  Easing,
   FadeIn,
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
+import MetadataSourceSelector from './MetadataSourceSelector';
 
 interface MetadataDetailsProps {
   metadata: any;
   imdbId: string | null;
   type: 'movie' | 'series';
   renderRatings?: () => React.ReactNode;
+  contentId: string;
+  currentMetadataSource?: string;
+  onMetadataSourceChange?: (sourceId: string, sourceType: 'addon' | 'tmdb') => void;
+  loadingMetadata?: boolean;
 }
 
 const MetadataDetails: React.FC<MetadataDetailsProps> = ({
   metadata,
-  imdbId,
+  imdbId: _imdbId,
   type,
   renderRatings,
+  contentId,
+  currentMetadataSource,
+  onMetadataSourceChange,
+  loadingMetadata = false,
 }) => {
   const { currentTheme } = useTheme();
   const [isFullDescriptionOpen, setIsFullDescriptionOpen] = useState(false);
 
   return (
     <>
+      {/* Metadata Source Selector */}
+      {onMetadataSourceChange && (
+        <View style={styles.sourceSelectorContainer}>
+          <MetadataSourceSelector
+            currentSource={currentMetadataSource}
+            contentId={contentId}
+            contentType={type}
+            onSourceChange={onMetadataSourceChange}
+            disabled={loadingMetadata}
+          />
+          {currentMetadataSource && currentMetadataSource !== 'auto' && (
+            <Text style={[styles.sourceIndicator, { color: currentTheme.colors.textMuted }]}>
+              Currently showing metadata from: {currentMetadataSource === 'tmdb' ? 'TMDB' : currentMetadataSource}
+            </Text>
+          )}
+        </View>
+      )}
+
+      {/* Loading indicator when switching sources */}
+      {loadingMetadata && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color={currentTheme.colors.primary} />
+          <Text style={[styles.loadingText, { color: currentTheme.colors.textMuted }]}>
+            Loading metadata...
+          </Text>
+        </View>
+      )}
+
       {/* Meta Info */}
-      <View style={styles.metaInfo}>
+      <View style={[styles.metaInfo, loadingMetadata && styles.dimmed]}>
         {metadata.year && (
           <Text style={[styles.metaText, { color: currentTheme.colors.text }]}>{metadata.year}</Text>
         )}
@@ -45,7 +81,7 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
         )}
         {metadata.imdbRating && (
           <View style={styles.ratingContainer}>
-            <Image 
+            <Image
               source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/IMDB_Logo_2016.svg/575px-IMDB_Logo_2016.svg.png' }}
               style={styles.imdbLogo}
               contentFit="contain"
@@ -61,7 +97,7 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
       {/* Creator/Director Info */}
       <Animated.View
         entering={FadeIn.duration(300).delay(100)}
-        style={styles.creatorContainer}
+        style={[styles.creatorContainer, loadingMetadata && styles.dimmed]}
       >
         {metadata.directors && metadata.directors.length > 0 && (
           <View style={styles.creatorSection}>
@@ -79,11 +115,11 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
 
       {/* Description */}
       {metadata.description && (
-        <Animated.View 
-          style={styles.descriptionContainer}
+        <Animated.View
+          style={[styles.descriptionContainer, loadingMetadata && styles.dimmed]}
           entering={FadeIn.duration(300)}
         >
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={() => setIsFullDescriptionOpen(!isFullDescriptionOpen)}
             activeOpacity={0.7}
           >
@@ -94,10 +130,10 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
               <Text style={[styles.showMoreText, { color: currentTheme.colors.textMuted }]}>
                 {isFullDescriptionOpen ? 'Show Less' : 'Show More'}
               </Text>
-              <MaterialIcons 
-                name={isFullDescriptionOpen ? "keyboard-arrow-up" : "keyboard-arrow-down"} 
-                size={18} 
-                color={currentTheme.colors.textMuted} 
+              <MaterialIcons
+                name={isFullDescriptionOpen ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+                size={18}
+                color={currentTheme.colors.textMuted}
               />
             </View>
           </TouchableOpacity>
@@ -108,6 +144,29 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
 };
 
 const styles = StyleSheet.create({
+  sourceSelectorContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  sourceIndicator: {
+    fontSize: 12,
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    marginBottom: 8,
+  },
+  loadingText: {
+    marginLeft: 8,
+    fontSize: 14,
+  },
+  dimmed: {
+    opacity: 0.6,
+  },
   metaInfo: {
     flexDirection: 'row',
     alignItems: 'center',
