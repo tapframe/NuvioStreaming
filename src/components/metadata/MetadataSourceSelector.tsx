@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,8 +7,10 @@ import {
   Modal,
   ScrollView,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../contexts/ThemeContext';
 import { stremioService } from '../../services/stremioService';
 import { tmdbService } from '../../services/tmdbService';
@@ -29,6 +31,8 @@ interface MetadataSourceSelectorProps {
   contentType: string;
   onSourceChange: (sourceId: string, sourceType: 'addon' | 'tmdb') => void;
   disabled?: boolean;
+  enableComplementary?: boolean;
+  onComplementaryToggle?: (enabled: boolean) => void;
 }
 
 const MetadataSourceSelector: React.FC<MetadataSourceSelectorProps> = ({
@@ -37,12 +41,16 @@ const MetadataSourceSelector: React.FC<MetadataSourceSelectorProps> = ({
   contentType,
   onSourceChange,
   disabled = false,
+  enableComplementary = false,
+  onComplementaryToggle,
 }) => {
   const { currentTheme } = useTheme();
   const [isVisible, setIsVisible] = useState(false);
   const [sources, setSources] = useState<MetadataSource[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedSource, setSelectedSource] = useState<string>(currentSource || 'auto');
+  const scaleAnim = useRef(new Animated.Value(0.8)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
 
   // Load available metadata sources
   const loadMetadataSources = useCallback(async () => {
@@ -143,10 +151,50 @@ const MetadataSourceSelector: React.FC<MetadataSourceSelectorProps> = ({
   }, [currentSource]);
 
   const handleSourceSelect = useCallback((source: MetadataSource) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedSource(source.id);
     setIsVisible(false);
     onSourceChange(source.id, source.type);
   }, [onSourceChange]);
+
+  const handleOpenModal = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Reset animation values
+    scaleAnim.setValue(0.8);
+    opacityAnim.setValue(0);
+    setIsVisible(true);
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 100,
+        friction: 8,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [scaleAnim, opacityAnim]);
+
+  const handleCloseModal = useCallback(() => {
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: 0.8,
+        useNativeDriver: true,
+        tension: 100,
+        friction: 8,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setIsVisible(false);
+    });
+  }, [scaleAnim, opacityAnim]);
 
   const currentSourceName = useMemo(() => {
     const source = sources.find(s => s.id === selectedSource);
@@ -189,8 +237,9 @@ const MetadataSourceSelector: React.FC<MetadataSourceSelectorProps> = ({
             },
             disabled && styles.disabled
           ]}
-          onPress={() => !disabled && setIsVisible(true)}
+          onPress={() => !disabled && handleOpenModal()}
           disabled={disabled}
+          activeOpacity={0.7}
         >
           <View style={styles.selectorContent}>
             <MaterialIcons 
@@ -217,19 +266,70 @@ const MetadataSourceSelector: React.FC<MetadataSourceSelectorProps> = ({
         visible={isVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setIsVisible(false)}
+        onRequestClose={handleCloseModal}
+        statusBarTranslucent
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: currentTheme.colors.elevation2 }]}>
+          <Animated.View style={[
+            styles.modalContent, 
+            { 
+              backgroundColor: 'rgba(30, 30, 30, 0.98)',
+              borderWidth: 1,
+              borderColor: 'rgba(255, 255, 255, 0.12)',
+              transform: [{ scale: scaleAnim }],
+              opacity: opacityAnim,
+            }
+          ]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: currentTheme.colors.text }]}>
                 Select Metadata Source
               </Text>
               <TouchableOpacity
-                onPress={() => setIsVisible(false)}
+                onPress={handleCloseModal}
                 style={styles.closeButton}
               >
                 <MaterialIcons name="close" size={24} color={currentTheme.colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Complementary Metadata Toggle */}
+            <View style={styles.complementaryToggle}>
+              <View style={styles.toggleContent}>
+                <MaterialIcons
+                  name="merge-type"
+                  size={20}
+                  color={currentTheme.colors.primary}
+                />
+                <View style={styles.toggleText}>
+                  <Text style={[styles.toggleTitle, { color: currentTheme.colors.text }]}>
+                    Complementary Metadata
+                  </Text>
+                  <Text style={[styles.toggleDescription, { color: currentTheme.colors.textMuted }]}>
+                    Fetch missing data from other sources
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={[
+                  styles.toggleSwitch,
+                  {
+                    backgroundColor: enableComplementary
+                      ? currentTheme.colors.primary
+                      : currentTheme.colors.elevation2,
+                  }
+                ]}
+                onPress={() => onComplementaryToggle?.(!enableComplementary)}
+                activeOpacity={0.7}
+              >
+                <View
+                  style={[
+                    styles.toggleThumb,
+                    {
+                      transform: [{ translateX: enableComplementary ? 20 : 2 }],
+                      backgroundColor: currentTheme.colors.white,
+                    }
+                  ]}
+                />
               </TouchableOpacity>
             </View>
 
@@ -247,19 +347,33 @@ const MetadataSourceSelector: React.FC<MetadataSourceSelectorProps> = ({
                     key={source.id}
                     style={[
                       styles.sourceItem,
-                      { borderBottomColor: currentTheme.colors.border },
-                      selectedSource === source.id && {
-                        backgroundColor: currentTheme.colors.primary + '20',
+                      { 
+                        backgroundColor: selectedSource === source.id 
+                          ? currentTheme.colors.primary + '25' 
+                          : 'rgba(45, 45, 45, 0.95)',
+                        borderColor: selectedSource === source.id 
+                          ? currentTheme.colors.primary + '50' 
+                          : 'rgba(255, 255, 255, 0.15)',
                       }
                     ]}
                     onPress={() => handleSourceSelect(source)}
+                    activeOpacity={0.7}
                   >
                     <View style={styles.sourceContent}>
-                      <MaterialIcons 
-                        name={getSourceIcon(source)} 
-                        size={24} 
-                        color={selectedSource === source.id ? currentTheme.colors.primary : currentTheme.colors.text} 
-                      />
+                      <View style={[
+                        styles.iconContainer,
+                        { 
+                          backgroundColor: selectedSource === source.id 
+                            ? currentTheme.colors.primary + '30' 
+                            : 'rgba(60, 60, 60, 0.95)'
+                        }
+                      ]}>
+                        <MaterialIcons 
+                          name={getSourceIcon(source)} 
+                          size={20} 
+                          color={selectedSource === source.id ? currentTheme.colors.primary : currentTheme.colors.text} 
+                        />
+                      </View>
                       <View style={styles.sourceInfo}>
                         <Text 
                           style={[
@@ -289,17 +403,19 @@ const MetadataSourceSelector: React.FC<MetadataSourceSelectorProps> = ({
                       </View>
                     </View>
                     {selectedSource === source.id && (
-                      <MaterialIcons 
-                        name="check" 
-                        size={20} 
-                        color={currentTheme.colors.primary} 
-                      />
+                      <View style={styles.checkContainer}>
+                        <MaterialIcons 
+                          name="check-circle" 
+                          size={24} 
+                          color={currentTheme.colors.primary} 
+                        />
+                      </View>
                     )}
                   </TouchableOpacity>
                 ))}
               </ScrollView>
             )}
-          </View>
+          </Animated.View>
         </View>
       </Modal>
     </>
@@ -319,10 +435,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
     borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   disabled: {
     opacity: 0.5,
@@ -340,52 +461,70 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   modalContent: {
-    width: '100%',
-    maxWidth: 400,
-    maxHeight: '80%',
-    borderRadius: 12,
+    width: '90%',
+    maxWidth: 380,
+    maxHeight: '75%',
+    borderRadius: 16,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 10,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.15)',
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   closeButton: {
-    padding: 4,
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
   loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 32,
+    padding: 40,
   },
   loadingText: {
-    marginLeft: 8,
+    marginLeft: 12,
     fontSize: 14,
+    fontWeight: '500',
   },
   sourcesList: {
-    maxHeight: 400,
+    maxHeight: 350,
   },
   sourceItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 16,
-    borderBottomWidth: 1,
+    marginHorizontal: 12,
+    marginVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
   },
   sourceContent: {
     flexDirection: 'row',
@@ -393,17 +532,79 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sourceInfo: {
-    marginLeft: 12,
+    marginLeft: 16,
     flex: 1,
   },
   sourceName: {
     fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 2,
+    fontWeight: '600',
+    marginBottom: 4,
+    letterSpacing: 0.2,
   },
   sourceDescription: {
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 18,
+    opacity: 0.8,
+  },
+  iconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  checkContainer: {
+    padding: 4,
+  },
+  complementaryToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  toggleContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  toggleText: {
+    marginLeft: 16,
+    flex: 1,
+  },
+  toggleTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  toggleDescription: {
+    fontSize: 13,
+    lineHeight: 18,
+    opacity: 0.8,
+  },
+  toggleSwitch: {
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  toggleThumb: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
 });
 
