@@ -13,9 +13,9 @@ interface CachedImage {
 
 class ImageCacheService {
   private cache = new Map<string, CachedImage>();
-  private readonly CACHE_DURATION = 12 * 60 * 60 * 1000; // Reduced to 12 hours
-  private readonly MAX_CACHE_SIZE = 50; // Reduced maximum number of cached images
-  private readonly MAX_MEMORY_MB = 100; // Maximum memory usage in MB
+  private readonly CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+  private readonly MAX_CACHE_SIZE = 100; // Increased maximum number of cached images
+  private readonly MAX_MEMORY_MB = 150; // Increased maximum memory usage in MB
   private currentMemoryUsage = 0;
   private cleanupInterval: NodeJS.Timeout | null = null;
 
@@ -44,9 +44,9 @@ class ImageCacheService {
       return cached.localPath;
     }
 
-    // Check memory pressure before adding new entries
-    if (this.shouldSkipCaching()) {
-      logger.log(`[ImageCache] Skipping cache due to memory pressure`);
+    // Check memory pressure before adding new entries (more lenient)
+    if (this.cache.size >= this.MAX_CACHE_SIZE * 0.95) {
+      logger.log(`[ImageCache] Skipping cache due to size limit`);
       return originalUrl;
     }
 

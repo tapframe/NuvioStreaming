@@ -17,18 +17,18 @@ const { width } = Dimensions.get('window');
 const calculatePosterLayout = (screenWidth: number) => {
   // Detect if device is a tablet (width >= 768px is common tablet breakpoint)
   const isTablet = screenWidth >= 768;
-  
+
   const MIN_POSTER_WIDTH = isTablet ? 140 : 100; // Bigger minimum for tablets
   const MAX_POSTER_WIDTH = isTablet ? 180 : 130; // Bigger maximum for tablets
   const LEFT_PADDING = 16; // Left padding
   const SPACING = 8; // Space between posters
-  
+
   // Calculate available width for posters (reserve space for left padding)
   const availableWidth = screenWidth - LEFT_PADDING;
-  
+
   // Try different numbers of full posters to find the best fit
   let bestLayout = { numFullPosters: 3, posterWidth: isTablet ? 160 : 120 };
-  
+
   for (let n = 3; n <= 6; n++) {
     // Calculate poster width needed for N full posters + 0.25 partial poster
     // Formula: N * posterWidth + (N-1) * spacing + 0.25 * posterWidth = availableWidth - rightPadding
@@ -36,12 +36,12 @@ const calculatePosterLayout = (screenWidth: number) => {
     // We'll use minimal right padding (8px) to maximize space
     const usableWidth = availableWidth - 8;
     const posterWidth = (usableWidth - (n - 1) * SPACING) / (n + 0.25);
-    
+
     if (posterWidth >= MIN_POSTER_WIDTH && posterWidth <= MAX_POSTER_WIDTH) {
       bestLayout = { numFullPosters: n, posterWidth };
     }
   }
-  
+
   return {
     numFullPosters: bestLayout.numFullPosters,
     posterWidth: bestLayout.posterWidth,
@@ -61,6 +61,7 @@ const ContentItem = ({ item, onPress }: ContentItemProps) => {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [shouldLoadImage, setShouldLoadImage] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const { currentTheme } = useTheme();
 
   // Intersection observer simulation for lazy loading
@@ -101,25 +102,36 @@ const ContentItem = ({ item, onPress }: ContentItemProps) => {
   useEffect(() => {
     const timer = setTimeout(() => {
       setShouldLoadImage(true);
-    }, 100); // Small delay to avoid loading offscreen items
-    
+    }, 50); // Reduced delay for faster loading
+
     return () => clearTimeout(timer);
   }, []);
 
   // Get optimized poster URL for smaller tiles
   const getOptimizedPosterUrl = useCallback((originalUrl: string) => {
-    if (!originalUrl) return 'https://via.placeholder.com/154x231/333/666?text=No+Image';
-    
+    if (!originalUrl || originalUrl.includes('placeholder')) {
+      return 'https://via.placeholder.com/154x231/333/666?text=No+Image';
+    }
+
+    // If we've had an error, try metahub fallback
+    if (retryCount > 0 && !originalUrl.includes('metahub.space')) {
+      return `https://images.metahub.space/poster/small/${item.id}/img`;
+    }
+
     // For TMDB images, use smaller sizes
     if (originalUrl.includes('image.tmdb.org')) {
       // Replace any size with w154 (fits 100-130px tiles perfectly)
       return originalUrl.replace(/\/w\d+\//, '/w154/');
     }
-    
-    // For other sources, try to add size parameters
-    const separator = originalUrl.includes('?') ? '&' : '?';
-    return `${originalUrl}${separator}w=154&h=231&q=75`;
-  }, []);
+
+    // For metahub images, use smaller sizes
+    if (originalUrl.includes('images.metahub.space')) {
+      return originalUrl.replace('/medium/', '/small/');
+    }
+
+    // Return original URL for other sources to avoid breaking them
+    return originalUrl;
+  }, [retryCount, item.id]);
 
   return (
     <>
@@ -138,8 +150,8 @@ const ContentItem = ({ item, onPress }: ContentItemProps) => {
                 source={{ uri: getOptimizedPosterUrl(item.poster) }}
                 style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1 }]}
                 contentFit="cover"
-                cachePolicy="disk" // Disk-only cache to save RAM
-                transition={0}
+                cachePolicy="memory-disk" // Use both memory and disk cache
+                transition={200} // Add smooth transition
                 placeholder={{ blurhash: PLACEHOLDER_BLURHASH } as any}
                 placeholderContentFit="cover"
                 allowDownscaling
@@ -147,11 +159,19 @@ const ContentItem = ({ item, onPress }: ContentItemProps) => {
                   setImageLoaded(true);
                   setImageError(false);
                 }}
-                onError={() => {
+                onError={(error) => {
+                  console.warn('Image load error for:', item.poster, error);
+                  // Try fallback URL on first error
+                  if (retryCount === 0 && item.poster && !item.poster.includes('metahub.space')) {
+                    setRetryCount(1);
+                    // Don't set error state yet, let it try the fallback
+                    return;
+                  }
                   setImageError(true);
                   setImageLoaded(false);
                 }}
-                priority="low"
+                priority="normal" // Increase priority for better loading
+                recyclingKey={item.id} // Add recycling key for better performance
               />
             ) : (
               // Show placeholder until lazy load triggers
@@ -182,7 +202,7 @@ const ContentItem = ({ item, onPress }: ContentItemProps) => {
           {item.name}
         </Text>
       </View>
-      
+
       <DropUpMenu
         visible={menuVisible}
         onClose={handleMenuClose}
@@ -199,7 +219,7 @@ const styles = StyleSheet.create({
   },
   contentItem: {
     width: POSTER_WIDTH,
-    aspectRatio: 2/3,
+    aspectRatio: 2 / 3,
     margin: 0,
     borderRadius: 12,
     overflow: 'hidden',
