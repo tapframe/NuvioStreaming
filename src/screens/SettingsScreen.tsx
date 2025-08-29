@@ -675,6 +675,26 @@ const SettingsScreen: React.FC = () => {
                   </Text>
                 </View>
               )}
+
+              {/* Discord Join Button - Show on all categories for tablet */}
+              <View style={styles.discordContainer}>
+                <TouchableOpacity
+                  style={[styles.discordButton, { backgroundColor: currentTheme.colors.elevation1 }]}
+                  onPress={() => Linking.openURL('https://discord.gg/6w8dr3TSDN')}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.discordButtonContent}>
+                    <Image
+                      source={{ uri: 'https://pngimg.com/uploads/discord/discord_PNG3.png' }}
+                      style={styles.discordLogo}
+                      resizeMode="contain"
+                    />
+                    <Text style={[styles.discordButtonText, { color: currentTheme.colors.highEmphasis }]}>
+                      Join Discord
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
             </ScrollView>
           </View>
         </View>
@@ -715,6 +735,26 @@ const SettingsScreen: React.FC = () => {
               <Text style={[styles.footerText, { color: currentTheme.colors.mediumEmphasis }]}>
                 Made with ❤️ by the Nuvio team
               </Text>
+            </View>
+
+            {/* Discord Join Button */}
+            <View style={styles.discordContainer}>
+              <TouchableOpacity
+                style={[styles.discordButton, { backgroundColor: currentTheme.colors.elevation1 }]}
+                onPress={() => Linking.openURL('https://discord.gg/6w8dr3TSDN')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.discordButtonContent}>
+                  <Image
+                    source={{ uri: 'https://pngimg.com/uploads/discord/discord_PNG3.png' }}
+                    style={styles.discordLogo}
+                    resizeMode="contain"
+                  />
+                  <Text style={[styles.discordButtonText, { color: currentTheme.colors.highEmphasis }]}>
+                    Join Discord
+                  </Text>
+                </View>
+              </TouchableOpacity>
             </View>
           </ScrollView>
         </View>
@@ -958,6 +998,34 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 14,
     opacity: 0.5,
+  },
+  // New styles for Discord button
+  discordContainer: {
+    marginTop: 20,
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  discordButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    maxWidth: 200,
+  },
+  discordButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  discordLogo: {
+    width: 16,
+    height: 16,
+    marginRight: 8,
+  },
+  discordButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
 

@@ -10,9 +10,10 @@ import { Episode } from '../../types/metadata';
 import { tmdbService } from '../../services/tmdbService';
 import { storageService } from '../../services/storageService';
 import { useFocusEffect } from '@react-navigation/native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, SlideInRight, SlideOutLeft, withTiming, withSpring, useSharedValue, useAnimatedStyle, Easing } from 'react-native-reanimated';
 import { TraktService } from '../../services/traktService';
 import { logger } from '../../utils/logger';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface SeriesContentProps {
   episodes: Episode[];
@@ -49,9 +50,157 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   // Local TMDB hydration for rating/runtime when addon (Cinemeta) lacks these
   const [tmdbEpisodeOverrides, setTmdbEpisodeOverrides] = useState<{ [epKey: string]: { vote_average?: number; runtime?: number; still_path?: string } }>({});
   
+  // Add state for season view mode (persists for current show across navigation)
+  const [seasonViewMode, setSeasonViewMode] = useState<'posters' | 'text'>('posters');
+  
+  // Animated values for view mode transitions
+  const posterViewOpacity = useSharedValue(1);
+  const textViewOpacity = useSharedValue(0);
+  const posterViewTranslateX = useSharedValue(0);
+  const textViewTranslateX = useSharedValue(50);
+  const posterViewScale = useSharedValue(1);
+  const textViewScale = useSharedValue(0.95);
+  
+  // Animated styles for view transitions
+  const posterViewAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: posterViewOpacity.value,
+    transform: [
+      { translateX: posterViewTranslateX.value },
+      { scale: posterViewScale.value }
+    ],
+  }));
+  
+  const textViewAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: textViewOpacity.value,
+    transform: [
+      { translateX: textViewTranslateX.value },
+      { scale: textViewScale.value }
+    ],
+  }));
+  
   // Add refs for the scroll views
   const seasonScrollViewRef = useRef<ScrollView | null>(null);
   const episodeScrollViewRef = useRef<FlashListRef<Episode>>(null);
+  const horizontalEpisodeScrollViewRef = useRef<FlatList<Episode>>(null);
+
+  // Load saved view mode preference when component mounts or show changes
+  useEffect(() => {
+    const loadViewModePreference = async () => {
+      if (metadata?.id) {
+        try {
+          const savedMode = await AsyncStorage.getItem(`season_view_mode_${metadata.id}`);
+          if (savedMode === 'text' || savedMode === 'posters') {
+            setSeasonViewMode(savedMode);
+            console.log('[SeriesContent] Loaded saved view mode:', savedMode, 'for show:', metadata.id);
+          }
+        } catch (error) {
+          console.log('[SeriesContent] Error loading view mode preference:', error);
+        }
+      }
+    };
+    
+    loadViewModePreference();
+  }, [metadata?.id]);
+
+  // Initialize animated values based on current view mode
+  useEffect(() => {
+    if (seasonViewMode === 'text') {
+      // Initialize text view as visible
+      posterViewOpacity.value = 0;
+      posterViewTranslateX.value = -60;
+      posterViewScale.value = 0.95;
+      textViewOpacity.value = 1;
+      textViewTranslateX.value = 0;
+      textViewScale.value = 1;
+    } else {
+      // Initialize poster view as visible
+      posterViewOpacity.value = 1;
+      posterViewTranslateX.value = 0;
+      posterViewScale.value = 1;
+      textViewOpacity.value = 0;
+      textViewTranslateX.value = 50;
+      textViewScale.value = 0.95;
+    }
+  }, [seasonViewMode]);
+
+  // Save view mode preference when it changes
+  const updateViewMode = (newMode: 'posters' | 'text') => {
+    setSeasonViewMode(newMode);
+    if (metadata?.id) {
+      AsyncStorage.setItem(`season_view_mode_${metadata.id}`, newMode).catch(error => {
+        console.log('[SeriesContent] Error saving view mode preference:', error);
+      });
+    }
+  };
+
+  // Animate view mode transition
+  const animateViewModeTransition = (newMode: 'posters' | 'text') => {
+    if (newMode === 'text') {
+      // Animate to text view with spring animations for smoother feel
+      posterViewOpacity.value = withTiming(0, { 
+        duration: 250, 
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1.0) 
+      });
+      posterViewTranslateX.value = withSpring(-60, { 
+        damping: 20, 
+        stiffness: 200,
+        mass: 0.8
+      });
+      posterViewScale.value = withSpring(0.95, { 
+        damping: 20, 
+        stiffness: 200,
+        mass: 0.8
+      });
+      
+      textViewOpacity.value = withTiming(1, { 
+        duration: 300, 
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1.0) 
+      });
+      textViewTranslateX.value = withSpring(0, { 
+        damping: 20, 
+        stiffness: 200,
+        mass: 0.8
+      });
+      textViewScale.value = withSpring(1, { 
+        damping: 20, 
+        stiffness: 200,
+        mass: 0.8
+      });
+    } else {
+      // Animate to poster view with spring animations
+      textViewOpacity.value = withTiming(0, { 
+        duration: 250, 
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1.0) 
+      });
+      textViewTranslateX.value = withSpring(60, { 
+        damping: 20, 
+        stiffness: 200,
+        mass: 0.8
+      });
+      textViewScale.value = withSpring(0.95, { 
+        damping: 20, 
+        stiffness: 200,
+        mass: 0.8
+      });
+      
+      posterViewOpacity.value = withTiming(1, { 
+        duration: 300, 
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1.0) 
+      });
+      posterViewTranslateX.value = withSpring(0, { 
+        damping: 20, 
+        stiffness: 200,
+        mass: 0.8
+      });
+      posterViewScale.value = withSpring(1, { 
+        damping: 20, 
+        stiffness: 200,
+        mass: 0.8
+      });
+    }
+  };
+  
+  // Add refs for the scroll views
   
 
 
@@ -118,7 +267,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
 
   // Function to find and scroll to the most recently watched episode
   const scrollToMostRecentEpisode = () => {
-    if (!metadata?.id || !episodeScrollViewRef.current || !settings?.episodeLayoutStyle || settings.episodeLayoutStyle !== 'horizontal') {
+    if (!metadata?.id || !settings?.episodeLayoutStyle || settings.episodeLayoutStyle !== 'horizontal') {
       return;
     }
     
@@ -149,8 +298,8 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
       const scrollPosition = mostRecentEpisodeIndex * cardWidth;
       
       setTimeout(() => {
-        if (episodeScrollViewRef.current && typeof (episodeScrollViewRef.current as any).scrollToOffset === 'function') {
-          (episodeScrollViewRef.current as any).scrollToOffset({
+        if (horizontalEpisodeScrollViewRef.current) {
+          horizontalEpisodeScrollViewRef.current.scrollToOffset({
             offset: scrollPosition,
             animated: true
           });
@@ -188,7 +337,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
         // Fetch all episodes from TMDB and build override map for the current season
         const all = await tmdbService.getAllEpisodes(tmdbShowId);
         const overrides: { [k: string]: { vote_average?: number; runtime?: number; still_path?: string } } = {};
-        const seasonEpisodes = all?.[String(selectedSeason)] || [];
+        const seasonEpisodes = all?.[selectedSeason] || [];
         seasonEpisodes.forEach((tmdbEp: any) => {
           const key = `${metadata.id}:${tmdbEp.season_number}:${tmdbEp.episode_number}`;
           overrides[key] = {
@@ -275,15 +424,53 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
       return null;
     }
     
+    console.log('[SeriesContent] renderSeasonSelector called, current view mode:', seasonViewMode);
+    
     const seasons = Object.keys(groupedEpisodes).map(Number).sort((a, b) => a - b);
     
     return (
       <View style={[styles.seasonSelectorWrapper, isTablet && styles.seasonSelectorWrapperTablet]}>
-        <Text style={[
-          styles.seasonSelectorTitle,
-          isTablet && styles.seasonSelectorTitleTablet,
-          { color: currentTheme.colors.highEmphasis }
-        ]}>Seasons</Text>
+        <View style={styles.seasonSelectorHeader}>
+          <Text style={[
+            styles.seasonSelectorTitle,
+            isTablet && styles.seasonSelectorTitleTablet,
+            { color: currentTheme.colors.highEmphasis }
+          ]}>Seasons</Text>
+          
+          {/* Dropdown Toggle Button */}
+          <TouchableOpacity
+            style={[
+              styles.seasonViewToggle, 
+              { 
+                backgroundColor: seasonViewMode === 'posters' 
+                  ? currentTheme.colors.elevation2 
+                  : currentTheme.colors.elevation3,
+                borderColor: seasonViewMode === 'posters' 
+                  ? 'rgba(255,255,255,0.2)' 
+                  : 'rgba(255,255,255,0.3)'
+              }
+            ]}
+            onPress={() => {
+              const newMode = seasonViewMode === 'posters' ? 'text' : 'posters';
+              animateViewModeTransition(newMode);
+              updateViewMode(newMode);
+              console.log('[SeriesContent] View mode changed to:', newMode, 'Current ref value:', seasonViewMode);
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={[
+              styles.seasonViewToggleText, 
+              { 
+                color: seasonViewMode === 'posters' 
+                  ? currentTheme.colors.mediumEmphasis 
+                  : currentTheme.colors.highEmphasis
+              }
+            ]}>
+              {seasonViewMode === 'posters' ? 'Posters' : 'Text'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        
         <FlatList
           ref={seasonScrollViewRef as React.RefObject<FlatList<any>>}
           data={seasons}
@@ -296,6 +483,8 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
           windowSize={3}
           renderItem={({ item: season }) => {
             const seasonEpisodes = groupedEpisodes[season] || [];
+            
+            // Get season poster URL (needed for both views)
             let seasonPoster = DEFAULT_PLACEHOLDER;
             if (seasonEpisodes[0]?.season_poster_path) {
               const tmdbUrl = tmdbService.getImageUrl(seasonEpisodes[0].season_poster_path, 'w500');
@@ -304,51 +493,94 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               seasonPoster = metadata.poster;
             }
             
-            return (
-              <TouchableOpacity
-                key={season}
-                style={[
-                  styles.seasonButton,
-                  isTablet && styles.seasonButtonTablet,
-                  selectedSeason === season && [styles.selectedSeasonButton, { borderColor: currentTheme.colors.primary }]
-                ]}
-                onPress={() => onSeasonChange(season)}
-              >
-                <View style={[styles.seasonPosterContainer, isTablet && styles.seasonPosterContainerTablet]}>
-                  <Image
-                    source={{ uri: seasonPoster }}
-                    style={styles.seasonPoster}
-                    contentFit="cover"
-                  />
-                  {selectedSeason === season && (
-                    <View style={[
-                      styles.selectedSeasonIndicator,
-                      isTablet && styles.selectedSeasonIndicatorTablet,
-                      { backgroundColor: currentTheme.colors.primary }
-                    ]} />
-                  )}
-                  {/* Show episode count badge, including when there are no episodes */}
-                  <View style={[styles.episodeCountBadge, { backgroundColor: currentTheme.colors.elevation2 }]}>
-                    <Text style={[styles.episodeCountText, { color: currentTheme.colors.textMuted }]}>
-                      {seasonEpisodes.length} ep{seasonEpisodes.length !== 1 ? 's' : ''}
-                    </Text>
-                  </View>
-                </View>
-                <Text 
-                  style={[
-                    styles.seasonButtonText,
-                    isTablet && styles.seasonButtonTextTablet,
-                    { color: currentTheme.colors.mediumEmphasis },
-                    selectedSeason === season && [
-                      styles.selectedSeasonButtonText,
-                      isTablet && styles.selectedSeasonButtonTextTablet,
-                      { color: currentTheme.colors.primary }
-                    ]
-                  ]}
+            if (seasonViewMode === 'text') {
+              // Text-only view
+              console.log('[SeriesContent] Rendering text view for season:', season, 'View mode ref:', seasonViewMode);
+              return (
+                <Animated.View 
+                  key={season}
+                  style={textViewAnimatedStyle}
+                  entering={SlideInRight.duration(400).easing(Easing.bezier(0.25, 0.1, 0.25, 1.0))}
+                  exiting={SlideOutLeft.duration(350).easing(Easing.bezier(0.25, 0.1, 0.25, 1.0))}
                 >
-                  Season {season}
-                </Text>
-              </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.seasonTextButton,
+                      isTablet && styles.seasonTextButtonTablet,
+                      selectedSeason === season && styles.selectedSeasonTextButton
+                    ]}
+                    onPress={() => onSeasonChange(season)}
+                  >
+                    <Text style={[
+                      styles.seasonTextButtonText,
+                      isTablet && styles.seasonTextButtonTextTablet,
+                      { color: currentTheme.colors.highEmphasis },
+                      selectedSeason === season && [
+                        styles.selectedSeasonTextButtonText,
+                        isTablet && styles.selectedSeasonTextButtonTextTablet,
+                        { color: currentTheme.colors.highEmphasis }
+                      ]
+                    ]} numberOfLines={1}>
+                      Season {season}
+                    </Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              );
+            }
+            
+            // Poster view (current implementation)
+            console.log('[SeriesContent] Rendering poster view for season:', season, 'View mode ref:', seasonViewMode);
+            return (
+              <Animated.View 
+                key={season}
+                style={posterViewAnimatedStyle}
+                entering={SlideInRight.duration(400).easing(Easing.bezier(0.25, 0.1, 0.25, 1.0))}
+                exiting={SlideOutLeft.duration(350).easing(Easing.bezier(0.25, 0.1, 0.25, 1.0))}
+              >
+                <TouchableOpacity
+                  style={[
+                    styles.seasonButton,
+                    isTablet && styles.seasonButtonTablet,
+                    selectedSeason === season && [styles.selectedSeasonButton, { borderColor: currentTheme.colors.primary }]
+                  ]}
+                  onPress={() => onSeasonChange(season)}
+                >
+                  <View style={[styles.seasonPosterContainer, isTablet && styles.seasonPosterContainerTablet]}>
+                    <Image
+                      source={{ uri: seasonPoster }}
+                      style={styles.seasonPoster}
+                      contentFit="cover"
+                    />
+                    {selectedSeason === season && (
+                      <View style={[
+                        styles.selectedSeasonIndicator,
+                        isTablet && styles.selectedSeasonIndicatorTablet,
+                        { backgroundColor: currentTheme.colors.primary }
+                      ]} />
+                    )}
+                    {/* Show episode count badge, including when there are no episodes */}
+                    <View style={[styles.episodeCountBadge, { backgroundColor: currentTheme.colors.elevation2 }]}>
+                      <Text style={[styles.episodeCountText, { color: currentTheme.colors.textMuted }]}>
+                        {seasonEpisodes.length} ep{seasonEpisodes.length !== 1 ? 's' : ''}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text 
+                    style={[
+                      styles.seasonButtonText,
+                      isTablet && styles.seasonButtonTextTablet,
+                      { color: currentTheme.colors.mediumEmphasis },
+                      selectedSeason === season && [
+                        styles.selectedSeasonButtonText,
+                        isTablet && styles.selectedSeasonButtonTextTablet,
+                        { color: currentTheme.colors.primary }
+                      ]
+                    ]}
+                  >
+                    Season {season}
+                  </Text>
+                </TouchableOpacity>
+              </Animated.View>
             );
           }}
           keyExtractor={season => season.toString()}
@@ -709,10 +941,10 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
         {/* Only render episode list if there are episodes */}
         {currentSeasonEpisodes.length > 0 && (
           (settings?.episodeLayoutStyle === 'horizontal') ? (
-            // Horizontal Layout (Netflix-style)
-            <FlashList
+            // Horizontal Layout (Netflix-style) - Using FlatList
+            <FlatList
               key={`episodes-${settings?.episodeLayoutStyle}-${selectedSeason}`}
-              ref={episodeScrollViewRef}
+              ref={horizontalEpisodeScrollViewRef}
               data={currentSeasonEpisodes}
               renderItem={({ item: episode, index }) => (
                 <Animated.View
@@ -729,18 +961,22 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={isTablet ? styles.episodeListContentHorizontalTablet : styles.episodeListContentHorizontal}
-              estimatedItemSize={(isTablet ? width * 0.4 : width * 0.75) + (isTablet ? 20 : 16)}
-              estimatedListSize={{ width: Dimensions.get('window').width, height: isTablet ? 260 + 24 : 200 + 20 }}
-              overrideItemLayout={(layout, _item, _index) => {
+              removeClippedSubviews
+              initialNumToRender={3}
+              maxToRenderPerBatch={5}
+              windowSize={5}
+              getItemLayout={(data, index) => {
                 const cardWidth = isTablet ? width * 0.4 : width * 0.75;
                 const margin = isTablet ? 20 : 16;
-                layout.size = cardWidth + margin;
-                layout.span = 1;
+                return {
+                  length: cardWidth + margin,
+                  offset: (cardWidth + margin) * index,
+                  index,
+                };
               }}
-              removeClippedSubviews
             />
           ) : (
-            // Vertical Layout (Traditional)
+            // Vertical Layout (Traditional) - Using FlashList
             <FlashList
               key={`episodes-${settings?.episodeLayoutStyle}-${selectedSeason}`}
               ref={episodeScrollViewRef}
@@ -754,14 +990,6 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               )}
               keyExtractor={episode => episode.id.toString()}
               contentContainerStyle={isTablet ? styles.episodeListContentVerticalTablet : styles.episodeListContentVertical}
-              estimatedItemSize={isTablet ? 160 + 16 : 120 + 16}
-              estimatedListSize={{ width: Dimensions.get('window').width, height: isTablet ? 160 + 16 : 120 + 16 }}
-              overrideItemLayout={(layout, _item, _index) => {
-                // height along main axis for vertical list
-                const itemHeight = (isTablet ? 160 : 120) + 16; // card height + marginBottom
-                layout.size = itemHeight;
-                layout.span = 1;
-              }}
               removeClippedSubviews
             />
           )
@@ -1148,15 +1376,21 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     paddingHorizontal: 24,
   },
+  seasonSelectorHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   seasonSelectorTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 12,
+    marginBottom: 0, // Removed margin bottom here
   },
   seasonSelectorTitleTablet: {
     fontSize: 22,
     fontWeight: '700',
-    marginBottom: 16,
+    marginBottom: 0, // Removed margin bottom here
   },
   seasonSelectorContainer: {
     flexGrow: 0,
@@ -1226,6 +1460,62 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   selectedSeasonButtonTextTablet: {
+    fontWeight: '800',
+  },
+  seasonViewToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  seasonViewToggleText: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginRight: 4,
+  },
+  seasonTextButton: {
+    alignItems: 'center',
+    marginRight: 16,
+    width: 110,
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: 'transparent',
+  },
+  seasonTextButtonTablet: {
+    alignItems: 'center',
+    marginRight: 20,
+    width: 130,
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 14,
+    backgroundColor: 'transparent',
+  },
+  selectedSeasonTextButton: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  seasonTextButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+    textAlign: 'center',
+  },
+  seasonTextButtonTextTablet: {
+    fontSize: 17,
+    fontWeight: '600',
+    letterSpacing: 0.4,
+    textAlign: 'center',
+  },
+  selectedSeasonTextButtonText: {
+    fontWeight: '700',
+  },
+  selectedSeasonTextButtonTextTablet: {
     fontWeight: '800',
   },
   episodeCountBadge: {
