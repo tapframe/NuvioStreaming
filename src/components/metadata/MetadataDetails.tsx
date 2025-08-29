@@ -12,7 +12,7 @@ import Animated, {
   FadeIn,
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
-import MetadataSourceSelector from './MetadataSourceSelector';
+// MetadataSourceSelector removed
 
 interface MetadataDetailsProps {
   metadata: any;
@@ -20,8 +20,7 @@ interface MetadataDetailsProps {
   type: 'movie' | 'series';
   renderRatings?: () => React.ReactNode;
   contentId: string;
-  currentMetadataSource?: string;
-  onMetadataSourceChange?: (sourceId: string, sourceType: 'addon' | 'tmdb') => void;
+  // Source switching removed
   loadingMetadata?: boolean;
 }
 
@@ -31,8 +30,6 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
   type,
   renderRatings,
   contentId,
-  currentMetadataSource,
-  onMetadataSourceChange,
   loadingMetadata = false,
 }) => {
   const { currentTheme } = useTheme();
@@ -40,23 +37,7 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
 
   return (
     <>
-      {/* Metadata Source Selector */}
-      {onMetadataSourceChange && (
-        <View style={styles.sourceSelectorContainer}>
-          <MetadataSourceSelector
-            currentSource={currentMetadataSource}
-            contentId={contentId}
-            contentType={type}
-            onSourceChange={onMetadataSourceChange}
-            disabled={loadingMetadata}
-          />
-          {currentMetadataSource && currentMetadataSource !== 'auto' && (
-            <Text style={[styles.sourceIndicator, { color: currentTheme.colors.textMuted }]}>
-              Currently showing metadata from: {currentMetadataSource === 'tmdb' ? 'TMDB' : currentMetadataSource}
-            </Text>
-          )}
-        </View>
-      )}
+      {/* Metadata Source Selector removed */}
 
       {/* Loading indicator when switching sources */}
       {loadingMetadata && (
@@ -144,15 +125,7 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
 };
 
 const styles = StyleSheet.create({
-  sourceSelectorContainer: {
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  sourceIndicator: {
-    fontSize: 12,
-    marginTop: 4,
-    fontStyle: 'italic',
-  },
+  // Removed source selector styles
   loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',

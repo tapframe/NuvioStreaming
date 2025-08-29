@@ -846,6 +846,46 @@ export const StreamsScreen = () => {
     );
   }, [selectedEpisode, groupedEpisodes, id]);
 
+  // TMDB hydration for series hero (rating/runtime/still)
+  const [tmdbEpisodeOverride, setTmdbEpisodeOverride] = useState<{ vote_average?: number; runtime?: number; still_path?: string } | null>(null);
+
+  useEffect(() => {
+    const hydrateEpisodeFromTmdb = async () => {
+      try {
+        setTmdbEpisodeOverride(null);
+        if (type !== 'series' || !currentEpisode || !id) return;
+        // Skip if data already present
+        const needsHydration = !(currentEpisode as any).runtime || !(currentEpisode as any).vote_average || !currentEpisode.still_path;
+        if (!needsHydration) return;
+
+        // Resolve TMDB show id
+        let tmdbShowId: number | null = null;
+        if (id.startsWith('tmdb:')) {
+          tmdbShowId = parseInt(id.split(':')[1], 10);
+        } else if (id.startsWith('tt')) {
+          tmdbShowId = await tmdbService.findTMDBIdByIMDB(id);
+        }
+        if (!tmdbShowId) return;
+
+        const allEpisodes: Record<string, any[]> = await tmdbService.getAllEpisodes(tmdbShowId) as any;
+        const seasonKey = String(currentEpisode.season_number);
+        const seasonList: any[] = (allEpisodes && (allEpisodes as any)[seasonKey]) || [];
+        const ep = seasonList.find((e: any) => e.episode_number === currentEpisode.episode_number);
+        if (ep) {
+          setTmdbEpisodeOverride({
+            vote_average: ep.vote_average,
+            runtime: ep.runtime,
+            still_path: ep.still_path,
+          });
+        }
+      } catch (e) {
+        logger.warn('[StreamsScreen] TMDB hydration failed:', e);
+      }
+    };
+
+    hydrateEpisodeFromTmdb();
+  }, [type, id, currentEpisode?.season_number, currentEpisode?.episode_number]);
+
   const navigateToPlayer = useCallback(async (stream: Stream, options?: { forceVlc?: boolean; headers?: Record<string, string> }) => {
     // Prepare available streams for the change source feature
     const streamsToPass = type === 'series' ? episodeStreams : groupedStreams;
@@ -1336,14 +1376,29 @@ export const StreamsScreen = () => {
       return tmdbService.getImageUrl(episodeThumbnail, 'original');
     }
     if (!currentEpisode) return null;
-    if (currentEpisode.still_path) {
+    const hydratedStill = tmdbEpisodeOverride?.still_path;
+    if (currentEpisode.still_path || hydratedStill) {
       if (currentEpisode.still_path.startsWith('http')) {
         return currentEpisode.still_path;
       }
-      return tmdbService.getImageUrl(currentEpisode.still_path, 'original');
+      const path = currentEpisode.still_path || hydratedStill || '';
+      return tmdbService.getImageUrl(path, 'original');
     }
     return metadata?.poster || null;
-  }, [currentEpisode, metadata, episodeThumbnail]);
+  }, [currentEpisode, metadata, episodeThumbnail, tmdbEpisodeOverride?.still_path]);
+
+  // Effective TMDB fields for hero (series)
+  const effectiveEpisodeVote = useMemo(() => {
+    if (!currentEpisode) return 0;
+    const v = (tmdbEpisodeOverride?.vote_average ?? currentEpisode.vote_average) || 0;
+    return typeof v === 'number' ? v : Number(v) || 0;
+  }, [currentEpisode, tmdbEpisodeOverride?.vote_average]);
+
+  const effectiveEpisodeRuntime = useMemo(() => {
+    if (!currentEpisode) return undefined as number | undefined;
+    const r = (tmdbEpisodeOverride?.runtime ?? (currentEpisode as any).runtime) as number | undefined;
+    return r;
+  }, [currentEpisode, tmdbEpisodeOverride?.runtime]);
 
   // Prefetch hero/backdrop and title logo when StreamsScreen opens
   useEffect(() => {
@@ -1508,33 +1563,35 @@ export const StreamsScreen = () => {
                         {currentEpisode.name}
                       </Text>
                       {!!currentEpisode.overview && (
-                        <Text style={styles.streamsHeroOverview} numberOfLines={2}>
-                          {currentEpisode.overview}
-                        </Text>
+                        <Animated.View entering={FadeIn.duration(400).delay(320)}>
+                          <Text style={styles.streamsHeroOverview} numberOfLines={2}>
+                            {currentEpisode.overview}
+                          </Text>
+                        </Animated.View>
                       )}
-                      <View style={styles.streamsHeroMeta}>
+                      <Animated.View entering={FadeIn.duration(400).delay(360)} style={styles.streamsHeroMeta}>
                         <Text style={styles.streamsHeroReleased}>
                           {tmdbService.formatAirDate(currentEpisode.air_date)}
                         </Text>
-                        {currentEpisode.vote_average > 0 && (
-                          <View style={styles.streamsHeroRating}>
+                        {effectiveEpisodeVote > 0 && (
+                          <Animated.View entering={FadeIn.duration(400).delay(380)} style={styles.streamsHeroRating}>
                             <Image source={{ uri: TMDB_LOGO }} style={styles.tmdbLogo} contentFit="contain" />
                             <Text style={styles.streamsHeroRatingText}>
-                              {currentEpisode.vote_average.toFixed(1)}
+                              {effectiveEpisodeVote.toFixed(1)}
                             </Text>
-                          </View>
+                          </Animated.View>
                         )}
-                        {!!currentEpisode.runtime && (
-                          <View style={styles.streamsHeroRuntime}>
+                        {!!effectiveEpisodeRuntime && (
+                          <Animated.View entering={FadeIn.duration(400).delay(400)} style={styles.streamsHeroRuntime}>
                             <MaterialIcons name="schedule" size={16} color={colors.mediumEmphasis} />
                             <Text style={styles.streamsHeroRuntimeText}>
-                              {currentEpisode.runtime >= 60
-                                ? `${Math.floor(currentEpisode.runtime / 60)}h ${currentEpisode.runtime % 60}m`
-                                : `${currentEpisode.runtime}m`}
+                              {effectiveEpisodeRuntime >= 60
+                                ? `${Math.floor(effectiveEpisodeRuntime / 60)}h ${effectiveEpisodeRuntime % 60}m`
+                                : `${effectiveEpisodeRuntime}m`}
                             </Text>
-                          </View>
+                          </Animated.View>
                         )}
-                      </View>
+                      </Animated.View>
                     </Animated.View>
                   ) : (
                     // Placeholder to reserve space and avoid layout shift while loading
@@ -1978,10 +2035,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   streamsHeroRating: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 4,
+    // chip background removed
     marginTop: 0,
   },
   tmdbLogo: {
@@ -1989,7 +2043,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     height: 14,
   },
   streamsHeroRatingText: {
-    color: colors.accent,
+    color: colors.highEmphasis,
     fontSize: 13,
     fontWeight: '700',
     marginLeft: 4,
@@ -2070,10 +2124,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    // chip background removed
   },
   streamsHeroRuntimeText: {
     color: colors.mediumEmphasis,

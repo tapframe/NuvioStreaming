@@ -46,6 +46,8 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   const [episodeProgress, setEpisodeProgress] = useState<{ [key: string]: { currentTime: number; duration: number; lastUpdated: number } }>({});
   // Delay item entering animations to avoid FlashList initial layout glitches
   const [enableItemAnimations, setEnableItemAnimations] = useState(false);
+  // Local TMDB hydration for rating/runtime when addon (Cinemeta) lacks these
+  const [tmdbEpisodeOverrides, setTmdbEpisodeOverrides] = useState<{ [epKey: string]: { vote_average?: number; runtime?: number; still_path?: string } }>({});
   
   // Add refs for the scroll views
   const seasonScrollViewRef = useRef<ScrollView | null>(null);
@@ -161,6 +163,50 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   useEffect(() => {
     loadEpisodesProgress();
   }, [episodes, metadata?.id]);
+
+  // Hydrate TMDB rating/runtime for current season episodes if missing
+  useEffect(() => {
+    const hydrateFromTmdb = async () => {
+      try {
+        if (!metadata?.id || !selectedSeason) return;
+        const currentSeasonEpisodes = groupedEpisodes[selectedSeason] || [];
+        if (currentSeasonEpisodes.length === 0) return;
+
+        // Check if hydration is needed
+        const needsHydration = currentSeasonEpisodes.some(ep => !(ep as any).runtime || !(ep as any).vote_average);
+        if (!needsHydration) return;
+
+        // Resolve TMDB show id
+        let tmdbShowId: number | null = null;
+        if (metadata.id.startsWith('tmdb:')) {
+          tmdbShowId = parseInt(metadata.id.split(':')[1], 10);
+        } else if (metadata.id.startsWith('tt')) {
+          tmdbShowId = await tmdbService.findTMDBIdByIMDB(metadata.id);
+        }
+        if (!tmdbShowId) return;
+
+        // Fetch all episodes from TMDB and build override map for the current season
+        const all = await tmdbService.getAllEpisodes(tmdbShowId);
+        const overrides: { [k: string]: { vote_average?: number; runtime?: number; still_path?: string } } = {};
+        const seasonEpisodes = all?.[String(selectedSeason)] || [];
+        seasonEpisodes.forEach((tmdbEp: any) => {
+          const key = `${metadata.id}:${tmdbEp.season_number}:${tmdbEp.episode_number}`;
+          overrides[key] = {
+            vote_average: tmdbEp.vote_average,
+            runtime: tmdbEp.runtime,
+            still_path: tmdbEp.still_path,
+          };
+        });
+        if (Object.keys(overrides).length > 0) {
+          setTmdbEpisodeOverrides(prev => ({ ...prev, ...overrides }));
+        }
+      } catch (err) {
+        logger.error('[SeriesContent] TMDB hydration failed:', err);
+      }
+    };
+
+    hydrateFromTmdb();
+  }, [metadata?.id, selectedSeason, groupedEpisodes]);
 
   // Enable item animations shortly after mount to avoid initial overlap/glitch
   useEffect(() => {
@@ -351,6 +397,13 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
 
     // Get episode progress
     const episodeId = episode.stremioId || `${metadata?.id}:${episode.season_number}:${episode.episode_number}`;
+    const tmdbOverride = tmdbEpisodeOverrides[`${metadata?.id}:${episode.season_number}:${episode.episode_number}`];
+    const effectiveVote = (tmdbOverride?.vote_average ?? episode.vote_average) || 0;
+    const effectiveRuntime = tmdbOverride?.runtime ?? (episode as any).runtime;
+    if (!episode.still_path && tmdbOverride?.still_path) {
+      const tmdbUrl = tmdbService.getImageUrl(tmdbOverride.still_path, 'w500');
+      if (tmdbUrl) episodeImage = tmdbUrl;
+    }
     const progress = episodeProgress[episodeId];
     const progressPercent = progress ? (progress.currentTime / progress.duration) * 100 : 0;
     
@@ -415,7 +468,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               styles.episodeMetadata,
               isTablet && styles.episodeMetadataTablet
             ]}>
-              {episode.vote_average > 0 && (
+              {effectiveVote > 0 && (
                 <View style={styles.ratingContainer}>
                   <Image
                     source={{ uri: TMDB_LOGO }}
@@ -423,15 +476,15 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                     contentFit="contain"
                   />
                   <Text style={[styles.ratingText, { color: currentTheme.colors.textMuted }]}>
-                    {episode.vote_average.toFixed(1)}
+                    {effectiveVote.toFixed(1)}
                   </Text>
                 </View>
               )}
-              {episode.runtime && (
+              {effectiveRuntime && (
                 <View style={styles.runtimeContainer}>
                   <MaterialIcons name="schedule" size={14} color={currentTheme.colors.textMuted} />
                   <Text style={[styles.runtimeText, { color: currentTheme.colors.textMuted }]}>
-                    {formatRuntime(episode.runtime)}
+                    {formatRuntime(effectiveRuntime)}
                   </Text>
                 </View>
               )}
@@ -853,10 +906,7 @@ const styles = StyleSheet.create({
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    borderRadius: 4,
+    // chip background removed
   },
   tmdbLogo: {
     width: 20,
@@ -871,10 +921,7 @@ const styles = StyleSheet.create({
   runtimeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    borderRadius: 4,
+    // chip background removed
   },
   runtimeText: {
     fontSize: 13,
@@ -1049,10 +1096,7 @@ const styles = StyleSheet.create({
   runtimeContainerHorizontal: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 3,
+    // chip background removed
   },
   runtimeTextHorizontal: {
     color: 'rgba(255,255,255,0.8)',
@@ -1062,10 +1106,7 @@ const styles = StyleSheet.create({
   ratingContainerHorizontal: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 3,
+    // chip background removed
     gap: 2,
   },
   ratingTextHorizontal: {
