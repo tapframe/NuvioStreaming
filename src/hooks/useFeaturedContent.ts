@@ -24,6 +24,7 @@ const persistentStore = {
 // Cache timeout in milliseconds (e.g., 5 minutes)
 const CACHE_TIMEOUT = 5 * 60 * 1000;
 const STORAGE_KEY = 'featured_content_cache_v1';
+const DISABLE_CACHE = true;
 
 export function useFeaturedContent() {
   const [featuredContent, setFeaturedContent] = useState<StreamingContent | null>(persistentStore.featuredContent);
@@ -52,32 +53,42 @@ export function useFeaturedContent() {
   }, []);
 
   const loadFeaturedContent = useCallback(async (forceRefresh = false) => {
+    const t0 = Date.now();
+    logger.info('[useFeaturedContent] load:start', { forceRefresh, contentSource, selectedCatalogsCount: (selectedCatalogs || []).length });
     // First, ensure contentSource matches current settings (could be outdated due to async updates)
     if (contentSource !== settings.featuredContentSource) {
-      console.log(`Updating content source from ${contentSource} to ${settings.featuredContentSource}`);
+      logger.debug('[useFeaturedContent] load:source-mismatch', { from: contentSource, to: settings.featuredContentSource });
       setContentSource(settings.featuredContentSource);
       // We return here and let the effect triggered by contentSource change handle the loading
       return;
     }
     
-    // Check if we should use cached data
+    // Check if we should use cached data (disabled if DISABLE_CACHE)
     const now = Date.now();
     const cacheAge = now - persistentStore.lastFetchTime;
-    
-    if (!forceRefresh && 
-        persistentStore.featuredContent && 
-        persistentStore.allFeaturedContent.length > 0 && 
-        cacheAge < CACHE_TIMEOUT) {
-      // Use cached data
-      console.log('Using cached featured content data');
-      setFeaturedContent(persistentStore.featuredContent);
-      setAllFeaturedContent(persistentStore.allFeaturedContent);
-      setLoading(false);
-      persistentStore.isFirstLoad = false;
-      return;
+    logger.debug('[useFeaturedContent] cache:status', {
+      disabled: DISABLE_CACHE,
+      hasFeatured: Boolean(persistentStore.featuredContent),
+      allCount: persistentStore.allFeaturedContent?.length || 0,
+      cacheAgeMs: cacheAge,
+      timeoutMs: CACHE_TIMEOUT,
+    });
+    if (!DISABLE_CACHE) {
+      if (!forceRefresh && 
+          persistentStore.featuredContent && 
+          persistentStore.allFeaturedContent.length > 0 && 
+          cacheAge < CACHE_TIMEOUT) {
+        // Use cached data
+        logger.info('[useFeaturedContent] cache:use', { duration: `${Date.now() - t0}ms` });
+        setFeaturedContent(persistentStore.featuredContent);
+        setAllFeaturedContent(persistentStore.allFeaturedContent);
+        setLoading(false);
+        persistentStore.isFirstLoad = false;
+        return;
+      }
     }
 
-    console.log(`Loading featured content from ${contentSource}`);
+    logger.info('[useFeaturedContent] fetch:start', { source: contentSource });
     setLoading(true);
     cleanup();
     abortControllerRef.current = new AbortController();
@@ -88,7 +99,9 @@ export function useFeaturedContent() {
 
       if (contentSource === 'tmdb') {
         // Load from TMDB trending
+        const tTmdb = Date.now();
         const trendingResults = await tmdbService.getTrending('movie', 'day');
+        logger.info('[useFeaturedContent] tmdb:trending', { count: trendingResults?.length || 0, duration: `${Date.now() - tTmdb}ms` });
         
         if (signal.aborted) return;
 
@@ -115,6 +128,7 @@ export function useFeaturedContent() {
             });
             
           // Then fetch logos for each item
+          const tLogos = Date.now();
           formattedContent = await Promise.all(
             preFormattedContent.map(async (item) => {
               try {
@@ -135,10 +149,13 @@ export function useFeaturedContent() {
               }
             })
           );
+          logger.info('[useFeaturedContent] tmdb:logos', { count: formattedContent.length, duration: `${Date.now() - tLogos}ms` });
         }
       } else {
         // Load from installed catalogs
+        const tCats = Date.now();
         const catalogs = await catalogService.getHomeCatalogs();
+        logger.info('[useFeaturedContent] catalogs:list', { count: catalogs?.length || 0, duration: `${Date.now() - tCats}ms` });
         
         if (signal.aborted) return;
 
@@ -153,14 +170,17 @@ export function useFeaturedContent() {
                 return selectedCatalogs.includes(catalogId);
               })
             : catalogs; // Use all catalogs if none specifically selected
+          logger.debug('[useFeaturedContent] catalogs:filtered', { filteredCount: filteredCatalogs.length, selectedCount: selectedCatalogs?.length || 0 });
 
           // Flatten all catalog items into a single array, filter out items without posters
+          const tFlat = Date.now();
           const allItems = filteredCatalogs.flatMap(catalog => catalog.items)
             .filter(item => item.poster)
             .filter((item, index, self) =>
               // Remove duplicates based on ID
               index === self.findIndex(t => t.id === item.id)
             );
+          logger.info('[useFeaturedContent] catalogs:items', { total: allItems.length, duration: `${Date.now() - tFlat}ms` });
 
           // Sort by popular, newest, etc. (possibly enhanced later)
           formattedContent = allItems.sort(() => Math.random() - 0.5).slice(0, 10);
@@ -171,6 +191,7 @@ export function useFeaturedContent() {
 
       // Safety guard: if nothing came back within a reasonable time, stop loading
       if (!formattedContent || formattedContent.length === 0) {
+        logger.warn('[useFeaturedContent] results:empty');
         // Fall back to any cached featured item so UI can render something
         const cachedJson = await AsyncStorage.getItem(STORAGE_KEY).catch(() => null);
         if (cachedJson) {
@@ -180,14 +201,17 @@ export function useFeaturedContent() {
               formattedContent = Array.isArray(parsed.allFeaturedContent) && parsed.allFeaturedContent.length > 0
                 ? parsed.allFeaturedContent
                 : [parsed.featuredContent];
+              logger.info('[useFeaturedContent] fallback:storage', { count: formattedContent.length });
             }
           } catch {}
         }
       }
 
-      // Update persistent store with the new data
+      // Update persistent store with the new data (no lastFetchTime when cache disabled)
       persistentStore.allFeaturedContent = formattedContent;
-      persistentStore.lastFetchTime = now;
+      if (!DISABLE_CACHE) {
+        persistentStore.lastFetchTime = now;
+      }
       persistentStore.isFirstLoad = false;
       
       setAllFeaturedContent(formattedContent);
@@ -196,40 +220,51 @@ export function useFeaturedContent() {
         persistentStore.featuredContent = formattedContent[0];
         setFeaturedContent(formattedContent[0]); 
         currentIndexRef.current = 0;
-        // Persist cache for fast startup
-        try {
-          await AsyncStorage.setItem(
-            STORAGE_KEY,
-            JSON.stringify({
-              ts: now,
-              featuredContent: formattedContent[0],
-              allFeaturedContent: formattedContent,
-            })
-          );
-        } catch {}
+        // Persist cache for fast startup (skipped when cache disabled)
+        if (!DISABLE_CACHE) {
+          try {
+            await AsyncStorage.setItem(
+              STORAGE_KEY,
+              JSON.stringify({
+                ts: now,
+                featuredContent: formattedContent[0],
+                allFeaturedContent: formattedContent,
+              })
+            );
+            logger.debug('[useFeaturedContent] cache:written', { firstId: formattedContent[0]?.id });
+          } catch {}
+        }
       } else {
         persistentStore.featuredContent = null;
         setFeaturedContent(null);
-        // Clear persisted cache on empty
-        try { await AsyncStorage.removeItem(STORAGE_KEY); } catch {}
+        // Clear persisted cache on empty (skipped when cache disabled)
+        if (!DISABLE_CACHE) {
+          try { await AsyncStorage.removeItem(STORAGE_KEY); } catch {}
+        }
       }
     } catch (error) {
       if (signal.aborted) {
-        logger.info('Featured content fetch aborted');
+        logger.info('[useFeaturedContent] fetch:aborted');
       } else {
-        logger.error('Failed to load featured content:', error);
+        logger.error('[useFeaturedContent] fetch:error', { error: String(error) });
       }
       setFeaturedContent(null);
       setAllFeaturedContent([]);
     } finally {
       if (!signal.aborted) {
         setLoading(false);
+        logger.info('[useFeaturedContent] load:done', { duration: `${Date.now() - t0}ms` });
       }
     }
   }, [cleanup, genreMap, loadingGenres, contentSource, selectedCatalogs]);
 
   // Hydrate from persisted cache immediately for instant render
   useEffect(() => {
+    if (DISABLE_CACHE) {
+      // Skip hydration entirely
+      logger.debug('[useFeaturedContent] hydrate:skipped');
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -245,6 +280,7 @@ export function useFeaturedContent() {
           setFeaturedContent(parsed.featuredContent);
           setAllFeaturedContent(persistentStore.allFeaturedContent);
           setLoading(false);
+          logger.info('[useFeaturedContent] hydrate:storage', { allCount: persistentStore.allFeaturedContent.length });
         }
       } catch {}
     })();
@@ -268,6 +304,7 @@ export function useFeaturedContent() {
     
     // Force refresh if settings changed during app restart
     if (settingsChanged) {
+      logger.info('[useFeaturedContent] settings:changed', { source: settings.featuredContentSource, selectedCount: settings.selectedHeroCatalogs?.length || 0 });
       loadFeaturedContent(true);
     }
   }, [settings, loadFeaturedContent]);
@@ -278,9 +315,7 @@ export function useFeaturedContent() {
       // Only refresh if current content source is different from settings
       // This prevents duplicate refreshes when HomeScreen also handles this event
       if (contentSource !== settings.featuredContentSource) {
-        console.log('Content source changed, refreshing featured content');
-        console.log('Current content source:', contentSource);
-        console.log('New settings source:', settings.featuredContentSource);
+        logger.info('[useFeaturedContent] event:content-source-changed', { from: contentSource, to: settings.featuredContentSource });
         // Content source will be updated in the next render cycle due to state updates
         // No need to call loadFeaturedContent here as it will be triggered by contentSource change
       } else if (
@@ -288,7 +323,7 @@ export function useFeaturedContent() {
         JSON.stringify(selectedCatalogs) !== JSON.stringify(settings.selectedHeroCatalogs)
       ) {
         // Only refresh if using catalogs and selected catalogs changed
-        console.log('Selected catalogs changed, refreshing featured content');
+        logger.info('[useFeaturedContent] event:selected-catalogs-changed');
         loadFeaturedContent(true);
       }
     };

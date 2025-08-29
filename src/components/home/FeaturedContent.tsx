@@ -49,6 +49,10 @@ const { width, height } = Dimensions.get('window');
 // Utility to determine if device is tablet-sized
 const isTablet = width >= 768;
 
+// Simple perf timer helper
+const nowMs = () => Date.now();
+const since = (start: number) => `${(nowMs() - start).toFixed(0)}ms`;
+
 const NoFeaturedContent = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
@@ -142,6 +146,19 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
   const [logoLoadError, setLogoLoadError] = useState(false);
   // Add a ref to track logo fetch in progress
   const logoFetchInProgress = useRef<boolean>(false);
+  const firstRenderTsRef = useRef<number>(nowMs());
+  const lastContentChangeTsRef = useRef<number>(0);
+
+  // Initial diagnostics
+  useEffect(() => {
+    logger.info('[FeaturedContent] mounted', {
+      isTablet,
+      screen: { width, height },
+    });
+    return () => {
+      logger.info('[FeaturedContent] unmounted');
+    };
+  }, []);
 
   // Enhanced poster transition animations
   const posterScale = useSharedValue(1);
@@ -185,6 +202,8 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
 
   // Preload the image
   const preloadImage = async (url: string): Promise<boolean> => {
+    const t0 = nowMs();
+    logger.debug('[FeaturedContent] preloadImage:start', { url });
     // Skip if already cached to prevent redundant prefetch
     if (imageCache[url]) return true;
 
@@ -205,10 +224,12 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
         timeout,
       ]);
       imageCache[url] = true;
+      logger.debug('[FeaturedContent] preloadImage:success', { url, duration: since(t0) });
       return true;
     } catch (error) {
       // Clear any partial cache entry on error
       delete imageCache[url];
+      logger.warn('[FeaturedContent] preloadImage:error', { url, duration: since(t0), error: String(error) });
       return false;
     }
   };
@@ -224,6 +245,8 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
 
     const fetchLogo = async () => {
       logoFetchInProgress.current = true;
+      const t0 = nowMs();
+      logger.info('[FeaturedContent] fetchLogo:start', { id: featuredContent?.id, type: featuredContent?.type });
 
       try {
         const contentId = featuredContent.id;
@@ -234,8 +257,10 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
         const logoPreference = settings.logoSourcePreference || 'metahub';
         const preferredLanguage = settings.tmdbLanguagePreference || 'en';
 
-        // Reset state for new fetch
-        setLogoUrl(null);
+        // Reset state for new fetch only if switching to a different item
+        if (prevContentIdRef.current !== contentId) {
+          setLogoUrl(null);
+        }
         setLogoLoadError(false);
 
         // Extract IDs
@@ -274,6 +299,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
         let fallbackAttempted = false;
 
         // --- Logo Fetching Logic ---
+        logger.debug('[FeaturedContent] fetchLogo:ids', { imdbId, tmdbId, preference: logoPreference, lang: preferredLanguage });
 
         if (logoPreference === 'metahub') {
           // Primary: Metahub (needs imdbId)
@@ -281,9 +307,11 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
             primaryAttempted = true;
             const metahubUrl = `https://images.metahub.space/logo/medium/${imdbId}/img`;
             try {
+              const tHead = nowMs();
               const response = await fetch(metahubUrl, { method: 'HEAD' });
               if (response.ok) {
                 finalLogoUrl = metahubUrl;
+                logger.debug('[FeaturedContent] fetchLogo:metahub:ok', { url: metahubUrl, duration: since(tHead) });
               }
             } catch (error) { /* Log if needed */ }
           }
@@ -293,9 +321,11 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
             fallbackAttempted = true;
             try {
               const tmdbService = TMDBService.getInstance();
+              const tTmdb = nowMs();
               const logoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId, preferredLanguage);
               if (logoUrl) {
                 finalLogoUrl = logoUrl;
+                logger.debug('[FeaturedContent] fetchLogo:tmdb:fallback:ok', { url: logoUrl, duration: since(tTmdb) });
               }
             } catch (error) { /* Log if needed */ }
           }
@@ -306,9 +336,11 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
             primaryAttempted = true;
             try {
               const tmdbService = TMDBService.getInstance();
+              const tTmdb = nowMs();
               const logoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId, preferredLanguage);
               if (logoUrl) {
                 finalLogoUrl = logoUrl;
+                logger.debug('[FeaturedContent] fetchLogo:tmdb:ok', { url: logoUrl, duration: since(tTmdb) });
               }
             } catch (error) { /* Log if needed */ }
           }
@@ -318,9 +350,11 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
             fallbackAttempted = true;
             const metahubUrl = `https://images.metahub.space/logo/medium/${imdbId}/img`;
             try {
+              const tHead = nowMs();
               const response = await fetch(metahubUrl, { method: 'HEAD' });
               if (response.ok) {
                 finalLogoUrl = metahubUrl;
+                logger.debug('[FeaturedContent] fetchLogo:metahub:fallback:ok', { url: metahubUrl, duration: since(tHead) });
               }
             } catch (error) { /* Log if needed */ }
           }
@@ -329,18 +363,22 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
         // --- Set Final Logo ---
         if (finalLogoUrl) {
           setLogoUrl(finalLogoUrl);
+          logger.info('[FeaturedContent] fetchLogo:done', { id: contentId, result: 'ok', duration: since(t0) });
         } else if (currentLogo) {
           // Use existing logo only if primary and fallback failed or weren't applicable
           setLogoUrl(currentLogo);
+          logger.info('[FeaturedContent] fetchLogo:done', { id: contentId, result: 'existing', duration: since(t0) });
         } else {
           // No logo found from any source
           setLogoLoadError(true);
+          logger.warn('[FeaturedContent] fetchLogo:none', { id: contentId, primaryAttempted, fallbackAttempted, duration: since(t0) });
           // logger.warn(`[FeaturedContent] No logo found for ${contentData.name} (${contentId}) with preference ${logoPreference}. Primary attempted: ${primaryAttempted}, Fallback attempted: ${fallbackAttempted}`);
         }
 
       } catch (error) {
         // logger.error('[FeaturedContent] Error in fetchLogo:', error);
         setLogoLoadError(true);
+        logger.error('[FeaturedContent] fetchLogo:error', { error: String(error), duration: since(t0) });
       } finally {
         logoFetchInProgress.current = false;
       }
@@ -357,6 +395,8 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
     const posterUrl = featuredContent.banner || featuredContent.poster;
     const contentId = featuredContent.id;
     const isContentChange = contentId !== prevContentIdRef.current;
+    const t0 = nowMs();
+    logger.info('[FeaturedContent] content:update', { id: contentId, isContentChange, posterUrlExists: Boolean(posterUrl), sinceMount: since(firstRenderTsRef.current) });
 
     // Enhanced content change detection and animations
     if (isContentChange) {
@@ -405,6 +445,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
 
       // Load poster with enhanced transition
       if (posterUrl) {
+        const tPoster = nowMs();
         const posterSuccess = await preloadImage(posterUrl);
         if (posterSuccess) {
           // Animate in new poster with scale and fade
@@ -420,6 +461,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
             duration: 600,
             easing: Easing.out(Easing.cubic)
           });
+          logger.debug('[FeaturedContent] poster:ready', { id: contentId, duration: since(tPoster) });
 
           // Animate content back in with delay
           contentOpacity.value = withDelay(200, withTiming(1, {
@@ -435,16 +477,20 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
 
       // Load logo if available with enhanced timing
       if (logoUrl) {
+        const tLogo = nowMs();
         const logoSuccess = await preloadImage(logoUrl);
         if (logoSuccess) {
           logoOpacity.value = withDelay(500, withTiming(1, {
             duration: 600,
             easing: Easing.out(Easing.cubic)
           }));
+          logger.debug('[FeaturedContent] logo:ready', { id: contentId, duration: since(tLogo) });
         } else {
           setLogoLoadError(true);
+          logger.warn('[FeaturedContent] logo:failed', { id: contentId, duration: since(tLogo) });
         }
       }
+      logger.info('[FeaturedContent] images:load:done', { id: contentId, total: since(t0) });
     };
 
     loadImages();
@@ -453,6 +499,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
   const onLogoLoadError = () => {
     setLogoLoaded(true); // Treat error as "loaded" to stop spinner
     setLogoError(true);
+    logger.warn('[FeaturedContent] logo:onError', { id: featuredContent?.id, url: logoUrl });
   };
 
   const handleInfoPress = () => {
@@ -464,13 +511,15 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
     }
   };
 
-  // Show skeleton while loading to avoid empty state flash and sluggish feel
-  if (loading) {
+  // Show skeleton only if we're loading AND no content is available yet
+  if (loading && !featuredContent) {
+    logger.debug('[FeaturedContent] render:loading', { sinceMount: since(firstRenderTsRef.current) });
     return <SkeletonFeatured />;
   }
 
   if (!featuredContent) {
     // Suppress empty state while loading to avoid flash on startup/hydration
+    logger.debug('[FeaturedContent] render:no-featured-content', { sinceMount: since(firstRenderTsRef.current) });
     return <NoFeaturedContent />;
   }
 

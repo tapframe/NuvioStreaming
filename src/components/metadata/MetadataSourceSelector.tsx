@@ -31,8 +31,6 @@ interface MetadataSourceSelectorProps {
   contentType: string;
   onSourceChange: (sourceId: string, sourceType: 'addon' | 'tmdb') => void;
   disabled?: boolean;
-  enableComplementary?: boolean;
-  onComplementaryToggle?: (enabled: boolean) => void;
 }
 
 const MetadataSourceSelector: React.FC<MetadataSourceSelectorProps> = ({
@@ -41,8 +39,6 @@ const MetadataSourceSelector: React.FC<MetadataSourceSelectorProps> = ({
   contentType,
   onSourceChange,
   disabled = false,
-  enableComplementary = false,
-  onComplementaryToggle,
 }) => {
   const { currentTheme } = useTheme();
   const [isVisible, setIsVisible] = useState(false);
@@ -292,46 +288,7 @@ const MetadataSourceSelector: React.FC<MetadataSourceSelectorProps> = ({
               </TouchableOpacity>
             </View>
 
-            {/* Complementary Metadata Toggle */}
-            <View style={styles.complementaryToggle}>
-              <View style={styles.toggleContent}>
-                <MaterialIcons
-                  name="merge-type"
-                  size={20}
-                  color={currentTheme.colors.primary}
-                />
-                <View style={styles.toggleText}>
-                  <Text style={[styles.toggleTitle, { color: currentTheme.colors.text }]}>
-                    Complementary Metadata
-                  </Text>
-                  <Text style={[styles.toggleDescription, { color: currentTheme.colors.textMuted }]}>
-                    Fetch missing data from other sources
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                style={[
-                  styles.toggleSwitch,
-                  {
-                    backgroundColor: enableComplementary
-                      ? currentTheme.colors.primary
-                      : currentTheme.colors.elevation2,
-                  }
-                ]}
-                onPress={() => onComplementaryToggle?.(!enableComplementary)}
-                activeOpacity={0.7}
-              >
-                <View
-                  style={[
-                    styles.toggleThumb,
-                    {
-                      transform: [{ translateX: enableComplementary ? 20 : 2 }],
-                      backgroundColor: currentTheme.colors.white,
-                    }
-                  ]}
-                />
-              </TouchableOpacity>
-            </View>
+            
 
             {loading ? (
               <View style={styles.loadingContainer}>
@@ -560,51 +517,6 @@ const styles = StyleSheet.create({
   },
   checkContainer: {
     padding: 4,
-  },
-  complementaryToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  toggleContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  toggleText: {
-    marginLeft: 16,
-    flex: 1,
-  },
-  toggleTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  toggleDescription: {
-    fontSize: 13,
-    lineHeight: 18,
-    opacity: 0.8,
-  },
-  toggleSwitch: {
-    width: 44,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    paddingHorizontal: 2,
-  },
-  toggleThumb: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
   },
 });
 
