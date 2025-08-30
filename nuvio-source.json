@@ -20,6 +20,7 @@
       "iconURL": "https://github.com/tapframe/NuvioStreaming/blob/main/assets/android/playstore-icon.png?raw=true",
       "tintColor": "#04dcfc",
       "category": "entertainment",
+      "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/0.6.0-beta.4/Beta_0_6_0_4.ipa",
       "screenshots": [
         "https://github.com/tapframe/NuvioStreaming/blob/main/screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.08.32-portrait.png?raw=true",
         "https://github.com/tapframe/NuvioStreaming/blob/main/screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.09.43-portrait.png?raw=true",
