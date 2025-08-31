@@ -906,6 +906,57 @@ const AndroidVideoPlayer: React.FC = () => {
         return;
       }
       
+      // Check for Dolby Digital Plus audio codec errors (ExoPlayer)
+      const isDolbyCodecError = error?.error?.errorCode === '24001' ||
+                               error?.errorCode === '24001' ||
+                               (error?.error?.errorString && 
+                                error.error.errorString.includes('ERROR_CODE_DECODER_INIT_FAILED')) ||
+                               (error?.error?.errorException && 
+                                error.error.errorException.includes('audio/eac3')) ||
+                               (error?.error?.errorException && 
+                                error.error.errorException.includes('Dolby Digital Plus'));
+      
+      // Handle Dolby Digital Plus codec errors with audio track fallback
+      if (isDolbyCodecError && rnVideoAudioTracks.length > 1) {
+        logger.warn('[AndroidVideoPlayer] Dolby Digital Plus codec error detected, attempting audio track fallback');
+        
+        // Find a non-Dolby audio track (usually index 0 is stereo/standard)
+        const fallbackTrack = rnVideoAudioTracks.find((track, index) => {
+          const trackName = (track.name || '').toLowerCase();
+          const trackLang = (track.language || '').toLowerCase();
+          // Prefer stereo, AAC, or standard audio formats
+          return !trackName.includes('dolby') && 
+                 !trackName.includes('dts') && 
+                 !trackName.includes('7.1') &&
+                 !trackName.includes('5.1') &&
+                 index !== selectedAudioTrack; // Don't select the same track
+        });
+        
+        if (fallbackTrack) {
+          const fallbackIndex = rnVideoAudioTracks.indexOf(fallbackTrack);
+          logger.warn(`[AndroidVideoPlayer] Switching to fallback audio track: ${fallbackTrack.name || 'Unknown'} (index: ${fallbackIndex})`);
+          
+          // Clear any existing error state
+          if (errorTimeoutRef.current) {
+            clearTimeout(errorTimeoutRef.current);
+            errorTimeoutRef.current = null;
+          }
+          safeSetState(() => setShowErrorModal(false));
+          
+          // Switch to fallback audio track
+          setSelectedAudioTrack(fallbackIndex);
+          
+          // Brief pause to allow track switching
+          setPaused(true);
+          setTimeout(() => {
+            if (!isMounted.current) return;
+            setPaused(false);
+          }, 500);
+          
+          return; // Don't show error UI, attempt recovery
+        }
+      }
+      
       // Detect Xprime provider to enable a one-shot silent retry (warms upstream/cache)
       const providerName = ((currentStreamProvider || streamProvider || '') as string).toLowerCase();
       const isXprimeProvider = providerName.includes('xprime');
@@ -945,7 +996,9 @@ const AndroidVideoPlayer: React.FC = () => {
       // Format error details for user display
       let errorMessage = 'An unknown error occurred';
       if (error) {
-        if (isServerConfigError) {
+        if (isDolbyCodecError) {
+          errorMessage = 'Audio codec compatibility issue detected. The video contains Dolby Digital Plus audio which is not supported on this device. Please try selecting a different audio track or use an alternative video source.';
+        } else if (isServerConfigError) {
           errorMessage = 'Stream server configuration issue. This may be a temporary problem with the video source.';
         } else if (typeof error === 'string') {
           errorMessage = error;
@@ -1974,6 +2027,14 @@ const AndroidVideoPlayer: React.FC = () => {
                   ignoreSilentSwitch="ignore"
                   mixWithOthers="inherit"
                   progressUpdateInterval={250}
+                  bufferConfig={{
+                    minBufferMs: 15000,
+                    maxBufferMs: 50000,
+                    bufferForPlaybackMs: 2500,
+                    bufferForPlaybackAfterRebufferMs: 5000,
+                  }}
+                  maxBitRate={2000000}
+                  disableFocus={true}
                 />
               </TouchableOpacity>
             </View>
