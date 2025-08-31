@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Platform,
   InteractionManager,
+  StatusBar,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -702,6 +703,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   const [isTrailerPlaying, setIsTrailerPlaying] = useState(false);
   const [trailerReady, setTrailerReady] = useState(false);
   const [trailerPreloaded, setTrailerPreloaded] = useState(false);
+  const [isTrailerFullscreen, setIsTrailerFullscreen] = useState(false);
   const imageOpacity = useSharedValue(1);
   const imageLoadOpacity = useSharedValue(0);
   const shimmerOpacity = useSharedValue(0.3);
@@ -745,6 +747,13 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     trailerOpacity.value = withTiming(0, { duration: 300 });
     thumbnailOpacity.value = withTiming(1, { duration: 300 });
   }, [trailerOpacity, thumbnailOpacity]);
+
+  // Handle trailer fullscreen toggle
+  const handleTrailerFullscreenToggle = useCallback(() => {
+    setIsTrailerFullscreen(true);
+    // Hide status bar when entering fullscreen
+    StatusBar.setHidden(true, 'slide');
+  }, []);
   
   // Memoized image source
   const imageSource = useMemo(() => 
@@ -951,6 +960,9 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       imageLoadOpacity.value = 0;
       shimmerOpacity.value = 0.3;
       interactionComplete.current = false;
+      
+      // Restore status bar when component unmounts
+      StatusBar.setHidden(false, 'slide');
     };
   }, []);
 
@@ -967,6 +979,38 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       return () => clearTimeout(timer);
     }
   });
+
+  // Don't render hero content when trailer is in fullscreen
+  if (isTrailerFullscreen) {
+    return (
+      <View style={styles.fullscreenTrailerContainer}>
+        {/* Back button for fullscreen mode */}
+        <TouchableOpacity
+          style={styles.fullscreenBackButton}
+          onPress={() => {
+            setIsTrailerFullscreen(false);
+            // Restore status bar when exiting fullscreen
+            StatusBar.setHidden(false, 'slide');
+          }}
+          activeOpacity={0.7}
+        >
+          <MaterialIcons name="arrow-back" size={28} color="white" />
+        </TouchableOpacity>
+        
+        {trailerUrl && (
+          <TrailerPlayer
+            trailerUrl={trailerUrl}
+            autoPlay={true}
+            muted={trailerMuted}
+            style={styles.fullscreenTrailerPlayer}
+            hideLoadingSpinner={false}
+            onLoad={handleTrailerReady}
+            onError={handleTrailerError}
+          />
+        )}
+      </View>
+    );
+  }
 
   return (
     <Animated.View style={[styles.heroSection, heroAnimatedStyle]}>
@@ -1048,21 +1092,32 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
           zIndex: 10,
           opacity: trailerOpacity
         }}>
-          <TouchableOpacity
-            onPress={() => setTrailerMuted(!trailerMuted)}
-            activeOpacity={0.7}
-            style={{
-              padding: 8,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              borderRadius: 20,
-            }}
-          >
-            <MaterialIcons
-              name={trailerMuted ? 'volume-off' : 'volume-up'}
-              size={24}
-              color="white"
-            />
-          </TouchableOpacity>
+          <View style={styles.trailerControlsContainer}>
+            <TouchableOpacity
+              onPress={() => setTrailerMuted(!trailerMuted)}
+              activeOpacity={0.7}
+              style={styles.trailerControlButton}
+            >
+              <MaterialIcons
+                name={trailerMuted ? 'volume-off' : 'volume-up'}
+                size={24}
+                color="white"
+              />
+            </TouchableOpacity>
+            
+            {/* Fullscreen button */}
+            <TouchableOpacity
+              onPress={handleTrailerFullscreenToggle}
+              activeOpacity={0.7}
+              style={styles.trailerControlButton}
+            >
+              <MaterialIcons
+                name="fullscreen"
+                size={24}
+                color="white"
+              />
+            </TouchableOpacity>
+          </View>
         </Animated.View>
       )}
 
@@ -1173,6 +1228,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
     overflow: 'hidden',
   },
+  fullscreenTrailerContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 9999,
+    backgroundColor: '#000',
+  },
+  fullscreenTrailerPlayer: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
   absoluteFill: {
     position: 'absolute',
     top: 0,
@@ -1193,6 +1262,15 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 3,
+  },
+  fullscreenBackButton: {
+    position: 'absolute',
+    top: Platform.OS === 'android' ? 40 : 50,
+    left: isTablet ? 32 : 16,
+    zIndex: 10,
+    padding: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 20,
   },
 
   heroGradient: {
@@ -1707,6 +1785,15 @@ const styles = StyleSheet.create({
      textAlign: 'center',
      opacity: 0.8,
      marginBottom: 1,
+   },
+   trailerControlsContainer: {
+     flexDirection: 'row',
+     gap: 10,
+   },
+   trailerControlButton: {
+     padding: 8,
+     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+     borderRadius: 20,
    },
 });
 
