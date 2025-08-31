@@ -31,6 +31,7 @@ interface TrailerPlayerProps {
   onLoad?: () => void;
   onError?: (error: string) => void;
   onProgress?: (data: OnProgressData) => void;
+  onPlaybackStatusUpdate?: (status: { isLoaded: boolean; didJustFinish: boolean }) => void;
   style?: any;
 }
 
@@ -42,6 +43,7 @@ const TrailerPlayer: React.FC<TrailerPlayerProps> = memo(({
   onLoad,
   onError,
   onProgress,
+  onPlaybackStatusUpdate,
   style,
 }) => {
   const { currentTheme } = useTheme();
@@ -143,7 +145,19 @@ const TrailerPlayer: React.FC<TrailerPlayerProps> = memo(({
   const handleProgress = useCallback((data: OnProgressData) => {
     setPosition(data.currentTime * 1000); // Convert to milliseconds
     onProgress?.(data);
-  }, [onProgress]);
+    
+    if (onPlaybackStatusUpdate) {
+      onPlaybackStatusUpdate({
+        isLoaded: data.currentTime > 0,
+        didJustFinish: false
+      });
+    }
+  }, [onProgress, onPlaybackStatusUpdate]);
+
+  // Sync internal muted state with prop
+  useEffect(() => {
+    setIsMuted(muted);
+  }, [muted]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -189,6 +203,9 @@ const TrailerPlayer: React.FC<TrailerPlayerProps> = memo(({
         paused={!isPlaying}
         repeat={true}
         muted={isMuted}
+        volume={isMuted ? 0 : 1}
+        mixWithOthers="duck"
+        ignoreSilentSwitch="ignore"
         onLoadStart={handleLoadStart}
         onLoad={handleLoad}
         onError={(error: any) => handleError(error?.error?.message || 'Unknown error')}

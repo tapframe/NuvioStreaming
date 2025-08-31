@@ -699,7 +699,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   const [trailerLoading, setTrailerLoading] = useState(false);
   const [trailerError, setTrailerError] = useState(false);
   const [trailerMuted, setTrailerMuted] = useState(true);
-  const [trailerPlaying, setTrailerPlaying] = useState(false);
+  const [isTrailerPlaying, setIsTrailerPlaying] = useState(false);
   const imageOpacity = useSharedValue(1);
   const imageLoadOpacity = useSharedValue(0);
   const shimmerOpacity = useSharedValue(0.3);
@@ -961,10 +961,8 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
             logger.warn('HeroSection', 'Trailer playback failed, falling back to image');
             setTrailerError(true);
           }}
-          onProgress={() => {
-            if (!trailerPlaying) {
-              setTrailerPlaying(true);
-            }
+          onPlaybackStatusUpdate={(status) => {
+            setIsTrailerPlaying(status.isLoaded && !status.didJustFinish);
           }}
         />
       ) : shouldLoadSecondaryData && imageSource && !loadingBanner ? (
@@ -976,6 +974,21 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
           onLoad={handleImageLoad}
         />
       ) : null}
+
+      {/* Unmute button for trailer */}
+      {isTrailerPlaying && trailerUrl && (
+        <TouchableOpacity
+          style={styles.unmuteButton}
+          onPress={() => setTrailerMuted(!trailerMuted)}
+          activeOpacity={0.7}
+        >
+          <MaterialIcons
+            name={trailerMuted ? 'volume-off' : 'volume-up'}
+            size={24}
+            color="white"
+          />
+        </TouchableOpacity>
+      )}
 
       <Animated.View style={styles.backButtonContainer}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
@@ -1017,7 +1030,9 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
           style={styles.bottomFadeGradient}
           pointerEvents="none"
         />
-        <View style={[styles.heroContent, isTablet && { maxWidth: 800, alignSelf: 'center' }]}>
+        <View style={[styles.heroContent, isTablet && { maxWidth: 800, alignSelf: 'center' }, {
+          opacity: isTrailerPlaying && !trailerMuted ? 0.3 : 1
+        }]}>
           {/* Optimized Title/Logo */}
           <View style={styles.logoContainer}>
             <Animated.View style={[styles.titleLogoContainer, logoAnimatedStyle]}>
@@ -1103,6 +1118,15 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 3,
   },
+  unmuteButton: {
+     position: 'absolute',
+     top: Platform.OS === 'android' ? 40 : 50,
+     right: width >= 768 ? 32 : 16,
+     zIndex: 10,
+     padding: 8,
+     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+     borderRadius: 20,
+   },
   heroGradient: {
     flex: 1,
     justifyContent: 'flex-end',
