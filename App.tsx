@@ -8,7 +8,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   View,
-  StyleSheet
+  StyleSheet,
+  I18nManager
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -43,6 +44,11 @@ Sentry.init({
   // uncomment the line below to enable Spotlight (https://spotlightjs.com)
   // spotlight: __DEV__,
 });
+
+// Force LTR layout to prevent RTL issues when Arabic is set as system language
+// This ensures posters and UI elements remain visible and properly positioned
+I18nManager.allowRTL(false);
+I18nManager.forceRTL(false);
 
 // This fixes many navigation layout issues by using native screen containers
 enableScreens(true);

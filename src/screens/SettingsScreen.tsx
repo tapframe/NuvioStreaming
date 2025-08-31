@@ -531,6 +531,20 @@ const SettingsScreen: React.FC = () => {
               isTablet={isTablet}
             />
             <SettingItem
+              title="Show Trailers"
+              description="Display trailers in hero section"
+              icon="movie"
+              renderControl={() => (
+                <Switch
+                  value={settings?.showTrailers ?? true}
+                  onValueChange={(value) => updateSetting('showTrailers', value)}
+                  trackColor={{ false: 'rgba(255,255,255,0.2)', true: currentTheme.colors.primary }}
+                  thumbColor={settings?.showTrailers ? '#fff' : '#f4f3f4'}
+                />
+              )}
+              isTablet={isTablet}
+            />
+            <SettingItem
               title="Notifications"
               description="Episode reminders"
               icon="notifications-none"

@@ -64,6 +64,8 @@ export interface AppSettings {
   posterSize: 'small' | 'medium' | 'large'; // Predefined sizes
   posterBorderRadius: number; // 0-20 range for border radius
   postersPerRow: number; // 3-6 range for number of posters per row
+  // Trailer settings
+  showTrailers: boolean; // Enable/disable trailer playback in hero section
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -98,10 +100,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
   themeId: 'default',
   customThemes: [],
   useDominantBackgroundColor: true,
-  // Home screen poster defaults
+  // Home screen poster customization
   posterSize: 'medium',
   posterBorderRadius: 12,
   postersPerRow: 4,
+  // Trailer settings
+  showTrailers: true, // Enable trailers by default
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';

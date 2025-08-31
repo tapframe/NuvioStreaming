@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Platform,
   InteractionManager,
-  StatusBar,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -28,6 +27,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useTraktContext } from '../../contexts/TraktContext';
+import { useSettings } from '../../hooks/useSettings';
 import { logger } from '../../utils/logger';
 import { TMDBService } from '../../services/tmdbService';
 import TrailerService from '../../services/trailerService';
@@ -311,7 +311,8 @@ const WatchProgressDisplay = memo(({
   type, 
   getEpisodeDetails, 
   animatedStyle,
-  isWatched
+  isWatched,
+  isTrailerPlaying
 }: {
   watchProgress: { 
     currentTime: number; 
@@ -325,6 +326,7 @@ const WatchProgressDisplay = memo(({
   getEpisodeDetails: (episodeId: string) => { seasonNumber: string; episodeNumber: string; episodeName: string } | null;
   animatedStyle: any;
   isWatched: boolean;
+  isTrailerPlaying: boolean;
 }) => {
   const { currentTheme } = useTheme();
   const { isAuthenticated: isTraktAuthenticated, forceSyncTraktProgress } = useTraktContext();
@@ -398,8 +400,8 @@ const WatchProgressDisplay = memo(({
       }
       
       const watchedDate = watchProgress?.lastUpdated 
-        ? new Date(watchProgress.lastUpdated).toLocaleDateString()
-        : new Date().toLocaleDateString();
+        ? new Date(watchProgress.lastUpdated).toLocaleDateString('en-US')
+        : new Date().toLocaleDateString('en-US');
       
       // Determine if watched via Trakt or local
       const watchedViaTrakt = isTraktAuthenticated && 
@@ -429,7 +431,7 @@ const WatchProgressDisplay = memo(({
     } else {
       progressPercent = (watchProgress.currentTime / watchProgress.duration) * 100;
     }
-    const formattedTime = new Date(watchProgress.lastUpdated).toLocaleDateString();
+    const formattedTime = new Date(watchProgress.lastUpdated).toLocaleDateString('en-US');
     let episodeInfo = '';
 
     if (type === 'series' && watchProgress.episodeId) {
@@ -534,6 +536,9 @@ const WatchProgressDisplay = memo(({
   }));
 
   if (!progressData) return null;
+  
+  // Hide watch progress when trailer is playing
+  if (isTrailerPlaying) return null;
 
   const isCompleted = progressData.isWatched || progressData.progressPercent >= 85;
 
@@ -688,6 +693,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
 }) => {
   const { currentTheme } = useTheme();
   const { isAuthenticated: isTraktAuthenticated } = useTraktContext();
+  const { settings } = useSettings();
 
   // Performance optimization: Refs for avoiding re-renders
   const interactionComplete = useRef(false);
@@ -703,12 +709,16 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   const [isTrailerPlaying, setIsTrailerPlaying] = useState(false);
   const [trailerReady, setTrailerReady] = useState(false);
   const [trailerPreloaded, setTrailerPreloaded] = useState(false);
-  const [isTrailerFullscreen, setIsTrailerFullscreen] = useState(false);
   const imageOpacity = useSharedValue(1);
   const imageLoadOpacity = useSharedValue(0);
   const shimmerOpacity = useSharedValue(0.3);
   const trailerOpacity = useSharedValue(0);
   const thumbnailOpacity = useSharedValue(1);
+  
+  // Animation values for trailer unmute effects
+  const actionButtonsOpacity = useSharedValue(1);
+  const titleCardTranslateY = useSharedValue(0);
+  const genreOpacity = useSharedValue(1);
   
   // Performance optimization: Cache theme colors
   const themeColors = useMemo(() => ({
@@ -747,13 +757,6 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     trailerOpacity.value = withTiming(0, { duration: 300 });
     thumbnailOpacity.value = withTiming(1, { duration: 300 });
   }, [trailerOpacity, thumbnailOpacity]);
-
-  // Handle trailer fullscreen toggle
-  const handleTrailerFullscreenToggle = useCallback(() => {
-    setIsTrailerFullscreen(true);
-    // Hide status bar when entering fullscreen
-    StatusBar.setHidden(true, 'slide');
-  }, []);
   
   // Memoized image source
   const imageSource = useMemo(() => 
@@ -772,10 +775,10 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     return () => timer.cancel();
   }, []);
 
-  // Fetch trailer URL when component mounts
+  // Fetch trailer URL when component mounts (only if trailers are enabled)
   useEffect(() => {
     const fetchTrailer = async () => {
-      if (!metadata?.name || !metadata?.year) return;
+      if (!metadata?.name || !metadata?.year || !settings?.showTrailers) return;
       
       setTrailerLoading(true);
       setTrailerError(false);
@@ -800,7 +803,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     };
 
     fetchTrailer();
-  }, [metadata?.name, metadata?.year]);
+  }, [metadata?.name, metadata?.year, settings?.showTrailers]);
 
   // Optimized shimmer animation for loading state
   useEffect(() => {
@@ -898,7 +901,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
 
   // Simplified buttons animation
   const buttonsAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: buttonsOpacity.value,
+    opacity: buttonsOpacity.value * actionButtonsOpacity.value,
     transform: [{ 
       translateY: interpolate(
         buttonsTranslateY.value,
@@ -907,6 +910,16 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
         Extrapolate.CLAMP
       )
     }]
+  }), []);
+
+  // Title card animation for lowering position when trailer is unmuted
+  const titleCardAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: titleCardTranslateY.value }]
+  }), []);
+
+  // Genre animation for hiding when trailer is unmuted
+  const genreAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: genreOpacity.value
   }), []);
 
   // Optimized genre rendering with lazy loading and memory management
@@ -960,9 +973,6 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       imageLoadOpacity.value = 0;
       shimmerOpacity.value = 0.3;
       interactionComplete.current = false;
-      
-      // Restore status bar when component unmounts
-      StatusBar.setHidden(false, 'slide');
     };
   }, []);
 
@@ -979,38 +989,6 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       return () => clearTimeout(timer);
     }
   });
-
-  // Don't render hero content when trailer is in fullscreen
-  if (isTrailerFullscreen) {
-    return (
-      <View style={styles.fullscreenTrailerContainer}>
-        {/* Back button for fullscreen mode */}
-        <TouchableOpacity
-          style={styles.fullscreenBackButton}
-          onPress={() => {
-            setIsTrailerFullscreen(false);
-            // Restore status bar when exiting fullscreen
-            StatusBar.setHidden(false, 'slide');
-          }}
-          activeOpacity={0.7}
-        >
-          <MaterialIcons name="arrow-back" size={28} color="white" />
-        </TouchableOpacity>
-        
-        {trailerUrl && (
-          <TrailerPlayer
-            trailerUrl={trailerUrl}
-            autoPlay={true}
-            muted={trailerMuted}
-            style={styles.fullscreenTrailerPlayer}
-            hideLoadingSpinner={false}
-            onLoad={handleTrailerReady}
-            onError={handleTrailerError}
-          />
-        )}
-      </View>
-    );
-  }
 
   return (
     <Animated.View style={[styles.heroSection, heroAnimatedStyle]}>
@@ -1047,7 +1025,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       )}
       
       {/* Hidden preload trailer player - loads in background */}
-      {shouldLoadSecondaryData && trailerUrl && !trailerLoading && !trailerError && !trailerPreloaded && (
+      {shouldLoadSecondaryData && settings?.showTrailers && trailerUrl && !trailerLoading && !trailerError && !trailerPreloaded && (
         <View style={[styles.absoluteFill, { opacity: 0, pointerEvents: 'none' }]}>
           <TrailerPlayer
             trailerUrl={trailerUrl}
@@ -1062,7 +1040,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       )}
       
       {/* Visible trailer player - rendered on top with fade transition */}
-      {shouldLoadSecondaryData && trailerUrl && !trailerLoading && !trailerError && trailerPreloaded && (
+      {shouldLoadSecondaryData && settings?.showTrailers && trailerUrl && !trailerLoading && !trailerError && trailerPreloaded && (
         <Animated.View style={[styles.absoluteFill, {
           opacity: trailerOpacity
         }]}>
@@ -1084,7 +1062,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       )}
 
       {/* Unmute button for trailer */}
-      {trailerReady && trailerUrl && (
+      {settings?.showTrailers && trailerReady && trailerUrl && (
         <Animated.View style={{
           position: 'absolute',
           top: Platform.OS === 'android' ? 40 : 50,
@@ -1092,32 +1070,34 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
           zIndex: 10,
           opacity: trailerOpacity
         }}>
-          <View style={styles.trailerControlsContainer}>
-            <TouchableOpacity
-              onPress={() => setTrailerMuted(!trailerMuted)}
-              activeOpacity={0.7}
-              style={styles.trailerControlButton}
-            >
-              <MaterialIcons
-                name={trailerMuted ? 'volume-off' : 'volume-up'}
-                size={24}
-                color="white"
-              />
-            </TouchableOpacity>
-            
-            {/* Fullscreen button */}
-            <TouchableOpacity
-              onPress={handleTrailerFullscreenToggle}
-              activeOpacity={0.7}
-              style={styles.trailerControlButton}
-            >
-              <MaterialIcons
-                name="fullscreen"
-                size={24}
-                color="white"
-              />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            onPress={() => {
+              setTrailerMuted(!trailerMuted);
+              if (trailerMuted) {
+                // When unmuting, hide action buttons, genre, and lower title card more
+                actionButtonsOpacity.value = withTiming(0, { duration: 300 });
+                genreOpacity.value = withTiming(0, { duration: 300 });
+                titleCardTranslateY.value = withTiming(60, { duration: 300 });
+              } else {
+                // When muting, show action buttons, genre, and restore title card position
+                actionButtonsOpacity.value = withTiming(1, { duration: 300 });
+                genreOpacity.value = withTiming(1, { duration: 300 });
+                titleCardTranslateY.value = withTiming(0, { duration: 300 });
+              }
+            }}
+            activeOpacity={0.7}
+            style={{
+              padding: 8,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              borderRadius: 20,
+            }}
+          >
+            <MaterialIcons
+              name={trailerMuted ? 'volume-off' : 'volume-up'}
+              size={24}
+              color="white"
+            />
+          </TouchableOpacity>
         </Animated.View>
       )}
 
@@ -1161,11 +1141,9 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
           style={styles.bottomFadeGradient}
           pointerEvents="none"
         />
-        <View style={[styles.heroContent, isTablet && { maxWidth: 800, alignSelf: 'center' }, {
-          opacity: trailerReady && !trailerMuted ? 0.3 : 1
-        }]}>
+        <View style={[styles.heroContent, isTablet && { maxWidth: 800, alignSelf: 'center' }]}>
           {/* Optimized Title/Logo */}
-          <View style={styles.logoContainer}>
+          <Animated.View style={[styles.logoContainer, titleCardAnimatedStyle]}>
             <Animated.View style={[styles.titleLogoContainer, logoAnimatedStyle]}>
               {shouldLoadSecondaryData && metadata.logo && !logoLoadError ? (
                 <Image
@@ -1183,7 +1161,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
                 </Text>
               )}
             </Animated.View>
-          </View>
+          </Animated.View>
 
           {/* Enhanced Watch Progress with Trakt integration */}
           <WatchProgressDisplay 
@@ -1192,13 +1170,14 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
             getEpisodeDetails={getEpisodeDetails}
             animatedStyle={watchProgressAnimatedStyle}
             isWatched={isWatched}
+            isTrailerPlaying={isTrailerPlaying}
           />
 
           {/* Optimized genre display with lazy loading */}
           {shouldLoadSecondaryData && genreElements && (
-            <View style={isTablet ? styles.tabletGenreContainer : styles.genreContainer}>
+            <Animated.View style={[isTablet ? styles.tabletGenreContainer : styles.genreContainer, genreAnimatedStyle]}>
               {genreElements}
-            </View>
+            </Animated.View>
           )}
 
           {/* Optimized Action Buttons */}
@@ -1228,20 +1207,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
     overflow: 'hidden',
   },
-  fullscreenTrailerContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 9999,
-    backgroundColor: '#000',
-  },
-  fullscreenTrailerPlayer: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-  },
   absoluteFill: {
     position: 'absolute',
     top: 0,
@@ -1262,15 +1227,6 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 3,
-  },
-  fullscreenBackButton: {
-    position: 'absolute',
-    top: Platform.OS === 'android' ? 40 : 50,
-    left: isTablet ? 32 : 16,
-    zIndex: 10,
-    padding: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 20,
   },
 
   heroGradient: {
@@ -1785,15 +1741,6 @@ const styles = StyleSheet.create({
      textAlign: 'center',
      opacity: 0.8,
      marginBottom: 1,
-   },
-   trailerControlsContainer: {
-     flexDirection: 'row',
-     gap: 10,
-   },
-   trailerControlButton: {
-     padding: 8,
-     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-     borderRadius: 20,
    },
 });
 

@@ -10,7 +10,7 @@ import { Episode } from '../../types/metadata';
 import { tmdbService } from '../../services/tmdbService';
 import { storageService } from '../../services/storageService';
 import { useFocusEffect } from '@react-navigation/native';
-import Animated, { FadeIn, FadeOut, SlideInRight, SlideOutLeft, withTiming, withSpring, useSharedValue, useAnimatedStyle, Easing } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, SlideInRight, SlideOutLeft } from 'react-native-reanimated';
 import { TraktService } from '../../services/traktService';
 import { logger } from '../../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -53,30 +53,9 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   // Add state for season view mode (persists for current show across navigation)
   const [seasonViewMode, setSeasonViewMode] = useState<'posters' | 'text'>('posters');
   
-  // Animated values for view mode transitions
-  const posterViewOpacity = useSharedValue(1);
-  const textViewOpacity = useSharedValue(0);
-  const posterViewTranslateX = useSharedValue(0);
-  const textViewTranslateX = useSharedValue(50);
-  const posterViewScale = useSharedValue(1);
-  const textViewScale = useSharedValue(0.95);
-  
-  // Animated styles for view transitions
-  const posterViewAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: posterViewOpacity.value,
-    transform: [
-      { translateX: posterViewTranslateX.value },
-      { scale: posterViewScale.value }
-    ],
-  }));
-  
-  const textViewAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: textViewOpacity.value,
-    transform: [
-      { translateX: textViewTranslateX.value },
-      { scale: textViewScale.value }
-    ],
-  }));
+  // View mode state (no animations)
+  const [posterViewVisible, setPosterViewVisible] = useState(true);
+  const [textViewVisible, setTextViewVisible] = useState(false);
   
   // Add refs for the scroll views
   const seasonScrollViewRef = useRef<ScrollView | null>(null);
@@ -102,100 +81,25 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
     loadViewModePreference();
   }, [metadata?.id]);
 
-  // Initialize animated values based on current view mode
+  // Initialize view mode visibility based on current view mode
   useEffect(() => {
     if (seasonViewMode === 'text') {
-      // Initialize text view as visible
-      posterViewOpacity.value = 0;
-      posterViewTranslateX.value = -60;
-      posterViewScale.value = 0.95;
-      textViewOpacity.value = 1;
-      textViewTranslateX.value = 0;
-      textViewScale.value = 1;
+      setPosterViewVisible(false);
+      setTextViewVisible(true);
     } else {
-      // Initialize poster view as visible
-      posterViewOpacity.value = 1;
-      posterViewTranslateX.value = 0;
-      posterViewScale.value = 1;
-      textViewOpacity.value = 0;
-      textViewTranslateX.value = 50;
-      textViewScale.value = 0.95;
+      setPosterViewVisible(true);
+      setTextViewVisible(false);
     }
   }, [seasonViewMode]);
 
-  // Save view mode preference when it changes
+
+
+  // Update view mode without animations
   const updateViewMode = (newMode: 'posters' | 'text') => {
     setSeasonViewMode(newMode);
     if (metadata?.id) {
       AsyncStorage.setItem(`season_view_mode_${metadata.id}`, newMode).catch(error => {
         console.log('[SeriesContent] Error saving view mode preference:', error);
-      });
-    }
-  };
-
-  // Animate view mode transition
-  const animateViewModeTransition = (newMode: 'posters' | 'text') => {
-    if (newMode === 'text') {
-      // Animate to text view with spring animations for smoother feel
-      posterViewOpacity.value = withTiming(0, { 
-        duration: 250, 
-        easing: Easing.bezier(0.25, 0.1, 0.25, 1.0) 
-      });
-      posterViewTranslateX.value = withSpring(-60, { 
-        damping: 20, 
-        stiffness: 200,
-        mass: 0.8
-      });
-      posterViewScale.value = withSpring(0.95, { 
-        damping: 20, 
-        stiffness: 200,
-        mass: 0.8
-      });
-      
-      textViewOpacity.value = withTiming(1, { 
-        duration: 300, 
-        easing: Easing.bezier(0.25, 0.1, 0.25, 1.0) 
-      });
-      textViewTranslateX.value = withSpring(0, { 
-        damping: 20, 
-        stiffness: 200,
-        mass: 0.8
-      });
-      textViewScale.value = withSpring(1, { 
-        damping: 20, 
-        stiffness: 200,
-        mass: 0.8
-      });
-    } else {
-      // Animate to poster view with spring animations
-      textViewOpacity.value = withTiming(0, { 
-        duration: 250, 
-        easing: Easing.bezier(0.25, 0.1, 0.25, 1.0) 
-      });
-      textViewTranslateX.value = withSpring(60, { 
-        damping: 20, 
-        stiffness: 200,
-        mass: 0.8
-      });
-      textViewScale.value = withSpring(0.95, { 
-        damping: 20, 
-        stiffness: 200,
-        mass: 0.8
-      });
-      
-      posterViewOpacity.value = withTiming(1, { 
-        duration: 300, 
-        easing: Easing.bezier(0.25, 0.1, 0.25, 1.0) 
-      });
-      posterViewTranslateX.value = withSpring(0, { 
-        damping: 20, 
-        stiffness: 200,
-        mass: 0.8
-      });
-      posterViewScale.value = withSpring(1, { 
-        damping: 20, 
-        stiffness: 200,
-        mass: 0.8
       });
     }
   };
@@ -452,7 +356,6 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
             ]}
             onPress={() => {
               const newMode = seasonViewMode === 'posters' ? 'text' : 'posters';
-              animateViewModeTransition(newMode);
               updateViewMode(newMode);
               console.log('[SeriesContent] View mode changed to:', newMode, 'Current ref value:', seasonViewMode);
             }}
@@ -497,11 +400,9 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               // Text-only view
               console.log('[SeriesContent] Rendering text view for season:', season, 'View mode ref:', seasonViewMode);
               return (
-                <Animated.View 
+                <View 
                   key={season}
-                  style={textViewAnimatedStyle}
-                  entering={SlideInRight.duration(400).easing(Easing.bezier(0.25, 0.1, 0.25, 1.0))}
-                  exiting={SlideOutLeft.duration(350).easing(Easing.bezier(0.25, 0.1, 0.25, 1.0))}
+                  style={{ opacity: textViewVisible ? 1 : 0 }}
                 >
                   <TouchableOpacity
                     style={[
@@ -524,18 +425,16 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                       Season {season}
                     </Text>
                   </TouchableOpacity>
-                </Animated.View>
+                </View>
               );
             }
             
             // Poster view (current implementation)
             console.log('[SeriesContent] Rendering poster view for season:', season, 'View mode ref:', seasonViewMode);
             return (
-              <Animated.View 
+              <View 
                 key={season}
-                style={posterViewAnimatedStyle}
-                entering={SlideInRight.duration(400).easing(Easing.bezier(0.25, 0.1, 0.25, 1.0))}
-                exiting={SlideOutLeft.duration(350).easing(Easing.bezier(0.25, 0.1, 0.25, 1.0))}
+                style={{ opacity: posterViewVisible ? 1 : 0 }}
               >
                 <TouchableOpacity
                   style={[
@@ -579,10 +478,10 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                   >
                     Season {season}
                   </Text>
-                </TouchableOpacity>
-              </Animated.View>
-            );
-          }}
+                                  </TouchableOpacity>
+                </View>
+              );
+            }}
           keyExtractor={season => season.toString()}
         />
       </View>
