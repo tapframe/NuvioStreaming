@@ -29,6 +29,8 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useTraktContext } from '../../contexts/TraktContext';
 import { logger } from '../../utils/logger';
 import { TMDBService } from '../../services/tmdbService';
+import TrailerService from '../../services/trailerService';
+import TrailerPlayer from '../video/TrailerPlayer';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -693,6 +695,11 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   // Image loading state with optimized management
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [trailerUrl, setTrailerUrl] = useState<string | null>(null);
+  const [trailerLoading, setTrailerLoading] = useState(false);
+  const [trailerError, setTrailerError] = useState(false);
+  const [trailerMuted, setTrailerMuted] = useState(true);
+  const [trailerPlaying, setTrailerPlaying] = useState(false);
   const imageOpacity = useSharedValue(1);
   const imageLoadOpacity = useSharedValue(0);
   const shimmerOpacity = useSharedValue(0.3);
@@ -721,6 +728,33 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     
     return () => timer.cancel();
   }, []);
+
+  // Fetch trailer URL when component mounts
+  useEffect(() => {
+    const fetchTrailer = async () => {
+      if (!metadata?.name || !metadata?.year) return;
+      
+      setTrailerLoading(true);
+      setTrailerError(false);
+      
+      try {
+        const url = await TrailerService.getTrailerUrl(metadata.name, metadata.year);
+        if (url) {
+          setTrailerUrl(TrailerService.getBestFormatUrl(url));
+          logger.info('HeroSection', `Trailer loaded for ${metadata.name}`);
+        } else {
+          logger.info('HeroSection', `No trailer found for ${metadata.name}`);
+        }
+      } catch (error) {
+        logger.error('HeroSection', 'Error fetching trailer:', error);
+        setTrailerError(true);
+      } finally {
+        setTrailerLoading(false);
+      }
+    };
+
+    fetchTrailer();
+  }, [metadata?.name, metadata?.year]);
 
   // Optimized shimmer animation for loading state
   useEffect(() => {
@@ -903,7 +937,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       <View style={[styles.absoluteFill, { backgroundColor: themeColors.black }]} />
       
       {/* Optimized shimmer loading effect */}
-      {shouldLoadSecondaryData && ((imageSource && !imageLoaded) || loadingBanner) && (
+      {shouldLoadSecondaryData && (trailerLoading || ((imageSource && !imageLoaded) || loadingBanner)) && (
         <Animated.View style={[styles.absoluteFill, {
           opacity: shimmerOpacity,
         }]}>
@@ -916,8 +950,24 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
         </Animated.View>
       )}
       
-      {/* Optimized background image with lazy loading */}
-      {shouldLoadSecondaryData && imageSource && !loadingBanner && (
+      {/* Trailer player or background image */}
+      {shouldLoadSecondaryData && trailerUrl && !trailerLoading && !trailerError ? (
+        <TrailerPlayer
+          trailerUrl={trailerUrl}
+          autoPlay={true}
+          muted={trailerMuted}
+          style={styles.absoluteFill}
+          onError={() => {
+            logger.warn('HeroSection', 'Trailer playback failed, falling back to image');
+            setTrailerError(true);
+          }}
+          onProgress={() => {
+            if (!trailerPlaying) {
+              setTrailerPlaying(true);
+            }
+          }}
+        />
+      ) : shouldLoadSecondaryData && imageSource && !loadingBanner ? (
         <Animated.Image 
           source={{ uri: imageSource }}
           style={[styles.absoluteFill, backdropImageStyle]}
@@ -925,7 +975,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
           onError={handleImageError}
           onLoad={handleImageLoad}
         />
-      )}
+      ) : null}
 
       <Animated.View style={styles.backButtonContainer}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
