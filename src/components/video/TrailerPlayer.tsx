@@ -33,6 +33,7 @@ interface TrailerPlayerProps {
   onProgress?: (data: OnProgressData) => void;
   onPlaybackStatusUpdate?: (status: { isLoaded: boolean; didJustFinish: boolean }) => void;
   style?: any;
+  hideLoadingSpinner?: boolean;
 }
 
 const TrailerPlayer: React.FC<TrailerPlayerProps> = memo(({
@@ -45,6 +46,7 @@ const TrailerPlayer: React.FC<TrailerPlayerProps> = memo(({
   onProgress,
   onPlaybackStatusUpdate,
   style,
+  hideLoadingSpinner = false,
 }) => {
   const { currentTheme } = useTheme();
   const videoRef = useRef<VideoRef>(null);
@@ -121,10 +123,11 @@ const TrailerPlayer: React.FC<TrailerPlayerProps> = memo(({
   const handleLoadStart = useCallback(() => {
     setIsLoading(true);
     setHasError(false);
-    loadingOpacity.value = 1;
+    // Only show loading spinner if not hidden
+    loadingOpacity.value = hideLoadingSpinner ? 0 : 1;
     onLoadStart?.();
     logger.info('TrailerPlayer', 'Video load started');
-  }, [loadingOpacity, onLoadStart]);
+  }, [loadingOpacity, onLoadStart, hideLoadingSpinner]);
 
   const handleLoad = useCallback((data: OnLoadData) => {
     setIsLoading(false);
@@ -218,10 +221,12 @@ const TrailerPlayer: React.FC<TrailerPlayerProps> = memo(({
         }}
       />
 
-      {/* Loading indicator */}
-      <Animated.View style={[styles.loadingContainer, loadingAnimatedStyle]}>
-        <ActivityIndicator size="large" color={currentTheme.colors.primary} />
-      </Animated.View>
+      {/* Loading indicator - hidden during smooth transitions */}
+      {!hideLoadingSpinner && (
+        <Animated.View style={[styles.loadingContainer, loadingAnimatedStyle]}>
+          <ActivityIndicator size="large" color={currentTheme.colors.primary} />
+        </Animated.View>
+      )}
 
       {/* Video controls overlay */}
       <TouchableOpacity 

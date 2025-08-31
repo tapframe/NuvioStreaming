@@ -700,9 +700,13 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   const [trailerError, setTrailerError] = useState(false);
   const [trailerMuted, setTrailerMuted] = useState(true);
   const [isTrailerPlaying, setIsTrailerPlaying] = useState(false);
+  const [trailerReady, setTrailerReady] = useState(false);
+  const [trailerPreloaded, setTrailerPreloaded] = useState(false);
   const imageOpacity = useSharedValue(1);
   const imageLoadOpacity = useSharedValue(0);
   const shimmerOpacity = useSharedValue(0.3);
+  const trailerOpacity = useSharedValue(0);
+  const thumbnailOpacity = useSharedValue(1);
   
   // Performance optimization: Cache theme colors
   const themeColors = useMemo(() => ({
@@ -711,6 +715,36 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     highEmphasis: currentTheme.colors.highEmphasis,
     text: currentTheme.colors.text
   }), [currentTheme.colors.black, currentTheme.colors.darkBackground, currentTheme.colors.highEmphasis, currentTheme.colors.text]);
+
+  // Handle trailer preload completion
+  const handleTrailerPreloaded = useCallback(() => {
+    setTrailerPreloaded(true);
+    logger.info('HeroSection', 'Trailer preloaded successfully');
+  }, []);
+
+  // Handle smooth transition when trailer is ready to play
+  const handleTrailerReady = useCallback(() => {
+    if (!trailerPreloaded) {
+      setTrailerPreloaded(true);
+    }
+    setTrailerReady(true);
+    setIsTrailerPlaying(true);
+    
+    // Smooth transition: fade out thumbnail, fade in trailer
+    thumbnailOpacity.value = withTiming(0, { duration: 500 });
+    trailerOpacity.value = withTiming(1, { duration: 500 });
+  }, [thumbnailOpacity, trailerOpacity, trailerPreloaded]);
+
+  // Handle trailer error - fade back to thumbnail
+  const handleTrailerError = useCallback(() => {
+    setTrailerError(true);
+    setTrailerReady(false);
+    setIsTrailerPlaying(false);
+    
+    // Fade back to thumbnail
+    trailerOpacity.value = withTiming(0, { duration: 300 });
+    thumbnailOpacity.value = withTiming(1, { duration: 300 });
+  }, [trailerOpacity, thumbnailOpacity]);
   
   // Memoized image source
   const imageSource = useMemo(() => 
@@ -736,12 +770,15 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       
       setTrailerLoading(true);
       setTrailerError(false);
+      setTrailerReady(false);
+      setTrailerPreloaded(false);
       
       try {
         const url = await TrailerService.getTrailerUrl(metadata.name, metadata.year);
         if (url) {
-          setTrailerUrl(TrailerService.getBestFormatUrl(url));
-          logger.info('HeroSection', `Trailer loaded for ${metadata.name}`);
+          const bestUrl = TrailerService.getBestFormatUrl(url);
+          setTrailerUrl(bestUrl);
+          logger.info('HeroSection', `Trailer URL loaded for ${metadata.name}`);
         } else {
           logger.info('HeroSection', `No trailer found for ${metadata.name}`);
         }
@@ -950,44 +987,83 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
         </Animated.View>
       )}
       
-      {/* Trailer player or background image */}
-      {shouldLoadSecondaryData && trailerUrl && !trailerLoading && !trailerError ? (
-        <TrailerPlayer
-          trailerUrl={trailerUrl}
-          autoPlay={true}
-          muted={trailerMuted}
-          style={styles.absoluteFill}
-          onError={() => {
-            logger.warn('HeroSection', 'Trailer playback failed, falling back to image');
-            setTrailerError(true);
-          }}
-          onPlaybackStatusUpdate={(status) => {
-            setIsTrailerPlaying(status.isLoaded && !status.didJustFinish);
-          }}
-        />
-      ) : shouldLoadSecondaryData && imageSource && !loadingBanner ? (
-        <Animated.Image 
-          source={{ uri: imageSource }}
-          style={[styles.absoluteFill, backdropImageStyle]}
-          resizeMode="cover"
-          onError={handleImageError}
-          onLoad={handleImageLoad}
-        />
-      ) : null}
+      {/* Background thumbnail image - always rendered when available */}
+      {shouldLoadSecondaryData && imageSource && !loadingBanner && (
+        <Animated.View style={[styles.absoluteFill, {
+          opacity: thumbnailOpacity
+        }]}>
+          <Animated.Image 
+            source={{ uri: imageSource }}
+            style={[styles.absoluteFill, backdropImageStyle]}
+            resizeMode="cover"
+            onError={handleImageError}
+            onLoad={handleImageLoad}
+          />
+        </Animated.View>
+      )}
+      
+      {/* Hidden preload trailer player - loads in background */}
+      {shouldLoadSecondaryData && trailerUrl && !trailerLoading && !trailerError && !trailerPreloaded && (
+        <View style={[styles.absoluteFill, { opacity: 0, pointerEvents: 'none' }]}>
+          <TrailerPlayer
+            trailerUrl={trailerUrl}
+            autoPlay={false}
+            muted={true}
+            style={styles.absoluteFill}
+            hideLoadingSpinner={true}
+            onLoad={handleTrailerPreloaded}
+            onError={handleTrailerError}
+          />
+        </View>
+      )}
+      
+      {/* Visible trailer player - rendered on top with fade transition */}
+      {shouldLoadSecondaryData && trailerUrl && !trailerLoading && !trailerError && trailerPreloaded && (
+        <Animated.View style={[styles.absoluteFill, {
+          opacity: trailerOpacity
+        }]}>
+          <TrailerPlayer
+              trailerUrl={trailerUrl}
+              autoPlay={true}
+              muted={trailerMuted}
+              style={styles.absoluteFill}
+              hideLoadingSpinner={true}
+              onLoad={handleTrailerReady}
+              onError={handleTrailerError}
+              onPlaybackStatusUpdate={(status) => {
+                if (status.isLoaded && !trailerReady) {
+                  handleTrailerReady();
+                }
+              }}
+            />
+        </Animated.View>
+      )}
 
       {/* Unmute button for trailer */}
-      {isTrailerPlaying && trailerUrl && (
-        <TouchableOpacity
-          style={styles.unmuteButton}
-          onPress={() => setTrailerMuted(!trailerMuted)}
-          activeOpacity={0.7}
-        >
-          <MaterialIcons
-            name={trailerMuted ? 'volume-off' : 'volume-up'}
-            size={24}
-            color="white"
-          />
-        </TouchableOpacity>
+      {trailerReady && trailerUrl && (
+        <Animated.View style={{
+          position: 'absolute',
+          top: Platform.OS === 'android' ? 40 : 50,
+          right: width >= 768 ? 32 : 16,
+          zIndex: 10,
+          opacity: trailerOpacity
+        }}>
+          <TouchableOpacity
+            onPress={() => setTrailerMuted(!trailerMuted)}
+            activeOpacity={0.7}
+            style={{
+              padding: 8,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              borderRadius: 20,
+            }}
+          >
+            <MaterialIcons
+              name={trailerMuted ? 'volume-off' : 'volume-up'}
+              size={24}
+              color="white"
+            />
+          </TouchableOpacity>
+        </Animated.View>
       )}
 
       <Animated.View style={styles.backButtonContainer}>
@@ -1031,7 +1107,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
           pointerEvents="none"
         />
         <View style={[styles.heroContent, isTablet && { maxWidth: 800, alignSelf: 'center' }, {
-          opacity: isTrailerPlaying && !trailerMuted ? 0.3 : 1
+          opacity: trailerReady && !trailerMuted ? 0.3 : 1
         }]}>
           {/* Optimized Title/Logo */}
           <View style={styles.logoContainer}>
@@ -1118,15 +1194,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 3,
   },
-  unmuteButton: {
-     position: 'absolute',
-     top: Platform.OS === 'android' ? 40 : 50,
-     right: width >= 768 ? 32 : 16,
-     zIndex: 10,
-     padding: 8,
-     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-     borderRadius: 20,
-   },
+
   heroGradient: {
     flex: 1,
     justifyContent: 'flex-end',
