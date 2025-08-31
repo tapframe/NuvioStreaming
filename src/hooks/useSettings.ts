@@ -66,6 +66,7 @@ export interface AppSettings {
   postersPerRow: number; // 3-6 range for number of posters per row
   // Trailer settings
   showTrailers: boolean; // Enable/disable trailer playback in hero section
+  trailerMuted: boolean; // Default to muted for better user experience
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -106,6 +107,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   postersPerRow: 4,
   // Trailer settings
   showTrailers: true, // Enable trailers by default
+  trailerMuted: true, // Default to muted for better user experience
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';

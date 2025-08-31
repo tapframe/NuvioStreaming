@@ -313,7 +313,8 @@ const WatchProgressDisplay = memo(({
   getEpisodeDetails, 
   animatedStyle,
   isWatched,
-  isTrailerPlaying
+  isTrailerPlaying,
+  trailerMuted
 }: {
   watchProgress: { 
     currentTime: number; 
@@ -328,6 +329,7 @@ const WatchProgressDisplay = memo(({
   animatedStyle: any;
   isWatched: boolean;
   isTrailerPlaying: boolean;
+  trailerMuted: boolean;
 }) => {
   const { currentTheme } = useTheme();
   const { isAuthenticated: isTraktAuthenticated, forceSyncTraktProgress } = useTraktContext();
@@ -538,8 +540,8 @@ const WatchProgressDisplay = memo(({
 
   if (!progressData) return null;
   
-  // Hide watch progress when trailer is playing
-  if (isTrailerPlaying) return null;
+  // Hide watch progress when trailer is playing AND unmuted
+  if (isTrailerPlaying && !trailerMuted) return null;
 
   const isCompleted = progressData.isWatched || progressData.progressPercent >= 85;
 
@@ -694,7 +696,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
 }) => {
   const { currentTheme } = useTheme();
   const { isAuthenticated: isTraktAuthenticated } = useTraktContext();
-  const { settings } = useSettings();
+  const { settings, updateSetting } = useSettings();
 
   // Performance optimization: Refs for avoiding re-renders
   const interactionComplete = useRef(false);
@@ -706,7 +708,8 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   const [trailerUrl, setTrailerUrl] = useState<string | null>(null);
   const [trailerLoading, setTrailerLoading] = useState(false);
   const [trailerError, setTrailerError] = useState(false);
-  const [trailerMuted, setTrailerMuted] = useState(true);
+  // Use persistent setting instead of local state
+  const trailerMuted = settings.trailerMuted;
   const [isTrailerPlaying, setIsTrailerPlaying] = useState(false);
   const [trailerReady, setTrailerReady] = useState(false);
   const [trailerPreloaded, setTrailerPreloaded] = useState(false);
@@ -1112,17 +1115,19 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
           {/* Unmute button */}
           <TouchableOpacity
             onPress={() => {
-              setTrailerMuted(!trailerMuted);
+              updateSetting('trailerMuted', !trailerMuted);
               if (trailerMuted) {
-                // When unmuting, hide action buttons, genre, and lower title card more
+                // When unmuting, hide action buttons, genre, title card, and watch progress
                 actionButtonsOpacity.value = withTiming(0, { duration: 300 });
                 genreOpacity.value = withTiming(0, { duration: 300 });
                 titleCardTranslateY.value = withTiming(60, { duration: 300 });
+                watchProgressOpacity.value = withTiming(0, { duration: 300 });
               } else {
-                // When muting, show action buttons, genre, and restore title card position
+                // When muting, show action buttons, genre, title card, and watch progress
                 actionButtonsOpacity.value = withTiming(1, { duration: 300 });
                 genreOpacity.value = withTiming(1, { duration: 300 });
                 titleCardTranslateY.value = withTiming(0, { duration: 300 });
+                watchProgressOpacity.value = withTiming(1, { duration: 300 });
               }
             }}
             activeOpacity={0.7}
@@ -1211,6 +1216,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
             animatedStyle={watchProgressAnimatedStyle}
             isWatched={isWatched}
             isTrailerPlaying={isTrailerPlaying}
+            trailerMuted={trailerMuted}
           />
 
           {/* Optimized genre display with lazy loading */}
