@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import Animated, {
   FadeIn,
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
+import { isMDBListEnabled } from '../../screens/MDBListSettingsScreen';
 // MetadataSourceSelector removed
 
 interface MetadataDetailsProps {
@@ -34,6 +35,20 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
 }) => {
   const { currentTheme } = useTheme();
   const [isFullDescriptionOpen, setIsFullDescriptionOpen] = useState(false);
+  const [isMDBEnabled, setIsMDBEnabled] = useState(false);
+
+  useEffect(() => {
+    const checkMDBListEnabled = async () => {
+      try {
+        const enabled = await isMDBListEnabled();
+        setIsMDBEnabled(enabled);
+      } catch (error) {
+        setIsMDBEnabled(false); // Default to disabled if there's an error
+      }
+    };
+    
+    checkMDBListEnabled();
+  }, []);
 
   return (
     <>
@@ -60,7 +75,7 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
         {metadata.certification && (
           <Text style={[styles.metaText, { color: currentTheme.colors.text }]}>{metadata.certification}</Text>
         )}
-        {metadata.imdbRating && (
+        {metadata.imdbRating && !isMDBEnabled && (
           <View style={styles.ratingContainer}>
             <Image
               source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/IMDB_Logo_2016.svg/575px-IMDB_Logo_2016.svg.png' }}

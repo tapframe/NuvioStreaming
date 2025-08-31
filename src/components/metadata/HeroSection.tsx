@@ -8,6 +8,7 @@ import {
   Platform,
   InteractionManager,
 } from 'react-native';
+
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
@@ -709,6 +710,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   const [isTrailerPlaying, setIsTrailerPlaying] = useState(false);
   const [trailerReady, setTrailerReady] = useState(false);
   const [trailerPreloaded, setTrailerPreloaded] = useState(false);
+  const trailerVideoRef = useRef<any>(null);
   const imageOpacity = useSharedValue(1);
   const imageLoadOpacity = useSharedValue(0);
   const shimmerOpacity = useSharedValue(0.3);
@@ -746,6 +748,18 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     thumbnailOpacity.value = withTiming(0, { duration: 500 });
     trailerOpacity.value = withTiming(1, { duration: 500 });
   }, [thumbnailOpacity, trailerOpacity, trailerPreloaded]);
+
+  // Handle fullscreen toggle
+  const handleFullscreenToggle = useCallback(async () => {
+    try {
+      if (trailerVideoRef.current) {
+        // Use the native fullscreen player
+        await trailerVideoRef.current.presentFullscreenPlayer();
+      }
+    } catch (error) {
+      logger.error('HeroSection', 'Error toggling fullscreen:', error);
+    }
+  }, []);
 
   // Handle trailer error - fade back to thumbnail
   const handleTrailerError = useCallback(() => {
@@ -973,6 +987,8 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       imageLoadOpacity.value = 0;
       shimmerOpacity.value = 0.3;
       interactionComplete.current = false;
+      
+      // Cleanup on unmount
     };
   }, []);
 
@@ -989,6 +1005,8 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       return () => clearTimeout(timer);
     }
   });
+
+
 
   return (
     <Animated.View style={[styles.heroSection, heroAnimatedStyle]}>
@@ -1045,11 +1063,13 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
           opacity: trailerOpacity
         }]}>
           <TrailerPlayer
+              ref={trailerVideoRef}
               trailerUrl={trailerUrl}
               autoPlay={true}
               muted={trailerMuted}
               style={styles.absoluteFill}
               hideLoadingSpinner={true}
+              onFullscreenToggle={handleFullscreenToggle}
               onLoad={handleTrailerReady}
               onError={handleTrailerError}
               onPlaybackStatusUpdate={(status) => {
@@ -1061,15 +1081,35 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
         </Animated.View>
       )}
 
-      {/* Unmute button for trailer */}
+      {/* Trailer control buttons (unmute and fullscreen) */}
       {settings?.showTrailers && trailerReady && trailerUrl && (
         <Animated.View style={{
           position: 'absolute',
           top: Platform.OS === 'android' ? 40 : 50,
           right: width >= 768 ? 32 : 16,
           zIndex: 10,
-          opacity: trailerOpacity
+          opacity: trailerOpacity,
+          flexDirection: 'row',
+          gap: 8,
         }}>
+          {/* Fullscreen button */}
+          <TouchableOpacity
+            onPress={handleFullscreenToggle}
+            activeOpacity={0.7}
+            style={{
+              padding: 8,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              borderRadius: 20,
+            }}
+          >
+            <MaterialIcons
+              name="fullscreen"
+              size={24}
+              color="white"
+            />
+          </TouchableOpacity>
+
+          {/* Unmute button */}
           <TouchableOpacity
             onPress={() => {
               setTrailerMuted(!trailerMuted);
@@ -1207,6 +1247,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
     overflow: 'hidden',
   },
+
   absoluteFill: {
     position: 'absolute',
     top: 0,

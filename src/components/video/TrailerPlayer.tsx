@@ -34,9 +34,10 @@ interface TrailerPlayerProps {
   onPlaybackStatusUpdate?: (status: { isLoaded: boolean; didJustFinish: boolean }) => void;
   style?: any;
   hideLoadingSpinner?: boolean;
+  onFullscreenToggle?: () => void;
 }
 
-const TrailerPlayer: React.FC<TrailerPlayerProps> = memo(({
+const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
   trailerUrl,
   autoPlay = true,
   muted = true,
@@ -47,7 +48,8 @@ const TrailerPlayer: React.FC<TrailerPlayerProps> = memo(({
   onPlaybackStatusUpdate,
   style,
   hideLoadingSpinner = false,
-}) => {
+  onFullscreenToggle,
+}, ref) => {
   const { currentTheme } = useTheme();
   const videoRef = useRef<VideoRef>(null);
   
@@ -171,6 +173,15 @@ const TrailerPlayer: React.FC<TrailerPlayerProps> = memo(({
     };
   }, []);
 
+  // Forward the ref to the video element
+  React.useImperativeHandle(ref, () => ({
+    presentFullscreenPlayer: () => {
+      if (videoRef.current) {
+        return videoRef.current.presentFullscreenPlayer();
+      }
+    }
+  }));
+
   // Animated styles
   const controlsAnimatedStyle = useAnimatedStyle(() => ({
     opacity: controlsOpacity.value,
@@ -287,6 +298,16 @@ const TrailerPlayer: React.FC<TrailerPlayerProps> = memo(({
                     color="white" 
                   />
                 </TouchableOpacity>
+                
+                {onFullscreenToggle && (
+                  <TouchableOpacity style={styles.controlButton} onPress={onFullscreenToggle}>
+                    <MaterialIcons 
+                      name="fullscreen" 
+                      size={isTablet ? 32 : 24} 
+                      color="white" 
+                    />
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           </LinearGradient>
@@ -295,6 +316,8 @@ const TrailerPlayer: React.FC<TrailerPlayerProps> = memo(({
     </View>
   );
 });
+
+
 
 const styles = StyleSheet.create({
   container: {

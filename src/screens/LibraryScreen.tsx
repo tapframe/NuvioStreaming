@@ -735,7 +735,6 @@ const LibraryScreen = () => {
           numColumns={numColumns}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
-          columnWrapperStyle={styles.columnWrapper}
            onEndReachedThreshold={0.7}
            onEndReached={() => {}}
         />
@@ -776,7 +775,6 @@ const LibraryScreen = () => {
         renderItem={({ item }) => renderTraktItem({ item })}
         keyExtractor={(item) => `${item.type}-${item.id}`}
         numColumns={numColumns}
-        columnWrapperStyle={styles.row}
         style={styles.traktContainer}
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
         showsVerticalScrollIndicator={false}
@@ -874,7 +872,6 @@ const LibraryScreen = () => {
               numColumns={numColumns}
               contentContainerStyle={styles.listContainer}
               showsVerticalScrollIndicator={false}
-              columnWrapperStyle={styles.columnWrapper}
               onEndReachedThreshold={0.7}
               onEndReached={() => {}}
             />
