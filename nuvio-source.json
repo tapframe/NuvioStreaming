@@ -13,7 +13,7 @@
       "bundleIdentifier": "com.nuvio.app",
       "developerName": "Tapframe",
       "subtitle": "Streaming app for movies and TV shows",
-      "localizedDescription": "Nuvio is a comprehensive streaming application that provides access to a vast library of movies and TV shows. Features include personalized recommendations, watch progress tracking, and seamless streaming experience.",
+      "localizedDescription": "Nuvio is a comprehensive streaming application that provides access to a vast library of movies and TV shows. Latest beta includes trailer support in Hero Section, IMDb rating fixes, and various backend improvements.",
       "iconURL": "https://github.com/tapframe/NuvioStreaming/blob/main/assets/android/playstore-icon.png?raw=true",
       "tintColor": "#04dcfc",
       "category": "entertainment",
@@ -23,6 +23,14 @@
         "https://github.com/tapframe/NuvioStreaming/blob/main/screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.10.14-portrait.png?raw=true"
       ],
       "versions": [
+        {
+          "version": "0.6.0-beta.6",
+          "buildVersion": "6",
+          "date": "2025-09-01",
+          "localizedDescription": "• Added a Trailer API to display trailers in the Hero Section (limited content available).\n• Fixed redundant IMDb rating issue.\n• Fixed sign-in page opening issue.\n• Many minor backend fixes and improvements.",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/0.6.0-beta.6/Beta_0_6_0_6.ipa",
+          "size": 29700000
+        },
         {
           "version": "1.0.0",
           "buildVersion": "1",
