@@ -457,12 +457,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                         { backgroundColor: currentTheme.colors.primary }
                       ]} />
                     )}
-                    {/* Show episode count badge, including when there are no episodes */}
-                    <View style={[styles.episodeCountBadge, { backgroundColor: currentTheme.colors.elevation2 }]}>
-                      <Text style={[styles.episodeCountText, { color: currentTheme.colors.textMuted }]}>
-                        {seasonEpisodes.length} ep{seasonEpisodes.length !== 1 ? 's' : ''}
-                      </Text>
-                    </View>
+
                   </View>
                   <Text 
                     style={[
@@ -1417,18 +1412,5 @@ const styles = StyleSheet.create({
   selectedSeasonTextButtonTextTablet: {
     fontWeight: '800',
   },
-  episodeCountBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  episodeCountText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
+
 });

@@ -921,7 +921,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="Player" 
               component={VideoPlayer as any} 
               options={{ 
-                animation: Platform.OS === 'android' ? 'none' : 'slide_from_right',
+                animation: Platform.OS === 'android' ? 'none' : 'default',
                 animationDuration: Platform.OS === 'android' ? 0 : 300,
                 // Force fullscreen presentation on iPad
                 presentation: Platform.OS === 'ios' ? 'fullScreenModal' : 'card',
