@@ -751,6 +751,166 @@
             opacity: 0.9;
         }
 
+        /* iOS Installation Modal */
+        .ios-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(20px);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .ios-modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .ios-modal-content {
+            background: rgba(20, 20, 20, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 2.5rem;
+            max-width: 500px;
+            width: 90%;
+            backdrop-filter: blur(30px);
+            transform: scale(0.8) translateY(50px);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .ios-modal.active .ios-modal-content {
+            transform: scale(1) translateY(0);
+        }
+
+        .ios-modal-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .ios-modal-title {
+            color: white;
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.02em;
+        }
+
+        .ios-modal-subtitle {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 1rem;
+            font-weight: 400;
+        }
+
+        .ios-install-options {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .ios-install-option {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1.25rem;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            color: white;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .ios-install-option:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .ios-option-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .ios-option-icon img {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+        }
+
+        .ios-option-content {
+            flex: 1;
+        }
+
+        .ios-option-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            color: white;
+        }
+
+        .ios-option-description {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.6);
+            line-height: 1.4;
+        }
+
+        .ios-modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1.2rem;
+        }
+
+        .ios-modal-close:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.1);
+        }
+
+        .copy-feedback {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            z-index: 3000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .copy-feedback.show {
+            opacity: 1;
+        }
+
         .screenshot h4 {
             font-size: 1rem;
             font-weight: 500;
@@ -1035,8 +1195,8 @@
                 <a href="https://github.com/tapframe/NuvioStreaming/releases" class="download-btn">
                      Download for Android
                 </a>
-                <a href="https://github.com/tapframe/NuvioStreaming/releases" class="download-btn">
-                     Download for iOS
+                <a href="#" class="download-btn" id="ios-install-btn">
+                     Install for iOS
                 </a>
             </div>
             
@@ -1050,6 +1210,63 @@
             </a>
         </div>
     </section>
+
+    <!-- iOS Installation Modal -->
+    <div id="ios-modal" class="ios-modal">
+        <div class="ios-modal-content">
+            <button class="ios-modal-close" id="ios-modal-close">×</button>
+            <div class="ios-modal-header">
+                <h3 class="ios-modal-title">Install Nuvio on iOS</h3>
+                <p class="ios-modal-subtitle">Choose your preferred installation method</p>
+            </div>
+            <div class="ios-install-options">
+                <a href="https://github.com/tapframe/NuvioStreaming/releases" class="ios-install-option" id="direct-download">
+                     <div class="ios-option-icon">
+                         <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMCA5TDEzLjA5IDE1Ljc0TDEyIDIyTDEwLjkxIDE1Ljc0TDQgOUwxMC45MSA4LjI2TDEyIDJaIiBmaWxsPSIjNjY2NjY2Ii8+Cjwvc3ZnPgo=" alt="Direct Download">
+                     </div>
+                     <div class="ios-option-content">
+                         <div class="ios-option-title">Direct Download</div>
+                         <div class="ios-option-description">Download the IPA file directly to your device</div>
+                     </div>
+                 </a>
+                 
+                 <a href="https://tinyurl.com/NuvioAltstore" class="ios-install-option" id="altstore-install">
+                     <div class="ios-option-icon">
+                         <img src="https://upload.wikimedia.org/wikipedia/commons/2/20/AltStore_logo.png" alt="AltStore">
+                     </div>
+                     <div class="ios-option-content">
+                         <div class="ios-option-title">Install via AltStore</div>
+                         <div class="ios-option-description">One-click installation through AltStore</div>
+                     </div>
+                 </a>
+                 
+                 <a href="https://tinyurl.com/NuvioSidestore" class="ios-install-option" id="sidestore-install">
+                     <div class="ios-option-icon">
+                         <img src="https://github.com/SideStore/assets/blob/main/icon.png?raw=true" alt="SideStore">
+                     </div>
+                     <div class="ios-option-content">
+                         <div class="ios-option-title">Install via SideStore</div>
+                         <div class="ios-option-description">One-click installation through SideStore</div>
+                     </div>
+                 </a>
+                
+                <div class="ios-install-option" id="copy-url">
+                    <div class="ios-option-icon">
+                        <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTggNUMzIDUgMyA1IDMgMTBWMTRDMyAxOSAzIDE5IDggMTlIMTZDMjEgMTkgMjEgMTkgMjEgMTRWMTBDMjEgNSAyMSA1IDE2IDVIOFoiIHN0cm9rZT0iIzY2NjY2NiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPHBhdGggZD0iTTEwIDEySDEwLjAxIiBzdHJva2U9IiM2NjY2NjYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CjxwYXRoIGQ9Ik0xNCAxMkgxNC4wMSIgc3Ryb2tlPSIjNjY2NjY2IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8L3N2Zz4K" alt="Copy URL">
+                    </div>
+                    <div class="ios-option-content">
+                        <div class="ios-option-title">Copy Source URL</div>
+                        <div class="ios-option-description">Copy the repository URL to add manually</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Copy Feedback -->
+    <div id="copy-feedback" class="copy-feedback">
+        URL copied to clipboard!
+    </div>
 
     <section class="features" id="features">
         <div class="container">
@@ -1164,10 +1381,7 @@
                      <img src="src/assets/search.jpg" alt="Search & Details" loading="lazy">
                      <h4>Search & Details</h4>
                  </div>
-                 <div class="screenshot">
-                     <img src="src/assets/metadascreen.jpg" alt="Content Details" loading="lazy">
-                     <h4>Content Details</h4>
-                 </div>
+
              </div>
         </div>
     </section>
@@ -1279,5 +1493,94 @@
              });
          });
      </script>
- </body>
- </html>
+ <script>
+        // iOS Installation Modal functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const iosInstallBtn = document.getElementById('ios-install-btn');
+            const iosModal = document.getElementById('ios-modal');
+            const iosModalClose = document.getElementById('ios-modal-close');
+            const copyUrlBtn = document.getElementById('copy-url');
+            const copyFeedback = document.getElementById('copy-feedback');
+            
+            // Source URL for manual installation
+            const sourceUrl = 'https://raw.githubusercontent.com/tapframe/NuvioStreaming/main/nuvio-source.json';
+            
+            // Open modal
+            iosInstallBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                iosModal.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            });
+            
+            // Close modal
+            function closeModal() {
+                iosModal.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+            
+            iosModalClose.addEventListener('click', closeModal);
+            
+            // Close modal when clicking outside
+            iosModal.addEventListener('click', function(e) {
+                if (e.target === iosModal) {
+                    closeModal();
+                }
+            });
+            
+            // Close modal with Escape key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && iosModal.classList.contains('active')) {
+                    closeModal();
+                }
+            });
+            
+            // Copy URL functionality
+            copyUrlBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // Try to copy to clipboard
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(sourceUrl).then(function() {
+                        showCopyFeedback();
+                    }).catch(function() {
+                        fallbackCopyTextToClipboard(sourceUrl);
+                    });
+                } else {
+                    fallbackCopyTextToClipboard(sourceUrl);
+                }
+            });
+            
+            // Fallback copy method for older browsers
+            function fallbackCopyTextToClipboard(text) {
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-999999px';
+                textArea.style.top = '-999999px';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                
+                try {
+                    document.execCommand('copy');
+                    showCopyFeedback();
+                } catch (err) {
+                    console.error('Failed to copy text: ', err);
+                    // Show URL in alert as last resort
+                    alert('Copy this URL manually: ' + text);
+                }
+                
+                document.body.removeChild(textArea);
+            }
+            
+            // Show copy feedback
+            function showCopyFeedback() {
+                copyFeedback.classList.add('show');
+                setTimeout(function() {
+                    copyFeedback.classList.remove('show');
+                }, 2000);
+            }
+        });
+    </script>
+    </body>
+</html>
