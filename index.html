@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nuvio - Stream Everything</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #000000 0%, #0a0a0a 15%, #1a1a1a 35%, #0f0f0f 65%, #000000 100%);
+            background-attachment: fixed;
+            color: #ffffff;
+            overflow-x: hidden;
+            line-height: 1.6;
+            width: 100vw;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            margin: 0 auto;
+            padding: 0 3rem;
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            height: auto;
+            width: 100vw;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            background: transparent;
+            position: relative;
+            overflow: hidden;
+            padding: 2rem 0;
+            margin: 0;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(40, 40, 40, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(60, 60, 60, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(80, 80, 80, 0.1) 0%, transparent 50%);
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .hero::after {
+            content: '';
+            position: absolute;
+            top: 10%;
+            left: 10%;
+            right: 10%;
+            bottom: 10%;
+            background: 
+                linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.01) 50%, transparent 70%),
+                linear-gradient(-45deg, transparent 30%, rgba(100, 100, 100, 0.02) 50%, transparent 70%);
+            border-radius: 50%;
+            animation: rotate 30s linear infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            33% { transform: translateY(-20px) rotate(1deg); }
+            66% { transform: translateY(10px) rotate(-1deg); }
+        }
+
+        @keyframes rotate {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 3;
+            max-width: 1100px;
+            padding: 0 2rem;
+        }
+
+        .hero-content::before {
+            content: '';
+            position: absolute;
+            top: -50px;
+            left: -50px;
+            right: -50px;
+            bottom: -50px;
+            background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.015) 0%, transparent 70%);
+            border-radius: 50%;
+            z-index: -1;
+        }
+
+        .hero-title {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 2rem;
+            margin-bottom: 2rem;
+            animation: fadeInUp 1s ease-out both;
+        }
+
+        .hero-logo {
+            width: clamp(6rem, 15vw, 10rem);
+            height: clamp(6rem, 15vw, 10rem);
+            object-fit: contain;
+            filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.3));
+        }
+
+        .hero h1 {
+            font-size: clamp(6rem, 15vw, 10rem);
+            font-weight: 800;
+            margin-bottom: 0;
+            background: linear-gradient(135deg, #ffffff 0%, #cccccc 25%, #999999 50%, #666666 75%, #ffffff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            background-size: 200% 200%;
+            letter-spacing: -0.05em;
+            line-height: 1.1;
+            text-transform: uppercase;
+            animation: shimmer 3s ease-in-out infinite;
+            position: relative;
+            z-index: 1;
+            text-shadow: 0 0 40px rgba(255, 255, 255, 0.2);
+            transform-style: preserve-3d;
+        }
+
+        .hero h1::before {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(100, 100, 100, 0.1) 0%, rgba(150, 150, 150, 0.1) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            transform: translateZ(-1px) scale(1.02);
+            filter: blur(2px);
+            opacity: 0.6;
+        }
+
+
+
+        @keyframes shimmer {
+            0% {
+                background-position: -200% center;
+            }
+            100% {
+                background-position: 200% center;
+            }
+        }
+
+        @keyframes titleFloat {
+            0%, 100% { transform: translateY(0px) rotateX(0deg); }
+            50% { transform: translateY(-10px) rotateX(2deg); }
+        }
+
+        .hero p {
+            font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: clamp(1.8rem, 4.5vw, 2.2rem);
+            font-weight: 300;
+            letter-spacing: 0.02em;
+            opacity: 0.95;
+            margin-bottom: 3rem;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.5;
+            color: #ffffff;
+            position: relative;
+            z-index: 1;
+            animation: fadeInUp 1s ease-out 0.5s both;
+            text-shadow: 0 2px 20px rgba(255, 255, 255, 0.1);
+            background: linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        @keyframes fadeInUp {
+            0% {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            100% {
+                opacity: 0.9;
+                transform: translateY(0);
+            }
+        }
+
+        .download-buttons {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+            animation: fadeInUp 1s ease-out 1s both;
+        }
+
+        .download-buttons::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(100, 100, 100, 0.05) 0%, transparent 70%);
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            animation: pulse 4s ease-in-out infinite;
+            z-index: -1;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.3; }
+            50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.1; }
+        }
+
+        .download-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1.25rem 2.5rem;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 60px;
+            color: white;
+            text-decoration: none;
+            font-size: 1.1rem;
+            font-weight: 500;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(30px);
+            letter-spacing: 0.005em;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .download-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transition: left 0.6s;
+        }
+
+        .download-btn:hover::before {
+            left: 100%;
+        }
+
+        .download-btn:hover {
+            background: rgba(120, 120, 120, 0.15);
+            border-color: rgba(150, 150, 150, 0.4);
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(100, 100, 100, 0.2);
+        }
+
+        .download-btn svg {
+            width: 22px;
+            height: 22px;
+            opacity: 0.9;
+        }
+
+        /* Features Section */
+        .features {
+            padding: 4rem 0 8rem 0;
+            background: transparent;
+            width: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .features::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.05) 50%, transparent 100%);
+        }
+
+        .features::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                radial-gradient(circle at 80% 70%, rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+                radial-gradient(circle at 40% 80%, rgba(255, 255, 255, 0.01) 1px, transparent 1px);
+            background-size: 100px 100px, 150px 150px, 200px 200px;
+            animation: floatParticles 20s linear infinite;
+            pointer-events: none;
+        }
+
+        @keyframes floatParticles {
+            0% { transform: translateY(0) rotate(0deg); }
+            100% { transform: translateY(-20px) rotate(360deg); }
+        }
+
+        .features h2 {
+            text-align: center;
+            font-size: 3.2rem;
+            font-weight: 700;
+            margin-bottom: 6rem;
+            color: #ffffff;
+            opacity: 0.95;
+            letter-spacing: -0.03em;
+            line-height: 1.2;
+            position: relative;
+            background: linear-gradient(135deg, #ffffff 0%, #cccccc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .features h2::after {
+            content: '';
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80px;
+            height: 3px;
+            background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.6) 50%, transparent 100%);
+            border-radius: 2px;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 3rem;
+        }
+
+        /* Mobile Carousel Styles */
+        @media (max-width: 768px) {
+            .features-grid {
+                display: flex;
+                overflow-x: auto;
+                scroll-snap-type: x mandatory;
+                gap: 2rem;
+                padding: 0 1rem;
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+            }
+
+            .features-grid::-webkit-scrollbar {
+                display: none;
+            }
+
+            .feature-card {
+                flex: 0 0 85%;
+                scroll-snap-align: center;
+                max-width: 350px;
+            }
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.025);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 32px;
+            padding: 4rem 3rem;
+            text-align: left;
+            transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(30px);
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, 
+                rgba(255, 255, 255, 0.08) 0%, 
+                rgba(255, 255, 255, 0.02) 50%, 
+                transparent 100%);
+            opacity: 0;
+            transition: all 0.6s ease;
+            transform: translateX(-100%);
+        }
+
+        .feature-card::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 100%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.03) 50%, transparent 70%);
+            transform: rotate(45deg);
+            opacity: 0;
+            transition: all 0.8s ease;
+        }
+
+        .feature-card:hover::before {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .feature-card:hover::after {
+            opacity: 1;
+            animation: shimmerSweep 1.5s ease-in-out;
+        }
+
+        @keyframes shimmerSweep {
+            0% { transform: translateX(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) rotate(45deg); }
+        }
+
+        .feature-card:hover {
+            transform: translateY(-12px) scale(1.02);
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.25);
+            box-shadow: 
+                0 25px 80px rgba(0, 0, 0, 0.6),
+                0 0 0 1px rgba(255, 255, 255, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .feature-icon {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 2rem;
+            color: #cccccc;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(20px);
+        }
+
+        .feature-icon svg {
+            width: 40px;
+            height: 40px;
+            transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .feature-card:hover .feature-icon {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-5px) scale(1.1);
+            box-shadow: 0 15px 40px rgba(255, 255, 255, 0.1);
+        }
+
+        .feature-card:hover .feature-icon svg {
+            transform: scale(1.2) rotate(5deg);
+            color: #ffffff;
+        }
+
+        .feature-card h3 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            color: #ffffff;
+            letter-spacing: -0.02em;
+            line-height: 1.3;
+            position: relative;
+            z-index: 1;
+            transition: all 0.4s ease;
+        }
+
+        .feature-card:hover h3 {
+            transform: translateY(-2px);
+            text-shadow: 0 4px 20px rgba(255, 255, 255, 0.2);
+        }
+
+        .feature-card p {
+            opacity: 0.75;
+            line-height: 1.8;
+            font-weight: 400;
+            font-size: 1.05rem;
+            position: relative;
+            z-index: 1;
+            transition: all 0.4s ease;
+            color: #e0e0e0;
+        }
+
+        .feature-card:hover p {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        /* Screenshots Section */
+        .screenshots {
+            padding: 8rem 0;
+            background: transparent;
+            width: 100%;
+        }
+
+        .screenshots h2 {
+            text-align: center;
+            font-size: 2.8rem;
+            font-weight: 600;
+            margin-bottom: 5rem;
+            color: #ffffff;
+            opacity: 0.95;
+            letter-spacing: -0.03em;
+            line-height: 1.2;
+        }
+
+        .screenshots-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 2.5rem;
+        }
+
+        .screenshot {
+            background: rgba(255, 255, 255, 0.025);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 28px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(30px);
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .screenshot::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.02) 0%, transparent 50%);
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .screenshot:hover::before {
+            opacity: 1;
+        }
+
+        .screenshot:hover {
+            transform: translateY(-5px) scale(1.02);
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(168, 85, 247, 0.25);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+        }
+
+        .screenshot img {
+            width: 100%;
+            height: auto;
+            max-height: 500px;
+            object-fit: contain;
+            border-radius: 16px;
+            margin-bottom: 1.5rem;
+            opacity: 0.95;
+            position: relative;
+            z-index: 1;
+            transition: all 0.4s ease;
+        }
+
+        .screenshot:hover img {
+            transform: scale(1.05);
+            opacity: 1;
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            backdrop-filter: blur(20px);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            position: relative;
+            max-width: 90vw;
+            max-height: 90vh;
+            transform: scale(0.8) translateY(50px);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .modal-overlay.active .modal-content {
+            transform: scale(1) translateY(0);
+        }
+
+        .modal-image {
+            width: 100%;
+            height: auto;
+            max-width: 100%;
+            max-height: 90vh;
+            object-fit: contain;
+            border-radius: 20px;
+            box-shadow: 0 25px 100px rgba(0, 0, 0, 0.8);
+        }
+
+        .modal-close {
+            position: absolute;
+            top: -50px;
+            right: 0;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(20px);
+        }
+
+        .modal-close:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.1);
+        }
+
+        .modal-title {
+            position: absolute;
+            bottom: -60px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 1.2rem;
+            font-weight: 500;
+            text-align: center;
+            opacity: 0.9;
+        }
+
+        .screenshot h4 {
+            font-size: 1rem;
+            font-weight: 500;
+            color: #ffffff;
+            opacity: 0.8;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Footer */
+        .footer {
+            padding: 5rem 0 3rem;
+            background: transparent;
+            text-align: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            width: 100%;
+        }
+
+        .credits {
+            margin-bottom: 3rem;
+            padding: 2rem 0;
+        }
+
+        .credits h3 {
+            color: #ffffff;
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+
+        .credits-grid {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 3rem;
+            flex-wrap: wrap;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .credit-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            opacity: 0.8;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        .credit-item:hover {
+            opacity: 1;
+            transform: translateY(-2px);
+        }
+
+        .credit-logo {
+            height: 32px;
+            width: auto;
+            filter: brightness(0.9);
+        }
+
+        .stremio-logos {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .footer p {
+            opacity: 0.5;
+            margin-bottom: 3rem;
+            font-weight: 400;
+            font-size: 1rem;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 4rem;
+            flex-wrap: wrap;
+            margin-bottom: 2rem;
+        }
+
+        .footer-links a {
+            color: #cccccc;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            font-size: 1rem;
+            opacity: 0.8;
+            position: relative;
+        }
+
+        .footer-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: #cccccc;
+            transition: width 0.3s ease;
+        }
+
+        .footer-links a:hover::after {
+            width: 100%;
+        }
+
+        .footer-links a:hover {
+            opacity: 1;
+            transform: translateY(-2px);
+        }
+
+        .github-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .github-logo {
+            width: 20px;
+            height: 20px;
+            filter: invert(1);
+        }
+
+        @media (max-width: 768px) {
+            .credits-grid {
+                gap: 2rem;
+            }
+            
+            .credit-logo {
+                height: 28px;
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .container {
+                padding: 0 2rem;
+            }
+            
+            .features-grid {
+                grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+                gap: 2rem;
+            }
+            
+            .feature-card {
+                padding: 3rem 2.5rem;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 1.5rem;
+            }
+            
+            .hero {
+                 padding: 2rem 0;
+                 min-height: 90vh;
+             }
+             
+             .hero-title {
+                 flex-direction: column;
+                 gap: 1rem;
+             }
+             
+             .hero-logo {
+                  width: clamp(4rem, 12vw, 6rem);
+                  height: clamp(4rem, 12vw, 6rem);
+              }
+             
+             .hero h1 {
+                 font-size: clamp(3rem, 12vw, 8rem);
+                 margin-bottom: 1.5rem;
+             }
+             
+             .hero p {
+                 font-size: 1.1rem;
+                 margin-bottom: 2.5rem;
+             }
+            
+            .download-buttons {
+                flex-direction: column;
+                align-items: center;
+                gap: 1.5rem;
+            }
+            
+            .download-btn {
+                width: 100%;
+                max-width: 300px;
+                justify-content: center;
+            }
+            
+            .features,
+             .screenshots {
+                 padding: 5rem 0;
+             }
+             
+             .features h2,
+             .screenshots h2 {
+                 font-size: 2rem;
+                 margin-bottom: 3rem;
+             }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+                gap: 2rem;
+            }
+            
+            .feature-card {
+                padding: 3rem 2rem;
+            }
+            
+            .screenshots-grid {
+                grid-template-columns: 1fr;
+                gap: 2rem;
+            }
+            
+            .footer-links {
+                gap: 2rem;
+            }
+        }
+        
+        @media (max-width: 480px) {
+             .container {
+                 padding: 0 1rem;
+             }
+             
+             .hero {
+                 min-height: 80vh;
+                 padding: 1.5rem 0;
+             }
+             
+             .hero h1 {
+                 font-size: clamp(2.5rem, 10vw, 6rem);
+                 margin-bottom: 1rem;
+             }
+             
+             .hero p {
+                 font-size: 1rem;
+                 margin-bottom: 2rem;
+             }
+             
+             .features,
+             .screenshots {
+                 padding: 3rem 0;
+             }
+             
+             .features h2,
+             .screenshots h2 {
+                 font-size: 1.8rem;
+                 margin-bottom: 2rem;
+             }
+             
+             .feature-card {
+                 padding: 2rem 1.5rem;
+             }
+             
+             .screenshot {
+                 padding: 1.5rem;
+             }
+         }
+    </style>
+</head>
+<body>
+    <section class="hero">
+        <div class="hero-content">
+            <div class="hero-title">
+                <img src="assets/splash-icon.png" alt="Nuvio Logo" class="hero-logo">
+                <h1 data-text="NUVIO">NUVIO</h1>
+            </div>
+            <p>The Ultimate Streaming Experience</p>
+            
+            <div class="download-buttons">
+                <a href="https://github.com/tapframe/NuvioStreaming/releases" class="download-btn">
+                     Download for Android
+                </a>
+                <a href="https://github.com/tapframe/NuvioStreaming/releases" class="download-btn">
+                     Download for iOS
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <section class="features">
+        <div class="container">
+            <h2>POWERFUL FEATURES</h2>
+            <div class="features-grid">
+                <div class="feature-card" data-aos="fade-up" data-aos-delay="100">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 2L3 7L12 12L21 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M3 17L12 22L21 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M3 12L12 17L21 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <h3>Smart Discovery</h3>
+                    <p>Personalized recommendations, advanced search, and calendar integration for tracking your favorite shows and movies.</p>
+                </div>
+                
+                <div class="feature-card" data-aos="fade-up" data-aos-delay="200">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <polygon points="23 7 16 12 23 17 23 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <h3>Premium Playback</h3>
+                    <p>Dual video player support with trailer integration, auto-play functionality, and seamless progress tracking across devices.</p>
+                </div>
+                
+                <div class="feature-card" data-aos="fade-up" data-aos-delay="300">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M10 13A5 5 0 0 0 7.54 7.54L4.93 4.93A10 10 0 1 0 19.07 19.07L16.46 16.46A5 5 0 0 0 13 10L10 13Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M21 21L15 15L9 9L3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <h3>Universal Integration</h3>
+                    <p>Full Trakt.tv sync, Stremio addon compatibility, TMDB integration, and MDBList support for the ultimate experience.</p>
+                </div>
+                
+                <div class="feature-card" data-aos="fade-up" data-aos-delay="400">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <h3>Beautiful Interface</h3>
+                    <p>Modern Material Design with dynamic theming, dominant color extraction, and smooth animations throughout.</p>
+                </div>
+                
+                <div class="feature-card" data-aos="fade-up" data-aos-delay="500">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M18 8A6 6 0 0 0 6 8C6 7 9 9 12 9S18 7 18 8Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M18 8V12A6 6 0 1 1 6 12V8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M12 20V16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <h3>Smart Notifications</h3>
+                    <p>Push notifications for new episodes, background sync, and comprehensive settings for complete customization.</p>
+                </div>
+                
+                <div class="feature-card" data-aos="fade-up" data-aos-delay="600">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <h3>Optimized Performance</h3>
+                    <p>Advanced caching system, offline functionality, and optimized rendering for lightning-fast performance.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="screenshots">
+        <div class="container">
+            <h2>SEE IT IN ACTION</h2>
+            <div class="screenshots-grid">
+                 <div class="screenshot">
+                     <img src="screesnhots/Simulator Screenshot - iPhone 16 Pro - 2025-08-27 at 21.08.32-portrait.png" alt="Home Screen" loading="lazy">
+                     <h4>Home Screen</h4>
+                 </div>
+                 <div class="screenshot">
+                     <img src="screesnhots/Simulator Screenshot - iPhone 16 Pro - 2025-08-27 at 21.09.43-portrait.png" alt="Home Screen 2" loading="lazy">
+                     <h4>Home Screen 2</h4>
+                 </div>
+                 <div class="screenshot">
+                     <img src="screesnhots/Simulator Screenshot - iPhone 16 Pro - 2025-08-27 at 21.10.14-portrait.png" alt="Library" loading="lazy">
+                     <h4>Library</h4>
+                 </div>
+                 <div class="screenshot">
+                     <img src="screesnhots/Simulator Screenshot - iPhone 16 Pro - 2025-08-27 at 21.12.41-landscape.png" alt="Player Loading" loading="lazy">
+                     <h4>Player Loading</h4>
+                 </div>
+                 <div class="screenshot">
+                     <img src="screesnhots/Simulator Screenshot - iPhone 16 Pro - 2025-08-27 at 21.13.36-landscape.png" alt="Video Player" loading="lazy">
+                     <h4>Video Player</h4>
+                 </div>
+                 <div class="screenshot">
+                     <img src="src/assets/ratingscreen.jpg" alt="Ratings" loading="lazy">
+                     <h4>Ratings</h4>
+                 </div>
+             </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="credits">
+                <h3>Special Thanks</h3>
+                <div class="credits-grid">
+                     <div class="credit-item">
+                         <img src="https://www.themoviedb.org/assets/2/v4/logos/v2/blue_square_2-d537fb228cf3ded904ef09b136fe3fec72548ebc1fea3fbbd1ad9e36364db38b.svg" alt="TMDB" class="credit-logo">
+                     </div>
+                     <div class="credit-item">
+                         <div class="stremio-logos">
+                             <img src="https://www.stremio.com/website/stremio-logo-small.png" alt="Stremio" class="credit-logo">
+                             <img src="https://www.stremio.com/website/stremio-txt-logo-small.png" alt="Stremio" class="credit-logo">
+                         </div>
+                     </div>
+                     <div class="credit-item">
+                         <img src="https://upload.wikimedia.org/wikipedia/commons/6/69/IMDB_Logo_2016.svg" alt="IMDb" class="credit-logo">
+                     </div>
+                     <div class="credit-item">
+                         <img src="https://mdblist.com/static/mdblist_logo.png" alt="MDBList" class="credit-logo">
+                     </div>
+                 </div>
+            </div>
+            <p>Built with ❤️ using React Native & Expo</p>
+            <div class="footer-links">
+                <a href="https://github.com/tapframe/NuvioStreaming" class="github-link">
+                    <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" alt="GitHub" class="github-logo">
+                    GitHub
+                </a>
+            </div>
+            <p style="margin-top: 2rem; opacity: 0.3; font-size: 0.8rem;">
+                © 2024 Nuvio. Licensed under GNU GPLv3. Free and Open Source.
+            </p>
+        </div>
+    </footer>
+
+     <!-- Modal for expanded screenshots -->
+     <div class="modal-overlay" id="screenshotModal">
+         <div class="modal-content">
+             <button class="modal-close" onclick="closeModal()">
+                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                     <line x1="18" y1="6" x2="6" y2="18"></line>
+                     <line x1="6" y1="6" x2="18" y2="18"></line>
+                 </svg>
+             </button>
+             <img class="modal-image" id="modalImage" src="" alt="">
+             <div class="modal-title" id="modalTitle"></div>
+         </div>
+     </div>
+
+     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+     <script>
+         AOS.init({
+             duration: 800,
+             easing: 'ease-out-cubic',
+             once: true,
+             offset: 100
+         });
+
+         // Screenshot modal functionality
+         function openModal(imageSrc, title) {
+             const modal = document.getElementById('screenshotModal');
+             const modalImage = document.getElementById('modalImage');
+             const modalTitle = document.getElementById('modalTitle');
+             
+             modalImage.src = imageSrc;
+             modalTitle.textContent = title;
+             
+             modal.classList.add('active');
+             document.body.style.overflow = 'hidden';
+         }
+
+         function closeModal() {
+             const modal = document.getElementById('screenshotModal');
+             modal.classList.remove('active');
+             document.body.style.overflow = 'auto';
+         }
+
+         // Add click event listeners to all screenshots
+         document.addEventListener('DOMContentLoaded', function() {
+             const screenshots = document.querySelectorAll('.screenshot');
+             
+             screenshots.forEach(screenshot => {
+                 screenshot.addEventListener('click', function() {
+                     const img = this.querySelector('img');
+                     const title = this.querySelector('h4');
+                     
+                     if (img && title) {
+                         openModal(img.src, title.textContent);
+                     }
+                 });
+             });
+
+             // Close modal when clicking outside the image
+             document.getElementById('screenshotModal').addEventListener('click', function(e) {
+                 if (e.target === this) {
+                     closeModal();
+                 }
+             });
+
+             // Close modal with Escape key
+             document.addEventListener('keydown', function(e) {
+                 if (e.key === 'Escape') {
+                     closeModal();
+                 }
+             });
+         });
+     </script>
+ </body>
+ </html>
