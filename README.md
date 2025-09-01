@@ -20,10 +20,10 @@ This app is currently in Beta testing. Please report any bugs or issues you enco
 ## 📱 Installation
 
 ### AltStore Installation
-[Add to AltStore](altstore://source?url=https://raw.githubusercontent.com/tapframe/NuvioStreaming/main/nuvio-source.json)
+<a href="altstore://source?url=https://raw.githubusercontent.com/tapframe/NuvioStreaming/main/nuvio-source.json">Add to AltStore</a>
 
 ### SideStore Installation
-[Add to SideStore](sidestore://source?url=https://raw.githubusercontent.com/tapframe/NuvioStreaming/main/nuvio-source.json)
+<a href="sidestore://source?url=https://raw.githubusercontent.com/tapframe/NuvioStreaming/main/nuvio-source.json">Add to SideStore</a>
 
 **Manual URL:** `https://raw.githubusercontent.com/tapframe/NuvioStreaming/main/nuvio-source.json`
 
