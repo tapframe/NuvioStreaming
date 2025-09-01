@@ -38,8 +38,7 @@
           "NSLocalNetworkUsageDescription": "App uses the local network to discover and connect to devices.",
           "NSMicrophoneUsageDescription": "This app does not require microphone access."
         }
-      },
-      "patreon": {}
+      }
     }
   ],
   "news": []
