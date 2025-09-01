@@ -19,38 +19,50 @@ This app is currently in Beta testing. Please report any bugs or issues you enco
 
 ## ✨ Key Features 
 
-### Content & Discovery
-- **Smart Home Screen:** Personalized content recommendations and continue watching
-- **Discover Section:** Browse trending and popular movies & TV shows
-- **Rich Metadata:** Detailed information, cast, ratings, and similar content
-- **Powerful Search:** Find content quickly with instant results
+### 🎬 Content Discovery & Management
+- **Smart Home Screen:** Personalized content recommendations and continue watching functionality
+- **Advanced Search:** Instant results with comprehensive filtering capabilities
+- **Rich Metadata Display:** Detailed information, cast, crew, ratings, and similar content
+- **Calendar Integration:** Track upcoming episodes and releases with notification support
+- **Library Management:** Personal collections with watch history and progress tracking
+- **Cast & Crew Exploration:** Dedicated actor/director filmographies and detailed profiles
 
-### Streaming & Playback
-- **Advanced Video Player:** 
-  - Built-in player with gesture controls
-  - External player support
-  - Auto-quality selection
-  - Subtitle customization
-- **Smart Stream Selection:** Automatically finds the best available streams
-- **Auto-Play:** Seamless playback of next episodes
-- **Continue Watching:** Resume from where you left off
+### 🎥 Streaming & Playbook
+- **Dual Video Player Support:** 
+  - Built-in React Native Video player with gesture controls
+  - External player integration for enhanced compatibility
+  - Auto-quality selection and subtitle customization
+- **Intelligent Stream Selection:** Automatically finds the best available quality
+- **Trailer Integration:** Seamless trailer playback with preloading capabilities
+- **Auto-Play Functionality:** Continuous episode watching experience
+- **Progress Tracking:** Resume from where you left off across devices
 
-### Integration & Sync
-- **Trakt Integration:**
-  - Account synchronization
-  - Watch history tracking
-  - Library management
-  - Progress syncing
-- **Stremio Addons:**
-  - Compatible with Stremio addon system
-  - Easy addon management
-  - Multiple source support
+### 🔗 Third-Party Integrations
+- **Trakt.tv Synchronization:**
+  - Complete watch history and rating sync
+  - Library management and progress tracking
+  - Auto-sync capabilities with background updates
+- **Stremio Addon Ecosystem:**
+  - Full compatibility with Stremio addon system
+  - Easy addon management and installation
+  - Support for multiple content sources
+- **TMDB Integration:** Comprehensive metadata and high-quality imagery
+- **MDBList Support:** Additional ratings and personalized recommendations
+- **Local Scraper System:** Custom content source integration
 
-### User Experience
-- **Modern UI/UX:** Clean, intuitive interface with smooth animations
-- **Performance:** Optimized for smooth scrolling and quick loading
-- **Customization:** Theme options and display preferences
-- **Cross-Platform:** Works on both iOS and Android
+### 🎨 User Experience & Interface
+- **Modern Material Design:** Clean, intuitive interface with smooth animations
+- **Dynamic Theming:** Dominant color extraction for content-based UI theming
+- **Theme Customization:** Multiple color schemes and display preferences
+- **Optimized Performance:** Image caching and efficient list rendering
+- **Cross-Platform Support:** Native experience on both iOS and Android
+
+### 🔔 Smart Features
+- **Push Notifications:** New episode alerts and personalized reminders
+- **Background Sync:** Automatic data updates and content synchronization
+- **Onboarding Experience:** Guided setup for new users
+- **Comprehensive Settings:** Extensive customization options
+- **Offline Functionality:** Robust caching system for improved performance
 
 ---
 
@@ -169,4 +181,4 @@ Built with help from the amazing communities behind:
 
 ---
 
-**Thank You for using Nuvio!** 
+**Thank You for using Nuvio!**
