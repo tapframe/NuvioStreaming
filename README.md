@@ -20,10 +20,10 @@ This app is currently in Beta testing. Please report any bugs or issues you enco
 ## 📱 Installation
 
 ### AltStore Installation
-[![Add to AltStore](https://img.shields.io/badge/Add%20to-AltStore-blue?style=for-the-badge)](https://tinyurl.com/NuvioAltstore)
+<img src="https://upload.wikimedia.org/wikipedia/commons/2/20/AltStore_logo.png" width="32" height="32" align="left"> [![Add to AltStore](https://img.shields.io/badge/Add%20to-AltStore-blue?style=for-the-badge)](https://tinyurl.com/NuvioAltstore)
 
 ### SideStore Installation
-[![Add to SideStore](https://img.shields.io/badge/Add%20to-SideStore-green?style=for-the-badge)](https://tinyurl.com/NuvioSidestore)
+<img src="https://github.com/SideStore/assets/blob/main/icon.png?raw=true" width="32" height="32" align="left"> [![Add to SideStore](https://img.shields.io/badge/Add%20to-SideStore-green?style=for-the-badge)](https://tinyurl.com/NuvioSidestore)
 
 **Manual URL:** `https://raw.githubusercontent.com/tapframe/NuvioStreaming/main/nuvio-source.json`
 
