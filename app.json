@@ -16,6 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "icon": "./assets/ios/AppIcon.appiconset/Icon-App-60x60@3x.png",
+      "buildNumber": "6",
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
