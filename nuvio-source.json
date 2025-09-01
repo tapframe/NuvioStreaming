@@ -3,8 +3,6 @@
   "subtitle": "A source for all of my apps",
   "description": "Welcome to my source! Here you'll find all of my apps.",
   "iconURL": "https://github.com/tapframe/NuvioStreaming/blob/main/assets/android/playstore-icon.png?raw=true",
-
-
   "tintColor": "#6156e2",
   "featuredApps": [
     "com.nuvio.app"
@@ -13,7 +11,6 @@
     {
       "name": "Nuvio",
       "bundleIdentifier": "com.nuvio.app",
-      "marketplaceID": "",
       "developerName": "Tapframe",
       "subtitle": "Streaming app for movies and TV shows",
       "localizedDescription": "Nuvio is a comprehensive streaming application that provides access to a vast library of movies and TV shows. Features include personalized recommendations, watch progress tracking, and seamless streaming experience.",
