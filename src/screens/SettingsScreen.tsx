@@ -227,7 +227,7 @@ const SettingsScreen: React.FC = () => {
   const { isAuthenticated, userProfile, refreshAuthStatus } = useTraktContext();
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
-  const { user, signOut } = useAccount();
+  const { user, signOut, loading: accountLoading } = useAccount();
   
   // Tablet-specific state
   const [selectedCategory, setSelectedCategory] = useState('account');
@@ -378,7 +378,7 @@ const SettingsScreen: React.FC = () => {
       case 'account':
         return (
           <SettingsCard title="ACCOUNT" isTablet={isTablet}>
-            {user ? (
+            {!accountLoading && user ? (
               <>
                 <SettingItem
                   title={user.displayName || user.email || user.id}
@@ -388,12 +388,19 @@ const SettingsScreen: React.FC = () => {
                   isTablet={isTablet}
                 />
               </>
-            ) : (
+            ) : !accountLoading && !user ? (
               <SettingItem
                 title="Sign in / Create account"
                 description="Sync across devices"
                 icon="login"
                 onPress={() => navigation.navigate('Account')}
+                isTablet={isTablet}
+              />
+            ) : (
+              <SettingItem
+                title="Loading account..."
+                description="Please wait"
+                icon="hourglass-empty"
                 isTablet={isTablet}
               />
             )}

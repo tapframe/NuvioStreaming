@@ -48,10 +48,11 @@ import { useSettings, settingsEmitter } from '../hooks/useSettings';
 import FeaturedContent from '../components/home/FeaturedContent';
 import CatalogSection from '../components/home/CatalogSection';
 import { SkeletonFeatured } from '../components/home/SkeletonLoaders';
-import DogLoadingSpinner from '../components/common/DogLoadingSpinner';
+import LoadingSpinner from '../components/common/LoadingSpinner';
 import homeStyles, { sharedStyles } from '../styles/homeStyles';
 import { useTheme } from '../contexts/ThemeContext';
 import type { Theme } from '../contexts/ThemeContext';
+import { useLoading } from '../contexts/LoadingContext';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -94,7 +95,7 @@ const SkeletonCatalog = React.memo(() => {
   return (
     <View style={styles.catalogContainer}>
       <View style={styles.loadingPlaceholder}>
-        <DogLoadingSpinner size="small" text="" />
+        <LoadingSpinner size="small" text="" />
       </View>
     </View>
   );
@@ -104,6 +105,7 @@ const HomeScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const isDarkMode = useColorScheme() === 'dark';
   const { currentTheme } = useTheme();
+  const { setHomeLoading } = useLoading();
   const continueWatchingRef = useRef<ContinueWatchingRef>(null);
   const { settings } = useSettings();
   const { lastUpdate } = useCatalogContext(); // Add catalog context to listen for addon changes
@@ -292,6 +294,11 @@ const HomeScreen = () => {
     const heroLoading = showHeroSection ? featuredLoading : false;
     return heroLoading && (catalogsLoading && loadedCatalogCount === 0);
   }, [showHeroSection, featuredLoading, catalogsLoading, loadedCatalogCount]);
+
+  // Update global loading state
+  useEffect(() => {
+    setHomeLoading(isLoading);
+  }, [isLoading, setHomeLoading]);
 
   // React to settings changes
   useEffect(() => {
@@ -539,7 +546,7 @@ const HomeScreen = () => {
             translucent
           />
           <View style={styles.loadingMainContainer}>
-            <DogLoadingSpinner size="large" offsetY={-20} />
+            <LoadingSpinner size="large" offsetY={-20} />
           </View>
         </View>
       );
@@ -639,7 +646,7 @@ const HomeScreen = () => {
           <View style={styles.catalogPlaceholder}>
             <View style={styles.placeholderHeader}>
               <View style={[styles.placeholderTitle, { backgroundColor: currentTheme.colors.elevation1 }]} />
-              <DogLoadingSpinner size="small" text="" />
+              <LoadingSpinner size="small" text="" />
             </View>
             <ScrollView
               horizontal

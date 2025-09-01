@@ -44,6 +44,7 @@ import OnboardingScreen from '../screens/OnboardingScreen';
 import AuthScreen from '../screens/AuthScreen';
 import AccountManageScreen from '../screens/AccountManageScreen';
 import { AccountProvider, useAccount } from '../contexts/AccountContext';
+import { LoadingProvider, useLoading } from '../contexts/LoadingContext';
 import PluginsScreen from '../screens/PluginsScreen';
 import CastMoviesScreen from '../screens/CastMoviesScreen';
 
@@ -419,6 +420,7 @@ const WrappedScreen: React.FC<{Screen: React.ComponentType<any>}> = ({ Screen })
 // Tab Navigator
 const MainTabs = () => {
   const { currentTheme } = useTheme();
+  const { isHomeLoading } = useLoading();
   const isTablet = Dimensions.get('window').width >= 768;
   const insets = useSafeAreaInsets();
   const isIosTablet = Platform.OS === 'ios' && isTablet;
@@ -438,6 +440,11 @@ const MainTabs = () => {
   const fade = headerAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
   
   const renderTabBar = (props: BottomTabBarProps) => {
+    // Hide tab bar when home is loading
+    if (isHomeLoading) {
+      return null;
+    }
+    
     if (isTablet) {
       // Top floating, text-only pill nav for tablets
       return (
@@ -840,17 +847,15 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               }),
             }}
           >
-            {!loading && !user && (
-              <Stack.Screen
-                name="Account"
-                component={AuthScreen as any}
-                options={{
-                  headerShown: false,
-                  animation: 'fade',
-                  contentStyle: { backgroundColor: currentTheme.colors.darkBackground },
-                }}
-              />
-            )}
+            <Stack.Screen
+              name="Account"
+              component={AuthScreen as any}
+              options={{
+                headerShown: false,
+                animation: 'fade',
+                contentStyle: { backgroundColor: currentTheme.colors.darkBackground },
+              }}
+            />
             <Stack.Screen 
               name="Onboarding" 
               component={OnboardingScreen}
@@ -1203,7 +1208,9 @@ const AppNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootStack
     }}
   >
     <AccountProvider>
-      <InnerNavigator initialRouteName={initialRouteName} />
+      <LoadingProvider>
+        <InnerNavigator initialRouteName={initialRouteName} />
+      </LoadingProvider>
     </AccountProvider>
   </PostHogProvider>
 );

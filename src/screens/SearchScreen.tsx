@@ -40,7 +40,7 @@ import { logger } from '../utils/logger';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
-import DogLoadingSpinner from '../components/common/DogLoadingSpinner';
+import LoadingSpinner from '../components/common/LoadingSpinner';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -585,10 +585,9 @@ const SearchScreen = () => {
         <View style={[styles.contentContainer, { backgroundColor: currentTheme.colors.darkBackground }]}>
           {searching ? (
             <View style={styles.loadingOverlay} pointerEvents="none">
-              <DogLoadingSpinner 
+              <LoadingSpinner 
                 size="large" 
                 offsetY={-60}
-                source={require('../../assets/Progress of loading hand.lottie')} 
               />
             </View>
           ) : query.trim().length === 1 ? (
