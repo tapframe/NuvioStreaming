@@ -30,6 +30,7 @@ import { RootStackParamList, RootStackNavigationProp } from '../navigation/AppNa
 import { useMetadata } from '../hooks/useMetadata';
 import { useMetadataAssets } from '../hooks/useMetadataAssets';
 import { useTheme } from '../contexts/ThemeContext';
+import { useTrailer } from '../contexts/TrailerContext';
 import { Stream } from '../types/metadata';
 import { tmdbService } from '../services/tmdbService';
 import { stremioService } from '../services/stremioService';
@@ -360,6 +361,7 @@ export const StreamsScreen = () => {
   const { settings } = useSettings();
   const { currentTheme } = useTheme();
   const { colors } = currentTheme;
+  const { pauseTrailer, resumeTrailer } = useTrailer();
 
   // Add ref to prevent excessive updates
   const isMounted = useRef(true);
@@ -382,6 +384,17 @@ export const StreamsScreen = () => {
   useEffect(() => {
     console.log('[StreamsScreen] Received thumbnail from params:', episodeThumbnail);
   }, [episodeThumbnail]);
+
+  // Pause trailer when StreamsScreen is opened
+  useEffect(() => {
+    // Pause trailer when component mounts
+    pauseTrailer();
+    
+    // Resume trailer when component unmounts
+    return () => {
+      resumeTrailer();
+    };
+  }, [pauseTrailer, resumeTrailer]);
 
   const {
     metadata,

@@ -164,6 +164,11 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
     setIsMuted(muted);
   }, [muted]);
 
+  // Sync internal playing state with autoPlay prop
+  useEffect(() => {
+    setIsPlaying(autoPlay);
+  }, [autoPlay]);
+
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {

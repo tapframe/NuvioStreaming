@@ -29,6 +29,7 @@ import Animated, {
 import { useTheme } from '../../contexts/ThemeContext';
 import { useTraktContext } from '../../contexts/TraktContext';
 import { useSettings } from '../../hooks/useSettings';
+import { useTrailer } from '../../contexts/TrailerContext';
 import { logger } from '../../utils/logger';
 import { TMDBService } from '../../services/tmdbService';
 import TrailerService from '../../services/trailerService';
@@ -697,6 +698,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   const { currentTheme } = useTheme();
   const { isAuthenticated: isTraktAuthenticated } = useTraktContext();
   const { settings, updateSetting } = useSettings();
+  const { isTrailerPlaying: globalTrailerPlaying, setTrailerPlaying } = useTrailer();
 
   // Performance optimization: Refs for avoiding re-renders
   const interactionComplete = useRef(false);
@@ -710,7 +712,6 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   const [trailerError, setTrailerError] = useState(false);
   // Use persistent setting instead of local state
   const trailerMuted = settings.trailerMuted;
-  const [isTrailerPlaying, setIsTrailerPlaying] = useState(false);
   const [trailerReady, setTrailerReady] = useState(false);
   const [trailerPreloaded, setTrailerPreloaded] = useState(false);
   const trailerVideoRef = useRef<any>(null);
@@ -745,7 +746,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       setTrailerPreloaded(true);
     }
     setTrailerReady(true);
-    setIsTrailerPlaying(true);
+    setTrailerPlaying(true);
     
     // Smooth transition: fade out thumbnail, fade in trailer
     thumbnailOpacity.value = withTiming(0, { duration: 500 });
@@ -768,7 +769,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   const handleTrailerError = useCallback(() => {
     setTrailerError(true);
     setTrailerReady(false);
-    setIsTrailerPlaying(false);
+    setTrailerPlaying(false);
     
     // Fade back to thumbnail
     trailerOpacity.value = withTiming(0, { duration: 300 });
@@ -1068,7 +1069,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
           <TrailerPlayer
               ref={trailerVideoRef}
               trailerUrl={trailerUrl}
-              autoPlay={true}
+              autoPlay={globalTrailerPlaying}
               muted={trailerMuted}
               style={styles.absoluteFill}
               hideLoadingSpinner={true}
@@ -1215,7 +1216,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
             getEpisodeDetails={getEpisodeDetails}
             animatedStyle={watchProgressAnimatedStyle}
             isWatched={isWatched}
-            isTrailerPlaying={isTrailerPlaying}
+            isTrailerPlaying={globalTrailerPlaying}
             trailerMuted={trailerMuted}
           />
 

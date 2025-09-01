@@ -25,6 +25,7 @@ import { CatalogProvider } from './src/contexts/CatalogContext';
 import { GenreProvider } from './src/contexts/GenreContext';
 import { TraktProvider } from './src/contexts/TraktContext';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
+import { TrailerProvider } from './src/contexts/TrailerContext';
 import SplashScreen from './src/components/SplashScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Sentry from '@sentry/react-native';
@@ -129,7 +130,9 @@ function App(): React.JSX.Element {
         <CatalogProvider>
           <TraktProvider>
             <ThemeProvider>
-              <ThemedApp />
+              <TrailerProvider>
+                <ThemedApp />
+              </TrailerProvider>
             </ThemeProvider>
           </TraktProvider>
         </CatalogProvider>
