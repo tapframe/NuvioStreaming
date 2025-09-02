@@ -1426,7 +1426,8 @@
              }
              
              .scroll-down {
-                 display: none;
+                 display: flex;
+                 margin-top: 2rem;
              }
             
             .download-buttons {
@@ -1515,6 +1516,29 @@
                  padding: 1.5rem;
              }
          }
+
+        /* Mobile focus highlight removal */
+        a, button, .download-btn, .privacy-back-btn, .ios-install-option, .ios-modal-close, .scroll-down {
+            -webkit-tap-highlight-color: transparent;
+        }
+        a:focus, a:active, button:focus, button:active,
+        .download-btn:focus, .download-btn:active,
+        .privacy-back-btn:focus, .privacy-back-btn:active,
+        .ios-install-option:focus, .ios-install-option:active,
+        .ios-modal-close:focus, .ios-modal-close:active,
+        .scroll-down:focus, .scroll-down:active {
+            outline: none;
+            box-shadow: none;
+        }
+
+        /* Apply tap highlight and focus removal globally, including feature cards and screenshots */
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+        *:focus, *:active {
+            outline: none !important;
+            box-shadow: none !important;
+        }
     </style>
 </head>
 <body>
