@@ -911,6 +911,132 @@
             opacity: 1;
         }
 
+        /* Mobile Responsive Styles for iOS Modal */
+        @media (max-width: 768px) {
+            .ios-modal-content {
+                padding: 1.5rem;
+                margin: 1rem;
+                max-width: calc(100% - 2rem);
+                width: calc(100% - 2rem);
+                border-radius: 20px;
+            }
+
+            .ios-modal-title {
+                font-size: 1.5rem;
+                margin-bottom: 0.25rem;
+            }
+
+            .ios-modal-subtitle {
+                font-size: 0.9rem;
+            }
+
+            .ios-modal-header {
+                margin-bottom: 1.5rem;
+            }
+
+            .ios-install-option {
+                padding: 1rem;
+                gap: 0.75rem;
+                border-radius: 12px;
+            }
+
+            .ios-option-icon {
+                width: 40px;
+                height: 40px;
+                border-radius: 10px;
+            }
+
+            .ios-option-icon img {
+                width: 28px;
+                height: 28px;
+                border-radius: 6px;
+            }
+
+            .ios-option-title {
+                font-size: 1rem;
+                margin-bottom: 0.2rem;
+            }
+
+            .ios-option-description {
+                font-size: 0.85rem;
+                line-height: 1.3;
+            }
+
+            .ios-modal-close {
+                top: 0.75rem;
+                right: 0.75rem;
+                width: 32px;
+                height: 32px;
+                font-size: 1.1rem;
+            }
+
+            .copy-feedback {
+                padding: 0.75rem 1.5rem;
+                font-size: 0.85rem;
+                border-radius: 10px;
+                margin: 0 1rem;
+                max-width: calc(100% - 2rem);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .ios-modal-content {
+                padding: 1.25rem;
+                margin: 0.75rem;
+                max-width: calc(100% - 1.5rem);
+                width: calc(100% - 1.5rem);
+                border-radius: 16px;
+            }
+
+            .ios-modal-title {
+                font-size: 1.3rem;
+            }
+
+            .ios-modal-subtitle {
+                font-size: 0.85rem;
+            }
+
+            .ios-install-option {
+                padding: 0.875rem;
+                gap: 0.625rem;
+                border-radius: 10px;
+            }
+
+            .ios-option-icon {
+                width: 36px;
+                height: 36px;
+                border-radius: 8px;
+            }
+
+            .ios-option-icon img {
+                width: 24px;
+                height: 24px;
+                border-radius: 5px;
+            }
+
+            .ios-option-title {
+                font-size: 0.95rem;
+            }
+
+            .ios-option-description {
+                font-size: 0.8rem;
+            }
+
+            .ios-modal-close {
+                top: 0.5rem;
+                right: 0.5rem;
+                width: 30px;
+                height: 30px;
+                font-size: 1rem;
+            }
+
+            .copy-feedback {
+                padding: 0.625rem 1.25rem;
+                font-size: 0.8rem;
+                border-radius: 8px;
+            }
+        }
+
         .screenshot h4 {
             font-size: 1rem;
             font-weight: 500;

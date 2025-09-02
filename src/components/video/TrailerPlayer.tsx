@@ -60,6 +60,7 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
   const [showControls, setShowControls] = useState(false);
   const [duration, setDuration] = useState(0);
   const [position, setPosition] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Animated values
   const controlsOpacity = useSharedValue(0);
@@ -139,12 +140,13 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
     logger.info('TrailerPlayer', 'Video loaded successfully');
   }, [loadingOpacity, onLoad]);
 
-  const handleError = useCallback((error: string) => {
+  const handleError = useCallback((error: any) => {
     setIsLoading(false);
     setHasError(true);
     loadingOpacity.value = withTiming(0, { duration: 300 });
-    onError?.(error);
-    logger.error('TrailerPlayer', 'Video error:', error);
+    const message = typeof error === 'string' ? error : (error?.errorString || error?.error?.string || error?.error?.message || JSON.stringify(error));
+    onError?.(message);
+    logger.error('TrailerPlayer', 'Video error details:', error);
   }, [loadingOpacity, onError]);
 
   const handleProgress = useCallback((data: OnProgressData) => {
@@ -216,24 +218,47 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
     <View style={[styles.container, style]}>
       <Video
         ref={videoRef}
-        source={{ uri: trailerUrl }}
+        source={(() => {
+          const androidHeaders = Platform.OS === 'android' ? { 'User-Agent': 'Nuvio/1.0 (Android)' } : {} as any;
+          // Help ExoPlayer select proper MediaSource
+          const lower = (trailerUrl || '').toLowerCase();
+          const looksLikeHls = /\.m3u8(\b|$)/.test(lower) || /hls|applehlsencryption|playlist|m3u/.test(lower);
+          const looksLikeDash = /\.mpd(\b|$)/.test(lower) || /dash|manifest/.test(lower);
+          if (Platform.OS === 'android') {
+            if (looksLikeHls) {
+              return { uri: trailerUrl, type: 'm3u8', headers: androidHeaders } as any;
+            }
+            if (looksLikeDash) {
+              return { uri: trailerUrl, type: 'mpd', headers: androidHeaders } as any;
+            }
+            return { uri: trailerUrl, headers: androidHeaders } as any;
+          }
+          return { uri: trailerUrl } as any;
+        })()}
         style={styles.video}
-        resizeMode="cover"
+        resizeMode={isFullscreen ? 'contain' : 'cover'}
         paused={!isPlaying}
-        repeat={true}
+        repeat={isPlaying}
         muted={isMuted}
         volume={isMuted ? 0 : 1}
         mixWithOthers="duck"
         ignoreSilentSwitch="ignore"
+        /* TextureView can cause rendering issues with complex overlays on Android */
+        useTextureView={Platform.OS === 'android' ? false : undefined}
+        playInBackground={false}
+        playWhenInactive={false}
+        onFullscreenPlayerWillPresent={() => setIsFullscreen(true)}
+        onFullscreenPlayerDidDismiss={() => setIsFullscreen(false)}
         onLoadStart={handleLoadStart}
         onLoad={handleLoad}
-        onError={(error: any) => handleError(error?.error?.message || 'Unknown error')}
+        onError={(error: any) => handleError(error)}
         onProgress={handleProgress}
         controls={false}
         onEnd={() => {
-          // Auto-restart when video ends
-          videoRef.current?.seek(0);
-          setIsPlaying(true);
+          // Only loop if still considered playing
+          if (isPlaying) {
+            videoRef.current?.seek(0);
+          }
         }}
       />
 

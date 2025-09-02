@@ -746,7 +746,6 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       setTrailerPreloaded(true);
     }
     setTrailerReady(true);
-    setTrailerPlaying(true);
     
     // Smooth transition: fade out thumbnail, fade in trailer
     thumbnailOpacity.value = withTiming(0, { duration: 500 });
