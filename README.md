@@ -80,11 +80,17 @@ This app is currently in Beta testing. Please report any bugs or issues you enco
 
 ## 📸 Screenshots
 
-| Home & Continue Watching | Discover & Browse | Search & Details |
-|:-----------------------:|:-----------------:|:----------------:|
-| ![Home](src/assets/home.jpg) | ![Discover](src/assets/discover.jpg) | ![Search](src/assets/search.jpg) |
-| **Content Details** | **Episodes & Seasons** | **Ratings & Info** |
-| ![Metadata](src/assets/metadascreen.jpg) | ![Seasons](src/assets/seasonandepisode.jpg) | ![Rating](src/assets/ratingscreen.jpg) |
+| Home Screen | Details Page | Home Screen 2 |
+|:-----------:|:------------:|:-------------:|
+| ![Home Screen](screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.08.32-portrait.png) | ![Details Page](screesnhots/WhatsApp%20Image%202025-09-02%20at%2000.24.31-portrait.png) | ![Home Screen 2](screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.09.43-portrait.png) |
+
+| Library | Player Loading | Video Player |
+|:-------:|:--------------:|:------------:|
+| ![Library](screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.10.14-portrait.png) | ![Player Loading](screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.12.41-landscape.png) | ![Video Player](screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.13.36-landscape.png) |
+
+| Ratings | Episodes & Seasons | Search & Details |
+|:-------:|:------------------:|:----------------:|
+| ![Ratings](screesnhots/ratingscreen-portrait.png) | ![Episodes & Seasons](screesnhots/seasonandepisode-portrait.png) | ![Search & Details](screesnhots/search-portrait.png) |
 
 ---
 
