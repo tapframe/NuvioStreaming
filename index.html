@@ -13,6 +13,212 @@
             box-sizing: border-box;
         }
 
+        /* Privacy Policy Styles */
+        .privacy-policy {
+            min-height: 100vh;
+            padding: 4rem 0;
+            background: linear-gradient(135deg, #000000 0%, #0a0a0a 15%, #1a1a1a 35%, #0f0f0f 65%, #000000 100%);
+            background-attachment: fixed;
+        }
+
+        .privacy-content {
+            max-width: 800px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .privacy-back-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 0.75rem 1.25rem;
+            color: white;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .privacy-back-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .privacy-content h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            color: white;
+            margin-bottom: 0.5rem;
+            text-align: center;
+            background: linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .last-updated {
+            text-align: center;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.9rem;
+            margin-bottom: 3rem;
+        }
+
+        .privacy-section {
+            margin-bottom: 2.5rem;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 2rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .privacy-section h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 0.5rem;
+        }
+
+        .privacy-section h3 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: white;
+            margin: 1.5rem 0 0.75rem 0;
+        }
+
+        .privacy-section p {
+            color: rgba(255, 255, 255, 0.8);
+            line-height: 1.7;
+            margin-bottom: 1rem;
+        }
+
+        .privacy-section ul {
+            list-style: none;
+            padding: 0;
+            margin: 1rem 0;
+        }
+
+        .privacy-section li {
+            color: rgba(255, 255, 255, 0.8);
+            line-height: 1.7;
+            margin-bottom: 0.75rem;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+
+        .privacy-section li::before {
+            content: '•';
+            color: rgba(255, 255, 255, 0.4);
+            position: absolute;
+            left: 0;
+            font-weight: bold;
+        }
+
+        .privacy-section a {
+            color: #4a9eff;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .privacy-section a:hover {
+            color: #66b3ff;
+            text-decoration: underline;
+        }
+
+        .privacy-link {
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            position: relative;
+            padding: 0.5rem 0;
+        }
+
+        .privacy-link::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #4a9eff, #66b3ff);
+            transition: width 0.3s ease;
+        }
+
+        .privacy-link:hover {
+            color: white;
+        }
+
+        .privacy-link:hover::after {
+            width: 100%;
+        }
+
+        /* Mobile responsive for privacy policy */
+        @media (max-width: 768px) {
+            .privacy-policy {
+                padding: 2rem 0;
+            }
+
+            .privacy-content {
+                padding: 0 1rem;
+            }
+
+            .privacy-content h1 {
+                font-size: 2.2rem;
+            }
+
+            .privacy-section {
+                padding: 1.5rem;
+                margin-bottom: 2rem;
+            }
+
+            .privacy-section h2 {
+                font-size: 1.3rem;
+            }
+
+            .privacy-section h3 {
+                font-size: 1.1rem;
+            }
+
+            .privacy-back-btn {
+                padding: 0.625rem 1rem;
+                font-size: 0.85rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .privacy-content h1 {
+                font-size: 1.8rem;
+            }
+
+            .privacy-section {
+                padding: 1.25rem;
+                border-radius: 12px;
+            }
+
+            .privacy-section h2 {
+                font-size: 1.2rem;
+            }
+
+            .privacy-section h3 {
+                font-size: 1rem;
+            }
+
+            .privacy-section p,
+            .privacy-section li {
+                font-size: 0.9rem;
+            }
+        }
+
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
 
         * {
@@ -145,18 +351,18 @@
             font-size: clamp(6rem, 15vw, 10rem);
             font-weight: 800;
             margin-bottom: 0;
-            background: linear-gradient(135deg, #ffffff 0%, #cccccc 25%, #999999 50%, #666666 75%, #ffffff 100%);
+            background: linear-gradient(120deg, #ffffff 0%, #e8f0ff 25%, #f0e8ff 50%, #e8fffb 75%, #ffffff 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            background-size: 200% 200%;
+            background-size: 300% 300%;
             letter-spacing: -0.05em;
             line-height: 1.1;
             text-transform: uppercase;
-            animation: shimmer 3s ease-in-out infinite;
+            animation: nuvioGradient 20s ease-in-out infinite;
             position: relative;
             z-index: 1;
-            text-shadow: 0 0 40px rgba(255, 255, 255, 0.2);
+            text-shadow: 0 0 40px rgba(255, 255, 255, 0.15);
             transform-style: preserve-3d;
         }
 
@@ -178,12 +384,15 @@
 
 
 
-        @keyframes shimmer {
+        @keyframes nuvioGradient {
             0% {
-                background-position: -200% center;
+                background-position: 0% 50%;
+            }
+            50% {
+                background-position: 100% 50%;
             }
             100% {
-                background-position: 200% center;
+                background-position: 0% 50%;
             }
         }
 
@@ -1512,6 +1721,61 @@
         </div>
     </section>
 
+    <!-- Privacy Policy Section -->
+    <section id="privacy-policy" class="privacy-policy" style="display: none;">
+        <div class="container">
+            <div class="privacy-content">
+                <button class="privacy-back-btn" onclick="hidePrivacyPolicy()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5M12 19l-7-7 7-7"/>
+                    </svg>
+                    Back
+                </button>
+                <h1>Privacy Policy</h1>
+                <p class="last-updated">Last updated: January 2025</p>
+                
+                <div class="privacy-section">
+                    <h2>Data Collection</h2>
+                    <p>Nuvio does not collect personal information. We only store:</p>
+                    <ul>
+                        <li><strong>User preferences:</strong> App settings and viewing preferences for account sync</li>
+                        <li><strong>Viewing history:</strong> Stored locally on your device for your own use</li>
+                    </ul>
+                </div>
+
+                <div class="privacy-section">
+                    <h2>How We Use Your Data</h2>
+                    <p>Your data is stored for your own purposes:</p>
+                    <ul>
+                        <li>Sync your preferences and viewing history across your devices</li>
+                        <li>Maintain your app settings and customizations</li>
+                    </ul>
+                    <p>We do not personalize recommendations or use your data for any other purposes.</p>
+                </div>
+
+                <div class="privacy-section">
+                    <h2>Third-Party Services</h2>
+                    <p>Nuvio integrates with third-party services that have their own privacy policies:</p>
+                    <ul>
+                        <li><strong>Trakt.tv:</strong> For tracking viewing progress (optional)</li>
+                        <li><strong>TMDB:</strong> For movie and TV show information</li>
+                        <li><strong>Content Sources:</strong> Various streaming providers</li>
+                    </ul>
+                </div>
+
+                <div class="privacy-section">
+                    <h2>Open Source</h2>
+                    <p>Nuvio is open-source. You can review our code and data handling on our <a href="https://github.com/tapframe/NuvioStreaming" target="_blank">GitHub repository</a> to verify our privacy practices.</p>
+                </div>
+
+                <div class="privacy-section">
+                    <h2>Contact</h2>
+                    <p>Questions about this policy? Contact us through our <a href="https://github.com/tapframe/NuvioStreaming/issues" target="_blank">GitHub repository</a>.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <footer class="footer">
         <div class="container">
             <div class="credits">
@@ -1539,6 +1803,9 @@
                 <a href="https://github.com/tapframe/NuvioStreaming" class="github-link">
                     <img src="https://github.githubassets.com/assets/GitHub-Mark-ea2971cee799.png" alt="GitHub" class="github-logo">
                     GitHub
+                </a>
+                <a href="#privacy-policy" class="privacy-link" onclick="showPrivacyPolicy()">
+                    Privacy Policy
                 </a>
             </div>
             <p style="margin-top: 2rem; opacity: 0.3; font-size: 0.8rem;">
@@ -1705,6 +1972,68 @@
                 setTimeout(function() {
                     copyFeedback.classList.remove('show');
                 }, 2000);
+            }
+        });
+    </script>
+    
+    <script>
+        // Privacy Policy functionality
+        function showPrivacyPolicy() {
+            const privacySection = document.getElementById('privacy-policy');
+            const mainContent = document.querySelector('body > *:not(#privacy-policy)');
+            
+            // Hide all main content
+            const allSections = document.querySelectorAll('body > *:not(#privacy-policy)');
+            allSections.forEach(section => {
+                if (section.id !== 'privacy-policy') {
+                    section.style.display = 'none';
+                }
+            });
+            
+            // Show privacy policy
+            privacySection.style.display = 'block';
+            
+            // Scroll to top
+            window.scrollTo(0, 0);
+            
+            // Prevent body scroll
+            document.body.style.overflow = 'auto';
+        }
+        
+        function hidePrivacyPolicy() {
+            const privacySection = document.getElementById('privacy-policy');
+            
+            // Hide privacy policy
+            privacySection.style.display = 'none';
+            
+            // Show all main content
+            const allSections = document.querySelectorAll('body > *:not(#privacy-policy)');
+            allSections.forEach(section => {
+                if (section.id !== 'privacy-policy') {
+                    section.style.display = '';
+                }
+            });
+            
+            // Scroll to top
+            window.scrollTo(0, 0);
+            
+            // Restore body scroll
+            document.body.style.overflow = '';
+        }
+        
+        // Handle browser back button
+        window.addEventListener('popstate', function(event) {
+            if (window.location.hash === '#privacy-policy') {
+                showPrivacyPolicy();
+            } else {
+                hidePrivacyPolicy();
+            }
+        });
+        
+        // Check if privacy policy should be shown on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.location.hash === '#privacy-policy') {
+                showPrivacyPolicy();
             }
         });
     </script>

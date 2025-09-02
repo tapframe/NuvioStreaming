@@ -569,7 +569,7 @@ const SettingsScreen: React.FC = () => {
             <SettingItem
               title="Privacy Policy"
               icon="lock"
-              onPress={() => Linking.openURL('https://github.com/Stremio/stremio-expo/blob/main/PRIVACY_POLICY.md')}
+              onPress={() => Linking.openURL('https://tapframe.github.io/NuvioStreaming/#privacy-policy')}
               renderControl={ChevronRight}
               isTablet={isTablet}
             />
