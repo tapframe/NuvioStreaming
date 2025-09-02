@@ -35,6 +35,7 @@ interface TrailerPlayerProps {
   style?: any;
   hideLoadingSpinner?: boolean;
   onFullscreenToggle?: () => void;
+  hideControls?: boolean;
 }
 
 const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
@@ -49,6 +50,7 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
   style,
   hideLoadingSpinner = false,
   onFullscreenToggle,
+  hideControls = false,
 }, ref) => {
   const { currentTheme } = useTheme();
   const videoRef = useRef<VideoRef>(null);
@@ -177,8 +179,16 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
       if (hideControlsTimeout.current) {
         clearTimeout(hideControlsTimeout.current);
       }
+      // Reset all animated values to prevent memory leaks
+      try {
+        controlsOpacity.value = 0;
+        loadingOpacity.value = 0;
+        playButtonScale.value = 1;
+      } catch (error) {
+        logger.error('TrailerPlayer', 'Error cleaning up animation values:', error);
+      }
     };
-  }, []);
+  }, [controlsOpacity, loadingOpacity, playButtonScale]);
 
   // Forward the ref to the video element
   React.useImperativeHandle(ref, () => ({
@@ -269,80 +279,82 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
         </Animated.View>
       )}
 
-      {/* Video controls overlay */}
-      <TouchableOpacity 
-        style={styles.videoOverlay} 
-        onPress={handleVideoPress}
-        activeOpacity={1}
-      >
-        <Animated.View style={[styles.controlsContainer, controlsAnimatedStyle]}>
-          {/* Top gradient */}
-          <LinearGradient
-            colors={['rgba(0,0,0,0.6)', 'transparent']}
-            style={styles.topGradient}
-            pointerEvents="none"
-          />
+            {/* Video controls overlay */}
+      {!hideControls && (
+        <TouchableOpacity 
+          style={styles.videoOverlay}
+          onPress={handleVideoPress}
+          activeOpacity={1}
+        >
+          <Animated.View style={[styles.controlsContainer, controlsAnimatedStyle]}>
+            {/* Top gradient */}
+            <LinearGradient
+              colors={['rgba(0,0,0,0.6)', 'transparent']}
+              style={styles.topGradient}
+              pointerEvents="none"
+            />
 
-          {/* Center play/pause button */}
-          <View style={styles.centerControls}>
-            <Animated.View style={playButtonAnimatedStyle}>
-              <TouchableOpacity style={styles.playButton} onPress={handlePlayPause}>
-                <MaterialIcons 
-                  name={isPlaying ? 'pause' : 'play-arrow'} 
-                  size={isTablet ? 64 : 48} 
-                  color="white" 
-                />
-              </TouchableOpacity>
-            </Animated.View>
-          </View>
-
-          {/* Bottom controls */}
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.8)']}
-            style={styles.bottomGradient}
-          >
-            <View style={styles.bottomControls}>
-              {/* Progress bar */}
-              <View style={styles.progressContainer}>
-                <View style={styles.progressBar}>
-                  <View 
-                    style={[styles.progressFill, { width: `${progressPercentage}%` }]} 
-                  />
-                </View>
-              </View>
-
-              {/* Control buttons */}
-              <View style={styles.controlButtons}>
-                <TouchableOpacity style={styles.controlButton} onPress={handlePlayPause}>
+            {/* Center play/pause button */}
+            <View style={styles.centerControls}>
+              <Animated.View style={playButtonAnimatedStyle}>
+                <TouchableOpacity style={styles.playButton} onPress={handlePlayPause}>
                   <MaterialIcons 
                     name={isPlaying ? 'pause' : 'play-arrow'} 
-                    size={isTablet ? 32 : 24} 
+                    size={isTablet ? 64 : 48} 
                     color="white" 
                   />
                 </TouchableOpacity>
-                
-                <TouchableOpacity style={styles.controlButton} onPress={handleMuteToggle}>
-                  <MaterialIcons 
-                    name={isMuted ? 'volume-off' : 'volume-up'} 
-                    size={isTablet ? 32 : 24} 
-                    color="white" 
-                  />
-                </TouchableOpacity>
-                
-                {onFullscreenToggle && (
-                  <TouchableOpacity style={styles.controlButton} onPress={onFullscreenToggle}>
+              </Animated.View>
+            </View>
+
+            {/* Bottom controls */}
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.8)']}
+              style={styles.bottomGradient}
+            >
+              <View style={styles.bottomControls}>
+                {/* Progress bar */}
+                <View style={styles.progressContainer}>
+                  <View style={styles.progressBar}>
+                    <View 
+                      style={[styles.progressFill, { width: `${progressPercentage}%` }]} 
+                    />
+                  </View>
+                </View>
+
+                {/* Control buttons */}
+                <View style={styles.controlButtons}>
+                  <TouchableOpacity style={styles.controlButton} onPress={handlePlayPause}>
                     <MaterialIcons 
-                      name="fullscreen" 
+                      name={isPlaying ? 'pause' : 'play-arrow'} 
                       size={isTablet ? 32 : 24} 
                       color="white" 
                     />
                   </TouchableOpacity>
-                )}
+                  
+                  <TouchableOpacity style={styles.controlButton} onPress={handleMuteToggle}>
+                    <MaterialIcons 
+                      name={isMuted ? 'volume-off' : 'volume-up'} 
+                      size={isTablet ? 32 : 24} 
+                      color="white" 
+                    />
+                  </TouchableOpacity>
+                  
+                  {onFullscreenToggle && (
+                    <TouchableOpacity style={styles.controlButton} onPress={onFullscreenToggle}>
+                      <MaterialIcons 
+                        name="fullscreen" 
+                        size={isTablet ? 32 : 24} 
+                        color="white" 
+                      />
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
-            </View>
-          </LinearGradient>
-        </Animated.View>
-      </TouchableOpacity>
+            </LinearGradient>
+          </Animated.View>
+        </TouchableOpacity>
+      )}
     </View>
   );
 });

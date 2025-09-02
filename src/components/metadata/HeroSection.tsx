@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Platform,
   InteractionManager,
+  AppState,
 } from 'react-native';
 
 import { MaterialIcons } from '@expo/vector-icons';
@@ -703,6 +704,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   // Performance optimization: Refs for avoiding re-renders
   const interactionComplete = useRef(false);
   const [shouldLoadSecondaryData, setShouldLoadSecondaryData] = useState(false);
+  const appState = useRef(AppState.currentState);
 
   // Image loading state with optimized management
   const [imageError, setImageError] = useState(false);
@@ -755,9 +757,12 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   // Handle fullscreen toggle
   const handleFullscreenToggle = useCallback(async () => {
     try {
+      logger.info('HeroSection', 'Fullscreen button pressed');
       if (trailerVideoRef.current) {
         // Use the native fullscreen player
         await trailerVideoRef.current.presentFullscreenPlayer();
+      } else {
+        logger.warn('HeroSection', 'Trailer video ref not available');
       }
     } catch (error) {
       logger.error('HeroSection', 'Error toggling fullscreen:', error);
@@ -803,18 +808,32 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       setTrailerPreloaded(false);
       
       try {
-        const url = await TrailerService.getTrailerUrl(metadata.name, metadata.year);
-        if (url) {
-          const bestUrl = TrailerService.getBestFormatUrl(url);
-          setTrailerUrl(bestUrl);
-          logger.info('HeroSection', `Trailer URL loaded for ${metadata.name}`);
-        } else {
-          logger.info('HeroSection', `No trailer found for ${metadata.name}`);
-        }
+        // Use requestIdleCallback or setTimeout to prevent blocking main thread
+        const fetchWithDelay = () => {
+          TrailerService.getTrailerUrl(metadata.name, metadata.year)
+            .then(url => {
+              if (url) {
+                const bestUrl = TrailerService.getBestFormatUrl(url);
+                setTrailerUrl(bestUrl);
+                logger.info('HeroSection', `Trailer URL loaded for ${metadata.name}`);
+              } else {
+                logger.info('HeroSection', `No trailer found for ${metadata.name}`);
+              }
+            })
+            .catch(error => {
+              logger.error('HeroSection', 'Error fetching trailer:', error);
+              setTrailerError(true);
+            })
+            .finally(() => {
+              setTrailerLoading(false);
+            });
+        };
+
+        // Delay trailer fetch to prevent blocking UI
+        setTimeout(fetchWithDelay, 100);
       } catch (error) {
-        logger.error('HeroSection', 'Error fetching trailer:', error);
+        logger.error('HeroSection', 'Error in trailer fetch setup:', error);
         setTrailerError(true);
-      } finally {
         setTrailerLoading(false);
       }
     };
@@ -982,18 +1001,50 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     return localWatched;
   }, [watchProgress, isTraktAuthenticated]);
 
+  // App state management to prevent background ANR
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: any) => {
+      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        // App came to foreground
+        logger.info('HeroSection', 'App came to foreground');
+      } else if (appState.current === 'active' && nextAppState.match(/inactive|background/)) {
+        // App going to background - pause heavy operations
+        logger.info('HeroSection', 'App going to background - pausing operations');
+        setTrailerPlaying(false);
+      }
+      appState.current = nextAppState;
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
+  }, []);
+
   // Memory management and cleanup
   useEffect(() => {
     return () => {
-      // Reset animation values on unmount
-      imageOpacity.value = 1;
-      imageLoadOpacity.value = 0;
-      shimmerOpacity.value = 0.3;
-      interactionComplete.current = false;
+      // Reset animation values on unmount to prevent memory leaks
+      try {
+        imageOpacity.value = 1;
+        imageLoadOpacity.value = 0;
+        shimmerOpacity.value = 0.3;
+        trailerOpacity.value = 0;
+        thumbnailOpacity.value = 1;
+        actionButtonsOpacity.value = 1;
+        titleCardTranslateY.value = 0;
+        genreOpacity.value = 1;
+        watchProgressOpacity.value = 1;
+        buttonsOpacity.value = 1;
+        buttonsTranslateY.value = 0;
+        logoOpacity.value = 1;
+        heroOpacity.value = 1;
+        heroHeight.value = height * 0.6;
+      } catch (error) {
+        logger.error('HeroSection', 'Error cleaning up animation values:', error);
+      }
       
-      // Cleanup on unmount
+      interactionComplete.current = false;
     };
-  }, []);
+  }, [imageOpacity, imageLoadOpacity, shimmerOpacity, trailerOpacity, thumbnailOpacity, actionButtonsOpacity, titleCardTranslateY, genreOpacity, watchProgressOpacity, buttonsOpacity, buttonsTranslateY, logoOpacity, heroOpacity, heroHeight]);
 
   // Development-only performance monitoring
   useEffect(() => {
@@ -1072,6 +1123,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
               muted={trailerMuted}
               style={styles.absoluteFill}
               hideLoadingSpinner={true}
+              hideControls={true}
               onFullscreenToggle={handleFullscreenToggle}
               onLoad={handleTrailerReady}
               onError={handleTrailerError}
@@ -1090,7 +1142,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
           position: 'absolute',
           top: Platform.OS === 'android' ? 40 : 50,
           right: width >= 768 ? 32 : 16,
-          zIndex: 10,
+          zIndex: 1000,
           opacity: trailerOpacity,
           flexDirection: 'row',
           gap: 8,
@@ -1099,6 +1151,8 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
           <TouchableOpacity
             onPress={handleFullscreenToggle}
             activeOpacity={0.7}
+            onPressIn={(e) => e.stopPropagation()}
+            onPressOut={(e) => e.stopPropagation()}
             style={{
               padding: 8,
               backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1115,6 +1169,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
           {/* Unmute button */}
           <TouchableOpacity
             onPress={() => {
+              logger.info('HeroSection', 'Mute toggle button pressed, current muted state:', trailerMuted);
               updateSetting('trailerMuted', !trailerMuted);
               if (trailerMuted) {
                 // When unmuting, hide action buttons, genre, title card, and watch progress
@@ -1131,6 +1186,8 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
               }
             }}
             activeOpacity={0.7}
+            onPressIn={(e) => e.stopPropagation()}
+            onPressOut={(e) => e.stopPropagation()}
             style={{
               padding: 8,
               backgroundColor: 'rgba(0, 0, 0, 0.5)',
