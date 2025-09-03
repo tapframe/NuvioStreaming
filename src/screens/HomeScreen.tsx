@@ -612,6 +612,7 @@ const HomeScreen = () => {
       <HeroCarousel
         key={`carousel-${featuredContentSource}`}
         items={allFeaturedContent || (featuredContent ? [featuredContent] : [])}
+        loading={featuredLoading}
       />
     ) : (
       <FeaturedContent

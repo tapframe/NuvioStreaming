@@ -312,18 +312,31 @@ export function useFeaturedContent() {
   // Subscribe directly to settings emitter for immediate updates
   useEffect(() => {
     const handleSettingsChange = () => {
-      // Only refresh if current content source is different from settings
-      // This prevents duplicate refreshes when HomeScreen also handles this event
-      if (contentSource !== settings.featuredContentSource) {
-        logger.info('[useFeaturedContent] event:content-source-changed', { from: contentSource, to: settings.featuredContentSource });
-        // Content source will be updated in the next render cycle due to state updates
-        // No need to call loadFeaturedContent here as it will be triggered by contentSource change
-      } else if (
-        contentSource === 'catalogs' && 
-        JSON.stringify(selectedCatalogs) !== JSON.stringify(settings.selectedHeroCatalogs)
-      ) {
-        // Only refresh if using catalogs and selected catalogs changed
-        logger.info('[useFeaturedContent] event:selected-catalogs-changed');
+      // Always reflect settings immediately in this hook
+      const nextSource = settings.featuredContentSource;
+      const nextSelected = settings.selectedHeroCatalogs || [];
+
+      const sourceChanged = contentSource !== nextSource;
+      const catalogsChanged = JSON.stringify(selectedCatalogs) !== JSON.stringify(nextSelected);
+
+      if (sourceChanged || (nextSource === 'catalogs' && catalogsChanged)) {
+        logger.info('[useFeaturedContent] event:settings-changed:immediate-refresh', {
+          fromSource: contentSource,
+          toSource: nextSource,
+          catalogsChanged
+        });
+
+        // Update internal state immediately so dependent effects are in sync
+        setContentSource(nextSource);
+        setSelectedCatalogs(nextSelected);
+
+        // Clear current data to reflect change instantly in UI
+        setAllFeaturedContent([]);
+        setFeaturedContent(null);
+        persistentStore.allFeaturedContent = [];
+        persistentStore.featuredContent = null;
+
+        // Force a fresh load
         loadFeaturedContent(true);
       }
     };
