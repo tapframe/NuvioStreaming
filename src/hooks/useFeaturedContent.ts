@@ -17,7 +17,9 @@ const persistentStore = {
   lastSettings: {
     showHeroSection: true,
     featuredContentSource: 'tmdb' as 'tmdb' | 'catalogs',
-    selectedHeroCatalogs: [] as string[]
+    selectedHeroCatalogs: [] as string[],
+    logoSourcePreference: 'metahub' as 'metahub' | 'tmdb',
+    tmdbLanguagePreference: 'en'
   }
 };
 
@@ -127,29 +129,87 @@ export function useFeaturedContent() {
               };
             });
             
-          // Then fetch logos for each item
+          // Then fetch logos for each item based on preference
           const tLogos = Date.now();
-          formattedContent = await Promise.all(
-            preFormattedContent.map(async (item) => {
-              try {
-                if (item.id.startsWith('tmdb:')) {
-                  const tmdbId = item.id.split(':')[1];
-                  const logoUrl = await tmdbService.getContentLogo('movie', tmdbId);
-                  if (logoUrl) {
-                    return {
-                      ...item,
-                      logo: logoUrl
-                    };
-                  }
-                }
-                return item;
-              } catch (error) {
-                logger.error(`Failed to fetch logo for ${item.name}:`, error);
+          const preference = settings.logoSourcePreference || 'metahub';
+          const preferredLanguage = settings.tmdbLanguagePreference || 'en';
+
+          const fetchLogoForItem = async (item: StreamingContent): Promise<StreamingContent> => {
+            try {
+              // Support both TMDB-prefixed and IMDb-prefixed IDs
+              const isTmdb = item.id.startsWith('tmdb:');
+              const isImdb = item.id.startsWith('tt');
+              let tmdbId: string | null = null;
+              let imdbId: string | null = null;
+
+              if (isTmdb) {
+                tmdbId = item.id.split(':')[1];
+              } else if (isImdb) {
+                imdbId = item.id.split(':')[0];
+              } else {
                 return item;
               }
-            })
-          );
-          logger.info('[useFeaturedContent] tmdb:logos', { count: formattedContent.length, duration: `${Date.now() - tLogos}ms` });
+
+              if (preference === 'tmdb') {
+                logger.debug('[useFeaturedContent] logo:try:tmdb', { name: item.name, id: item.id, tmdbId, lang: preferredLanguage });
+                // Resolve TMDB id if we only have IMDb
+                if (!tmdbId && imdbId) {
+                  const found = await tmdbService.findTMDBIdByIMDB(imdbId);
+                  tmdbId = found ? String(found) : null;
+                }
+                if (!tmdbId) return item;
+                const logoUrl = tmdbId ? await tmdbService.getContentLogo('movie', tmdbId as string, preferredLanguage) : null;
+                if (logoUrl) {
+                  logger.debug('[useFeaturedContent] logo:tmdb:ok', { name: item.name, id: item.id, url: logoUrl, lang: preferredLanguage });
+                  return { ...item, logo: logoUrl };
+                }
+                // Fallback to Metahub via IMDb ID
+                if (!imdbId && tmdbId) {
+                  const movieDetails: any = await tmdbService.getMovieDetails(tmdbId);
+                  imdbId = movieDetails?.imdb_id;
+                }
+                if (imdbId) {
+                  const metahubUrl = `https://images.metahub.space/logo/medium/${imdbId}/img`;
+                  logger.debug('[useFeaturedContent] logo:fallback:metahub', { name: item.name, id: item.id, url: metahubUrl });
+                  return { ...item, logo: metahubUrl };
+                }
+                logger.debug('[useFeaturedContent] logo:none', { name: item.name, id: item.id });
+                return item;
+              } else {
+                // preference === 'metahub'
+                // If have IMDb, use directly
+                if (!imdbId && tmdbId) {
+                  const movieDetails: any = await tmdbService.getMovieDetails(tmdbId);
+                  imdbId = movieDetails?.imdb_id;
+                }
+                if (imdbId) {
+                  const metahubUrl = `https://images.metahub.space/logo/medium/${imdbId}/img`;
+                  logger.debug('[useFeaturedContent] logo:metahub:ok', { name: item.name, id: item.id, url: metahubUrl });
+                  return { ...item, logo: metahubUrl };
+                }
+                // Fallback to TMDB logo
+                logger.debug('[useFeaturedContent] logo:metahub:miss → fallback:tmdb', { name: item.name, id: item.id, lang: preferredLanguage });
+                if (!tmdbId && imdbId) {
+                  const found = await tmdbService.findTMDBIdByIMDB(imdbId);
+                  tmdbId = found ? String(found) : null;
+                }
+                if (!tmdbId) return item;
+                const logoUrl = tmdbId ? await tmdbService.getContentLogo('movie', tmdbId as string, preferredLanguage) : null;
+                if (logoUrl) {
+                  logger.debug('[useFeaturedContent] logo:tmdb:fallback:ok', { name: item.name, id: item.id, url: logoUrl, lang: preferredLanguage });
+                  return { ...item, logo: logoUrl };
+                }
+                logger.debug('[useFeaturedContent] logo:none', { name: item.name, id: item.id });
+                return item;
+              }
+            } catch (error) {
+              logger.error('[useFeaturedContent] logo:error', { name: item.name, id: item.id, error: String(error) });
+              return item;
+            }
+          };
+
+          formattedContent = await Promise.all(preFormattedContent.map(fetchLogoForItem));
+          logger.info('[useFeaturedContent] logos:resolved', { count: formattedContent.length, duration: `${Date.now() - tLogos}ms`, preference });
         }
       } else {
         // Load from installed catalogs
@@ -182,8 +242,86 @@ export function useFeaturedContent() {
             );
           logger.info('[useFeaturedContent] catalogs:items', { total: allItems.length, duration: `${Date.now() - tFlat}ms` });
 
-          // Sort by popular, newest, etc. (possibly enhanced later)
-          formattedContent = allItems.sort(() => Math.random() - 0.5).slice(0, 10);
+          // Sort by popular, newest, etc. (possibly enhanced later) and take first 10
+          const topItems = allItems.sort(() => Math.random() - 0.5).slice(0, 10);
+
+          // Optionally enrich with logos based on preference for tmdb-sourced IDs
+          const preference = settings.logoSourcePreference || 'metahub';
+          const preferredLanguage = settings.tmdbLanguagePreference || 'en';
+
+          const enrichLogo = async (item: any): Promise<StreamingContent> => {
+            const base: StreamingContent = {
+              id: item.id,
+              type: item.type,
+              name: item.name,
+              poster: item.poster,
+              banner: (item as any).banner,
+              logo: (item as any).logo,
+              description: (item as any).description,
+              year: (item as any).year,
+              genres: (item as any).genres,
+              inLibrary: Boolean((item as any).inLibrary),
+            };
+            try {
+              const rawId = String(item.id);
+              const isTmdb = rawId.startsWith('tmdb:');
+              const isImdb = rawId.startsWith('tt');
+              let tmdbId: string | null = null;
+              let imdbId: string | null = null;
+
+              if (isTmdb) tmdbId = rawId.split(':')[1];
+              if (isImdb) imdbId = rawId.split(':')[0];
+              if (!tmdbId && imdbId) {
+                const found = await tmdbService.findTMDBIdByIMDB(imdbId);
+                tmdbId = found ? String(found) : null;
+              }
+              if (!tmdbId && !imdbId) return base;
+              if (preference === 'tmdb') {
+                logger.debug('[useFeaturedContent] logo:try:tmdb', { name: item.name, id: item.id, tmdbId, lang: preferredLanguage });
+                if (!tmdbId) return base;
+                const logoUrl = await tmdbService.getContentLogo(item.type === 'series' ? 'tv' : 'movie', tmdbId as string, preferredLanguage);
+                if (logoUrl) {
+                  logger.debug('[useFeaturedContent] logo:tmdb:ok', { name: item.name, id: item.id, url: logoUrl, lang: preferredLanguage });
+                  return { ...base, logo: logoUrl };
+                }
+                // fallback metahub
+                if (!imdbId && tmdbId) {
+                  const details: any = item.type === 'series' ? await tmdbService.getShowExternalIds(parseInt(tmdbId)) : await tmdbService.getMovieDetails(tmdbId);
+                  imdbId = details?.imdb_id;
+                }
+                if (imdbId) {
+                  const url = `https://images.metahub.space/logo/medium/${imdbId}/img`;
+                  logger.debug('[useFeaturedContent] logo:fallback:metahub', { name: item.name, id: item.id, url });
+                  return { ...base, logo: url };
+                }
+                return base;
+              } else {
+                // metahub first
+                if (!imdbId && tmdbId) {
+                  const details: any = item.type === 'series' ? await tmdbService.getShowExternalIds(parseInt(tmdbId)) : await tmdbService.getMovieDetails(tmdbId);
+                  imdbId = details?.imdb_id;
+                }
+                if (imdbId) {
+                  const url = `https://images.metahub.space/logo/medium/${imdbId}/img`;
+                  logger.debug('[useFeaturedContent] logo:metahub:ok', { name: item.name, id: item.id, url });
+                  return { ...base, logo: url };
+                }
+                logger.debug('[useFeaturedContent] logo:metahub:miss → fallback:tmdb', { name: item.name, id: item.id, lang: preferredLanguage });
+                if (!tmdbId) return base;
+                const logoUrl = await tmdbService.getContentLogo(item.type === 'series' ? 'tv' : 'movie', tmdbId as string, preferredLanguage);
+                if (logoUrl) {
+                  logger.debug('[useFeaturedContent] logo:tmdb:fallback:ok', { name: item.name, id: item.id, url: logoUrl, lang: preferredLanguage });
+                  return { ...base, logo: logoUrl };
+                }
+                return base;
+              }
+            } catch (error) {
+              logger.error('[useFeaturedContent] logo:error', { name: item.name, id: item.id, error: String(error) });
+              return base;
+            }
+          };
+
+          formattedContent = await Promise.all(topItems.map(enrichLogo));
         }
       }
 
@@ -293,13 +431,17 @@ export function useFeaturedContent() {
     const settingsChanged = 
       persistentStore.lastSettings.showHeroSection !== settings.showHeroSection ||
       persistentStore.lastSettings.featuredContentSource !== settings.featuredContentSource ||
-      JSON.stringify(persistentStore.lastSettings.selectedHeroCatalogs) !== JSON.stringify(settings.selectedHeroCatalogs);
+      JSON.stringify(persistentStore.lastSettings.selectedHeroCatalogs) !== JSON.stringify(settings.selectedHeroCatalogs) ||
+      persistentStore.lastSettings.logoSourcePreference !== settings.logoSourcePreference ||
+      persistentStore.lastSettings.tmdbLanguagePreference !== settings.tmdbLanguagePreference;
     
     // Update our tracking of last used settings
     persistentStore.lastSettings = {
       showHeroSection: settings.showHeroSection,
       featuredContentSource: settings.featuredContentSource,
-      selectedHeroCatalogs: [...settings.selectedHeroCatalogs]
+      selectedHeroCatalogs: [...settings.selectedHeroCatalogs],
+      logoSourcePreference: settings.logoSourcePreference,
+      tmdbLanguagePreference: settings.tmdbLanguagePreference
     };
     
     // Force refresh if settings changed during app restart
@@ -315,20 +457,29 @@ export function useFeaturedContent() {
       // Always reflect settings immediately in this hook
       const nextSource = settings.featuredContentSource;
       const nextSelected = settings.selectedHeroCatalogs || [];
+      const nextLogoPref = settings.logoSourcePreference;
+      const nextTmdbLang = settings.tmdbLanguagePreference;
 
       const sourceChanged = contentSource !== nextSource;
       const catalogsChanged = JSON.stringify(selectedCatalogs) !== JSON.stringify(nextSelected);
+      const logoPrefChanged = persistentStore.lastSettings.logoSourcePreference !== nextLogoPref;
+      const tmdbLangChanged = persistentStore.lastSettings.tmdbLanguagePreference !== nextTmdbLang;
 
-      if (sourceChanged || (nextSource === 'catalogs' && catalogsChanged)) {
+      if (sourceChanged || (nextSource === 'catalogs' && catalogsChanged) || logoPrefChanged || tmdbLangChanged) {
         logger.info('[useFeaturedContent] event:settings-changed:immediate-refresh', {
           fromSource: contentSource,
           toSource: nextSource,
-          catalogsChanged
+          catalogsChanged,
+          logoPrefChanged,
+          tmdbLangChanged
         });
 
         // Update internal state immediately so dependent effects are in sync
         setContentSource(nextSource);
         setSelectedCatalogs(nextSelected);
+        // Update tracked last settings for subsequent comparisons
+        persistentStore.lastSettings.logoSourcePreference = nextLogoPref;
+        persistentStore.lastSettings.tmdbLanguagePreference = nextTmdbLang;
 
         // Clear current data to reflect change instantly in UI
         setAllFeaturedContent([]);

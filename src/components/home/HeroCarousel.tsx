@@ -28,6 +28,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
 
   const data = useMemo(() => (items && items.length ? items.slice(0, 10) : []), [items]);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [failedLogoIds, setFailedLogoIds] = useState<Set<string>>(new Set());
 
   if (loading) {
     return (
@@ -149,11 +150,24 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
                     />
                   </View>
                   <View style={styles.info as ViewStyle}>
-                    <Text style={[styles.title as TextStyle, { color: currentTheme.colors.highEmphasis }]} numberOfLines={1}>
-                      {item.name}
-                    </Text>
+                    {item.logo && !failedLogoIds.has(item.id) ? (
+                      <ExpoImage
+                        source={{ uri: item.logo }}
+                        style={styles.logo as ImageStyle}
+                        contentFit="contain"
+                        transition={250}
+                        cachePolicy="memory-disk"
+                        onError={() => {
+                          setFailedLogoIds((prev) => new Set(prev).add(item.id));
+                        }}
+                      />
+                    ) : (
+                      <Text style={[styles.title as TextStyle, { color: currentTheme.colors.highEmphasis, textAlign: 'center' }]} numberOfLines={1}>
+                        {item.name}
+                      </Text>
+                    )}
                     {item.genres && (
-                      <Text style={[styles.genres as TextStyle, { color: currentTheme.colors.mediumEmphasis }]} numberOfLines={1}>
+                      <Text style={[styles.genres as TextStyle, { color: currentTheme.colors.mediumEmphasis, textAlign: 'center' }]} numberOfLines={1}>
                         {item.genres.slice(0, 3).join(' • ')}
                       </Text>
                     )}
@@ -297,6 +311,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 12,
+    alignItems: 'center',
   },
   title: {
     fontSize: 18,
@@ -311,6 +326,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     marginTop: 12,
+    justifyContent: 'center',
+  },
+  logo: {
+    width: Math.round(CARD_WIDTH * 0.72),
+    height: 64,
+    marginBottom: 6,
   },
   playButton: {
     flexDirection: 'row',
