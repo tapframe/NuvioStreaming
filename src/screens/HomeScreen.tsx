@@ -46,6 +46,7 @@ import { useHomeCatalogs } from '../hooks/useHomeCatalogs';
 import { useFeaturedContent } from '../hooks/useFeaturedContent';
 import { useSettings, settingsEmitter } from '../hooks/useSettings';
 import FeaturedContent from '../components/home/FeaturedContent';
+import HeroCarousel from '../components/home/HeroCarousel';
 import CatalogSection from '../components/home/CatalogSection';
 import { SkeletonFeatured } from '../components/home/SkeletonLoaders';
 import LoadingSpinner from '../components/common/LoadingSpinner';
@@ -125,6 +126,7 @@ const HomeScreen = () => {
   
   const { 
     featuredContent, 
+    allFeaturedContent,
     loading: featuredLoading, 
     isSaved, 
     handleSaveToLibrary, 
@@ -606,14 +608,21 @@ const HomeScreen = () => {
 
   // Memoize individual section components to prevent re-renders
   const memoizedFeaturedContent = useMemo(() => (
-    <FeaturedContent
-      key={`featured-${showHeroSection}-${featuredContentSource}`}
-      featuredContent={featuredContent}
-      isSaved={isSaved}
-      handleSaveToLibrary={handleSaveToLibrary}
-      loading={featuredLoading}
-    />
-  ), [showHeroSection, featuredContentSource, featuredContent, isSaved, handleSaveToLibrary]);
+    settings.heroStyle === 'carousel' ? (
+      <HeroCarousel
+        key={`carousel-${featuredContentSource}`}
+        items={allFeaturedContent || (featuredContent ? [featuredContent] : [])}
+      />
+    ) : (
+      <FeaturedContent
+        key={`featured-${showHeroSection}-${featuredContentSource}`}
+        featuredContent={featuredContent}
+        isSaved={isSaved}
+        handleSaveToLibrary={handleSaveToLibrary}
+        loading={featuredLoading}
+      />
+    )
+  ), [settings.heroStyle, showHeroSection, featuredContentSource, featuredContent, allFeaturedContent, isSaved, handleSaveToLibrary]);
 
   const memoizedThisWeekSection = useMemo(() => <ThisWeekSection />, []);
   const memoizedContinueWatchingSection = useMemo(() => <ContinueWatchingSection ref={continueWatchingRef} />, []);

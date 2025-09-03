@@ -39,6 +39,7 @@ export interface AppSettings {
   preferredPlayer: 'internal' | 'vlc' | 'infuse' | 'outplayer' | 'vidhub' | 'external';
   showHeroSection: boolean;
   featuredContentSource: 'tmdb' | 'catalogs';
+  heroStyle: 'legacy' | 'carousel';
   selectedHeroCatalogs: string[]; // Array of catalog IDs to display in hero section
   logoSourcePreference: 'metahub' | 'tmdb'; // Preferred source for title logos
   tmdbLanguagePreference: string; // Preferred language for TMDB logos (ISO 639-1 code)
@@ -80,6 +81,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   preferredPlayer: 'internal',
   showHeroSection: true,
   featuredContentSource: 'catalogs',
+  heroStyle: 'legacy',
   selectedHeroCatalogs: [], // Empty array means all catalogs are selected
   logoSourcePreference: 'metahub', // Default to Metahub as first source
   tmdbLanguagePreference: 'en', // Default to English

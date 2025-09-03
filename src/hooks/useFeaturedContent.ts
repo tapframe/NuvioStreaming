@@ -428,6 +428,7 @@ export function useFeaturedContent() {
 
   return { 
     featuredContent, 
+    allFeaturedContent,
     loading, 
     isSaved, 
     handleSaveToLibrary, 

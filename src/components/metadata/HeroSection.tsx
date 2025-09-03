@@ -9,6 +9,7 @@ import {
   InteractionManager,
   AppState,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -1017,11 +1018,28 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription?.remove();
-  }, []);
+  }, [setTrailerPlaying]);
+
+  // Navigation focus effect to stop trailer when navigating away
+  useFocusEffect(
+    useCallback(() => {
+      // Screen is focused
+      logger.info('HeroSection', 'Screen focused');
+      
+      return () => {
+        // Screen is unfocused - stop trailer playback
+        logger.info('HeroSection', 'Screen unfocused - stopping trailer');
+        setTrailerPlaying(false);
+      };
+    }, [setTrailerPlaying])
+  );
 
   // Memory management and cleanup
   useEffect(() => {
     return () => {
+      // Stop trailer playback when component unmounts
+      setTrailerPlaying(false);
+      
       // Reset animation values on unmount to prevent memory leaks
       try {
         imageOpacity.value = 1;
@@ -1044,7 +1062,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       
       interactionComplete.current = false;
     };
-  }, [imageOpacity, imageLoadOpacity, shimmerOpacity, trailerOpacity, thumbnailOpacity, actionButtonsOpacity, titleCardTranslateY, genreOpacity, watchProgressOpacity, buttonsOpacity, buttonsTranslateY, logoOpacity, heroOpacity, heroHeight]);
+  }, [imageOpacity, imageLoadOpacity, shimmerOpacity, trailerOpacity, thumbnailOpacity, actionButtonsOpacity, titleCardTranslateY, genreOpacity, watchProgressOpacity, buttonsOpacity, buttonsTranslateY, logoOpacity, heroOpacity, heroHeight, setTrailerPlaying]);
 
   // Development-only performance monitoring
   useEffect(() => {
@@ -1100,6 +1118,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       {shouldLoadSecondaryData && settings?.showTrailers && trailerUrl && !trailerLoading && !trailerError && !trailerPreloaded && (
         <View style={[styles.absoluteFill, { opacity: 0, pointerEvents: 'none' }]}>
           <TrailerPlayer
+            key={`preload-${trailerUrl}`}
             trailerUrl={trailerUrl}
             autoPlay={false}
             muted={true}
@@ -1117,6 +1136,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
           opacity: trailerOpacity
         }]}>
           <TrailerPlayer
+              key={`visible-${trailerUrl}`}
               ref={trailerVideoRef}
               trailerUrl={trailerUrl}
               autoPlay={globalTrailerPlaying}

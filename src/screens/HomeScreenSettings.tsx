@@ -276,6 +276,31 @@ const HomeScreenSettings: React.FC = () => {
           <>
             <View style={styles.radioCardContainer}>
               <RadioOption 
+                selected={settings.heroStyle === 'legacy'}
+                onPress={() => handleUpdateSetting('heroStyle', 'legacy')}
+                label="Legacy Hero (banner)"
+              />
+              <View style={styles.radioDescription}>
+                <Text style={[styles.radioDescriptionText, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>
+                  Original full-width banner with overlayed info and actions.
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.radioCardContainer}>
+              <RadioOption 
+                selected={settings.heroStyle === 'carousel'}
+                onPress={() => handleUpdateSetting('heroStyle', 'carousel')}
+                label="New Card Carousel"
+              />
+              <View style={styles.radioDescription}>
+                <Text style={[styles.radioDescriptionText, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>
+                  A beautiful, swipeable carousel of featured cards with smooth animations.
+                </Text>
+              </View>
+            </View>
+            <View style={styles.radioCardContainer}>
+              <RadioOption 
                 selected={settings.featuredContentSource === 'tmdb'}
                 onPress={() => {
                   console.log('Selected TMDB source');

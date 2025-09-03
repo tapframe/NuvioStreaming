@@ -6,6 +6,8 @@ import {
   Dimensions,
   Platform,
   ActivityIndicator,
+  AppState,
+  AppStateStatus,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import Video, { VideoRef, OnLoadData, OnProgressData } from 'react-native-video';
@@ -63,6 +65,7 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
   const [duration, setDuration] = useState(0);
   const [position, setPosition] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isComponentMounted, setIsComponentMounted] = useState(true);
 
   // Animated values
   const controlsOpacity = useSharedValue(0);
@@ -71,8 +74,65 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
 
   // Auto-hide controls after 3 seconds
   const hideControlsTimeout = useRef<NodeJS.Timeout | null>(null);
+  const appState = useRef(AppState.currentState);
+
+  // Cleanup function to stop video and reset state
+  const cleanupVideo = useCallback(() => {
+    try {
+      if (videoRef.current) {
+        // Pause the video
+        setIsPlaying(false);
+        
+        // Seek to beginning to stop any background processing
+        videoRef.current.seek(0);
+        
+        // Clear any pending timeouts
+        if (hideControlsTimeout.current) {
+          clearTimeout(hideControlsTimeout.current);
+          hideControlsTimeout.current = null;
+        }
+        
+        logger.info('TrailerPlayer', 'Video cleanup completed');
+      }
+    } catch (error) {
+      logger.error('TrailerPlayer', 'Error during video cleanup:', error);
+    }
+  }, []);
+
+  // Handle app state changes to pause video when app goes to background
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (appState.current === 'active' && nextAppState.match(/inactive|background/)) {
+        // App going to background - pause video
+        logger.info('TrailerPlayer', 'App going to background - pausing video');
+        setIsPlaying(false);
+      } else if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        // App coming to foreground - resume if it was playing
+        logger.info('TrailerPlayer', 'App coming to foreground');
+        if (autoPlay && isComponentMounted) {
+          setIsPlaying(true);
+        }
+      }
+      appState.current = nextAppState;
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
+  }, [autoPlay, isComponentMounted]);
+
+  // Component mount/unmount tracking
+  useEffect(() => {
+    setIsComponentMounted(true);
+    
+    return () => {
+      setIsComponentMounted(false);
+      cleanupVideo();
+    };
+  }, [cleanupVideo]);
 
   const showControlsWithTimeout = useCallback(() => {
+    if (!isComponentMounted) return;
+    
     setShowControls(true);
     controlsOpacity.value = withTiming(1, { duration: 200 });
     
@@ -83,12 +143,16 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
     
     // Set new timeout to hide controls
     hideControlsTimeout.current = setTimeout(() => {
-      setShowControls(false);
-      controlsOpacity.value = withTiming(0, { duration: 200 });
+      if (isComponentMounted) {
+        setShowControls(false);
+        controlsOpacity.value = withTiming(0, { duration: 200 });
+      }
     }, 3000);
-  }, [controlsOpacity]);
+  }, [controlsOpacity, isComponentMounted]);
 
   const handleVideoPress = useCallback(() => {
+    if (!isComponentMounted) return;
+    
     if (showControls) {
       // If controls are visible, toggle play/pause
       handlePlayPause();
@@ -96,14 +160,16 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
       // If controls are hidden, show them
       showControlsWithTimeout();
     }
-  }, [showControls, showControlsWithTimeout]);
+  }, [showControls, showControlsWithTimeout, isComponentMounted]);
 
   const handlePlayPause = useCallback(async () => {
     try {
-      if (!videoRef.current) return;
+      if (!videoRef.current || !isComponentMounted) return;
       
       playButtonScale.value = withTiming(0.8, { duration: 100 }, () => {
-        playButtonScale.value = withTiming(1, { duration: 100 });
+        if (isComponentMounted) {
+          playButtonScale.value = withTiming(1, { duration: 100 });
+        }
       });
 
       setIsPlaying(!isPlaying);
@@ -112,46 +178,54 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
     } catch (error) {
       logger.error('TrailerPlayer', 'Error toggling playback:', error);
     }
-  }, [isPlaying, playButtonScale, showControlsWithTimeout]);
+  }, [isPlaying, playButtonScale, showControlsWithTimeout, isComponentMounted]);
 
   const handleMuteToggle = useCallback(async () => {
     try {
-      if (!videoRef.current) return;
+      if (!videoRef.current || !isComponentMounted) return;
       
       setIsMuted(!isMuted);
       showControlsWithTimeout();
     } catch (error) {
       logger.error('TrailerPlayer', 'Error toggling mute:', error);
     }
-  }, [isMuted, showControlsWithTimeout]);
+  }, [isMuted, showControlsWithTimeout, isComponentMounted]);
 
   const handleLoadStart = useCallback(() => {
+    if (!isComponentMounted) return;
+    
     setIsLoading(true);
     setHasError(false);
     // Only show loading spinner if not hidden
     loadingOpacity.value = hideLoadingSpinner ? 0 : 1;
     onLoadStart?.();
     logger.info('TrailerPlayer', 'Video load started');
-  }, [loadingOpacity, onLoadStart, hideLoadingSpinner]);
+  }, [loadingOpacity, onLoadStart, hideLoadingSpinner, isComponentMounted]);
 
   const handleLoad = useCallback((data: OnLoadData) => {
+    if (!isComponentMounted) return;
+    
     setIsLoading(false);
     loadingOpacity.value = withTiming(0, { duration: 300 });
     setDuration(data.duration * 1000); // Convert to milliseconds
     onLoad?.();
     logger.info('TrailerPlayer', 'Video loaded successfully');
-  }, [loadingOpacity, onLoad]);
+  }, [loadingOpacity, onLoad, isComponentMounted]);
 
   const handleError = useCallback((error: any) => {
+    if (!isComponentMounted) return;
+    
     setIsLoading(false);
     setHasError(true);
     loadingOpacity.value = withTiming(0, { duration: 300 });
     const message = typeof error === 'string' ? error : (error?.errorString || error?.error?.string || error?.error?.message || JSON.stringify(error));
     onError?.(message);
     logger.error('TrailerPlayer', 'Video error details:', error);
-  }, [loadingOpacity, onError]);
+  }, [loadingOpacity, onError, isComponentMounted]);
 
   const handleProgress = useCallback((data: OnProgressData) => {
+    if (!isComponentMounted) return;
+    
     setPosition(data.currentTime * 1000); // Convert to milliseconds
     onProgress?.(data);
     
@@ -161,24 +235,30 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
         didJustFinish: false
       });
     }
-  }, [onProgress, onPlaybackStatusUpdate]);
+  }, [onProgress, onPlaybackStatusUpdate, isComponentMounted]);
 
   // Sync internal muted state with prop
   useEffect(() => {
-    setIsMuted(muted);
-  }, [muted]);
+    if (isComponentMounted) {
+      setIsMuted(muted);
+    }
+  }, [muted, isComponentMounted]);
 
   // Sync internal playing state with autoPlay prop
   useEffect(() => {
-    setIsPlaying(autoPlay);
-  }, [autoPlay]);
+    if (isComponentMounted) {
+      setIsPlaying(autoPlay);
+    }
+  }, [autoPlay, isComponentMounted]);
 
-  // Cleanup timeout on unmount
+  // Cleanup timeout and animated values on unmount
   useEffect(() => {
     return () => {
       if (hideControlsTimeout.current) {
         clearTimeout(hideControlsTimeout.current);
+        hideControlsTimeout.current = null;
       }
+      
       // Reset all animated values to prevent memory leaks
       try {
         controlsOpacity.value = 0;
@@ -187,13 +267,16 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
       } catch (error) {
         logger.error('TrailerPlayer', 'Error cleaning up animation values:', error);
       }
+      
+      // Ensure video is stopped
+      cleanupVideo();
     };
-  }, [controlsOpacity, loadingOpacity, playButtonScale]);
+  }, [controlsOpacity, loadingOpacity, playButtonScale, cleanupVideo]);
 
   // Forward the ref to the video element
   React.useImperativeHandle(ref, () => ({
     presentFullscreenPlayer: () => {
-      if (videoRef.current) {
+      if (videoRef.current && isComponentMounted) {
         return videoRef.current.presentFullscreenPlayer();
       }
     }
@@ -265,8 +348,8 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
         onProgress={handleProgress}
         controls={false}
         onEnd={() => {
-          // Only loop if still considered playing
-          if (isPlaying) {
+          // Only loop if still considered playing and component is mounted
+          if (isPlaying && isComponentMounted) {
             videoRef.current?.seek(0);
           }
         }}
