@@ -369,13 +369,14 @@ const HomeScreen = () => {
         StatusBar.setTranslucent(true);
         StatusBar.setBackgroundColor('transparent');
         
+        // Ensure portrait when coming back to Home on all platforms
+        try {
+          ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+        } catch {}
+
         // For iOS specifically
         if (Platform.OS === 'ios') {
           StatusBar.setHidden(false);
-          // Ensure portrait when coming back to Home on iOS
-          try {
-            ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-          } catch {}
         }
       };
       
@@ -607,8 +608,11 @@ const HomeScreen = () => {
   }, []);
 
   // Memoize individual section components to prevent re-renders
-  const memoizedFeaturedContent = useMemo(() => (
-    settings.heroStyle === 'carousel' ? (
+  const memoizedFeaturedContent = useMemo(() => {
+    const deviceWidth = Dimensions.get('window').width;
+    const isTablet = deviceWidth >= 768;
+    const heroStyleToUse = isTablet ? 'legacy' : settings.heroStyle;
+    return heroStyleToUse === 'carousel' ? (
       <HeroCarousel
         key={`carousel-${featuredContentSource}`}
         items={allFeaturedContent || (featuredContent ? [featuredContent] : [])}
@@ -622,8 +626,8 @@ const HomeScreen = () => {
         handleSaveToLibrary={handleSaveToLibrary}
         loading={featuredLoading}
       />
-    )
-  ), [settings.heroStyle, showHeroSection, featuredContentSource, featuredContent, allFeaturedContent, isSaved, handleSaveToLibrary]);
+    );
+  }, [settings.heroStyle, showHeroSection, featuredContentSource, featuredContent, allFeaturedContent, isSaved, handleSaveToLibrary]);
 
   const memoizedThisWeekSection = useMemo(() => <ThisWeekSection />, []);
   const memoizedContinueWatchingSection = useMemo(() => <ContinueWatchingSection ref={continueWatchingRef} />, []);

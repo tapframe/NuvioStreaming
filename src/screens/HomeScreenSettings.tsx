@@ -10,7 +10,8 @@ import {
   StatusBar,
   Platform,
   useColorScheme,
-  Animated
+  Animated,
+  Dimensions
 } from 'react-native';
 import { useSettings } from '../hooks/useSettings';
 import { useNavigation } from '@react-navigation/native';
@@ -60,6 +61,8 @@ const SettingItem: React.FC<SettingItemProps> = ({
   isDarkMode,
   colors
 }) => {
+  const isTabletDevice = Platform.OS !== 'web' && (Dimensions.get('window').width >= 768);
+
   return (
     <TouchableOpacity 
       activeOpacity={onPress ? 0.7 : 1}
@@ -310,7 +313,7 @@ const HomeScreenSettings: React.FC = () => {
           )}
         </SettingsCard>
 
-        {settings.showHeroSection && (
+        {settings.showHeroSection && !(Dimensions.get('window').width >= 768) && (
           <>
             <View style={styles.segmentCard}>
               <Text style={[styles.segmentTitle, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Hero Layout</Text>

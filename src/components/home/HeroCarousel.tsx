@@ -19,7 +19,7 @@ interface HeroCarouselProps {
 const { width } = Dimensions.get('window');
 
 const CARD_WIDTH = Math.min(width * 0.8, 480);
-const CARD_HEIGHT = Math.round(CARD_WIDTH * 9 / 16) + 290; // slight increase for text/actions
+const CARD_HEIGHT = Math.round(CARD_WIDTH * 9 / 16) + 310; // increased for more vertical space
 
 const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
@@ -80,9 +80,39 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
     if (clamped !== activeIndex) setActiveIndex(clamped);
   };
 
+  const handleScroll = (event: any) => {
+    const offsetX = event?.nativeEvent?.contentOffset?.x ?? 0;
+    const interval = CARD_WIDTH + 16;
+    const idx = Math.round(offsetX / interval);
+    const clamped = Math.max(0, Math.min(idx, data.length - 1));
+    if (clamped !== activeIndex) setActiveIndex(clamped);
+  };
+
   return (
     <Animated.View entering={FadeIn.duration(350).easing(Easing.out(Easing.cubic))}>
       <View style={styles.container as ViewStyle}>
+        {data.length > 0 && (
+          <View style={{ height: 0, width: 0, overflow: 'hidden' }}>
+            {data[activeIndex + 1] && (
+              <ExpoImage
+                source={{ uri: data[activeIndex + 1].banner || data[activeIndex + 1].poster }}
+                style={{ width: 1, height: 1 }}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                transition={0}
+              />
+            )}
+            {activeIndex > 0 && data[activeIndex - 1] && (
+              <ExpoImage
+                source={{ uri: data[activeIndex - 1].banner || data[activeIndex - 1].poster }}
+                style={{ width: 1, height: 1 }}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                transition={0}
+              />
+            )}
+          </View>
+        )}
         {data[activeIndex] && (
           <View
             style={[
@@ -103,9 +133,10 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
                 contentFit="cover"
                 blurRadius={36}
                 cachePolicy="memory-disk"
+                transition={220}
               />
               <LinearGradient
-                colors={["rgba(0,0,0,0.65)", "rgba(0,0,0,0.85)"]}
+                colors={["rgba(0,0,0,0.45)", "rgba(0,0,0,0.75)"]}
                 locations={[0.4, 1]}
                 style={styles.backgroundOverlay as ViewStyle}
               />
@@ -127,6 +158,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
           snapToInterval={CARD_WIDTH + 16}
           decelerationRate="fast"
           contentContainerStyle={{ paddingHorizontal: (width - CARD_WIDTH) / 2 }}
+          onScroll={handleScroll}
           onMomentumScrollEnd={handleMomentumEnd}
           renderItem={({ item }) => (
             <View style={{ width: CARD_WIDTH + 16 }}>
@@ -144,8 +176,8 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
                       cachePolicy="memory-disk"
                     />
                     <LinearGradient
-                      colors={["transparent", "rgba(0,0,0,0.35)"]}
-                      locations={[0.6, 1]}
+                      colors={["transparent", "rgba(0,0,0,0.2)", "rgba(0,0,0,0.6)"]}
+                      locations={[0.4, 0.7, 1]}
                       style={styles.bannerGradient as ViewStyle}
                     />
                   </View>
