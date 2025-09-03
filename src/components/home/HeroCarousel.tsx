@@ -145,7 +145,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
         )}
         {/* Bottom blend to HomeScreen background (not the card) */}
         <LinearGradient
-          colors={["transparent", currentTheme.colors.background]}
+          colors={["transparent", currentTheme.colors.darkBackground]}
           locations={[0, 1]}
           style={styles.bottomBlend as ViewStyle}
           pointerEvents="none"
