@@ -994,7 +994,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="HomeScreenSettings" 
               component={HomeScreenSettings}
               options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 presentation: 'card',
                 gestureEnabled: true,
@@ -1009,7 +1009,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="HeroCatalogs" 
               component={HeroCatalogsScreen}
               options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 presentation: 'card',
                 gestureEnabled: true,

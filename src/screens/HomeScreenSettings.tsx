@@ -14,7 +14,7 @@ import {
   Dimensions
 } from 'react-native';
 import { useSettings } from '../hooks/useSettings';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
@@ -115,6 +115,21 @@ const HomeScreenSettings: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const [showSavedIndicator, setShowSavedIndicator] = useState(false);
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
+
+  // Prevent iOS entrance flicker by restoring a non-translucent StatusBar
+  useFocusEffect(
+    React.useCallback(() => {
+      try {
+        StatusBar.setTranslucent(false);
+        StatusBar.setBackgroundColor(isDarkMode ? colors.darkBackground : '#F2F2F7');
+        StatusBar.setBarStyle(isDarkMode ? 'light-content' : 'dark-content');
+        if (Platform.OS === 'ios') {
+          StatusBar.setHidden(false);
+        }
+      } catch {}
+      return () => {};
+    }, [isDarkMode, colors.darkBackground])
+  );
 
   const handleBack = useCallback(() => {
     navigation.goBack();
