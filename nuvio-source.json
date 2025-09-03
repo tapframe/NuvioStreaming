@@ -31,6 +31,14 @@
       ],
       "versions": [
         {
+          "version": "0.6.0-beta.7",
+          "buildVersion": "7",
+          "date": "2025-09-03",
+          "localizedDescription": "• Added new Hero Section layout for mobile devices. Users can now choose between the old (legacy) layout and a new swipeable carousel-based layout.\n• Expanded HomeScreen customization:\n  - Option to enable/disable text under posters.\n  - Option to adjust poster size and corner radius.\n• Minor UI changes and code fixes.",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/0.6.0-beta.7/Beta_0_6_0_7.ipa",
+          "size": 29700000
+        },
+        {
           "version": "0.6.0-beta.6",
           "buildVersion": "6",
           "date": "2025-09-01",
@@ -50,8 +58,7 @@
       "appPermissions": {
         "entitlements": [],
         "privacy": {
-          "NSLocalNetworkUsageDescription": "App uses the local network to discover and connect to devices.",
-          "NSMicrophoneUsageDescription": "This app does not require microphone access."
+          "NSLocalNetworkUsageDescription": "App uses the local network to discover and connect to devices."
         }
       }
     }

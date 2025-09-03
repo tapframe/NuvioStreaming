@@ -113,7 +113,8 @@ print_success "Updated app.json"
 
 # Update SettingsScreen.tsx
 print_status "Updating SettingsScreen.tsx..."
-sed -i '' "s/description=\"[0-9]\+\.[0-9]\+\.[0-9]\+\(-[^\"]*\)\?\"/description=\"$NEW_VERSION\"/g" "$SETTINGS_SCREEN"
+# Note: Use BSD sed compatible regex on macOS. Enable extended regex with -E.
+sed -E -i '' "s/description=\"[0-9]+\.[0-9]+\.[0-9]+(-[^\"]*)?\"/description=\"$NEW_VERSION\"/g" "$SETTINGS_SCREEN"
 print_success "Updated SettingsScreen.tsx"
 
 # Update Info.plist
