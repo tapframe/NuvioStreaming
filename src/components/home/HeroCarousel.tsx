@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ViewStyle, TextStyle, ImageStyle, FlatList, StyleProp } from 'react-native';
-import Animated, { FadeIn, FadeOut, Easing } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, Easing, useSharedValue, withTiming, useAnimatedStyle } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image as ExpoImage } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -77,7 +77,12 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
     const interval = CARD_WIDTH + 16;
     const idx = Math.round(offsetX / interval);
     const clamped = Math.max(0, Math.min(idx, data.length - 1));
-    if (clamped !== activeIndex) setActiveIndex(clamped);
+    if (clamped !== activeIndex) {
+      // Small delay to ensure smooth transition
+      setTimeout(() => {
+        setActiveIndex(clamped);
+      }, 50);
+    }
   };
 
   const handleScroll = (event: any) => {
@@ -85,8 +90,61 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
     const interval = CARD_WIDTH + 16;
     const idx = Math.round(offsetX / interval);
     const clamped = Math.max(0, Math.min(idx, data.length - 1));
-    if (clamped !== activeIndex) setActiveIndex(clamped);
+    if (clamped !== activeIndex) {
+      setActiveIndex(clamped);
+    }
   };
+
+  // Memoized background component with improved timing
+  const BackgroundImage = React.memo(({ 
+    item, 
+    insets
+  }: { 
+    item: StreamingContent; 
+    insets: any;
+  }) => {
+    const animatedOpacity = useSharedValue(1);
+    
+    useEffect(() => {
+      // Start with opacity 0 and animate to 1
+      animatedOpacity.value = 0;
+      animatedOpacity.value = withTiming(1, { duration: 400 });
+    }, [item.id]);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+      opacity: animatedOpacity.value,
+    }));
+
+    return (
+      <View
+        style={[
+          styles.backgroundContainer,
+          { top: -insets.top },
+        ] as StyleProp<ViewStyle>}
+        pointerEvents="none"
+      >
+        <Animated.View
+          key={item.id}
+          style={[animatedStyle, { flex: 1 }] as any}
+        >
+          <ExpoImage
+            source={{ uri: item.banner || item.poster }}
+            style={styles.backgroundImage as ImageStyle}
+            contentFit="cover"
+            blurRadius={24}
+            cachePolicy="memory-disk"
+            transition={300}
+            priority="high"
+          />
+          <LinearGradient
+            colors={["rgba(0,0,0,0.45)", "rgba(0,0,0,0.75)"]}
+            locations={[0.4, 1]}
+            style={styles.backgroundOverlay as ViewStyle}
+          />
+        </Animated.View>
+      </View>
+    );
+  });
 
   return (
     <Animated.View entering={FadeIn.duration(350).easing(Easing.out(Easing.cubic))}>
@@ -113,36 +171,12 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
             )}
           </View>
         )}
-        {data[activeIndex] && (
-          <View
-            style={[
-              styles.backgroundContainer,
-              { top: -insets.top },
-            ] as StyleProp<ViewStyle>}
-            pointerEvents="none"
-          >
-            <Animated.View
-              key={data[activeIndex].id}
-              entering={FadeIn.duration(300).easing(Easing.out(Easing.cubic))}
-              exiting={FadeOut.duration(300).easing(Easing.in(Easing.cubic))}
-              style={{ flex: 1 } as ViewStyle}
-            >
-              <ExpoImage
-                source={{ uri: data[activeIndex].banner || data[activeIndex].poster }}
-                style={styles.backgroundImage as ImageStyle}
-                contentFit="cover"
-                blurRadius={36}
-                cachePolicy="memory-disk"
-                transition={220}
-              />
-              <LinearGradient
-                colors={["rgba(0,0,0,0.45)", "rgba(0,0,0,0.75)"]}
-                locations={[0.4, 1]}
-                style={styles.backgroundOverlay as ViewStyle}
-              />
-            </Animated.View>
-          </View>
-        )}
+                  {data[activeIndex] && (
+            <BackgroundImage
+              item={data[activeIndex]}
+              insets={insets}
+            />
+          )}
         {/* Bottom blend to HomeScreen background (not the card) */}
         <LinearGradient
           colors={["transparent", currentTheme.colors.darkBackground]}
