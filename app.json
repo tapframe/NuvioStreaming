@@ -2,7 +2,7 @@
   "expo": {
     "name": "Nuvio",
     "slug": "nuvio",
-    "version": "0.6.0-beta.6",
+    "version": "0.6.0-beta.7",
     "orientation": "default",
     "icon": "./assets/ios/AppIcon.appiconset/Icon-App-60x60@3x.png",
     "userInterfaceStyle": "dark",
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "icon": "./assets/ios/AppIcon.appiconset/Icon-App-60x60@3x.png",
-      "buildNumber": "6",
+      "buildNumber": "7",
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
@@ -46,7 +46,7 @@
         "WAKE_LOCK"
       ],
       "package": "com.nuvio.app",
-      "versionCode": 6,
+      "versionCode": 7,
       "architectures": [
         "arm64-v8a",
         "armeabi-v7a",

@@ -81,7 +81,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   preferredPlayer: 'internal',
   showHeroSection: true,
   featuredContentSource: 'catalogs',
-  heroStyle: 'legacy',
+  heroStyle: 'carousel',
   selectedHeroCatalogs: [], // Empty array means all catalogs are selected
   logoSourcePreference: 'metahub', // Default to Metahub as first source
   tmdbLanguagePreference: 'en', // Default to English

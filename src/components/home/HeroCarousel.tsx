@@ -19,7 +19,7 @@ interface HeroCarouselProps {
 const { width } = Dimensions.get('window');
 
 const CARD_WIDTH = Math.min(width * 0.8, 480);
-const CARD_HEIGHT = Math.round(CARD_WIDTH * 9 / 16) + 270; // further increased space for text/actions
+const CARD_HEIGHT = Math.round(CARD_WIDTH * 9 / 16) + 290; // slight increase for text/actions
 
 const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();

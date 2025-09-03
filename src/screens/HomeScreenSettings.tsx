@@ -178,6 +178,44 @@ const HomeScreenSettings: React.FC = () => {
     </TouchableOpacity>
   );
 
+  // Compact segmented control for nicer toggles
+  const SegmentedControl = ({
+    options,
+    value,
+    onChange
+  }: {
+    options: { label: string; value: string }[];
+    value: string;
+    onChange: (val: string) => void;
+  }) => (
+    <View style={[styles.segmentContainer, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }]}>
+      {options.map((opt, idx) => {
+        const selected = value === opt.value;
+        return (
+          <TouchableOpacity
+            key={opt.value}
+            onPress={() => onChange(opt.value)}
+            activeOpacity={0.85}
+            style={[
+              styles.segment,
+              idx === 0 && styles.segmentFirst,
+              idx === options.length - 1 && styles.segmentLast,
+              selected && { backgroundColor: colors.primary },
+            ]}
+          >
+            <Text style={{
+              color: selected ? colors.white : (isDarkMode ? colors.highEmphasis : colors.textDark),
+              fontWeight: '700',
+              fontSize: 13,
+            }}>
+              {opt.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+
   // Format selected catalogs text
   const getSelectedCatalogsText = useCallback(() => {
     if (!settings.selectedHeroCatalogs || settings.selectedHeroCatalogs.length === 0) {
@@ -274,61 +312,33 @@ const HomeScreenSettings: React.FC = () => {
 
         {settings.showHeroSection && (
           <>
-            <View style={styles.radioCardContainer}>
-              <RadioOption 
-                selected={settings.heroStyle === 'legacy'}
-                onPress={() => handleUpdateSetting('heroStyle', 'legacy')}
-                label="Legacy Hero (banner)"
+            <View style={styles.segmentCard}>
+              <Text style={[styles.segmentTitle, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Hero Layout</Text>
+              <SegmentedControl
+                options={[{ label: 'Legacy', value: 'legacy' }, { label: 'Carousel', value: 'carousel' }]}
+                value={settings.heroStyle}
+                onChange={(val) => handleUpdateSetting('heroStyle', val as any)}
               />
-              <View style={styles.radioDescription}>
-                <Text style={[styles.radioDescriptionText, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>
-                  Original full-width banner with overlayed info and actions.
-                </Text>
-              </View>
+              <Text style={[styles.segmentHint, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Full-width banner or swipeable cards</Text>
             </View>
 
-            <View style={styles.radioCardContainer}>
-              <RadioOption 
-                selected={settings.heroStyle === 'carousel'}
-                onPress={() => handleUpdateSetting('heroStyle', 'carousel')}
-                label="New Card Carousel"
+            <View style={styles.segmentCard}>
+              <Text style={[styles.segmentTitle, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Featured Source</Text>
+              <SegmentedControl
+                options={[{ label: 'TMDB', value: 'tmdb' }, { label: 'Catalogs', value: 'catalogs' }]}
+                value={settings.featuredContentSource}
+                onChange={(val) => handleUpdateSetting('featuredContentSource', val as any)}
               />
-              <View style={styles.radioDescription}>
-                <Text style={[styles.radioDescriptionText, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>
-                  A beautiful, swipeable carousel of featured cards with smooth animations.
-                </Text>
-              </View>
-            </View>
-            <View style={styles.radioCardContainer}>
-              <RadioOption 
-                selected={settings.featuredContentSource === 'tmdb'}
-                onPress={() => {
-                  console.log('Selected TMDB source');
-                  handleUpdateSetting('featuredContentSource', 'tmdb');
-                }}
-                label="TMDB Trending Movies"
-              />
-              <View style={styles.radioDescription}>
-                <Text style={[styles.radioDescriptionText, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>
-                  Featured content will be sourced from TMDB's trending movies API. This provides a variety of popular and recent content, even if not available in your catalogs.
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.radioCardContainer}>
-              <RadioOption 
-                selected={settings.featuredContentSource === 'catalogs'}
-                onPress={() => {
-                  console.log('Selected Catalogs source');
-                  handleUpdateSetting('featuredContentSource', 'catalogs');
-                }}
-                label="Installed Catalogs"
-              />
-              <View style={styles.radioDescription}>
-                <Text style={[styles.radioDescriptionText, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>
-                  Featured content will be sourced from your enabled catalogs. This ensures that featured content is available to stream from your installed add-ons.
-                </Text>
-              </View>
+              {settings.featuredContentSource === 'catalogs' && (
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('HeroCatalogs')}
+                  style={[styles.manageLink, { backgroundColor: isDarkMode ? colors.elevation1 : 'rgba(0,0,0,0.04)' }]}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ color: isDarkMode ? colors.highEmphasis : colors.textDark, fontWeight: '600' }}>Manage selected catalogs</Text>
+                  <MaterialIcons name="chevron-right" size={20} color={isDarkMode ? colors.mediumEmphasis : colors.textMutedDark} />
+                </TouchableOpacity>
+              )}
             </View>
           </>
         )}
@@ -480,6 +490,51 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: 14,
     lineHeight: 20,
+  },
+  segmentContainer: {
+    flexDirection: 'row',
+    borderRadius: 10,
+    padding: 4,
+    gap: 6,
+    marginTop: 8,
+  },
+  segment: {
+    flex: 1,
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentFirst: {
+  },
+  segmentLast: {
+  },
+  segmentCard: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)'
+  },
+  segmentTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    opacity: 0.9,
+  },
+  segmentHint: {
+    marginTop: 8,
+    fontSize: 12,
+    opacity: 0.7,
+  },
+  manageLink: {
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   savedIndicator: {
     position: 'absolute',
