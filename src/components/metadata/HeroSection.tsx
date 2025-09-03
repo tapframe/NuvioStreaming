@@ -755,6 +755,15 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     trailerOpacity.value = withTiming(1, { duration: 500 });
   }, [thumbnailOpacity, trailerOpacity, trailerPreloaded]);
 
+  // Ensure trailer state is properly synchronized when trailer becomes ready
+  useEffect(() => {
+    if (trailerReady && settings?.showTrailers && !globalTrailerPlaying) {
+      // If trailer is ready but not playing, start it
+      logger.info('HeroSection', 'Starting trailer after it became ready');
+      setTrailerPlaying(true);
+    }
+  }, [trailerReady, settings?.showTrailers, globalTrailerPlaying, setTrailerPlaying]);
+
   // Handle fullscreen toggle
   const handleFullscreenToggle = useCallback(async () => {
     try {
@@ -1008,37 +1017,53 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
         // App came to foreground
         logger.info('HeroSection', 'App came to foreground');
+        // Don't automatically resume trailer - let TrailerPlayer handle it
       } else if (appState.current === 'active' && nextAppState.match(/inactive|background/)) {
-        // App going to background - pause heavy operations
+        // App going to background - only pause if trailer is actually playing
         logger.info('HeroSection', 'App going to background - pausing operations');
-        setTrailerPlaying(false);
+        // Only pause if trailer is currently playing to avoid unnecessary state changes
+        if (globalTrailerPlaying) {
+          setTrailerPlaying(false);
+        }
       }
       appState.current = nextAppState;
     };
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription?.remove();
-  }, [setTrailerPlaying]);
+  }, [setTrailerPlaying, globalTrailerPlaying]);
 
-  // Navigation focus effect to stop trailer when navigating away
+  // Navigation focus effect - improved to prevent trailer interruption
   useFocusEffect(
     useCallback(() => {
-      // Screen is focused
+      // Screen is focused - ensure trailer can play if it should be playing
       logger.info('HeroSection', 'Screen focused');
       
+      // Small delay to ensure the screen is fully focused before checking trailer state
+      const focusTimer = setTimeout(() => {
+        // If trailer should be playing but isn't, resume it
+        if (settings?.showTrailers && trailerReady && !globalTrailerPlaying) {
+          logger.info('HeroSection', 'Resuming trailer after screen focus');
+          setTrailerPlaying(true);
+        }
+      }, 100);
+      
       return () => {
-        // Screen is unfocused - stop trailer playback
-        logger.info('HeroSection', 'Screen unfocused - stopping trailer');
-        setTrailerPlaying(false);
+        clearTimeout(focusTimer);
+        // Don't automatically stop trailer when component unmounts
+        // Let the new hero section (if any) take control of trailer state
+        // This prevents the trailer from stopping when navigating between screens
+        logger.info('HeroSection', 'Screen unfocused - not stopping trailer automatically');
       };
-    }, [setTrailerPlaying])
+    }, [settings?.showTrailers, trailerReady, globalTrailerPlaying, setTrailerPlaying])
   );
 
   // Memory management and cleanup
   useEffect(() => {
     return () => {
-      // Stop trailer playback when component unmounts
-      setTrailerPlaying(false);
+      // Don't stop trailer playback when component unmounts
+      // Let the new hero section (if any) take control of trailer state
+      // This prevents the trailer from stopping when navigating between screens
       
       // Reset animation values on unmount to prevent memory leaks
       try {
@@ -1062,7 +1087,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       
       interactionComplete.current = false;
     };
-  }, [imageOpacity, imageLoadOpacity, shimmerOpacity, trailerOpacity, thumbnailOpacity, actionButtonsOpacity, titleCardTranslateY, genreOpacity, watchProgressOpacity, buttonsOpacity, buttonsTranslateY, logoOpacity, heroOpacity, heroHeight, setTrailerPlaying]);
+  }, [imageOpacity, imageLoadOpacity, shimmerOpacity, trailerOpacity, thumbnailOpacity, actionButtonsOpacity, titleCardTranslateY, genreOpacity, watchProgressOpacity, buttonsOpacity, buttonsTranslateY, logoOpacity, heroOpacity, heroHeight]);
 
   // Development-only performance monitoring
   useEffect(() => {

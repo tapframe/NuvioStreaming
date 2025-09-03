@@ -107,10 +107,17 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
         logger.info('TrailerPlayer', 'App going to background - pausing video');
         setIsPlaying(false);
       } else if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
-        // App coming to foreground - resume if it was playing
+        // App coming to foreground - resume if it was playing and autoPlay is enabled
         logger.info('TrailerPlayer', 'App coming to foreground');
+        // Only resume if autoPlay is true and component is still mounted
+        // Add a small delay to ensure the app is fully active
         if (autoPlay && isComponentMounted) {
-          setIsPlaying(true);
+          setTimeout(() => {
+            if (isComponentMounted) {
+              logger.info('TrailerPlayer', 'Resuming video after app foreground');
+              setIsPlaying(true);
+            }
+          }, 200);
         }
       }
       appState.current = nextAppState;
@@ -129,6 +136,13 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
       cleanupVideo();
     };
   }, [cleanupVideo]);
+
+  // Handle autoPlay prop changes to keep internal state synchronized
+  useEffect(() => {
+    if (isComponentMounted) {
+      setIsPlaying(autoPlay);
+    }
+  }, [autoPlay, isComponentMounted]);
 
   const showControlsWithTimeout = useCallback(() => {
     if (!isComponentMounted) return;
@@ -243,13 +257,6 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
       setIsMuted(muted);
     }
   }, [muted, isComponentMounted]);
-
-  // Sync internal playing state with autoPlay prop
-  useEffect(() => {
-    if (isComponentMounted) {
-      setIsPlaying(autoPlay);
-    }
-  }, [autoPlay, isComponentMounted]);
 
   // Cleanup timeout and animated values on unmount
   useEffect(() => {
