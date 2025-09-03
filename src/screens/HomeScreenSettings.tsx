@@ -346,6 +346,34 @@ const HomeScreenSettings: React.FC = () => {
           </>
         )}
 
+        <SettingsCard isDarkMode={isDarkMode} colors={colors}>
+          <Text style={[styles.cardHeader, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Posters</Text>
+          <View style={styles.settingsRowInline}>
+            <Text style={[styles.rowLabel, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>Show Titles</Text>
+            <CustomSwitch 
+              value={settings.showPosterTitles}
+              onValueChange={(value) => handleUpdateSetting('showPosterTitles', value)}
+            />
+          </View>
+          <View style={styles.settingsRow}>
+            <Text style={[styles.rowLabel, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>Poster Size</Text>
+            <SegmentedControl
+              options={[{ label: 'Small', value: 'small' }, { label: 'Medium', value: 'medium' }, { label: 'Large', value: 'large' }]}
+              value={settings.posterSize}
+              onChange={(val) => handleUpdateSetting('posterSize', val as any)}
+            />
+          </View>
+
+          <View style={styles.settingsRow}>
+            <Text style={[styles.rowLabel, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>Poster Corners</Text>
+            <SegmentedControl
+              options={[{ label: 'Square', value: '0' }, { label: 'Rounded', value: '12' }, { label: 'Pill', value: '20' }]}
+              value={String(settings.posterBorderRadius)}
+              onChange={(val) => handleUpdateSetting('posterBorderRadius', Number(val) as any)}
+            />
+          </View>
+        </SettingsCard>
+
         <SectionHeader title="ABOUT THESE SETTINGS" isDarkMode={isDarkMode} colors={colors} />
         <View style={[styles.infoCard, { backgroundColor: isDarkMode ? colors.elevation1 : 'rgba(0,0,0,0.03)' }]}>
           <Text style={[styles.infoText, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>
@@ -385,6 +413,7 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     paddingHorizontal: 16,
+    marginHorizontal: 16,
     paddingTop: 20,
     paddingBottom: 8,
   },
@@ -395,6 +424,8 @@ const styles = StyleSheet.create({
   },
   card: {
     marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 12,
     borderRadius: 12,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -515,6 +546,7 @@ const styles = StyleSheet.create({
   segmentCard: {
     marginHorizontal: 16,
     marginTop: 12,
+    marginBottom: 12,
     padding: 16,
     borderRadius: 12,
     backgroundColor: 'rgba(255,255,255,0.05)'
@@ -538,6 +570,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  settingsRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  settingsRowInline: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  rowLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+    opacity: 0.9,
+  },
+  cardHeader: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    opacity: 0.9,
   },
   savedIndicator: {
     position: 'absolute',

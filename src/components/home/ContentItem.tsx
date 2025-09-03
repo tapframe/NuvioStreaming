@@ -3,6 +3,7 @@ import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Plat
 import { Image as ExpoImage } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useSettings } from '../../hooks/useSettings';
 import { catalogService, StreamingContent } from '../../services/catalogService';
 import { DropUpMenu } from './DropUpMenu';
 
@@ -63,6 +64,18 @@ const ContentItem = ({ item, onPress }: ContentItemProps) => {
   const [shouldLoadImage, setShouldLoadImage] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const { currentTheme } = useTheme();
+  const { settings } = useSettings();
+  const posterRadius = typeof settings.posterBorderRadius === 'number' ? settings.posterBorderRadius : 12;
+  const posterWidth = React.useMemo(() => {
+    switch (settings.posterSize) {
+      case 'small':
+        return Math.max(100, Math.min(POSTER_WIDTH - 10, POSTER_WIDTH));
+      case 'large':
+        return Math.min(POSTER_WIDTH + 20, POSTER_WIDTH + 30);
+      default:
+        return POSTER_WIDTH;
+    }
+  }, [settings.posterSize]);
 
   // Intersection observer simulation for lazy loading
   const itemRef = useRef<View>(null);
@@ -135,20 +148,20 @@ const ContentItem = ({ item, onPress }: ContentItemProps) => {
 
   return (
     <>
-      <View style={styles.itemContainer}>
+      <View style={[styles.itemContainer, { width: posterWidth }]}>
         <TouchableOpacity
-          style={styles.contentItem}
+          style={[styles.contentItem, { width: posterWidth, borderRadius: posterRadius }]}
           activeOpacity={0.7}
           onPress={handlePress}
           onLongPress={handleLongPress}
           delayLongPress={300}
         >
-          <View ref={itemRef} style={styles.contentItemContainer}>
+          <View ref={itemRef} style={[styles.contentItemContainer, { borderRadius: posterRadius }] }>
             {/* Only load image when shouldLoadImage is true (lazy loading) */}
             {shouldLoadImage && item.poster ? (
               <ExpoImage
                 source={{ uri: getOptimizedPosterUrl(item.poster) }}
-                style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1 }]}
+                style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, borderRadius: posterRadius }]}
                 contentFit="cover"
                 cachePolicy="memory-disk" // Use both memory and disk cache
                 transition={200} // Add smooth transition
@@ -175,7 +188,7 @@ const ContentItem = ({ item, onPress }: ContentItemProps) => {
               />
             ) : (
               // Show placeholder until lazy load triggers
-              <View style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, justifyContent: 'center', alignItems: 'center' }]}>
+              <View style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, justifyContent: 'center', alignItems: 'center', borderRadius: posterRadius }] }>
                 <Text style={{ color: currentTheme.colors.textMuted, fontSize: 10, textAlign: 'center' }}>
                   {item.name.substring(0, 20)}...
                 </Text>
@@ -198,9 +211,11 @@ const ContentItem = ({ item, onPress }: ContentItemProps) => {
             )}
           </View>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: currentTheme.colors.text }]} numberOfLines={2}>
-          {item.name}
-        </Text>
+        {settings.showPosterTitles && (
+          <Text style={[styles.title, { color: currentTheme.colors.text }]} numberOfLines={2}>
+            {item.name}
+          </Text>
+        )}
       </View>
 
       <DropUpMenu
