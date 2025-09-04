@@ -1519,24 +1519,26 @@ export const StreamsScreen = () => {
       />
       
       
-      <Animated.View
-        entering={FadeIn.duration(300)}
-        style={[styles.backButtonContainer]}
-      >
-        <TouchableOpacity 
-          style={[
-            styles.backButton,
-            Platform.OS === 'ios' ? { paddingTop: Math.max(insets.top, 12) + 6 } : null
-          ]}
-          onPress={handleBack}
-          activeOpacity={0.7}
+      {Platform.OS !== 'ios' && (
+        <Animated.View
+          entering={FadeIn.duration(300)}
+          style={[styles.backButtonContainer]}
         >
-          <MaterialIcons name="arrow-back" size={24} color={colors.white} />
-          <Text style={styles.backButtonText}>
-            {type === 'series' ? 'Back to Episodes' : 'Back to Info'}
-          </Text>
-        </TouchableOpacity>
-      </Animated.View>
+          <TouchableOpacity 
+            style={[
+              styles.backButton,
+              Platform.OS === 'android' ? { paddingTop: 45 } : null
+            ]}
+            onPress={handleBack}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons name="arrow-back" size={24} color={colors.white} />
+            <Text style={styles.backButtonText}>
+              {type === 'series' ? 'Back to Episodes' : 'Back to Info'}
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
 
       {type === 'movie' && metadata && (
         <Animated.View style={[styles.movieTitleContainer, heroStyle]}>

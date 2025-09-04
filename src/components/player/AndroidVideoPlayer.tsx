@@ -807,18 +807,12 @@ const AndroidVideoPlayer: React.FC = () => {
       }
       disableImmersiveMode();
       
-      // For series, hard reset to maintain proper navigation stack with MetadataScreen
-      if (type === 'series' && id && episodeId) {
-        (navigation as any).reset({
-          index: 1,
-          routes: [
-            { name: 'MainTabs' },
-            { name: 'Metadata', params: { id, type } },
-            { name: 'Streams', params: { id, type: 'series', episodeId, fromPlayer: true } }
-          ]
-        });
+      // Simple back navigation (StreamsScreen should be below Player)
+      if ((navigation as any).canGoBack && (navigation as any).canGoBack()) {
+        (navigation as any).goBack();
       } else {
-        navigation.goBack();
+        // Fallback to Streams if stack isn't present
+        (navigation as any).navigate('Streams', { id, type, episodeId, fromPlayer: true });
       }
     }).catch(() => {
       // Fallback: still try to restore portrait then navigate
@@ -829,18 +823,11 @@ const AndroidVideoPlayer: React.FC = () => {
       }
       disableImmersiveMode();
       
-      // For series, hard reset to maintain proper navigation stack with MetadataScreen
-      if (type === 'series' && id && episodeId) {
-        (navigation as any).reset({
-          index: 1,
-          routes: [
-            { name: 'MainTabs' },
-            { name: 'Metadata', params: { id, type } },
-            { name: 'Streams', params: { id, type: 'series', episodeId, fromPlayer: true } }
-          ]
-        });
+      // Simple back navigation fallback path
+      if ((navigation as any).canGoBack && (navigation as any).canGoBack()) {
+        (navigation as any).goBack();
       } else {
-        navigation.goBack();
+        (navigation as any).navigate('Streams', { id, type, episodeId, fromPlayer: true });
       }
     });
 

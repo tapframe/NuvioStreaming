@@ -848,27 +848,19 @@ const VideoPlayer: React.FC = () => {
       // Disable immersive mode
       disableImmersiveMode();
 
-      // Navigate back with proper handling for fullscreen modal
+      // Navigate back to previous screen (StreamsScreen expected to be below Player)
       try {
-        // For series, hard reset to a single Streams route to avoid stacking multiple modals/pages
-        if (type === 'series' && id && episodeId) {
-          (navigation as any).reset({
-            index: 0,
-            routes: [
-              { name: 'Streams', params: { id, type: 'series', episodeId, fromPlayer: true } }
-            ]
-          });
-        } else if (navigation.canGoBack()) {
+        if (navigation.canGoBack()) {
           navigation.goBack();
         } else {
-          // Fallback: navigate to main tabs if can't go back
-          navigation.navigate('MainTabs');
+          // Fallback: navigate to Streams if stack was not set as expected
+          (navigation as any).navigate('Streams', { id, type, episodeId, fromPlayer: true });
         }
         logger.log('[VideoPlayer] Navigation completed');
       } catch (navError) {
         logger.error('[VideoPlayer] Navigation error:', navError);
-        // Last resort: try to navigate to home
-        navigation.navigate('MainTabs');
+        // Last resort: try to navigate to Streams
+        (navigation as any).navigate('Streams', { id, type, episodeId, fromPlayer: true });
       }
     };
 
