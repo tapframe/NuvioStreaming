@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, memo } from 'react';
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ViewStyle, TextStyle, ImageStyle, FlatList, StyleProp } from 'react-native';
 import Animated, { FadeIn, FadeOut, Easing, useSharedValue, withTiming, useAnimatedStyle } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -29,6 +29,44 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   const data = useMemo(() => (items && items.length ? items.slice(0, 10) : []), [items]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [failedLogoIds, setFailedLogoIds] = useState<Set<string>>(new Set());
+
+  // Note: do not early-return before hooks. Loading UI is returned later.
+
+  const hasData = data.length > 0;
+
+  const handleMomentumEnd = useCallback((event: any) => {
+    const offsetX = event?.nativeEvent?.contentOffset?.x ?? 0;
+    const interval = CARD_WIDTH + 16;
+    const idx = Math.round(offsetX / interval);
+    const clamped = Math.max(0, Math.min(idx, data.length - 1));
+    if (clamped !== activeIndex) {
+      // Small delay to ensure smooth transition
+      setTimeout(() => {
+        setActiveIndex(clamped);
+      }, 50);
+    }
+  }, [activeIndex, data.length]);
+
+  const contentPadding = useMemo(() => ({ paddingHorizontal: (width - CARD_WIDTH) / 2 }), []);
+
+  const keyExtractor = useCallback((item: StreamingContent) => item.id, []);
+
+  const getItemLayout = useCallback(
+    (_: unknown, index: number) => {
+      const length = CARD_WIDTH + 16;
+      const offset = length * index;
+      return { length, offset, index };
+    },
+    []
+  );
+
+  const handleNavigateToMetadata = useCallback((id: string, type: any) => {
+    navigation.navigate('Metadata', { id, type });
+  }, [navigation]);
+
+  const handleNavigateToStreams = useCallback((id: string, type: any) => {
+    navigation.navigate('Streams', { id, type });
+  }, [navigation]);
 
   if (loading) {
     return (
@@ -69,31 +107,6 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
       </View>
     );
   }
-
-  if (data.length === 0) return null;
-
-  const handleMomentumEnd = (event: any) => {
-    const offsetX = event?.nativeEvent?.contentOffset?.x ?? 0;
-    const interval = CARD_WIDTH + 16;
-    const idx = Math.round(offsetX / interval);
-    const clamped = Math.max(0, Math.min(idx, data.length - 1));
-    if (clamped !== activeIndex) {
-      // Small delay to ensure smooth transition
-      setTimeout(() => {
-        setActiveIndex(clamped);
-      }, 50);
-    }
-  };
-
-  const handleScroll = (event: any) => {
-    const offsetX = event?.nativeEvent?.contentOffset?.x ?? 0;
-    const interval = CARD_WIDTH + 16;
-    const idx = Math.round(offsetX / interval);
-    const clamped = Math.max(0, Math.min(idx, data.length - 1));
-    if (clamped !== activeIndex) {
-      setActiveIndex(clamped);
-    }
-  };
 
   // Memoized background component with improved timing
   const BackgroundImage = React.memo(({ 
@@ -146,6 +159,8 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
     );
   });
 
+  if (!hasData) return null;
+
   return (
     <Animated.View entering={FadeIn.duration(350).easing(Easing.out(Easing.cubic))}>
       <View style={styles.container as ViewStyle}>
@@ -186,78 +201,29 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
         />
         <FlatList
           data={data}
-          keyExtractor={(item) => item.id}
+          keyExtractor={keyExtractor}
           horizontal
           showsHorizontalScrollIndicator={false}
           snapToInterval={CARD_WIDTH + 16}
           decelerationRate="fast"
-          contentContainerStyle={{ paddingHorizontal: (width - CARD_WIDTH) / 2 }}
-          onScroll={handleScroll}
+          contentContainerStyle={contentPadding}
           onMomentumScrollEnd={handleMomentumEnd}
+          initialNumToRender={3}
+          windowSize={3}
+          maxToRenderPerBatch={3}
+          updateCellsBatchingPeriod={50}
+          removeClippedSubviews
+          getItemLayout={getItemLayout}
           renderItem={({ item }) => (
             <View style={{ width: CARD_WIDTH + 16 }}>
-              <TouchableOpacity
-                activeOpacity={0.9}
-                onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type })}
-              >
-                <View style={[styles.card, { backgroundColor: currentTheme.colors.elevation1 }] as StyleProp<ViewStyle>}>
-                  <View style={styles.bannerContainer as ViewStyle}>
-                    <ExpoImage
-                      source={{ uri: item.banner || item.poster }}
-                      style={styles.banner as ImageStyle}
-                      contentFit="cover"
-                      transition={300}
-                      cachePolicy="memory-disk"
-                    />
-                    <LinearGradient
-                      colors={["transparent", "rgba(0,0,0,0.2)", "rgba(0,0,0,0.6)"]}
-                      locations={[0.4, 0.7, 1]}
-                      style={styles.bannerGradient as ViewStyle}
-                    />
-                  </View>
-                  <View style={styles.info as ViewStyle}>
-                    {item.logo && !failedLogoIds.has(item.id) ? (
-                      <ExpoImage
-                        source={{ uri: item.logo }}
-                        style={styles.logo as ImageStyle}
-                        contentFit="contain"
-                        transition={250}
-                        cachePolicy="memory-disk"
-                        onError={() => {
-                          setFailedLogoIds((prev) => new Set(prev).add(item.id));
-                        }}
-                      />
-                    ) : (
-                      <Text style={[styles.title as TextStyle, { color: currentTheme.colors.highEmphasis, textAlign: 'center' }]} numberOfLines={1}>
-                        {item.name}
-                      </Text>
-                    )}
-                    {item.genres && (
-                      <Text style={[styles.genres as TextStyle, { color: currentTheme.colors.mediumEmphasis, textAlign: 'center' }]} numberOfLines={1}>
-                        {item.genres.slice(0, 3).join(' • ')}
-                      </Text>
-                    )}
-                    <View style={styles.actions as ViewStyle}>
-                      <TouchableOpacity
-                        style={[styles.playButton as ViewStyle, { backgroundColor: currentTheme.colors.white }]}
-                        onPress={() => navigation.navigate('Streams', { id: item.id, type: item.type })}
-                        activeOpacity={0.85}
-                      >
-                        <MaterialIcons name="play-arrow" size={22} color={currentTheme.colors.black} />
-                        <Text style={[styles.playText as TextStyle, { color: currentTheme.colors.black }]}>Play</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.secondaryButton as ViewStyle, { borderColor: 'rgba(255,255,255,0.25)' }]}
-                        onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type })}
-                        activeOpacity={0.8}
-                      >
-                        <MaterialIcons name="info-outline" size={18} color={currentTheme.colors.white} />
-                        <Text style={[styles.secondaryText as TextStyle, { color: currentTheme.colors.white }]}>Info</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-              </TouchableOpacity>
+              <CarouselCard
+                item={item}
+                colors={currentTheme.colors}
+                logoFailed={failedLogoIds.has(item.id)}
+                onLogoError={() => setFailedLogoIds((prev) => new Set(prev).add(item.id))}
+                onPressInfo={() => handleNavigateToMetadata(item.id, item.type)}
+                onPressPlay={() => handleNavigateToStreams(item.id, item.type)}
+              />
             </View>
           )}
         />
@@ -265,6 +231,80 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
     </Animated.View>
   );
 };
+
+interface CarouselCardProps {
+  item: StreamingContent;
+  colors: any;
+  logoFailed: boolean;
+  onLogoError: () => void;
+  onPressPlay: () => void;
+  onPressInfo: () => void;
+}
+
+const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFailed, onLogoError, onPressPlay, onPressInfo }) => {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.9}
+      onPress={onPressInfo}
+    >
+      <View style={[styles.card, { backgroundColor: colors.elevation1 }] as StyleProp<ViewStyle>}>
+        <View style={styles.bannerContainer as ViewStyle}>
+          <ExpoImage
+            source={{ uri: item.banner || item.poster }}
+            style={styles.banner as ImageStyle}
+            contentFit="cover"
+            transition={300}
+            cachePolicy="memory-disk"
+          />
+          <LinearGradient
+            colors={["transparent", "rgba(0,0,0,0.2)", "rgba(0,0,0,0.6)"]}
+            locations={[0.4, 0.7, 1]}
+            style={styles.bannerGradient as ViewStyle}
+          />
+        </View>
+        <View style={styles.info as ViewStyle}>
+          {item.logo && !logoFailed ? (
+            <ExpoImage
+              source={{ uri: item.logo }}
+              style={styles.logo as ImageStyle}
+              contentFit="contain"
+              transition={250}
+              cachePolicy="memory-disk"
+              onError={onLogoError}
+            />
+          ) : (
+            <Text style={[styles.title as TextStyle, { color: colors.highEmphasis, textAlign: 'center' }]} numberOfLines={1}>
+              {item.name}
+            </Text>
+          )}
+          {item.genres && (
+            <Text style={[styles.genres as TextStyle, { color: colors.mediumEmphasis, textAlign: 'center' }]} numberOfLines={1}>
+              {item.genres.slice(0, 3).join(' • ')}
+            </Text>
+          )}
+          <View style={styles.actions as ViewStyle}>
+            <TouchableOpacity
+              style={[styles.playButton as ViewStyle, { backgroundColor: colors.white }]}
+              onPress={onPressPlay}
+              activeOpacity={0.85}
+            >
+              <MaterialIcons name="play-arrow" size={22} color={colors.black} />
+              <Text style={[styles.playText as TextStyle, { color: colors.black }]}>Play</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.secondaryButton as ViewStyle, { borderColor: 'rgba(255,255,255,0.25)' }]}
+              onPress={onPressInfo}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons name="info-outline" size={18} color={colors.white} />
+              <Text style={[styles.secondaryText as TextStyle, { color: colors.white }]}>Info</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+});
 
 const styles = StyleSheet.create({
   container: {
