@@ -104,7 +104,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   // Theme defaults
   themeId: 'default',
   customThemes: [],
-  useDominantBackgroundColor: true,
+  useDominantBackgroundColor: false,
   // Home screen poster customization
   posterSize: 'medium',
   posterBorderRadius: 12,

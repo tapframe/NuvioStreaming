@@ -40,6 +40,7 @@ import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useSettings } from '../hooks/useSettings';
 import { MetadataLoadingScreen } from '../components/loading/MetadataLoadingScreen';
+import { useTrailer } from '../contexts/TrailerContext';
 
 // Import our optimized components and hooks
 import HeroSection from '../components/metadata/HeroSection';
@@ -71,6 +72,7 @@ const MetadataScreen: React.FC = () => {
   const { settings } = useSettings();
   const { currentTheme } = useTheme();
   const { top: safeAreaTop } = useSafeAreaInsets();
+  const { pauseTrailer } = useTrailer();
 
   // Optimized state management - reduced state variables
   const [isContentReady, setIsContentReady] = useState(false);
@@ -349,6 +351,9 @@ const MetadataScreen: React.FC = () => {
   const handleShowStreams = useCallback(() => {
     const { watchProgress } = watchProgressData;
 
+    // Ensure trailer stops immediately before navigating to Streams
+    try { pauseTrailer(); } catch {}
+
     // Helper to build episodeId from episode object
     const buildEpisodeId = (ep: any): string => {
       return ep.stremioId || `${id}:${ep.season_number}:${ep.episode_number}`;
@@ -445,6 +450,8 @@ const MetadataScreen: React.FC = () => {
     
     // Optimize navigation with requestAnimationFrame
     requestAnimationFrame(() => {
+      // Ensure trailer stops immediately before navigating to Streams
+      try { pauseTrailer(); } catch {}
       navigation.navigate('Streams', { 
         id, 
         type, 
@@ -452,7 +459,7 @@ const MetadataScreen: React.FC = () => {
         episodeThumbnail: episode.still_path || undefined
       });
     });
-  }, [navigation, id, type, isScreenFocused]);
+  }, [navigation, id, type, isScreenFocused, pauseTrailer]);
 
   const handleBack = useCallback(() => {
     if (isScreenFocused) {
