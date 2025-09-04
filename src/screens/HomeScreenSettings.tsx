@@ -358,6 +358,25 @@ const HomeScreenSettings: React.FC = () => {
                 </TouchableOpacity>
               )}
             </View>
+
+            {settings.heroStyle === 'carousel' && (
+              <SettingsCard isDarkMode={isDarkMode} colors={colors}>
+                <SettingItem
+                  title="Dynamic Hero Background"
+                  description="Blurred banner behind carousel"
+                  icon="wallpaper"
+                  isDarkMode={isDarkMode}
+                  colors={colors}
+                  renderControl={() => (
+                    <CustomSwitch 
+                      value={settings.enableHomeHeroBackground}
+                      onValueChange={(value) => handleUpdateSetting('enableHomeHeroBackground', value)}
+                    />
+                  )}
+                />
+                <Text style={[styles.settingInlineNote, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>May impact performance on low-end devices.</Text>
+              </SettingsCard>
+            )}
           </>
         )}
 
@@ -488,6 +507,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingLeft: 12,
+  },
+  settingInlineNote: {
+    fontSize: 12,
+    opacity: 0.7,
+    marginTop: 8,
+    marginBottom: 8,
+    textAlign: 'center',
+    alignSelf: 'center',
+    width: '100%',
+    paddingHorizontal: 16,
   },
   radioCardContainer: {
     marginHorizontal: 16,

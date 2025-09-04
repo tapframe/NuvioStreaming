@@ -67,6 +67,8 @@ export interface AppSettings {
   postersPerRow: number; // 3-6 range for number of posters per row
   // Home screen content item
   showPosterTitles: boolean; // Show text titles under posters
+  // Home screen background behavior
+  enableHomeHeroBackground: boolean; // Enable dynamic hero background on Home
   // Trailer settings
   showTrailers: boolean; // Enable/disable trailer playback in hero section
   trailerMuted: boolean; // Default to muted for better user experience
@@ -110,6 +112,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   posterBorderRadius: 12,
   postersPerRow: 4,
   showPosterTitles: true,
+  enableHomeHeroBackground: true,
   // Trailer settings
   showTrailers: true, // Enable trailers by default
   trailerMuted: true, // Default to muted for better user experience

@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback, memo } from 'react';
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ViewStyle, TextStyle, ImageStyle, FlatList, StyleProp } from 'react-native';
-import Animated, { FadeIn, FadeOut, Easing, useSharedValue, withTiming, useAnimatedStyle } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, Easing, useSharedValue, withTiming, useAnimatedStyle, useAnimatedScrollHandler, useAnimatedReaction, runOnJS } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image as ExpoImage } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -10,6 +10,7 @@ import { RootStackParamList } from '../../navigation/AppNavigator';
 import { StreamingContent } from '../../services/catalogService';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSettings } from '../../hooks/useSettings';
 
 interface HeroCarouselProps {
   items: StreamingContent[];
@@ -25,6 +26,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
+  const { settings } = useSettings();
 
   const data = useMemo(() => (items && items.length ? items.slice(0, 10) : []), [items]);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -34,18 +36,29 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
 
   const hasData = data.length > 0;
 
-  const handleMomentumEnd = useCallback((event: any) => {
-    const offsetX = event?.nativeEvent?.contentOffset?.x ?? 0;
-    const interval = CARD_WIDTH + 16;
-    const idx = Math.round(offsetX / interval);
-    const clamped = Math.max(0, Math.min(idx, data.length - 1));
-    if (clamped !== activeIndex) {
-      // Small delay to ensure smooth transition
-      setTimeout(() => {
-        setActiveIndex(clamped);
-      }, 50);
-    }
-  }, [activeIndex, data.length]);
+  // Optimized: update background as soon as scroll starts, without waiting for momentum end
+  const scrollX = useSharedValue(0);
+  const interval = CARD_WIDTH + 16;
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollX.value = event.contentOffset.x;
+    },
+  });
+
+  // Derive the index reactively and only set state when it changes
+  useAnimatedReaction(
+    () => {
+      const idx = Math.round(scrollX.value / interval);
+      return idx;
+    },
+    (idx, prevIdx) => {
+      if (idx == null || idx === prevIdx) return;
+      // Clamp to bounds to avoid out-of-range access
+      const clamped = Math.max(0, Math.min(idx, data.length - 1));
+      runOnJS(setActiveIndex)(clamped);
+    },
+    [data.length]
+  );
 
   const contentPadding = useMemo(() => ({ paddingHorizontal: (width - CARD_WIDTH) / 2 }), []);
 
@@ -164,7 +177,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   return (
     <Animated.View entering={FadeIn.duration(350).easing(Easing.out(Easing.cubic))}>
       <View style={styles.container as ViewStyle}>
-        {data.length > 0 && (
+        {settings.enableHomeHeroBackground && data.length > 0 && (
           <View style={{ height: 0, width: 0, overflow: 'hidden' }}>
             {data[activeIndex + 1] && (
               <ExpoImage
@@ -186,20 +199,22 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
             )}
           </View>
         )}
-                  {data[activeIndex] && (
+          {settings.enableHomeHeroBackground && data[activeIndex] && (
             <BackgroundImage
               item={data[activeIndex]}
               insets={insets}
             />
           )}
         {/* Bottom blend to HomeScreen background (not the card) */}
-        <LinearGradient
-          colors={["transparent", currentTheme.colors.darkBackground]}
-          locations={[0, 1]}
-          style={styles.bottomBlend as ViewStyle}
-          pointerEvents="none"
-        />
-        <FlatList
+        {settings.enableHomeHeroBackground && (
+          <LinearGradient
+            colors={["transparent", currentTheme.colors.darkBackground]}
+            locations={[0, 1]}
+            style={styles.bottomBlend as ViewStyle}
+            pointerEvents="none"
+          />
+        )}
+        <Animated.FlatList
           data={data}
           keyExtractor={keyExtractor}
           horizontal
@@ -207,7 +222,8 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
           snapToInterval={CARD_WIDTH + 16}
           decelerationRate="fast"
           contentContainerStyle={contentPadding}
-          onMomentumScrollEnd={handleMomentumEnd}
+          onScroll={scrollHandler}
+          scrollEventThrottle={16}
           initialNumToRender={3}
           windowSize={3}
           maxToRenderPerBatch={3}
