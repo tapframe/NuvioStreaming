@@ -799,11 +799,15 @@ const AndroidVideoPlayer: React.FC = () => {
     
     // Navigate immediately without delay
     ScreenOrientation.unlockAsync().then(() => {
-      // On iOS, explicitly return to portrait to avoid sticking in landscape
-      if (Platform.OS === 'ios') {
+      // On tablets keep rotation unlocked; on phones, return to portrait
+      const { width: dw, height: dh } = Dimensions.get('window');
+      const isTablet = Math.min(dw, dh) >= 768 || ((Platform as any).isPad === true);
+      if (!isTablet) {
         setTimeout(() => {
           ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
         }, 50);
+      } else {
+        ScreenOrientation.unlockAsync().catch(() => {});
       }
       disableImmersiveMode();
       
@@ -815,11 +819,15 @@ const AndroidVideoPlayer: React.FC = () => {
         (navigation as any).navigate('Streams', { id, type, episodeId, fromPlayer: true });
       }
     }).catch(() => {
-      // Fallback: still try to restore portrait then navigate
-      if (Platform.OS === 'ios') {
+      // Fallback: still try to restore portrait on phones then navigate
+      const { width: dw, height: dh } = Dimensions.get('window');
+      const isTablet = Math.min(dw, dh) >= 768 || ((Platform as any).isPad === true);
+      if (!isTablet) {
         setTimeout(() => {
           ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
         }, 50);
+      } else {
+        ScreenOrientation.unlockAsync().catch(() => {});
       }
       disableImmersiveMode();
       

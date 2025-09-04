@@ -838,10 +838,16 @@ const VideoPlayer: React.FC = () => {
         logger.warn('[VideoPlayer] Failed to unlock orientation:', orientationError);
       }
 
-      // On iOS, explicitly return to portrait to avoid sticking in landscape
+      // On iOS tablets, keep rotation unlocked; on phones, return to portrait
       if (Platform.OS === 'ios') {
+        const { width: dw, height: dh } = Dimensions.get('window');
+        const isTablet = (Platform as any).isPad === true || Math.min(dw, dh) >= 768;
         setTimeout(() => {
-          ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+          if (isTablet) {
+            ScreenOrientation.unlockAsync().catch(() => {});
+          } else {
+            ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+          }
         }, 50);
       }
 

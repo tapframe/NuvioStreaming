@@ -100,7 +100,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   // Quality filtering defaults
   excludedQualities: [], // No qualities excluded by default
   // Playback behavior defaults
-  alwaysResume: false,
+  alwaysResume: true,
   // Theme defaults
   themeId: 'default',
   customThemes: [],

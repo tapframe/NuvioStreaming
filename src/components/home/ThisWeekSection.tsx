@@ -23,9 +23,10 @@ import { parseISO, isThisWeek, format, isAfter, isBefore } from 'date-fns';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useCalendarData } from '../../hooks/useCalendarData';
 
+// Compute base sizes; actual tablet sizes will be adjusted inside component for responsiveness
 const { width } = Dimensions.get('window');
-const ITEM_WIDTH = width * 0.75; // Reduced width for better spacing
-const ITEM_HEIGHT = 180; // Compact height for cleaner design
+const ITEM_WIDTH = width * 0.75; // phone default
+const ITEM_HEIGHT = 180; // phone default
 
 interface ThisWeekEpisode {
   id: string;
@@ -56,6 +57,12 @@ export const ThisWeekSection = React.memo(() => {
   } = useTraktContext();
   const { currentTheme } = useTheme();
   const { calendarData, loading } = useCalendarData();
+
+  // Responsive sizing for tablets
+  const deviceWidth = Dimensions.get('window').width;
+  const isTablet = deviceWidth >= 768;
+  const computedItemWidth = useMemo(() => (isTablet ? Math.min(deviceWidth * 0.46, 560) : ITEM_WIDTH), [isTablet, deviceWidth]);
+  const computedItemHeight = useMemo(() => (isTablet ? 220 : ITEM_HEIGHT), [isTablet]);
 
   const thisWeekEpisodes = useMemo(() => {
     const thisWeekSection = calendarData.find(section => section.title === 'This Week');
@@ -109,7 +116,7 @@ export const ThisWeekSection = React.memo(() => {
         item.poster);
     
     return (
-      <View style={styles.episodeItemContainer}>
+      <View style={[styles.episodeItemContainer, { width: computedItemWidth, height: computedItemHeight }]}>
         <TouchableOpacity
           style={[
             styles.episodeItem,
@@ -143,30 +150,30 @@ export const ThisWeekSection = React.memo(() => {
             >
               {/* Content area */}
               <View style={styles.contentArea}>
-                <Text style={[styles.seriesName, { color: currentTheme.colors.white }]} numberOfLines={1}>
+                <Text style={[styles.seriesName, { color: currentTheme.colors.white, fontSize: isTablet ? 18 : undefined }]} numberOfLines={1}>
                   {item.seriesName}
                 </Text>
                 
-                <Text style={[styles.episodeTitle, { color: 'rgba(255,255,255,0.9)' }]} numberOfLines={2}>
+                <Text style={[styles.episodeTitle, { color: 'rgba(255,255,255,0.9)', fontSize: isTablet ? 16 : undefined }]} numberOfLines={2}>
                   {item.title}
                 </Text>
               
                 {item.overview && (
-                  <Text style={[styles.overview, { color: 'rgba(255,255,255,0.8)' }]} numberOfLines={2}>
+                  <Text style={[styles.overview, { color: 'rgba(255,255,255,0.8)', fontSize: isTablet ? 13 : undefined }]} numberOfLines={isTablet ? 3 : 2}>
                     {item.overview}
                   </Text>
                 )}
                 
                 <View style={styles.dateContainer}>
-                  <Text style={[styles.episodeInfo, { color: 'rgba(255,255,255,0.7)' }]}>
+                  <Text style={[styles.episodeInfo, { color: 'rgba(255,255,255,0.7)', fontSize: isTablet ? 13 : undefined }]}>
                     S{item.season}:E{item.episode} • 
                   </Text>
                   <MaterialIcons
                     name="event" 
-                    size={14} 
+                    size={isTablet ? 16 : 14} 
                     color={currentTheme.colors.primary}
                   />
-                  <Text style={[styles.releaseDate, { color: currentTheme.colors.primary }]}>
+                  <Text style={[styles.releaseDate, { color: currentTheme.colors.primary, fontSize: isTablet ? 14 : undefined }]}>
                     {formattedDate}
                   </Text>
                 </View>
@@ -197,10 +204,19 @@ export const ThisWeekSection = React.memo(() => {
         renderItem={renderEpisodeItem}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
-        snapToInterval={ITEM_WIDTH + 16}
+        contentContainerStyle={[styles.listContent, { paddingLeft: isTablet ? 24 : 16, paddingRight: isTablet ? 24 : 16 }]}
+        snapToInterval={computedItemWidth + 16}
         decelerationRate="fast"
         snapToAlignment="start"
+        initialNumToRender={isTablet ? 4 : 3}
+        windowSize={3}
+        maxToRenderPerBatch={3}
+        removeClippedSubviews
+        getItemLayout={(data, index) => {
+          const length = computedItemWidth + 16;
+          const offset = length * index;
+          return { length, offset, index };
+        }}
         ItemSeparatorComponent={() => <View style={{ width: 16 }} />}
       />
     </Animated.View>

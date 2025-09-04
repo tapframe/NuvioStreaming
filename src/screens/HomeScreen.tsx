@@ -369,9 +369,16 @@ const HomeScreen = () => {
         StatusBar.setTranslucent(true);
         StatusBar.setBackgroundColor('transparent');
         
-        // Ensure portrait when coming back to Home on all platforms
+        // Allow free rotation on tablets; lock portrait on phones
         try {
-          ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+          const { width: dw, height: dh } = Dimensions.get('window');
+          const smallestDimension = Math.min(dw, dh);
+          const isTablet = (Platform.OS === 'ios' ? (Platform as any).isPad === true : smallestDimension >= 768);
+          if (isTablet) {
+            ScreenOrientation.unlockAsync();
+          } else {
+            ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+          }
         } catch {}
 
         // For iOS specifically
@@ -569,7 +576,6 @@ const HomeScreen = () => {
     // Normal flow when addons are present (featured moved to ListHeaderComponent)
 
     data.push({ type: 'thisWeek', key: 'thisWeek' });
-    data.push({ type: 'continueWatching', key: 'continueWatching' });
 
     // Only show a limited number of catalogs initially for performance
     const catalogsToShow = catalogs.slice(0, visibleCatalogCount);
@@ -631,6 +637,12 @@ const HomeScreen = () => {
 
   const memoizedThisWeekSection = useMemo(() => <ThisWeekSection />, []);
   const memoizedContinueWatchingSection = useMemo(() => <ContinueWatchingSection ref={continueWatchingRef} />, []);
+  const memoizedHeader = useMemo(() => (
+    <>
+      {showHeroSection ? memoizedFeaturedContent : null}
+      {memoizedContinueWatchingSection}
+    </>
+  ), [showHeroSection, memoizedFeaturedContent, memoizedContinueWatchingSection]);
   // Track scroll direction manually for reliable behavior across platforms
   const lastScrollYRef = useRef(0);
   const lastToggleRef = useRef(0);
@@ -652,7 +664,7 @@ const HomeScreen = () => {
       case 'thisWeek':
         return wrapper(memoizedThisWeekSection);
       case 'continueWatching':
-        return wrapper(memoizedContinueWatchingSection);
+        return null; // Moved to ListHeaderComponent to avoid remounts on scroll
       case 'catalog':
         return wrapper(<CatalogSection catalog={item.catalog} />);
       case 'placeholder':
@@ -749,7 +761,7 @@ const HomeScreen = () => {
             { paddingTop: insets.top }
           ]}
           showsVerticalScrollIndicator={false}
-          ListHeaderComponent={showHeroSection ? memoizedFeaturedContent : null}
+          ListHeaderComponent={memoizedHeader}
           ListFooterComponent={ListFooterComponent}
           onMomentumScrollEnd={handleScrollEnd}
           onEndReached={handleLoadMoreCatalogs}
