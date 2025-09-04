@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { NavigationContainer, DefaultTheme as NavigationDefaultTheme, DarkTheme as NavigationDarkTheme, Theme, NavigationProp } from '@react-navigation/native';
 import { createNativeStackNavigator, NativeStackNavigationOptions, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createBottomTabNavigator, BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { useColorScheme, Platform, Animated, StatusBar, TouchableOpacity, View, Text, AppState, Easing, Dimensions } from 'react-native';
+import { useColorScheme, Platform, Animated, StatusBar, TouchableOpacity, View, Text, AppState, Easing, Dimensions, useWindowDimensions } from 'react-native';
 import { PaperProvider, MD3DarkTheme, MD3LightTheme, adaptNavigationTheme } from 'react-native-paper';
 import type { MD3Theme } from 'react-native-paper';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
@@ -358,7 +358,9 @@ const TabIcon = React.memo(({ focused, color, iconName }: {
 
 // Update the TabScreenWrapper component with fixed layout dimensions
 const TabScreenWrapper: React.FC<{children: React.ReactNode}> = ({ children }) => {
-  const isTablet = Dimensions.get('window').width >= 768;
+  const { width, height } = useWindowDimensions();
+  const smallestDimension = Math.min(width, height);
+  const isTablet = (Platform.OS === 'ios' ? (Platform as any).isPad === true : smallestDimension >= 768);
   const insets = useSafeAreaInsets();
   // Force consistent status bar settings
   useEffect(() => {
@@ -421,7 +423,9 @@ const WrappedScreen: React.FC<{Screen: React.ComponentType<any>}> = ({ Screen })
 const MainTabs = () => {
   const { currentTheme } = useTheme();
   const { isHomeLoading } = useLoading();
-  const isTablet = Dimensions.get('window').width >= 768;
+  const { width, height } = useWindowDimensions();
+  const smallestDimension = Math.min(width, height);
+  const isTablet = (Platform.OS === 'ios' ? (Platform as any).isPad === true : smallestDimension >= 768);
   const insets = useSafeAreaInsets();
   const isIosTablet = Platform.OS === 'ios' && isTablet;
   const [hidden, setHidden] = React.useState(HeaderVisibility.isHidden());
@@ -927,7 +931,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               component={VideoPlayer as any} 
               options={{ 
                 animation: Platform.OS === 'android' ? 'none' : 'default',
-                animationDuration: Platform.OS === 'android' ? 0 : 300,
+                animationDuration: Platform.OS === 'android' ? 0 : 0,
                 // Force fullscreen presentation on iPad
                 presentation: Platform.OS === 'ios' ? 'fullScreenModal' : 'card',
                 // Disable gestures during video playback

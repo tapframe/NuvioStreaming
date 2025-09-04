@@ -66,6 +66,27 @@ const { width, height } = Dimensions.get('window');
 const scraperLogoCache = new Map<string, string>();
 let scraperLogoCachePromise: Promise<void> | null = null;
 
+// Short-budget HEAD detection to avoid long delays before navigation
+const MKV_HEAD_TIMEOUT_MS = 600;
+
+const detectMkvViaHead = async (url: string, headers?: Record<string, string>) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), MKV_HEAD_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      method: 'HEAD',
+      headers,
+      signal: controller.signal as any,
+    } as any);
+    const contentType = res.headers.get('content-type') || '';
+    return /matroska|x-matroska/i.test(contentType);
+  } catch (_e) {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
 // Extracted Components
 const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, theme, showLogos }: { 
   stream: Stream; 
@@ -973,43 +994,28 @@ export const StreamsScreen = () => {
           logger.warn('[StreamsScreen] MKV pre-check failed:', err);
         }
 
-        // On iOS, for installed addons where URL may not include .mkv, send a HEAD request
-        // to detect MKV via Content-Type before opening the player
+        // iOS: very short MKV detection race; never block longer than MKV_HEAD_TIMEOUT_MS
         if (Platform.OS === 'ios') {
           const lowerUrl = (stream.url || '').toLowerCase();
-          const isMkvByPath = lowerUrl.includes('.mkv') || /[?&]ext=mkv\b/.test(lowerUrl) || /format=mkv\b/.test(lowerUrl) || /container=mkv\b/.test(lowerUrl);
+          const isMkvByPath = lowerUrl.includes('.mkv') || /[?&]ext=mkv\b/i.test(lowerUrl) || /format=mkv\b/i.test(lowerUrl) || /container=mkv\b/i.test(lowerUrl);
           const isHttp = lowerUrl.startsWith('http://') || lowerUrl.startsWith('https://');
           if (!isMkvByPath && isHttp) {
             try {
-              const mkvDetected = await (async () => {
-                const controller = new AbortController();
-                const timeout = setTimeout(() => controller.abort(), 4000);
-                try {
-                  const res = await fetch(stream.url, {
-                    method: 'HEAD',
-                    // Pass along any known headers to improve odds of correct response
-                    headers: (stream.headers as any) || undefined,
-                    signal: controller.signal as any,
-                  } as any);
-                  const contentType = res.headers.get('content-type') || '';
-                  return typeof contentType === 'string' && /matroska|x-matroska/i.test(contentType);
-                } catch (_e) {
-                  return false;
-                } finally {
-                  clearTimeout(timeout);
-                }
-              })();
+              const mkvDetected = await Promise.race<boolean>([
+                detectMkvViaHead(stream.url, (stream.headers as any) || undefined),
+                new Promise<boolean>(res => setTimeout(() => res(false), MKV_HEAD_TIMEOUT_MS)),
+              ]);
               if (mkvDetected) {
                 const mergedHeaders = {
                   ...(stream.headers || {}),
                   'Content-Type': 'video/x-matroska',
                 } as Record<string, string>;
-                logger.log('[StreamsScreen] HEAD detected MKV via Content-Type, forcing in-app VLC on iOS');
+                logger.log('[StreamsScreen] HEAD detected MKV via Content-Type quickly, forcing in-app VLC on iOS');
                 navigateToPlayer(stream, { forceVlc: true, headers: mergedHeaders });
                 return;
               }
             } catch (e) {
-              logger.warn('[StreamsScreen] HEAD MKV detection failed:', e);
+              logger.warn('[StreamsScreen] Short MKV detection failed:', e);
             }
           }
         }
