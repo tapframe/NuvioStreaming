@@ -31,6 +31,14 @@
       ],
       "versions": [
         {
+          "version": "0.6.0-beta.8",
+          "buildVersion": "8",
+          "date": "2025-09-04",
+          "localizedDescription": "• Focused primarily on fixing various visual glitches across the app.\n• Video player optimizations for smoother playback.\n• Optimized Hero Carousel performance.",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/0.6.0-beta.8/Beta_0_6_0_8.ipa",
+          "size": 29700000
+        },
+        {
           "version": "0.6.0-beta.7",
           "buildVersion": "7",
           "date": "2025-09-03",
