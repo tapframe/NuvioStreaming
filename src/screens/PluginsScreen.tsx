@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,9 @@ import {
   Platform,
   Image,
   ActivityIndicator,
+  Modal,
+  Dimensions,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +24,8 @@ import { useSettings } from '../hooks/useSettings';
 import { localScraperService, ScraperInfo } from '../services/localScraperService';
 import { logger } from '../utils/logger';
 import { useTheme } from '../contexts/ThemeContext';
+
+const { width: screenWidth } = Dimensions.get('window');
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
@@ -355,7 +360,289 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.white,
     fontWeight: '600',
   },
+  // New styles for improved UX
+  collapsibleSection: {
+    backgroundColor: colors.elevation1,
+    marginBottom: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  collapsibleHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: colors.elevation2,
+  },
+  collapsibleTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.white,
+  },
+  collapsibleContent: {
+    padding: 16,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.elevation1,
+    borderRadius: 12,
+    marginBottom: 16,
+    paddingHorizontal: 12,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    color: colors.white,
+    fontSize: 16,
+  },
+  filterContainer: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    gap: 8,
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: colors.elevation2,
+    borderWidth: 1,
+    borderColor: colors.elevation3,
+  },
+  filterChipSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  filterChipText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  filterChipTextSelected: {
+    color: colors.white,
+    fontWeight: '600',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  statusBadgeText: {
+    color: 'white',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  bulkActionsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    gap: 8,
+  },
+  bulkActionButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  bulkActionButtonEnabled: {
+    backgroundColor: '#34C759',
+  },
+  bulkActionButtonDisabled: {
+    backgroundColor: colors.elevation2,
+    borderWidth: 1,
+    borderColor: colors.elevation3,
+  },
+  bulkActionButtonText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  helpButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 44 : ANDROID_STATUSBAR_HEIGHT + 16,
+    right: 16,
+    backgroundColor: colors.elevation2,
+    borderRadius: 20,
+    padding: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: colors.elevation1,
+    borderRadius: 16,
+    padding: 24,
+    margin: 20,
+    maxHeight: '80%',
+    width: screenWidth - 40,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: colors.white,
+    marginBottom: 16,
+  },
+  modalText: {
+    fontSize: 16,
+    color: colors.mediumGray,
+    lineHeight: 24,
+    marginBottom: 16,
+  },
+  modalButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  modalButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  quickSetupContainer: {
+    backgroundColor: colors.elevation2,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.primary,
+  },
+  quickSetupTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.white,
+    marginBottom: 8,
+  },
+  quickSetupText: {
+    fontSize: 14,
+    color: colors.mediumGray,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  quickSetupButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  quickSetupButtonText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  scraperCard: {
+    backgroundColor: colors.elevation2,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.elevation3,
+  },
+  scraperCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  scraperCardInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  scraperCardMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 12,
+  },
+  scraperCardMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  scraperCardMetaText: {
+    fontSize: 12,
+    color: colors.mediumGray,
+  },
+  emptyStateContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  emptyStateIcon: {
+    marginBottom: 16,
+  },
 });
+
+// Helper component for collapsible sections
+const CollapsibleSection: React.FC<{
+  title: string;
+  children: React.ReactNode;
+  isExpanded: boolean;
+  onToggle: () => void;
+  colors: any;
+  styles: any;
+}> = ({ title, children, isExpanded, onToggle, colors, styles }) => (
+  <View style={styles.collapsibleSection}>
+    <TouchableOpacity style={styles.collapsibleHeader} onPress={onToggle}>
+      <Text style={styles.collapsibleTitle}>{title}</Text>
+      <Ionicons 
+        name={isExpanded ? "chevron-up" : "chevron-down"} 
+        size={20} 
+        color={colors.mediumGray} 
+      />
+    </TouchableOpacity>
+    {isExpanded && <View style={styles.collapsibleContent}>{children}</View>}
+  </View>
+);
+
+// Helper component for info tooltips
+const InfoTooltip: React.FC<{ text: string; colors: any }> = ({ text, colors }) => (
+  <TouchableOpacity style={{ marginLeft: 8 }}>
+    <Ionicons name="information-circle-outline" size={16} color={colors.mediumGray} />
+  </TouchableOpacity>
+);
+
+// Helper component for status badges
+const StatusBadge: React.FC<{ 
+  status: 'enabled' | 'disabled' | 'available' | 'platform-disabled' | 'error';
+  colors: any;
+}> = ({ status, colors }) => {
+  const getStatusConfig = () => {
+    switch (status) {
+      case 'enabled':
+        return { color: '#34C759', text: 'Active', icon: 'checkmark-circle' };
+      case 'disabled':
+        return { color: colors.mediumGray, text: 'Disabled', icon: 'close-circle' };
+      case 'available':
+        return { color: colors.primary, text: 'Available', icon: 'download' };
+      case 'platform-disabled':
+        return { color: '#FF9500', text: 'Platform Disabled', icon: 'phone-portrait' };
+      case 'error':
+        return { color: '#FF3B30', text: 'Error', icon: 'warning' };
+      default:
+        return { color: colors.mediumGray, text: 'Unknown', icon: 'help-circle' };
+    }
+  };
+
+  const config = getStatusConfig();
+  
+  return (
+    <View style={[{ backgroundColor: config.color, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, gap: 4 }]}>
+      <Ionicons name={config.icon as any} size={12} color="white" />
+      <Text style={{ color: 'white', fontSize: 11, fontWeight: '600' }}>{config.text}</Text>
+    </View>
+  );
+};
 
 const PluginsScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -363,6 +650,8 @@ const PluginsScreen: React.FC = () => {
   const { currentTheme } = useTheme();
   const colors = currentTheme.colors;
   const styles = createStyles(colors);
+  
+  // Core state
   const [repositoryUrl, setRepositoryUrl] = useState(settings.scraperRepositoryUrl);
   const [installedScrapers, setInstalledScrapers] = useState<ScraperInfo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -370,6 +659,19 @@ const PluginsScreen: React.FC = () => {
   const [hasRepository, setHasRepository] = useState(false);
   const [showboxCookie, setShowboxCookie] = useState<string>('');
   const [showboxRegion, setShowboxRegion] = useState<string>('');
+  
+  // New UX state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFilter, setSelectedFilter] = useState<'all' | 'movie' | 'tv'>('all');
+  const [expandedSections, setExpandedSections] = useState({
+    repository: true,
+    scrapers: true,
+    settings: false,
+    quality: false,
+  });
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  const [showRepositoryModal, setShowRepositoryModal] = useState(false);
+  const [showScraperDetails, setShowScraperDetails] = useState<string | null>(null);
   const regionOptions = [
     { value: 'USA7', label: 'US East' },
     { value: 'USA6', label: 'US West' },
@@ -383,6 +685,62 @@ const PluginsScreen: React.FC = () => {
     { value: 'AU1', label: 'Australia' },
     { value: 'SZ', label: 'China' },
   ];
+
+  // Filtered scrapers based on search and filter
+  const filteredScrapers = useMemo(() => {
+    let filtered = installedScrapers;
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(scraper => 
+        scraper.name.toLowerCase().includes(query) ||
+        scraper.description.toLowerCase().includes(query) ||
+        scraper.id.toLowerCase().includes(query)
+      );
+    }
+
+    // Filter by type
+    if (selectedFilter !== 'all') {
+      filtered = filtered.filter(scraper => 
+        scraper.supportedTypes?.includes(selectedFilter as 'movie' | 'tv')
+      );
+    }
+
+    return filtered;
+  }, [installedScrapers, searchQuery, selectedFilter]);
+
+  // Helper functions
+  const toggleSection = (section: keyof typeof expandedSections) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  const getScraperStatus = (scraper: ScraperInfo): 'enabled' | 'disabled' | 'available' | 'platform-disabled' | 'error' => {
+    if (scraper.manifestEnabled === false) return 'disabled';
+    if (scraper.disabledPlatforms?.includes(Platform.OS as 'ios' | 'android')) return 'platform-disabled';
+    if (scraper.enabled) return 'enabled';
+    return 'available';
+  };
+
+  const handleBulkToggle = async (enabled: boolean) => {
+    try {
+      setIsRefreshing(true);
+      const promises = filteredScrapers.map(scraper => 
+        localScraperService.setScraperEnabled(scraper.id, enabled)
+      );
+      await Promise.all(promises);
+      await loadScrapers();
+      Alert.alert('Success', `${enabled ? 'Enabled' : 'Disabled'} ${filteredScrapers.length} scrapers`);
+    } catch (error) {
+      logger.error('[ScraperSettings] Failed to bulk toggle:', error);
+      Alert.alert('Error', 'Failed to update scrapers');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   useEffect(() => {
     loadScrapers();
@@ -586,6 +944,8 @@ const PluginsScreen: React.FC = () => {
         barStyle={Platform.OS === 'ios' ? 'light-content' : 'light-content'}
         backgroundColor={colors.background}
       />
+      
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -593,6 +953,14 @@ const PluginsScreen: React.FC = () => {
         >
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
           <Text style={styles.backText}>Settings</Text>
+        </TouchableOpacity>
+        
+        {/* Help Button */}
+        <TouchableOpacity
+          style={styles.helpButton}
+          onPress={() => setShowHelpModal(true)}
+        >
+          <Ionicons name="help-circle-outline" size={20} color={colors.primary} />
         </TouchableOpacity>
       </View>
       
@@ -604,8 +972,33 @@ const PluginsScreen: React.FC = () => {
           <RefreshControl refreshing={isRefreshing} onRefresh={loadScrapers} />
         }
       >
-        {/* Enable Local Scrapers - Top Priority */}
-        <View style={styles.section}>
+        {/* Quick Setup for New Users */}
+        {!hasRepository && (
+          <View style={styles.quickSetupContainer}>
+            <Text style={styles.quickSetupTitle}>Quick Setup</Text>
+            <Text style={styles.quickSetupText}>
+              Get started with plugins in 3 easy steps! Enable local scrapers, set up a repository, and start streaming.
+            </Text>
+            <TouchableOpacity
+              style={styles.quickSetupButton}
+              onPress={() => {
+                setExpandedSections(prev => ({ ...prev, repository: true }));
+                setShowHelpModal(true);
+              }}
+            >
+              <Text style={styles.quickSetupButtonText}>Get Started</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Enable Local Scrapers */}
+        <CollapsibleSection
+          title="Enable Local Scrapers"
+          isExpanded={expandedSections.repository}
+          onToggle={() => toggleSection('repository')}
+          colors={colors}
+          styles={styles}
+        >
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
               <Text style={styles.settingTitle}>Enable Local Scrapers</Text>
@@ -620,30 +1013,25 @@ const PluginsScreen: React.FC = () => {
               thumbColor={settings.enableLocalScrapers ? colors.white : '#f4f3f4'}
             />
           </View>
-        </View>
+        </CollapsibleSection>
 
-        {/* Repository Configuration - Moved up for better UX */}
-        <View style={[styles.section, !settings.enableLocalScrapers && styles.disabledSection]}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, !settings.enableLocalScrapers && styles.disabledText]}>Repository Configuration</Text>
-            {hasRepository && settings.enableLocalScrapers && (
-              <TouchableOpacity
-                style={styles.clearButton}
-                onPress={handleClearCache}
-              >
-                <Text style={styles.clearButtonText}>Clear Cache</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          <Text style={[styles.sectionDescription, !settings.enableLocalScrapers && styles.disabledText]}>
+        {/* Repository Configuration */}
+        <CollapsibleSection
+          title="Repository Configuration"
+          isExpanded={expandedSections.repository}
+          onToggle={() => toggleSection('repository')}
+          colors={colors}
+          styles={styles}
+        >
+          <Text style={styles.sectionDescription}>
             Enter the URL of a Nuvio scraper repository to download and install scrapers.
           </Text>
           
           {hasRepository && repositoryUrl && (
-            <View style={[styles.currentRepoContainer, !settings.enableLocalScrapers && styles.disabledContainer]}>
-              <Text style={[styles.currentRepoLabel, !settings.enableLocalScrapers && styles.disabledText]}>Current Repository:</Text>
-              <Text style={[styles.currentRepoUrl, !settings.enableLocalScrapers && styles.disabledText]}>{localScraperService.getRepositoryName()}</Text>
-              <Text style={[styles.currentRepoUrl, !settings.enableLocalScrapers && styles.disabledText, { fontSize: 12, opacity: 0.7, marginTop: 4 }]}>{repositoryUrl}</Text>
+            <View style={styles.currentRepoContainer}>
+              <Text style={styles.currentRepoLabel}>Current Repository:</Text>
+              <Text style={styles.currentRepoUrl}>{localScraperService.getRepositoryName()}</Text>
+              <Text style={[styles.currentRepoUrl, { fontSize: 12, opacity: 0.7, marginTop: 4 }]}>{repositoryUrl}</Text>
             </View>
           )}
           
@@ -660,7 +1048,7 @@ const PluginsScreen: React.FC = () => {
               editable={settings.enableLocalScrapers}
             />
             <Text style={[styles.urlHint, !settings.enableLocalScrapers && styles.disabledText]}>
-              💡 Use GitHub raw URL format. Default: https://raw.githubusercontent.com/tapframe/nuvio-providers/main
+              Use GitHub raw URL format. Default: https://raw.githubusercontent.com/tapframe/nuvio-providers/main
             </Text>
             
             <TouchableOpacity 
@@ -699,159 +1087,228 @@ const PluginsScreen: React.FC = () => {
               </TouchableOpacity>
             )}
           </View>
-        </View>
+        </CollapsibleSection>
 
         {/* Available Scrapers */}
-        <View style={[styles.section, !settings.enableLocalScrapers && styles.disabledSection]}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, !settings.enableLocalScrapers && styles.disabledText]}>Available Scrapers</Text>
-            {installedScrapers.length > 0 && settings.enableLocalScrapers && (
-              <TouchableOpacity
-                style={styles.clearButton}
-                onPress={handleClearScrapers}
-              >
-                <Text style={styles.clearButtonText}>Clear All</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          <Text style={[styles.sectionDescription, !settings.enableLocalScrapers && styles.disabledText]}>
-            Scrapers available in the repository. Only enabled scrapers that are also installed will be used for streaming.
-          </Text>
+        <CollapsibleSection
+          title={`Available Scrapers (${filteredScrapers.length})`}
+          isExpanded={expandedSections.scrapers}
+          onToggle={() => toggleSection('scrapers')}
+          colors={colors}
+          styles={styles}
+        >
+          {installedScrapers.length > 0 && (
+            <>
+              {/* Search and Filter */}
+              <View style={styles.searchContainer}>
+                <Ionicons name="search" size={20} color={colors.mediumGray} />
+                <TextInput
+                  style={styles.searchInput}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder="Search scrapers..."
+                  placeholderTextColor={colors.mediumGray}
+                />
+                {searchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setSearchQuery('')}>
+                    <Ionicons name="close-circle" size={20} color={colors.mediumGray} />
+                  </TouchableOpacity>
+                )}
+              </View>
 
-          {installedScrapers.length === 0 ? (
-             <View style={[styles.emptyContainer, !settings.enableLocalScrapers && styles.disabledContainer]}>
-               <Ionicons name="download-outline" size={48} color={!settings.enableLocalScrapers ? colors.elevation3 : colors.mediumGray} />
-               <Text style={[styles.emptyStateTitle, !settings.enableLocalScrapers && styles.disabledText]}>No Scrapers Available</Text>
-               <Text style={[styles.emptyStateDescription, !settings.enableLocalScrapers && styles.disabledText]}>
-                 Configure a repository above to view available scrapers.
-               </Text>
-             </View>
-           ) : (
-             <View style={styles.scrapersContainer}>
-                {installedScrapers.map((scraper) => {
-                                  return (
-                    <View key={scraper.id} style={[styles.scraperItem, !settings.enableLocalScrapers && styles.disabledContainer]}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%' }}>
-                        {scraper.logo ? (
-                          <Image
-                            source={{ uri: scraper.logo }}
-                            style={[styles.scraperLogo, !settings.enableLocalScrapers && styles.disabledImage]}
-                            resizeMode="contain"
-                          />
-                        ) : (
-                          <View style={[styles.scraperLogo, !settings.enableLocalScrapers && styles.disabledContainer]} />
-                        )}
-                        <View style={styles.scraperInfo}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                             <Text style={[styles.scraperName, !settings.enableLocalScrapers && styles.disabledText]}>{scraper.name}</Text>
-                             {scraper.manifestEnabled === false ? (
-                               <View style={[styles.availableIndicator, { backgroundColor: colors.mediumGray }]}>
-                                 <Text style={styles.availableIndicatorText}>Disabled</Text>
-                               </View>
-                             ) : scraper.disabledPlatforms && scraper.disabledPlatforms.includes(Platform.OS as 'ios' | 'android') ? (
-                               <View style={[styles.availableIndicator, { backgroundColor: '#ff9500' }]}>
-                                 <Text style={styles.availableIndicatorText}>Platform Disabled</Text>
-                               </View>
-                             ) : !scraper.enabled && (
-                               <View style={styles.availableIndicator}>
-                                 <Text style={styles.availableIndicatorText}>Available</Text>
-                               </View>
-                             )}
-                           </View>
-                          <Text style={[styles.scraperDescription, !settings.enableLocalScrapers && styles.disabledText]}>{scraper.description}</Text>
-                          <View style={styles.scraperMeta}>
-                            <Text style={[styles.scraperVersion, !settings.enableLocalScrapers && styles.disabledText]}>v{scraper.version}</Text>
-                            <Text style={[styles.scraperDot, !settings.enableLocalScrapers && styles.disabledText]}>•</Text>
-                            <Text style={[styles.scraperTypes, !settings.enableLocalScrapers && styles.disabledText]}>
-                              {scraper.supportedTypes && Array.isArray(scraper.supportedTypes) ? scraper.supportedTypes.join(', ') : 'Unknown'}
-                            </Text>
-                            {scraper.contentLanguage && Array.isArray(scraper.contentLanguage) && scraper.contentLanguage.length > 0 && (
-                              <>
-                                <Text style={[styles.scraperDot, !settings.enableLocalScrapers && styles.disabledText]}>•</Text>
-                                <Text style={[styles.scraperLanguage, !settings.enableLocalScrapers && styles.disabledText]}>
-                                  {scraper.contentLanguage.map(lang => lang.toUpperCase()).join(', ')}
-                                </Text>
-                              </>
-                            )}
-                          </View>
-                        </View>
-                        <Switch
-                              value={scraper.enabled && settings.enableLocalScrapers}
-                              onValueChange={(enabled) => handleToggleScraper(scraper.id, enabled)}
-                              trackColor={{ false: colors.elevation3, true: colors.primary }}
-                              thumbColor={scraper.enabled && settings.enableLocalScrapers ? colors.white : '#f4f3f4'}
-                              disabled={!settings.enableLocalScrapers || scraper.manifestEnabled === false || (scraper.disabledPlatforms && scraper.disabledPlatforms.includes(Platform.OS as 'ios' | 'android'))}
-                              style={{ opacity: (!settings.enableLocalScrapers || scraper.manifestEnabled === false || (scraper.disabledPlatforms && scraper.disabledPlatforms.includes(Platform.OS as 'ios' | 'android'))) ? 0.5 : 1 }}
-                            />
+              {/* Filter Chips */}
+              <View style={styles.filterContainer}>
+                {['all', 'movie', 'tv'].map((filter) => (
+                  <TouchableOpacity
+                    key={filter}
+                    style={[
+                      styles.filterChip,
+                      selectedFilter === filter && styles.filterChipSelected
+                    ]}
+                    onPress={() => setSelectedFilter(filter as any)}
+                  >
+                    <Text style={[
+                      styles.filterChipText,
+                      selectedFilter === filter && styles.filterChipTextSelected
+                    ]}>
+                      {filter === 'all' ? 'All' : filter === 'movie' ? 'Movies' : 'TV Shows'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Bulk Actions */}
+              {filteredScrapers.length > 0 && (
+                <View style={styles.bulkActionsContainer}>
+                  <TouchableOpacity
+                    style={[styles.bulkActionButton, styles.bulkActionButtonEnabled]}
+                    onPress={() => handleBulkToggle(true)}
+                    disabled={isRefreshing}
+                  >
+                    <Text style={styles.bulkActionButtonText}>Enable All</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.bulkActionButton, styles.bulkActionButtonDisabled]}
+                    onPress={() => handleBulkToggle(false)}
+                    disabled={isRefreshing}
+                  >
+                    <Text style={styles.bulkActionButtonText}>Disable All</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </>
+          )}
+
+          {filteredScrapers.length === 0 ? (
+            <View style={styles.emptyStateContainer}>
+              <Ionicons 
+                name={searchQuery ? "search" : "download-outline"} 
+                size={48} 
+                color={colors.mediumGray}
+                style={styles.emptyStateIcon}
+              />
+              <Text style={styles.emptyStateTitle}>
+                {searchQuery ? 'No Scrapers Found' : 'No Scrapers Available'}
+              </Text>
+              <Text style={styles.emptyStateDescription}>
+                {searchQuery 
+                  ? `No scrapers match "${searchQuery}". Try a different search term.`
+                  : 'Configure a repository above to view available scrapers.'
+                }
+              </Text>
+              {searchQuery && (
+                <TouchableOpacity
+                  style={styles.button}
+                  onPress={() => setSearchQuery('')}
+                >
+                  <Text style={styles.buttonText}>Clear Search</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            <View style={styles.scrapersContainer}>
+              {filteredScrapers.map((scraper) => (
+                <View key={scraper.id} style={styles.scraperCard}>
+                  <View style={styles.scraperCardHeader}>
+                    {scraper.logo ? (
+                      <Image
+                        source={{ uri: scraper.logo }}
+                        style={styles.scraperLogo}
+                        resizeMode="contain"
+                      />
+                    ) : (
+                      <View style={styles.scraperLogo} />
+                    )}
+                    <View style={styles.scraperCardInfo}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                        <Text style={styles.scraperName}>{scraper.name}</Text>
+                        <StatusBadge status={getScraperStatus(scraper)} colors={colors} />
                       </View>
-                       {scraper.id === 'showboxog' && settings.enableLocalScrapers && (
-                         <View style={{ marginTop: 16, width: '100%', paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.elevation3 }}>
-                           <Text style={[styles.settingTitle, { marginBottom: 8 }]}>ShowBox Cookie</Text>
-                           <TextInput
-                             style={[styles.textInput, { marginBottom: 12 }]}
-                             value={showboxCookie}
-                             onChangeText={setShowboxCookie}
-                             placeholder="Paste FebBox ui cookie value"
-                             placeholderTextColor={colors.mediumGray}
-                             autoCapitalize="none"
-                             autoCorrect={false}
-                             multiline={true}
-                             numberOfLines={3}
-                           />
-                           <Text style={[styles.settingTitle, { marginBottom: 8 }]}>Region</Text>
-                           <View style={[styles.qualityChipsContainer, { marginBottom: 16 }]}>
-                             {regionOptions.map(opt => {
-                               const selected = showboxRegion === opt.value;
-                               return (
-                                 <TouchableOpacity
-                                   key={opt.value}
-                                   style={[styles.qualityChip, selected && styles.qualityChipSelected]}
-                                   onPress={() => setShowboxRegion(opt.value)}
-                                 >
-                                   <Text style={[styles.qualityChipText, selected && styles.qualityChipTextSelected]}>
-                                     {opt.label}
-                                   </Text>
-                                 </TouchableOpacity>
-                               );
-                             })}
-                           </View>
-                           <View style={styles.buttonRow}>
-                             <TouchableOpacity
-                               style={[styles.button, styles.primaryButton]}
-                               onPress={async () => {
-                                 await localScraperService.setScraperSettings('showboxog', { cookie: showboxCookie, region: showboxRegion });
-                                 Alert.alert('Saved', 'ShowBox settings updated');
-                               }}
-                             >
-                               <Text style={styles.buttonText}>Save</Text>
-                             </TouchableOpacity>
-                             <TouchableOpacity
-                               style={[styles.button, styles.secondaryButton]}
-                               onPress={async () => {
-                                 setShowboxCookie('');
-                                 setShowboxRegion('');
-                                 await localScraperService.setScraperSettings('showboxog', {});
-                               }}
-                             >
-                               <Text style={styles.secondaryButtonText}>Clear</Text>
-                             </TouchableOpacity>
-                           </View>
-                         </View>
-                       )}
-                     </View>
-                 );
-               })}
-             </View>
-           )}
-        </View>
+                      <Text style={styles.scraperDescription}>{scraper.description}</Text>
+                    </View>
+                    <Switch
+                      value={scraper.enabled && settings.enableLocalScrapers}
+                      onValueChange={(enabled) => handleToggleScraper(scraper.id, enabled)}
+                      trackColor={{ false: colors.elevation3, true: colors.primary }}
+                      thumbColor={scraper.enabled && settings.enableLocalScrapers ? colors.white : '#f4f3f4'}
+                      disabled={!settings.enableLocalScrapers || scraper.manifestEnabled === false || (scraper.disabledPlatforms && scraper.disabledPlatforms.includes(Platform.OS as 'ios' | 'android'))}
+                    />
+                  </View>
+                  
+                  <View style={styles.scraperCardMeta}>
+                    <View style={styles.scraperCardMetaItem}>
+                      <Ionicons name="information-circle" size={12} color={colors.mediumGray} />
+                      <Text style={styles.scraperCardMetaText}>v{scraper.version}</Text>
+                    </View>
+                    <View style={styles.scraperCardMetaItem}>
+                      <Ionicons name="film" size={12} color={colors.mediumGray} />
+                      <Text style={styles.scraperCardMetaText}>
+                        {scraper.supportedTypes?.join(', ') || 'Unknown'}
+                      </Text>
+                    </View>
+                    {scraper.contentLanguage && scraper.contentLanguage.length > 0 && (
+                      <View style={styles.scraperCardMetaItem}>
+                        <Ionicons name="globe" size={12} color={colors.mediumGray} />
+                        <Text style={styles.scraperCardMetaText}>
+                          {scraper.contentLanguage.map(lang => lang.toUpperCase()).join(', ')}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
 
-        {/* Additional Scraper Settings */}
-        <View style={[styles.section, !settings.enableLocalScrapers && styles.disabledSection]}>
-          <Text style={[styles.sectionTitle, !settings.enableLocalScrapers && styles.disabledText]}>Additional Settings</Text>
+                  {/* ShowBox Settings */}
+                  {scraper.id === 'showboxog' && settings.enableLocalScrapers && (
+                    <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.elevation3 }}>
+                      <Text style={[styles.settingTitle, { marginBottom: 8 }]}>ShowBox Cookie</Text>
+                      <TextInput
+                        style={[styles.textInput, { marginBottom: 12 }]}
+                        value={showboxCookie}
+                        onChangeText={setShowboxCookie}
+                        placeholder="Paste FebBox ui cookie value"
+                        placeholderTextColor={colors.mediumGray}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        multiline={true}
+                        numberOfLines={3}
+                      />
+                      <Text style={[styles.settingTitle, { marginBottom: 8 }]}>Region</Text>
+                      <View style={[styles.qualityChipsContainer, { marginBottom: 16 }]}>
+                        {regionOptions.map(opt => {
+                          const selected = showboxRegion === opt.value;
+                          return (
+                            <TouchableOpacity
+                              key={opt.value}
+                              style={[styles.qualityChip, selected && styles.qualityChipSelected]}
+                              onPress={() => setShowboxRegion(opt.value)}
+                            >
+                              <Text style={[styles.qualityChipText, selected && styles.qualityChipTextSelected]}>
+                                {opt.label}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                      <View style={styles.buttonRow}>
+                        <TouchableOpacity
+                          style={[styles.button, styles.primaryButton]}
+                          onPress={async () => {
+                            await localScraperService.setScraperSettings('showboxog', { cookie: showboxCookie, region: showboxRegion });
+                            Alert.alert('Saved', 'ShowBox settings updated');
+                          }}
+                        >
+                          <Text style={styles.buttonText}>Save</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.button, styles.secondaryButton]}
+                          onPress={async () => {
+                            setShowboxCookie('');
+                            setShowboxRegion('');
+                            await localScraperService.setScraperSettings('showboxog', {});
+                          }}
+                        >
+                          <Text style={styles.secondaryButtonText}>Clear</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+                </View>
+              ))}
+            </View>
+          )}
+        </CollapsibleSection>
+
+        {/* Additional Settings */}
+        <CollapsibleSection
+          title="Additional Settings"
+          isExpanded={expandedSections.settings}
+          onToggle={() => toggleSection('settings')}
+          colors={colors}
+          styles={styles}
+        >
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, !settings.enableLocalScrapers && styles.disabledText]}>Enable URL Validation</Text>
-              <Text style={[styles.settingDescription, !settings.enableLocalScrapers && styles.disabledText]}>
+              <Text style={styles.settingTitle}>Enable URL Validation</Text>
+              <Text style={styles.settingDescription}>
                 Validate streaming URLs before returning them (may slow down results but improves reliability)
               </Text>
             </View>
@@ -866,8 +1323,8 @@ const PluginsScreen: React.FC = () => {
           
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, !settings.enableLocalScrapers && styles.disabledText]}>Group Plugin Streams</Text>
-              <Text style={[styles.settingDescription, !settings.enableLocalScrapers && styles.disabledText]}>
+              <Text style={styles.settingTitle}>Group Plugin Streams</Text>
+              <Text style={styles.settingDescription}>
                 When enabled, all plugin streams are grouped under "{localScraperService.getRepositoryName()}". When disabled, each plugin shows as a separate provider.
               </Text>
             </View>
@@ -888,8 +1345,8 @@ const PluginsScreen: React.FC = () => {
           
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, (!settings.enableLocalScrapers || settings.streamDisplayMode !== 'grouped') && styles.disabledText]}>Sort by Quality First</Text>
-              <Text style={[styles.settingDescription, (!settings.enableLocalScrapers || settings.streamDisplayMode !== 'grouped') && styles.disabledText]}>
+              <Text style={styles.settingTitle}>Sort by Quality First</Text>
+              <Text style={styles.settingDescription}>
                 When enabled, streams are sorted by quality first, then by scraper. When disabled, streams are sorted by scraper first, then by quality. Only available when grouping is enabled.
               </Text>
             </View>
@@ -904,8 +1361,8 @@ const PluginsScreen: React.FC = () => {
           
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, !settings.enableLocalScrapers && styles.disabledText]}>Show Scraper Logos</Text>
-              <Text style={[styles.settingDescription, !settings.enableLocalScrapers && styles.disabledText]}>
+              <Text style={styles.settingTitle}>Show Scraper Logos</Text>
+              <Text style={styles.settingDescription}>
                 Display scraper logos next to streaming links on the streams screen.
               </Text>
             </View>
@@ -917,12 +1374,17 @@ const PluginsScreen: React.FC = () => {
                disabled={!settings.enableLocalScrapers}
              />
           </View>
-        </View>
+        </CollapsibleSection>
 
         {/* Quality Filtering */}
-        <View style={[styles.section, !settings.enableLocalScrapers && styles.disabledSection]}>
-          <Text style={[styles.sectionTitle, !settings.enableLocalScrapers && styles.disabledText]}>Quality Filtering</Text>
-          <Text style={[styles.sectionDescription, !settings.enableLocalScrapers && styles.disabledText]}>
+        <CollapsibleSection
+          title="Quality Filtering"
+          isExpanded={expandedSections.quality}
+          onToggle={() => toggleSection('quality')}
+          colors={colors}
+          styles={styles}
+        >
+          <Text style={styles.sectionDescription}>
             Exclude specific video qualities from search results. Tap on a quality to exclude it from plugin results.
           </Text>
           
@@ -954,10 +1416,10 @@ const PluginsScreen: React.FC = () => {
           
           {(settings.excludedQualities || []).length > 0 && (
             <Text style={[styles.infoText, { marginTop: 12 }, !settings.enableLocalScrapers && styles.disabledText]}>
-              💡 Excluded qualities: {(settings.excludedQualities || []).join(', ')}
+              Excluded qualities: {(settings.excludedQualities || []).join(', ')}
             </Text>
           )}
-        </View>
+        </CollapsibleSection>
 
         {/* About */}
         <View style={[styles.section, styles.lastSection]}>
@@ -968,246 +1430,40 @@ const PluginsScreen: React.FC = () => {
           </Text>
         </View>
       </ScrollView>
+
+      {/* Help Modal */}
+      <Modal
+        visible={showHelpModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowHelpModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Getting Started with Plugins</Text>
+            <Text style={styles.modalText}>
+              1. <Text style={{ fontWeight: '600' }}>Enable Local Scrapers</Text> - Turn on the main switch to allow plugins
+            </Text>
+            <Text style={styles.modalText}>
+              2. <Text style={{ fontWeight: '600' }}>Set Repository URL</Text> - Enter a GitHub raw URL or use the default repository
+            </Text>
+            <Text style={styles.modalText}>
+              3. <Text style={{ fontWeight: '600' }}>Refresh Repository</Text> - Download available scrapers from the repository
+            </Text>
+            <Text style={styles.modalText}>
+              4. <Text style={{ fontWeight: '600' }}>Enable Scrapers</Text> - Turn on the scrapers you want to use for streaming
+            </Text>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => setShowHelpModal(false)}
+            >
+              <Text style={styles.modalButtonText}>Got it!</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000000',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
-  },
-  backButton: {
-    marginRight: 16,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  content: {
-    flex: 1,
-  },
-  section: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
-  },
-  lastSection: {
-    borderBottomWidth: 0,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-    marginHorizontal: -16,
-    paddingHorizontal: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 8,
-  },
-  sectionDescription: {
-    fontSize: 14,
-    color: '#999',
-    marginBottom: 16,
-    lineHeight: 20,
-  },
-  settingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  settingInfo: {
-    flex: 1,
-    marginRight: 16,
-  },
-  settingTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  settingDescription: {
-    fontSize: 14,
-    color: '#999',
-    lineHeight: 18,
-  },
-  inputContainer: {
-    marginBottom: 16,
-  },
-  textInput: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#333',
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  button: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 44,
-  },
-  primaryButton: {
-    backgroundColor: '#007AFF',
-  },
-  secondaryButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#007AFF',
-  },
-  buttonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  secondaryButtonText: {
-    color: '#007AFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  clearButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    backgroundColor: '#ff3b30',
-    marginLeft: 0,
-  },
-  clearButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  scrapersList: {
-    gap: 12,
-  },
-  scraperItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1a1a1a',
-    borderRadius: 8,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#333',
-  },
-  scraperLogo: {
-    width: 40,
-    height: 40,
-    marginRight: 12,
-    borderRadius: 8,
-  },
-  scraperInfo: {
-    flex: 1,
-    marginRight: 16,
-  },
-  scraperName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  scraperDescription: {
-    fontSize: 14,
-    color: '#999',
-    marginBottom: 8,
-    lineHeight: 18,
-  },
-  scraperMeta: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  scraperVersion: {
-    fontSize: 12,
-    color: '#007AFF',
-    fontWeight: '500',
-  },
-  scraperTypes: {
-    fontSize: 12,
-    color: '#666',
-    textTransform: 'uppercase',
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 32,
-  },
-  emptyStateTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyStateDescription: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#999',
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  currentRepoContainer: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#333',
-  },
-  currentRepoLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#007AFF',
-    marginBottom: 4,
-  },
-  currentRepoUrl: {
-    fontSize: 14,
-    color: '#ffffff',
-    fontFamily: 'monospace',
-    lineHeight: 18,
-  },
-  urlHint: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 8,
-    lineHeight: 16,
-  },
-  defaultRepoButton: {
-    backgroundColor: '#333',
-    borderRadius: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginTop: 8,
-    alignItems: 'center',
-  },
-  defaultRepoButtonText: {
-    color: '#007AFF',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-});
 
 export default PluginsScreen;
