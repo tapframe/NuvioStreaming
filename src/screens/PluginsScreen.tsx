@@ -21,7 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useSettings } from '../hooks/useSettings';
-import { localScraperService, ScraperInfo } from '../services/localScraperService';
+import { localScraperService, ScraperInfo, RepositoryInfo } from '../services/localScraperService';
 import { logger } from '../utils/logger';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -189,28 +189,34 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 15,
   },
   button: {
-    backgroundColor: colors.elevation2,
+    backgroundColor: 'transparent',
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     borderRadius: 8,
-    marginRight: 8,
+    borderWidth: 1,
+    borderColor: colors.elevation3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
   },
   primaryButton: {
     backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   secondaryButton: {
-    backgroundColor: colors.elevation2,
+    backgroundColor: 'transparent',
+    borderColor: colors.elevation3,
   },
   buttonText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '500',
     color: colors.white,
     textAlign: 'center',
   },
   secondaryButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.mediumGray,
+    fontSize: 15,
+    fontWeight: '500',
+    color: colors.white,
     textAlign: 'center',
   },
   clearButton: {
@@ -264,6 +270,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   buttonRow: {
     flexDirection: 'row',
     gap: 12,
+    marginTop: 8,
   },
   infoText: {
      fontSize: 14,
@@ -440,35 +447,40 @@ const createStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 16,
-    gap: 8,
+    gap: 12,
   },
   bulkActionButton: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+    borderWidth: 1,
   },
   bulkActionButtonEnabled: {
-    backgroundColor: '#34C759',
+    backgroundColor: 'transparent',
+    borderColor: '#34C759',
   },
   bulkActionButtonDisabled: {
-    backgroundColor: colors.elevation2,
-    borderWidth: 1,
+    backgroundColor: 'transparent',
     borderColor: colors.elevation3,
   },
   bulkActionButtonText: {
     color: colors.white,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   helpButton: {
     position: 'absolute',
     top: Platform.OS === 'ios' ? 44 : ANDROID_STATUSBAR_HEIGHT + 16,
     right: 16,
-    backgroundColor: colors.elevation2,
+    backgroundColor: 'transparent',
     borderRadius: 20,
     padding: 8,
+    borderWidth: 1,
+    borderColor: colors.elevation3,
   },
   modalOverlay: {
     flex: 1,
@@ -498,16 +510,18 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   modalButton: {
     backgroundColor: colors.primary,
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 16,
+    minHeight: 48,
   },
   modalButtonText: {
     color: colors.white,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   quickSetupContainer: {
     backgroundColor: colors.elevation2,
@@ -531,15 +545,17 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   quickSetupButton: {
     backgroundColor: colors.primary,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
   },
   quickSetupButtonText: {
     color: colors.white,
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '500',
   },
   scraperCard: {
     backgroundColor: colors.elevation2,
@@ -580,6 +596,75 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   emptyStateIcon: {
     marginBottom: 16,
+  },
+  // Repository management styles
+  repositoriesList: {
+    marginBottom: 16,
+  },
+  repositoryItem: {
+    backgroundColor: colors.elevation2,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.elevation3,
+  },
+  repositoryInfo: {
+    flex: 1,
+    marginBottom: 12,
+  },
+  repositoryName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.white,
+    marginRight: 8,
+  },
+  repositoryDescription: {
+    fontSize: 14,
+    color: colors.mediumGray,
+    marginBottom: 4,
+    lineHeight: 18,
+  },
+  repositoryUrl: {
+    fontSize: 12,
+    color: colors.mediumGray,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    marginBottom: 4,
+  },
+  repositoryMeta: {
+    fontSize: 12,
+    color: colors.mediumGray,
+  },
+  repositoryActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  repositoryActionButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 36,
+  },
+  repositoryActionButtonPrimary: {
+    backgroundColor: 'transparent',
+    borderColor: colors.primary,
+  },
+  repositoryActionButtonSecondary: {
+    backgroundColor: 'transparent',
+    borderColor: colors.elevation3,
+  },
+  repositoryActionButtonDanger: {
+    backgroundColor: 'transparent',
+    borderColor: '#ff3b30',
+  },
+  repositoryActionButtonText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.white,
   },
 });
 
@@ -659,6 +744,16 @@ const PluginsScreen: React.FC = () => {
   const [hasRepository, setHasRepository] = useState(false);
   const [showboxCookie, setShowboxCookie] = useState<string>('');
   const [showboxRegion, setShowboxRegion] = useState<string>('');
+  
+  // Multiple repositories state
+  const [repositories, setRepositories] = useState<RepositoryInfo[]>([]);
+  const [currentRepositoryId, setCurrentRepositoryId] = useState<string>('');
+  const [showAddRepositoryModal, setShowAddRepositoryModal] = useState(false);
+  const [newRepositoryUrl, setNewRepositoryUrl] = useState('');
+  const [newRepositoryName, setNewRepositoryName] = useState('');
+  const [newRepositoryDescription, setNewRepositoryDescription] = useState('');
+  const [switchingRepository, setSwitchingRepository] = useState<string | null>(null);
+  const [fetchingRepoName, setFetchingRepoName] = useState(false);
   
   // New UX state
   const [searchQuery, setSearchQuery] = useState('');
@@ -742,9 +837,123 @@ const PluginsScreen: React.FC = () => {
     }
   };
 
+  const handleUrlChange = async (url: string) => {
+    setNewRepositoryUrl(url);
+    // Auto-populate repository name if it's empty and URL is valid
+    if (!newRepositoryName.trim() && url.trim()) {
+      setFetchingRepoName(true);
+      try {
+        // Try to fetch name from manifest first
+        const manifestName = await localScraperService.fetchRepositoryNameFromManifest(url.trim());
+        setNewRepositoryName(manifestName);
+      } catch (error) {
+        // Fallback to URL extraction if manifest fetch fails
+        try {
+          const extractedName = localScraperService.extractRepositoryName(url.trim());
+          if (extractedName !== 'Unknown Repository') {
+            setNewRepositoryName(extractedName);
+          }
+        } catch (extractError) {
+          // Ignore errors, just don't auto-populate
+        }
+      } finally {
+        setFetchingRepoName(false);
+      }
+    }
+  };
+
+  const handleAddRepository = async () => {
+    if (!newRepositoryUrl.trim()) {
+      Alert.alert('Error', 'Please enter a valid repository URL');
+      return;
+    }
+
+    // Validate URL format
+    const url = newRepositoryUrl.trim();
+    if (!url.startsWith('https://raw.githubusercontent.com/') && !url.startsWith('http://')) {
+      Alert.alert(
+        'Invalid URL Format', 
+        'Please use a valid GitHub raw URL format:\n\nhttps://raw.githubusercontent.com/username/repo/branch/\n\nExample:\nhttps://raw.githubusercontent.com/tapframe/nuvio-providers/main/'
+      );
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const repoId = await localScraperService.addRepository({
+        name: newRepositoryName.trim(), // Let the service fetch from manifest if empty
+        url,
+        description: newRepositoryDescription.trim(),
+        enabled: true
+      });
+      
+      await loadRepositories();
+      
+      // Switch to the new repository and refresh it
+      await localScraperService.setCurrentRepository(repoId);
+      await loadRepositories();
+      await loadScrapers();
+      
+      setNewRepositoryUrl('');
+      setNewRepositoryName('');
+      setNewRepositoryDescription('');
+      setFetchingRepoName(false);
+      setShowAddRepositoryModal(false);
+      Alert.alert('Success', 'Repository added and refreshed successfully');
+    } catch (error) {
+      logger.error('[ScraperSettings] Failed to add repository:', error);
+      Alert.alert('Error', 'Failed to add repository');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSwitchRepository = async (repoId: string) => {
+    try {
+      setSwitchingRepository(repoId);
+      await localScraperService.setCurrentRepository(repoId);
+      await loadRepositories();
+      await loadScrapers();
+      Alert.alert('Success', 'Repository switched successfully');
+    } catch (error) {
+      logger.error('[ScraperSettings] Failed to switch repository:', error);
+      Alert.alert('Error', 'Failed to switch repository');
+    } finally {
+      setSwitchingRepository(null);
+    }
+  };
+
+  const handleRemoveRepository = async (repoId: string) => {
+    const repo = repositories.find(r => r.id === repoId);
+    if (!repo) return;
+
+    Alert.alert(
+      'Remove Repository',
+      `Are you sure you want to remove "${repo.name}"? This will also remove all scrapers from this repository.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await localScraperService.removeRepository(repoId);
+              await loadRepositories();
+              await loadScrapers();
+              Alert.alert('Success', 'Repository removed successfully');
+            } catch (error) {
+              logger.error('[ScraperSettings] Failed to remove repository:', error);
+              Alert.alert('Error', error instanceof Error ? error.message : 'Failed to remove repository');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   useEffect(() => {
     loadScrapers();
-    checkRepository();
+    loadRepositories();
   }, []);
 
   const loadScrapers = async () => {
@@ -760,6 +969,27 @@ const PluginsScreen: React.FC = () => {
       }
     } catch (error) {
       logger.error('[ScraperSettings] Failed to load scrapers:', error);
+    }
+  };
+
+  const loadRepositories = async () => {
+    try {
+      // First refresh repository names from manifests for existing repositories
+      await localScraperService.refreshRepositoryNamesFromManifests();
+      
+      const repos = await localScraperService.getRepositories();
+      setRepositories(repos);
+      setHasRepository(repos.length > 0);
+      
+      const currentRepoId = localScraperService.getCurrentRepositoryId();
+      setCurrentRepositoryId(currentRepoId);
+      
+      const currentRepo = repos.find(r => r.id === currentRepoId);
+      if (currentRepo) {
+        setRepositoryUrl(currentRepo.url);
+      }
+    } catch (error) {
+      logger.error('[ScraperSettings] Failed to load repositories:', error);
     }
   };
 
@@ -1024,10 +1254,11 @@ const PluginsScreen: React.FC = () => {
           styles={styles}
         >
           <Text style={styles.sectionDescription}>
-            Enter the URL of a Nuvio scraper repository to download and install scrapers.
+            Manage multiple scraper repositories. Switch between repositories to access different sets of scrapers.
           </Text>
           
-          {hasRepository && repositoryUrl && (
+          {/* Current Repository */}
+          {currentRepositoryId && (
             <View style={styles.currentRepoContainer}>
               <Text style={styles.currentRepoLabel}>Current Repository:</Text>
               <Text style={styles.currentRepoUrl}>{localScraperService.getRepositoryName()}</Text>
@@ -1035,58 +1266,84 @@ const PluginsScreen: React.FC = () => {
             </View>
           )}
           
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={[styles.textInput, !settings.enableLocalScrapers && styles.disabledInput]}
-              value={repositoryUrl}
-              onChangeText={setRepositoryUrl}
-              placeholder="https://raw.githubusercontent.com/tapframe/nuvio-providers/main"
-              placeholderTextColor={!settings.enableLocalScrapers ? colors.elevation3 : "#999"}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              editable={settings.enableLocalScrapers}
-            />
-            <Text style={[styles.urlHint, !settings.enableLocalScrapers && styles.disabledText]}>
-              Use GitHub raw URL format. Default: https://raw.githubusercontent.com/tapframe/nuvio-providers/main
+          {/* Repository List */}
+          {repositories.length > 0 && (
+            <View style={styles.repositoriesList}>
+              <Text style={[styles.settingTitle, { marginBottom: 12 }]}>Available Repositories</Text>
+              {repositories.map((repo) => (
+                <View key={repo.id} style={styles.repositoryItem}>
+                  <View style={styles.repositoryInfo}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                      <Text style={styles.repositoryName}>{repo.name}</Text>
+                      {repo.id === currentRepositoryId && (
+                        <View style={[styles.statusBadge, { backgroundColor: '#34C759' }]}>
+                          <Ionicons name="checkmark-circle" size={12} color="white" />
+                          <Text style={styles.statusBadgeText}>Active</Text>
+                        </View>
+                      )}
+                      {switchingRepository === repo.id && (
+                        <View style={[styles.statusBadge, { backgroundColor: colors.primary }]}>
+                          <ActivityIndicator size={12} color="white" />
+                          <Text style={styles.statusBadgeText}>Switching...</Text>
+                        </View>
+                      )}
+                    </View>
+                    {repo.description && (
+                      <Text style={styles.repositoryDescription}>{repo.description}</Text>
+                    )}
+                    <Text style={styles.repositoryUrl}>{repo.url}</Text>
+                    <Text style={styles.repositoryMeta}>
+                      {repo.scraperCount || 0} scrapers • Last updated: {repo.lastUpdated ? new Date(repo.lastUpdated).toLocaleDateString() : 'Never'}
             </Text>
-            
-            <TouchableOpacity 
-              style={[styles.defaultRepoButton, !settings.enableLocalScrapers && styles.disabledButton]} 
-              onPress={handleUseDefaultRepo}
-              disabled={!settings.enableLocalScrapers}
-            >
-              <Text style={[styles.defaultRepoButtonText, !settings.enableLocalScrapers && styles.disabledText]}>Use Default Repository</Text>
-            </TouchableOpacity>
           </View>
+                  <View style={styles.repositoryActions}>
+                    {repo.id !== currentRepositoryId && (
+                      <TouchableOpacity
+                        style={[styles.repositoryActionButton, styles.repositoryActionButtonPrimary]}
+                        onPress={() => handleSwitchRepository(repo.id)}
+                        disabled={switchingRepository === repo.id}
+                      >
+                        {switchingRepository === repo.id ? (
+                          <ActivityIndicator size="small" color={colors.primary} />
+                        ) : (
+                          <Text style={styles.repositoryActionButtonText}>Switch</Text>
+                        )}
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity
+                      style={[styles.repositoryActionButton, styles.repositoryActionButtonSecondary]}
+                      onPress={() => handleRefreshRepository()}
+                      disabled={isRefreshing || switchingRepository !== null}
+                    >
+                      {isRefreshing ? (
+                        <ActivityIndicator size="small" color={colors.mediumGray} />
+                      ) : (
+                        <Text style={styles.repositoryActionButtonText}>Refresh</Text>
+                      )}
+                    </TouchableOpacity>
+                    {repositories.length > 1 && (
+                      <TouchableOpacity
+                        style={[styles.repositoryActionButton, styles.repositoryActionButtonDanger]}
+                        onPress={() => handleRemoveRepository(repo.id)}
+                        disabled={switchingRepository !== null}
+                      >
+                        <Text style={styles.repositoryActionButtonText}>Remove</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+        </View>
+              ))}
+            </View>
+          )}
 
-          <View style={styles.buttonRow}>
-            <TouchableOpacity
-              style={[styles.button, styles.primaryButton, !settings.enableLocalScrapers && styles.disabledButton]}
-              onPress={handleSaveRepository}
-              disabled={isLoading || !settings.enableLocalScrapers}
-            >
-              {isLoading ? (
-                <ActivityIndicator size="small" color="#ffffff" />
-              ) : (
-                <Text style={[styles.buttonText, !settings.enableLocalScrapers && styles.disabledText]}>Save Repository</Text>
-              )}
-            </TouchableOpacity>
-
-            {hasRepository && (
-              <TouchableOpacity
-                style={[styles.button, styles.secondaryButton, !settings.enableLocalScrapers && styles.disabledButton]}
-                onPress={handleRefreshRepository}
-                disabled={isRefreshing || !settings.enableLocalScrapers}
-              >
-                {isRefreshing ? (
-                  <ActivityIndicator size="small" color={colors.primary} />
-                ) : (
-                  <Text style={[styles.secondaryButtonText, !settings.enableLocalScrapers && styles.disabledText]}>Refresh</Text>
-                )}
-              </TouchableOpacity>
-            )}
-          </View>
+          {/* Add Repository Button */}
+          <TouchableOpacity
+            style={[styles.button, styles.primaryButton, { marginTop: 16 }]}
+            onPress={() => setShowAddRepositoryModal(true)}
+            disabled={!settings.enableLocalScrapers || switchingRepository !== null}
+          >
+            <Text style={styles.buttonText}>Add New Repository</Text>
+          </TouchableOpacity>
         </CollapsibleSection>
 
         {/* Available Scrapers */}
@@ -1112,9 +1369,9 @@ const PluginsScreen: React.FC = () => {
                 {searchQuery.length > 0 && (
                   <TouchableOpacity onPress={() => setSearchQuery('')}>
                     <Ionicons name="close-circle" size={20} color={colors.mediumGray} />
-                  </TouchableOpacity>
-                )}
-              </View>
+              </TouchableOpacity>
+            )}
+          </View>
 
               {/* Filter Chips */}
               <View style={styles.filterContainer}>
@@ -1132,7 +1389,7 @@ const PluginsScreen: React.FC = () => {
                       selectedFilter === filter && styles.filterChipTextSelected
                     ]}>
                       {filter === 'all' ? 'All' : filter === 'movie' ? 'Movies' : 'TV Shows'}
-                    </Text>
+          </Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -1145,14 +1402,14 @@ const PluginsScreen: React.FC = () => {
                     onPress={() => handleBulkToggle(true)}
                     disabled={isRefreshing}
                   >
-                    <Text style={styles.bulkActionButtonText}>Enable All</Text>
+                    <Text style={[styles.bulkActionButtonText, { color: '#34C759' }]}>Enable All</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.bulkActionButton, styles.bulkActionButtonDisabled]}
                     onPress={() => handleBulkToggle(false)}
                     disabled={isRefreshing}
                   >
-                    <Text style={styles.bulkActionButtonText}>Disable All</Text>
+                    <Text style={[styles.bulkActionButtonText, { color: colors.mediumGray }]}>Disable All</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -1169,7 +1426,7 @@ const PluginsScreen: React.FC = () => {
               />
               <Text style={styles.emptyStateTitle}>
                 {searchQuery ? 'No Scrapers Found' : 'No Scrapers Available'}
-              </Text>
+               </Text>
               <Text style={styles.emptyStateDescription}>
                 {searchQuery 
                   ? `No scrapers match "${searchQuery}". Try a different search term.`
@@ -1178,42 +1435,42 @@ const PluginsScreen: React.FC = () => {
               </Text>
               {searchQuery && (
                 <TouchableOpacity
-                  style={styles.button}
+                  style={[styles.button, styles.secondaryButton]}
                   onPress={() => setSearchQuery('')}
                 >
-                  <Text style={styles.buttonText}>Clear Search</Text>
+                  <Text style={styles.secondaryButtonText}>Clear Search</Text>
                 </TouchableOpacity>
               )}
-            </View>
-          ) : (
-            <View style={styles.scrapersContainer}>
+             </View>
+           ) : (
+             <View style={styles.scrapersContainer}>
               {filteredScrapers.map((scraper) => (
                 <View key={scraper.id} style={styles.scraperCard}>
                   <View style={styles.scraperCardHeader}>
-                    {scraper.logo ? (
-                      <Image
-                        source={{ uri: scraper.logo }}
+                        {scraper.logo ? (
+                          <Image
+                            source={{ uri: scraper.logo }}
                         style={styles.scraperLogo}
-                        resizeMode="contain"
-                      />
-                    ) : (
+                            resizeMode="contain"
+                          />
+                        ) : (
                       <View style={styles.scraperLogo} />
                     )}
                     <View style={styles.scraperCardInfo}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                         <Text style={styles.scraperName}>{scraper.name}</Text>
                         <StatusBadge status={getScraperStatus(scraper)} colors={colors} />
-                      </View>
+                               </View>
                       <Text style={styles.scraperDescription}>{scraper.description}</Text>
-                    </View>
-                    <Switch
-                      value={scraper.enabled && settings.enableLocalScrapers}
-                      onValueChange={(enabled) => handleToggleScraper(scraper.id, enabled)}
-                      trackColor={{ false: colors.elevation3, true: colors.primary }}
-                      thumbColor={scraper.enabled && settings.enableLocalScrapers ? colors.white : '#f4f3f4'}
-                      disabled={!settings.enableLocalScrapers || scraper.manifestEnabled === false || (scraper.disabledPlatforms && scraper.disabledPlatforms.includes(Platform.OS as 'ios' | 'android'))}
-                    />
-                  </View>
+                        </View>
+                        <Switch
+                              value={scraper.enabled && settings.enableLocalScrapers}
+                              onValueChange={(enabled) => handleToggleScraper(scraper.id, enabled)}
+                              trackColor={{ false: colors.elevation3, true: colors.primary }}
+                              thumbColor={scraper.enabled && settings.enableLocalScrapers ? colors.white : '#f4f3f4'}
+                              disabled={!settings.enableLocalScrapers || scraper.manifestEnabled === false || (scraper.disabledPlatforms && scraper.disabledPlatforms.includes(Platform.OS as 'ios' | 'android'))}
+                            />
+                      </View>
                   
                   <View style={styles.scraperCardMeta}>
                     <View style={styles.scraperCardMetaItem}>
@@ -1237,64 +1494,64 @@ const PluginsScreen: React.FC = () => {
                   </View>
 
                   {/* ShowBox Settings */}
-                  {scraper.id === 'showboxog' && settings.enableLocalScrapers && (
+                       {scraper.id === 'showboxog' && settings.enableLocalScrapers && (
                     <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.elevation3 }}>
-                      <Text style={[styles.settingTitle, { marginBottom: 8 }]}>ShowBox Cookie</Text>
-                      <TextInput
-                        style={[styles.textInput, { marginBottom: 12 }]}
-                        value={showboxCookie}
-                        onChangeText={setShowboxCookie}
-                        placeholder="Paste FebBox ui cookie value"
-                        placeholderTextColor={colors.mediumGray}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        multiline={true}
-                        numberOfLines={3}
-                      />
-                      <Text style={[styles.settingTitle, { marginBottom: 8 }]}>Region</Text>
-                      <View style={[styles.qualityChipsContainer, { marginBottom: 16 }]}>
-                        {regionOptions.map(opt => {
-                          const selected = showboxRegion === opt.value;
-                          return (
-                            <TouchableOpacity
-                              key={opt.value}
-                              style={[styles.qualityChip, selected && styles.qualityChipSelected]}
-                              onPress={() => setShowboxRegion(opt.value)}
-                            >
-                              <Text style={[styles.qualityChipText, selected && styles.qualityChipTextSelected]}>
-                                {opt.label}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                      <View style={styles.buttonRow}>
-                        <TouchableOpacity
-                          style={[styles.button, styles.primaryButton]}
-                          onPress={async () => {
-                            await localScraperService.setScraperSettings('showboxog', { cookie: showboxCookie, region: showboxRegion });
-                            Alert.alert('Saved', 'ShowBox settings updated');
-                          }}
-                        >
-                          <Text style={styles.buttonText}>Save</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.button, styles.secondaryButton]}
-                          onPress={async () => {
-                            setShowboxCookie('');
-                            setShowboxRegion('');
-                            await localScraperService.setScraperSettings('showboxog', {});
-                          }}
-                        >
-                          <Text style={styles.secondaryButtonText}>Clear</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  )}
-                </View>
+                           <Text style={[styles.settingTitle, { marginBottom: 8 }]}>ShowBox Cookie</Text>
+                           <TextInput
+                             style={[styles.textInput, { marginBottom: 12 }]}
+                             value={showboxCookie}
+                             onChangeText={setShowboxCookie}
+                             placeholder="Paste FebBox ui cookie value"
+                             placeholderTextColor={colors.mediumGray}
+                             autoCapitalize="none"
+                             autoCorrect={false}
+                             multiline={true}
+                             numberOfLines={3}
+                           />
+                           <Text style={[styles.settingTitle, { marginBottom: 8 }]}>Region</Text>
+                           <View style={[styles.qualityChipsContainer, { marginBottom: 16 }]}>
+                             {regionOptions.map(opt => {
+                               const selected = showboxRegion === opt.value;
+                               return (
+                                 <TouchableOpacity
+                                   key={opt.value}
+                                   style={[styles.qualityChip, selected && styles.qualityChipSelected]}
+                                   onPress={() => setShowboxRegion(opt.value)}
+                                 >
+                                   <Text style={[styles.qualityChipText, selected && styles.qualityChipTextSelected]}>
+                                     {opt.label}
+                                   </Text>
+                                 </TouchableOpacity>
+                               );
+                             })}
+                           </View>
+                           <View style={styles.buttonRow}>
+                             <TouchableOpacity
+                               style={[styles.button, styles.primaryButton]}
+                               onPress={async () => {
+                                 await localScraperService.setScraperSettings('showboxog', { cookie: showboxCookie, region: showboxRegion });
+                                 Alert.alert('Saved', 'ShowBox settings updated');
+                               }}
+                             >
+                               <Text style={styles.buttonText}>Save</Text>
+                             </TouchableOpacity>
+                             <TouchableOpacity
+                               style={[styles.button, styles.secondaryButton]}
+                               onPress={async () => {
+                                 setShowboxCookie('');
+                                 setShowboxRegion('');
+                                 await localScraperService.setScraperSettings('showboxog', {});
+                               }}
+                             >
+                               <Text style={styles.secondaryButtonText}>Clear</Text>
+                             </TouchableOpacity>
+                           </View>
+                         </View>
+                       )}
+                     </View>
               ))}
-            </View>
-          )}
+             </View>
+           )}
         </CollapsibleSection>
 
         {/* Additional Settings */}
@@ -1445,7 +1702,7 @@ const PluginsScreen: React.FC = () => {
               1. <Text style={{ fontWeight: '600' }}>Enable Local Scrapers</Text> - Turn on the main switch to allow plugins
             </Text>
             <Text style={styles.modalText}>
-              2. <Text style={{ fontWeight: '600' }}>Set Repository URL</Text> - Enter a GitHub raw URL or use the default repository
+              2. <Text style={{ fontWeight: '600' }}>Add Repository</Text> - Add a GitHub raw URL or use the default repository
             </Text>
             <Text style={styles.modalText}>
               3. <Text style={{ fontWeight: '600' }}>Refresh Repository</Text> - Download available scrapers from the repository
@@ -1459,6 +1716,85 @@ const PluginsScreen: React.FC = () => {
             >
               <Text style={styles.modalButtonText}>Got it!</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Add Repository Modal */}
+      <Modal
+        visible={showAddRepositoryModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowAddRepositoryModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add New Repository</Text>
+            
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={styles.settingTitle}>Repository Name</Text>
+              {fetchingRepoName && (
+                <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 8 }} />
+              )}
+            </View>
+            <TextInput
+              style={styles.textInput}
+              value={newRepositoryName}
+              onChangeText={setNewRepositoryName}
+              placeholder="Enter repository name"
+              placeholderTextColor={colors.mediumGray}
+              autoCapitalize="words"
+            />
+            
+            <Text style={[styles.settingTitle, { marginBottom: 8 }]}>Repository URL</Text>
+            <TextInput
+              style={styles.textInput}
+              value={newRepositoryUrl}
+              onChangeText={handleUrlChange}
+              placeholder="https://raw.githubusercontent.com/username/repo/branch/"
+              placeholderTextColor={colors.mediumGray}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+            />
+            
+            <Text style={[styles.settingTitle, { marginBottom: 8 }]}>Description (Optional)</Text>
+            <TextInput
+              style={[styles.textInput, { height: 80 }]}
+              value={newRepositoryDescription}
+              onChangeText={setNewRepositoryDescription}
+              placeholder="Enter repository description"
+              placeholderTextColor={colors.mediumGray}
+              multiline={true}
+              numberOfLines={3}
+            />
+            
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={[styles.button, styles.secondaryButton, { flex: 1 }]}
+                onPress={() => {
+                  setShowAddRepositoryModal(false);
+                  setNewRepositoryUrl('');
+                  setNewRepositoryName('');
+                  setNewRepositoryDescription('');
+                  setFetchingRepoName(false);
+                }}
+              >
+                <Text style={styles.secondaryButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.button, styles.primaryButton, { flex: 1 }]}
+                onPress={handleAddRepository}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text style={styles.buttonText}>Add Repository</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>

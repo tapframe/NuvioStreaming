@@ -31,6 +31,18 @@ export interface ScraperInfo {
   // We support both `formats` and `supportedFormats` keys for manifest flexibility.
   formats?: string[];
   supportedFormats?: string[];
+  repositoryId?: string; // Which repository this scraper came from
+}
+
+export interface RepositoryInfo {
+  id: string;
+  name: string;
+  url: string;
+  description?: string;
+  isDefault?: boolean;
+  enabled: boolean;
+  lastUpdated?: number;
+  scraperCount?: number;
 }
 
 export interface LocalScraperResult {
@@ -55,12 +67,17 @@ class LocalScraperService {
   private static instance: LocalScraperService;
   private readonly STORAGE_KEY = 'local-scrapers';
   private readonly REPOSITORY_KEY = 'scraper-repository-url';
+  private readonly REPOSITORIES_KEY = 'scraper-repositories';
   private readonly SCRAPER_SETTINGS_KEY = 'scraper-settings';
   private installedScrapers: Map<string, ScraperInfo> = new Map();
   private scraperCode: Map<string, string> = new Map();
+  private repositories: Map<string, RepositoryInfo> = new Map();
+  private currentRepositoryId: string = '';
   private repositoryUrl: string = '';
   private repositoryName: string = '';
   private initialized: boolean = false;
+  private autoRefreshCompleted: boolean = false;
+  private isRefreshing: boolean = false;
   private scraperSettingsCache: Record<string, any> | null = null;
 
   private constructor() {
@@ -78,10 +95,43 @@ class LocalScraperService {
     if (this.initialized) return;
     
     try {
-      // Load repository URL
-      const storedRepoUrl = await AsyncStorage.getItem(this.REPOSITORY_KEY);
-      if (storedRepoUrl) {
-        this.repositoryUrl = storedRepoUrl;
+      // Load repositories
+      const repositoriesData = await AsyncStorage.getItem(this.REPOSITORIES_KEY);
+      if (repositoriesData) {
+        const repos = JSON.parse(repositoriesData);
+        this.repositories = new Map(Object.entries(repos));
+      } else {
+        // Migrate from old single repository format
+        const storedRepoUrl = await AsyncStorage.getItem(this.REPOSITORY_KEY);
+        if (storedRepoUrl) {
+          const defaultRepo: RepositoryInfo = {
+            id: 'default',
+            name: this.extractRepositoryName(storedRepoUrl),
+            url: storedRepoUrl,
+            description: 'Default repository',
+            isDefault: true,
+            enabled: true,
+            lastUpdated: Date.now()
+          };
+          this.repositories.set('default', defaultRepo);
+          this.currentRepositoryId = 'default';
+          await this.saveRepositories();
+        }
+      }
+
+      // Load current repository
+      const currentRepoId = await AsyncStorage.getItem('current-repository-id');
+      if (currentRepoId && this.repositories.has(currentRepoId)) {
+        this.currentRepositoryId = currentRepoId;
+        const currentRepo = this.repositories.get(currentRepoId)!;
+        this.repositoryUrl = currentRepo.url;
+        this.repositoryName = currentRepo.name;
+      } else if (this.repositories.size > 0) {
+        // Use first repository as default
+        const firstRepo = Array.from(this.repositories.values())[0];
+        this.currentRepositoryId = firstRepo.id;
+        this.repositoryUrl = firstRepo.url;
+        this.repositoryName = firstRepo.name;
       }
 
       // Load installed scrapers
@@ -156,14 +206,16 @@ class LocalScraperService {
       // Load scraper code from cache
       await this.loadScraperCode();
       
-      // Auto-refresh repository on app startup if URL is configured
-      if (this.repositoryUrl) {
+      // Auto-refresh repository on app startup if URL is configured (only once)
+      if (this.repositoryUrl && !this.autoRefreshCompleted) {
         try {
           logger.log('[LocalScraperService] Auto-refreshing repository on startup');
           await this.performRepositoryRefresh();
+          this.autoRefreshCompleted = true;
         } catch (error) {
           logger.error('[LocalScraperService] Auto-refresh failed on startup:', error);
           // Don't fail initialization if auto-refresh fails
+          this.autoRefreshCompleted = true; // Mark as completed even on error to prevent retries
         }
       }
       
@@ -199,6 +251,199 @@ class LocalScraperService {
     return this.repositoryName || 'Plugins';
   }
 
+  // Multiple repository management methods
+  async getRepositories(): Promise<RepositoryInfo[]> {
+    await this.ensureInitialized();
+    return Array.from(this.repositories.values());
+  }
+
+  async addRepository(repo: Omit<RepositoryInfo, 'id' | 'lastUpdated' | 'scraperCount'>): Promise<string> {
+    await this.ensureInitialized();
+    const id = `repo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Try to fetch the repository name from manifest if not provided
+    let repositoryName = repo.name;
+    if (!repositoryName || repositoryName.trim() === '') {
+      try {
+        repositoryName = await this.fetchRepositoryNameFromManifest(repo.url);
+      } catch (error) {
+        logger.warn('[LocalScraperService] Failed to fetch repository name from manifest, using fallback:', error);
+        repositoryName = this.extractRepositoryName(repo.url);
+      }
+    }
+    
+    const newRepo: RepositoryInfo = {
+      ...repo,
+      name: repositoryName,
+      id,
+      lastUpdated: Date.now(),
+      scraperCount: 0
+    };
+    this.repositories.set(id, newRepo);
+    await this.saveRepositories();
+    logger.log('[LocalScraperService] Added repository:', newRepo.name);
+    return id;
+  }
+
+  async updateRepository(id: string, updates: Partial<RepositoryInfo>): Promise<void> {
+    await this.ensureInitialized();
+    const repo = this.repositories.get(id);
+    if (!repo) {
+      throw new Error(`Repository with id ${id} not found`);
+    }
+    const updatedRepo = { ...repo, ...updates };
+    this.repositories.set(id, updatedRepo);
+    await this.saveRepositories();
+    
+    // If this is the current repository, update current values
+    if (id === this.currentRepositoryId) {
+      this.repositoryUrl = updatedRepo.url;
+      this.repositoryName = updatedRepo.name;
+    }
+    logger.log('[LocalScraperService] Updated repository:', updatedRepo.name);
+  }
+
+  async removeRepository(id: string): Promise<void> {
+    await this.ensureInitialized();
+    if (!this.repositories.has(id)) {
+      throw new Error(`Repository with id ${id} not found`);
+    }
+    
+    // Don't allow removing the last repository
+    if (this.repositories.size <= 1) {
+      throw new Error('Cannot remove the last repository');
+    }
+    
+    // If removing current repository, switch to another one
+    if (id === this.currentRepositoryId) {
+      const remainingRepos = Array.from(this.repositories.values()).filter(r => r.id !== id);
+      if (remainingRepos.length > 0) {
+        await this.setCurrentRepository(remainingRepos[0].id);
+      }
+    }
+    
+    // Remove scrapers from this repository
+    const scrapersToRemove = Array.from(this.installedScrapers.values())
+      .filter(s => s.repositoryId === id)
+      .map(s => s.id);
+    
+    for (const scraperId of scrapersToRemove) {
+      this.installedScrapers.delete(scraperId);
+      this.scraperCode.delete(scraperId);
+      await AsyncStorage.removeItem(`scraper-code-${scraperId}`);
+    }
+    
+    this.repositories.delete(id);
+    await this.saveRepositories();
+    await this.saveInstalledScrapers();
+    logger.log('[LocalScraperService] Removed repository:', id);
+  }
+
+  async setCurrentRepository(id: string): Promise<void> {
+    await this.ensureInitialized();
+    const repo = this.repositories.get(id);
+    if (!repo) {
+      throw new Error(`Repository with id ${id} not found`);
+    }
+    
+    this.currentRepositoryId = id;
+    this.repositoryUrl = repo.url;
+    this.repositoryName = repo.name;
+    
+    await AsyncStorage.setItem('current-repository-id', id);
+    
+    // Refresh the repository to get its scrapers
+    try {
+      logger.log('[LocalScraperService] Refreshing repository after switch:', repo.name);
+      await this.performRepositoryRefresh();
+    } catch (error) {
+      logger.error('[LocalScraperService] Failed to refresh repository after switch:', error);
+      // Don't throw error, just log it - the switch should still succeed
+    }
+    
+    logger.log('[LocalScraperService] Switched to repository:', repo.name);
+  }
+
+  getCurrentRepositoryId(): string {
+    return this.currentRepositoryId;
+  }
+
+  // Public method to extract repository name from URL
+  extractRepositoryName(url: string): string {
+    try {
+      const urlObj = new URL(url);
+      const pathParts = urlObj.pathname.split('/').filter(part => part.length > 0);
+      if (pathParts.length >= 2) {
+        return `${pathParts[0]}/${pathParts[1]}`;
+      }
+      return urlObj.hostname || 'Unknown Repository';
+    } catch {
+      return 'Unknown Repository';
+    }
+  }
+
+  // Fetch repository name from manifest.json
+  async fetchRepositoryNameFromManifest(repositoryUrl: string): Promise<string> {
+    try {
+      logger.log('[LocalScraperService] Fetching repository name from manifest:', repositoryUrl);
+      
+      // Construct manifest URL
+      const baseManifestUrl = repositoryUrl.endsWith('/') 
+        ? `${repositoryUrl}manifest.json`
+        : `${repositoryUrl}/manifest.json`;
+      const manifestUrl = `${baseManifestUrl}?t=${Date.now()}`;
+      
+      const response = await axios.get(manifestUrl, { 
+        timeout: 10000,
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      
+      if (response.data && response.data.name) {
+        logger.log('[LocalScraperService] Found repository name in manifest:', response.data.name);
+        return response.data.name;
+      } else {
+        logger.warn('[LocalScraperService] No name found in manifest, using fallback');
+        return this.extractRepositoryName(repositoryUrl);
+      }
+    } catch (error) {
+      logger.error('[LocalScraperService] Failed to fetch repository name from manifest:', error);
+      throw error;
+    }
+  }
+
+  // Update repository name from manifest for existing repositories
+  async refreshRepositoryNamesFromManifests(): Promise<void> {
+    await this.ensureInitialized();
+    
+    for (const [id, repo] of this.repositories) {
+      try {
+        const manifestName = await this.fetchRepositoryNameFromManifest(repo.url);
+        if (manifestName !== repo.name) {
+          logger.log('[LocalScraperService] Updating repository name:', repo.name, '->', manifestName);
+          repo.name = manifestName;
+          
+          // If this is the current repository, update the current name
+          if (id === this.currentRepositoryId) {
+            this.repositoryName = manifestName;
+          }
+        }
+      } catch (error) {
+        logger.warn('[LocalScraperService] Failed to refresh name for repository:', repo.name, error);
+      }
+    }
+    
+    await this.saveRepositories();
+  }
+
+  private async saveRepositories(): Promise<void> {
+    const reposObject = Object.fromEntries(this.repositories);
+    await AsyncStorage.setItem(this.REPOSITORIES_KEY, JSON.stringify(reposObject));
+  }
+
+
   // Check if a scraper is compatible with the current platform
   private isPlatformCompatible(scraper: ScraperInfo): boolean {
     const currentPlatform = Platform.OS as 'ios' | 'android';
@@ -223,6 +468,7 @@ class LocalScraperService {
   async refreshRepository(): Promise<void> {
     await this.ensureInitialized();
     await this.performRepositoryRefresh();
+    this.autoRefreshCompleted = true; // Mark as completed after manual refresh
   }
 
   // Internal method to refresh repository without initialization check
@@ -230,6 +476,14 @@ class LocalScraperService {
     if (!this.repositoryUrl) {
       throw new Error('No repository URL configured');
     }
+
+    // Prevent multiple simultaneous refreshes
+    if (this.isRefreshing) {
+      logger.log('[LocalScraperService] Repository refresh already in progress, skipping');
+      return;
+    }
+
+    this.isRefreshing = true;
 
     try {
       logger.log('[LocalScraperService] Fetching repository manifest from:', this.repositoryUrl);
@@ -285,8 +539,10 @@ class LocalScraperService {
         const isPlatformCompatible = this.isPlatformCompatible(scraperInfo);
         
         if (isPlatformCompatible) {
+          // Add repository ID to scraper info
+          const scraperWithRepo = { ...scraperInfo, repositoryId: this.currentRepositoryId };
           // Download/update the scraper (downloadScraper handles force disabling based on manifest.enabled)
-          await this.downloadScraper(scraperInfo);
+          await this.downloadScraper(scraperWithRepo);
         } else {
           logger.log('[LocalScraperService] Skipping platform-incompatible scraper:', scraperInfo.name);
           // Remove if it was previously installed but is now platform-incompatible
@@ -300,11 +556,25 @@ class LocalScraperService {
       }
       
       await this.saveInstalledScrapers();
+      
+      // Update repository info
+      const currentRepo = this.repositories.get(this.currentRepositoryId);
+      if (currentRepo) {
+        const scraperCount = Array.from(this.installedScrapers.values())
+          .filter(s => s.repositoryId === this.currentRepositoryId).length;
+        await this.updateRepository(this.currentRepositoryId, {
+          lastUpdated: Date.now(),
+          scraperCount
+        });
+      }
+      
       logger.log('[LocalScraperService] Repository refresh completed');
       
     } catch (error) {
       logger.error('[LocalScraperService] Failed to refresh repository:', error);
       throw error;
+    } finally {
+      this.isRefreshing = false;
     }
   }
 
