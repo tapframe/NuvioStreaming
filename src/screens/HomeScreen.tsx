@@ -756,10 +756,10 @@ const HomeScreen = () => {
           data={listData}
           renderItem={renderListItem}
           keyExtractor={item => item.key}
-          contentContainerStyle={[
+          contentContainerStyle={StyleSheet.flatten([
             styles.scrollContent,
             { paddingTop: insets.top }
-          ]}
+          ])}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={memoizedHeader}
           ListFooterComponent={ListFooterComponent}
@@ -767,6 +767,7 @@ const HomeScreen = () => {
           onEndReached={handleLoadMoreCatalogs}
           onEndReachedThreshold={0.6}
           scrollEventThrottle={32}
+          estimatedItemSize={220}
           onScroll={event => {
             const y = event.nativeEvent.contentOffset.y;
             const dy = y - lastScrollYRef.current;

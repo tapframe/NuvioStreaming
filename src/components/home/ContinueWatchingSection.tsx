@@ -631,6 +631,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         ItemSeparatorComponent={() => <View style={{ width: 16 }} />}
         onEndReachedThreshold={0.7}
         onEndReached={() => {}}
+        estimatedItemSize={280 + 16}
       />
     </Animated.View>
   );

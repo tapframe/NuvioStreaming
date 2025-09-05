@@ -104,11 +104,12 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
         keyExtractor={keyExtractor}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={[styles.catalogList, { paddingRight: 16 - posterLayout.partialPosterWidth }]}
+        contentContainerStyle={StyleSheet.flatten([styles.catalogList, { paddingRight: 16 - posterLayout.partialPosterWidth }])}
         ItemSeparatorComponent={ItemSeparator}
         onEndReachedThreshold={0.7}
         onEndReached={() => {}}
         scrollEventThrottle={16}
+        estimatedItemSize={POSTER_WIDTH + 8}
       />
     </Animated.View>
   );

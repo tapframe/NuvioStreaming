@@ -708,6 +708,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           }
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
+          estimatedItemSize={effectiveItemWidth * 1.5 + SPACING.lg}
         />
       ) : renderEmptyState()}
     </SafeAreaView>
