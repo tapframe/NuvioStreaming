@@ -58,9 +58,10 @@ fi
 APP_JSON="./app.json"
 SETTINGS_SCREEN="./src/screens/SettingsScreen.tsx"
 INFO_PLIST="./ios/Nuvio/Info.plist"
+ANDROID_BUILD_GRADLE="./android/app/build.gradle"
 
 # Check if files exist
-for file in "$APP_JSON" "$SETTINGS_SCREEN" "$INFO_PLIST"; do
+for file in "$APP_JSON" "$SETTINGS_SCREEN" "$INFO_PLIST" "$ANDROID_BUILD_GRADLE"; do
     if [ ! -f "$file" ]; then
         print_error "File not found: $file"
         exit 1
@@ -89,6 +90,7 @@ print_status "Creating backups..."
 cp "$APP_JSON" "${APP_JSON}.backup"
 cp "$SETTINGS_SCREEN" "${SETTINGS_SCREEN}.backup"
 cp "$INFO_PLIST" "${INFO_PLIST}.backup"
+cp "$ANDROID_BUILD_GRADLE" "${ANDROID_BUILD_GRADLE}.backup"
 
 # Function to restore backups on error
 restore_backups() {
@@ -96,6 +98,7 @@ restore_backups() {
     mv "${APP_JSON}.backup" "$APP_JSON"
     mv "${SETTINGS_SCREEN}.backup" "$SETTINGS_SCREEN"
     mv "${INFO_PLIST}.backup" "$INFO_PLIST"
+    mv "${ANDROID_BUILD_GRADLE}.backup" "$ANDROID_BUILD_GRADLE"
 }
 
 # Set trap to restore backups on error
@@ -105,6 +108,8 @@ trap restore_backups ERR
 print_status "Updating app.json..."
 # Update version in expo section
 sed -i '' "s/\"version\": \"[^\"]*\"/\"version\": \"$NEW_VERSION\"/g" "$APP_JSON"
+# Update ALL runtimeVersion fields (handles multiple instances if they exist)
+sed -i '' "s/\"runtimeVersion\": \"[^\"]*\"/\"runtimeVersion\": \"$NEW_VERSION\"/g" "$APP_JSON"
 # Update versionCode in android section
 sed -i '' "s/\"versionCode\": [0-9]*/\"versionCode\": $NEW_BUILD_NUMBER/g" "$APP_JSON"
 # Update buildNumber in ios section
@@ -125,11 +130,20 @@ sed -i '' "/<key>CFBundleShortVersionString<\/key>/{n;s/<string>[^<]*<\/string>/
 sed -i '' "/<key>CFBundleVersion<\/key>/{n;s/<string>[^<]*<\/string>/<string>$NEW_BUILD_NUMBER<\/string>/;}" "$INFO_PLIST"
 print_success "Updated Info.plist"
 
+# Update Android build.gradle
+print_status "Updating Android build.gradle..."
+# Update versionCode
+sed -i '' "s/versionCode [0-9]*/versionCode $NEW_BUILD_NUMBER/g" "$ANDROID_BUILD_GRADLE"
+# Update versionName
+sed -i '' "s/versionName \"[^\"]*\"/versionName \"$NEW_VERSION\"/g" "$ANDROID_BUILD_GRADLE"
+print_success "Updated Android build.gradle"
+
 # Verify updates
 print_status "Verifying updates..."
 
 # Check app.json
 if grep -q "\"version\": \"$NEW_VERSION\"" "$APP_JSON" && 
+   grep -q "\"runtimeVersion\": \"$NEW_VERSION\"" "$APP_JSON" &&
    grep -q "\"versionCode\": $NEW_BUILD_NUMBER" "$APP_JSON" && 
    grep -q "\"buildNumber\": \"$NEW_BUILD_NUMBER\"" "$APP_JSON"; then
     print_success "app.json updated correctly"
@@ -155,15 +169,25 @@ else
     exit 1
 fi
 
+# Check Android build.gradle
+if grep -q "versionCode $NEW_BUILD_NUMBER" "$ANDROID_BUILD_GRADLE" && 
+   grep -q "versionName \"$NEW_VERSION\"" "$ANDROID_BUILD_GRADLE"; then
+    print_success "Android build.gradle updated correctly"
+else
+    print_error "Android build.gradle update verification failed"
+    exit 1
+fi
+
 # Clean up backups
 print_status "Cleaning up backups..."
-rm "${APP_JSON}.backup" "${SETTINGS_SCREEN}.backup" "${INFO_PLIST}.backup"
+rm "${APP_JSON}.backup" "${SETTINGS_SCREEN}.backup" "${INFO_PLIST}.backup" "${ANDROID_BUILD_GRADLE}.backup"
 
 print_success "Version update completed successfully!"
 print_status "Summary:"
 echo "  Version: $NEW_VERSION"
+echo "  Runtime Version: $NEW_VERSION"
 echo "  Build Number: $NEW_BUILD_NUMBER"
-echo "  Files updated: app.json, SettingsScreen.tsx, Info.plist"
+echo "  Files updated: app.json, SettingsScreen.tsx, Info.plist, Android build.gradle"
 echo ""
 print_status "Next steps:"
 echo "  1. Test the app to ensure everything works correctly"

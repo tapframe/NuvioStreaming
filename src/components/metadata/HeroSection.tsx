@@ -758,9 +758,9 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   // Ensure trailer state is properly synchronized when trailer becomes ready
   useEffect(() => {
     if (trailerReady && settings?.showTrailers && !globalTrailerPlaying) {
-      // If trailer is ready but not playing, start it
-      logger.info('HeroSection', 'Starting trailer after it became ready');
-      setTrailerPlaying(true);
+      // Only start trailer if it's the initial load, not when returning from other screens
+      // This prevents auto-starting when returning from StreamsScreen
+      logger.info('HeroSection', 'Trailer ready but not playing - not auto-starting to prevent unwanted playback');
     }
   }, [trailerReady, settings?.showTrailers, globalTrailerPlaying, setTrailerPlaying]);
 
@@ -1033,29 +1033,23 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     return () => subscription?.remove();
   }, [setTrailerPlaying, globalTrailerPlaying]);
 
-  // Navigation focus effect - improved to prevent trailer interruption
+  // Navigation focus effect - conservative approach to prevent unwanted trailer resumption
   useFocusEffect(
     useCallback(() => {
-      // Screen is focused - ensure trailer can play if it should be playing
+      // Screen is focused - only resume trailer if it was previously playing and got interrupted
       logger.info('HeroSection', 'Screen focused');
       
-      // Small delay to ensure the screen is fully focused before checking trailer state
-      const focusTimer = setTimeout(() => {
-        // If trailer should be playing but isn't, resume it
-        if (settings?.showTrailers && trailerReady && !globalTrailerPlaying) {
-          logger.info('HeroSection', 'Resuming trailer after screen focus');
-          setTrailerPlaying(true);
-        }
-      }, 100);
+      // Don't automatically resume trailer when returning from other screens
+      // This prevents the trailer from starting when returning from StreamsScreen
+      // The trailer should only resume if the user explicitly wants it to play
       
       return () => {
-        clearTimeout(focusTimer);
         // Don't automatically stop trailer when component unmounts
         // Let the new hero section (if any) take control of trailer state
         // This prevents the trailer from stopping when navigating between screens
         logger.info('HeroSection', 'Screen unfocused - not stopping trailer automatically');
       };
-    }, [settings?.showTrailers, trailerReady, globalTrailerPlaying, setTrailerPlaying])
+    }, [])
   );
 
   // Memory management and cleanup

@@ -47,6 +47,7 @@ import { AccountProvider, useAccount } from '../contexts/AccountContext';
 import { LoadingProvider, useLoading } from '../contexts/LoadingContext';
 import PluginsScreen from '../screens/PluginsScreen';
 import CastMoviesScreen from '../screens/CastMoviesScreen';
+import UpdateScreen from '../screens/UpdateScreen';
 
 // Stack navigator types
 export type RootStackParamList = {
@@ -55,6 +56,7 @@ export type RootStackParamList = {
   Home: undefined;
   Library: undefined;
   Settings: undefined;
+  Update: undefined;
   Search: undefined;
   Calendar: undefined;
   Metadata: { 
@@ -1187,6 +1189,21 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="Update" 
+              component={UpdateScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
+                animationDuration: Platform.OS === 'android' ? 250 : 300,
                 presentation: 'card',
                 gestureEnabled: true,
                 gestureDirection: 'horizontal',

@@ -27,6 +27,8 @@ import { TraktProvider } from './src/contexts/TraktContext';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import { TrailerProvider } from './src/contexts/TrailerContext';
 import SplashScreen from './src/components/SplashScreen';
+import UpdatePopup from './src/components/UpdatePopup';
+import { useUpdatePopup } from './src/hooks/useUpdatePopup';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Sentry from '@sentry/react-native';
 import UpdateService from './src/services/updateService';
@@ -60,6 +62,16 @@ const ThemedApp = () => {
   const { currentTheme } = useTheme();
   const [isAppReady, setIsAppReady] = useState(false);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
+  
+  // Update popup functionality
+  const {
+    showUpdatePopup,
+    updateInfo,
+    isInstalling,
+    handleUpdateNow,
+    handleUpdateLater,
+    handleDismiss,
+  } = useUpdatePopup();
   
   // Check onboarding status and initialize update service
   useEffect(() => {
@@ -122,6 +134,16 @@ const ThemedApp = () => {
           />
           {!isAppReady && <SplashScreen onFinish={handleSplashComplete} />}
           {shouldShowApp && <AppNavigator initialRouteName={initialRouteName} />}
+          
+          {/* Update Popup */}
+          <UpdatePopup
+            visible={showUpdatePopup}
+            updateInfo={updateInfo}
+            onUpdateNow={handleUpdateNow}
+            onUpdateLater={handleUpdateLater}
+            onDismiss={handleDismiss}
+            isInstalling={isInstalling}
+          />
         </View>
       </NavigationContainer>
     </PaperProvider>
