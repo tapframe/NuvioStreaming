@@ -1,3 +1,6 @@
 [submodule "local-scrapers-repo"]
 	path = local-scrapers-repo
 	url = https://github.com/tapframe/nuvio-providers.git
+[submodule "xavia-ota"]
+	path = xavia-ota
+	url = https://github.com/tapframe/NuvioOTA.git
