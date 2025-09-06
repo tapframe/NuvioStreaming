@@ -31,6 +31,14 @@
       ],
       "versions": [
         {
+          "version": "0.6.0-beta.9",
+          "buildVersion": "9",
+          "date": "2025-06-09",
+          "localizedDescription": "• Added **OTA (Over-The-Air) support** – this allows the app to receive UI and code changes without requiring manual updates each time.\n  - Note: Major updates and fixes will still require a full app update or fresh install.\n  - ⚠️ Some slowness and heating is expected during the first few minutes after OTA updates while changes are applied.\n• Fixed an issue where trailers kept playing in the background when navigating to other screens.",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/0.6.0-beta.9/Beta_0_6_0_9.ipa",
+          "size": 29700000
+        },
+        {
           "version": "0.6.0-beta.8",
           "buildVersion": "8",
           "date": "2025-09-04",
