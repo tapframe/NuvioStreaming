@@ -29,6 +29,7 @@ import { TrailerProvider } from './src/contexts/TrailerContext';
 import SplashScreen from './src/components/SplashScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Sentry from '@sentry/react-native';
+import UpdateService from './src/services/updateService';
 
 Sentry.init({
   dsn: 'https://1a58bf436454d346e5852b7bfd3c95e8@o4509536317276160.ingest.de.sentry.io/4509536317734992',
@@ -60,20 +61,24 @@ const ThemedApp = () => {
   const [isAppReady, setIsAppReady] = useState(false);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
   
-  // Check onboarding status
+  // Check onboarding status and initialize update service
   useEffect(() => {
-    const checkOnboardingStatus = async () => {
+    const initializeApp = async () => {
       try {
+        // Check onboarding status
         const onboardingCompleted = await AsyncStorage.getItem('hasCompletedOnboarding');
         setHasCompletedOnboarding(onboardingCompleted === 'true');
+        
+        // Initialize update service
+        await UpdateService.initialize();
       } catch (error) {
-        console.error('Error checking onboarding status:', error);
+        console.error('Error initializing app:', error);
         // Default to showing onboarding if we can't check
         setHasCompletedOnboarding(false);
       }
     };
     
-    checkOnboardingStatus();
+    initializeApp();
   }, []);
   
   // Create custom themes based on current theme

@@ -13,7 +13,8 @@ import {
   Dimensions,
   Image,
   Button,
-  Linking
+  Linking,
+  Clipboard
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
@@ -30,6 +31,7 @@ import { useAccount } from '../contexts/AccountContext';
 import { catalogService } from '../services/catalogService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
+import UpdateService from '../services/updateService';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -43,6 +45,7 @@ const SETTINGS_CATEGORIES = [
   { id: 'appearance', title: 'Appearance', icon: 'palette' },
   { id: 'integrations', title: 'Integrations', icon: 'extension' },
   { id: 'playback', title: 'Playback', icon: 'play-circle-outline' },
+  { id: 'updates', title: 'Updates', icon: 'system-update' },
   { id: 'about', title: 'About', icon: 'info-outline' },
   { id: 'developer', title: 'Developer', icon: 'code' },
   { id: 'cache', title: 'Cache', icon: 'cached' },
@@ -216,6 +219,348 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, c
           </TouchableOpacity>
         ))}
       </ScrollView>
+    </View>
+  );
+};
+
+// Updates Section Component
+interface UpdatesSectionProps {
+  isTablet: boolean;
+}
+
+const UpdatesSection: React.FC<UpdatesSectionProps> = ({ isTablet }) => {
+  const { currentTheme } = useTheme();
+  const [updateInfo, setUpdateInfo] = useState<any>(null);
+  const [isChecking, setIsChecking] = useState(false);
+  const [isInstalling, setIsInstalling] = useState(false);
+  const [lastChecked, setLastChecked] = useState<Date | null>(null);
+  const [logs, setLogs] = useState<string[]>([]);
+  const [showLogs, setShowLogs] = useState(false);
+  const [lastOperation, setLastOperation] = useState<string>('');
+
+  const checkForUpdates = async () => {
+    try {
+      setIsChecking(true);
+      setLastOperation('Checking for updates...');
+      
+      const info = await UpdateService.checkForUpdates();
+      setUpdateInfo(info);
+      setLastChecked(new Date());
+      
+      // Refresh logs after operation
+      const logs = UpdateService.getLogs();
+      setLogs(logs);
+      
+      if (info.isAvailable) {
+        setLastOperation(`Update available: ${info.manifest?.id?.substring(0, 8) || 'unknown'}...`);
+      } else {
+        setLastOperation('No updates available');
+      }
+    } catch (error) {
+      console.error('Error checking for updates:', error);
+      setLastOperation(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      Alert.alert('Error', 'Failed to check for updates');
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  const installUpdate = async () => {
+    try {
+      setIsInstalling(true);
+      setLastOperation('Installing update...');
+      
+      const success = await UpdateService.downloadAndInstallUpdate();
+      
+      // Refresh logs after operation
+      const logs = UpdateService.getLogs();
+      setLogs(logs);
+      
+      if (success) {
+        setLastOperation('Update installed successfully');
+        Alert.alert('Success', 'Update will be applied on next app restart');
+      } else {
+        setLastOperation('No update available to install');
+        Alert.alert('No Update', 'No update available to install');
+      }
+    } catch (error) {
+      console.error('Error installing update:', error);
+      setLastOperation(`Installation error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      Alert.alert('Error', 'Failed to install update');
+    } finally {
+      setIsInstalling(false);
+    }
+  };
+
+  const getCurrentUpdateInfo = async () => {
+    const info = await UpdateService.getCurrentUpdateInfo();
+    setUpdateInfo(info);
+    const logs = UpdateService.getLogs();
+    setLogs(logs);
+  };
+
+  const refreshLogs = () => {
+    const logs = UpdateService.getLogs();
+    setLogs(logs);
+  };
+
+  const clearLogs = () => {
+    UpdateService.clearLogs();
+    setLogs([]);
+    setLastOperation('Logs cleared');
+  };
+
+  const copyLog = (logText: string) => {
+    Clipboard.setString(logText);
+    Alert.alert('Copied', 'Log entry copied to clipboard');
+  };
+
+  const copyAllLogs = () => {
+    const allLogsText = logs.join('\n');
+    Clipboard.setString(allLogsText);
+    Alert.alert('Copied', 'All logs copied to clipboard');
+  };
+
+  const addTestLog = () => {
+    UpdateService.addTestLog(`Test log entry at ${new Date().toISOString()}`);
+    const logs = UpdateService.getLogs();
+    setLogs(logs);
+    setLastOperation('Test log added');
+  };
+
+  const testConnectivity = async () => {
+    try {
+      setLastOperation('Testing connectivity...');
+      const isReachable = await UpdateService.testUpdateConnectivity();
+      const logs = UpdateService.getLogs();
+      setLogs(logs);
+      
+      if (isReachable) {
+        setLastOperation('Update server is reachable');
+      } else {
+        setLastOperation('Update server is not reachable');
+      }
+    } catch (error) {
+      console.error('Error testing connectivity:', error);
+      setLastOperation(`Connectivity test error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const logs = UpdateService.getLogs();
+      setLogs(logs);
+    }
+  };
+
+  const testAssetUrls = async () => {
+    try {
+      setLastOperation('Testing asset URLs...');
+      await UpdateService.testAllAssetUrls();
+      const logs = UpdateService.getLogs();
+      setLogs(logs);
+      setLastOperation('Asset URL testing completed');
+    } catch (error) {
+      console.error('Error testing asset URLs:', error);
+      setLastOperation(`Asset URL test error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const logs = UpdateService.getLogs();
+      setLogs(logs);
+    }
+  };
+
+  // Load current update info on mount
+  useEffect(() => {
+    const loadInitialData = async () => {
+      await getCurrentUpdateInfo();
+      // Also refresh logs to ensure we have the latest
+      refreshLogs();
+    };
+    loadInitialData();
+  }, []);
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleString();
+  };
+
+  return (
+    <View>
+      <SettingsCard title="APP UPDATES" isTablet={isTablet}>
+        <SettingItem
+          title="Check for Updates"
+          description={isChecking ? "Checking..." : lastOperation || "Manually check for new updates"}
+          icon="system-update"
+          onPress={checkForUpdates}
+          renderControl={() => (
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              {isChecking && (
+                <View style={[styles.loadingSpinner, { borderColor: currentTheme.colors.primary }]} />
+              )}
+              <MaterialIcons 
+                name="chevron-right" 
+                size={24} 
+                color={currentTheme.colors.mediumEmphasis} 
+              />
+            </View>
+          )}
+          isTablet={isTablet}
+        />
+        
+        {updateInfo?.isAvailable && (
+          <SettingItem
+            title="Install Update"
+            description={isInstalling ? "Installing..." : "Download and install the latest update"}
+            icon="download"
+            onPress={installUpdate}
+            renderControl={() => (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {isInstalling && (
+                  <View style={[styles.loadingSpinner, { borderColor: currentTheme.colors.primary }]} />
+                )}
+                <MaterialIcons 
+                  name="chevron-right" 
+                  size={24} 
+                  color={currentTheme.colors.mediumEmphasis} 
+                />
+              </View>
+            )}
+            isTablet={isTablet}
+          />
+        )}
+
+        <SettingItem
+          title="Current Version"
+          description={updateInfo?.manifest?.id ? `Update ID: ${updateInfo.manifest.id.substring(0, 8)}...` : "App version info"}
+          icon="info"
+          isTablet={isTablet}
+        />
+
+        {lastChecked && (
+          <SettingItem
+            title="Last Checked"
+            description={formatDate(lastChecked)}
+            icon="schedule"
+            isTablet={isTablet}
+          />
+        )}
+
+        <SettingItem
+          title="Update Logs"
+          description={`${logs.length} log entries`}
+          icon="history"
+          onPress={() => setShowLogs(!showLogs)}
+          renderControl={() => (
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <MaterialIcons 
+                name={showLogs ? "expand-less" : "expand-more"} 
+                size={24} 
+                color={currentTheme.colors.mediumEmphasis} 
+              />
+            </View>
+          )}
+          isTablet={isTablet}
+        />
+      </SettingsCard>
+
+      {showLogs && (
+        <SettingsCard title="UPDATE LOGS" isTablet={isTablet}>
+          <View style={styles.logsContainer}>
+            <View style={styles.logsHeader}>
+              <Text style={[styles.logsHeaderText, { color: currentTheme.colors.highEmphasis }]}>
+                Update Service Logs
+              </Text>
+              <View style={styles.logsActions}>
+                <TouchableOpacity
+                  style={[styles.logActionButton, { backgroundColor: currentTheme.colors.elevation2 }]}
+                  onPress={testConnectivity}
+                  activeOpacity={0.7}
+                >
+                  <MaterialIcons name="wifi" size={16} color={currentTheme.colors.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.logActionButton, { backgroundColor: currentTheme.colors.elevation2 }]}
+                  onPress={testAssetUrls}
+                  activeOpacity={0.7}
+                >
+                  <MaterialIcons name="link" size={16} color={currentTheme.colors.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.logActionButton, { backgroundColor: currentTheme.colors.elevation2 }]}
+                  onPress={addTestLog}
+                  activeOpacity={0.7}
+                >
+                  <MaterialIcons name="add" size={16} color={currentTheme.colors.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.logActionButton, { backgroundColor: currentTheme.colors.elevation2 }]}
+                  onPress={copyAllLogs}
+                  activeOpacity={0.7}
+                >
+                  <MaterialIcons name="content-copy" size={16} color={currentTheme.colors.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.logActionButton, { backgroundColor: currentTheme.colors.elevation2 }]}
+                  onPress={refreshLogs}
+                  activeOpacity={0.7}
+                >
+                  <MaterialIcons name="refresh" size={16} color={currentTheme.colors.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.logActionButton, { backgroundColor: currentTheme.colors.elevation2 }]}
+                  onPress={clearLogs}
+                  activeOpacity={0.7}
+                >
+                  <MaterialIcons name="clear" size={16} color={currentTheme.colors.error || '#ff4444'} />
+                </TouchableOpacity>
+              </View>
+            </View>
+            
+            <ScrollView 
+              style={[styles.logsScrollView, { backgroundColor: currentTheme.colors.elevation2 }]}
+              showsVerticalScrollIndicator={true}
+              nestedScrollEnabled={true}
+            >
+              {logs.length === 0 ? (
+                <Text style={[styles.noLogsText, { color: currentTheme.colors.mediumEmphasis }]}>
+                  No logs available
+                </Text>
+              ) : (
+                logs.map((log, index) => {
+                  const isError = log.includes('[ERROR]');
+                  const isWarning = log.includes('[WARN]');
+                  
+                  return (
+                    <TouchableOpacity 
+                      key={index} 
+                      style={[
+                        styles.logEntry,
+                        { backgroundColor: 'rgba(255,255,255,0.05)' }
+                      ]}
+                      onPress={() => copyLog(log)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.logEntryContent}>
+                        <Text style={[
+                          styles.logText,
+                          { 
+                            color: isError 
+                              ? (currentTheme.colors.error || '#ff4444')
+                              : isWarning 
+                              ? (currentTheme.colors.warning || '#ffaa00')
+                              : currentTheme.colors.mediumEmphasis 
+                          }
+                        ]}>
+                          {log}
+                        </Text>
+                        <MaterialIcons 
+                          name="content-copy" 
+                          size={14} 
+                          color={currentTheme.colors.mediumEmphasis}
+                          style={styles.logCopyIcon}
+                        />
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </ScrollView>
+          </View>
+        </SettingsCard>
+      )}
     </View>
   );
 };
@@ -582,7 +927,7 @@ const SettingsScreen: React.FC = () => {
             />
             <SettingItem
               title="Version"
-              description="0.6.0-beta.8"
+              description="0.6.0-beta.8-test"
               icon="info-outline"
               isLast={true}
               isTablet={isTablet}
@@ -656,6 +1001,9 @@ const SettingsScreen: React.FC = () => {
             />
           </SettingsCard>
         ) : null;
+
+      case 'updates':
+        return <UpdatesSection isTablet={isTablet} />;
 
       default:
         return null;
@@ -748,6 +1096,7 @@ const SettingsScreen: React.FC = () => {
             {renderCategoryContent('appearance')}
             {renderCategoryContent('integrations')}
             {renderCategoryContent('playback')}
+            {renderCategoryContent('updates')}
             {renderCategoryContent('about')}
             {renderCategoryContent('developer')}
             {renderCategoryContent('cache')}
@@ -1047,6 +1396,70 @@ const styles = StyleSheet.create({
   discordButtonText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  loadingSpinner: {
+    width: 16,
+    height: 16,
+    borderWidth: 2,
+    borderRadius: 8,
+    borderTopColor: 'transparent',
+    marginRight: 8,
+  },
+  // Logs styles
+  logsContainer: {
+    padding: 16,
+  },
+  logsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  logsHeaderText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  logsActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  logActionButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logsScrollView: {
+    maxHeight: 200,
+    borderRadius: 8,
+    padding: 12,
+  },
+  logEntry: {
+    marginBottom: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+  },
+  logEntryContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  logText: {
+    fontSize: 12,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    lineHeight: 16,
+    flex: 1,
+    marginRight: 8,
+  },
+  logCopyIcon: {
+    opacity: 0.6,
+  },
+  noLogsText: {
+    fontSize: 14,
+    textAlign: 'center',
+    paddingVertical: 20,
   },
 });
 
