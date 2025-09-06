@@ -62,7 +62,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     flex: 1,
   },
   section: {
-    backgroundColor: colors.elevation1,
+    backgroundColor: colors.darkBackground,
     marginBottom: 16,
     borderRadius: 12,
     padding: 16,
@@ -181,7 +181,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     lineHeight: 20,
   },
   textInput: {
-    backgroundColor: colors.elevation1,
+    backgroundColor: colors.darkBackground,
     borderRadius: 8,
     padding: 12,
     color: colors.white,
@@ -369,7 +369,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   // New styles for improved UX
   collapsibleSection: {
-    backgroundColor: colors.elevation1,
+    backgroundColor: colors.darkBackground,
     marginBottom: 16,
     borderRadius: 12,
     overflow: 'hidden',
@@ -392,7 +392,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.elevation1,
+    backgroundColor: colors.darkBackground,
     borderRadius: 12,
     marginBottom: 16,
     paddingHorizontal: 12,
@@ -489,7 +489,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: colors.elevation1,
+    backgroundColor: colors.darkBackground,
     borderRadius: 16,
     padding: 24,
     margin: 20,
@@ -750,10 +750,7 @@ const PluginsScreen: React.FC = () => {
   const [currentRepositoryId, setCurrentRepositoryId] = useState<string>('');
   const [showAddRepositoryModal, setShowAddRepositoryModal] = useState(false);
   const [newRepositoryUrl, setNewRepositoryUrl] = useState('');
-  const [newRepositoryName, setNewRepositoryName] = useState('');
-  const [newRepositoryDescription, setNewRepositoryDescription] = useState('');
   const [switchingRepository, setSwitchingRepository] = useState<string | null>(null);
-  const [fetchingRepoName, setFetchingRepoName] = useState(false);
   
   // New UX state
   const [searchQuery, setSearchQuery] = useState('');
@@ -837,29 +834,8 @@ const PluginsScreen: React.FC = () => {
     }
   };
 
-  const handleUrlChange = async (url: string) => {
+  const handleUrlChange = (url: string) => {
     setNewRepositoryUrl(url);
-    // Auto-populate repository name if it's empty and URL is valid
-    if (!newRepositoryName.trim() && url.trim()) {
-      setFetchingRepoName(true);
-      try {
-        // Try to fetch name from manifest first
-        const manifestName = await localScraperService.fetchRepositoryNameFromManifest(url.trim());
-        setNewRepositoryName(manifestName);
-      } catch (error) {
-        // Fallback to URL extraction if manifest fetch fails
-        try {
-          const extractedName = localScraperService.extractRepositoryName(url.trim());
-          if (extractedName !== 'Unknown Repository') {
-            setNewRepositoryName(extractedName);
-          }
-        } catch (extractError) {
-          // Ignore errors, just don't auto-populate
-        }
-      } finally {
-        setFetchingRepoName(false);
-      }
-    }
   };
 
   const handleAddRepository = async () => {
@@ -873,7 +849,7 @@ const PluginsScreen: React.FC = () => {
     if (!url.startsWith('https://raw.githubusercontent.com/') && !url.startsWith('http://')) {
       Alert.alert(
         'Invalid URL Format', 
-        'Please use a valid GitHub raw URL format:\n\nhttps://raw.githubusercontent.com/username/repo/branch/\n\nExample:\nhttps://raw.githubusercontent.com/tapframe/nuvio-providers/main/'
+        'Please use a valid GitHub raw URL format:\n\nhttps://raw.githubusercontent.com/username/repo/refs/heads/branch\n\nExample:\nhttps://raw.githubusercontent.com/tapframe/nuvio-providers/refs/heads/master'
       );
       return;
     }
@@ -881,9 +857,9 @@ const PluginsScreen: React.FC = () => {
     try {
       setIsLoading(true);
       const repoId = await localScraperService.addRepository({
-        name: newRepositoryName.trim(), // Let the service fetch from manifest if empty
+        name: '', // Let the service fetch from manifest
         url,
-        description: newRepositoryDescription.trim(),
+        description: '',
         enabled: true
       });
       
@@ -895,9 +871,6 @@ const PluginsScreen: React.FC = () => {
       await loadScrapers();
       
       setNewRepositoryUrl('');
-      setNewRepositoryName('');
-      setNewRepositoryDescription('');
-      setFetchingRepoName(false);
       setShowAddRepositoryModal(false);
       Alert.alert('Success', 'Repository added and refreshed successfully');
     } catch (error) {
@@ -1016,7 +989,7 @@ const PluginsScreen: React.FC = () => {
     if (!url.startsWith('https://raw.githubusercontent.com/') && !url.startsWith('http://')) {
       Alert.alert(
         'Invalid URL Format', 
-        'Please use a valid GitHub raw URL format:\n\nhttps://raw.githubusercontent.com/username/repo/branch/\n\nExample:\nhttps://raw.githubusercontent.com/tapframe/nuvio-providers/main/'
+        'Please use a valid GitHub raw URL format:\n\nhttps://raw.githubusercontent.com/username/repo/refs/heads/branch\n\nExample:\nhttps://raw.githubusercontent.com/tapframe/nuvio-providers/refs/heads/master'
       );
       return;
     }
@@ -1051,7 +1024,7 @@ const PluginsScreen: React.FC = () => {
       const errorMessage = error instanceof Error ? error.message : String(error);
       Alert.alert(
         'Repository Error', 
-        `Failed to refresh repository: ${errorMessage}\n\nPlease ensure your URL is correct and follows this format:\nhttps://raw.githubusercontent.com/username/repo/branch/`
+        `Failed to refresh repository: ${errorMessage}\n\nPlease ensure your URL is correct and follows this format:\nhttps://raw.githubusercontent.com/username/repo/refs/heads/branch`
       );
     } finally {
       setIsRefreshing(false);
@@ -1135,7 +1108,7 @@ const PluginsScreen: React.FC = () => {
   };
 
   const handleUseDefaultRepo = () => {
-    const defaultUrl = 'https://raw.githubusercontent.com/tapframe/nuvio-providers/main';
+    const defaultUrl = 'https://raw.githubusercontent.com/tapframe/nuvio-providers/refs/heads/master';
     setRepositoryUrl(defaultUrl);
   };
 
@@ -1731,42 +1704,16 @@ const PluginsScreen: React.FC = () => {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Add New Repository</Text>
             
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-              <Text style={styles.settingTitle}>Repository Name</Text>
-              {fetchingRepoName && (
-                <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 8 }} />
-              )}
-            </View>
-            <TextInput
-              style={styles.textInput}
-              value={newRepositoryName}
-              onChangeText={setNewRepositoryName}
-              placeholder="Enter repository name"
-              placeholderTextColor={colors.mediumGray}
-              autoCapitalize="words"
-            />
-            
             <Text style={[styles.settingTitle, { marginBottom: 8 }]}>Repository URL</Text>
             <TextInput
               style={styles.textInput}
               value={newRepositoryUrl}
               onChangeText={handleUrlChange}
-              placeholder="https://raw.githubusercontent.com/username/repo/branch/"
+              placeholder="https://raw.githubusercontent.com/username/repo/refs/heads/branch"
               placeholderTextColor={colors.mediumGray}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"
-            />
-            
-            <Text style={[styles.settingTitle, { marginBottom: 8 }]}>Description (Optional)</Text>
-            <TextInput
-              style={[styles.textInput, { height: 80 }]}
-              value={newRepositoryDescription}
-              onChangeText={setNewRepositoryDescription}
-              placeholder="Enter repository description"
-              placeholderTextColor={colors.mediumGray}
-              multiline={true}
-              numberOfLines={3}
             />
             
             <View style={styles.buttonRow}>
@@ -1775,9 +1722,6 @@ const PluginsScreen: React.FC = () => {
                 onPress={() => {
                   setShowAddRepositoryModal(false);
                   setNewRepositoryUrl('');
-                  setNewRepositoryName('');
-                  setNewRepositoryDescription('');
-                  setFetchingRepoName(false);
                 }}
               >
                 <Text style={styles.secondaryButtonText}>Cancel</Text>

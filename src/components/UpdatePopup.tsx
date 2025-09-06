@@ -72,7 +72,7 @@ const UpdatePopup: React.FC<UpdatePopupProps> = ({
         <View style={[
           styles.popup,
           {
-            backgroundColor: currentTheme.colors.elevation1 || '#1a1a1a',
+            backgroundColor: currentTheme.colors.darkBackground || '#1a1a1a',
             borderColor: currentTheme.colors.elevation2 || '#333333',
             marginTop: insets.top + 20,
             marginBottom: insets.bottom + 20,
@@ -173,8 +173,8 @@ const UpdatePopup: React.FC<UpdatePopupProps> = ({
                   styles.button,
                   styles.secondaryButton,
                   { 
-                    backgroundColor: currentTheme.colors.elevation2,
-                    borderColor: currentTheme.colors.elevation3,
+                    backgroundColor: currentTheme.colors.darkBackground || '#2a2a2a',
+                    borderColor: currentTheme.colors.elevation3 || '#444444',
                   }
                 ]}
                 onPress={handleUpdateLater}
@@ -194,8 +194,8 @@ const UpdatePopup: React.FC<UpdatePopupProps> = ({
                   styles.button,
                   styles.secondaryButton,
                   { 
-                    backgroundColor: currentTheme.colors.elevation2,
-                    borderColor: currentTheme.colors.elevation3,
+                    backgroundColor: currentTheme.colors.darkBackground || '#2a2a2a',
+                    borderColor: currentTheme.colors.elevation3 || '#444444',
                   }
                 ]}
                 onPress={handleDismiss}
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
     width: Math.min(width - 40, 400),
     borderRadius: 20,
     borderWidth: 1,
-    backgroundColor: '#1a1a1a', // Fallback solid background
+    backgroundColor: '#1a1a1a', // Solid background - not transparent
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.5,
@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     padding: 12,
     borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
   description: {
     fontSize: 14,

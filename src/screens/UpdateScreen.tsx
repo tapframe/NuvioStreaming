@@ -410,6 +410,7 @@ const UpdateScreen: React.FC = () => {
                       </Text>
                     </TouchableOpacity>
                   )}
+
                 </View>
               </View>
 
