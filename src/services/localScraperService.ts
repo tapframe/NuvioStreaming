@@ -415,16 +415,18 @@ class LocalScraperService {
       throw new Error(`Repository with id ${id} not found`);
     }
     
-    // Don't allow removing the last repository
-    if (this.repositories.size <= 1) {
-      throw new Error('Cannot remove the last repository');
-    }
+    // Allow removing the last repository - users can add new ones
+    // The app will work without repositories (no scrapers available)
     
-    // If removing current repository, switch to another one
+    // If removing current repository, switch to another one or clear current
     if (id === this.currentRepositoryId) {
       const remainingRepos = Array.from(this.repositories.values()).filter(r => r.id !== id);
       if (remainingRepos.length > 0) {
         await this.setCurrentRepository(remainingRepos[0].id);
+      } else {
+        // No repositories left, clear current repository
+        this.currentRepositoryId = '';
+        await AsyncStorage.removeItem('current-repository-id');
       }
     }
     

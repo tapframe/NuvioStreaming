@@ -900,9 +900,17 @@ const PluginsScreen: React.FC = () => {
     const repo = repositories.find(r => r.id === repoId);
     if (!repo) return;
 
+    // Special handling for the last repository
+    const isLastRepository = repositories.length === 1;
+    
+    const alertTitle = isLastRepository ? 'Remove Last Repository' : 'Remove Repository';
+    const alertMessage = isLastRepository 
+      ? `Are you sure you want to remove "${repo.name}"? This is your only repository, so you'll have no scrapers available until you add a new repository.`
+      : `Are you sure you want to remove "${repo.name}"? This will also remove all scrapers from this repository.`;
+
     Alert.alert(
-      'Remove Repository',
-      `Are you sure you want to remove "${repo.name}"? This will also remove all scrapers from this repository.`,
+      alertTitle,
+      alertMessage,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -913,7 +921,10 @@ const PluginsScreen: React.FC = () => {
               await localScraperService.removeRepository(repoId);
               await loadRepositories();
               await loadScrapers();
-              Alert.alert('Success', 'Repository removed successfully');
+              const successMessage = isLastRepository 
+                ? 'Repository removed successfully. You can add a new repository using the "Add Repository" button.'
+                : 'Repository removed successfully';
+              Alert.alert('Success', successMessage);
             } catch (error) {
               logger.error('[ScraperSettings] Failed to remove repository:', error);
               Alert.alert('Error', error instanceof Error ? error.message : 'Failed to remove repository');
@@ -1312,15 +1323,13 @@ const PluginsScreen: React.FC = () => {
                         <Text style={styles.repositoryActionButtonText}>Refresh</Text>
                       )}
                     </TouchableOpacity>
-                    {repositories.length > 1 && (
-                      <TouchableOpacity
-                        style={[styles.repositoryActionButton, styles.repositoryActionButtonDanger]}
-                        onPress={() => handleRemoveRepository(repo.id)}
-                        disabled={switchingRepository !== null}
-                      >
-                        <Text style={styles.repositoryActionButtonText}>Remove</Text>
-                      </TouchableOpacity>
-                    )}
+                    <TouchableOpacity
+                      style={[styles.repositoryActionButton, styles.repositoryActionButtonDanger]}
+                      onPress={() => handleRemoveRepository(repo.id)}
+                      disabled={switchingRepository !== null}
+                    >
+                      <Text style={styles.repositoryActionButtonText}>Remove</Text>
+                    </TouchableOpacity>
                   </View>
         </View>
               ))}

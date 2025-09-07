@@ -11,7 +11,7 @@ export interface UpdateInfo {
 export class UpdateService {
   private static instance: UpdateService;
   private updateCheckInterval: NodeJS.Timeout | null = null;
-  private readonly CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
+  // Removed automatic periodic checks - only check on app start and manual trigger
   private logs: string[] = [];
   private readonly MAX_LOGS = 100; // Keep last 100 logs
 
@@ -233,10 +233,7 @@ export class UpdateService {
         return;
       }
 
-      this.addLog('Updates are enabled, setting up periodic checks', 'INFO');
-
-      // Set up periodic update checks
-      this.startPeriodicUpdateChecks();
+      this.addLog('Updates are enabled, skipping automatic periodic checks', 'INFO');
       this.addLog('UpdateService initialization completed successfully', 'INFO');
     } catch (error) {
       this.addLog(`Initialization failed: ${error instanceof Error ? error.message : String(error)}`, 'ERROR');
@@ -408,39 +405,21 @@ export class UpdateService {
   }
 
   /**
-   * Start periodic update checks
+   * Start periodic update checks - DISABLED
+   * Updates are now only checked on app start and manual trigger
    */
   private startPeriodicUpdateChecks(): void {
-    if (this.updateCheckInterval) {
-      this.addLog('Stopping existing periodic update checks', 'INFO');
-      clearInterval(this.updateCheckInterval);
-    }
-
-    this.addLog(`Starting periodic update checks every ${this.CHECK_INTERVAL / 1000} seconds`, 'INFO');
-    
-    this.updateCheckInterval = setInterval(async () => {
-      try {
-        this.addLog('Performing scheduled update check...', 'INFO');
-        await this.checkForUpdates();
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        this.addLog(`Scheduled update check failed: ${errorMessage}`, 'ERROR');
-        console.error('Periodic update check failed:', error);
-      }
-    }, this.CHECK_INTERVAL);
+    this.addLog('Periodic update checks are disabled - only checking on app start and manual trigger', 'INFO');
+    // Method kept for compatibility but no longer starts automatic checks
   }
 
   /**
-   * Stop periodic update checks
+   * Stop periodic update checks - DISABLED
+   * No periodic checks are running, so this is a no-op
    */
   public stopPeriodicUpdateChecks(): void {
-    if (this.updateCheckInterval) {
-      this.addLog('Stopping periodic update checks', 'INFO');
-      clearInterval(this.updateCheckInterval);
-      this.updateCheckInterval = null;
-    } else {
-      this.addLog('No periodic update checks running to stop', 'INFO');
-    }
+    this.addLog('Periodic update checks are disabled - nothing to stop', 'INFO');
+    // Method kept for compatibility but no longer stops automatic checks
   }
 
   /**

@@ -41,7 +41,6 @@ const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
 
 // Ultra-optimized animation constants
-const PARALLAX_FACTOR = 0.3;
 const SCALE_FACTOR = 1.02;
 const FADE_THRESHOLD = 200;
 
@@ -933,13 +932,11 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   // Enhanced backdrop with smooth loading animation
   const backdropImageStyle = useAnimatedStyle(() => {
     'worklet';
-    const translateY = scrollY.value * PARALLAX_FACTOR;
     const scale = 1 + (scrollY.value * 0.0001); // Micro scale effect
     
     return {
       opacity: imageOpacity.value * imageLoadOpacity.value,
       transform: [
-        { translateY: -Math.min(translateY, 100) }, // Cap translation
         { scale: Math.min(scale, SCALE_FACTOR) }    // Cap scale
       ],
     };
