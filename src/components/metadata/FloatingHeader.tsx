@@ -14,6 +14,8 @@ import Animated, {
   useAnimatedStyle,
   interpolate,
   Extrapolate,
+  useAnimatedReaction,
+  runOnJS,
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
 import { logger } from '../../utils/logger';
@@ -46,6 +48,7 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
   setLogoLoadError,
 }) => {
   const { currentTheme } = useTheme();
+  const [isHeaderInteractive, setIsHeaderInteractive] = React.useState(false);
   
   // Animated styles for the header
   const headerAnimatedStyle = useAnimatedStyle(() => ({
@@ -55,6 +58,15 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
     ]
   }));
   
+  // Disable touches when header is transparent (Android can still register touches at opacity 0)
+  useAnimatedReaction(
+    () => headerOpacity.value,
+    (opacity) => {
+      const interactive = opacity > 0.05;
+      runOnJS(setIsHeaderInteractive)(interactive);
+    }
+  );
+
   // Animated style for header elements
   const headerElementsStyle = useAnimatedStyle(() => ({
     opacity: headerElementsOpacity.value,
@@ -62,7 +74,7 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
   }));
   
   return (
-    <Animated.View style={[styles.floatingHeader, headerAnimatedStyle]}>
+    <Animated.View style={[styles.floatingHeader, headerAnimatedStyle]} pointerEvents={isHeaderInteractive ? 'auto' : 'none'}>
       {Platform.OS === 'ios' ? (
         <ExpoBlurView
           intensity={50}

@@ -66,6 +66,7 @@ const UpdateScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   
   const [updateInfo, setUpdateInfo] = useState<any>(null);
+  const [currentInfo, setCurrentInfo] = useState<any>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
@@ -154,9 +155,33 @@ const UpdateScreen: React.FC = () => {
 
   const getCurrentUpdateInfo = async () => {
     const info = await UpdateService.getCurrentUpdateInfo();
-    setUpdateInfo(info);
+    setCurrentInfo(info);
     const logs = UpdateService.getLogs();
     setLogs(logs);
+  };
+
+  // Extract release notes from various possible manifest fields
+  const getReleaseNotes = () => {
+    const manifest: any = updateInfo?.manifest || {};
+    return (
+      manifest.description ||
+      manifest.releaseNotes ||
+      manifest.extra?.releaseNotes ||
+      manifest.metadata?.releaseNotes ||
+      ''
+    );
+  };
+
+  // Extract release notes for the currently running version
+  const getCurrentReleaseNotes = () => {
+    const manifest: any = currentInfo?.manifest || {};
+    return (
+      manifest.description ||
+      manifest.releaseNotes ||
+      manifest.extra?.releaseNotes ||
+      manifest.metadata?.releaseNotes ||
+      ''
+    );
   };
 
   const refreshLogs = () => {
@@ -414,6 +439,19 @@ const UpdateScreen: React.FC = () => {
                 </View>
               </View>
 
+              {/* Release Notes */}
+              {updateInfo?.isAvailable && !!getReleaseNotes() && (
+                <View style={styles.infoSection}>
+                  <View style={styles.infoItem}>
+                    <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
+                      <MaterialIcons name="notes" size={14} color={currentTheme.colors.primary} />
+                    </View>
+                    <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Release notes:</Text>
+                  </View>
+                  <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>{getReleaseNotes()}</Text>
+                </View>
+              )}
+
               {/* Info Section */}
               <View style={styles.infoSection}>
                 <View style={styles.infoItem}>
@@ -434,6 +472,33 @@ const UpdateScreen: React.FC = () => {
                     <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Last checked:</Text>
                     <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>
                       {formatDate(lastChecked)}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Current Version Section */}
+              <View style={styles.infoSection}>
+                <View style={styles.infoItem}>
+                  <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
+                    <MaterialIcons name="verified" size={14} color={currentTheme.colors.primary} />
+                  </View>
+                  <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Current version:</Text>
+                  <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>
+                    {currentInfo?.manifest?.id ? `${currentInfo.manifest.id.substring(0, 8)}...` : (currentInfo?.isEmbeddedLaunch === false ? 'Unknown' : 'Embedded')}
+                  </Text>
+                </View>
+
+                {!!getCurrentReleaseNotes() && (
+                  <View style={{ marginTop: 8 }}>
+                    <View style={[styles.infoItem, { alignItems: 'flex-start' }]}>
+                      <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
+                        <MaterialIcons name="notes" size={14} color={currentTheme.colors.primary} />
+                      </View>
+                      <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Current release notes:</Text>
+                    </View>
+                    <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>
+                      {getCurrentReleaseNotes()}
                     </Text>
                   </View>
                 )}

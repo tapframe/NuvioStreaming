@@ -353,7 +353,7 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
         onLoad={handleLoad}
         onError={(error: any) => handleError(error)}
         onProgress={handleProgress}
-        controls={false}
+        controls={Platform.OS === 'android' ? isFullscreen : false}
         onEnd={() => {
           // Only loop if still considered playing and component is mounted
           if (isPlaying && isComponentMounted) {

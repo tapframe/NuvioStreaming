@@ -1,9 +1,13 @@
 #!/bin/bash
 
-# Check if the correct number of arguments are provided
-if [ "$#" -ne 1 ]; then
-  echo "Usage: $0 <xavia-ota-url>"
-  echo "Example: $0 https://grim-reyna-tapframe-69970143.koyeb.app"
+# Usage: build-and-publish-app-release.sh <xavia-ota-url> [--yes] [--release-notes "text here"]
+# --yes           Skip interactive confirmation
+# --release-notes Provide release notes to attach to this upload
+
+# Parse arguments
+if [ "$#" -lt 1 ]; then
+  echo "Usage: $0 <xavia-ota-url> [--yes] [--release-notes \"text here\"]"
+  echo "Example: $0 https://grim-reyna-tapframe-69970143.koyeb.app --yes --release-notes \"Bug fixes and improvements\""
   exit 1
 fi
 
@@ -27,6 +31,29 @@ fi
 
 # Assign arguments to variables
 serverHost=$1
+shift
+
+SKIP_CONFIRM=false
+RELEASE_NOTES=""
+
+while [[ $# -gt 0 ]]; do
+  key="$1"
+  case $key in
+    --yes)
+      SKIP_CONFIRM=true
+      shift
+      ;;
+    --release-notes)
+      RELEASE_NOTES="$2"
+      shift
+      shift
+      ;;
+    *)
+      echo "Unknown option: $1"
+      shift
+      ;;
+  esac
+done
 
 # Validate server URL format
 if [[ ! "$serverHost" =~ ^https?:// ]]; then
@@ -47,13 +74,15 @@ echo "📱 Runtime Version: $runtimeVersion"
 echo "🔗 Commit Hash: $commitHash"
 echo "📝 Commit Message: $commitMessage"
 echo "🌐 Server URL: $serverHost"
+echo "📝 Release Notes: ${RELEASE_NOTES:-<none provided>}"
 echo ""
 
-read -p "Do you want to proceed with these values? (y/n): " confirm
-
-if [ "$confirm" != "y" ]; then
-  echo "❌ Operation cancelled by the user."
-  exit 1
+if [ "$SKIP_CONFIRM" = false ]; then
+  read -p "Do you want to proceed with these values? (y/n): " confirm
+  if [ "$confirm" != "y" ]; then
+    echo "❌ Operation cancelled by the user."
+    exit 1
+  fi
 fi
 
 echo "🔨 Starting build process..."
@@ -107,6 +136,7 @@ while [ $retry_count -lt $max_retries ]; do
     -F "runtimeVersion=$runtimeVersion" \
     -F "commitHash=$commitHash" \
     -F "commitMessage=$commitMessage" \
+    ${RELEASE_NOTES:+-F "releaseNotes=$RELEASE_NOTES"} \
     --write-out "HTTP_CODE:%{http_code}" \
     --silent \
     --show-error)

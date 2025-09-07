@@ -42,6 +42,17 @@ const UpdatePopup: React.FC<UpdatePopupProps> = ({
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
 
+  const getReleaseNotes = () => {
+    const manifest: any = updateInfo?.manifest || {};
+    return (
+      manifest.description ||
+      manifest.releaseNotes ||
+      manifest.extra?.releaseNotes ||
+      manifest.metadata?.releaseNotes ||
+      ''
+    );
+  };
+
   const handleUpdateNow = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     onUpdateNow();
@@ -129,13 +140,13 @@ const UpdatePopup: React.FC<UpdatePopupProps> = ({
               </Text>
             </View>
             
-            {updateInfo.manifest?.description && (
+            {!!getReleaseNotes() && (
               <View style={styles.descriptionContainer}>
                 <Text style={[
                   styles.description,
                   { color: currentTheme.colors.mediumEmphasis }
                 ]}>
-                  {updateInfo.manifest.description}
+                  {getReleaseNotes()}
                 </Text>
               </View>
             )}
