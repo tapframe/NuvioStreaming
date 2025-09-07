@@ -223,15 +223,7 @@ const UpdatePopup: React.FC<UpdatePopupProps> = ({
             </View>
           </View>
 
-          {/* Footer */}
-          <View style={styles.footer}>
-            <Text style={[
-              styles.footerText,
-              { color: currentTheme.colors.textMuted }
-            ]}>
-              Updates include bug fixes and new features
-            </Text>
-          </View>
+          {/* Footer removed: hardcoded message no longer shown */}
         </View>
       </View>
     </Modal>
