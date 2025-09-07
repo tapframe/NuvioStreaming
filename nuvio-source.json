@@ -31,6 +31,14 @@
       ],
       "versions": [
         {
+          "version": "0.6.0-beta.10",
+          "buildVersion": "10",
+          "date": "2025-09-07",
+          "localizedDescription": "## Version 0.6.0-beta.10 – Hotfix Update Notes\n\n- Immediate hotfix for an issue that caused iOS apps to crash after the latest OTA update.\n- Android users are also recommended to update to this version to ensure compatibility and continue receiving further updates.",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/0.6.0-beta.10/Beta_0_6_0_10.ipa",
+          "size": 29700000
+        },
+        {
           "version": "0.6.0-beta.9",
           "buildVersion": "9",
           "date": "2025-06-09",
