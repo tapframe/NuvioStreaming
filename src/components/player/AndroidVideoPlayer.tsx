@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { View, TouchableOpacity, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, Image, StyleSheet, Modal } from 'react-native';
+import { View, TouchableOpacity, TouchableWithoutFeedback, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, Image, StyleSheet, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Video, { VideoRef, SelectedTrack, SelectedTrackType, BufferingStrategyType } from 'react-native-video';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -435,6 +435,17 @@ const AndroidVideoPlayer: React.FC = () => {
       // Removed the 100ms delay
       backgroundFadeAnim.setValue(0);
     });
+    
+    // Fallback: ensure animation completes even if something goes wrong
+    setTimeout(() => {
+      if (!isOpeningAnimationComplete) {
+        logger.warn('[AndroidVideoPlayer] Opening animation fallback triggered');
+        setIsOpeningAnimationComplete(true);
+        openingScaleAnim.setValue(1);
+        openingFadeAnim.setValue(1);
+        backgroundFadeAnim.setValue(0);
+      }
+    }, 1000); // 1 second fallback
   };
 
   useEffect(() => {
@@ -2034,6 +2045,14 @@ const AndroidVideoPlayer: React.FC = () => {
               </TouchableOpacity>
             </View>
           </PinchGestureHandler>
+
+          {/* Tap-capture overlay above the Video to toggle controls (Android fix) */}
+          <TouchableWithoutFeedback onPress={toggleControls}>
+            <View
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+              pointerEvents={showControls ? 'none' : 'auto'}
+            />
+          </TouchableWithoutFeedback>
 
           <PlayerControls
             showControls={showControls}

@@ -33,7 +33,8 @@
         "UIFileSharingEnabled": true
       },
       "bundleIdentifier": "com.nuvio.app",
-      "associatedDomains": []
+      "associatedDomains": [],
+      "jsEngine": "hermes"
     },
     "android": {
       "adaptiveIcon": {
@@ -52,7 +53,8 @@
         "armeabi-v7a",
         "x86",
         "x86_64"
-      ]
+      ],
+      "jsEngine": "hermes"
     },
 
     "extra": {

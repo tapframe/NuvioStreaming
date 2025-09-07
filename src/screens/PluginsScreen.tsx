@@ -1108,7 +1108,7 @@ const PluginsScreen: React.FC = () => {
   };
 
   const handleUseDefaultRepo = () => {
-    const defaultUrl = 'https://raw.githubusercontent.com/tapframe/nuvio-providers/refs/heads/master';
+    const defaultUrl = 'https://raw.githubusercontent.com/tapframe/nuvio-providers/refs/heads/main';
     setRepositoryUrl(defaultUrl);
   };
 
@@ -1178,18 +1178,36 @@ const PluginsScreen: React.FC = () => {
         {/* Quick Setup for New Users */}
         {!hasRepository && (
           <View style={styles.quickSetupContainer}>
-            <Text style={styles.quickSetupTitle}>Quick Setup</Text>
+            <Text style={styles.quickSetupTitle}>🚀 Quick Start with Official Plugins</Text>
             <Text style={styles.quickSetupText}>
-              Get started with plugins in 3 easy steps! Enable local scrapers, set up a repository, and start streaming.
+              Get instant access to 9+ premium streaming scrapers from Tapframe's official repository. Enable local scrapers and start streaming movies and TV shows immediately.
             </Text>
             <TouchableOpacity
               style={styles.quickSetupButton}
-              onPress={() => {
-                setExpandedSections(prev => ({ ...prev, repository: true }));
-                setShowHelpModal(true);
+              onPress={async () => {
+                try {
+                  setIsLoading(true);
+                  // Add the official tapframe repository
+                  const tapframeInfo = localScraperService.getTapframeRepositoryInfo();
+                  const repoId = await localScraperService.addRepository(tapframeInfo);
+
+                  // Switch to the new repository and refresh it
+                  await localScraperService.setCurrentRepository(repoId);
+                  await loadRepositories();
+                  await loadScrapers();
+
+                  Alert.alert('Success', 'Official repository added! Enable local scrapers above to start using plugins.');
+                } catch (error) {
+                  logger.error('[PluginsScreen] Failed to add tapframe repository:', error);
+                  Alert.alert('Error', 'Failed to add official repository');
+                } finally {
+                  setIsLoading(false);
+                }
               }}
             >
-              <Text style={styles.quickSetupButtonText}>Get Started</Text>
+              <Text style={styles.quickSetupButtonText}>
+                {isLoading ? 'Adding Repository...' : 'Add Official Repository'}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1307,6 +1325,31 @@ const PluginsScreen: React.FC = () => {
         </View>
               ))}
             </View>
+          )}
+
+          {/* Add Official Repository Button */}
+          {!localScraperService.hasTapframeRepository() && (
+            <TouchableOpacity
+              style={[styles.defaultRepoButton]}
+              onPress={async () => {
+                try {
+                  setIsLoading(true);
+                  const tapframeInfo = localScraperService.getTapframeRepositoryInfo();
+                  const repoId = await localScraperService.addRepository(tapframeInfo);
+                  await loadRepositories();
+                  Alert.alert('Success', 'Official repository added successfully!');
+                } catch (error) {
+                  logger.error('[PluginsScreen] Failed to add tapframe repository:', error);
+                  Alert.alert('Error', 'Failed to add official repository');
+                } finally {
+                  setIsLoading(false);
+                }
+              }}
+              disabled={!settings.enableLocalScrapers || isLoading}
+            >
+              <Ionicons name="add-circle" size={16} color={colors.primary} />
+              <Text style={styles.defaultRepoButtonText}>Add Official Repository</Text>
+            </TouchableOpacity>
           )}
 
           {/* Add Repository Button */}

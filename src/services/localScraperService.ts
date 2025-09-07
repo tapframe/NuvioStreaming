@@ -93,15 +93,17 @@ class LocalScraperService {
 
   private async initialize(): Promise<void> {
     if (this.initialized) return;
-    
+
     try {
+      // Ensure tapframe repository is available
+      await this.ensureTapframeRepository();
       // Load repositories
       const repositoriesData = await AsyncStorage.getItem(this.REPOSITORIES_KEY);
       if (repositoriesData) {
         const repos = JSON.parse(repositoriesData);
         this.repositories = new Map(Object.entries(repos));
       } else {
-        // Migrate from old single repository format
+        // Migrate from old single repository format or create default tapframe repository
         const storedRepoUrl = await AsyncStorage.getItem(this.REPOSITORY_KEY);
         if (storedRepoUrl) {
           const defaultRepo: RepositoryInfo = {
@@ -116,8 +118,25 @@ class LocalScraperService {
           this.repositories.set('default', defaultRepo);
           this.currentRepositoryId = 'default';
           await this.saveRepositories();
+        } else {
+          // Create default tapframe repository for new users
+          const tapframeRepo: RepositoryInfo = {
+            id: 'tapframe-nuvio-providers',
+            name: 'Tapframe\'s Repo',
+            url: 'https://raw.githubusercontent.com/tapframe/nuvio-providers/refs/heads/main',
+            description: 'Official Nuvio streaming plugins repository by Tapframe',
+            isDefault: true,
+            enabled: true,
+            lastUpdated: Date.now()
+          };
+          this.repositories.set('tapframe-nuvio-providers', tapframeRepo);
+          this.currentRepositoryId = 'tapframe-nuvio-providers';
+          await this.saveRepositories();
         }
       }
+
+      // Ensure tapframe repository is available for existing users too
+      await this.ensureTapframeRepository();
 
       // Load current repository
       const currentRepoId = await AsyncStorage.getItem('current-repository-id');
@@ -231,6 +250,93 @@ class LocalScraperService {
     if (!this.initialized) {
       await this.initialize();
     }
+  }
+
+  /**
+   * Ensure the tapframe repository is available for all users
+   */
+  public async ensureTapframeRepository(): Promise<void> {
+    const tapframeRepoId = 'tapframe-nuvio-providers';
+    const tapframeRepoUrl = 'https://raw.githubusercontent.com/tapframe/nuvio-providers/refs/heads/main';
+
+    // Check if tapframe repository already exists
+    if (this.repositories.has(tapframeRepoId)) {
+      const existingRepo = this.repositories.get(tapframeRepoId)!;
+      // Update URL if it changed
+      if (existingRepo.url !== tapframeRepoUrl) {
+        existingRepo.url = tapframeRepoUrl;
+        existingRepo.name = 'Tapframe\'s Repo';
+        existingRepo.description = 'Official Nuvio streaming plugins repository by Tapframe';
+        await this.saveRepositories();
+      }
+      return;
+    }
+
+    // Check if any repository with the same URL already exists
+    for (const [id, repo] of this.repositories) {
+      if (repo.url === tapframeRepoUrl) {
+        // Update existing repository to use the tapframe ID and info
+        repo.id = tapframeRepoId;
+        repo.name = 'Tapframe\'s Repo';
+        repo.description = 'Official Nuvio streaming plugins repository by Tapframe';
+        repo.isDefault = true;
+        this.repositories.delete(id);
+        this.repositories.set(tapframeRepoId, repo);
+        await this.saveRepositories();
+        return;
+      }
+    }
+
+    // Create new tapframe repository
+    const tapframeRepo: RepositoryInfo = {
+      id: tapframeRepoId,
+      name: 'Tapframe\'s Repo',
+      url: tapframeRepoUrl,
+      description: 'Official Nuvio streaming plugins repository by Tapframe',
+      isDefault: true,
+      enabled: true,
+      lastUpdated: Date.now()
+    };
+
+    this.repositories.set(tapframeRepoId, tapframeRepo);
+    await this.saveRepositories();
+  }
+
+  /**
+   * Get the official tapframe repository info
+   */
+  public getTapframeRepositoryInfo(): RepositoryInfo {
+    return {
+      id: 'tapframe-nuvio-providers',
+      name: 'Tapframe\'s Repo',
+      url: 'https://raw.githubusercontent.com/tapframe/nuvio-providers/refs/heads/main',
+      description: 'Official Nuvio streaming plugins repository by Tapframe',
+      isDefault: true,
+      enabled: true,
+      lastUpdated: Date.now()
+    };
+  }
+
+  /**
+   * Check if the tapframe repository is available
+   */
+  public hasTapframeRepository(): boolean {
+    const tapframeRepoId = 'tapframe-nuvio-providers';
+    const tapframeRepoUrl = 'https://raw.githubusercontent.com/tapframe/nuvio-providers/refs/heads/main';
+
+    // Check if tapframe repository exists by ID
+    if (this.repositories.has(tapframeRepoId)) {
+      return true;
+    }
+
+    // Check if any repository has the tapframe URL
+    for (const repo of this.repositories.values()) {
+      if (repo.url === tapframeRepoUrl) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   // Set repository URL
