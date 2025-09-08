@@ -1080,19 +1080,19 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     };
   }, [imageOpacity, imageLoadOpacity, shimmerOpacity, trailerOpacity, thumbnailOpacity, actionButtonsOpacity, titleCardTranslateY, genreOpacity, watchProgressOpacity, buttonsOpacity, buttonsTranslateY, logoOpacity, heroOpacity, heroHeight]);
 
-  // Development-only performance monitoring
-  useEffect(() => {
-    if (__DEV__) {
-      const startTime = Date.now();
-      const timer = setTimeout(() => {
-        const renderTime = Date.now() - startTime;
-        if (renderTime > 100) {
-          console.warn(`[HeroSection] Slow render detected: ${renderTime}ms`);
-        }
-      }, 0);
-      return () => clearTimeout(timer);
-    }
-  });
+  // Disabled performance monitoring to reduce CPU overhead in production
+  // useEffect(() => {
+  //   if (__DEV__) {
+  //     const startTime = Date.now();
+  //     const timer = setTimeout(() => {
+  //       const renderTime = Date.now() - startTime;
+  //       if (renderTime > 100) {
+  //         console.warn(`[HeroSection] Slow render detected: ${renderTime}ms`);
+  //       }
+  //     }, 0);
+  //     return () => clearTimeout(timer);
+  //   }
+  // });
 
 
 

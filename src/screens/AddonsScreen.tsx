@@ -608,6 +608,28 @@ const AddonsScreen = () => {
   const [communityLoading, setCommunityLoading] = useState(true);
   const [communityError, setCommunityError] = useState<string | null>(null);
 
+  // Promotional addon: Nuvio Streams
+  const PROMO_ADDON_URL = 'https://nuviostreams.hayd.uk/manifest.json';
+  const promoAddon: ExtendedManifest = {
+    id: 'org.nuvio.streams',
+    name: 'Nuvio Streams | Elfhosted',
+    version: '0.5.0',
+    description: 'Stremio addon for high-quality streaming links.',
+    // @ts-ignore - logo not in base manifest type
+    logo: 'https://raw.githubusercontent.com/tapframe/NuvioStreaming/refs/heads/appstore/assets/titlelogo.png',
+    types: ['movie', 'series'],
+    catalogs: [],
+    behaviorHints: { configurable: true },
+    // help handleConfigureAddon derive configure URL from the transport
+    transport: PROMO_ADDON_URL,
+  } as ExtendedManifest;
+  const isPromoInstalled = addons.some(a =>
+    a.id === 'org.nuvio.streams' ||
+    (typeof a.id === 'string' && a.id.includes('nuviostreams.hayd.uk')) ||
+    (typeof a.transport === 'string' && a.transport.includes('nuviostreams.hayd.uk')) ||
+    (typeof (a as any).url === 'string' && (a as any).url.includes('nuviostreams.hayd.uk'))
+  );
+
   useEffect(() => {
     loadAddons();
     loadCommunityAddons();
@@ -1129,6 +1151,7 @@ const AddonsScreen = () => {
           showsVerticalScrollIndicator={false}
           contentInsetAdjustmentBehavior="automatic"
         >
+          
           {/* Overview Section */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>OVERVIEW</Text>
@@ -1194,6 +1217,65 @@ const AddonsScreen = () => {
 
           {/* Separator */}
            <View style={styles.sectionSeparator} />
+
+           {/* Promotional Addon Section (hidden if installed) */}
+           {!isPromoInstalled && (
+             <View style={styles.section}>
+               <Text style={styles.sectionTitle}>OFFICIAL ADDON</Text>
+               <View style={styles.addonList}>
+                 <View style={styles.addonItem}>
+                   <View style={styles.addonHeader}>
+                     {promoAddon.logo ? (
+                       <ExpoImage 
+                         source={{ uri: promoAddon.logo }} 
+                         style={styles.addonIcon} 
+                         contentFit="contain"
+                       />
+                     ) : (
+                       <View style={styles.addonIconPlaceholder}>
+                         <MaterialIcons name="extension" size={22} color={colors.mediumGray} />
+                       </View>
+                     )}
+                     <View style={styles.addonTitleContainer}>
+                       <Text style={styles.addonName}>{promoAddon.name}</Text>
+                       <View style={styles.addonMetaContainer}>
+                         <Text style={styles.addonVersion}>v{promoAddon.version}</Text>
+                         <Text style={styles.addonDot}>•</Text>
+                         <Text style={styles.addonCategory}>{promoAddon.types?.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(' • ')}</Text>
+                       </View>
+                     </View>
+                     <View style={styles.addonActions}>
+                       {promoAddon.behaviorHints?.configurable && (
+                         <TouchableOpacity 
+                           style={styles.configButton}
+                           onPress={() => handleConfigureAddon(promoAddon, PROMO_ADDON_URL)}
+                         >
+                           <MaterialIcons name="settings" size={20} color={colors.primary} />
+                         </TouchableOpacity>
+                       )}
+                       <TouchableOpacity 
+                         style={styles.installButton}
+                         onPress={() => handleAddAddon(PROMO_ADDON_URL)}
+                         disabled={installing}
+                       >
+                         {installing ? (
+                           <ActivityIndicator size="small" color={colors.white} />
+                         ) : (
+                           <MaterialIcons name="add" size={20} color={colors.white} />
+                         )}
+                       </TouchableOpacity>
+                     </View>
+                   </View>
+                   <Text style={styles.addonDescription}>
+                     {promoAddon.description}
+                   </Text>
+                   <Text style={[styles.addonDescription, { marginTop: 4, opacity: 0.9 }]}>
+                     Configure and install for full functionality.
+                   </Text>
+                 </View>
+               </View>
+             </View>
+           )}
 
            {/* Community Addons Section */}
           <View style={styles.section}>

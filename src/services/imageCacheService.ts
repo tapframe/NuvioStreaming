@@ -189,9 +189,7 @@ class ImageCacheService {
       removedCount++;
     }
 
-    if (removedCount > 0) {
-      logger.log(`[ImageCache] Evicted ${removedCount} entries to free memory. Current usage: ${(this.currentMemoryUsage / 1024 / 1024).toFixed(1)}MB`);
-    }
+    // Skip verbose memory eviction logging to reduce CPU load
   }
 
   /**
@@ -236,9 +234,7 @@ class ImageCacheService {
     const finalSize = this.cache.size;
     const finalMemory = this.currentMemoryUsage;
 
-    if (initialSize !== finalSize || Math.abs(initialMemory - finalMemory) > 1024 * 1024) {
-      logger.log(`[ImageCache] Cleanup completed: ${initialSize}→${finalSize} entries, ${(initialMemory / 1024 / 1024).toFixed(1)}→${(finalMemory / 1024 / 1024).toFixed(1)}MB`);
-    }
+    // Skip verbose cleanup logging to reduce CPU load
   }
 
   /**

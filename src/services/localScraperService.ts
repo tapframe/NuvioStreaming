@@ -977,7 +977,7 @@ class LocalScraperService {
         throw new Error(`No code found for scraper ${scraper.id}`);
       }
       
-      logger.log('[LocalScraperService] Executing scraper:', scraper.name);
+        // Skip verbose logging to reduce CPU load
       
       // Load per-scraper settings
       const scraperSettings = await this.getScraperSettings(scraper.id);
@@ -999,7 +999,7 @@ class LocalScraperService {
         callback(streams, scraper.id, scraper.name, null);
       }
       
-      logger.log('[LocalScraperService] Scraper', scraper.name, 'returned', streams.length, 'streams');
+      // Skip verbose logging to reduce CPU load
       
     } catch (error) {
       logger.error('[LocalScraperService] Scraper', scraper.name, 'failed:', error);

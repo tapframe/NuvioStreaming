@@ -102,7 +102,7 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         if (mountedRef.current) {
           setIsVisible(true);
         }
-      }, priority === 'high' ? 100 : priority === 'normal' ? 300 : 500);
+      }, priority === 'high' ? 200 : priority === 'normal' ? 500 : 1000);
 
       return () => clearTimeout(timer);
     }
@@ -124,8 +124,8 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         }
       }, 10000); // 10 second timeout
 
-      // Prefetch the image
-      await ExpoImage.prefetch(cachedUrl);
+      // Skip prefetch to reduce memory pressure and heating
+      // await ExpoImage.prefetch(cachedUrl);
       
       if (mountedRef.current) {
         setIsLoaded(true);

@@ -129,14 +129,16 @@ const UpdatePopup: React.FC<UpdatePopupProps> = ({
               ]}>
                 Version:
               </Text>
-              <Text style={[
-                styles.infoValue,
-                { color: currentTheme.colors.highEmphasis }
-              ]}>
-                {updateInfo.manifest?.id ? 
-                  `${updateInfo.manifest.id.substring(0, 8)}...` : 
-                  'Latest'
-                }
+              <Text
+                style={[
+                  styles.infoValue,
+                  { color: currentTheme.colors.highEmphasis }
+                ]}
+                numberOfLines={1}
+                ellipsizeMode="middle"
+                selectable
+              >
+                {updateInfo.manifest?.id || 'Latest'}
               </Text>
             </View>
             

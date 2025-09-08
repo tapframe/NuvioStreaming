@@ -93,7 +93,7 @@ const UpdateScreen: React.FC = () => {
       
       if (info.isAvailable) {
         setUpdateStatus('available');
-        setLastOperation(`Update available: ${info.manifest?.id?.substring(0, 8) || 'unknown'}...`);
+        setLastOperation(`Update available: ${info.manifest?.id || 'unknown'}`);
       } else {
         setUpdateStatus('idle');
         setLastOperation('No updates available');
@@ -484,8 +484,9 @@ const UpdateScreen: React.FC = () => {
                     <MaterialIcons name="verified" size={14} color={currentTheme.colors.primary} />
                   </View>
                   <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Current version:</Text>
-                  <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>
-                    {currentInfo?.manifest?.id ? `${currentInfo.manifest.id.substring(0, 8)}...` : (currentInfo?.isEmbeddedLaunch === false ? 'Unknown' : 'Embedded')}
+                  <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}
+                    selectable>
+                    {currentInfo?.manifest?.id || (currentInfo?.isEmbeddedLaunch === false ? 'Unknown' : 'Embedded')}
                   </Text>
                 </View>
 

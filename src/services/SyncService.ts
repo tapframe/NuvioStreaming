@@ -213,7 +213,7 @@ class SyncService {
       } catch (e) {
         // silent
       }
-    }, 14400000);
+    }, 21600000); // Increased from 4 hours to 6 hours to reduce background CPU
   };
 
   unsubscribeRealtime = (): void => {

@@ -482,11 +482,11 @@ class CatalogService {
 
   async getContentDetails(type: string, id: string, preferredAddonId?: string): Promise<StreamingContent | null> {
     try {
-      // Try up to 3 times with increasing delays
+      // Try up to 2 times with increasing delays to reduce CPU load
       let meta = null;
       let lastError = null;
       
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 2; i++) {
         try {
           meta = await stremioService.getMetaDetails(type, id, preferredAddonId);
           if (meta) break;

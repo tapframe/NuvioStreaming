@@ -260,7 +260,7 @@ export class TraktService {
   
   // Rate limiting
   private lastApiCall: number = 0;
-  private readonly MIN_API_INTERVAL = 1000; // Minimum 1 second between API calls
+  private readonly MIN_API_INTERVAL = 2000; // Minimum 2 seconds between API calls (reduce heating)
   private requestQueue: Array<() => Promise<any>> = [];
   private isProcessingQueue: boolean = false;
 
@@ -272,11 +272,11 @@ export class TraktService {
   // Track currently watching sessions to avoid duplicate starts// Sync debouncing
   private currentlyWatching: Set<string> = new Set();
   private lastSyncTimes: Map<string, number> = new Map();
-  private readonly SYNC_DEBOUNCE_MS = 1000; // 1 second for immediate sync
+  private readonly SYNC_DEBOUNCE_MS = 15000; // 15 seconds to align with player save interval
   
   // Debounce for stop calls
   private lastStopCalls: Map<string, number> = new Map();
-  private readonly STOP_DEBOUNCE_MS = 1000; // 1 second debounce for immediate stop calls
+  private readonly STOP_DEBOUNCE_MS = 3000; // 3 seconds to avoid duplicate stop calls
   
   // Default completion threshold (overridden by user settings)
   private readonly DEFAULT_COMPLETION_THRESHOLD = 80; // 80%
@@ -356,9 +356,7 @@ export class TraktService {
       }
     }
     
-    if (cleanupCount > 0) {
-      logger.log(`[TraktService] Cleaned up ${cleanupCount} old tracking entries`);
-    }
+    // Skip verbose cleanup logging to reduce CPU load
   }
 
   public static getInstance(): TraktService {

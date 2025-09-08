@@ -285,14 +285,14 @@ class NotificationService {
 
   // Setup background sync for notifications
   private setupBackgroundSync(): void {
-    // Sync notifications every 6 hours
+    // Sync notifications every 12 hours to reduce background CPU usage
     this.backgroundSyncInterval = setInterval(async () => {
       if (this.settings.enabled) {
         // Reduced logging verbosity
         // logger.log('[NotificationService] Running background notification sync');
         await this.performBackgroundSync();
       }
-    }, 6 * 60 * 60 * 1000); // 6 hours
+    }, 12 * 60 * 60 * 1000); // 12 hours
   }
 
   // Setup app state handling for foreground sync
@@ -326,8 +326,8 @@ class NotificationService {
       
       for (const series of seriesItems) {
         await this.updateNotificationsForSeries(series.id);
-        // Small delay to prevent overwhelming the API
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Longer delay to prevent overwhelming the API and reduce heating
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
       
       // Reduced logging verbosity

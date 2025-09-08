@@ -17,7 +17,7 @@ interface TraktCollections {
 
 const THIS_WEEK_CACHE_KEY = 'this_week_episodes_cache';
 const CALENDAR_CACHE_KEY = 'calendar_data_cache';
-const CACHE_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes (increased to reduce API calls)
 const ERROR_CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes for error recovery
 
 class RobustCalendarCache {

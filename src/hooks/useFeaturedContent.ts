@@ -557,8 +557,8 @@ export function useFeaturedContent() {
       }
     };
 
-    // Increased rotation interval from 15s to 45s to reduce heating
-    const intervalId = setInterval(rotateContent, 45000);
+    // Further increased rotation interval to 90s to reduce CPU cycles
+    const intervalId = setInterval(rotateContent, 90000);
 
     return () => clearInterval(intervalId);
   }, [allFeaturedContent]);
