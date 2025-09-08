@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback, memo } from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ViewStyle, TextStyle, ImageStyle, FlatList, StyleProp } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ViewStyle, TextStyle, ImageStyle, FlatList, StyleProp, Platform } from 'react-native';
 import Animated, { FadeIn, FadeOut, Easing, useSharedValue, withTiming, useAnimatedStyle, useAnimatedScrollHandler, useAnimatedReaction, runOnJS } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image as ExpoImage } from 'expo-image';
@@ -157,9 +157,9 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
             source={{ uri: item.banner || item.poster }}
             style={styles.backgroundImage as ImageStyle}
             contentFit="cover"
-            blurRadius={24}
+            blurRadius={Platform.OS === 'android' ? 12 : 20}
             cachePolicy="memory-disk"
-            transition={300}
+            transition={200}
             priority="high"
           />
           <LinearGradient
@@ -223,10 +223,11 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
           decelerationRate="fast"
           contentContainerStyle={contentPadding}
           onScroll={scrollHandler}
-          scrollEventThrottle={16}
-          initialNumToRender={3}
+          scrollEventThrottle={32}
+          disableIntervalMomentum
+          initialNumToRender={2}
           windowSize={3}
-          maxToRenderPerBatch={3}
+          maxToRenderPerBatch={2}
           updateCellsBatchingPeriod={50}
           removeClippedSubviews
           getItemLayout={getItemLayout}

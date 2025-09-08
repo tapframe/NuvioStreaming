@@ -718,7 +718,10 @@ const MainTabs = () => {
             elevation: 0,
             backgroundColor: currentTheme.colors.darkBackground,
           },
-          detachInactiveScreens: false,
+          // Ensure background tabs are frozen and detached
+          freezeOnBlur: true,
+          lazy: true,
+          detachInactiveScreens: true,
         })}
       >
         <Tab.Screen
@@ -926,6 +929,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 contentStyle: {
                   backgroundColor: currentTheme.colors.darkBackground,
                 },
+                // Freeze when blurred to stop timers/network without full unmount
+                freezeOnBlur: true,
               }}
             />
             <Stack.Screen 
@@ -948,6 +953,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                   statusBarHidden: true,
                   statusBarAnimation: 'none',
                 }),
+                // Freeze when blurred to release resources safely
+                freezeOnBlur: true,
               }}
             />
             <Stack.Screen 

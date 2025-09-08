@@ -816,30 +816,47 @@ export class TMDBService {
    */
   async getCertification(type: string, id: number): Promise<string | null> {
     try {
-      // Different endpoints for movies and TV shows
-      const endpoint = type === 'movie' ? 'movie' : 'tv';
-      const response = await axios.get(`${BASE_URL}/${endpoint}/${id}/release_dates`, {
-        headers: await this.getHeaders(),
-        params: await this.getParams()
-      });
+      if (type === 'movie') {
+        const response = await axios.get(`${BASE_URL}/movie/${id}/release_dates`, {
+          headers: await this.getHeaders(),
+          params: await this.getParams()
+        });
 
-      if (response.data && response.data.results) {
-        // Try to find US certification first
-        const usRelease = response.data.results.find((r: any) => r.iso_3166_1 === 'US');
-        if (usRelease && usRelease.release_dates && usRelease.release_dates.length > 0) {
-          const certification = usRelease.release_dates.find((rd: any) => rd.certification)?.certification;
-          if (certification) return certification;
-        }
-
-        // Fallback to any certification if US is not available
-        for (const country of response.data.results) {
-          if (country.release_dates && country.release_dates.length > 0) {
-            const certification = country.release_dates.find((rd: any) => rd.certification)?.certification;
-            if (certification) return certification;
+        if (response.data && response.data.results) {
+          // Prefer US, then GB, then any
+          const countryPriority = ['US', 'GB'];
+          for (const code of countryPriority) {
+            const rel = response.data.results.find((r: any) => r.iso_3166_1 === code);
+            if (rel?.release_dates?.length) {
+              const cert = rel.release_dates.find((rd: any) => rd.certification)?.certification;
+              if (cert) return cert;
+            }
+          }
+          for (const country of response.data.results) {
+            const cert = country.release_dates?.find((rd: any) => rd.certification)?.certification;
+            if (cert) return cert;
           }
         }
+        return null;
+      } else {
+        // TV uses content ratings endpoint, not release_dates
+        const response = await axios.get(`${BASE_URL}/tv/${id}/content_ratings`, {
+          headers: await this.getHeaders(),
+          params: await this.getParams()
+        });
+
+        if (response.data && response.data.results) {
+          // Prefer US, then GB, then any
+          const countryPriority = ['US', 'GB'];
+          for (const code of countryPriority) {
+            const rating = response.data.results.find((r: any) => r.iso_3166_1 === code);
+            if (rating?.rating) return rating.rating;
+          }
+          const any = response.data.results.find((r: any) => !!r.rating);
+          if (any?.rating) return any.rating;
+        }
+        return null;
       }
-      return null;
     } catch (error) {
       return null;
     }

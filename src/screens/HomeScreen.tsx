@@ -158,7 +158,7 @@ const HomeScreen = () => {
       let catalogIndex = 0;
       
       // Limit concurrent catalog loading to prevent overwhelming the system
-      const MAX_CONCURRENT_CATALOGS = 5;
+      const MAX_CONCURRENT_CATALOGS = 3; // Lower concurrency to reduce CPU/network spikes
       let activeCatalogLoads = 0;
       const catalogQueue: (() => Promise<void>)[] = [];
       
@@ -167,8 +167,10 @@ const HomeScreen = () => {
           const catalogLoader = catalogQueue.shift();
           if (catalogLoader) {
             activeCatalogLoads++;
-            catalogLoader().finally(() => {
+            catalogLoader().finally(async () => {
               activeCatalogLoads--;
+              // Yield to event loop to avoid JS thread starvation
+              await new Promise(resolve => setTimeout(resolve, 10));
               processCatalogQueue(); // Process next in queue
             });
           }
@@ -767,7 +769,6 @@ const HomeScreen = () => {
           onEndReached={handleLoadMoreCatalogs}
           onEndReachedThreshold={0.6}
           scrollEventThrottle={32}
-          estimatedItemSize={220}
           onScroll={event => {
             const y = event.nativeEvent.contentOffset.y;
             const dy = y - lastScrollYRef.current;

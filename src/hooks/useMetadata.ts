@@ -1141,20 +1141,24 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
           const tmdbService = TMDBService.getInstance();
           const fetchedTmdbId = await tmdbService.extractTMDBIdFromStremioId(id);
           if (fetchedTmdbId) {
+            console.log('[useMetadata] extracted TMDB id from content id', { id, fetchedTmdbId });
             setTmdbId(fetchedTmdbId);
             // Fetch certification
             const certification = await tmdbService.getCertification(type, fetchedTmdbId);
             if (certification) {
+              console.log('[useMetadata] fetched certification via TMDB id (extract path)', { type, fetchedTmdbId, certification });
               setMetadata(prev => prev ? {
                 ...prev,
                 certification
               } : null);
+            } else {
+              console.warn('[useMetadata] certification not returned from TMDB (extract path)', { type, fetchedTmdbId });
             }
           } else {
-            console.warn('Could not determine TMDB ID for recommendations.');
+            console.warn('[useMetadata] Could not determine TMDB ID for recommendations / certification', { id });
           }
         } catch (error) {
-          console.error('Error fetching TMDB ID:', error);
+          console.error('[useMetadata] Error fetching TMDB ID (extract path):', error);
         }
       }
     };
@@ -1164,6 +1168,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
   useEffect(() => {
     if (tmdbId) {
+      console.log('[useMetadata] tmdbId available; loading recommendations and enabling certification checks', { tmdbId });
       loadRecommendations();
       // Reset recommendations when tmdbId changes
       return () => {
@@ -1172,6 +1177,37 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       };
     }
   }, [tmdbId, loadRecommendations]);
+
+  // Ensure certification is attached whenever a TMDB id is known and metadata lacks it
+  useEffect(() => {
+    const maybeAttachCertification = async () => {
+      try {
+        if (!metadata) {
+          console.warn('[useMetadata] skip certification attach: metadata not ready');
+          return;
+        }
+        if (!tmdbId) {
+          console.warn('[useMetadata] skip certification attach: tmdbId not available yet');
+          return;
+        }
+        if ((metadata as any).certification) {
+          console.log('[useMetadata] certification already present on metadata; skipping fetch');
+          return;
+        }
+        const tmdbSvc = TMDBService.getInstance();
+        const cert = await tmdbSvc.getCertification(type, tmdbId);
+        if (cert) {
+          console.log('[useMetadata] fetched certification (attach path)', { type, tmdbId, cert });
+          setMetadata(prev => prev ? { ...prev, certification: cert } : prev);
+        } else {
+          console.warn('[useMetadata] TMDB returned no certification (attach path)', { type, tmdbId });
+        }
+      } catch (err) {
+        console.error('[useMetadata] error attaching certification', err);
+      }
+    };
+    maybeAttachCertification();
+  }, [tmdbId, metadata, type]);
 
   // Reset tmdbId when id changes
   useEffect(() => {

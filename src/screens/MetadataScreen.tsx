@@ -111,14 +111,17 @@ const MetadataScreen: React.FC = () => {
   
   // Extract dominant color from hero image for dynamic background
   const heroImageUri = useMemo(() => {
+    if (!settings.useDominantBackgroundColor) return null;
     if (!metadata) return null;
     return assetData.bannerImage || metadata.banner || metadata.poster || null;
-  }, [metadata, assetData.bannerImage]);
+  }, [settings.useDominantBackgroundColor, metadata, assetData.bannerImage]);
   
   // Preload color extraction as soon as we have the URI
   useEffect(() => {
     if (heroImageUri) {
-      preloadDominantColor(heroImageUri);
+      InteractionManager.runAfterInteractions(() => {
+        preloadDominantColor(heroImageUri);
+      });
     }
   }, [heroImageUri]);
   
@@ -188,7 +191,7 @@ const MetadataScreen: React.FC = () => {
 
   // Debug logging for color extraction timing
   useEffect(() => {
-    if (heroImageUri && dominantColor) {
+    if (__DEV__ && heroImageUri && dominantColor) {
       console.log('[MetadataScreen] Dynamic background color:', {
         dominantColor,
         fallback: currentTheme.colors.darkBackground,
@@ -266,7 +269,7 @@ const MetadataScreen: React.FC = () => {
       if (relevantProgress.length === 0) return;
 
       // Log only essential progress information for performance
-      console.log(`[MetadataScreen] Found ${relevantProgress.length} Trakt progress items for ${type}`);
+      if (__DEV__) console.log(`[MetadataScreen] Found ${relevantProgress.length} Trakt progress items for ${type}`);
       
       // Find most recent progress if multiple episodes
       if (type === 'series' && relevantProgress.length > 1) {
@@ -275,7 +278,7 @@ const MetadataScreen: React.FC = () => {
         )[0];
         
         if (mostRecent.episode && mostRecent.show) {
-          console.log(`[MetadataScreen] Most recent: S${mostRecent.episode.season}E${mostRecent.episode.number} - ${mostRecent.progress.toFixed(1)}%`);
+          if (__DEV__) console.log(`[MetadataScreen] Most recent: S${mostRecent.episode.season}E${mostRecent.episode.number} - ${mostRecent.progress.toFixed(1)}%`);
         }
       }
         
@@ -396,7 +399,7 @@ const MetadataScreen: React.FC = () => {
           // DIRECT APPROACH: Just create the next episode ID directly
           // This ensures we navigate to the next episode even if it's not yet in our episodes array
           const nextEpisodeId = `${id}:${currentSeason}:${currentEpisode + 1}`;
-          console.log(`[MetadataScreen] Created next episode ID directly: ${nextEpisodeId}`);
+          if (__DEV__) console.log(`[MetadataScreen] Created next episode ID directly: ${nextEpisodeId}`);
           
           // Still try to find the episode in our list to verify it exists
           const nextEpisodeExists = episodes.some(ep => 
@@ -404,9 +407,9 @@ const MetadataScreen: React.FC = () => {
           );
           
           if (nextEpisodeExists) {
-            console.log(`[MetadataScreen] Verified next episode S${currentSeason}E${currentEpisode + 1} exists in episodes list`);
+            if (__DEV__) console.log(`[MetadataScreen] Verified next episode S${currentSeason}E${currentEpisode + 1} exists in episodes list`);
           } else {
-            console.log(`[MetadataScreen] Warning: Next episode S${currentSeason}E${currentEpisode + 1} not found in episodes list, but proceeding anyway`);
+            if (__DEV__) console.log(`[MetadataScreen] Warning: Next episode S${currentSeason}E${currentEpisode + 1} not found in episodes list, but proceeding anyway`);
           }
           
           targetEpisodeId = nextEpisodeId;
@@ -416,7 +419,7 @@ const MetadataScreen: React.FC = () => {
       // Fallback logic: if not finished or nextEp not found
       if (!targetEpisodeId) {
         targetEpisodeId = watchProgress?.episodeId || episodeId || (episodes.length > 0 ? buildEpisodeId(episodes[0]) : undefined);
-        console.log(`[MetadataScreen] Using fallback episode ID: ${targetEpisodeId}`);
+        if (__DEV__) console.log(`[MetadataScreen] Using fallback episode ID: ${targetEpisodeId}`);
       }
 
       if (targetEpisodeId) {
@@ -426,7 +429,7 @@ const MetadataScreen: React.FC = () => {
         if (epParts.length === 2) {
           normalizedEpisodeId = `${id}:${epParts[0]}:${epParts[1]}`;
         }
-        console.log(`[MetadataScreen] Navigating to streams with episodeId: ${normalizedEpisodeId}`);
+        if (__DEV__) console.log(`[MetadataScreen] Navigating to streams with episodeId: ${normalizedEpisodeId}`);
         navigation.navigate('Streams', { id, type, episodeId: normalizedEpisodeId });
         return;
       }
@@ -438,7 +441,7 @@ const MetadataScreen: React.FC = () => {
       const p = episodeId.split(':');
       fallbackEpisodeId = `${id}:${p[0]}:${p[1]}`;
     }
-    console.log(`[MetadataScreen] Navigating with fallback episodeId: ${fallbackEpisodeId}`);
+    if (__DEV__) console.log(`[MetadataScreen] Navigating with fallback episodeId: ${fallbackEpisodeId}`);
     navigation.navigate('Streams', { id, type, episodeId: fallbackEpisodeId });
   }, [navigation, id, type, episodes, episodeId, watchProgressData.watchProgress]);
 
