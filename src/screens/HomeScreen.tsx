@@ -158,7 +158,7 @@ const HomeScreen = () => {
       let catalogIndex = 0;
       
       // Limit concurrent catalog loading to prevent overwhelming the system
-      const MAX_CONCURRENT_CATALOGS = 3; // Lower concurrency to reduce CPU/network spikes
+      const MAX_CONCURRENT_CATALOGS = 2; // Very low concurrency to reduce heating
       let activeCatalogLoads = 0;
       const catalogQueue: (() => Promise<void>)[] = [];
       
@@ -169,8 +169,8 @@ const HomeScreen = () => {
             activeCatalogLoads++;
             catalogLoader().finally(async () => {
               activeCatalogLoads--;
-              // Yield to event loop to avoid JS thread starvation
-              await new Promise(resolve => setTimeout(resolve, 10));
+              // Yield to event loop to avoid JS thread starvation and reduce heating
+              await new Promise(resolve => setTimeout(resolve, 50));
               processCatalogQueue(); // Process next in queue
             });
           }
@@ -605,14 +605,7 @@ const HomeScreen = () => {
 
   // Add memory cleanup on scroll end
   const handleScrollEnd = useCallback(() => {
-    // Clear memory cache after scroll settles to free up RAM
-    setTimeout(() => {
-      try {
-        ExpoImage.clearMemoryCache();
-      } catch (error) {
-        // Ignore errors
-      }
-    }, 1000);
+    // No-op; avoid clearing image memory cache here to prevent decode thrash/heating
   }, []);
 
   // Memoize individual section components to prevent re-renders
@@ -765,7 +758,6 @@ const HomeScreen = () => {
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={memoizedHeader}
           ListFooterComponent={ListFooterComponent}
-          onMomentumScrollEnd={handleScrollEnd}
           onEndReached={handleLoadMoreCatalogs}
           onEndReachedThreshold={0.6}
           scrollEventThrottle={32}

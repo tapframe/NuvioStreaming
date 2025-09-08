@@ -20,10 +20,10 @@ class ImageCacheService {
   private cleanupInterval: NodeJS.Timeout | null = null;
 
   constructor() {
-    // Start cleanup interval every 10 minutes
+    // Start cleanup interval every 30 minutes (less churn)
     this.cleanupInterval = setInterval(() => {
       this.performCleanup();
-    }, 10 * 60 * 1000);
+    }, 30 * 60 * 1000);
   }
 
   /**
@@ -40,13 +40,13 @@ class ImageCacheService {
       // Update access tracking
       cached.accessCount++;
       cached.lastAccessed = Date.now();
-      logger.log(`[ImageCache] Retrieved from cache: ${originalUrl.substring(0, 50)}...`);
+      // Skip verbose logging to reduce CPU load
       return cached.localPath;
     }
 
     // Check memory pressure before adding new entries (more lenient)
     if (this.cache.size >= this.MAX_CACHE_SIZE * 0.95) {
-      logger.log(`[ImageCache] Skipping cache due to size limit`);
+      // Skip verbose logging to reduce CPU load
       return originalUrl;
     }
 
@@ -68,7 +68,7 @@ class ImageCacheService {
       this.currentMemoryUsage += estimatedSize;
       this.enforceMemoryLimits();
 
-      logger.log(`[ImageCache] ✅ NEW CACHE ENTRY: ${originalUrl.substring(0, 50)}... (Cache: ${this.cache.size}/${this.MAX_CACHE_SIZE}, Memory: ${(this.currentMemoryUsage / 1024 / 1024).toFixed(1)}MB)`);
+      // Skip verbose logging to reduce CPU load
       return cachedImage.localPath;
     } catch (error) {
       logger.error('[ImageCache] Failed to cache image:', error);
@@ -231,12 +231,7 @@ class ImageCacheService {
     this.enforceMemoryLimits();
     this.enforceMaxCacheSize();
 
-    // Clear Expo image memory cache periodically
-    try {
-      ExpoImage.clearMemoryCache();
-    } catch (error) {
-      // Ignore errors from clearing memory cache
-    }
+    // Avoid clearing Expo's global memory cache to prevent re-decode churn
 
     const finalSize = this.cache.size;
     const finalMemory = this.currentMemoryUsage;

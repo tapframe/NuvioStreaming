@@ -547,8 +547,8 @@ const VideoPlayer: React.FC = () => {
         clearInterval(progressSaveInterval);
       }
 
-      // IMMEDIATE SYNC: Reduce sync interval to 5 seconds for near real-time sync
-      const syncInterval = 5000; // 5 seconds for immediate sync
+      // HEATING FIX: Increase sync interval to 15 seconds to reduce CPU load
+      const syncInterval = 15000; // 15 seconds to prevent heating
 
       const interval = setInterval(() => {
         saveWatchProgress();

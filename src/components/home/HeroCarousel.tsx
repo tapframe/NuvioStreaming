@@ -157,10 +157,10 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
             source={{ uri: item.banner || item.poster }}
             style={styles.backgroundImage as ImageStyle}
             contentFit="cover"
-            blurRadius={Platform.OS === 'android' ? 12 : 20}
+            blurRadius={Platform.OS === 'android' ? 8 : 12}
             cachePolicy="memory-disk"
-            transition={200}
-            priority="high"
+            transition={0}
+            priority="low"
           />
           <LinearGradient
             colors={["rgba(0,0,0,0.45)", "rgba(0,0,0,0.75)"]}
@@ -270,7 +270,7 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
             source={{ uri: item.banner || item.poster }}
             style={styles.banner as ImageStyle}
             contentFit="cover"
-            transition={300}
+            transition={0}
             cachePolicy="memory-disk"
           />
           <LinearGradient
@@ -285,7 +285,7 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
               source={{ uri: item.logo }}
               style={styles.logo as ImageStyle}
               contentFit="contain"
-              transition={250}
+              transition={0}
               cachePolicy="memory-disk"
               onError={onLogoError}
             />
@@ -360,11 +360,11 @@ const styles = StyleSheet.create({
     height: CARD_HEIGHT,
     borderRadius: 16,
     overflow: 'hidden',
-    elevation: 6,
+    elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
   },
   skeletonCard: {
     width: CARD_WIDTH,

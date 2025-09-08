@@ -164,10 +164,11 @@ const ContentItem = ({ item, onPress }: ContentItemProps) => {
                 style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, borderRadius: posterRadius }]}
                 contentFit="cover"
                 cachePolicy="memory-disk" // Use both memory and disk cache
-                transition={200} // Add smooth transition
+                transition={0} // Disable transition to reduce GPU work
                 placeholder={{ blurhash: PLACEHOLDER_BLURHASH } as any}
                 placeholderContentFit="cover"
                 allowDownscaling
+                priority="low" // Deprioritize decode for long lists
                 onLoad={() => {
                   setImageLoaded(true);
                   setImageError(false);
@@ -183,7 +184,6 @@ const ContentItem = ({ item, onPress }: ContentItemProps) => {
                   setImageError(true);
                   setImageLoaded(false);
                 }}
-                priority="normal" // Increase priority for better loading
                 recyclingKey={item.id} // Add recycling key for better performance
               />
             ) : (
@@ -239,11 +239,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     position: 'relative',
-    elevation: Platform.OS === 'android' ? 2 : 0,
+    elevation: Platform.OS === 'android' ? 1 : 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
     borderWidth: 0.5,
     borderColor: 'rgba(255,255,255,0.12)',
     marginBottom: 8,

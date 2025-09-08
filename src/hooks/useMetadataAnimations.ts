@@ -161,7 +161,7 @@ export const useMetadataAnimations = (safeAreaTop: number, watchProgress: any) =
       // Use single progress value for all header animations
       if (headerProgress.value !== progress) {
         headerProgress.value = withTiming(progress, { 
-          duration: progress ? 200 : 150, 
+          duration: progress ? 150 : 100, 
           easing: easings.ultraFast 
         });
         }

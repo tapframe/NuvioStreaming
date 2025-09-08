@@ -870,8 +870,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         });
       };
       
-      // Check completion periodically
-      const completionInterval = setInterval(checkScrapersCompletion, 1000);
+      // Check completion less frequently to reduce CPU load
+      const completionInterval = setInterval(checkScrapersCompletion, 2000);
       
       // Fallback timeout after 30 seconds
       const fallbackTimeout = setTimeout(() => {
@@ -1039,8 +1039,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         });
       };
       
-      // Check completion periodically
-      const episodeCompletionInterval = setInterval(checkEpisodeScrapersCompletion, 1000);
+      // Check completion less frequently to reduce CPU load
+      const episodeCompletionInterval = setInterval(checkEpisodeScrapersCompletion, 2000);
       
       // Fallback timeout after 30 seconds
       const episodeFallbackTimeout = setTimeout(() => {
