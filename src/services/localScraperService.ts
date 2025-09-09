@@ -95,8 +95,6 @@ class LocalScraperService {
     if (this.initialized) return;
 
     try {
-      // Ensure tapframe repository is available
-      await this.ensureTapframeRepository();
       // Load repositories
       const repositoriesData = await AsyncStorage.getItem(this.REPOSITORIES_KEY);
       if (repositoriesData) {
@@ -135,7 +133,7 @@ class LocalScraperService {
         }
       }
 
-      // Ensure tapframe repository is available for existing users too
+      // Ensure tapframe repository is available for all users
       await this.ensureTapframeRepository();
 
       // Load current repository
@@ -275,15 +273,21 @@ class LocalScraperService {
     // Check if any repository with the same URL already exists
     for (const [id, repo] of this.repositories) {
       if (repo.url === tapframeRepoUrl) {
-        // Update existing repository to use the tapframe ID and info
-        repo.id = tapframeRepoId;
-        repo.name = 'Tapframe\'s Repo';
-        repo.description = 'Official Nuvio streaming plugins repository by Tapframe';
-        repo.isDefault = true;
-        this.repositories.delete(id);
-        this.repositories.set(tapframeRepoId, repo);
-        await this.saveRepositories();
-        return;
+        // If this is already a tapframe repository (by name or description), just update its ID
+        if (repo.name === 'Tapframe\'s Repo' || repo.description?.includes('Tapframe')) {
+          repo.id = tapframeRepoId;
+          repo.name = 'Tapframe\'s Repo';
+          repo.description = 'Official Nuvio streaming plugins repository by Tapframe';
+          repo.isDefault = true;
+          this.repositories.delete(id);
+          this.repositories.set(tapframeRepoId, repo);
+          await this.saveRepositories();
+          return;
+        }
+        // If this is a user's repository with the same URL, don't overwrite it
+        // Just create a new tapframe repository with a different ID
+        logger.log('[LocalScraperService] User repository with tapframe URL found, creating separate tapframe repository');
+        break;
       }
     }
 
