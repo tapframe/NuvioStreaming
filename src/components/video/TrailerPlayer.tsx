@@ -338,7 +338,7 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
         style={styles.video}
         resizeMode={isFullscreen ? 'contain' : 'cover'}
         paused={!isPlaying}
-        repeat={isPlaying}
+        repeat={false}
         muted={isMuted}
         volume={isMuted ? 0 : 1}
         mixWithOthers="duck"
@@ -347,6 +347,12 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
         useTextureView={Platform.OS === 'android' ? false : undefined}
         playInBackground={false}
         playWhenInactive={false}
+        onEnd={() => {
+          // Stop playback when trailer finishes to avoid continuous GPU/decoder use
+          if (isComponentMounted) {
+            setIsPlaying(false);
+          }
+        }}
         onFullscreenPlayerWillPresent={() => setIsFullscreen(true)}
         onFullscreenPlayerDidDismiss={() => setIsFullscreen(false)}
         onLoadStart={handleLoadStart}
@@ -354,12 +360,6 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
         onError={(error: any) => handleError(error)}
         onProgress={handleProgress}
         controls={Platform.OS === 'android' ? isFullscreen : false}
-        onEnd={() => {
-          // Only loop if still considered playing and component is mounted
-          if (isPlaying && isComponentMounted) {
-            videoRef.current?.seek(0);
-          }
-        }}
       />
 
       {/* Loading indicator - hidden during smooth transitions */}

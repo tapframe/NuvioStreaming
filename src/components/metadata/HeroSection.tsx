@@ -27,6 +27,7 @@ import Animated, {
   withRepeat,
   FadeIn,
   runOnUI,
+  useDerivedValue,
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useTraktContext } from '../../contexts/TraktContext';
@@ -1041,13 +1042,24 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       // The trailer should only resume if the user explicitly wants it to play
       
       return () => {
-        // Don't automatically stop trailer when component unmounts
-        // Let the new hero section (if any) take control of trailer state
-        // This prevents the trailer from stopping when navigating between screens
-        logger.info('HeroSection', 'Screen unfocused - not stopping trailer automatically');
+        // Stop trailer when leaving this screen to prevent background playback/heat
+        logger.info('HeroSection', 'Screen unfocused - stopping trailer playback');
+        setTrailerPlaying(false);
       };
-    }, [])
+    }, [setTrailerPlaying])
   );
+
+  // Pause trailer when the hero is scrolled substantially off-screen
+  useDerivedValue(() => {
+    try {
+      const threshold = heroHeight.value * 0.6;
+      if (scrollY.value > threshold) {
+        runOnJS(setTrailerPlaying)(false);
+      }
+    } catch (e) {
+      // no-op
+    }
+  });
 
   // Memory management and cleanup
   useEffect(() => {
