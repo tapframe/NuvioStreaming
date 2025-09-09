@@ -209,15 +209,16 @@ const CastMoviesScreen: React.FC = () => {
     if (__DEV__) {
       console.log('=== CastMoviesScreen: Movie Press ===');
       console.log('Movie data:', {
-      id: movie.id,
-      title: movie.title,
-      media_type: movie.media_type,
-      release_date: movie.release_date,
-      character: movie.character,
-      popularity: movie.popularity,
-      vote_average: movie.vote_average,
-      isUpcoming: movie.isUpcoming
-    });
+        id: movie.id,
+        title: movie.title,
+        media_type: movie.media_type,
+        release_date: movie.release_date,
+        character: movie.character,
+        popularity: movie.popularity,
+        vote_average: movie.vote_average,
+        isUpcoming: movie.isUpcoming
+      });
+    }
     
     try {
       if (__DEV__) console.log('Attempting to get Stremio ID for:', movie.media_type, movie.id.toString());
