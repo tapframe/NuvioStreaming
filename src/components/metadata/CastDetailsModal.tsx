@@ -91,7 +91,7 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
       setPersonDetails(details);
       setHasFetched(true);
     } catch (error) {
-      console.error('Error fetching person details:', error);
+      if (__DEV__) console.error('Error fetching person details:', error);
     } finally {
       setLoading(false);
     }

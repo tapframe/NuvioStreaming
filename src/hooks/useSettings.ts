@@ -172,7 +172,7 @@ export const useSettings = () => {
       if (merged) setSettings({ ...DEFAULT_SETTINGS, ...merged });
       else setSettings(DEFAULT_SETTINGS);
     } catch (error) {
-      console.error('Failed to load settings:', error);
+      if (__DEV__) console.error('Failed to load settings:', error);
       // Fallback to default settings on error
       setSettings(DEFAULT_SETTINGS);
     }
@@ -195,18 +195,18 @@ export const useSettings = () => {
       // Ensure a current scope exists to avoid future loads missing the chosen scope
       await AsyncStorage.setItem('@user:current', scope);
       setSettings(newSettings);
-      console.log(`Setting updated: ${key}`, value);
+      if (__DEV__) console.log(`Setting updated: ${key}`, value);
       
       // Notify all subscribers that settings have changed (if requested)
       if (emitEvent) {
-        console.log('Emitting settings change event');
+        if (__DEV__) console.log('Emitting settings change event');
         settingsEmitter.emit();
       }
 
       // If authenticated, push settings to server to prevent overwrite on next pull
       try { syncService.pushSettings(); } catch {}
     } catch (error) {
-      console.error('Failed to save settings:', error);
+      if (__DEV__) console.error('Failed to save settings:', error);
     }
   }, [settings]);
 

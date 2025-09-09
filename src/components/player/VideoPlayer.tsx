@@ -61,15 +61,17 @@ const VideoPlayer: React.FC = () => {
   // - Xprime streams on any platform
   // - Non-MKV files on iOS (unless forceVlc is set)
   const shouldUseAndroidPlayer = Platform.OS === 'android' || isXprimeStream || (Platform.OS === 'ios' && !isMkvFile && !forceVlc);
-  logger.log('[VideoPlayer] Player selection:', {
-    platform: Platform.OS,
-    isXprimeStream,
-    isMkvFile,
-    forceVlc: !!forceVlc,
-    selected: shouldUseAndroidPlayer ? 'AndroidVideoPlayer' : 'VLCPlayer',
-    streamProvider,
-    uri
-  });
+  if (__DEV__) {
+    logger.log('[VideoPlayer] Player selection:', {
+      platform: Platform.OS,
+      isXprimeStream,
+      isMkvFile,
+      forceVlc: !!forceVlc,
+      selected: shouldUseAndroidPlayer ? 'AndroidVideoPlayer' : 'VLCPlayer',
+      streamProvider,
+      uri
+    });
+  }
   if (shouldUseAndroidPlayer) {
     return <AndroidVideoPlayer />;
   }
@@ -335,7 +337,7 @@ const VideoPlayer: React.FC = () => {
     const newScale = Math.max(1, Math.min(lastZoomScale * scale, 1.1));
     setZoomScale(newScale);
     if (DEBUG_MODE) {
-      logger.log(`[VideoPlayer] Center Zoom: ${newScale.toFixed(2)}x`);
+      if (__DEV__) logger.log(`[VideoPlayer] Center Zoom: ${newScale.toFixed(2)}x`);
     }
   };
 
@@ -343,7 +345,7 @@ const VideoPlayer: React.FC = () => {
     if (event.nativeEvent.state === State.END) {
       setLastZoomScale(zoomScale);
       if (DEBUG_MODE) {
-        logger.log(`[VideoPlayer] Pinch ended - saved scale: ${zoomScale.toFixed(2)}x`);
+        if (__DEV__) logger.log(`[VideoPlayer] Pinch ended - saved scale: ${zoomScale.toFixed(2)}x`);
       }
     }
   };
@@ -353,7 +355,7 @@ const VideoPlayer: React.FC = () => {
     setZoomScale(targetZoom);
     setLastZoomScale(targetZoom);
     if (DEBUG_MODE) {
-      logger.log(`[VideoPlayer] Zoom reset to ${targetZoom}x (16:9: ${is16by9Content})`);
+      if (__DEV__) logger.log(`[VideoPlayer] Zoom reset to ${targetZoom}x (16:9: ${is16by9Content})`);
     }
   };
 
@@ -367,7 +369,7 @@ const VideoPlayer: React.FC = () => {
       );
       setCustomVideoStyles(styles);
       if (DEBUG_MODE) {
-        logger.log(`[VideoPlayer] Screen dimensions changed, recalculated styles:`, styles);
+        if (__DEV__) logger.log(`[VideoPlayer] Screen dimensions changed, recalculated styles:`, styles);
       }
     }
   }, [effectiveDimensions, videoAspectRatio]);
@@ -377,7 +379,7 @@ const VideoPlayer: React.FC = () => {
     const lockOrientation = async () => {
       try {
         await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-        logger.log('[VideoPlayer] Locked to landscape orientation');
+        if (__DEV__) logger.log('[VideoPlayer] Locked to landscape orientation');
       } catch (error) {
         logger.warn('[VideoPlayer] Failed to lock orientation:', error);
       }
@@ -483,32 +485,36 @@ const VideoPlayer: React.FC = () => {
     const loadWatchProgress = async () => {
       if (id && type) {
         try {
-          logger.log(`[VideoPlayer] Loading watch progress for ${type}:${id}${episodeId ? `:${episodeId}` : ''}`);
+          if (__DEV__) {
+            logger.log(`[VideoPlayer] Loading watch progress for ${type}:${id}${episodeId ? `:${episodeId}` : ''}`);
+          }
           const savedProgress = await storageService.getWatchProgress(id, type, episodeId);
-          logger.log(`[VideoPlayer] Saved progress:`, savedProgress);
+          if (__DEV__) {
+            logger.log(`[VideoPlayer] Saved progress:`, savedProgress);
+          }
 
           if (savedProgress) {
             const progressPercent = (savedProgress.currentTime / savedProgress.duration) * 100;
-            logger.log(`[VideoPlayer] Progress: ${progressPercent.toFixed(1)}% (${savedProgress.currentTime}/${savedProgress.duration})`);
+            if (__DEV__) logger.log(`[VideoPlayer] Progress: ${progressPercent.toFixed(1)}% (${savedProgress.currentTime}/${savedProgress.duration})`);
 
             if (progressPercent < 85) {
               setResumePosition(savedProgress.currentTime);
               setSavedDuration(savedProgress.duration);
-              logger.log(`[VideoPlayer] Set resume position to: ${savedProgress.currentTime} of ${savedProgress.duration}`);
+              if (__DEV__) logger.log(`[VideoPlayer] Set resume position to: ${savedProgress.currentTime} of ${savedProgress.duration}`);
               if (appSettings.alwaysResume) {
                 // Only prepare auto-resume state and seek when AlwaysResume is enabled
                 setInitialPosition(savedProgress.currentTime);
                 initialSeekTargetRef.current = savedProgress.currentTime;
-                logger.log(`[VideoPlayer] AlwaysResume enabled. Auto-seeking to ${savedProgress.currentTime}`);
+                if (__DEV__) logger.log(`[VideoPlayer] AlwaysResume enabled. Auto-seeking to ${savedProgress.currentTime}`);
                 // Seek immediately after load
                 seekToTime(savedProgress.currentTime);
               } else {
                 // Do not set initialPosition; start from beginning with no auto-seek
                 setShowResumeOverlay(true);
-                logger.log(`[VideoPlayer] AlwaysResume disabled. Not auto-seeking; overlay shown (if enabled)`);
+                if (__DEV__) logger.log(`[VideoPlayer] AlwaysResume disabled. Not auto-seeking; overlay shown (if enabled)`);
               }
             } else {
-              logger.log(`[VideoPlayer] Progress too high (${progressPercent.toFixed(1)}%), not showing resume overlay`);
+              if (__DEV__) logger.log(`[VideoPlayer] Progress too high (${progressPercent.toFixed(1)}%), not showing resume overlay`);
             }
           } else {
             logger.log(`[VideoPlayer] No saved progress found`);
@@ -517,7 +523,7 @@ const VideoPlayer: React.FC = () => {
           logger.error('[VideoPlayer] Error loading watch progress:', error);
         }
       } else {
-        logger.log(`[VideoPlayer] Missing id or type: id=${id}, type=${type}`);
+        if (__DEV__) logger.log(`[VideoPlayer] Missing id or type: id=${id}, type=${type}`);
       }
     };
     loadWatchProgress();
@@ -547,8 +553,7 @@ const VideoPlayer: React.FC = () => {
         clearInterval(progressSaveInterval);
       }
 
-      // HEATING FIX: Increase sync interval to 15 seconds to reduce CPU load
-      const syncInterval = 15000; // 15 seconds to prevent heating
+      const syncInterval = 20000; // 20s to further reduce CPU load
 
       const interval = setInterval(() => {
         saveWatchProgress();
@@ -560,7 +565,7 @@ const VideoPlayer: React.FC = () => {
         setProgressSaveInterval(null);
       };
     }
-  }, [id, type, paused, currentTime, duration]);
+  }, [id, type, paused, duration]);
 
   useEffect(() => {
     return () => {
@@ -597,7 +602,7 @@ const VideoPlayer: React.FC = () => {
     const timeInSeconds = Math.max(0, Math.min(rawSeconds, duration > 0 ? duration - END_EPSILON : rawSeconds));
     if (vlcRef.current && duration > 0 && !isSeeking.current) {
       if (DEBUG_MODE) {
-        logger.log(`[VideoPlayer] Seeking to ${timeInSeconds.toFixed(2)}s out of ${duration.toFixed(2)}s`);
+        if (__DEV__) logger.log(`[VideoPlayer] Seeking to ${timeInSeconds.toFixed(2)}s out of ${duration.toFixed(2)}s`);
       }
 
       isSeeking.current = true;
@@ -799,7 +804,7 @@ const VideoPlayer: React.FC = () => {
           NativeModules.StatusBarManager.setHidden(true);
         }
       } catch (error) {
-        console.log('Immersive mode error:', error);
+        if (__DEV__) console.log('Immersive mode error:', error);
       }
     }
   };

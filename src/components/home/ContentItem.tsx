@@ -174,7 +174,7 @@ const ContentItem = ({ item, onPress }: ContentItemProps) => {
                   setImageError(false);
                 }}
                 onError={(error) => {
-                  console.warn('Image load error for:', item.poster, error);
+                  if (__DEV__) console.warn('Image load error for:', item.poster, error);
                   // Try fallback URL on first error
                   if (retryCount === 0 && item.poster && !item.poster.includes('metahub.space')) {
                     setRetryCount(1);

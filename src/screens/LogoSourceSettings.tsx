@@ -605,7 +605,7 @@ const LogoSourceSettings = () => {
       try {
         await AsyncStorage.setItem('logo_settings_selected_show', show.imdbId);
       } catch (e) {
-        console.error('Error saving selected show:', e);
+        if (__DEV__) console.error('Error saving selected show:', e);
       }
     };
     
@@ -621,7 +621,7 @@ const LogoSourceSettings = () => {
             }
           }
         } catch (e) {
-          console.error('Error loading selected show:', e);
+          if (__DEV__) console.error('Error loading selected show:', e);
         }
       };
       

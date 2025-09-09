@@ -142,7 +142,7 @@ const selectBestColor = (result: ImageColorsResult): string => {
 export const preloadDominantColor = async (imageUri: string | null) => {
   if (!imageUri || colorCache.has(imageUri)) return;
   
-  console.log('[useDominantColor] Preloading color for URI:', imageUri);
+  if (__DEV__) console.log('[useDominantColor] Preloading color for URI:', imageUri);
   
   try {
     // Fast first-pass: prioritize speed to avoid visible delay
@@ -157,7 +157,7 @@ export const preloadDominantColor = async (imageUri: string | null) => {
     const extractedColor = selectBestColor(result);
     colorCache.set(imageUri, extractedColor);
   } catch (err) {
-    console.warn('[preloadDominantColor] Failed to preload color:', err);
+    if (__DEV__) console.warn('[preloadDominantColor] Failed to preload color:', err);
     colorCache.set(imageUri, '#1a1a1a');
   }
 };
@@ -236,7 +236,7 @@ export const useDominantColor = (imageUri: string | null): DominantColorResult =
           // Ignore refine errors silently
         });
     } catch (err) {
-      console.warn('[useDominantColor] Failed to extract color:', err);
+      if (__DEV__) console.warn('[useDominantColor] Failed to extract color:', err);
       setError(err instanceof Error ? err.message : 'Failed to extract color');
       const fallbackColor = '#1a1a1a';
       colorCache.set(uri, fallbackColor); // Cache fallback to avoid repeated failures

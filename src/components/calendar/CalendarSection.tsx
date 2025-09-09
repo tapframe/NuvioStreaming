@@ -85,7 +85,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
 
   // Process episodes to identify dates with content
   useEffect(() => {
-    console.log(`[CalendarSection] Processing ${episodes.length} episodes for calendar dots`);
+    if (__DEV__) console.log(`[CalendarSection] Processing ${episodes.length} episodes for calendar dots`);
     const dateMap: { [key: string]: boolean } = {};
     
     episodes.forEach(episode => {
@@ -96,7 +96,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       }
     });
     
-    console.log(`[CalendarSection] Found ${Object.keys(dateMap).length} unique dates with episodes`);
+    if (__DEV__) console.log(`[CalendarSection] Found ${Object.keys(dateMap).length} unique dates with episodes`);
     setDatesWithEpisodes(dateMap);
   }, [episodes]);
 

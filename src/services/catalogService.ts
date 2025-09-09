@@ -844,18 +844,20 @@ class CatalogService {
   }
 
   async getStremioId(type: string, tmdbId: string): Promise<string | null> {
-    console.log('=== CatalogService.getStremioId ===');
-    console.log('Input type:', type);
-    console.log('Input tmdbId:', tmdbId);
+    if (__DEV__) {
+      console.log('=== CatalogService.getStremioId ===');
+      console.log('Input type:', type);
+      console.log('Input tmdbId:', tmdbId);
+    }
     
     try {
       // For movies, use the tt prefix with IMDb ID
       if (type === 'movie') {
-        console.log('Processing movie - fetching TMDB details...');
+        if (__DEV__) console.log('Processing movie - fetching TMDB details...');
         const tmdbService = TMDBService.getInstance();
         const movieDetails = await tmdbService.getMovieDetails(tmdbId);
         
-        console.log('Movie details result:', {
+        if (__DEV__) console.log('Movie details result:', {
           id: movieDetails?.id,
           title: movieDetails?.title,
           imdb_id: movieDetails?.imdb_id,
@@ -863,7 +865,7 @@ class CatalogService {
         });
         
         if (movieDetails?.imdb_id) {
-          console.log('Successfully found IMDb ID:', movieDetails.imdb_id);
+          if (__DEV__) console.log('Successfully found IMDb ID:', movieDetails.imdb_id);
           return movieDetails.imdb_id;
         } else {
           console.warn('No IMDb ID found for movie:', tmdbId);
@@ -872,25 +874,25 @@ class CatalogService {
       }
       // For TV shows, get the IMDb ID like movies
       else if (type === 'tv' || type === 'series') {
-        console.log('Processing TV show - fetching TMDB details for IMDb ID...');
+        if (__DEV__) console.log('Processing TV show - fetching TMDB details for IMDb ID...');
         const tmdbService = TMDBService.getInstance();
         
         // Get TV show external IDs to find IMDb ID
         const externalIds = await tmdbService.getShowExternalIds(parseInt(tmdbId));
         
-        console.log('TV show external IDs result:', {
+        if (__DEV__) console.log('TV show external IDs result:', {
           tmdbId: tmdbId,
           imdb_id: externalIds?.imdb_id,
           hasImdbId: !!externalIds?.imdb_id
         });
         
         if (externalIds?.imdb_id) {
-          console.log('Successfully found IMDb ID for TV show:', externalIds.imdb_id);
+          if (__DEV__) console.log('Successfully found IMDb ID for TV show:', externalIds.imdb_id);
           return externalIds.imdb_id;
         } else {
           console.warn('No IMDb ID found for TV show, falling back to kitsu format:', tmdbId);
           const fallbackId = `kitsu:${tmdbId}`;
-          console.log('Generated fallback Stremio ID for TV:', fallbackId);
+          if (__DEV__) console.log('Generated fallback Stremio ID for TV:', fallbackId);
           return fallbackId;
         }
       }
@@ -899,11 +901,13 @@ class CatalogService {
         return null;
       }
     } catch (error: any) {
-      console.error('=== Error in getStremioId ===');
-      console.error('Type:', type);
-      console.error('TMDB ID:', tmdbId);
-      console.error('Error details:', error);
-      console.error('Error message:', error.message);
+      if (__DEV__) {
+        console.error('=== Error in getStremioId ===');
+        console.error('Type:', type);
+        console.error('TMDB ID:', tmdbId);
+        console.error('Error details:', error);
+        console.error('Error message:', error.message);
+      }
       logger.error('Error getting Stremio ID:', error);
       return null;
     }

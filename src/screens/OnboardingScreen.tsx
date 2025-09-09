@@ -117,7 +117,7 @@ const OnboardingScreen = () => {
         navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
       }
     } catch (error) {
-      console.error('Error saving onboarding status:', error);
+      if (__DEV__) console.error('Error saving onboarding status:', error);
       navigation.reset({ index: 0, routes: [{ name: user ? 'MainTabs' : 'Account', params: !user ? ({ fromOnboarding: true } as any) : undefined }] });
     }
   };

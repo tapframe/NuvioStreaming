@@ -89,7 +89,7 @@ export const useMetadataAnimations = (safeAreaTop: number, watchProgress: any) =
       });
       } catch (error) {
         // Silently handle any animation errors
-        console.warn('Animation error in enterAnimations:', error);
+        if (__DEV__) console.warn('Animation error in enterAnimations:', error);
       }
     };
 
@@ -97,7 +97,7 @@ export const useMetadataAnimations = (safeAreaTop: number, watchProgress: any) =
     try {
     runOnUI(enterAnimations)();
     } catch (error) {
-      console.warn('Failed to run enter animations:', error);
+      if (__DEV__) console.warn('Failed to run enter animations:', error);
     }
   }, []);
   
@@ -114,14 +114,14 @@ export const useMetadataAnimations = (safeAreaTop: number, watchProgress: any) =
       easing: easings.fast
     });
       } catch (error) {
-        console.warn('Animation error in updateProgress:', error);
+        if (__DEV__) console.warn('Animation error in updateProgress:', error);
       }
     };
     
     try {
     runOnUI(updateProgress)();
     } catch (error) {
-      console.warn('Failed to run progress animation:', error);
+      if (__DEV__) console.warn('Failed to run progress animation:', error);
     }
   }, [watchProgress]);
   
@@ -140,7 +140,7 @@ export const useMetadataAnimations = (safeAreaTop: number, watchProgress: any) =
         cancelAnimation(headerProgress);
         cancelAnimation(staticHeaderElementsY);
       } catch (error) {
-        console.warn('Error canceling animations:', error);
+        if (__DEV__) console.warn('Error canceling animations:', error);
       }
     };
   }, []);
@@ -166,7 +166,7 @@ export const useMetadataAnimations = (safeAreaTop: number, watchProgress: any) =
         });
         }
       } catch (error) {
-        console.warn('Animation error in scroll handler:', error);
+        if (__DEV__) console.warn('Animation error in scroll handler:', error);
       }
     },
   });

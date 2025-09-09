@@ -244,7 +244,7 @@ const SettingsScreen: React.FC = () => {
       // Refresh auth status
       if (isAuthenticated || userProfile) {
         // Just to be cautious, log the current state
-        console.log('SettingsScreen focused, refreshing auth status. Current state:', { isAuthenticated, userProfile: userProfile?.username });
+        if (__DEV__) console.log('SettingsScreen focused, refreshing auth status. Current state:', { isAuthenticated, userProfile: userProfile?.username });
       }
       refreshAuthStatus();
     });
@@ -291,7 +291,7 @@ const SettingsScreen: React.FC = () => {
       setMdblistKeySet(!!mdblistKey);
       
     } catch (error) {
-      console.error('Error loading settings data:', error);
+      if (__DEV__) console.error('Error loading settings data:', error);
     }
   }, []);
 
@@ -343,7 +343,7 @@ const SettingsScreen: React.FC = () => {
               Alert.alert("Success", "MDBList cache has been cleared.");
             } catch (error) {
               Alert.alert("Error", "Could not clear MDBList cache.");
-              console.error('Error clearing MDBList cache:', error);
+              if (__DEV__) console.error('Error clearing MDBList cache:', error);
             }
           }
         }

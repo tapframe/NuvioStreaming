@@ -1,16 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Alert } from 'react-native';
-import UpdateService from '../services/updateService';
+import UpdateService, { UpdateInfo } from '../services/updateService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-interface UpdateInfo {
-  isAvailable: boolean;
-  manifest?: {
-    id: string;
-    version?: string;
-    description?: string;
-  };
-}
 
 interface UseUpdatePopupReturn {
   showUpdatePopup: boolean;
@@ -24,6 +15,7 @@ interface UseUpdatePopupReturn {
 
 const UPDATE_POPUP_STORAGE_KEY = '@update_popup_dismissed';
 const UPDATE_LATER_STORAGE_KEY = '@update_later_timestamp';
+const UPDATE_LAST_CHECK_TS_KEY = '@update_last_check_ts';
 
 export const useUpdatePopup = (): UseUpdatePopupReturn => {
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
@@ -59,7 +51,7 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
         setShowUpdatePopup(true);
       }
     } catch (error) {
-      console.error('Error checking for updates:', error);
+      if (__DEV__) console.error('Error checking for updates:', error);
       // Don't show popup on error, just log it
     }
   }, [updateInfo.manifest?.id]);
@@ -102,7 +94,7 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
         setShowUpdatePopup(true);
       }
     } catch (error) {
-      console.error('Error installing update:', error);
+      if (__DEV__) console.error('Error installing update:', error);
       Alert.alert(
         'Update Error',
         'An error occurred while installing the update. Please try again later.'
@@ -120,7 +112,7 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
       await AsyncStorage.setItem(UPDATE_LATER_STORAGE_KEY, Date.now().toString());
       setShowUpdatePopup(false);
     } catch (error) {
-      console.error('Error storing update later preference:', error);
+      if (__DEV__) console.error('Error storing update later preference:', error);
       setShowUpdatePopup(false);
     }
   }, []);
@@ -134,7 +126,7 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
       }
       setShowUpdatePopup(false);
     } catch (error) {
-      console.error('Error storing dismiss preference:', error);
+      if (__DEV__) console.error('Error storing dismiss preference:', error);
       setShowUpdatePopup(false);
     }
   }, [updateInfo.manifest?.id]);
@@ -143,7 +135,21 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
   useEffect(() => {
     // Add a small delay to ensure the app is fully loaded
     const timer = setTimeout(() => {
-      checkForUpdates();
+      (async () => {
+        try {
+          const lastCheckTs = await AsyncStorage.getItem(UPDATE_LAST_CHECK_TS_KEY);
+          const last = lastCheckTs ? parseInt(lastCheckTs, 10) : 0;
+          const now = Date.now();
+          const twentyFourHours = 24 * 60 * 60 * 1000;
+          if (now - last < twentyFourHours) {
+            return; // Throttle: only auto-check once per 24h
+          }
+          await checkForUpdates();
+          await AsyncStorage.setItem(UPDATE_LAST_CHECK_TS_KEY, String(now));
+        } catch {
+          // ignore
+        }
+      })();
     }, 2000); // 2 second delay
 
     return () => clearTimeout(timer);

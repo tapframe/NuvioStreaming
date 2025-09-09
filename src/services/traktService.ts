@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppState, AppStateStatus } from 'react-native';
 import { logger } from '../utils/logger';
 import { imageCacheService } from './imageCacheService';
 
@@ -260,7 +261,7 @@ export class TraktService {
   
   // Rate limiting
   private lastApiCall: number = 0;
-  private readonly MIN_API_INTERVAL = 2000; // Minimum 2 seconds between API calls (reduce heating)
+  private readonly MIN_API_INTERVAL = 3000; // Minimum 3 seconds between API calls (further reduce heating)
   private requestQueue: Array<() => Promise<any>> = [];
   private isProcessingQueue: boolean = false;
 
@@ -272,7 +273,7 @@ export class TraktService {
   // Track currently watching sessions to avoid duplicate starts// Sync debouncing
   private currentlyWatching: Set<string> = new Set();
   private lastSyncTimes: Map<string, number> = new Map();
-  private readonly SYNC_DEBOUNCE_MS = 15000; // 15 seconds to align with player save interval
+  private readonly SYNC_DEBOUNCE_MS = 20000; // 20 seconds to further reduce API calls
   
   // Debounce for stop calls
   private lastStopCalls: Map<string, number> = new Map();
@@ -284,6 +285,9 @@ export class TraktService {
   private constructor() {
     // Increased cleanup interval from 5 minutes to 15 minutes to reduce heating
     setInterval(() => this.cleanupOldStopCalls(), 15 * 60 * 1000); // Clean up every 15 minutes
+    
+    // Add AppState cleanup to reduce memory pressure
+    AppState.addEventListener('change', this.handleAppStateChange);
     
     // Load user settings
     this.loadCompletionThreshold();
@@ -1566,6 +1570,24 @@ export class TraktService {
       return [];
     }
   }
+
+  /**
+   * Handle app state changes to reduce memory pressure
+   */
+  private handleAppStateChange = (nextState: AppStateStatus) => {
+    if (nextState !== 'active') {
+      // Clear tracking maps to reduce memory pressure when app goes to background
+      this.scrobbledItems.clear();
+      this.scrobbledTimestamps.clear();
+      this.currentlyWatching.clear();
+      this.lastSyncTimes.clear();
+      this.lastStopCalls.clear();
+      
+      // Clear request queue to prevent background processing
+      this.requestQueue = [];
+      this.isProcessingQueue = false;
+    }
+  };
 }
 
 // Export a singleton instance

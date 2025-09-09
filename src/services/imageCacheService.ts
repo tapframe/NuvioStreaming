@@ -1,5 +1,6 @@
 import { logger } from '../utils/logger';
 import { Image as ExpoImage } from 'expo-image';
+import { AppState, AppStateStatus } from 'react-native';
 
 interface CachedImage {
   url: string;
@@ -14,16 +15,20 @@ interface CachedImage {
 class ImageCacheService {
   private cache = new Map<string, CachedImage>();
   private readonly CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
-  private readonly MAX_CACHE_SIZE = 100; // Increased maximum number of cached images
-  private readonly MAX_MEMORY_MB = 150; // Increased maximum memory usage in MB
+  private readonly MAX_CACHE_SIZE = 25; // Further reduced maximum number of cached images
+  private readonly MAX_MEMORY_MB = 40; // Further reduced maximum memory usage in MB
   private currentMemoryUsage = 0;
   private cleanupInterval: NodeJS.Timeout | null = null;
+  private appStateSubscription: any = null;
 
   constructor() {
-    // Start cleanup interval every 30 minutes (less churn)
+    // Start cleanup interval every 15 minutes (more frequent cleanup to reduce memory pressure)
     this.cleanupInterval = setInterval(() => {
       this.performCleanup();
-    }, 30 * 60 * 1000);
+    }, 15 * 60 * 1000);
+
+    // Reduce memory footprint when app goes to background
+    this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange);
   }
 
   /**
@@ -255,8 +260,32 @@ class ImageCacheService {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;
     }
+    if (this.appStateSubscription) {
+      this.appStateSubscription.remove();
+      this.appStateSubscription = null;
+    }
     this.clearAllCache();
   }
+
+  private handleAppStateChange = (nextState: AppStateStatus) => {
+    if (nextState !== 'active') {
+      // On background/inactive, aggressively trim cache to 25% to reduce memory pressure
+      const targetSize = Math.floor(this.MAX_CACHE_SIZE * 0.25);
+      if (this.cache.size > targetSize) {
+        const entries = Array.from(this.cache.entries());
+        const toRemove = this.cache.size - targetSize;
+        for (let i = 0; i < toRemove; i++) {
+          const [url, cached] = entries[i];
+          this.cache.delete(url);
+          this.currentMemoryUsage -= cached.size || 0;
+        }
+      }
+      // Force aggressive memory cleanup
+      this.enforceMemoryLimits();
+      // Clear any remaining memory pressure
+      this.currentMemoryUsage = Math.min(this.currentMemoryUsage, this.MAX_MEMORY_MB * 1024 * 1024 * 0.3);
+    }
+  };
 }
 
 export const imageCacheService = new ImageCacheService(); 

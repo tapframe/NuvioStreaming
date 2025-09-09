@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { StreamingContent } from '../types/metadata';
+import { StreamingContent } from '../services/catalogService';
 import { catalogService } from '../services/catalogService';
 
 const LEGACY_LIBRARY_STORAGE_KEY = 'stremio-library';
@@ -36,7 +36,7 @@ export const useLibrary = () => {
         }
       }
     } catch (error) {
-      console.error('Error loading library items:', error);
+      if (__DEV__) console.error('Error loading library items:', error);
     } finally {
       setLoading(false);
     }
@@ -56,7 +56,7 @@ export const useLibrary = () => {
       // keep legacy for backward-compat
       await AsyncStorage.setItem(LEGACY_LIBRARY_STORAGE_KEY, JSON.stringify(itemsObject));
     } catch (error) {
-      console.error('Error saving library items:', error);
+      if (__DEV__) console.error('Error saving library items:', error);
     }
   }, []);
 
@@ -66,7 +66,7 @@ export const useLibrary = () => {
       await catalogService.addToLibrary({ ...item, inLibrary: true });
       return true;
     } catch (e) {
-      console.error('Error adding to library via catalogService:', e);
+      if (__DEV__) console.error('Error adding to library via catalogService:', e);
       // Fallback local write
       const updatedItems = [...libraryItems, { ...item, inLibrary: true }];
       setLibraryItems(updatedItems);
@@ -82,7 +82,7 @@ export const useLibrary = () => {
       await catalogService.removeFromLibrary(type, id);
       return true;
     } catch (e) {
-      console.error('Error removing from library via catalogService:', e);
+      if (__DEV__) console.error('Error removing from library via catalogService:', e);
       // Fallback local write
       const updatedItems = libraryItems.filter(item => item.id !== id);
       setLibraryItems(updatedItems);
@@ -115,7 +115,7 @@ export const useLibrary = () => {
   // Subscribe to catalogService library updates
   useEffect(() => {
     const unsubscribe = catalogService.subscribeToLibraryUpdates((items) => {
-      console.log('[useLibrary] Received library update from catalogService:', items.length, 'items');
+      if (__DEV__) console.log('[useLibrary] Received library update from catalogService:', items.length, 'items');
       setLibraryItems(items);
       setLoading(false);
     });

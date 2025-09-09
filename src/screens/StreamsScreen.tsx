@@ -403,7 +403,7 @@ export const StreamsScreen = () => {
   }, []);
 
   useEffect(() => {
-    console.log('[StreamsScreen] Received thumbnail from params:', episodeThumbnail);
+    if (__DEV__) console.log('[StreamsScreen] Received thumbnail from params:', episodeThumbnail);
   }, [episodeThumbnail]);
 
   // Pause trailer when StreamsScreen is opened
@@ -1081,29 +1081,29 @@ export const StreamsScreen = () => {
                 return;
             }
             
-            console.log(`Attempting to open stream in ${settings.preferredPlayer}`);
+            if (__DEV__) console.log(`Attempting to open stream in ${settings.preferredPlayer}`);
             
             // Try each URL format in sequence
             const tryNextUrl = (index: number) => {
               if (index >= externalPlayerUrls.length) {
-                console.log(`All ${settings.preferredPlayer} formats failed, falling back to direct URL`);
+                if (__DEV__) console.log(`All ${settings.preferredPlayer} formats failed, falling back to direct URL`);
                 // Try direct URL as last resort
                 Linking.openURL(stream.url)
-                  .then(() => console.log('Opened with direct URL'))
+                  .then(() => { if (__DEV__) console.log('Opened with direct URL'); })
                   .catch(() => {
-                    console.log('Direct URL failed, falling back to built-in player');
+                    if (__DEV__) console.log('Direct URL failed, falling back to built-in player');
                     navigateToPlayer(stream);
                   });
                 return;
               }
               
               const url = externalPlayerUrls[index];
-              console.log(`Trying ${settings.preferredPlayer} URL format ${index + 1}: ${url}`);
+              if (__DEV__) console.log(`Trying ${settings.preferredPlayer} URL format ${index + 1}: ${url}`);
               
               Linking.openURL(url)
-                .then(() => console.log(`Successfully opened stream with ${settings.preferredPlayer} format ${index + 1}`))
+                .then(() => { if (__DEV__) console.log(`Successfully opened stream with ${settings.preferredPlayer} format ${index + 1}`); })
                 .catch(err => {
-                  console.log(`Format ${index + 1} failed: ${err.message}`, err);
+                  if (__DEV__) console.log(`Format ${index + 1} failed: ${err.message}`, err);
                   tryNextUrl(index + 1);
                 });
             };
@@ -1112,7 +1112,7 @@ export const StreamsScreen = () => {
             tryNextUrl(0);
             
           } catch (error) {
-            console.error(`Error with ${settings.preferredPlayer}:`, error);
+            if (__DEV__) console.error(`Error with ${settings.preferredPlayer}:`, error);
             // Fallback to the built-in player
             navigateToPlayer(stream);
           }
@@ -1120,18 +1120,18 @@ export const StreamsScreen = () => {
         // For Android with external player preference
         else if (Platform.OS === 'android' && settings.useExternalPlayer) {
           try {
-            console.log('Opening stream with Android native app chooser');
+            if (__DEV__) console.log('Opening stream with Android native app chooser');
             
             // For Android, determine if the URL is a direct http/https URL or a magnet link
             const isMagnet = stream.url.startsWith('magnet:');
             
             if (isMagnet) {
               // For magnet links, open directly which will trigger the torrent app chooser
-              console.log('Opening magnet link directly');
+              if (__DEV__) console.log('Opening magnet link directly');
               Linking.openURL(stream.url)
-                .then(() => console.log('Successfully opened magnet link'))
-                .catch(err => {
-                  console.error('Failed to open magnet link:', err);
+                .then(() => { if (__DEV__) console.log('Successfully opened magnet link'); })
+                  .catch(err => {
+                    if (__DEV__) console.error('Failed to open magnet link:', err);
                   // No good fallback for magnet links
                   navigateToPlayer(stream);
                 });
@@ -1145,12 +1145,12 @@ export const StreamsScreen = () => {
               });
               
               if (!success) {
-                console.log('VideoPlayerService failed, falling back to built-in player');
+                if (__DEV__) console.log('VideoPlayerService failed, falling back to built-in player');
                       navigateToPlayer(stream);
               }
             }
           } catch (error) {
-            console.error('Error with external player:', error);
+            if (__DEV__) console.error('Error with external player:', error);
             // Fallback to the built-in player
             navigateToPlayer(stream);
           }
@@ -1161,7 +1161,7 @@ export const StreamsScreen = () => {
         }
       }
     } catch (error) {
-      console.error('Error in handleStreamPress:', error);
+      if (__DEV__) console.error('Error in handleStreamPress:', error);
       // Final fallback: Use built-in player
       navigateToPlayer(stream);
     }

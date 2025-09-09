@@ -313,7 +313,7 @@ const AndroidVideoPlayer: React.FC = () => {
     const newScale = Math.max(1, Math.min(lastZoomScale * scale, 1.1));
     setZoomScale(newScale);
     if (DEBUG_MODE) {
-      logger.log(`[AndroidVideoPlayer] Center Zoom: ${newScale.toFixed(2)}x`);
+      if (__DEV__) logger.log(`[AndroidVideoPlayer] Center Zoom: ${newScale.toFixed(2)}x`);
     }
   };
 
@@ -321,7 +321,7 @@ const AndroidVideoPlayer: React.FC = () => {
     if (event.nativeEvent.state === State.END) {
       setLastZoomScale(zoomScale);
       if (DEBUG_MODE) {
-        logger.log(`[AndroidVideoPlayer] Pinch ended - saved scale: ${zoomScale.toFixed(2)}x`);
+        if (__DEV__) logger.log(`[AndroidVideoPlayer] Pinch ended - saved scale: ${zoomScale.toFixed(2)}x`);
       }
     }
   };
@@ -331,7 +331,7 @@ const AndroidVideoPlayer: React.FC = () => {
     setZoomScale(targetZoom);
     setLastZoomScale(targetZoom);
     if (DEBUG_MODE) {
-      logger.log(`[AndroidVideoPlayer] Zoom reset to ${targetZoom}x (16:9: ${is16by9Content})`);
+      if (__DEV__) logger.log(`[AndroidVideoPlayer] Zoom reset to ${targetZoom}x (16:9: ${is16by9Content})`);
     }
   };
 
@@ -345,7 +345,7 @@ const AndroidVideoPlayer: React.FC = () => {
       );
       setCustomVideoStyles(styles);
       if (DEBUG_MODE) {
-        logger.log(`[AndroidVideoPlayer] Screen dimensions changed, recalculated styles:`, styles);
+        if (__DEV__) logger.log(`[AndroidVideoPlayer] Screen dimensions changed, recalculated styles:`, styles);
       }
     }
   }, [screenDimensions, videoAspectRatio]);
@@ -439,7 +439,7 @@ const AndroidVideoPlayer: React.FC = () => {
     // Fallback: ensure animation completes even if something goes wrong
     setTimeout(() => {
       if (!isOpeningAnimationComplete) {
-        logger.warn('[AndroidVideoPlayer] Opening animation fallback triggered');
+        if (__DEV__) logger.warn('[AndroidVideoPlayer] Opening animation fallback triggered');
         setIsOpeningAnimationComplete(true);
         openingScaleAnim.setValue(1);
         openingFadeAnim.setValue(1);
@@ -452,40 +452,40 @@ const AndroidVideoPlayer: React.FC = () => {
     const loadWatchProgress = async () => {
       if (id && type) {
         try {
-          logger.log(`[AndroidVideoPlayer] Loading watch progress for ${type}:${id}${episodeId ? `:${episodeId}` : ''}`);
+          if (__DEV__) logger.log(`[AndroidVideoPlayer] Loading watch progress for ${type}:${id}${episodeId ? `:${episodeId}` : ''}`);
           const savedProgress = await storageService.getWatchProgress(id, type, episodeId);
-          logger.log(`[AndroidVideoPlayer] Saved progress:`, savedProgress);
+          if (__DEV__) logger.log(`[AndroidVideoPlayer] Saved progress:`, savedProgress);
           
           if (savedProgress) {
             const progressPercent = (savedProgress.currentTime / savedProgress.duration) * 100;
-            logger.log(`[AndroidVideoPlayer] Progress: ${progressPercent.toFixed(1)}% (${savedProgress.currentTime}/${savedProgress.duration})`);
+            if (__DEV__) logger.log(`[AndroidVideoPlayer] Progress: ${progressPercent.toFixed(1)}% (${savedProgress.currentTime}/${savedProgress.duration})`);
             
             if (progressPercent < 85) {
               setResumePosition(savedProgress.currentTime);
               setSavedDuration(savedProgress.duration);
-              logger.log(`[AndroidVideoPlayer] Set resume position to: ${savedProgress.currentTime} of ${savedProgress.duration}`);
+              if (__DEV__) logger.log(`[AndroidVideoPlayer] Set resume position to: ${savedProgress.currentTime} of ${savedProgress.duration}`);
               if (appSettings.alwaysResume) {
                 // Only prepare auto-resume state and seek when AlwaysResume is enabled
                 setInitialPosition(savedProgress.currentTime);
                 initialSeekTargetRef.current = savedProgress.currentTime;
-                logger.log(`[AndroidVideoPlayer] AlwaysResume enabled. Auto-seeking to ${savedProgress.currentTime}`);
+                if (__DEV__) logger.log(`[AndroidVideoPlayer] AlwaysResume enabled. Auto-seeking to ${savedProgress.currentTime}`);
                 seekToTime(savedProgress.currentTime);
               } else {
                 // Do not set initialPosition; start from beginning with no auto-seek
                 setShowResumeOverlay(true);
-                logger.log(`[AndroidVideoPlayer] AlwaysResume disabled. Not auto-seeking; overlay shown (if enabled)`);
+                if (__DEV__) logger.log(`[AndroidVideoPlayer] AlwaysResume disabled. Not auto-seeking; overlay shown (if enabled)`);
               }
             } else {
-              logger.log(`[AndroidVideoPlayer] Progress too high (${progressPercent.toFixed(1)}%), not showing resume overlay`);
+              if (__DEV__) logger.log(`[AndroidVideoPlayer] Progress too high (${progressPercent.toFixed(1)}%), not showing resume overlay`);
             }
           } else {
-            logger.log(`[AndroidVideoPlayer] No saved progress found`);
+            if (__DEV__) logger.log(`[AndroidVideoPlayer] No saved progress found`);
           }
         } catch (error) {
           logger.error('[AndroidVideoPlayer] Error loading watch progress:', error);
         }
       } else {
-        logger.log(`[AndroidVideoPlayer] Missing id or type: id=${id}, type=${type}`);
+        if (__DEV__) logger.log(`[AndroidVideoPlayer] Missing id or type: id=${id}, type=${type}`);
       }
     };
     loadWatchProgress();
@@ -545,7 +545,7 @@ const AndroidVideoPlayer: React.FC = () => {
     const timeInSeconds = Math.max(0, Math.min(rawSeconds, duration > 0 ? duration - END_EPSILON : rawSeconds));
     if (videoRef.current && duration > 0 && !isSeeking.current) {
       if (DEBUG_MODE) {
-        logger.log(`[AndroidVideoPlayer] Seeking to ${timeInSeconds.toFixed(2)}s out of ${duration.toFixed(2)}s`);
+        if (__DEV__) logger.log(`[AndroidVideoPlayer] Seeking to ${timeInSeconds.toFixed(2)}s out of ${duration.toFixed(2)}s`);
       }
       
       isSeeking.current = true;
@@ -779,7 +779,7 @@ const AndroidVideoPlayer: React.FC = () => {
           NativeModules.StatusBarManager.setHidden(true);
         }
       } catch (error) {
-        console.log('Immersive mode error:', error);
+        if (__DEV__) console.log('Immersive mode error:', error);
       }
     }
   };

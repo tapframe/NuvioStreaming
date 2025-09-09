@@ -137,7 +137,7 @@ class SyncService {
         logger.log('[Sync] fullPull (debounced) start');
         this.fullPull()
           .then(() => logger.log('[Sync] fullPull (debounced) done'))
-          .catch((e) => console.warn('[Sync] fullPull (debounced) error', e));
+          .catch((e) => { if (__DEV__) console.warn('[Sync] fullPull (debounced) error', e); });
       }, 300);
     };
 
@@ -168,7 +168,7 @@ class SyncService {
           logger.log(`[Sync][rt] user_library ${payload.eventType} ${mediaType}:${mediaId}`);
         }
       } catch (e) {
-        console.warn('[Sync][rt] user_library handler error', e);
+        if (__DEV__) console.warn('[Sync][rt] user_library handler error', e);
       } finally {
         this.suppressLibraryPush = false;
       }
@@ -455,7 +455,7 @@ class SyncService {
         .select('media_type, media_id, title, poster_url, year, deleted_at, updated_at')
         .eq('user_id', userId);
       if (error) {
-        console.warn('[SyncService] pull library error', error);
+        if (__DEV__) console.warn('[SyncService] pull library error', error);
         return;
       }
       const obj: Record<string, any> = {};
@@ -475,7 +475,7 @@ class SyncService {
       await AsyncStorage.setItem('stremio-library', JSON.stringify(obj));
       logger.log(`[Sync] pull user_library wrote items=${Object.keys(obj).length}`);
     } catch (e) {
-      console.warn('[SyncService] pullLibrary exception', e);
+      if (__DEV__) console.warn('[SyncService] pullLibrary exception', e);
     }
   }
 
@@ -516,12 +516,12 @@ class SyncService {
         const { error: upErr } = await supabase
           .from('user_library')
           .upsert(rows, { onConflict: 'user_id,media_type,media_id' });
-        if (upErr) console.warn('[SyncService] push library upsert error', upErr);
+        if (upErr && __DEV__) console.warn('[SyncService] push library upsert error', upErr);
         else await AsyncStorage.setItem(`@user:${user.id}:library_initialized`, 'true');
       }
       // No computed deletions; removals happen only via explicit user action (soft delete)
     } catch (e) {
-      console.warn('[SyncService] pushLibrary exception', e);
+      if (__DEV__) console.warn('[SyncService] pushLibrary exception', e);
     }
   }
 
@@ -540,9 +540,9 @@ class SyncService {
         updated_at: new Date().toISOString(),
       };
       const { error } = await supabase.from('user_library').upsert(row, { onConflict: 'user_id,media_type,media_id' });
-      if (error) console.warn('[SyncService] pushLibraryAdd error', error);
+      if (error && __DEV__) console.warn('[SyncService] pushLibraryAdd error', error);
     } catch (e) {
-      console.warn('[SyncService] pushLibraryAdd exception', e);
+      if (__DEV__) console.warn('[SyncService] pushLibraryAdd exception', e);
     }
   }
 
@@ -556,9 +556,9 @@ class SyncService {
         .eq('user_id', user.id)
         .eq('media_type', type === 'movie' ? 'movie' : 'series')
         .eq('media_id', id);
-      if (error) console.warn('[SyncService] pushLibraryRemove error', error);
+      if (error && __DEV__) console.warn('[SyncService] pushLibraryRemove error', error);
     } catch (e) {
-      console.warn('[SyncService] pushLibraryRemove exception', e);
+      if (__DEV__) console.warn('[SyncService] pushLibraryRemove exception', e);
     }
   }
 
@@ -570,7 +570,7 @@ class SyncService {
       .eq('user_id', userId)
       .order('position', { ascending: true });
     if (addonsErr) {
-      console.warn('[SyncService] pull addons error', addonsErr);
+      if (__DEV__) console.warn('[SyncService] pull addons error', addonsErr);
       return;
     }
     if (!(addons && Array.isArray(addons))) return;
@@ -603,7 +603,7 @@ class SyncService {
         manifest.id = a.addon_id;
         map.set(a.addon_id, manifest);
       } catch (e) {
-        console.warn('[SyncService] failed to fetch manifest for', a.addon_id, e);
+        if (__DEV__) console.warn('[SyncService] failed to fetch manifest for', a.addon_id, e);
       }
     }
 
@@ -715,7 +715,7 @@ class SyncService {
           const { error } = await supabase
             .from('watch_progress')
             .upsert(filteredRows, { onConflict: 'user_id,media_type,media_id,episode_id' });
-          if (error) console.warn('[SyncService] push watch_progress error', error);
+          if (error && __DEV__) console.warn('[SyncService] push watch_progress error', error);
           else logger.log('[Sync] push watch_progress upsert ok');
         }
       } catch (e) {
@@ -723,7 +723,7 @@ class SyncService {
         const { error } = await supabase
           .from('watch_progress')
           .upsert(rows, { onConflict: 'user_id,media_type,media_id,episode_id' });
-        if (error) console.warn('[SyncService] push watch_progress error', error);
+        if (error && __DEV__) console.warn('[SyncService] push watch_progress error', error);
         else logger.log('[Sync] push watch_progress upsert ok');
       }
     }
@@ -742,9 +742,9 @@ class SyncService {
         .eq('media_type', type)
         .eq('media_id', id)
         .eq('episode_id', episodeId || '');
-      if (error) console.warn('[SyncService] softDeleteWatchProgress error', error);
+      if (error && __DEV__) console.warn('[SyncService] softDeleteWatchProgress error', error);
     } catch (e) {
-      console.warn('[SyncService] softDeleteWatchProgress exception', e);
+      if (__DEV__) console.warn('[SyncService] softDeleteWatchProgress exception', e);
     }
   }
 
@@ -767,7 +767,7 @@ class SyncService {
       app_settings: appSettings,
       subtitle_settings: subtitleSettings,
     });
-    if (error) console.warn('[SyncService] push settings error', error);
+    if (error && __DEV__) console.warn('[SyncService] push settings error', error);
     else logger.log('[Sync] push user_settings ok');
   }
 
@@ -807,14 +807,14 @@ class SyncService {
             .delete()
             .eq('user_id', userId)
             .in('addon_id', toDelete);
-          if (del.error) console.warn('[SyncService] delete addons error', del.error);
+          if (del.error && __DEV__) console.warn('[SyncService] delete addons error', del.error);
         }
       }
     } catch (e) {
-      console.warn('[SyncService] deletion sync for addons failed', e);
+      if (__DEV__) console.warn('[SyncService] deletion sync for addons failed', e);
     }
     const { error } = await supabase.from('installed_addons').upsert(rows, { onConflict: 'user_id,addon_id' });
-    if (error) console.warn('[SyncService] push addons error', error);
+    if (error && __DEV__) console.warn('[SyncService] push addons error', error);
   }
 
   // Excluded: pushLocalScrapers (local scrapers are device-local only)

@@ -79,7 +79,7 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
         throw new Error('Could not find Stremio ID');
       }
     } catch (error) {
-      console.error('Error navigating to recommendation:', error);
+      if (__DEV__) console.error('Error navigating to recommendation:', error);
       Alert.alert(
         'Error',
         'Unable to load this content. Please try again later.',

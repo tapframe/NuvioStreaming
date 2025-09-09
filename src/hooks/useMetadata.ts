@@ -143,7 +143,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     const logPrefix = isEpisode ? 'loadEpisodeStreams' : 'loadStreams';
     const sourceName = 'stremio';
     
-    logger.log(`🔍 [${logPrefix}:${sourceName}] Starting fetch`);
+    if (__DEV__) logger.log(`🔍 [${logPrefix}:${sourceName}] Starting fetch`);
 
     try {
       await stremioService.getStreams(type, id, 
@@ -180,12 +180,12 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
           if (error) {
             logger.error(`❌ [${logPrefix}:${sourceName}] Error for addon ${addonName} (${addonId}):`, error);
           } else if (streams && addonId && addonName) {
-            logger.log(`✅ [${logPrefix}:${sourceName}] Received ${streams.length} streams from ${addonName} (${addonId}) after ${processTime}ms`);
+            if (__DEV__) logger.log(`✅ [${logPrefix}:${sourceName}] Received ${streams.length} streams from ${addonName} (${addonId}) after ${processTime}ms`);
             
             if (streams.length > 0) {
               // Use the streams directly as they are already processed by stremioService
               const updateState = (prevState: GroupedStreams): GroupedStreams => {
-                 logger.log(`🔄 [${logPrefix}:${sourceName}] Updating state for addon ${addonName} (${addonId})`);
+                 if (__DEV__) logger.log(`🔄 [${logPrefix}:${sourceName}] Updating state for addon ${addonName} (${addonId})`);
                  return {
                    ...prevState,
                    [addonId]: {
@@ -205,16 +205,16 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
                 setLoadingStreams(false);
               }
             } else {
-               logger.log(`🤷 [${logPrefix}:${sourceName}] No streams found for addon ${addonName} (${addonId})`);
+               if (__DEV__) logger.log(`🤷 [${logPrefix}:${sourceName}] No streams found for addon ${addonName} (${addonId})`);
             }
           } else {
             // Handle case where callback provides null streams without error (e.g., empty results)
-            logger.log(`🏁 [${logPrefix}:${sourceName}] Finished fetching for addon ${addonName} (${addonId}) with no streams after ${processTime}ms`);
+            if (__DEV__) logger.log(`🏁 [${logPrefix}:${sourceName}] Finished fetching for addon ${addonName} (${addonId}) with no streams after ${processTime}ms`);
           }
         }
       );
       // The function now returns void, just await to let callbacks fire
-      logger.log(`🏁 [${logPrefix}:${sourceName}] Stremio fetching process initiated`);
+      if (__DEV__) logger.log(`🏁 [${logPrefix}:${sourceName}] Stremio fetching process initiated`);
     } catch (error) {
        // Catch errors from the initial call to getStreams (e.g., initialization errors)
        logger.error(`❌ [${logPrefix}:${sourceName}] Initial call failed:`, error);
@@ -225,13 +225,13 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
   };
 
   const loadCast = async () => {
-    logger.log('[loadCast] Starting cast fetch for:', id);
+    if (__DEV__) logger.log('[loadCast] Starting cast fetch for:', id);
     setLoadingCast(true);
     try {
       // Check cache first
       const cachedCast = cacheService.getCast(id, type);
       if (cachedCast) {
-        logger.log('[loadCast] Using cached cast data');
+        if (__DEV__) logger.log('[loadCast] Using cached cast data');
         setCast(cachedCast);
         setLoadingCast(false);
         return;
@@ -240,7 +240,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       // Handle TMDB IDs
       if (id.startsWith('tmdb:')) {
         const tmdbId = id.split(':')[1];
-        logger.log('[loadCast] Using TMDB ID directly:', tmdbId);
+        if (__DEV__) logger.log('[loadCast] Using TMDB ID directly:', tmdbId);
         const castData = await tmdbService.getCredits(parseInt(tmdbId), type);
         if (castData && castData.cast) {
           const formattedCast = castData.cast.map((actor: any) => ({
@@ -249,7 +249,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             character: actor.character,
             profile_path: actor.profile_path
           }));
-          logger.log(`[loadCast] Found ${formattedCast.length} cast members from TMDB`);
+          if (__DEV__) logger.log(`[loadCast] Found ${formattedCast.length} cast members from TMDB`);
           setCast(formattedCast);
           cacheService.setCast(id, type, formattedCast);
           setLoadingCast(false);
@@ -260,12 +260,12 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       // Handle IMDb IDs or convert to TMDB ID
       let tmdbId;
       if (id.startsWith('tt')) {
-        logger.log('[loadCast] Converting IMDb ID to TMDB ID');
+        if (__DEV__) logger.log('[loadCast] Converting IMDb ID to TMDB ID');
         tmdbId = await tmdbService.findTMDBIdByIMDB(id);
       }
 
       if (tmdbId) {
-        logger.log('[loadCast] Fetching cast using TMDB ID:', tmdbId);
+        if (__DEV__) logger.log('[loadCast] Fetching cast using TMDB ID:', tmdbId);
         const castData = await tmdbService.getCredits(tmdbId, type);
         if (castData && castData.cast) {
           const formattedCast = castData.cast.map((actor: any) => ({
@@ -274,12 +274,12 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             character: actor.character,
             profile_path: actor.profile_path
           }));
-          logger.log(`[loadCast] Found ${formattedCast.length} cast members`);
+          if (__DEV__) logger.log(`[loadCast] Found ${formattedCast.length} cast members`);
           setCast(formattedCast);
           cacheService.setCast(id, type, formattedCast);
         }
       } else {
-        logger.warn('[loadCast] Could not find TMDB ID for cast fetch');
+        if (__DEV__) logger.warn('[loadCast] Could not find TMDB ID for cast fetch');
       }
     } catch (error) {
       logger.error('[loadCast] Failed to load cast:', error);
@@ -325,7 +325,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         const tmdbId = id.split(':')[1];
         // For TMDB IDs, we need to handle metadata differently
         if (type === 'movie') {
-          logger.log('Fetching movie details from TMDB for:', tmdbId);
+          if (__DEV__) logger.log('Fetching movie details from TMDB for:', tmdbId);
           const movieDetails = await tmdbService.getMovieDetails(tmdbId);
           if (movieDetails) {
             const imdbId = movieDetails.imdb_id || movieDetails.external_ids?.imdb_id;
@@ -388,7 +388,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
           }
         } else if (type === 'series') {
           // Handle TV shows with TMDB IDs
-          logger.log('Fetching TV show details from TMDB for:', tmdbId);
+          if (__DEV__) logger.log('Fetching TV show details from TMDB for:', tmdbId);
           try {
             const showDetails = await tmdbService.getTVShowDetails(parseInt(tmdbId));
             if (showDetails) {
@@ -443,7 +443,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
                   const logoUrl = await tmdbService.getTvShowImages(tmdbId);
                   if (logoUrl) {
                     formattedShow.logo = logoUrl;
-                    logger.log(`Successfully fetched logo for TV show ${tmdbId} from TMDB`);
+                    if (__DEV__) logger.log(`Successfully fetched logo for TV show ${tmdbId} from TMDB`);
                   }
                 } catch (error) {
                   logger.error('Failed to fetch logo from TMDB:', error);
@@ -455,7 +455,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
                 
                 // Load series data (episodes)
                 setTmdbId(parseInt(tmdbId));
-                loadSeriesData().catch(console.error);
+                loadSeriesData().catch((error) => { if (__DEV__) console.error(error); });
                 
                 const isInLib = catalogService.getLibraryItems().some(item => item.id === id);
                 setInLibrary(isInLib);
@@ -502,7 +502,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         throw new Error('Content not found');
       }
     } catch (error) {
-      console.error('Failed to load metadata:', error);
+      if (__DEV__) console.error('Failed to load metadata:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to load content';
       setError(errorMessage);
       
@@ -522,7 +522,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       // First check if we have episode data from the addon
       const addonVideos = metadata?.videos;
       if (addonVideos && Array.isArray(addonVideos) && addonVideos.length > 0) {
-        logger.log(`🎬 Found ${addonVideos.length} episodes from addon metadata for ${metadata?.name || id}`);
+        if (__DEV__) logger.log(`🎬 Found ${addonVideos.length} episodes from addon metadata for ${metadata?.name || id}`);
         
         // Group addon episodes by season
         const groupedAddonEpisodes: GroupedEpisodes = {};
@@ -562,7 +562,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
           groupedAddonEpisodes[parseInt(season)].sort((a, b) => a.episode_number - b.episode_number);
         });
         
-        logger.log(`📺 Processed addon episodes into ${Object.keys(groupedAddonEpisodes).length} seasons`);
+        if (__DEV__) logger.log(`📺 Processed addon episodes into ${Object.keys(groupedAddonEpisodes).length} seasons`);
         
         // Fetch season posters from TMDB
         try {
@@ -582,7 +582,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
                   }));
                 }
               });
-              logger.log('🖼️ Successfully fetched and attached TMDB season posters to addon episodes.');
+              if (__DEV__) logger.log('🖼️ Successfully fetched and attached TMDB season posters to addon episodes.');
             }
           }
         } catch (error) {
@@ -697,7 +697,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         setEpisodes(transformedEpisodes[selectedSeasonNumber] || []);
       }
     } catch (error) {
-      console.error('Failed to load episodes:', error);
+      if (__DEV__) console.error('Failed to load episodes:', error);
     } finally {
       setLoadingSeasons(false);
     }
@@ -724,7 +724,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
   const loadStreams = async () => {
     const startTime = Date.now();
     try {
-      console.log('🚀 [loadStreams] START - Loading streams for:', id);
+      if (__DEV__) console.log('🚀 [loadStreams] START - Loading streams for:', id);
       updateLoadingState();
       
       // Reset scraper tracking
@@ -732,21 +732,21 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       setActiveFetchingScrapers([]);
 
       // Get TMDB ID for external sources and determine the correct ID for Stremio addons
-      console.log('🔍 [loadStreams] Getting TMDB ID for:', id);
+      if (__DEV__) console.log('🔍 [loadStreams] Getting TMDB ID for:', id);
       let tmdbId;
       let stremioId = id; // Default to original ID
       
       if (id.startsWith('tmdb:')) {
         tmdbId = id.split(':')[1];
-        console.log('✅ [loadStreams] Using TMDB ID from ID:', tmdbId);
+        if (__DEV__) console.log('✅ [loadStreams] Using TMDB ID from ID:', tmdbId);
         
         // Try to get IMDb ID from metadata first, then convert if needed
         if (metadata?.imdb_id) {
           stremioId = metadata.imdb_id;
-          console.log('✅ [loadStreams] Using IMDb ID from metadata for Stremio:', stremioId);
+          if (__DEV__) console.log('✅ [loadStreams] Using IMDb ID from metadata for Stremio:', stremioId);
         } else if (imdbId) {
           stremioId = imdbId;
-          console.log('✅ [loadStreams] Using stored IMDb ID for Stremio:', stremioId);
+          if (__DEV__) console.log('✅ [loadStreams] Using stored IMDb ID for Stremio:', stremioId);
         } else {
           // Convert TMDB ID to IMDb ID for Stremio addons (they expect IMDb format)
           try {
@@ -760,24 +760,24 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             
             if (externalIds?.imdb_id) {
               stremioId = externalIds.imdb_id;
-              console.log('✅ [loadStreams] Converted TMDB to IMDb ID for Stremio:', stremioId);
+              if (__DEV__) console.log('✅ [loadStreams] Converted TMDB to IMDb ID for Stremio:', stremioId);
             } else {
-              console.log('⚠️ [loadStreams] No IMDb ID found for TMDB ID, using original:', stremioId);
+              if (__DEV__) console.log('⚠️ [loadStreams] No IMDb ID found for TMDB ID, using original:', stremioId);
             }
           } catch (error) {
-            console.log('⚠️ [loadStreams] Failed to convert TMDB to IMDb, using original ID:', error);
+            if (__DEV__) console.log('⚠️ [loadStreams] Failed to convert TMDB to IMDb, using original ID:', error);
           }
         }
       } else if (id.startsWith('tt')) {
         // This is already an IMDB ID, perfect for Stremio
         stremioId = id;
-        console.log('📝 [loadStreams] Converting IMDB ID to TMDB ID...');
+        if (__DEV__) console.log('📝 [loadStreams] Converting IMDB ID to TMDB ID...');
         tmdbId = await withTimeout(tmdbService.findTMDBIdByIMDB(id), API_TIMEOUT);
-        console.log('✅ [loadStreams] Converted to TMDB ID:', tmdbId);
+        if (__DEV__) console.log('✅ [loadStreams] Converted to TMDB ID:', tmdbId);
       } else {
         tmdbId = id;
         stremioId = id;
-        console.log('ℹ️ [loadStreams] Using ID as both TMDB and Stremio ID:', tmdbId);
+        if (__DEV__) console.log('ℹ️ [loadStreams] Using ID as both TMDB and Stremio ID:', tmdbId);
       }
       
       // Initialize scraper tracking
@@ -851,11 +851,11 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
          setScraperStatuses(initialStatuses);
          setActiveFetchingScrapers(initialActiveFetching);
        } catch (error) {
-         console.error('Failed to initialize scraper tracking:', error);
+         if (__DEV__) console.error('Failed to initialize scraper tracking:', error);
        }
       
       // Start Stremio request using the converted ID format
-      console.log('🎬 [loadStreams] Using ID for Stremio addons:', stremioId);
+      if (__DEV__) console.log('🎬 [loadStreams] Using ID for Stremio addons:', stremioId);
       processStremioSource(type, stremioId, false);
       
       // Monitor scraper completion status instead of using fixed timeout
@@ -881,7 +881,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       }, 30000);
 
     } catch (error) {
-      console.error('❌ [loadStreams] Failed to load streams:', error);
+      if (__DEV__) console.error('❌ [loadStreams] Failed to load streams:', error);
       setError('Failed to load streams');
       setLoadingStreams(false);
     }
@@ -890,7 +890,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
   const loadEpisodeStreams = async (episodeId: string) => {
     const startTime = Date.now();
     try {
-      console.log('🚀 [loadEpisodeStreams] START - Loading episode streams for:', episodeId);
+      if (__DEV__) console.log('🚀 [loadEpisodeStreams] START - Loading episode streams for:', episodeId);
       updateEpisodeLoadingState();
       
       // Reset scraper tracking for episodes
@@ -968,28 +968,28 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
          setScraperStatuses(initialStatuses);
          setActiveFetchingScrapers(initialActiveFetching);
        } catch (error) {
-         console.error('Failed to initialize episode scraper tracking:', error);
+         if (__DEV__) console.error('Failed to initialize episode scraper tracking:', error);
        }
 
       // Get TMDB ID for external sources and determine the correct ID for Stremio addons
-      console.log('🔍 [loadEpisodeStreams] Getting TMDB ID for:', id);
+      if (__DEV__) console.log('🔍 [loadEpisodeStreams] Getting TMDB ID for:', id);
       let tmdbId;
       let stremioEpisodeId = episodeId; // Default to original episode ID
       
       if (id.startsWith('tmdb:')) {
         tmdbId = id.split(':')[1];
-        console.log('✅ [loadEpisodeStreams] Using TMDB ID from ID:', tmdbId);
+        if (__DEV__) console.log('✅ [loadEpisodeStreams] Using TMDB ID from ID:', tmdbId);
         
         // Try to get IMDb ID from metadata first, then convert if needed
         if (metadata?.imdb_id) {
           // Replace the series ID in episodeId with the IMDb ID
           const [, season, episode] = episodeId.split(':');
           stremioEpisodeId = `series:${metadata.imdb_id}:${season}:${episode}`;
-          console.log('✅ [loadEpisodeStreams] Using IMDb ID from metadata for Stremio episode:', stremioEpisodeId);
+          if (__DEV__) console.log('✅ [loadEpisodeStreams] Using IMDb ID from metadata for Stremio episode:', stremioEpisodeId);
         } else if (imdbId) {
           const [, season, episode] = episodeId.split(':');
           stremioEpisodeId = `series:${imdbId}:${season}:${episode}`;
-          console.log('✅ [loadEpisodeStreams] Using stored IMDb ID for Stremio episode:', stremioEpisodeId);
+          if (__DEV__) console.log('✅ [loadEpisodeStreams] Using stored IMDb ID for Stremio episode:', stremioEpisodeId);
         } else {
           // Convert TMDB ID to IMDb ID for Stremio addons
           try {
@@ -998,33 +998,33 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             if (externalIds?.imdb_id) {
               const [, season, episode] = episodeId.split(':');
               stremioEpisodeId = `series:${externalIds.imdb_id}:${season}:${episode}`;
-              console.log('✅ [loadEpisodeStreams] Converted TMDB to IMDb ID for Stremio episode:', stremioEpisodeId);
+              if (__DEV__) console.log('✅ [loadEpisodeStreams] Converted TMDB to IMDb ID for Stremio episode:', stremioEpisodeId);
             } else {
-              console.log('⚠️ [loadEpisodeStreams] No IMDb ID found for TMDB ID, using original episode ID:', stremioEpisodeId);
+              if (__DEV__) console.log('⚠️ [loadEpisodeStreams] No IMDb ID found for TMDB ID, using original episode ID:', stremioEpisodeId);
             }
           } catch (error) {
-            console.log('⚠️ [loadEpisodeStreams] Failed to convert TMDB to IMDb, using original episode ID:', error);
+            if (__DEV__) console.log('⚠️ [loadEpisodeStreams] Failed to convert TMDB to IMDb, using original episode ID:', error);
           }
         }
       } else if (id.startsWith('tt')) {
         // This is already an IMDB ID, perfect for Stremio
-        console.log('📝 [loadEpisodeStreams] Converting IMDB ID to TMDB ID...');
+        if (__DEV__) console.log('📝 [loadEpisodeStreams] Converting IMDB ID to TMDB ID...');
         tmdbId = await withTimeout(tmdbService.findTMDBIdByIMDB(id), API_TIMEOUT);
-        console.log('✅ [loadEpisodeStreams] Converted to TMDB ID:', tmdbId);
+        if (__DEV__) console.log('✅ [loadEpisodeStreams] Converted to TMDB ID:', tmdbId);
       } else {
         tmdbId = id;
-        console.log('ℹ️ [loadEpisodeStreams] Using ID as both TMDB and Stremio ID:', tmdbId);
+        if (__DEV__) console.log('ℹ️ [loadEpisodeStreams] Using ID as both TMDB and Stremio ID:', tmdbId);
       }
 
       // Extract episode info from the episodeId for logging
       const [, season, episode] = episodeId.split(':');
       const episodeQuery = `?s=${season}&e=${episode}`;
-      console.log(`ℹ️ [loadEpisodeStreams] Episode query: ${episodeQuery}`);
+      if (__DEV__) console.log(`ℹ️ [loadEpisodeStreams] Episode query: ${episodeQuery}`);
 
-      console.log('🔄 [loadEpisodeStreams] Starting stream requests');
+      if (__DEV__) console.log('🔄 [loadEpisodeStreams] Starting stream requests');
       
       // Start Stremio request using the converted episode ID format
-      console.log('🎬 [loadEpisodeStreams] Using episode ID for Stremio addons:', stremioEpisodeId);
+      if (__DEV__) console.log('🎬 [loadEpisodeStreams] Using episode ID for Stremio addons:', stremioEpisodeId);
       processStremioSource('series', stremioEpisodeId, true);
       
       // Monitor scraper completion status instead of using fixed timeout
@@ -1040,7 +1040,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       };
       
       // Check completion less frequently to reduce CPU load
-      const episodeCompletionInterval = setInterval(checkEpisodeScrapersCompletion, 2000);
+      const episodeCompletionInterval = setInterval(checkEpisodeScrapersCompletion, 3000);
       
       // Fallback timeout after 30 seconds
       const episodeFallbackTimeout = setTimeout(() => {
@@ -1050,7 +1050,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       }, 30000);
 
     } catch (error) {
-      console.error('❌ [loadEpisodeStreams] Failed to load episode streams:', error);
+      if (__DEV__) console.error('❌ [loadEpisodeStreams] Failed to load episode streams:', error);
       setError('Failed to load episode streams');
       setLoadingEpisodeStreams(false);
     }
@@ -1103,7 +1103,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
   useEffect(() => {
     if (metadata && type === 'series' && metadata.videos && metadata.videos.length > 0) {
       logger.log(`🎬 Metadata updated with ${metadata.videos.length} episodes, reloading series data`);
-      loadSeriesData().catch(console.error);
+      loadSeriesData().catch((error) => { if (__DEV__) console.error(error); });
     }
   }, [metadata?.videos, type]);
 
@@ -1126,7 +1126,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       
       setRecommendations(formattedRecommendations);
     } catch (error) {
-      console.error('Failed to load recommendations:', error);
+      if (__DEV__) console.error('Failed to load recommendations:', error);
       setRecommendations([]);
     } finally {
       setLoadingRecommendations(false);
@@ -1141,24 +1141,24 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
           const tmdbService = TMDBService.getInstance();
           const fetchedTmdbId = await tmdbService.extractTMDBIdFromStremioId(id);
           if (fetchedTmdbId) {
-            console.log('[useMetadata] extracted TMDB id from content id', { id, fetchedTmdbId });
+            if (__DEV__) console.log('[useMetadata] extracted TMDB id from content id', { id, fetchedTmdbId });
             setTmdbId(fetchedTmdbId);
             // Fetch certification
             const certification = await tmdbService.getCertification(type, fetchedTmdbId);
             if (certification) {
-              console.log('[useMetadata] fetched certification via TMDB id (extract path)', { type, fetchedTmdbId, certification });
+              if (__DEV__) console.log('[useMetadata] fetched certification via TMDB id (extract path)', { type, fetchedTmdbId, certification });
               setMetadata(prev => prev ? {
                 ...prev,
                 certification
               } : null);
             } else {
-              console.warn('[useMetadata] certification not returned from TMDB (extract path)', { type, fetchedTmdbId });
+              if (__DEV__) console.warn('[useMetadata] certification not returned from TMDB (extract path)', { type, fetchedTmdbId });
             }
           } else {
-            console.warn('[useMetadata] Could not determine TMDB ID for recommendations / certification', { id });
+            if (__DEV__) console.warn('[useMetadata] Could not determine TMDB ID for recommendations / certification', { id });
           }
         } catch (error) {
-          console.error('[useMetadata] Error fetching TMDB ID (extract path):', error);
+          if (__DEV__) console.error('[useMetadata] Error fetching TMDB ID (extract path):', error);
         }
       }
     };
@@ -1168,7 +1168,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
   useEffect(() => {
     if (tmdbId) {
-      console.log('[useMetadata] tmdbId available; loading recommendations and enabling certification checks', { tmdbId });
+      if (__DEV__) console.log('[useMetadata] tmdbId available; loading recommendations and enabling certification checks', { tmdbId });
       loadRecommendations();
       // Reset recommendations when tmdbId changes
       return () => {
@@ -1183,27 +1183,27 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     const maybeAttachCertification = async () => {
       try {
         if (!metadata) {
-          console.warn('[useMetadata] skip certification attach: metadata not ready');
+          if (__DEV__) console.warn('[useMetadata] skip certification attach: metadata not ready');
           return;
         }
         if (!tmdbId) {
-          console.warn('[useMetadata] skip certification attach: tmdbId not available yet');
+          if (__DEV__) console.warn('[useMetadata] skip certification attach: tmdbId not available yet');
           return;
         }
         if ((metadata as any).certification) {
-          console.log('[useMetadata] certification already present on metadata; skipping fetch');
+          if (__DEV__) console.log('[useMetadata] certification already present on metadata; skipping fetch');
           return;
         }
         const tmdbSvc = TMDBService.getInstance();
         const cert = await tmdbSvc.getCertification(type, tmdbId);
         if (cert) {
-          console.log('[useMetadata] fetched certification (attach path)', { type, tmdbId, cert });
+          if (__DEV__) console.log('[useMetadata] fetched certification (attach path)', { type, tmdbId, cert });
           setMetadata(prev => prev ? { ...prev, certification: cert } : prev);
         } else {
-          console.warn('[useMetadata] TMDB returned no certification (attach path)', { type, tmdbId });
+          if (__DEV__) console.warn('[useMetadata] TMDB returned no certification (attach path)', { type, tmdbId });
         }
       } catch (err) {
-        console.error('[useMetadata] error attaching certification', err);
+        if (__DEV__) console.error('[useMetadata] error attaching certification', err);
       }
     };
     maybeAttachCertification();

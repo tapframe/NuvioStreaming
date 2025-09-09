@@ -13,7 +13,7 @@ import {
   Modal
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTraktContext } from '../contexts/TraktContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -58,7 +58,7 @@ const ProfilesScreen: React.FC = () => {
         await AsyncStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify([defaultProfile]));
       }
     } catch (error) {
-      console.error('Error loading profiles:', error);
+      if (__DEV__) console.error('Error loading profiles:', error);
       Alert.alert('Error', 'Failed to load profiles');
     } finally {
       setIsLoading(false);
@@ -84,7 +84,7 @@ const ProfilesScreen: React.FC = () => {
     try {
       await AsyncStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(updatedProfiles));
     } catch (error) {
-      console.error('Error saving profiles:', error);
+      if (__DEV__) console.error('Error saving profiles:', error);
       Alert.alert('Error', 'Failed to save profiles');
     }
   }, []);

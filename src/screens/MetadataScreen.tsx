@@ -192,7 +192,7 @@ const MetadataScreen: React.FC = () => {
   // Debug logging for color extraction timing
   useEffect(() => {
     if (__DEV__ && heroImageUri && dominantColor) {
-      console.log('[MetadataScreen] Dynamic background color:', {
+      if (__DEV__) console.log('[MetadataScreen] Dynamic background color:', {
         dominantColor,
         fallback: currentTheme.colors.darkBackground,
         finalColor: dynamicBackgroundColor,
@@ -242,7 +242,7 @@ const MetadataScreen: React.FC = () => {
       const isAuthenticated = await traktService.isAuthenticated();
       
       if (!isAuthenticated) {
-        console.log(`[MetadataScreen] Not authenticated with Trakt`);
+        if (__DEV__) console.log(`[MetadataScreen] Not authenticated with Trakt`);
         return;
       }
 
@@ -283,7 +283,7 @@ const MetadataScreen: React.FC = () => {
       }
         
     } catch (error) {
-      console.error(`[MetadataScreen] Failed to fetch Trakt progress:`, error);
+      if (__DEV__) console.error(`[MetadataScreen] Failed to fetch Trakt progress:`, error);
     }
   }, [shouldLoadSecondaryData, metadata, id, type]);
 
@@ -315,7 +315,7 @@ const MetadataScreen: React.FC = () => {
       const timer = setTimeout(() => {
         const renderTime = Date.now() - startTime;
         if (renderTime > 100) {
-          console.warn(`[MetadataScreen] Slow render detected: ${renderTime}ms for ${metadata.name}`);
+          if (__DEV__) console.warn(`[MetadataScreen] Slow render detected: ${renderTime}ms for ${metadata.name}`);
         }
       }, 0);
       return () => clearTimeout(timer);
@@ -448,7 +448,7 @@ const MetadataScreen: React.FC = () => {
   const handleEpisodeSelect = useCallback((episode: Episode) => {
     if (!isScreenFocused) return;
     
-    console.log('[MetadataScreen] Selected Episode:', episode.episode_number, episode.season_number);
+    if (__DEV__) console.log('[MetadataScreen] Selected Episode:', episode.episode_number, episode.season_number);
     const episodeId = episode.stremioId || `${id}:${episode.season_number}:${episode.episode_number}`;
     
     // Optimize navigation with requestAnimationFrame

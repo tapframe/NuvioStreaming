@@ -119,7 +119,7 @@ const HeroCatalogsScreen: React.FC = () => {
         
         setCatalogs(catalogItems);
       } catch (error) {
-        console.error('Failed to load catalogs:', error);
+        if (__DEV__) console.error('Failed to load catalogs:', error);
         Alert.alert('Error', 'Failed to load catalogs');
       } finally {
         setLoading(false);

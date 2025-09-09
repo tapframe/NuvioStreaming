@@ -158,7 +158,7 @@ const HomeScreen = () => {
       let catalogIndex = 0;
       
       // Limit concurrent catalog loading to prevent overwhelming the system
-      const MAX_CONCURRENT_CATALOGS = 2; // Very low concurrency to reduce heating
+      const MAX_CONCURRENT_CATALOGS = 1; // Single catalog at a time to minimize heating
       let activeCatalogLoads = 0;
       const catalogQueue: (() => Promise<void>)[] = [];
       
@@ -170,7 +170,7 @@ const HomeScreen = () => {
             catalogLoader().finally(async () => {
               activeCatalogLoads--;
               // Yield to event loop to avoid JS thread starvation and reduce heating
-              await new Promise(resolve => setTimeout(resolve, 50));
+              await new Promise(resolve => setTimeout(resolve, 100));
               processCatalogQueue(); // Process next in queue
             });
           }
@@ -257,7 +257,7 @@ const HomeScreen = () => {
                     });
                   }
                 } catch (error) {
-                  console.error(`[HomeScreen] Failed to load ${catalog.name} from ${addon.name}:`, error);
+                  if (__DEV__) console.error(`[HomeScreen] Failed to load ${catalog.name} from ${addon.name}:`, error);
                 } finally {
                   setLoadedCatalogCount(prev => {
                     const next = prev + 1;
@@ -285,7 +285,7 @@ const HomeScreen = () => {
       // Start processing the catalog queue (parallel fetching continues in background)
       processCatalogQueue();
     } catch (error) {
-      console.error('[HomeScreen] Error in progressive catalog loading:', error);
+      if (__DEV__) console.error('[HomeScreen] Error in progressive catalog loading:', error);
       setCatalogsLoading(false);
     }
   }, []);
@@ -414,7 +414,7 @@ const HomeScreen = () => {
        try {
          ExpoImage.clearMemoryCache();
        } catch (error) {
-         console.warn('Failed to clear image cache:', error);
+         if (__DEV__) console.warn('Failed to clear image cache:', error);
        }
     };
   }, [currentTheme.colors.darkBackground]);
@@ -527,7 +527,7 @@ const HomeScreen = () => {
       setHasContinueWatching(hasContent);
         
       } catch (error) {
-        console.error('[HomeScreen] Error refreshing continue watching:', error);
+        if (__DEV__) console.error('[HomeScreen] Error refreshing continue watching:', error);
         setHasContinueWatching(false);
       }
     }

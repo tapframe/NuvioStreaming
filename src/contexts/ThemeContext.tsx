@@ -181,7 +181,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           if (theme) setCurrentThemeState(theme);
         }
       } catch (error) {
-        console.error('Failed to load themes:', error);
+        if (__DEV__) console.error('Failed to load themes:', error);
       }
     };
     loadThemes();
@@ -241,7 +241,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       await AsyncStorage.setItem(CURRENT_THEME_KEY, id);
       // Do not emit global settings sync for themes
     } catch (error) {
-      console.error('Failed to add custom theme:', error);
+      if (__DEV__) console.error('Failed to add custom theme:', error);
     }
   };
 
@@ -279,7 +279,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       }
       // Do not emit global settings sync for themes
     } catch (error) {
-      console.error('Failed to update custom theme:', error);
+      if (__DEV__) console.error('Failed to update custom theme:', error);
     }
   };
 
@@ -316,7 +316,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       }
       // Do not emit global settings sync for themes
     } catch (error) {
-      console.error('Failed to delete custom theme:', error);
+      if (__DEV__) console.error('Failed to delete custom theme:', error);
     }
   };
 

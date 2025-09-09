@@ -32,13 +32,13 @@ export const AccountProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (u) {
           try {
             await syncService.migrateLocalScopeToUser();
-            // Small yield to event loop
-            await new Promise(resolve => setTimeout(resolve, 50));
+            // Longer yield to event loop to reduce CPU pressure
+            await new Promise(resolve => setTimeout(resolve, 100));
             await syncService.subscribeRealtime();
-            await new Promise(resolve => setTimeout(resolve, 50));
+            await new Promise(resolve => setTimeout(resolve, 100));
             // Pull first to hydrate local state, then push to avoid wiping server with empty local
             await syncService.fullPull();
-            await new Promise(resolve => setTimeout(resolve, 50));
+            await new Promise(resolve => setTimeout(resolve, 100));
             await syncService.fullPush();
           } catch {}
         }

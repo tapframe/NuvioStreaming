@@ -38,8 +38,17 @@ export class UpdateService {
       this.logs = this.logs.slice(0, this.MAX_LOGS);
     }
     
-    // Always log to console - this will be visible in adb logcat for production builds
-    // Use different console methods for better filtering in logcat
+    // Console logging policy:
+    // - Development: log INFO/WARN/ERROR for visibility
+    // - Production: only log ERROR to reduce JS<->native bridge traffic and CPU usage
+    if (!__DEV__) {
+      if (level === 'ERROR') {
+        console.error(`[UpdateService] ${logEntry}`);
+      }
+      return;
+    }
+
+    // Development detailed logging
     if (level === 'ERROR') {
       console.error(`[UpdateService] ${logEntry}`);
     } else if (level === 'WARN') {
@@ -47,9 +56,11 @@ export class UpdateService {
     } else {
       console.log(`[UpdateService] ${logEntry}`);
     }
-    
-    // Also log with a consistent prefix for easy filtering
-    console.log(`UpdateService: ${logEntry}`);
+
+    // Additional prefixed line for easier filtering during development only
+    if (__DEV__) {
+      console.log(`UpdateService: ${logEntry}`);
+    }
   }
 
   /**

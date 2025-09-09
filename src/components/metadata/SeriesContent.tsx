@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, useWindowDimensions, useColorScheme, FlatList } from 'react-native';
 import { Image } from 'expo-image';
-import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FlashList, FlashListRef } from '@shopify/flash-list';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -70,10 +70,10 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
           const savedMode = await AsyncStorage.getItem(`season_view_mode_${metadata.id}`);
           if (savedMode === 'text' || savedMode === 'posters') {
             setSeasonViewMode(savedMode);
-            console.log('[SeriesContent] Loaded saved view mode:', savedMode, 'for show:', metadata.id);
+            if (__DEV__) console.log('[SeriesContent] Loaded saved view mode:', savedMode, 'for show:', metadata.id);
           }
         } catch (error) {
-          console.log('[SeriesContent] Error loading view mode preference:', error);
+          if (__DEV__) console.log('[SeriesContent] Error loading view mode preference:', error);
         }
       }
     };
@@ -99,7 +99,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
     setSeasonViewMode(newMode);
     if (metadata?.id) {
       AsyncStorage.setItem(`season_view_mode_${metadata.id}`, newMode).catch(error => {
-        console.log('[SeriesContent] Error saving view mode preference:', error);
+        if (__DEV__) console.log('[SeriesContent] Error saving view mode preference:', error);
       });
     }
   };
@@ -328,7 +328,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
       return null;
     }
     
-    console.log('[SeriesContent] renderSeasonSelector called, current view mode:', seasonViewMode);
+    if (__DEV__) console.log('[SeriesContent] renderSeasonSelector called, current view mode:', seasonViewMode);
     
     const seasons = Object.keys(groupedEpisodes).map(Number).sort((a, b) => a - b);
     
@@ -357,7 +357,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
             onPress={() => {
               const newMode = seasonViewMode === 'posters' ? 'text' : 'posters';
               updateViewMode(newMode);
-              console.log('[SeriesContent] View mode changed to:', newMode, 'Current ref value:', seasonViewMode);
+              if (__DEV__) console.log('[SeriesContent] View mode changed to:', newMode, 'Current ref value:', seasonViewMode);
             }}
             activeOpacity={0.7}
           >
@@ -398,7 +398,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
             
             if (seasonViewMode === 'text') {
               // Text-only view
-              console.log('[SeriesContent] Rendering text view for season:', season, 'View mode ref:', seasonViewMode);
+              if (__DEV__) console.log('[SeriesContent] Rendering text view for season:', season, 'View mode ref:', seasonViewMode);
               return (
                 <View 
                   key={season}
@@ -430,7 +430,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
             }
             
             // Poster view (current implementation)
-            console.log('[SeriesContent] Rendering poster view for season:', season, 'View mode ref:', seasonViewMode);
+            if (__DEV__) console.log('[SeriesContent] Rendering poster view for season:', season, 'View mode ref:', seasonViewMode);
             return (
               <View 
                 key={season}

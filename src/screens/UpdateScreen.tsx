@@ -99,7 +99,7 @@ const UpdateScreen: React.FC = () => {
         setLastOperation('No updates available');
       }
     } catch (error) {
-      console.error('Error checking for updates:', error);
+      if (__DEV__) console.error('Error checking for updates:', error);
       setUpdateStatus('error');
       setLastOperation(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       Alert.alert('Error', 'Failed to check for updates');
@@ -144,7 +144,7 @@ const UpdateScreen: React.FC = () => {
         Alert.alert('No Update', 'No update available to install');
       }
     } catch (error) {
-      console.error('Error installing update:', error);
+      if (__DEV__) console.error('Error installing update:', error);
       setUpdateStatus('error');
       setLastOperation(`Installation error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       Alert.alert('Error', 'Failed to install update');
@@ -226,7 +226,7 @@ const UpdateScreen: React.FC = () => {
         setLastOperation('Update server is not reachable');
       }
     } catch (error) {
-      console.error('Error testing connectivity:', error);
+      if (__DEV__) console.error('Error testing connectivity:', error);
       setLastOperation(`Connectivity test error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       const logs = UpdateService.getLogs();
       setLogs(logs);
@@ -241,7 +241,7 @@ const UpdateScreen: React.FC = () => {
       setLogs(logs);
       setLastOperation('Asset URL testing completed');
     } catch (error) {
-      console.error('Error testing asset URLs:', error);
+      if (__DEV__) console.error('Error testing asset URLs:', error);
       setLastOperation(`Asset URL test error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       const logs = UpdateService.getLogs();
       setLogs(logs);
