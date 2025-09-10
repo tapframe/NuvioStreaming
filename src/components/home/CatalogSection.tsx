@@ -61,11 +61,15 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
     navigation.navigate('Metadata', { id, type, addonId: catalog.addon });
   }, [navigation, catalog.addon]);
 
-  const renderContentItem = useCallback(({ item }: { item: StreamingContent, index: number }) => {
+  const renderContentItem = useCallback(({ item, index }: { item: StreamingContent, index: number }) => {
+    // Only load images for the first few items eagerly; others defer based on viewability
+    const eager = index < 6;
     return (
       <ContentItem 
         item={item} 
         onPress={handleContentPress}
+        shouldLoadImage={eager}
+        deferMs={eager ? 0 : Math.min(400 + index * 15, 1500)}
       />
     );
   }, [handleContentPress]);
@@ -108,8 +112,7 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
         ItemSeparatorComponent={ItemSeparator}
         onEndReachedThreshold={0.7}
         onEndReached={() => {}}
-        scrollEventThrottle={16}
-        estimatedItemSize={POSTER_WIDTH + 8}
+        scrollEventThrottle={32}
       />
     </Animated.View>
   );

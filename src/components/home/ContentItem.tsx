@@ -10,6 +10,8 @@ import { DropUpMenu } from './DropUpMenu';
 interface ContentItemProps {
   item: StreamingContent;
   onPress: (id: string, type: string) => void;
+  shouldLoadImage?: boolean;
+  deferMs?: number;
 }
 
 const { width } = Dimensions.get('window');
@@ -56,12 +58,12 @@ const POSTER_WIDTH = posterLayout.posterWidth;
 
 const PLACEHOLDER_BLURHASH = 'LEHV6nWB2yk8pyo0adR*.7kCMdnj';
 
-const ContentItem = ({ item, onPress }: ContentItemProps) => {
+const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, deferMs = 0 }: ContentItemProps) => {
   const [menuVisible, setMenuVisible] = useState(false);
   const [isWatched, setIsWatched] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const [shouldLoadImage, setShouldLoadImage] = useState(false);
+  const [shouldLoadImageState, setShouldLoadImageState] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const { currentTheme } = useTheme();
   const { settings } = useSettings();
@@ -111,14 +113,22 @@ const ContentItem = ({ item, onPress }: ContentItemProps) => {
     setMenuVisible(false);
   }, []);
 
-  // Lazy load images - only load when likely to be visible
+  // Lazy load images - only load when asked by parent (viewability) or after small defer
   useEffect(() => {
+    if (shouldLoadImageProp !== undefined) {
+      if (shouldLoadImageProp) {
+        const t = setTimeout(() => setShouldLoadImageState(true), deferMs);
+        return () => clearTimeout(t);
+      } else {
+        setShouldLoadImageState(false);
+      }
+      return;
+    }
     const timer = setTimeout(() => {
-      setShouldLoadImage(true);
-    }, 50); // Reduced delay for faster loading
-
+      setShouldLoadImageState(true);
+    }, 80);
     return () => clearTimeout(timer);
-  }, []);
+  }, [shouldLoadImageProp, deferMs]);
 
   // Get optimized poster URL for smaller tiles
   const getOptimizedPosterUrl = useCallback((originalUrl: string) => {
@@ -158,12 +168,12 @@ const ContentItem = ({ item, onPress }: ContentItemProps) => {
         >
           <View ref={itemRef} style={[styles.contentItemContainer, { borderRadius: posterRadius }] }>
             {/* Only load image when shouldLoadImage is true (lazy loading) */}
-            {shouldLoadImage && item.poster ? (
+            {(shouldLoadImageProp ?? shouldLoadImageState) && item.poster ? (
               <ExpoImage
                 source={{ uri: getOptimizedPosterUrl(item.poster) }}
                 style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, borderRadius: posterRadius }]}
                 contentFit="cover"
-                cachePolicy="memory-disk" // Use both memory and disk cache
+                cachePolicy={Platform.OS === 'android' ? 'disk' : 'memory-disk'}
                 transition={0} // Disable transition to reduce GPU work
                 placeholder={{ blurhash: PLACEHOLDER_BLURHASH } as any}
                 placeholderContentFit="cover"

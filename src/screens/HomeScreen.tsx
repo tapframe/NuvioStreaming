@@ -158,7 +158,7 @@ const HomeScreen = () => {
       let catalogIndex = 0;
       
       // Limit concurrent catalog loading to prevent overwhelming the system
-      const MAX_CONCURRENT_CATALOGS = 1; // Single catalog at a time to minimize heating
+      const MAX_CONCURRENT_CATALOGS = 1; // Single catalog at a time to minimize heating/memory
       let activeCatalogLoads = 0;
       const catalogQueue: (() => Promise<void>)[] = [];
       
@@ -196,8 +196,9 @@ const HomeScreen = () => {
 
                   const metas = await stremioService.getCatalog(manifest, catalog.type, catalog.id, 1);
                   if (metas && metas.length > 0) {
-                    // Limit items per catalog to reduce memory usage
-                    const limitedMetas = metas.slice(0, 30);
+                    // Aggressively limit items per catalog on Android to reduce memory usage
+                    const limit = Platform.OS === 'android' ? 18 : 30;
+                    const limitedMetas = metas.slice(0, limit);
                     
                     const items = limitedMetas.map((meta: any) => ({
                       id: meta.id,
@@ -217,7 +218,7 @@ const HomeScreen = () => {
                       certification: meta.certification
                     }));
 
-                    // Skip prefetching to reduce memory pressure
+                    // Skip prefetching to reduce memory pressure (keep disabled)
                     // Resolve custom display name; if custom exists, use as-is
                     const originalName = catalog.name || catalog.id;
                     let displayName = await getCatalogDisplayName(addon.id, catalog.type, catalog.id, originalName);
@@ -282,7 +283,7 @@ const HomeScreen = () => {
       // Initialize catalogs array with proper length
       setCatalogs(new Array(catalogIndex).fill(null));
       
-      // Start processing the catalog queue (parallel fetching continues in background)
+      // Start processing the catalog queue
       processCatalogQueue();
     } catch (error) {
       if (__DEV__) console.error('[HomeScreen] Error in progressive catalog loading:', error);
@@ -650,7 +651,7 @@ const HomeScreen = () => {
 
   const renderListItem = useCallback(({ item, index }: { item: HomeScreenListItem, index: number }) => {
     const wrapper = (child: React.ReactNode) => (
-      <Animated.View entering={FadeIn.duration(350).delay(Math.min(index * 70, 700))}>
+      <Animated.View>
         {child}
       </Animated.View>
     );
