@@ -88,7 +88,7 @@ const detectMkvViaHead = async (url: string, headers?: Record<string, string>) =
 };
 
 // Extracted Components
-const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, theme, showLogos }: { 
+const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, theme, showLogos, scraperLogo }: { 
   stream: Stream; 
   onPress: () => void; 
   index: number;
@@ -96,6 +96,7 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
   statusMessage?: string;
   theme: any;
   showLogos?: boolean;
+  scraperLogo?: string | null;
 }) => {
   
   // Handle long press to copy stream URL to clipboard
@@ -153,46 +154,7 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
     };
   }, [stream.name, stream.title, stream.behaviorHints, stream.size]);
   
-  // Get scraper logo for local scrapers using cache
-  const [scraperLogo, setScraperLogo] = React.useState<string | null>(() => {
-    const scraperId = stream.addonId || stream.addon;
-    return scraperId ? scraperLogoCache.get(scraperId) || null : null;
-  });
-  
-  React.useEffect(() => {
-    const scraperId = stream.addonId || stream.addon;
-    if (!scraperId) return;
-    
-    // Check cache first
-    const cachedLogo = scraperLogoCache.get(scraperId);
-    if (cachedLogo) {
-      setScraperLogo(cachedLogo);
-      return;
-    }
-    
-    // If not in cache, fetch asynchronously
-    let isMounted = true;
-    
-    const getScraperLogo = async () => {
-      try {
-        const availableScrapers = await localScraperService.getAvailableScrapers();
-        const scraper = availableScrapers.find(s => s.id === scraperId);
-        if (scraper && scraper.logo && isMounted) {
-          // Cache the logo for future use
-          scraperLogoCache.set(scraperId, scraper.logo);
-          setScraperLogo(scraper.logo);
-        }
-      } catch (error) {
-        // Silently fail if we can't get scraper info
-      }
-    };
-    
-    getScraperLogo();
-    
-    return () => {
-      isMounted = false;
-    };
-  }, [stream.addonId, stream.addon]);
+  // Logo is provided by parent to avoid per-card async work
   
   const isDebrid = streamInfo.isDebrid;
   return (
@@ -285,35 +247,11 @@ const QualityTag = React.memo(({ text, color, theme }: { text: string; color: st
 const PulsingChip = memo(({ text, delay }: { text: string; delay: number }) => {
   const { currentTheme } = useTheme();
   const styles = React.useMemo(() => createStyles(currentTheme.colors), [currentTheme.colors]);
-  
-  const pulseValue = useSharedValue(0.6);
-  
-  useEffect(() => {
-    const startPulse = () => {
-      pulseValue.value = withTiming(1, { duration: 1200 }, () => {
-        pulseValue.value = withTiming(0.6, { duration: 1200 }, () => {
-          runOnJS(startPulse)();
-        });
-      });
-    };
-    
-    const timer = setTimeout(startPulse, delay);
-    return () => {
-      clearTimeout(timer);
-      cancelAnimation(pulseValue);
-    };
-  }, [delay]);
-  
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      opacity: pulseValue.value
-    };
-  });
-  
+  // Make chip static to avoid continuous animation load
   return (
-    <Animated.View style={[styles.activeScraperChip, animatedStyle]}>
+    <View style={styles.activeScraperChip}>
       <Text style={styles.activeScraperText}>{text}</Text>
-    </Animated.View>
+    </View>
   );
 });
 
@@ -476,25 +414,37 @@ export const StreamsScreen = () => {
   // Add state for no sources error
   const [showNoSourcesError, setShowNoSourcesError] = useState(false);
   
-  // Preload scraper logos to cache for faster display
+  // Scraper logos map to avoid per-card async fetches
+  const [scraperLogos, setScraperLogos] = useState<Record<string, string>>({});
+  // Preload scraper logos once and expose via state
   React.useEffect(() => {
     const preloadScraperLogos = async () => {
-      if (scraperLogoCachePromise) return; // Already loading
-      
-      scraperLogoCachePromise = (async () => {
-        try {
-          const availableScrapers = await localScraperService.getAvailableScrapers();
-          availableScrapers.forEach(scraper => {
-            if (scraper.logo && scraper.id) {
-              scraperLogoCache.set(scraper.id, scraper.logo);
-            }
-          });
-        } catch (error) {
-          // Silently fail
-        }
-      })();
+      if (!scraperLogoCachePromise) {
+        scraperLogoCachePromise = (async () => {
+          try {
+            const availableScrapers = await localScraperService.getAvailableScrapers();
+            const map: Record<string, string> = {};
+            availableScrapers.forEach(scraper => {
+              if (scraper.logo && scraper.id) {
+                scraperLogoCache.set(scraper.id, scraper.logo);
+                map[scraper.id] = scraper.logo;
+              }
+            });
+            setScraperLogos(map);
+          } catch (error) {
+            // Silently fail
+          }
+        })();
+      } else {
+        // If already loading, update state after it resolves
+        scraperLogoCachePromise.then(() => {
+          // Build map from cache
+          const map: Record<string, string> = {};
+          // No direct way to iterate Map keys safely without exposing it; copy known ids on demand during render
+          setScraperLogos(prev => prev); // no-op to ensure consistency
+        }).catch(() => {});
+      }
     };
-    
     preloadScraperLogos();
   }, []);
 
@@ -526,15 +476,19 @@ export const StreamsScreen = () => {
     const now = Date.now();
     
     setLoadingProviders(prevLoading => {
-      const newLoading = { ...prevLoading };
+      const nextLoading = { ...prevLoading };
+      let changed = false;
       expectedProviders.forEach(providerId => {
-        // Provider is loading if overall loading is true OR if it doesn't have streams yet
-        const hasStreams = currentStreamsData[providerId] && 
-                          currentStreamsData[providerId].streams && 
+        const hasStreams = currentStreamsData[providerId] &&
+                          currentStreamsData[providerId].streams &&
                           currentStreamsData[providerId].streams.length > 0;
-        newLoading[providerId] = (loadingStreams || loadingEpisodeStreams) && !hasStreams;
+        const value = (loadingStreams || loadingEpisodeStreams) && !hasStreams;
+        if (nextLoading[providerId] !== value) {
+          nextLoading[providerId] = value;
+          changed = true;
+        }
       });
-      return newLoading;
+      return changed ? nextLoading : prevLoading;
     });
     
   }, [loadingStreams, loadingEpisodeStreams, groupedStreams, episodeStreams, type]);
@@ -985,6 +939,13 @@ export const StreamsScreen = () => {
   const handleStreamPress = useCallback(async (stream: Stream) => {
     try {
       if (stream.url) {
+        // Block magnet links - not supported yet
+        if (stream.url.startsWith('magnet:')) {
+          try {
+            Alert.alert('Not supported', 'Torrent streaming is not supported yet.');
+          } catch (_e) {}
+          return;
+        }
         // If provider declares MKV support, force the in-app VLC-based player on iOS
         try {
           const providerId = stream.addonId || (stream as any).addon;
@@ -1473,7 +1434,7 @@ export const StreamsScreen = () => {
     const isLoading = false; // If streams are being rendered, they're available and shouldn't be loading
     
     return (
-      <Animated.View entering={FadeIn.duration(300).delay(index * 50)}>
+      <View>
         <StreamCard 
           stream={stream} 
           onPress={() => handleStreamPress(stream)} 
@@ -1482,10 +1443,11 @@ export const StreamsScreen = () => {
           statusMessage={undefined}
           theme={currentTheme}
           showLogos={settings.showScraperLogos}
+          scraperLogo={(stream.addonId && scraperLogos[stream.addonId]) || (stream as any).addon ? scraperLogoCache.get((stream.addonId || (stream as any).addon) as string) || null : null}
         />
-      </Animated.View>
+      </View>
     );
-  }, [handleStreamPress, currentTheme, settings.showScraperLogos]);
+  }, [handleStreamPress, currentTheme, settings.showScraperLogos, scraperLogos]);
 
   const renderSectionHeader = useCallback(({ section }: { section: { title: string; addonId: string } }) => {
     const isProviderLoading = loadingProviders[section.addonId];
@@ -1527,7 +1489,6 @@ export const StreamsScreen = () => {
       
       {Platform.OS !== 'ios' && (
         <Animated.View
-          entering={FadeIn.duration(300)}
           style={[styles.backButtonContainer]}
         >
           <TouchableOpacity 
@@ -1566,9 +1527,8 @@ export const StreamsScreen = () => {
 
       {type === 'series' && (
         <Animated.View style={[styles.streamsHeroContainer, heroStyle]}>
-          <Animated.View entering={FadeIn.duration(300)} style={StyleSheet.absoluteFill}>
+          <Animated.View style={StyleSheet.absoluteFill}>
             <Animated.View
-              entering={FadeIn.duration(400).delay(100).withInitialValues({ transform: [{ scale: 1.05 }] })}
               style={StyleSheet.absoluteFill}
             >
               <Image
@@ -1584,24 +1544,24 @@ export const StreamsScreen = () => {
               >
                 <View style={styles.streamsHeroContent}>
                   {currentEpisode ? (
-                    <Animated.View entering={FadeIn.duration(400).delay(300)} style={styles.streamsHeroInfo}>
+                    <Animated.View style={styles.streamsHeroInfo}>
                       <Text style={styles.streamsHeroEpisodeNumber}>{currentEpisode.episodeString}</Text>
                       <Text style={styles.streamsHeroTitle} numberOfLines={1}>
                         {currentEpisode.name}
                       </Text>
                       {!!currentEpisode.overview && (
-                        <Animated.View entering={FadeIn.duration(400).delay(320)}>
+                        <Animated.View>
                           <Text style={styles.streamsHeroOverview} numberOfLines={2}>
                             {currentEpisode.overview}
                           </Text>
                         </Animated.View>
                       )}
-                      <Animated.View entering={FadeIn.duration(400).delay(360)} style={styles.streamsHeroMeta}>
+                      <Animated.View style={styles.streamsHeroMeta}>
                         <Text style={styles.streamsHeroReleased}>
                           {tmdbService.formatAirDate(currentEpisode.air_date)}
                         </Text>
                         {effectiveEpisodeVote > 0 && (
-                          <Animated.View entering={FadeIn.duration(400).delay(380)} style={styles.streamsHeroRating}>
+                          <Animated.View style={styles.streamsHeroRating}>
                             <Image source={{ uri: TMDB_LOGO }} style={styles.tmdbLogo} contentFit="contain" />
                             <Text style={styles.streamsHeroRatingText}>
                               {effectiveEpisodeVote.toFixed(1)}
@@ -1609,7 +1569,7 @@ export const StreamsScreen = () => {
                           </Animated.View>
                         )}
                         {!!effectiveEpisodeRuntime && (
-                          <Animated.View entering={FadeIn.duration(400).delay(400)} style={styles.streamsHeroRuntime}>
+                          <Animated.View style={styles.streamsHeroRuntime}>
                             <MaterialIcons name="schedule" size={16} color={colors.mediumEmphasis} />
                             <Text style={styles.streamsHeroRuntimeText}>
                               {effectiveEpisodeRuntime >= 60
@@ -1649,7 +1609,6 @@ export const StreamsScreen = () => {
         {/* Active Scrapers Status */}
         {activeFetchingScrapers.length > 0 && (
           <Animated.View 
-            entering={FadeIn.duration(300)}
             style={styles.activeScrapersContainer}
           >
             <Text style={styles.activeScrapersTitle}>Fetching from:</Text>
@@ -1682,7 +1641,6 @@ export const StreamsScreen = () => {
         ) : streamsEmpty ? (
           showInitialLoading ? (
             <Animated.View 
-              entering={FadeIn.duration(300)}
               style={styles.loadingContainer}
             >
               <ActivityIndicator size="large" color={colors.primary} />
@@ -1692,7 +1650,6 @@ export const StreamsScreen = () => {
             </Animated.View>
           ) : showStillFetching ? (
             <Animated.View 
-              entering={FadeIn.duration(300)}
               style={styles.loadingContainer}
             >
               <MaterialIcons name="hourglass-bottom" size={32} color={colors.primary} />
@@ -1701,7 +1658,6 @@ export const StreamsScreen = () => {
           ) : (
             // No streams and not loading = no streams available
             <Animated.View 
-              entering={FadeIn.duration(300)}
               style={styles.noStreams}
             >
               <MaterialIcons name="error-outline" size={48} color={colors.textMuted} />
@@ -1714,7 +1670,6 @@ export const StreamsScreen = () => {
             {/* Show autoplay loading overlay if waiting for autoplay */}
             {isAutoplayWaiting && !autoplayTriggered && (
               <Animated.View 
-                entering={FadeIn.duration(300)}
                 style={styles.autoplayOverlay}
               >
                 <View style={styles.autoplayIndicator}>
@@ -1731,9 +1686,9 @@ export const StreamsScreen = () => {
               renderSectionHeader={renderSectionHeader}
               stickySectionHeadersEnabled={false}
               initialNumToRender={6}
-              maxToRenderPerBatch={3}
-              windowSize={4}
-              removeClippedSubviews={false}
+              maxToRenderPerBatch={2}
+              windowSize={3}
+              removeClippedSubviews={true}
               contentContainerStyle={styles.streamsContainer}
               style={styles.streamsContent}
               showsVerticalScrollIndicator={false}
@@ -1854,10 +1809,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     width: '100%',
     zIndex: 1,
     shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 0,
   },
   scraperLogoContainer: {
     width: 32,
