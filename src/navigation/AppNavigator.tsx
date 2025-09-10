@@ -1,8 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { NavigationContainer, DefaultTheme as NavigationDefaultTheme, DarkTheme as NavigationDarkTheme, Theme, NavigationProp } from '@react-navigation/native';
 import { createNativeStackNavigator, NativeStackNavigationOptions, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createBottomTabNavigator, BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { useColorScheme, Platform, Animated, StatusBar, TouchableOpacity, View, Text, AppState, Easing, Dimensions, useWindowDimensions } from 'react-native';
+import { useColorScheme, Platform, Animated, StatusBar, TouchableOpacity, View, Text, AppState, Easing, Dimensions } from 'react-native';
 import { PaperProvider, MD3DarkTheme, MD3LightTheme, adaptNavigationTheme } from 'react-native-paper';
 import type { MD3Theme } from 'react-native-paper';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
@@ -360,9 +360,11 @@ const TabIcon = React.memo(({ focused, color, iconName }: {
 
 // Update the TabScreenWrapper component with fixed layout dimensions
 const TabScreenWrapper: React.FC<{children: React.ReactNode}> = ({ children }) => {
-  const { width, height } = useWindowDimensions();
-  const smallestDimension = Math.min(width, height);
-  const isTablet = (Platform.OS === 'ios' ? (Platform as any).isPad === true : smallestDimension >= 768);
+  const isTablet = useMemo(() => {
+    const { width, height } = Dimensions.get('window');
+    const smallestDimension = Math.min(width, height);
+    return (Platform.OS === 'ios' ? (Platform as any).isPad === true : smallestDimension >= 768);
+  }, []);
   const insets = useSafeAreaInsets();
   // Force consistent status bar settings
   useEffect(() => {
@@ -425,9 +427,11 @@ const WrappedScreen: React.FC<{Screen: React.ComponentType<any>}> = ({ Screen })
 const MainTabs = () => {
   const { currentTheme } = useTheme();
   const { isHomeLoading } = useLoading();
-  const { width, height } = useWindowDimensions();
-  const smallestDimension = Math.min(width, height);
-  const isTablet = (Platform.OS === 'ios' ? (Platform as any).isPad === true : smallestDimension >= 768);
+  const isTablet = useMemo(() => {
+    const { width, height } = Dimensions.get('window');
+    const smallestDimension = Math.min(width, height);
+    return (Platform.OS === 'ios' ? (Platform as any).isPad === true : smallestDimension >= 768);
+  }, []);
   const insets = useSafeAreaInsets();
   const isIosTablet = Platform.OS === 'ios' && isTablet;
   const [hidden, setHidden] = React.useState(HeaderVisibility.isHidden());

@@ -68,6 +68,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
   const { currentTheme } = useTheme();
   const { settings } = useSettings();
   const posterRadius = typeof settings.posterBorderRadius === 'number' ? settings.posterBorderRadius : 12;
+  // Memoize poster width calculation to avoid recalculating on every render
   const posterWidth = React.useMemo(() => {
     switch (settings.posterSize) {
       case 'small':
@@ -130,31 +131,31 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
     return () => clearTimeout(timer);
   }, [shouldLoadImageProp, deferMs]);
 
-  // Get optimized poster URL for smaller tiles
-  const getOptimizedPosterUrl = useCallback((originalUrl: string) => {
-    if (!originalUrl || originalUrl.includes('placeholder')) {
+  // Memoize optimized poster URL to prevent recalculating
+  const optimizedPosterUrl = React.useMemo(() => {
+    if (!item.poster || item.poster.includes('placeholder')) {
       return 'https://via.placeholder.com/154x231/333/666?text=No+Image';
     }
 
     // If we've had an error, try metahub fallback
-    if (retryCount > 0 && !originalUrl.includes('metahub.space')) {
+    if (retryCount > 0 && !item.poster.includes('metahub.space')) {
       return `https://images.metahub.space/poster/small/${item.id}/img`;
     }
 
     // For TMDB images, use smaller sizes
-    if (originalUrl.includes('image.tmdb.org')) {
+    if (item.poster.includes('image.tmdb.org')) {
       // Replace any size with w154 (fits 100-130px tiles perfectly)
-      return originalUrl.replace(/\/w\d+\//, '/w154/');
+      return item.poster.replace(/\/w\d+\//, '/w154/');
     }
 
     // For metahub images, use smaller sizes
-    if (originalUrl.includes('images.metahub.space')) {
-      return originalUrl.replace('/medium/', '/small/');
+    if (item.poster.includes('images.metahub.space')) {
+      return item.poster.replace('/medium/', '/small/');
     }
 
     // Return original URL for other sources to avoid breaking them
-    return originalUrl;
-  }, [retryCount, item.id]);
+    return item.poster;
+  }, [item.poster, retryCount, item.id]);
 
   return (
     <>
@@ -170,7 +171,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
             {/* Only load image when shouldLoadImage is true (lazy loading) */}
             {(shouldLoadImageProp ?? shouldLoadImageState) && item.poster ? (
               <ExpoImage
-                source={{ uri: getOptimizedPosterUrl(item.poster) }}
+                source={{ uri: optimizedPosterUrl }}
                 style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, borderRadius: posterRadius }]}
                 contentFit="cover"
                 cachePolicy={Platform.OS === 'android' ? 'disk' : 'memory-disk'}
@@ -303,7 +304,9 @@ const styles = StyleSheet.create({
 });
 
 export default React.memo(ContentItem, (prev, next) => {
-  // Aggressive memoization - only re-render if ID changes (different item entirely)
-  // This keeps loaded posters stable during fast scrolls
-  return prev.item.id === next.item.id;
+  // Re-render when identity changes or when visibility-driven loading flips
+  if (prev.item.id !== next.item.id) return false;
+  if (prev.item.poster !== next.item.poster) return false;
+  if ((prev.shouldLoadImage ?? false) !== (next.shouldLoadImage ?? false)) return false;
+  return true;
 });

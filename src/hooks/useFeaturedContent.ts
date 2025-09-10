@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StreamingContent, catalogService } from '../services/catalogService';
 import { tmdbService } from '../services/tmdbService';
@@ -547,20 +548,45 @@ export function useFeaturedContent() {
   useEffect(() => {
     if (allFeaturedContent.length <= 1) return;
 
+    let intervalId: NodeJS.Timeout | null = null;
+    let appState = AppState.currentState;
+
     const rotateContent = () => {
       currentIndexRef.current = (currentIndexRef.current + 1) % allFeaturedContent.length;
       if (allFeaturedContent[currentIndexRef.current]) {
         const newContent = allFeaturedContent[currentIndexRef.current];
         setFeaturedContent(newContent);
-        // Also update the persistent store
         persistentStore.featuredContent = newContent;
       }
     };
 
-    // Further increased rotation interval to 90s to reduce CPU cycles
-    const intervalId = setInterval(rotateContent, 90000);
+    const start = () => {
+      if (!intervalId) intervalId = setInterval(rotateContent, 90000);
+    };
+    const stop = () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
 
-    return () => clearInterval(intervalId);
+    const handleAppStateChange = (nextState: any) => {
+      if (appState.match(/inactive|background/) && nextState === 'active') {
+        start();
+      } else if (nextState.match(/inactive|background/)) {
+        stop();
+      }
+      appState = nextState;
+    };
+
+    // Start when mounted and app is active
+    if (!appState.match(/inactive|background/)) start();
+    const sub = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      stop();
+      sub.remove();
+    };
   }, [allFeaturedContent]);
 
   useEffect(() => {

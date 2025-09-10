@@ -28,61 +28,32 @@ export class UpdateService {
    * Add a log entry with timestamp - always log to console for adb logcat visibility
    */
   private addLog(message: string, level: 'INFO' | 'WARN' | 'ERROR' = 'INFO'): void {
-    const timestamp = new Date().toISOString();
-    const logEntry = `[${timestamp}] [${level}] ${message}`;
-    
-    this.logs.unshift(logEntry);
-    
-    // Keep only the last MAX_LOGS entries
-    if (this.logs.length > this.MAX_LOGS) {
-      this.logs = this.logs.slice(0, this.MAX_LOGS);
-    }
-    
-    // Console logging policy:
-    // - Development: log INFO/WARN/ERROR for visibility
-    // - Production: only log ERROR to reduce JS<->native bridge traffic and CPU usage
-    if (!__DEV__) {
-      if (level === 'ERROR') {
-        console.error(`[UpdateService] ${logEntry}`);
-      }
-      return;
-    }
-
-    // Development detailed logging
-    if (level === 'ERROR') {
-      console.error(`[UpdateService] ${logEntry}`);
-    } else if (level === 'WARN') {
-      console.warn(`[UpdateService] ${logEntry}`);
-    } else {
-      console.log(`[UpdateService] ${logEntry}`);
-    }
-
-    // Additional prefixed line for easier filtering during development only
-    if (__DEV__) {
-      console.log(`UpdateService: ${logEntry}`);
-    }
+    // Logging disabled intentionally
+    return;
   }
 
   /**
    * Get all logs
    */
   public getLogs(): string[] {
-    return [...this.logs];
+    // Logging disabled - return empty list
+    return [];
   }
 
   /**
    * Clear all logs
    */
   public clearLogs(): void {
+    // Logging disabled - no-op
     this.logs = [];
-    this.addLog('Logs cleared', 'INFO');
   }
 
   /**
    * Add a test log entry (useful for debugging)
    */
   public addTestLog(message: string): void {
-    this.addLog(`TEST: ${message}`, 'INFO');
+    // Logging disabled - no-op
+    return;
   }
 
   /**

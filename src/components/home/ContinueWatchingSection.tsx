@@ -96,8 +96,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const longPressTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Use a state to track if a background refresh is in progress
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  // Use a ref to track if a background refresh is in progress to avoid state updates
+  const isRefreshingRef = useRef(false);
 
   // Cache for metadata to avoid redundant API calls
   const metadataCache = useRef<Record<string, { metadata: any; basicContent: StreamingContent | null; timestamp: number }>>({});
@@ -133,12 +133,12 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
 
   // Modified loadContinueWatching to render incrementally
   const loadContinueWatching = useCallback(async (isBackgroundRefresh = false) => {
-    if (isRefreshing) return;
+    if (isRefreshingRef.current) return;
 
     if (!isBackgroundRefresh) {
       setLoading(true);
     }
-    setIsRefreshing(true);
+    isRefreshingRef.current = true;
 
     // Helper to merge a batch of items into state (dedupe by type:id, keep newest)
     const mergeBatchIntoState = (batch: ContinueWatchingItem[]) => {
@@ -361,9 +361,9 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       logger.error('Failed to load continue watching items:', error);
     } finally {
       setLoading(false);
-      setIsRefreshing(false);
+      isRefreshingRef.current = false;
     }
-  }, [isRefreshing, getCachedMetadata]);
+  }, [getCachedMetadata]);
 
   // Clear cache when component unmounts or when needed
   useEffect(() => {
@@ -398,7 +398,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       refreshTimerRef.current = setTimeout(() => {
         // Trigger a background refresh
         loadContinueWatching(true);
-      }, 500); // Increased debounce time slightly
+      }, 2000); // Increased debounce time significantly to reduce churn
     };
 
     // Try to set up a custom event listener or use a timer as fallback
@@ -415,8 +415,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         }
       };
     } else {
-      // Reduced polling frequency from 30s to 2 minutes to reduce heating
-      const intervalId = setInterval(() => loadContinueWatching(true), 120000);
+      // Reduced polling frequency from 30s to 5 minutes to reduce heating and battery drain
+      const intervalId = setInterval(() => loadContinueWatching(true), 300000);
       return () => {
         subscription.remove();
         clearInterval(intervalId);
@@ -448,7 +448,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     navigation.navigate('Metadata', { id, type });
   }, [navigation]);
 
-  // Handle long press to delete
+  // Handle long press to delete (moved before renderContinueWatchingItem)
   const handleLongPress = useCallback((item: ContinueWatchingItem) => {
     try {
       // Trigger haptic feedback
@@ -503,6 +503,119 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     );
   }, []);
 
+  // Memoized render function for continue watching items
+  const renderContinueWatchingItem = useCallback(({ item }: { item: ContinueWatchingItem }) => (
+    <TouchableOpacity
+      style={[styles.wideContentItem, {
+        backgroundColor: currentTheme.colors.elevation1,
+        borderColor: currentTheme.colors.border,
+        shadowColor: currentTheme.colors.black
+      }]}
+      activeOpacity={0.8}
+      onPress={() => handleContentPress(item.id, item.type)}
+      onLongPress={() => handleLongPress(item)}
+      delayLongPress={800}
+    >
+      {/* Poster Image */}
+      <View style={styles.posterContainer}>
+        <ExpoImage
+          source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
+          style={styles.continueWatchingPoster}
+          contentFit="cover"
+          cachePolicy="memory"
+          transition={0}
+          placeholder={{ uri: 'https://via.placeholder.com/300x450' }}
+          placeholderContentFit="cover"
+          recyclingKey={item.id}
+        />
+        
+        {/* Delete Indicator Overlay */}
+        {deletingItemId === item.id && (
+          <View style={styles.deletingOverlay}>
+            <ActivityIndicator size="large" color="#FFFFFF" />
+          </View>
+        )}
+      </View>
+
+      {/* Content Details */}
+      <View style={styles.contentDetails}>
+        <View style={styles.titleRow}>
+          {(() => {
+            const isUpNext = item.progress === 0;
+            return (
+              <View style={styles.titleRow}>
+                <Text 
+                  style={[styles.contentTitle, { color: currentTheme.colors.highEmphasis }]}
+                  numberOfLines={1}
+                >
+                  {item.name}
+                </Text>
+                {isUpNext && (
+                <View style={[styles.progressBadge, { backgroundColor: currentTheme.colors.primary }]}>
+                    <Text style={styles.progressText}>Up Next</Text>
+                </View>
+                )}
+              </View>
+            );
+          })()}
+        </View>
+
+        {/* Episode Info or Year */}
+        {(() => {
+          if (item.type === 'series' && item.season && item.episode) {
+            return (
+              <View style={styles.episodeRow}>
+                <Text style={[styles.episodeText, { color: currentTheme.colors.mediumEmphasis }]}>
+                  Season {item.season}
+                </Text>
+                {item.episodeTitle && (
+                  <Text 
+                    style={[styles.episodeTitle, { color: currentTheme.colors.mediumEmphasis }]}
+                    numberOfLines={1}
+                  >
+                    {item.episodeTitle}
+                  </Text>
+                )}
+              </View>
+            );
+          } else {
+            return (
+              <Text style={[styles.yearText, { color: currentTheme.colors.mediumEmphasis }]}>
+                {item.year} • {item.type === 'movie' ? 'Movie' : 'Series'}
+              </Text>
+            );
+          }
+        })()}
+
+        {/* Progress Bar */}
+        {item.progress > 0 && (
+          <View style={styles.wideProgressContainer}>
+            <View style={styles.wideProgressTrack}>
+              <View 
+                style={[
+                  styles.wideProgressBar, 
+                  { 
+                    width: `${item.progress}%`, 
+                    backgroundColor: currentTheme.colors.primary 
+                  }
+                ]} 
+              />
+            </View>
+            <Text style={[styles.progressLabel, { color: currentTheme.colors.textMuted }]}>
+              {Math.round(item.progress)}% watched
+            </Text>
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+  ), [currentTheme.colors, handleContentPress, handleLongPress, deletingItemId]);
+
+  // Memoized key extractor
+  const keyExtractor = useCallback((item: ContinueWatchingItem) => `continue-${item.id}-${item.type}`, []);
+
+  // Memoized item separator
+  const ItemSeparator = useCallback(() => <View style={{ width: 16 }} />, []);
+
   // If no continue watching items, don't render anything
   if (continueWatchingItems.length === 0) {
     return null;
@@ -519,119 +632,15 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       
       <FlashList
         data={continueWatchingItems}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[styles.wideContentItem, {
-              backgroundColor: currentTheme.colors.elevation1,
-              borderColor: currentTheme.colors.border,
-              shadowColor: currentTheme.colors.black
-            }]}
-            activeOpacity={0.8}
-            onPress={() => handleContentPress(item.id, item.type)}
-            onLongPress={() => handleLongPress(item)}
-            delayLongPress={800}
-          >
-            {/* Poster Image */}
-            <View style={styles.posterContainer}>
-              <ExpoImage
-                source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
-                style={styles.continueWatchingPoster}
-                contentFit="cover"
-                cachePolicy="memory"
-                transition={0}
-                placeholder={{ uri: 'https://via.placeholder.com/300x450' }}
-                placeholderContentFit="cover"
-                recyclingKey={item.id}
-              />
-              
-              {/* Delete Indicator Overlay */}
-              {deletingItemId === item.id && (
-                <View style={styles.deletingOverlay}>
-                  <ActivityIndicator size="large" color="#FFFFFF" />
-                </View>
-              )}
-            </View>
-
-            {/* Content Details */}
-            <View style={styles.contentDetails}>
-              <View style={styles.titleRow}>
-                {(() => {
-                  const isUpNext = item.progress === 0;
-                  return (
-                    <View style={styles.titleRow}>
-                      <Text 
-                        style={[styles.contentTitle, { color: currentTheme.colors.highEmphasis }]}
-                        numberOfLines={1}
-                      >
-                        {item.name}
-                      </Text>
-                      {isUpNext && (
-                      <View style={[styles.progressBadge, { backgroundColor: currentTheme.colors.primary }]}>
-                          <Text style={styles.progressText}>Up Next</Text>
-                      </View>
-                      )}
-                    </View>
-                  );
-                })()}
-              </View>
-
-              {/* Episode Info or Year */}
-              {(() => {
-                if (item.type === 'series' && item.season && item.episode) {
-                  return (
-                    <View style={styles.episodeRow}>
-                      <Text style={[styles.episodeText, { color: currentTheme.colors.mediumEmphasis }]}>
-                        Season {item.season}
-                      </Text>
-                      {item.episodeTitle && (
-                        <Text 
-                          style={[styles.episodeTitle, { color: currentTheme.colors.mediumEmphasis }]}
-                          numberOfLines={1}
-                        >
-                          {item.episodeTitle}
-                        </Text>
-                      )}
-                    </View>
-                  );
-                } else {
-                  return (
-                    <Text style={[styles.yearText, { color: currentTheme.colors.mediumEmphasis }]}>
-                      {item.year} • {item.type === 'movie' ? 'Movie' : 'Series'}
-                    </Text>
-                  );
-                }
-              })()}
-
-              {/* Progress Bar */}
-              {item.progress > 0 && (
-                <View style={styles.wideProgressContainer}>
-                  <View style={styles.wideProgressTrack}>
-                    <View 
-                      style={[
-                        styles.wideProgressBar, 
-                        { 
-                          width: `${item.progress}%`, 
-                          backgroundColor: currentTheme.colors.primary 
-                        }
-                      ]} 
-                    />
-                  </View>
-                  <Text style={[styles.progressLabel, { color: currentTheme.colors.textMuted }]}>
-                    {Math.round(item.progress)}% watched
-                  </Text>
-                </View>
-              )}
-            </View>
-          </TouchableOpacity>
-        )}
-        keyExtractor={(item) => `continue-${item.id}-${item.type}`}
+        renderItem={renderContinueWatchingItem}
+        keyExtractor={keyExtractor}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.wideList}
-        ItemSeparatorComponent={() => <View style={{ width: 16 }} />}
+        ItemSeparatorComponent={ItemSeparator}
         onEndReachedThreshold={0.7}
         onEndReached={() => {}}
-        estimatedItemSize={280 + 16}
+        removeClippedSubviews={true}
       />
     </Animated.View>
   );
@@ -826,4 +835,7 @@ const styles = StyleSheet.create({
   },
 });
 
-export default React.memo(ContinueWatchingSection);
+export default React.memo(ContinueWatchingSection, (prevProps, nextProps) => {
+  // This component has no props that would cause re-renders
+  return true;
+});

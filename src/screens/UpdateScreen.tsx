@@ -9,8 +9,7 @@ import {
   StatusBar,
   Alert,
   Platform,
-  Dimensions,
-  Clipboard
+  Dimensions
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -70,8 +69,7 @@ const UpdateScreen: React.FC = () => {
   const [isChecking, setIsChecking] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
-  const [logs, setLogs] = useState<string[]>([]);
-  const [showLogs, setShowLogs] = useState(false);
+  // Logs removed
   const [lastOperation, setLastOperation] = useState<string>('');
   const [updateProgress, setUpdateProgress] = useState<number>(0);
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'downloading' | 'installing' | 'success' | 'error'>('idle');
@@ -87,9 +85,7 @@ const UpdateScreen: React.FC = () => {
       setUpdateInfo(info);
       setLastChecked(new Date());
       
-      // Refresh logs after operation
-      const logs = UpdateService.getLogs();
-      setLogs(logs);
+      // Logs disabled
       
       if (info.isAvailable) {
         setUpdateStatus('available');
@@ -130,9 +126,7 @@ const UpdateScreen: React.FC = () => {
       setUpdateStatus('installing');
       setLastOperation('Installing update...');
       
-      // Refresh logs after operation
-      const logs = UpdateService.getLogs();
-      setLogs(logs);
+      // Logs disabled
       
       if (success) {
         setUpdateStatus('success');
@@ -156,8 +150,7 @@ const UpdateScreen: React.FC = () => {
   const getCurrentUpdateInfo = async () => {
     const info = await UpdateService.getCurrentUpdateInfo();
     setCurrentInfo(info);
-    const logs = UpdateService.getLogs();
-    setLogs(logs);
+    // Logs disabled
   };
 
   // Extract release notes from various possible manifest fields
@@ -184,41 +177,12 @@ const UpdateScreen: React.FC = () => {
     );
   };
 
-  const refreshLogs = () => {
-    const logs = UpdateService.getLogs();
-    setLogs(logs);
-  };
-
-  const clearLogs = () => {
-    UpdateService.clearLogs();
-    setLogs([]);
-    setLastOperation('Logs cleared');
-  };
-
-  const copyLog = (logText: string) => {
-    Clipboard.setString(logText);
-    Alert.alert('Copied', 'Log entry copied to clipboard');
-  };
-
-  const copyAllLogs = () => {
-    const allLogsText = logs.join('\n');
-    Clipboard.setString(allLogsText);
-    Alert.alert('Copied', 'All logs copied to clipboard');
-  };
-
-  const addTestLog = () => {
-    UpdateService.addTestLog(`Test log entry at ${new Date().toISOString()}`);
-    const logs = UpdateService.getLogs();
-    setLogs(logs);
-    setLastOperation('Test log added');
-  };
+  // Logs disabled: remove actions
 
   const testConnectivity = async () => {
     try {
       setLastOperation('Testing connectivity...');
       const isReachable = await UpdateService.testUpdateConnectivity();
-      const logs = UpdateService.getLogs();
-      setLogs(logs);
       
       if (isReachable) {
         setLastOperation('Update server is reachable');
@@ -228,8 +192,7 @@ const UpdateScreen: React.FC = () => {
     } catch (error) {
       if (__DEV__) console.error('Error testing connectivity:', error);
       setLastOperation(`Connectivity test error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      const logs = UpdateService.getLogs();
-      setLogs(logs);
+      // Logs disabled
     }
   };
 
@@ -237,14 +200,11 @@ const UpdateScreen: React.FC = () => {
     try {
       setLastOperation('Testing asset URLs...');
       await UpdateService.testAllAssetUrls();
-      const logs = UpdateService.getLogs();
-      setLogs(logs);
       setLastOperation('Asset URL testing completed');
     } catch (error) {
       if (__DEV__) console.error('Error testing asset URLs:', error);
       setLastOperation(`Asset URL test error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      const logs = UpdateService.getLogs();
-      setLogs(logs);
+      // Logs disabled
     }
   };
 
@@ -252,8 +212,6 @@ const UpdateScreen: React.FC = () => {
   useEffect(() => {
     const loadInitialData = async () => {
       await getCurrentUpdateInfo();
-      // Also refresh logs to ensure we have the latest
-      refreshLogs();
     };
     loadInitialData();
   }, []);
@@ -505,30 +463,10 @@ const UpdateScreen: React.FC = () => {
                 )}
               </View>
 
-              {/* Advanced Toggle */}
-              <TouchableOpacity
-                style={[styles.modernAdvancedToggle, { backgroundColor: `${currentTheme.colors.primary}08` }]}
-                onPress={() => setShowLogs(!showLogs)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.advancedToggleLeft}>
-                  <MaterialIcons name="code" size={18} color={currentTheme.colors.primary} />
-                  <Text style={[styles.advancedToggleLabel, { color: currentTheme.colors.primary }]}>
-                    Developer Logs
-                  </Text>
-                  <View style={[styles.logsBadge, { backgroundColor: currentTheme.colors.primary }]}>
-                    <Text style={styles.logsBadgeText}>{logs.length}</Text>
-                  </View>
-                </View>
-                <MaterialIcons 
-                  name={showLogs ? "keyboard-arrow-up" : "keyboard-arrow-down"} 
-                  size={20} 
-                  color={currentTheme.colors.primary} 
-                />
-              </TouchableOpacity>
+              {/* Developer Logs removed */}
             </SettingsCard>
 
-            {showLogs && (
+            {false && (
               <SettingsCard title="UPDATE LOGS" isTablet={isTablet}>
                 <View style={styles.logsContainer}>
                   <View style={styles.logsHeader}>
@@ -550,34 +488,10 @@ const UpdateScreen: React.FC = () => {
                       >
                         <MaterialIcons name="link" size={16} color={currentTheme.colors.primary} />
                       </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.logActionButton, { backgroundColor: currentTheme.colors.elevation2 }]}
-                        onPress={addTestLog}
-                        activeOpacity={0.7}
-                      >
-                        <MaterialIcons name="add" size={16} color={currentTheme.colors.primary} />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.logActionButton, { backgroundColor: currentTheme.colors.elevation2 }]}
-                        onPress={copyAllLogs}
-                        activeOpacity={0.7}
-                      >
-                        <MaterialIcons name="content-copy" size={16} color={currentTheme.colors.primary} />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.logActionButton, { backgroundColor: currentTheme.colors.elevation2 }]}
-                        onPress={refreshLogs}
-                        activeOpacity={0.7}
-                      >
-                        <MaterialIcons name="refresh" size={16} color={currentTheme.colors.primary} />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.logActionButton, { backgroundColor: currentTheme.colors.elevation2 }]}
-                        onPress={clearLogs}
-                        activeOpacity={0.7}
-                      >
-                        <MaterialIcons name="clear" size={16} color={currentTheme.colors.error || '#ff4444'} />
-                      </TouchableOpacity>
+                      {/* Test log removed */}
+                      {/* Copy all logs removed */}
+                      {/* Refresh logs removed */}
+                      {/* Clear logs removed */}
                     </View>
                   </View>
                   
@@ -586,14 +500,12 @@ const UpdateScreen: React.FC = () => {
                     showsVerticalScrollIndicator={true}
                     nestedScrollEnabled={true}
                   >
-                    {logs.length === 0 ? (
-                      <Text style={[styles.noLogsText, { color: currentTheme.colors.mediumEmphasis }]}>
-                        No logs available
-                      </Text>
+                    {false ? (
+                      <Text style={[styles.noLogsText, { color: currentTheme.colors.mediumEmphasis }]}>No logs available</Text>
                     ) : (
-                      logs.map((log, index) => {
-                        const isError = log.includes('[ERROR]');
-                        const isWarning = log.includes('[WARN]');
+                      ([] as string[]).map((log, index) => {
+                        const isError = log.indexOf('[ERROR]') !== -1;
+                        const isWarning = log.indexOf('[WARN]') !== -1;
                         
                         return (
                           <TouchableOpacity 
@@ -602,7 +514,7 @@ const UpdateScreen: React.FC = () => {
                               styles.logEntry,
                               { backgroundColor: 'rgba(255,255,255,0.05)' }
                             ]}
-                            onPress={() => copyLog(log)}
+                            onPress={() => {}}
                             activeOpacity={0.7}
                           >
                             <View style={styles.logEntryContent}>

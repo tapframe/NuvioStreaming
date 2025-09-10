@@ -39,6 +39,7 @@ interface FeaturedContentProps {
   isSaved: boolean;
   handleSaveToLibrary: () => void;
   loading?: boolean;
+  onRetry?: () => void;
 }
 
 // Cache to store preloaded images
@@ -53,7 +54,7 @@ const isTablet = width >= 768;
 const nowMs = () => Date.now();
 const since = (start: number) => `${(nowMs() - start).toFixed(0)}ms`;
 
-const NoFeaturedContent = () => {
+const NoFeaturedContent = ({ onRetry }: { onRetry?: () => void }) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
 
@@ -105,29 +106,42 @@ const NoFeaturedContent = () => {
   return (
     <View style={styles.noContentContainer}>
       <MaterialIcons name="theaters" size={48} color={currentTheme.colors.mediumEmphasis} />
-      <Text style={styles.noContentTitle}>No Featured Content</Text>
+      <Text style={styles.noContentTitle}>{onRetry ? 'Couldn\'t load featured content' : 'No Featured Content'}</Text>
       <Text style={styles.noContentText}>
-        Install addons with catalogs or change the content source in your settings.
+        {onRetry
+          ? 'There was a problem fetching featured content. Please check your connection and try again.'
+          : 'Install addons with catalogs or change the content source in your settings.'}
       </Text>
       <View style={styles.noContentButtons}>
-        <TouchableOpacity
-          style={[styles.noContentButton, { backgroundColor: currentTheme.colors.primary }]}
-          onPress={() => navigation.navigate('Addons')}
-        >
-          <Text style={[styles.noContentButtonText, { color: currentTheme.colors.white }]}>Install Addons</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.noContentButton}
-          onPress={() => navigation.navigate('HomeScreenSettings')}
-        >
-          <Text style={styles.noContentButtonText}>Settings</Text>
-        </TouchableOpacity>
+        {onRetry ? (
+          <TouchableOpacity
+            style={[styles.noContentButton, { backgroundColor: currentTheme.colors.primary }]}
+            onPress={onRetry}
+          >
+            <Text style={[styles.noContentButtonText, { color: currentTheme.colors.white }]}>Retry</Text>
+          </TouchableOpacity>
+        ) : (
+          <>
+            <TouchableOpacity
+              style={[styles.noContentButton, { backgroundColor: currentTheme.colors.primary }]}
+              onPress={() => navigation.navigate('Addons')}
+            >
+              <Text style={[styles.noContentButtonText, { color: currentTheme.colors.white }]}>Install Addons</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.noContentButton}
+              onPress={() => navigation.navigate('HomeScreenSettings')}
+            >
+              <Text style={styles.noContentButtonText}>Settings</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     </View>
   );
 };
 
-const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loading }: FeaturedContentProps) => {
+const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loading, onRetry }: FeaturedContentProps) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
@@ -520,7 +534,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
   if (!featuredContent) {
     // Suppress empty state while loading to avoid flash on startup/hydration
     logger.debug('[FeaturedContent] render:no-featured-content', { sinceMount: since(firstRenderTsRef.current) });
-    return <NoFeaturedContent />;
+    return <NoFeaturedContent onRetry={onRetry} />;
   }
 
   if (isTablet) {

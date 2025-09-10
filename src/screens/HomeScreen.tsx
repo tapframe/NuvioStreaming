@@ -133,34 +133,31 @@ const HomeScreen = () => {
     refreshFeatured 
   } = useFeaturedContent();
 
-    // Progressive catalog loading function with performance optimizations
+  // Progressive catalog loading function with performance optimizations
   const loadCatalogsProgressively = useCallback(async () => {
     setCatalogsLoading(true);
     setCatalogs([]);
     setLoadedCatalogCount(0);
     
     try {
-      const addons = await catalogService.getAllAddons();
+      const [addons, catalogSettingsJson, addonManifests] = await Promise.all([
+        catalogService.getAllAddons(),
+        AsyncStorage.getItem(CATALOG_SETTINGS_KEY),
+        stremioService.getInstalledAddonsAsync()
+      ]);
       
       // Set hasAddons state based on whether we have any addons
       setHasAddons(addons.length > 0);
       
-      // Load catalog settings to check which catalogs are enabled
-      const catalogSettingsJson = await AsyncStorage.getItem(CATALOG_SETTINGS_KEY);
       const catalogSettings = catalogSettingsJson ? JSON.parse(catalogSettingsJson) : {};
       
-      // Hoist addon manifest loading out of the loop
-      const addonManifests = await stremioService.getInstalledAddonsAsync();
-      
       // Create placeholder array with proper order and track indices
-      const catalogPlaceholders: (CatalogContent | null)[] = [];
-      const catalogPromises: Promise<void>[] = [];
       let catalogIndex = 0;
+      const catalogQueue: (() => Promise<void>)[] = [];
       
       // Limit concurrent catalog loading to prevent overwhelming the system
       const MAX_CONCURRENT_CATALOGS = 1; // Single catalog at a time to minimize heating/memory
       let activeCatalogLoads = 0;
-      const catalogQueue: (() => Promise<void>)[] = [];
       
       const processCatalogQueue = async () => {
         while (catalogQueue.length > 0 && activeCatalogLoads < MAX_CONCURRENT_CATALOGS) {
@@ -187,7 +184,6 @@ const HomeScreen = () => {
             // Only load enabled catalogs
             if (isEnabled) {
               const currentIndex = catalogIndex;
-              catalogPlaceholders.push(null); // Reserve position
               
               const catalogLoader = async () => {
                 try {
@@ -218,7 +214,6 @@ const HomeScreen = () => {
                       certification: meta.certification
                     }));
 
-                    // Skip prefetching to reduce memory pressure (keep disabled)
                     // Resolve custom display name; if custom exists, use as-is
                     const originalName = catalog.name || catalog.id;
                     let displayName = await getCatalogDisplayName(addon.id, catalog.type, catalog.id, originalName);
@@ -305,11 +300,13 @@ const HomeScreen = () => {
     setHomeLoading(isLoading);
   }, [isLoading, setHomeLoading]);
 
-  // React to settings changes
+  // React to settings changes (memoized to prevent unnecessary effects)
+  const settingsShowHero = settings.showHeroSection;
+  const settingsFeaturedSource = settings.featuredContentSource;
   useEffect(() => {
-    setShowHeroSection(settings.showHeroSection);
-    setFeaturedContentSource(settings.featuredContentSource);
-  }, [settings]);
+    setShowHeroSection(settingsShowHero);
+    setFeaturedContentSource(settingsFeaturedSource);
+  }, [settingsShowHero, settingsFeaturedSource]);
 
   // Load catalogs progressively on mount and when settings change
   useEffect(() => {
@@ -362,7 +359,7 @@ const HomeScreen = () => {
     const unsubscribe = settingsEmitter.addListener(handleSettingsChange);
     
     return unsubscribe;
-  }, [settings]);
+  }, [settings.showHeroSection, settings.featuredContentSource]);
 
   useFocusEffect(
     useCallback(() => {
@@ -374,10 +371,8 @@ const HomeScreen = () => {
         
         // Allow free rotation on tablets; lock portrait on phones
         try {
-          const { width: dw, height: dh } = Dimensions.get('window');
-          const smallestDimension = Math.min(dw, dh);
-          const isTablet = (Platform.OS === 'ios' ? (Platform as any).isPad === true : smallestDimension >= 768);
-          if (isTablet) {
+          const isTabletDevice = Platform.OS === 'ios' ? (Platform as any).isPad === true : isTablet;
+          if (isTabletDevice) {
             ScreenOrientation.unlockAsync();
           } else {
             ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
@@ -567,7 +562,8 @@ const HomeScreen = () => {
     return null;
   }, [isLoading, currentTheme.colors]);
 
-  const listData: HomeScreenListItem[] = useMemo(() => {
+  // Stabilize listData to prevent FlashList re-renders
+  const listData = useMemo(() => {
     const data: HomeScreenListItem[] = [];
 
     // If no addons are installed, just show the welcome component
@@ -577,7 +573,6 @@ const HomeScreen = () => {
     }
 
     // Normal flow when addons are present (featured moved to ListHeaderComponent)
-
     data.push({ type: 'thisWeek', key: 'thisWeek' });
 
     // Only show a limited number of catalogs initially for performance
@@ -594,25 +589,27 @@ const HomeScreen = () => {
 
     // Add a "Load More" button if there are more catalogs to show
     if (catalogs.length > visibleCatalogCount && catalogs.filter(c => c).length > visibleCatalogCount) {
-      data.push({ type: 'loadMore', key: 'load-more' } as any);
+      data.push({ type: 'loadMore', key: 'load-more' });
     }
 
     return data;
-  }, [hasAddons, showHeroSection, catalogs, visibleCatalogCount]);
+  }, [hasAddons, catalogs, visibleCatalogCount]);
 
   const handleLoadMoreCatalogs = useCallback(() => {
     setVisibleCatalogCount(prev => Math.min(prev + 3, catalogs.length));
   }, [catalogs.length]);
 
-  // Add memory cleanup on scroll end
-  const handleScrollEnd = useCallback(() => {
-    // No-op; avoid clearing image memory cache here to prevent decode thrash/heating
+  // Stable keyExtractor for FlashList
+  const keyExtractor = useCallback((item: HomeScreenListItem) => item.key, []);
+
+  // Memoize device check to avoid repeated Dimensions.get calls
+  const isTablet = useMemo(() => {
+    const deviceWidth = Dimensions.get('window').width;
+    return deviceWidth >= 768;
   }, []);
 
   // Memoize individual section components to prevent re-renders
   const memoizedFeaturedContent = useMemo(() => {
-    const deviceWidth = Dimensions.get('window').width;
-    const isTablet = deviceWidth >= 768;
     const heroStyleToUse = isTablet ? 'legacy' : settings.heroStyle;
     return heroStyleToUse === 'carousel' ? (
       <HeroCarousel
@@ -629,7 +626,7 @@ const HomeScreen = () => {
         loading={featuredLoading}
       />
     );
-  }, [settings.heroStyle, showHeroSection, featuredContentSource, featuredContent, allFeaturedContent, isSaved, handleSaveToLibrary]);
+  }, [isTablet, settings.heroStyle, showHeroSection, featuredContentSource, featuredContent, allFeaturedContent, isSaved, handleSaveToLibrary, featuredLoading]);
 
   const memoizedThisWeekSection = useMemo(() => <ThisWeekSection />, []);
   const memoizedContinueWatchingSection = useMemo(() => <ContinueWatchingSection ref={continueWatchingRef} />, []);
@@ -649,39 +646,40 @@ const HomeScreen = () => {
     HeaderVisibility.setHidden(hide);
   }, []);
 
-  const renderListItem = useCallback(({ item, index }: { item: HomeScreenListItem, index: number }) => {
-    const wrapper = (child: React.ReactNode) => (
-      <Animated.View>
-        {child}
-      </Animated.View>
-    );
+  // Stabilize renderItem to prevent FlashList re-renders
+  const renderListItem = useCallback(({ item }: { item: HomeScreenListItem; index: number }) => {
     switch (item.type) {
-      // featured is rendered via ListHeaderComponent to avoid remounts
       case 'thisWeek':
-        return wrapper(memoizedThisWeekSection);
+        return <Animated.View>{memoizedThisWeekSection}</Animated.View>;
       case 'continueWatching':
         return null; // Moved to ListHeaderComponent to avoid remounts on scroll
       case 'catalog':
-        return wrapper(<CatalogSection catalog={item.catalog} />);
+        return (
+          <Animated.View>
+            <CatalogSection catalog={item.catalog} />
+          </Animated.View>
+        );
       case 'placeholder':
-        return wrapper(
-          <View style={styles.catalogPlaceholder}>
-            <View style={styles.placeholderHeader}>
-              <View style={[styles.placeholderTitle, { backgroundColor: currentTheme.colors.elevation1 }]} />
-              <LoadingSpinner size="small" text="" />
+        return (
+          <Animated.View>
+            <View style={styles.catalogPlaceholder}>
+              <View style={styles.placeholderHeader}>
+                <View style={[styles.placeholderTitle, { backgroundColor: currentTheme.colors.elevation1 }]} />
+                <LoadingSpinner size="small" text="" />
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.placeholderPosters}>
+                {[...Array(3)].map((_, posterIndex) => (
+                  <View
+                    key={posterIndex}
+                    style={[styles.placeholderPoster, { backgroundColor: currentTheme.colors.elevation1 }]}
+                  />
+                ))}
+              </ScrollView>
             </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.placeholderPosters}>
-              {[...Array(3)].map((_, posterIndex) => (
-                <View
-                  key={posterIndex}
-                  style={[styles.placeholderPoster, { backgroundColor: currentTheme.colors.elevation1 }]}
-                />
-              ))}
-            </ScrollView>
-          </View>
+          </Animated.View>
         );
       case 'loadMore':
         return (
@@ -700,19 +698,11 @@ const HomeScreen = () => {
           </Animated.View>
         );
       case 'welcome':
-        return wrapper(<FirstTimeWelcome />);
+        return <Animated.View><FirstTimeWelcome /></Animated.View>;
       default:
         return null;
     }
-  }, [
-    showHeroSection,
-    featuredContentSource,
-    featuredContent,
-    isSaved,
-    handleSaveToLibrary,
-    currentTheme.colors,
-    handleLoadMoreCatalogs
-  ]);
+  }, [memoizedThisWeekSection, currentTheme.colors.elevation1, currentTheme.colors.primary, currentTheme.colors.white, handleLoadMoreCatalogs]);
 
   // FlashList: using minimal props per installed version
 
@@ -737,6 +727,29 @@ const HomeScreen = () => {
     </>
   ), [catalogsLoading, catalogs, loadedCatalogCount, totalCatalogsRef.current, navigation, currentTheme.colors]);
 
+  // Memoize scroll handler to prevent recreating on every render
+  const handleScroll = useCallback((event: any) => {
+    const y = event.nativeEvent.contentOffset.y;
+    const dy = y - lastScrollYRef.current;
+    lastScrollYRef.current = y;
+    if (y <= 10) {
+      toggleHeader(false);
+      return;
+    }
+    // Threshold to avoid jitter
+    if (dy > 6) {
+      toggleHeader(true); // scrolling down
+    } else if (dy < -6) {
+      toggleHeader(false); // scrolling up
+    }
+  }, [toggleHeader]);
+
+  // Memoize content container style
+  const contentContainerStyle = useMemo(() => 
+    StyleSheet.flatten([styles.scrollContent, { paddingTop: insets.top }]),
+    [insets.top]
+  );
+
   // Memoize the main content section
   const renderMainContent = useMemo(() => {
     if (isLoading) return null;
@@ -751,42 +764,31 @@ const HomeScreen = () => {
         <FlashList
           data={listData}
           renderItem={renderListItem}
-          keyExtractor={item => item.key}
-          contentContainerStyle={StyleSheet.flatten([
-            styles.scrollContent,
-            { paddingTop: insets.top }
-          ])}
+          keyExtractor={keyExtractor}
+          contentContainerStyle={contentContainerStyle}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={memoizedHeader}
           ListFooterComponent={ListFooterComponent}
           onEndReached={handleLoadMoreCatalogs}
           onEndReachedThreshold={0.6}
-          scrollEventThrottle={32}
-          onScroll={event => {
-            const y = event.nativeEvent.contentOffset.y;
-            const dy = y - lastScrollYRef.current;
-            lastScrollYRef.current = y;
-            if (y <= 10) {
-              toggleHeader(false);
-              return;
-            }
-            // Threshold to avoid jitter
-            if (dy > 6) {
-              toggleHeader(true); // scrolling down
-            } else if (dy < -6) {
-              toggleHeader(false); // scrolling up
-            }
-          }}
+          removeClippedSubviews={true}
+          scrollEventThrottle={64}
+          onScroll={handleScroll}
         />
         {/* Toasts are rendered globally at root */}
       </View>
     );
   }, [
     isLoading,
-    currentTheme.colors,
+    currentTheme.colors.darkBackground,
     listData,
     renderListItem,
-    ListFooterComponent
+    keyExtractor,
+    contentContainerStyle,
+    memoizedHeader,
+    ListFooterComponent,
+    handleLoadMoreCatalogs,
+    handleScroll
   ]);
 
   return isLoading ? renderLoadingScreen : renderMainContent;

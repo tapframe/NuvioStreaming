@@ -20,7 +20,7 @@ interface UpdatePopupProps {
   updateInfo: {
     isAvailable: boolean;
     manifest?: {
-      id: string;
+      id?: string;
       version?: string;
       description?: string;
     };

@@ -59,6 +59,14 @@ enableScreens(true);
 
 // Inner app component that uses the theme context
 const ThemedApp = () => {
+  // Log JS engine once at startup
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const engine = (global as any).HermesInternal ? 'Hermes' : 'JSC';
+      console.log('JS Engine:', engine);
+    } catch {}
+  }, []);
   const { currentTheme } = useTheme();
   const [isAppReady, setIsAppReady] = useState(false);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
