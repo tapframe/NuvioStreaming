@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { StreamingContent } from '../services/catalogService';
 import { catalogService } from '../services/catalogService';
 import { stremioService } from '../services/stremioService';
@@ -134,6 +134,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
   const [availableStreams, setAvailableStreams] = useState<{ [sourceType: string]: Stream }>({});
   const [scraperStatuses, setScraperStatuses] = useState<ScraperStatus[]>([]);
   const [activeFetchingScrapers, setActiveFetchingScrapers] = useState<string[]>([]);
+  // Prevent re-initializing season selection repeatedly for the same series
+  const initializedSeasonRef = useRef(false);
 
   // Add hook for persistent seasons
   const { getSeason, saveSeason } = usePersistentSeasons();
@@ -591,12 +593,21 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         
         setGroupedEpisodes(groupedAddonEpisodes);
         
-                 // Set the first available season
-         const seasons = Object.keys(groupedAddonEpisodes).map(Number);
-         const firstSeason = Math.min(...seasons);
-         logger.log(`📺 Setting season ${firstSeason} as selected (${groupedAddonEpisodes[firstSeason]?.length || 0} episodes)`);
-         setSelectedSeason(firstSeason);
-         setEpisodes(groupedAddonEpisodes[firstSeason] || []);
+        // Determine initial season only once per series
+        const seasons = Object.keys(groupedAddonEpisodes).map(Number);
+        const firstSeason = Math.min(...seasons);
+        if (!initializedSeasonRef.current) {
+          const nextSeason = firstSeason;
+          if (selectedSeason !== nextSeason) {
+            logger.log(`📺 Setting season ${nextSeason} as selected (${groupedAddonEpisodes[nextSeason]?.length || 0} episodes)`);
+            setSelectedSeason(nextSeason);
+          }
+          setEpisodes(groupedAddonEpisodes[nextSeason] || []);
+          initializedSeasonRef.current = true;
+        } else {
+          // Keep current selection; refresh episode list for selected season
+          setEpisodes(groupedAddonEpisodes[selectedSeason] || []);
+        }
         
         // Try to get TMDB ID for additional metadata (cast, etc.) but don't override episodes
         const tmdbIdResult = await tmdbService.findTMDBIdByIMDB(id);
@@ -640,61 +651,55 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         // Get the first available season as fallback
         const firstSeason = Math.min(...Object.keys(allEpisodes).map(Number));
         
-        // Check for watch progress to auto-select season
-        let selectedSeasonNumber = firstSeason;
-        
-        try {
-          // Check watch progress for auto-season selection
-          const allProgress = await storageService.getAllWatchProgress();
-          
-          // Find the most recently watched episode for this series
-          let mostRecentEpisodeId = '';
-          let mostRecentTimestamp = 0;
-          
-          Object.entries(allProgress).forEach(([key, progress]) => {
-            if (key.includes(`series:${id}:`)) {
-              const episodeId = key.split(`series:${id}:`)[1];
-              if (progress.lastUpdated > mostRecentTimestamp && progress.currentTime > 0) {
-                mostRecentTimestamp = progress.lastUpdated;
-                mostRecentEpisodeId = episodeId;
+        if (!initializedSeasonRef.current) {
+          // Check for watch progress to auto-select season
+          let selectedSeasonNumber = firstSeason;
+          try {
+            const allProgress = await storageService.getAllWatchProgress();
+            let mostRecentEpisodeId = '';
+            let mostRecentTimestamp = 0;
+            Object.entries(allProgress).forEach(([key, progress]) => {
+              if (key.includes(`series:${id}:`)) {
+                const episodeId = key.split(`series:${id}:`)[1];
+                if (progress.lastUpdated > mostRecentTimestamp && progress.currentTime > 0) {
+                  mostRecentTimestamp = progress.lastUpdated;
+                  mostRecentEpisodeId = episodeId;
+                }
               }
-            }
-          });
-          
-          if (mostRecentEpisodeId) {
-            // Parse season number from episode ID
-            const parts = mostRecentEpisodeId.split(':');
-            if (parts.length === 3) {
-              const watchProgressSeason = parseInt(parts[1], 10);
-              if (transformedEpisodes[watchProgressSeason]) {
-                selectedSeasonNumber = watchProgressSeason;
-                logger.log(`[useMetadata] Auto-selected season ${selectedSeasonNumber} based on most recent watch progress for ${mostRecentEpisodeId}`);
+            });
+            if (mostRecentEpisodeId) {
+              const parts = mostRecentEpisodeId.split(':');
+              if (parts.length === 3) {
+                const watchProgressSeason = parseInt(parts[1], 10);
+                if (transformedEpisodes[watchProgressSeason]) {
+                  selectedSeasonNumber = watchProgressSeason;
+                  logger.log(`[useMetadata] Auto-selected season ${selectedSeasonNumber} based on most recent watch progress for ${mostRecentEpisodeId}`);
+                }
+              } else {
+                const allEpisodesList = Object.values(transformedEpisodes).flat();
+                const episode = allEpisodesList.find(ep => ep.stremioId === mostRecentEpisodeId);
+                if (episode) {
+                  selectedSeasonNumber = episode.season_number;
+                  logger.log(`[useMetadata] Auto-selected season ${selectedSeasonNumber} based on most recent watch progress for episode with stremioId ${mostRecentEpisodeId}`);
+                }
               }
             } else {
-              // Try to find episode by stremioId to get season
-              const allEpisodesList = Object.values(transformedEpisodes).flat();
-              const episode = allEpisodesList.find(ep => ep.stremioId === mostRecentEpisodeId);
-              if (episode) {
-                selectedSeasonNumber = episode.season_number;
-                logger.log(`[useMetadata] Auto-selected season ${selectedSeasonNumber} based on most recent watch progress for episode with stremioId ${mostRecentEpisodeId}`);
-              }
+              selectedSeasonNumber = getSeason(id, firstSeason);
+              logger.log(`[useMetadata] No watch progress found, using persistent season ${selectedSeasonNumber}`);
             }
-          } else {
-            // No watch progress found, use persistent storage as fallback
+          } catch (error) {
+            logger.error('[useMetadata] Error checking watch progress for season selection:', error);
             selectedSeasonNumber = getSeason(id, firstSeason);
-            logger.log(`[useMetadata] No watch progress found, using persistent season ${selectedSeasonNumber}`);
           }
-        } catch (error) {
-          logger.error('[useMetadata] Error checking watch progress for season selection:', error);
-          // Fall back to persistent storage
-          selectedSeasonNumber = getSeason(id, firstSeason);
+          if (selectedSeason !== selectedSeasonNumber) {
+            setSelectedSeason(selectedSeasonNumber);
+          }
+          setEpisodes(transformedEpisodes[selectedSeasonNumber] || []);
+          initializedSeasonRef.current = true;
+        } else {
+          // Keep existing selection stable and only refresh episode list for it
+          setEpisodes(transformedEpisodes[selectedSeason] || []);
         }
-        
-        // Set the selected season
-        setSelectedSeason(selectedSeasonNumber);
-        
-        // Set episodes for the selected season
-        setEpisodes(transformedEpisodes[selectedSeasonNumber] || []);
       }
     } catch (error) {
       if (__DEV__) console.error('Failed to load episodes:', error);
@@ -1082,6 +1087,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
   // Reset load attempts when id or type changes
   useEffect(() => {
     setLoadAttempts(0);
+    initializedSeasonRef.current = false;
   }, [id, type]);
 
   // Auto-retry on error with delay

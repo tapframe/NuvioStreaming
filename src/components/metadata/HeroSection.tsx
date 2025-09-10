@@ -723,6 +723,13 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   const shimmerOpacity = useSharedValue(0.3);
   const trailerOpacity = useSharedValue(0);
   const thumbnailOpacity = useSharedValue(1);
+  // Scroll-based pause/resume control
+  const pausedByScrollSV = useSharedValue(0);
+  const scrollGuardEnabledSV = useSharedValue(0);
+  const isPlayingSV = useSharedValue(0);
+  // Guards to avoid repeated auto-starts
+  const startedOnFocusRef = useRef(false);
+  const startedOnReadyRef = useRef(false);
   
   // Animation values for trailer unmute effects
   const actionButtonsOpacity = useSharedValue(1);
@@ -753,14 +760,18 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     // Smooth transition: fade out thumbnail, fade in trailer
     thumbnailOpacity.value = withTiming(0, { duration: 500 });
     trailerOpacity.value = withTiming(1, { duration: 500 });
+    // Enable scroll guard after a brief delay to avoid immediate pause on entry
+    scrollGuardEnabledSV.value = 0;
+    setTimeout(() => { scrollGuardEnabledSV.value = 1; }, 1000);
   }, [thumbnailOpacity, trailerOpacity, trailerPreloaded]);
 
-  // Ensure trailer state is properly synchronized when trailer becomes ready
+  // Auto-start trailer when ready on initial entry if enabled
   useEffect(() => {
-    if (trailerReady && settings?.showTrailers && !globalTrailerPlaying) {
-      // Only start trailer if it's the initial load, not when returning from other screens
-      // This prevents auto-starting when returning from StreamsScreen
-      logger.info('HeroSection', 'Trailer ready but not playing - not auto-starting to prevent unwanted playback');
+    if (trailerReady && settings?.showTrailers && !globalTrailerPlaying && !startedOnReadyRef.current) {
+      startedOnReadyRef.current = true;
+      logger.info('HeroSection', 'Trailer ready - auto-starting playback');
+      setTrailerPlaying(true);
+      isPlayingSV.value = 1;
     }
   }, [trailerReady, settings?.showTrailers, globalTrailerPlaying, setTrailerPlaying]);
 
@@ -1036,25 +1047,61 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     useCallback(() => {
       // Screen is focused - only resume trailer if it was previously playing and got interrupted
       logger.info('HeroSection', 'Screen focused');
-      
-      // Don't automatically resume trailer when returning from other screens
-      // This prevents the trailer from starting when returning from StreamsScreen
-      // The trailer should only resume if the user explicitly wants it to play
+      // If trailers are enabled and not playing, start playback (unless scrolled past resume threshold)
+      if (settings?.showTrailers) {
+        setTimeout(() => {
+          try {
+            const y = (scrollY as any).value || 0;
+            const resumeThreshold = heroHeight.value * 0.4;
+            if (y < resumeThreshold && !startedOnFocusRef.current && isPlayingSV.value === 0) {
+              setTrailerPlaying(true);
+              isPlayingSV.value = 1;
+              startedOnFocusRef.current = true;
+            }
+          } catch (_e) {
+            if (!startedOnFocusRef.current && isPlayingSV.value === 0) {
+              setTrailerPlaying(true);
+              isPlayingSV.value = 1;
+              startedOnFocusRef.current = true;
+            }
+          }
+        }, 50);
+      }
       
       return () => {
         // Stop trailer when leaving this screen to prevent background playback/heat
         logger.info('HeroSection', 'Screen unfocused - stopping trailer playback');
         setTrailerPlaying(false);
+        isPlayingSV.value = 0;
+        startedOnFocusRef.current = false;
+        startedOnReadyRef.current = false;
       };
-    }, [setTrailerPlaying])
+    }, [setTrailerPlaying, settings?.showTrailers])
   );
 
-  // Pause trailer when the hero is scrolled substantially off-screen
+  // Mirror playing state to shared value to use inside worklets
+  useEffect(() => {
+    isPlayingSV.value = globalTrailerPlaying ? 1 : 0;
+  }, [globalTrailerPlaying]);
+
+  // Pause/resume trailer based on scroll with hysteresis and guard
   useDerivedValue(() => {
+    'worklet';
     try {
-      const threshold = heroHeight.value * 0.6;
-      if (scrollY.value > threshold) {
+      if (!scrollGuardEnabledSV.value) return;
+      const pauseThreshold = heroHeight.value * 0.7;   // pause when beyond 70%
+      const resumeThreshold = heroHeight.value * 0.4;  // resume when back within 40%
+
+      const y = scrollY.value;
+
+      if (y > pauseThreshold && isPlayingSV.value === 1 && pausedByScrollSV.value === 0) {
+        pausedByScrollSV.value = 1;
         runOnJS(setTrailerPlaying)(false);
+        isPlayingSV.value = 0;
+      } else if (y < resumeThreshold && pausedByScrollSV.value === 1) {
+        pausedByScrollSV.value = 0;
+        runOnJS(setTrailerPlaying)(true);
+        isPlayingSV.value = 1;
       }
     } catch (e) {
       // no-op
