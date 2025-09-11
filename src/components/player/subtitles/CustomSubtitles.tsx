@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text } from 'react-native';
+import Svg, { Text as SvgText, TSpan } from 'react-native-svg';
 import { styles } from '../utils/playerStyles';
 
 interface CustomSubtitlesProps {
@@ -45,22 +46,22 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
   const inverseScale = 1 / zoomScale;
   const bgColor = subtitleBackground ? `rgba(0, 0, 0, ${Math.min(Math.max(backgroundOpacity, 0), 1)})` : 'transparent';
 
-  // Outline via textShadow for multi-direction pass
-  const outlineStyle = outline
-    ? {
-        textShadowColor: outlineColor,
-        textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: outlineWidth,
-      }
-    : {};
+  // When using crisp outline, prefer SVG text with real stroke instead of blur shadow
+  const useCrispSvgOutline = outline === true;
 
-  const shadowStyle = textShadow
+  const shadowStyle = (textShadow && !useCrispSvgOutline)
     ? {
         textShadowColor: 'rgba(0, 0, 0, 0.9)',
         textShadowOffset: { width: 2, height: 2 },
         textShadowRadius: 4,
       }
     : {};
+
+  // Prepare content lines
+  const lines = String(currentSubtitle).split(/\r?\n/);
+  const displayFontSize = subtitleSize * inverseScale;
+  const displayLineHeight = subtitleSize * lineHeightMultiplier * inverseScale;
+  const svgHeight = Math.max(displayFontSize, lines.length * displayLineHeight);
 
   return (
     <View
@@ -74,25 +75,87 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
         styles.customSubtitleWrapper,
         {
           backgroundColor: bgColor,
-          alignSelf: align === 'center' ? 'center' : align === 'left' ? 'flex-start' : 'flex-end',
+          position: 'relative',
+          width: '100%',
+          alignItems: 'center',
         }
       ]}>
-        <Text style={[
-          styles.customSubtitleText,
-          {
-            color: textColor,
-            fontFamily,
-            textAlign: align,
-            letterSpacing,
-            fontSize: subtitleSize * inverseScale,
-            lineHeight: subtitleSize * lineHeightMultiplier * inverseScale,
-            transform: [{ scale: inverseScale }],
-          },
-          shadowStyle,
-          outlineStyle,
-        ]}>
-          {currentSubtitle}
-        </Text>
+        {useCrispSvgOutline ? (
+          // Crisp outline using react-native-svg (stroke under, fill on top)
+          <Svg
+            width={'100%'}
+            height={svgHeight}
+            viewBox={`0 0 1000 ${svgHeight}`}
+            preserveAspectRatio="xMidYMid meet"
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          >
+            {(() => {
+              const anchor = align === 'center' ? 'middle' : align === 'left' ? 'start' : 'end';
+              const x = 500; // always compute against center of 0..1000; anchor handles alignment
+              const baseFontSize = displayFontSize;
+              const lineHeightPx = displayLineHeight;
+              const strokeWidth = Math.max(0.5, outlineWidth);
+              return (
+                <>
+                  {/* Stroke layer */}
+                  <SvgText
+                    x={x}
+                    y={baseFontSize}
+                    textAnchor={anchor}
+                    fill="none"
+                    stroke={outlineColor}
+                    strokeWidth={strokeWidth}
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                    strokeMiterlimit={2}
+                    fontFamily={fontFamily}
+                    fontSize={baseFontSize}
+                    letterSpacing={letterSpacing}
+                  >
+                    {lines.map((line, idx) => (
+                      <TSpan key={idx} x={x} dy={idx === 0 ? 0 : lineHeightPx}>
+                        {line}
+                      </TSpan>
+                    ))}
+                  </SvgText>
+                  {/* Fill layer */}
+                  <SvgText
+                    x={x}
+                    y={baseFontSize}
+                    textAnchor={anchor}
+                    fill={textColor}
+                    fontFamily={fontFamily}
+                    fontSize={baseFontSize}
+                    letterSpacing={letterSpacing}
+                  >
+                    {lines.map((line, idx) => (
+                      <TSpan key={idx} x={x} dy={idx === 0 ? 0 : lineHeightPx}>
+                        {line}
+                      </TSpan>
+                    ))}
+                  </SvgText>
+                </>
+              );
+            })()}
+          </Svg>
+        ) : (
+          // No outline: use RN Text with (optional) shadow
+          <Text style={[
+            styles.customSubtitleText,
+            {
+              color: textColor,
+              fontFamily,
+              textAlign: align,
+              letterSpacing,
+              fontSize: subtitleSize * inverseScale,
+              lineHeight: subtitleSize * lineHeightMultiplier * inverseScale,
+              transform: [{ scale: inverseScale }],
+            },
+            shadowStyle,
+          ]}>
+            {currentSubtitle}
+          </Text>
+        )}
       </View>
     </View>
   );

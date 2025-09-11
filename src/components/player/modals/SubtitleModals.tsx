@@ -679,7 +679,24 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                     {/* Outline */}
                     <View style={{ flex: 1, gap: 8 }}>
                       <Text style={{ color: 'white', fontWeight: '600' }}>Outline</Text>
-                      <TouchableOpacity onPress={() => setSubtitleOutline(!subtitleOutline)} style={{ paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: subtitleOutline ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', alignItems: 'center' }}>
+                      <TouchableOpacity onPress={() => {
+                        const next = !subtitleOutline;
+                        setSubtitleOutline(next);
+                        if (next) {
+                          // Apply sensible defaults when enabling outline unless user already set larger values
+                          if (subtitleSize < 24) {
+                            // increase by calling increase handler enough times or provide a direct setter via size controls
+                            // We only have +/- handlers here, so set via stepping until >= 24
+                            const steps = Math.ceil((24 - subtitleSize) / 1); // size is integer steps
+                            for (let i = 0; i < steps; i++) {
+                              increaseSubtitleSize();
+                            }
+                          }
+                          if (subtitleBottomOffset < 40) {
+                            setSubtitleBottomOffset(40);
+                          }
+                        }
+                      }} style={{ paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: subtitleOutline ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', alignItems: 'center' }}>
                         <Text style={{ color: '#fff', fontWeight: '700' }}>{subtitleOutline ? 'On' : 'Off'}</Text>
                       </TouchableOpacity>
                     </View>
