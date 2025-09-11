@@ -95,7 +95,8 @@ const ActionButtons = memo(({
   isWatched,
   watchProgress,
   groupedEpisodes,
-  metadata
+  metadata,
+  aiChatEnabled
 }: {
   handleShowStreams: () => void;
   toggleLibrary: () => void;
@@ -109,6 +110,7 @@ const ActionButtons = memo(({
   watchProgress: any;
   groupedEpisodes?: { [seasonNumber: number]: any[] };
   metadata: any;
+  aiChatEnabled?: boolean;
 }) => {
   const { currentTheme } = useTheme();
   
@@ -290,6 +292,7 @@ const ActionButtons = memo(({
       </TouchableOpacity>
 
       {/* AI Chat Button */}
+      {aiChatEnabled && (
       <TouchableOpacity
         style={[styles.iconButton, isTablet && styles.tabletIconButton]}
         onPress={() => {
@@ -327,6 +330,7 @@ const ActionButtons = memo(({
           color={currentTheme.colors.white}
         />
       </TouchableOpacity>
+      )}
 
       {type === 'series' && (
         <TouchableOpacity
@@ -1465,6 +1469,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
             watchProgress={watchProgress}
             groupedEpisodes={groupedEpisodes}
             metadata={metadata}
+            aiChatEnabled={settings?.aiChatEnabled}
           />
         </View>
       </LinearGradient>

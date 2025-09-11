@@ -72,6 +72,8 @@ export interface AppSettings {
   // Trailer settings
   showTrailers: boolean; // Enable/disable trailer playback in hero section
   trailerMuted: boolean; // Default to muted for better user experience
+  // AI
+  aiChatEnabled: boolean; // Enable/disable Ask AI and AI features
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -116,6 +118,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   // Trailer settings
   showTrailers: true, // Enable trailers by default
   trailerMuted: true, // Default to muted for better user experience
+  // AI
+  aiChatEnabled: false,
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';
