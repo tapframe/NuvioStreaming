@@ -86,6 +86,16 @@ const AndroidVideoPlayer: React.FC = () => {
     } as any;
   };
 
+  const defaultIosHeaders = () => {
+    if (Platform.OS !== 'ios') return {} as any;
+    return {
+      'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1 Nuvio/1.0',
+      'Accept': '*/*',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Connection': 'keep-alive',
+    } as any;
+  };
+
   // Initialize Trakt autosync
   const traktAutosync = useTraktAutosync({
     id: id || '',
@@ -203,6 +213,10 @@ const AndroidVideoPlayer: React.FC = () => {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string>('');
   const errorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // iOS startup timing diagnostics
+  const loadStartAtRef = useRef<number | null>(null);
+  const firstFrameAtRef = useRef<number | null>(null);
 
   // Pause overlay state
   const [showPauseOverlay, setShowPauseOverlay] = useState(false);
@@ -614,9 +628,10 @@ const AndroidVideoPlayer: React.FC = () => {
       isSeeking.current = false;
       // Resume playback on iOS if we paused for seeking
       if (Platform.OS === 'ios') {
-        const shouldResume = wasPlayingBeforeDragRef.current || iosWasPausedDuringSeekRef.current === false;
+        const shouldResume = wasPlayingBeforeDragRef.current || iosWasPausedDuringSeekRef.current === false || isDragging;
+        // Aggressively resume on iOS after seek if user was playing or this was a drag
         if (shouldResume) {
-          logger.log('[AndroidVideoPlayer] onSeek: resuming after drag/seek (iOS)');
+          logger.log('[AndroidVideoPlayer] onSeek: resuming after seek (iOS)');
           setPaused(false);
         } else {
           logger.log('[AndroidVideoPlayer] onSeek: staying paused (iOS)');
@@ -659,6 +674,13 @@ const AndroidVideoPlayer: React.FC = () => {
       const seekTime = Math.min(value, duration - END_EPSILON);
       seekToTime(seekTime);
       pendingSeekValue.current = null;
+      // iOS safety: if the user was playing before drag, ensure resume shortly after seek
+      if (Platform.OS === 'ios' && wasPlayingBeforeDragRef.current) {
+        setTimeout(() => {
+          logger.log('[AndroidVideoPlayer] handleSlidingComplete: forcing resume after seek (iOS)');
+          setPaused(false);
+        }, 60);
+      }
     }
     // Restart auto-hide timer after interaction finishes
     if (controlsTimeout.current) {
@@ -2067,12 +2089,26 @@ const AndroidVideoPlayer: React.FC = () => {
                 <Video
                   ref={videoRef}
                   style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
-                  source={{ uri: currentStreamUrl, headers: headers || defaultAndroidHeaders(), type: (currentVideoType as any) }}
+                  source={{ uri: currentStreamUrl, headers: headers || (Platform.OS === 'android' ? defaultAndroidHeaders() : defaultIosHeaders()), type: (currentVideoType as any) }}
                   paused={paused}
+                  onLoadStart={() => {
+                    loadStartAtRef.current = Date.now();
+                    logger.log('[AndroidVideoPlayer] onLoadStart');
+                  }}
                   onProgress={handleProgress}
                   onLoad={(e) => {
                     logger.log('[AndroidVideoPlayer] onLoad fired', { duration: e?.duration });
                     onLoad(e);
+                  }}
+                  onReadyForDisplay={() => {
+                    firstFrameAtRef.current = Date.now();
+                    const startedAt = loadStartAtRef.current;
+                    if (startedAt) {
+                      const deltaMs = firstFrameAtRef.current - startedAt;
+                      logger.log(`[AndroidVideoPlayer] First frame ready after ${deltaMs} ms (${Platform.OS})`);
+                    } else {
+                      logger.log('[AndroidVideoPlayer] First frame ready (no start timestamp)');
+                    }
                   }}
                   onSeek={onSeek}
                   onEnd={onEnd}
@@ -2096,14 +2132,13 @@ const AndroidVideoPlayer: React.FC = () => {
                   ignoreSilentSwitch="ignore"
                   mixWithOthers="inherit"
                   progressUpdateInterval={1000}
-                  bufferConfig={{
-                    minBufferMs: 15000,
-                    maxBufferMs: 50000,
-                    bufferForPlaybackMs: 2500,
-                    bufferForPlaybackAfterRebufferMs: 5000,
-                  }}
                   maxBitRate={2000000}
                   disableFocus={true}
+                  // iOS AVPlayer startup tuning
+                  automaticallyWaitsToMinimizeStalling={true as any}
+                  preferredForwardBufferDuration={1 as any}
+                  allowsExternalPlayback={false as any}
+                  preventsDisplaySleepDuringVideoPlayback={true as any}
                 />
               </TouchableOpacity>
             </View>
