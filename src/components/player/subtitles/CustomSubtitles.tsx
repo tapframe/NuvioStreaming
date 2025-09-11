@@ -109,8 +109,9 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
               const lineHeightPx = displayLineHeight;
               const strokeWidth = Math.max(0.5, outlineWidth);
               // Position text from bottom up - last line should be at svgHeight - small margin
-              const marginFromBottom = baseFontSize * 0.1; // tighter to bottom to match RN Text
-              const lastLineBaselineY = svgHeight - marginFromBottom;
+              // Add descender buffer so letters like y/g/p/q/j aren't clipped
+              const descenderBuffer = baseFontSize * 0.35 + (strokeWidth * 0.5);
+              const lastLineBaselineY = svgHeight - descenderBuffer;
               const startY = lastLineBaselineY - (lines.length - 1) * lineHeightPx;
               return (
                 <>
