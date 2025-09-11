@@ -12,6 +12,7 @@ export interface MovieContext {
   title: string;
   overview: string;
   releaseDate: string;
+  released?: boolean;
   genres: string[];
   cast: Array<{
     name: string;
@@ -104,15 +105,18 @@ class AIService {
     
     if (isEpisode) {
       const ep = context as EpisodeContext;
-      return `You are an AI assistant specialized in TV shows and episodes. You have detailed knowledge about "${ep.showTitle}" Season ${ep.seasonNumber}, Episode ${ep.episodeNumber}: "${ep.episodeTitle}".
+      const currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      return `You are an AI assistant with access to current, up-to-date information about "${ep.showTitle}" Season ${ep.seasonNumber}, Episode ${ep.episodeNumber}: "${ep.episodeTitle}".
 
-Episode Details:
+CRITICAL: Today's date is ${currentDate}. Use ONLY the verified information provided below from our database. IGNORE any conflicting information from your training data which is outdated.
+
+VERIFIED CURRENT INFORMATION FROM DATABASE:
 - Show: ${ep.showTitle}
 - Episode: S${ep.seasonNumber}E${ep.episodeNumber} - "${ep.episodeTitle}"
-- Air Date: ${ep.airDate}
-- Release Status: ${ep.released ? 'Released' : 'Unreleased'}
+- Air Date: ${ep.airDate || 'Unknown'}
+- Release Status: ${ep.released ? 'RELEASED AND AVAILABLE FOR VIEWING' : 'Not Yet Released'}
 - Runtime: ${ep.runtime ? `${ep.runtime} minutes` : 'Unknown'}
-- Synopsis: ${ep.overview}
+- Synopsis: ${ep.overview || 'No synopsis available'}
 
 Cast:
 ${ep.cast.map(c => `- ${c.name} as ${c.character}`).join('\n')}
@@ -122,22 +126,27 @@ ${ep.guestStars && ep.guestStars.length > 0 ? `Guest Stars:\n${ep.guestStars.map
 Crew:
 ${ep.crew.map(c => `- ${c.name} (${c.job})`).join('\n')}
 
-Guidance:
-- Never provide spoilers under any circumstances. Always keep responses spoiler-safe.
-- If Release Status is Released, do not claim the episode is unreleased. Provide specific, accurate details.
-- If Release Status is Unreleased, avoid spoilers and focus on official information only.
-- Be specific to this episode and provide detailed, informative responses. If asked about other episodes or seasons, politely redirect the conversation back to this specific episode while acknowledging the broader context of the show.`;
+CRITICAL INSTRUCTIONS:
+1. Never provide spoilers under any circumstances. Always keep responses spoiler-safe.
+2. The information above is from our verified database and is more current than your training data.
+3. If Release Status shows "RELEASED AND AVAILABLE FOR VIEWING", the content IS AVAILABLE. Do not say it's "upcoming" or "unreleased".
+4. Compare air dates to today's date (${currentDate}) to determine if something has already aired.
+5. Base ALL responses on the verified information above, NOT on your training knowledge.
+6. If asked about release dates or availability, refer ONLY to the database information provided.`;
     } else {
       const movie = context as MovieContext;
-      return `You are an AI assistant specialized in movies and cinema. You have detailed knowledge about the movie "${movie.title}".
+      const currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      return `You are an AI assistant with access to current, verified information about the movie "${movie.title}".
 
-Movie Details:
+CRITICAL: Today's date is ${currentDate}. Use ONLY the verified information provided below from our database. IGNORE any conflicting information from your training data which is outdated.
+
+VERIFIED CURRENT MOVIE INFORMATION FROM DATABASE:
 - Title: ${movie.title}
-- Release Date: ${movie.releaseDate}
+- Release Date: ${movie.releaseDate || 'Unknown'}
 - Runtime: ${movie.runtime ? `${movie.runtime} minutes` : 'Unknown'}
-- Genres: ${movie.genres.join(', ')}
+- Genres: ${movie.genres.join(', ') || 'Unknown'}
 - Tagline: ${movie.tagline || 'N/A'}
-- Synopsis: ${movie.overview}
+- Synopsis: ${movie.overview || 'No synopsis available'}
 
 Cast:
 ${movie.cast.map(c => `- ${c.name} as ${c.character}`).join('\n')}
@@ -147,12 +156,15 @@ ${movie.crew.map(c => `- ${c.name} (${c.job})`).join('\n')}
 
 ${movie.keywords && movie.keywords.length > 0 ? `Keywords: ${movie.keywords.join(', ')}` : ''}
 
-Guidance:
-- Never provide spoilers under any circumstances. Always keep responses spoiler-safe.
-- You can discuss themes, production, performances, and high-level plot setup without revealing twists, surprises, or outcomes.
-- If users explicitly request spoilers, refuse gently and offer a spoiler-safe summary or analysis instead.
+CRITICAL INSTRUCTIONS:
+1. Never provide spoilers under any circumstances. Always keep responses spoiler-safe.
+2. The information above is from our verified database and is more current than your training data.
+3. Use the release date and today's date (${currentDate}) to determine availability - don't contradict database information.
+4. Base ALL responses on the verified information above, NOT on your training knowledge.
+5. If asked about release dates or availability, refer ONLY to the database information provided.
+6. You can discuss themes, production, performances, and high-level plot setup without revealing twists, surprises, or outcomes.
 
-You should answer questions about this movie, including plot analysis, character development, themes, cinematography, production notes, trivia, and critical analysis. Provide detailed, informative responses that demonstrate deep knowledge of the film while remaining spoiler-safe. Be specific and focus on this particular movie.`;
+Answer questions about this movie using only the verified database information above, including plot analysis, character development, themes, cinematography, production notes, and trivia. Provide detailed, informative responses while remaining spoiler-safe.`;
     }
   }
 
@@ -200,7 +212,7 @@ You should answer questions about this movie, including plot analysis, character
           'X-Title': 'Nuvio - AI Chat',
         },
         body: JSON.stringify({
-          model: 'anthropic/claude-3.5-sonnet', // Using Claude for better analysis
+          model: 'openrouter/sonoma-dusk-alpha',
           messages,
           max_tokens: 1000,
           temperature: 0.7,
@@ -246,7 +258,44 @@ You should answer questions about this movie, including plot analysis, character
         crewCount: movieData.credits?.crew?.length || 0,
         hasKeywords: !!(movieData.keywords?.keywords || movieData.keywords?.results),
         keywordCount: (movieData.keywords?.keywords || movieData.keywords?.results)?.length || 0,
-        genreCount: movieData.genres?.length || 0
+        genreCount: movieData.genres?.length || 0,
+        tmdbStatus: movieData.status,
+        tmdbReleaseDate: movieData.release_date,
+        tmdbReleaseDatesBlock: !!movieData.release_dates
+      });
+    }
+
+    // Prefer US theatrical release date from release_dates if available
+    let releaseDate: string = movieData.release_date || movieData.first_air_date || '';
+    try {
+      const groups = movieData.release_dates?.results as any[] | undefined;
+      const us = groups?.find(g => g.iso_3166_1 === 'US');
+      const theatric = us?.release_dates?.find((r: any) => r.type === 3 || r.type === 2 || r.type === 4);
+      const anyDate = us?.release_dates?.[0]?.release_date || theatric?.release_date;
+      if (anyDate) {
+        // TMDB returns full ISO timestamps; keep only date part
+        releaseDate = String(anyDate).split('T')[0];
+      }
+    } catch {}
+    const statusText: string = (movieData.status || '').toString().toLowerCase();
+    let released = statusText === 'released';
+    if (!released && releaseDate) {
+      const d = new Date(releaseDate);
+      if (!isNaN(d.getTime())) released = d.getTime() <= Date.now();
+    }
+    if (!released) {
+      const hasOverview = typeof movieData.overview === 'string' && movieData.overview.trim().length > 40;
+      const hasRuntime = typeof movieData.runtime === 'number' && movieData.runtime > 0;
+      const hasVotes = typeof movieData.vote_average === 'number' && movieData.vote_average > 0;
+      if (hasOverview || hasRuntime || hasVotes) released = true;
+    }
+
+    if (__DEV__) {
+      console.log('[AIService] Movie release resolution:', {
+        resolvedReleaseDate: releaseDate,
+        statusText: (movieData.status || '').toString(),
+        computedReleased: released,
+        today: new Date().toISOString().split('T')[0]
       });
     }
 
@@ -254,7 +303,8 @@ You should answer questions about this movie, including plot analysis, character
       id: movieData.id?.toString() || '',
       title: movieData.title || movieData.name || '',
       overview: movieData.overview || '',
-      releaseDate: movieData.release_date || movieData.first_air_date || '',
+      releaseDate,
+      released,
       genres: movieData.genres?.map((g: any) => g.name) || [],
       cast: movieData.credits?.cast?.slice(0, 10).map((c: any) => ({
         name: c.name,

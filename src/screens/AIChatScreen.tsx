@@ -20,6 +20,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { aiService, ChatMessage, ContentContext, createMovieContext, createEpisodeContext, generateConversationStarters } from '../services/aiService';
 import { tmdbService } from '../services/tmdbService';
+import Markdown from 'react-native-markdown-display';
 import Animated, { 
   useAnimatedStyle, 
   useSharedValue, 
@@ -105,12 +106,126 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, isLast }) => {
           { backgroundColor: currentTheme.colors.elevation2 }
         ]
       ]}>
-        <Text style={[
-          styles.messageText,
-          { color: isUser ? 'white' : currentTheme.colors.highEmphasis }
-        ]}>
-          {message.content}
-        </Text>
+         {isUser ? (
+           <Text style={[styles.messageText, { color: 'white' }]}>
+             {message.content}
+           </Text>
+         ) : (
+           <Markdown
+             style={{
+               body: { 
+                 color: currentTheme.colors.highEmphasis, 
+                 fontSize: 16, 
+                 lineHeight: 22,
+                 margin: 0,
+                 padding: 0
+               },
+               paragraph: { 
+                 marginBottom: 8,
+                 marginTop: 0,
+                 color: currentTheme.colors.highEmphasis
+               },
+               heading1: {
+                 fontSize: 20,
+                 fontWeight: '700',
+                 color: currentTheme.colors.highEmphasis,
+                 marginBottom: 8,
+                 marginTop: 0
+               },
+               heading2: {
+                 fontSize: 18,
+                 fontWeight: '600',
+                 color: currentTheme.colors.highEmphasis,
+                 marginBottom: 6,
+                 marginTop: 0
+               },
+               link: { 
+                 color: currentTheme.colors.primary,
+                 textDecorationLine: 'underline'
+               },
+               code_inline: {
+                 backgroundColor: currentTheme.colors.elevation2,
+                 paddingHorizontal: 6,
+                 paddingVertical: 2,
+                 borderRadius: 4,
+                 fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+                 fontSize: 14,
+                 color: currentTheme.colors.highEmphasis,
+               },
+               code_block: {
+                 backgroundColor: currentTheme.colors.elevation2,
+                 borderRadius: 8,
+                 padding: 12,
+                 marginVertical: 8,
+                 color: currentTheme.colors.highEmphasis,
+                 fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+                 fontSize: 14,
+               },
+               fence: {
+                 backgroundColor: currentTheme.colors.elevation2,
+                 borderRadius: 8,
+                 padding: 12,
+                 marginVertical: 8,
+                 color: currentTheme.colors.highEmphasis,
+                 fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+                 fontSize: 14,
+               },
+               bullet_list: { 
+                 marginBottom: 8,
+                 marginTop: 0
+               },
+               ordered_list: { 
+                 marginBottom: 8,
+                 marginTop: 0
+               },
+               list_item: {
+                 marginBottom: 4,
+                 color: currentTheme.colors.highEmphasis
+               },
+               strong: {
+                 fontWeight: '700',
+                 color: currentTheme.colors.highEmphasis
+               },
+               em: {
+                 fontStyle: 'italic',
+                 color: currentTheme.colors.highEmphasis
+               },
+               blockquote: {
+                 backgroundColor: currentTheme.colors.elevation1,
+                 borderLeftWidth: 4,
+                 borderLeftColor: currentTheme.colors.primary,
+                 paddingLeft: 12,
+                 paddingVertical: 8,
+                 marginVertical: 8,
+                 borderRadius: 4,
+               },
+               table: {
+                 borderWidth: 1,
+                 borderColor: currentTheme.colors.elevation2,
+                 borderRadius: 8,
+                 marginVertical: 8,
+               },
+               thead: {
+                 backgroundColor: currentTheme.colors.elevation1,
+               },
+               th: {
+                 padding: 8,
+                 fontWeight: '600',
+                 color: currentTheme.colors.highEmphasis,
+                 borderBottomWidth: 1,
+                 borderBottomColor: currentTheme.colors.elevation2,
+               },
+               td: {
+                 padding: 8,
+                 color: currentTheme.colors.highEmphasis,
+                 borderBottomWidth: 1,
+                 borderBottomColor: currentTheme.colors.elevation2,
+               },
+             }}
+           >
+             {message.content}
+           </Markdown>
+         )}
         <Text style={[
           styles.messageTime,
           { color: isUser ? 'rgba(255,255,255,0.7)' : currentTheme.colors.mediumEmphasis }
@@ -288,8 +403,16 @@ const AIChatScreen: React.FC = () => {
       if ('showTitle' in context) {
         const sxe = messageText.match(/s(\d+)e(\d+)/i);
         const words = messageText.match(/season\s+(\d+)[^\d]+episode\s+(\d+)/i);
-        const season = sxe ? parseInt(sxe[1], 10) : (words ? parseInt(words[1], 10) : undefined);
-        const episode = sxe ? parseInt(sxe[2], 10) : (words ? parseInt(words[2], 10) : undefined);
+        const seasonOnly = messageText.match(/s(\d+)(?!e)/i) || messageText.match(/season\s+(\d+)/i);
+        
+        let season = sxe ? parseInt(sxe[1], 10) : (words ? parseInt(words[1], 10) : undefined);
+        let episode = sxe ? parseInt(sxe[2], 10) : (words ? parseInt(words[2], 10) : undefined);
+        
+        // If only season mentioned (like "s2" or "season 2"), default to episode 1
+        if (!season && seasonOnly) {
+          season = parseInt(seasonOnly[1], 10);
+          episode = 1;
+        }
 
         if (season && episode) {
           try {
