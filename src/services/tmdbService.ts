@@ -166,6 +166,7 @@ export class TMDBService {
         headers: await this.getHeaders(),
         params: await this.getParams({
           language: 'en-US',
+          append_to_response: 'external_ids,credits,keywords' // Append external IDs, cast/crew, and keywords for AI context
         }),
       });
       return response.data;
@@ -300,6 +301,7 @@ export class TMDBService {
           headers: await this.getHeaders(),
           params: await this.getParams({
             language: 'en-US',
+            append_to_response: 'credits' // Include guest stars and crew for episode context
           }),
         }
       );
@@ -585,7 +587,7 @@ export class TMDBService {
         headers: await this.getHeaders(),
         params: await this.getParams({
           language: 'en-US',
-          append_to_response: 'external_ids' // Append external IDs
+          append_to_response: 'external_ids,credits,keywords' // Append external IDs, cast/crew, and keywords for AI context
         }),
       });
       return response.data;

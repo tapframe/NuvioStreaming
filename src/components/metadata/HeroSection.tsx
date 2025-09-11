@@ -94,7 +94,8 @@ const ActionButtons = memo(({
   animatedStyle,
   isWatched,
   watchProgress,
-  groupedEpisodes
+  groupedEpisodes,
+  metadata
 }: {
   handleShowStreams: () => void;
   toggleLibrary: () => void;
@@ -107,6 +108,7 @@ const ActionButtons = memo(({
   isWatched: boolean;
   watchProgress: any;
   groupedEpisodes?: { [seasonNumber: number]: any[] };
+  metadata: any;
 }) => {
   const { currentTheme } = useTheme();
   
@@ -285,6 +287,45 @@ const ActionButtons = memo(({
         <Text style={[styles.infoButtonText, isTablet && styles.tabletInfoButtonText]}>
           {inLibrary ? 'Saved' : 'Save'}
         </Text>
+      </TouchableOpacity>
+
+      {/* AI Chat Button */}
+      <TouchableOpacity
+        style={[styles.iconButton, isTablet && styles.tabletIconButton]}
+        onPress={() => {
+          // Extract episode info if it's a series
+          let episodeData = null;
+          if (type === 'series' && watchProgress?.episodeId) {
+            const parts = watchProgress.episodeId.split(':');
+            if (parts.length >= 3) {
+              episodeData = {
+                seasonNumber: parseInt(parts[1], 10),
+                episodeNumber: parseInt(parts[2], 10)
+              };
+            }
+          }
+
+          navigation.navigate('AIChat', {
+            contentId: id,
+            contentType: type,
+            episodeId: episodeData ? watchProgress.episodeId : undefined,
+            seasonNumber: episodeData?.seasonNumber,
+            episodeNumber: episodeData?.episodeNumber,
+            title: metadata?.name || metadata?.title || 'Unknown'
+          });
+        }}
+        activeOpacity={0.85}
+      >
+        {Platform.OS === 'ios' ? (
+          <ExpoBlurView intensity={80} style={styles.blurBackgroundRound} tint="dark" />
+        ) : (
+          <View style={styles.androidFallbackBlurRound} />
+        )}
+        <MaterialIcons 
+          name="smart-toy" 
+          size={isTablet ? 28 : 24} 
+          color={currentTheme.colors.white}
+        />
       </TouchableOpacity>
 
       {type === 'series' && (
@@ -1423,6 +1464,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
             isWatched={isWatched}
             watchProgress={watchProgress}
             groupedEpisodes={groupedEpisodes}
+            metadata={metadata}
           />
         </View>
       </LinearGradient>

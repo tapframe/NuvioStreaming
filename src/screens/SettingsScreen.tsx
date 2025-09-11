@@ -43,6 +43,7 @@ const SETTINGS_CATEGORIES = [
   { id: 'content', title: 'Content & Discovery', icon: 'explore' as keyof typeof MaterialIcons.glyphMap },
   { id: 'appearance', title: 'Appearance', icon: 'palette' as keyof typeof MaterialIcons.glyphMap },
   { id: 'integrations', title: 'Integrations', icon: 'extension' as keyof typeof MaterialIcons.glyphMap },
+  { id: 'ai', title: 'AI Assistant', icon: 'smart-toy' as keyof typeof MaterialIcons.glyphMap },
   { id: 'playback', title: 'Playback', icon: 'play-circle-outline' as keyof typeof MaterialIcons.glyphMap },
   { id: 'updates', title: 'Updates', icon: 'system-update' as keyof typeof MaterialIcons.glyphMap },
   { id: 'about', title: 'About', icon: 'info-outline' as keyof typeof MaterialIcons.glyphMap },
@@ -256,6 +257,7 @@ const SettingsScreen: React.FC = () => {
   const [addonCount, setAddonCount] = useState<number>(0);
   const [catalogCount, setCatalogCount] = useState<number>(0);
   const [mdblistKeySet, setMdblistKeySet] = useState<boolean>(false);
+  const [openRouterKeySet, setOpenRouterKeySet] = useState<boolean>(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -289,6 +291,10 @@ const SettingsScreen: React.FC = () => {
       // Check MDBList API key status
       const mdblistKey = await AsyncStorage.getItem('mdblist_api_key');
       setMdblistKeySet(!!mdblistKey);
+
+      // Check OpenRouter API key status
+      const openRouterKey = await AsyncStorage.getItem('openrouter_api_key');
+      setOpenRouterKeySet(!!openRouterKey);
       
     } catch (error) {
       if (__DEV__) console.error('Error loading settings data:', error);
@@ -520,6 +526,21 @@ const SettingsScreen: React.FC = () => {
               icon="image"
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('LogoSourceSettings')}
+              isLast={true}
+              isTablet={isTablet}
+            />
+          </SettingsCard>
+        );
+
+      case 'ai':
+        return (
+          <SettingsCard title="AI ASSISTANT" isTablet={isTablet}>
+            <SettingItem
+              title="OpenRouter API"
+              description={openRouterKeySet ? "Connected" : "Add your API key to enable AI chat"}
+              icon="smart-toy"
+              renderControl={ChevronRight}
+              onPress={() => navigation.navigate('AISettings')}
               isLast={true}
               isTablet={isTablet}
             />
@@ -765,6 +786,7 @@ const SettingsScreen: React.FC = () => {
             {renderCategoryContent('content')}
             {renderCategoryContent('appearance')}
             {renderCategoryContent('integrations')}
+            {renderCategoryContent('ai')}
             {renderCategoryContent('playback')}
             {renderCategoryContent('updates')}
             {renderCategoryContent('about')}

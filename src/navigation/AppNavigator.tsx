@@ -48,6 +48,8 @@ import { LoadingProvider, useLoading } from '../contexts/LoadingContext';
 import PluginsScreen from '../screens/PluginsScreen';
 import CastMoviesScreen from '../screens/CastMoviesScreen';
 import UpdateScreen from '../screens/UpdateScreen';
+import AISettingsScreen from '../screens/AISettingsScreen';
+import AIChatScreen from '../screens/AIChatScreen';
 
 // Stack navigator types
 export type RootStackParamList = {
@@ -126,6 +128,15 @@ export type RootStackParamList = {
       profile_path: string | null;
       character?: string;
     };
+  };
+  AISettings: undefined;
+  AIChat: {
+    contentId: string;
+    contentType: 'movie' | 'series';
+    episodeId?: string;
+    seasonNumber?: number;
+    episodeNumber?: number;
+    title: string;
   };
 };
 
@@ -1218,6 +1229,36 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 presentation: 'card',
                 gestureEnabled: true,
                 gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="AISettings" 
+              component={AISettingsScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
+                animationDuration: Platform.OS === 'android' ? 250 : 300,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="AIChat" 
+              component={AIChatScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_bottom' : 'slide_from_bottom',
+                animationDuration: Platform.OS === 'android' ? 250 : 300,
+                presentation: 'modal',
+                gestureEnabled: true,
+                gestureDirection: 'vertical',
                 headerShown: false,
                 contentStyle: {
                   backgroundColor: currentTheme.colors.darkBackground,
