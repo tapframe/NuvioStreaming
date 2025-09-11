@@ -2460,6 +2460,8 @@ const AndroidVideoPlayer: React.FC = () => {
             bottomOffset={subtitleBottomOffset}
             letterSpacing={subtitleLetterSpacing}
             lineHeightMultiplier={subtitleLineHeightMultiplier}
+            controlsVisible={showControls}
+            controlsFixedOffset={Math.min(Dimensions.get('window').width, Dimensions.get('window').height) >= 768 ? 120 : 100}
           />
 
           {/* Resume overlay removed when AlwaysResume is enabled; overlay component omitted */}

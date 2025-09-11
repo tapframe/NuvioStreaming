@@ -19,6 +19,10 @@ interface CustomSubtitlesProps {
   outlineWidth?: number; // px
   align?: 'center' | 'left' | 'right';
   bottomOffset?: number; // px from bottom
+  // Controls overlay awareness
+  controlsVisible?: boolean;
+  controlsExtraOffset?: number; // additional px to push up when controls are visible
+  controlsFixedOffset?: number; // fixed px when controls visible (ignores user offset)
   letterSpacing?: number;
   lineHeightMultiplier?: number; // multiplies subtitleSize
 }
@@ -38,6 +42,9 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
   outlineWidth = 2,
   align = 'center',
   bottomOffset = 20,
+  controlsVisible = false,
+  controlsExtraOffset = 0,
+  controlsFixedOffset,
   letterSpacing = 0,
   lineHeightMultiplier = 1.2,
 }) => {
@@ -45,6 +52,13 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
   
   const inverseScale = 1 / zoomScale;
   const bgColor = subtitleBackground ? `rgba(0, 0, 0, ${Math.min(Math.max(backgroundOpacity, 0), 1)})` : 'transparent';
+  let effectiveBottom = bottomOffset;
+  if (controlsVisible) {
+    effectiveBottom = controlsFixedOffset !== undefined
+      ? controlsFixedOffset
+      : bottomOffset + controlsExtraOffset;
+  }
+  effectiveBottom = Math.max(0, effectiveBottom);
 
   // When using crisp outline, prefer SVG text with real stroke instead of blur shadow
   const useCrispSvgOutline = outline === true;
@@ -67,7 +81,7 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
     <View
       style={[
         styles.customSubtitleContainer,
-        { bottom: bottomOffset },
+        { bottom: effectiveBottom },
       ]}
       pointerEvents="none"
     >
