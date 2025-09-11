@@ -132,7 +132,16 @@ CRITICAL INSTRUCTIONS:
 3. If Release Status shows "RELEASED AND AVAILABLE FOR VIEWING", the content IS AVAILABLE. Do not say it's "upcoming" or "unreleased".
 4. Compare air dates to today's date (${currentDate}) to determine if something has already aired.
 5. Base ALL responses on the verified information above, NOT on your training knowledge.
-6. If asked about release dates or availability, refer ONLY to the database information provided.`;
+6. If asked about release dates or availability, refer ONLY to the database information provided.
+
+FORMATTING RULES (use Markdown):
+- Use short paragraphs separated by blank lines.
+- Use clear headings (## or ###) when helpful.
+- Use bullet lists for points, character lists, and steps.
+- Add a blank line before and after lists and headings.
+- Keep lines concise; avoid giant unbroken blocks of text.
+- Wrap inline code/terms with backticks only when appropriate.
+`;
     } else {
       const movie = context as MovieContext;
       const currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
@@ -163,6 +172,13 @@ CRITICAL INSTRUCTIONS:
 4. Base ALL responses on the verified information above, NOT on your training knowledge.
 5. If asked about release dates or availability, refer ONLY to the database information provided.
 6. You can discuss themes, production, performances, and high-level plot setup without revealing twists, surprises, or outcomes.
+
+FORMATTING RULES (use Markdown):
+- Use short paragraphs separated by blank lines.
+- Use clear headings (## or ###) when helpful.
+- Use bullet lists for points and steps.
+- Add a blank line before and after lists and headings.
+- Keep lines concise; avoid giant unbroken blocks of text.
 
 Answer questions about this movie using only the verified database information above, including plot analysis, character development, themes, cinematography, production notes, and trivia. Provide detailed, informative responses while remaining spoiler-safe.`;
     }

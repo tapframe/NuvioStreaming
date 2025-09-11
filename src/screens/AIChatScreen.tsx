@@ -14,9 +14,12 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
+import { useRoute, useNavigation, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { Image } from 'expo-image';
+import { BlurView as ExpoBlurView } from 'expo-blur';
+import { BlurView as CommunityBlurView } from '@react-native-community/blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { aiService, ChatMessage, ContentContext, createMovieContext, createEpisodeContext, generateConversationStarters } from '../services/aiService';
 import { tmdbService } from '../services/tmdbService';
@@ -27,7 +30,8 @@ import Animated, {
   withSpring, 
   withTiming,
   interpolate,
-  Extrapolate
+  Extrapolate,
+  runOnJS
 } from 'react-native-reanimated';
 
 const { width, height } = Dimensions.get('window');
@@ -102,10 +106,18 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, isLast }) => {
           styles.userBubble, 
           { backgroundColor: currentTheme.colors.primary }
         ] : [
-          styles.assistantBubble, 
-          { backgroundColor: currentTheme.colors.elevation2 }
+          styles.assistantBubble,
+          { backgroundColor: 'transparent' }
         ]
       ]}>
+        {!isUser && (
+          <View style={styles.assistantBlurBackdrop} pointerEvents="none">
+            {Platform.OS === 'ios' 
+              ? <ExpoBlurView intensity={70} tint="dark" style={StyleSheet.absoluteFill} />
+              : <CommunityBlurView blurAmount={16} blurRadius={8} style={StyleSheet.absoluteFill} />}
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.50)' }]} />
+          </View>
+        )}
          {isUser ? (
            <Text style={[styles.messageText, { color: 'white' }]}>
              {message.content}
@@ -281,6 +293,18 @@ const AIChatScreen: React.FC = () => {
   const [context, setContext] = useState<ContentContext | null>(null);
   const [isLoadingContext, setIsLoadingContext] = useState(true);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [backdropUrl, setBackdropUrl] = useState<string | null>(null);
+
+  // Ensure Android cleans up heavy image resources when leaving the screen to avoid flash on back
+  useFocusEffect(
+    React.useCallback(() => {
+      return () => {
+        if (Platform.OS === 'android') {
+          setBackdropUrl(null);
+        }
+      };
+    }, [])
+  );
   
   const scrollViewRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
@@ -288,10 +312,20 @@ const AIChatScreen: React.FC = () => {
   // Animation values
   const headerOpacity = useSharedValue(1);
   const inputContainerY = useSharedValue(0);
+  // Android full-screen modal fade
+  const modalOpacity = useSharedValue(Platform.OS === 'android' ? 0 : 1);
 
   useEffect(() => {
     loadContext();
   }, []);
+
+  // Animate in on Android for full-screen modal feel
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      // Use spring to avoid jank on some devices
+      modalOpacity.value = withSpring(1, { damping: 20, stiffness: 140 });
+    }
+  }, [modalOpacity]);
 
   useEffect(() => {
     if (context && messages.length === 0) {
@@ -320,6 +354,10 @@ const AIChatScreen: React.FC = () => {
 
         const movieContext = createMovieContext(movieData);
         setContext(movieContext);
+        try {
+          const path = movieData.backdrop_path || movieData.poster_path || null;
+          if (path) setBackdropUrl(`https://image.tmdb.org/t/p/w780${path}`);
+        } catch {}
       } else {
         // Series: resolve TMDB numeric id first (contentId may be IMDb/stremio id)
         let tmdbNumericId: number | null = null;
@@ -343,6 +381,10 @@ const AIChatScreen: React.FC = () => {
         ]);
 
         if (!showData) throw new Error('Unable to load TV show details');
+        try {
+          const path = showData.backdrop_path || showData.poster_path || null;
+          if (path) setBackdropUrl(`https://image.tmdb.org/t/p/w780${path}`);
+        } catch {}
         
         if (episodeData && seasonNumber && episodeNumber) {
           const episodeContext = createEpisodeContext(
@@ -533,21 +575,44 @@ const AIChatScreen: React.FC = () => {
   }
 
   return (
+    <Animated.View style={{ flex: 1, opacity: modalOpacity }}>
     <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
+      {backdropUrl && (
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Image
+            source={{ uri: backdropUrl }}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            recyclingKey={backdropUrl || undefined}
+          />
+          {Platform.OS === 'ios' 
+            ? <ExpoBlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
+            : <CommunityBlurView blurAmount={12} blurRadius={6} style={StyleSheet.absoluteFill} />}
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: Platform.OS === 'android' ? 'rgba(0,0,0,0.28)' : 'rgba(0,0,0,0.45)' }]} />
+        </View>
+      )}
       <StatusBar barStyle="light-content" />
       
       {/* Header */}
       <Animated.View style={[
         styles.header,
         { 
-          backgroundColor: currentTheme.colors.darkBackground,
-          paddingTop: insets.top 
+          backgroundColor: 'transparent',
+          paddingTop: Platform.OS === 'ios' ? 8 : insets.top 
         },
         headerAnimatedStyle
       ]}>
         <View style={styles.headerContent}>
           <TouchableOpacity 
-            onPress={() => navigation.goBack()}
+            onPress={() => {
+              if (Platform.OS === 'android') {
+                modalOpacity.value = withSpring(0, { damping: 18, stiffness: 160 }, (finished) => {
+                  if (finished) runOnJS(navigation.goBack)();
+                });
+              } else {
+                navigation.goBack();
+              }
+            }}
             style={styles.backButton}
           >
             <MaterialIcons name="arrow-back" size={24} color={currentTheme.colors.text} />
@@ -571,13 +636,16 @@ const AIChatScreen: React.FC = () => {
       {/* Chat Messages */}
       <KeyboardAvoidingView 
         style={styles.chatContainer} 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={insets.top + 60}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 60 : 0}
       >
         <ScrollView
           ref={scrollViewRef}
           style={styles.messagesContainer}
-          contentContainerStyle={styles.messagesContent}
+          contentContainerStyle={[
+            styles.messagesContent,
+            { paddingBottom: 120 + insets.bottom }
+          ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
@@ -637,10 +705,19 @@ const AIChatScreen: React.FC = () => {
         {/* Input Container */}
         <Animated.View style={[
           styles.inputContainer,
-          { backgroundColor: currentTheme.colors.darkBackground },
+          { 
+            backgroundColor: 'transparent',
+            paddingBottom: 12 + insets.bottom
+          },
           inputAnimatedStyle
         ]}>
-          <View style={[styles.inputWrapper, { backgroundColor: currentTheme.colors.elevation1 }]}>
+          <View style={[styles.inputWrapper, { backgroundColor: 'transparent' }]}>
+            <View style={styles.inputBlurBackdrop} pointerEvents="none">
+              {Platform.OS === 'ios' 
+                ? <ExpoBlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+                : <CommunityBlurView blurAmount={10} blurRadius={4} style={StyleSheet.absoluteFill} />}
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: Platform.OS === 'android' ? 'rgba(0,0,0,0.15)' : 'rgba(0,0,0,0.25)' }]} />
+            </View>
             <TextInput
               ref={inputRef}
               style={[
@@ -679,6 +756,7 @@ const AIChatScreen: React.FC = () => {
         </Animated.View>
       </KeyboardAvoidingView>
     </SafeAreaView>
+    </Animated.View>
   );
 };
 
@@ -827,12 +905,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 20,
+    overflow: 'hidden',
   },
   userBubble: {
-    borderBottomRightRadius: 4,
+    borderBottomRightRadius: 20,
   },
   assistantBubble: {
-    borderBottomLeftRadius: 4,
+    borderBottomLeftRadius: 20,
+  },
+  assistantBlurBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 20,
   },
   messageText: {
     fontSize: 16,
@@ -876,6 +959,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     gap: 12,
+    overflow: 'hidden'
+  },
+  inputBlurBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 24,
   },
   textInput: {
     flex: 1,
