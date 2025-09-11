@@ -291,6 +291,10 @@ const AndroidVideoPlayer: React.FC = () => {
   const END_EPSILON = 0.3;
 
   const hideControls = () => {
+    // Do not hide while user is interacting with the slider
+    if (isDragging) {
+      return;
+    }
     Animated.timing(fadeAnim, {
       toValue: 0,
       duration: 300,
@@ -622,6 +626,12 @@ const AndroidVideoPlayer: React.FC = () => {
 
   const handleSlidingStart = () => {
     setIsDragging(true);
+    // Keep controls visible while dragging and cancel any hide timeout
+    if (!showControls) setShowControls(true);
+    if (controlsTimeout.current) {
+      clearTimeout(controlsTimeout.current);
+      controlsTimeout.current = null;
+    }
     // On iOS, pause during drag for more reliable seeks
     if (Platform.OS === 'ios') {
       wasPlayingBeforeDragRef.current = !paused;
@@ -637,7 +647,24 @@ const AndroidVideoPlayer: React.FC = () => {
       seekToTime(seekTime);
       pendingSeekValue.current = null;
     }
+    // Restart auto-hide timer after interaction finishes
+    if (controlsTimeout.current) {
+      clearTimeout(controlsTimeout.current);
+    }
+    // Ensure controls are visible, then schedule auto-hide
+    if (!showControls) setShowControls(true);
+    controlsTimeout.current = setTimeout(hideControls, 5000);
   };
+
+  // Ensure auto-hide resumes after drag ends
+  useEffect(() => {
+    if (!isDragging && showControls) {
+      if (controlsTimeout.current) {
+        clearTimeout(controlsTimeout.current);
+      }
+      controlsTimeout.current = setTimeout(hideControls, 5000);
+    }
+  }, [isDragging, showControls]);
   
   // Removed processProgressTouch - no longer needed with React Native Community Slider
 
