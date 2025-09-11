@@ -75,7 +75,7 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
   const lines = String(currentSubtitle).split(/\r?\n/);
   const displayFontSize = subtitleSize * inverseScale;
   const displayLineHeight = subtitleSize * lineHeightMultiplier * inverseScale;
-  const svgHeight = Math.max(displayFontSize, lines.length * displayLineHeight);
+  const svgHeight = lines.length * displayLineHeight;
 
   return (
     <View
@@ -100,21 +100,24 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
             width={'100%'}
             height={svgHeight}
             viewBox={`0 0 1000 ${svgHeight}`}
-            preserveAspectRatio="xMidYMid meet"
-            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+            preserveAspectRatio="xMidYMax meet"
           >
             {(() => {
               const anchor = align === 'center' ? 'middle' : align === 'left' ? 'start' : 'end';
-              const x = 500; // always compute against center of 0..1000; anchor handles alignment
+              const x = align === 'center' ? 500 : (align === 'left' ? 0 : 1000);
               const baseFontSize = displayFontSize;
               const lineHeightPx = displayLineHeight;
               const strokeWidth = Math.max(0.5, outlineWidth);
+              // Position text from bottom up - last line should be at svgHeight - small margin
+              const marginFromBottom = baseFontSize * 0.1; // tighter to bottom to match RN Text
+              const lastLineBaselineY = svgHeight - marginFromBottom;
+              const startY = lastLineBaselineY - (lines.length - 1) * lineHeightPx;
               return (
                 <>
                   {/* Stroke layer */}
                   <SvgText
                     x={x}
-                    y={baseFontSize}
+                    y={startY}
                     textAnchor={anchor}
                     fill="none"
                     stroke={outlineColor}
@@ -135,7 +138,7 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
                   {/* Fill layer */}
                   <SvgText
                     x={x}
-                    y={baseFontSize}
+                    y={startY}
                     textAnchor={anchor}
                     fill={textColor}
                     fontFamily={fontFamily}
