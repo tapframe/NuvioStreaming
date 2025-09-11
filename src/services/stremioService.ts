@@ -749,6 +749,66 @@ class StremioService {
     }
   }
 
+  /**
+   * Memory-efficient method to fetch only upcoming episodes within a specific date range
+   * This prevents over-fetching all episode data and reduces memory consumption
+   */
+  async getUpcomingEpisodes(
+    type: string, 
+    id: string, 
+    options: {
+      daysBack?: number;
+      daysAhead?: number;
+      maxEpisodes?: number;
+      preferredAddonId?: string;
+    } = {}
+  ): Promise<{ seriesName: string; poster: string; episodes: any[] } | null> {
+    const { daysBack = 14, daysAhead = 28, maxEpisodes = 50, preferredAddonId } = options;
+    
+    try {
+      // Get metadata first (this is lightweight compared to episodes)
+      const metadata = await this.getMetaDetails(type, id, preferredAddonId);
+      if (!metadata) {
+        return null;
+      }
+
+      // If no videos array exists, return basic info
+      if (!metadata.videos || metadata.videos.length === 0) {
+        return {
+          seriesName: metadata.name,
+          poster: metadata.poster || '',
+          episodes: []
+        };
+      }
+
+      const now = new Date();
+      const startDate = new Date(now.getTime() - (daysBack * 24 * 60 * 60 * 1000));
+      const endDate = new Date(now.getTime() + (daysAhead * 24 * 60 * 60 * 1000));
+
+      // Filter episodes to only include those within our date range
+      // This is done immediately after fetching to reduce memory footprint
+      const filteredEpisodes = metadata.videos
+        .filter(video => {
+          if (!video.released) return false;
+          const releaseDate = new Date(video.released);
+          return releaseDate >= startDate && releaseDate <= endDate;
+        })
+        .sort((a, b) => new Date(a.released).getTime() - new Date(b.released).getTime())
+        .slice(0, maxEpisodes); // Limit number of episodes to prevent memory overflow
+
+      logger.log(`[StremioService] Filtered ${metadata.videos.length} episodes down to ${filteredEpisodes.length} upcoming episodes for ${metadata.name}`);
+
+      return {
+        seriesName: metadata.name,
+        poster: metadata.poster || '',
+        episodes: filteredEpisodes
+      };
+    } catch (error) {
+      logger.error(`[StremioService] Error fetching upcoming episodes for ${id}:`, error);
+      return null;
+    }
+  }
+
   // Modify getStreams to use this.getInstalledAddons() instead of getEnabledAddons
   async getStreams(type: string, id: string, callback?: StreamCallback): Promise<void> {
     await this.ensureInitialized();

@@ -15,13 +15,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useTraktContext } from '../../contexts/TraktContext';
-import { stremioService } from '../../services/stremioService';
-import { tmdbService } from '../../services/tmdbService';
 import { useLibrary } from '../../hooks/useLibrary';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { parseISO, isThisWeek, format, isAfter, isBefore } from 'date-fns';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useCalendarData } from '../../hooks/useCalendarData';
+import { memoryManager } from '../../utils/memoryManager';
+import { tmdbService } from '../../services/tmdbService';
 
 // Compute base sizes; actual tablet sizes will be adjusted inside component for responsiveness
 const { width } = Dimensions.get('window');
@@ -46,15 +46,6 @@ interface ThisWeekEpisode {
 
 export const ThisWeekSection = React.memo(() => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
-  const { libraryItems, loading: libraryLoading } = useLibrary();
-  const {
-    isAuthenticated: traktAuthenticated,
-    isLoading: traktLoading,
-    watchedShows,
-    watchlistShows,
-    continueWatching,
-    loadAllCollections
-  } = useTraktContext();
   const { currentTheme } = useTheme();
   const { calendarData, loading } = useCalendarData();
 
@@ -64,13 +55,17 @@ export const ThisWeekSection = React.memo(() => {
   const computedItemWidth = useMemo(() => (isTablet ? Math.min(deviceWidth * 0.46, 560) : ITEM_WIDTH), [isTablet, deviceWidth]);
   const computedItemHeight = useMemo(() => (isTablet ? 220 : ITEM_HEIGHT), [isTablet]);
 
+  // Use the already memory-optimized calendar data instead of fetching separately
   const thisWeekEpisodes = useMemo(() => {
     const thisWeekSection = calendarData.find(section => section.title === 'This Week');
     if (!thisWeekSection) return [];
 
-    return thisWeekSection.data.map(episode => ({
+    // Limit episodes to prevent memory issues and add release status
+    const episodes = memoryManager.limitArraySize(thisWeekSection.data, 20); // Limit to 20 for home screen
+    
+    return episodes.map(episode => ({
       ...episode,
-      isReleased: isBefore(parseISO(episode.releaseDate), new Date()),
+      isReleased: episode.releaseDate ? isBefore(parseISO(episode.releaseDate), new Date()) : false,
     }));
   }, [calendarData]);
   
@@ -104,8 +99,9 @@ export const ThisWeekSection = React.memo(() => {
   }
   
   const renderEpisodeItem = ({ item, index }: { item: ThisWeekEpisode, index: number }) => {
-    const releaseDate = parseISO(item.releaseDate);
-    const formattedDate = format(releaseDate, 'E, MMM d');
+    // Handle episodes without release dates gracefully
+    const releaseDate = item.releaseDate ? parseISO(item.releaseDate) : null;
+    const formattedDate = releaseDate ? format(releaseDate, 'E, MMM d') : 'TBA';
     const isReleased = item.isReleased;
     
     // Use episode still image if available, fallback to series poster

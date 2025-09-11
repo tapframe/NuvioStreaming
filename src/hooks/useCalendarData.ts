@@ -5,6 +5,7 @@ import { robustCalendarCache } from '../services/robustCalendarCache';
 import { stremioService } from '../services/stremioService';
 import { tmdbService } from '../services/tmdbService';
 import { logger } from '../utils/logger';
+import { memoryManager } from '../utils/memoryManager';
 import { parseISO, isBefore, isAfter, startOfToday, addWeeks, isThisWeek } from 'date-fns';
 import { StreamingContent } from '../services/catalogService';
 
@@ -53,6 +54,9 @@ export const useCalendarData = (): UseCalendarDataReturn => {
         setLoading(true);
         
         try {
+          // Check memory pressure and cleanup if needed
+          memoryManager.checkMemoryPressure();
+          
           if (!forceRefresh) {
             const cachedData = await robustCalendarCache.getCachedCalendarData(
               libraryItems,
@@ -138,47 +142,64 @@ export const useCalendarData = (): UseCalendarDataReturn => {
             }
           }
           
+          // Limit the number of series to prevent memory overflow
+          const maxSeries = 100; // Reasonable limit to prevent OOM
+          if (allSeries.length > maxSeries) {
+            logger.warn(`[CalendarData] Too many series (${allSeries.length}), limiting to ${maxSeries} to prevent memory issues`);
+            allSeries = allSeries.slice(0, maxSeries);
+          }
+          
           logger.log(`[CalendarData] Total series to check: ${allSeries.length} (Library: ${librarySeries.length}, Trakt: ${allSeries.length - librarySeries.length})`);
           
           let allEpisodes: CalendarEpisode[] = [];
           let seriesWithoutEpisodes: CalendarEpisode[] = [];
           
-          for (const series of allSeries) {
-            try {
-              const metadata = await stremioService.getMetaDetails(series.type, series.id);
-              
-              if (metadata?.videos && metadata.videos.length > 0) {
-                const today = startOfToday();
-                const fourWeeksLater = addWeeks(today, 4);
-                const twoWeeksAgo = addWeeks(today, -2);
+          // Process series in memory-efficient batches to prevent OOM
+          const processedSeries = await memoryManager.processArrayInBatches(
+            allSeries,
+            async (series: StreamingContent, index: number) => {
+              try {
+                // Use the new memory-efficient method to fetch only upcoming episodes
+                const episodeData = await stremioService.getUpcomingEpisodes(series.type, series.id, {
+                  daysBack: 14,  // 2 weeks back
+                  daysAhead: 28, // 4 weeks ahead  
+                  maxEpisodes: 25, // Limit episodes per series
+                });
                 
-                const tmdbId = await tmdbService.findTMDBIdByIMDB(series.id);
-                let tmdbEpisodes: { [key: string]: any } = {};
-                
-                if (tmdbId) {
-                  const allTMDBEpisodes = await tmdbService.getAllEpisodes(tmdbId);
-                  Object.values(allTMDBEpisodes).forEach(seasonEpisodes => {
-                    seasonEpisodes.forEach(episode => {
-                      const key = `${episode.season_number}:${episode.episode_number}`;
-                      tmdbEpisodes[key] = episode;
-                    });
-                  });
-                }
-                
-                const upcomingEpisodes = metadata.videos
-                  .filter(video => {
-                    if (!video.released) return false;
-                    const releaseDate = parseISO(video.released);
-                    return isBefore(releaseDate, fourWeeksLater) && isAfter(releaseDate, twoWeeksAgo);
-                  })
-                  .map(video => {
+                if (episodeData && episodeData.episodes.length > 0) {
+                  const tmdbId = await tmdbService.findTMDBIdByIMDB(series.id);
+                  let tmdbEpisodes: { [key: string]: any } = {};
+                  
+                  // Only fetch TMDB data if we need it and limit it
+                  if (tmdbId && episodeData.episodes.length > 0) {
+                    try {
+                      // Get only current and next season to limit memory usage
+                      const seasons = [...new Set(episodeData.episodes.map(ep => ep.season || 1))];
+                      const limitedSeasons = seasons.slice(0, 3); // Limit to 3 seasons max
+                      
+                      for (const seasonNum of limitedSeasons) {
+                        const seasonEpisodes = await tmdbService.getSeasonDetails(tmdbId, seasonNum);
+                        if (seasonEpisodes?.episodes) {
+                          seasonEpisodes.episodes.forEach((episode: any) => {
+                            const key = `${episode.season_number}:${episode.episode_number}`;
+                            tmdbEpisodes[key] = episode;
+                          });
+                        }
+                      }
+                    } catch (tmdbError) {
+                      logger.warn(`[CalendarData] TMDB fetch failed for ${series.name}, continuing without additional metadata`);
+                    }
+                  }
+                  
+                  // Transform episodes with memory-efficient processing
+                  const transformedEpisodes = episodeData.episodes.map(video => {
                     const tmdbEpisode = tmdbEpisodes[`${video.season}:${video.episode}`] || {};
                     return {
                       id: video.id,
                       seriesId: series.id,
                       title: tmdbEpisode.name || video.title || `Episode ${video.episode}`,
-                      seriesName: series.name || metadata.name,
-                      poster: series.poster || metadata.poster || '',
+                      seriesName: series.name || episodeData.seriesName,
+                      poster: series.poster || episodeData.poster || '',
                       releaseDate: video.released,
                       season: video.season || 0,
                       episode: video.episode || 0,
@@ -188,25 +209,89 @@ export const useCalendarData = (): UseCalendarDataReturn => {
                       season_poster_path: tmdbEpisode.season_poster_path || null
                     };
                   });
-                
-                if (upcomingEpisodes.length > 0) {
-                  allEpisodes = [...allEpisodes, ...upcomingEpisodes];
+                  
+                  // Clear references to help garbage collection
+                  memoryManager.clearObjects(tmdbEpisodes);
+                  
+                  return { type: 'episodes', data: transformedEpisodes };
                 } else {
-                  seriesWithoutEpisodes.push({ id: series.id, seriesId: series.id, title: 'No upcoming episodes', seriesName: series.name || (metadata?.name || ''), poster: series.poster || (metadata?.poster || ''), releaseDate: '', season: 0, episode: 0, overview: '', vote_average: 0, still_path: null, season_poster_path: null });
+                  return { 
+                    type: 'no-episodes', 
+                    data: { 
+                      id: series.id, 
+                      seriesId: series.id, 
+                      title: 'No upcoming episodes', 
+                      seriesName: series.name || episodeData?.seriesName || '', 
+                      poster: series.poster || episodeData?.poster || '', 
+                      releaseDate: '', 
+                      season: 0, 
+                      episode: 0, 
+                      overview: '', 
+                      vote_average: 0, 
+                      still_path: null, 
+                      season_poster_path: null 
+                    }
+                  };
                 }
-              } else {
-                seriesWithoutEpisodes.push({ id: series.id, seriesId: series.id, title: 'No upcoming episodes', seriesName: series.name || (metadata?.name || ''), poster: series.poster || (metadata?.poster || ''), releaseDate: '', season: 0, episode: 0, overview: '', vote_average: 0, still_path: null, season_poster_path: null });
+              } catch (error) {
+                logger.error(`[CalendarData] Error fetching episodes for ${series.name}:`, error);
+                return { 
+                  type: 'no-episodes', 
+                  data: { 
+                    id: series.id, 
+                    seriesId: series.id, 
+                    title: 'No upcoming episodes', 
+                    seriesName: series.name || '', 
+                    poster: series.poster || '', 
+                    releaseDate: '', 
+                    season: 0, 
+                    episode: 0, 
+                    overview: '', 
+                    vote_average: 0, 
+                    still_path: null, 
+                    season_poster_path: null 
+                  }
+                };
               }
-            } catch (error) {
-              logger.error(`Error fetching episodes for ${series.name}:`, error);
+            },
+            5, // Small batch size to prevent memory spikes
+            100 // Small delay between batches
+          );
+          
+          // Process results and separate episodes from no-episode series
+          for (const result of processedSeries) {
+            if (result.type === 'episodes' && Array.isArray(result.data)) {
+              allEpisodes.push(...result.data);
+            } else if (result.type === 'no-episodes') {
+              seriesWithoutEpisodes.push(result.data as CalendarEpisode);
             }
           }
           
+          // Clear processed series to free memory
+          memoryManager.clearObjects(processedSeries);
+          
+          // Limit total episodes to prevent memory overflow
+          allEpisodes = memoryManager.limitArraySize(allEpisodes, 500);
+          seriesWithoutEpisodes = memoryManager.limitArraySize(seriesWithoutEpisodes, 100);
+          
+          // Sort episodes by release date
           allEpisodes.sort((a, b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime());
           
-          const thisWeekEpisodes = allEpisodes.filter(ep => isThisWeek(parseISO(ep.releaseDate)));
-          const upcomingEpisodes = allEpisodes.filter(ep => isAfter(parseISO(ep.releaseDate), new Date()) && !isThisWeek(parseISO(ep.releaseDate)));
-          const recentEpisodes = allEpisodes.filter(ep => isBefore(parseISO(ep.releaseDate), new Date()) && !isThisWeek(parseISO(ep.releaseDate)));
+          // Use memory-efficient filtering
+          const thisWeekEpisodes = await memoryManager.filterLargeArray(
+            allEpisodes, 
+            ep => isThisWeek(parseISO(ep.releaseDate))
+          );
+          
+          const upcomingEpisodes = await memoryManager.filterLargeArray(
+            allEpisodes, 
+            ep => isAfter(parseISO(ep.releaseDate), new Date()) && !isThisWeek(parseISO(ep.releaseDate))
+          );
+          
+          const recentEpisodes = await memoryManager.filterLargeArray(
+            allEpisodes, 
+            ep => isBefore(parseISO(ep.releaseDate), new Date()) && !isThisWeek(parseISO(ep.releaseDate))
+          );
           
           const sections: CalendarSection[] = [];
           if (thisWeekEpisodes.length > 0) sections.push({ title: 'This Week', data: thisWeekEpisodes });
@@ -216,6 +301,9 @@ export const useCalendarData = (): UseCalendarDataReturn => {
           
           setCalendarData(sections);
           
+          // Clear large arrays to help garbage collection
+          memoryManager.clearObjects(allEpisodes, thisWeekEpisodes, upcomingEpisodes, recentEpisodes);
+          
           await robustCalendarCache.setCachedCalendarData(
             sections,
             libraryItems,
@@ -223,7 +311,7 @@ export const useCalendarData = (): UseCalendarDataReturn => {
           );
     
         } catch (error) {
-          logger.error('Error fetching calendar data:', error);
+          logger.error('[CalendarData] Error fetching calendar data:', error);
           await robustCalendarCache.setCachedCalendarData(
             [],
             libraryItems,
@@ -231,6 +319,8 @@ export const useCalendarData = (): UseCalendarDataReturn => {
             true
           );
         } finally {
+          // Force garbage collection after processing
+          memoryManager.forceGarbageCollection();
           setLoading(false);
         }
       }, [libraryItems, traktAuthenticated, watchlistShows, continueWatching, watchedShows]);

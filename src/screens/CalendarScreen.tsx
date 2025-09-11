@@ -27,6 +27,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { CalendarSection as CalendarSectionComponent } from '../components/calendar/CalendarSection';
 import { tmdbService } from '../services/tmdbService';
 import { logger } from '../utils/logger';
+import { memoryManager } from '../utils/memoryManager';
 import { useCalendarData } from '../hooks/useCalendarData';
 
 const { width } = Dimensions.get('window');
@@ -73,6 +74,8 @@ const CalendarScreen = () => {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
+    // Check memory pressure before refresh
+    memoryManager.checkMemoryPressure();
     refresh(true);
     setRefreshing(false);
   }, [refresh]);
@@ -206,9 +209,14 @@ const CalendarScreen = () => {
     </View>
   );
   
-  // Process all episodes once data is loaded
-  const allEpisodes = calendarData.reduce((acc: CalendarEpisode[], section: CalendarSection) => 
-    [...acc, ...section.data], [] as CalendarEpisode[]);
+  // Process all episodes once data is loaded - using memory-efficient approach
+  const allEpisodes = React.useMemo(() => {
+    const episodes = calendarData.reduce((acc: CalendarEpisode[], section: CalendarSection) => 
+      [...acc, ...section.data], [] as CalendarEpisode[]);
+    
+    // Limit episodes to prevent memory issues in large libraries
+    return memoryManager.limitArraySize(episodes, 1000);
+  }, [calendarData]);
   
   // Log when rendering with relevant state info
   logger.log(`[Calendar] Rendering: loading=${loading}, calendarData sections=${calendarData.length}, allEpisodes=${allEpisodes.length}`);

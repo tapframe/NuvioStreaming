@@ -7,6 +7,7 @@ import { catalogService } from './catalogService';
 import { traktService } from './traktService';
 import { tmdbService } from './tmdbService';
 import { logger } from '../utils/logger';
+import { memoryManager } from '../utils/memoryManager';
 
 // Define notification storage keys
 const NOTIFICATION_STORAGE_KEY = 'stremio-notifications';
@@ -319,19 +320,37 @@ class NotificationService {
     }
   };
 
-  // Sync notifications for all library items
+  // Sync notifications for all library items using memory-efficient batching
   private async syncNotificationsForLibrary(libraryItems: any[]): Promise<void> {
     try {
       const seriesItems = libraryItems.filter(item => item.type === 'series');
       
-      for (const series of seriesItems) {
-        await this.updateNotificationsForSeries(series.id);
-        // Longer delay to prevent overwhelming the API and reduce heating
-        await new Promise(resolve => setTimeout(resolve, 500));
+      // Limit series to prevent memory overflow during notifications sync
+      const limitedSeries = memoryManager.limitArraySize(seriesItems, 50);
+      
+      if (limitedSeries.length < seriesItems.length) {
+        logger.warn(`[NotificationService] Limited series sync from ${seriesItems.length} to ${limitedSeries.length} to prevent memory issues`);
       }
       
+      // Process in small batches with memory management
+      await memoryManager.processArrayInBatches(
+        limitedSeries,
+        async (series) => {
+          try {
+            await this.updateNotificationsForSeries(series.id);
+          } catch (error) {
+            logger.error(`[NotificationService] Failed to sync notifications for ${series.name || series.id}:`, error);
+          }
+        },
+        3, // Very small batch size to prevent memory spikes
+        800 // Longer delay to prevent API overwhelming and reduce heating
+      );
+      
+      // Force cleanup after processing
+      memoryManager.forceGarbageCollection();
+      
       // Reduced logging verbosity
-      // logger.log(`[NotificationService] Synced notifications for ${seriesItems.length} series from library`);
+      // logger.log(`[NotificationService] Synced notifications for ${limitedSeries.length} series from library`);
     } catch (error) {
       logger.error('[NotificationService] Error syncing library notifications:', error);
     }
@@ -460,18 +479,31 @@ class NotificationService {
       // Reduced logging verbosity
       // logger.log(`[NotificationService] Found ${allTraktShows.size} unique Trakt shows from all sources`);
 
-      // Sync notifications for each Trakt show
-      let syncedCount = 0;
-      for (const show of allTraktShows.values()) {
-        try {
-          await this.updateNotificationsForSeries(show.id);
-          syncedCount++;
-          // Small delay to prevent API rate limiting
-          await new Promise(resolve => setTimeout(resolve, 200));
-        } catch (error) {
-          logger.error(`[NotificationService] Failed to sync notifications for ${show.name}:`, error);
-        }
+      // Sync notifications for each Trakt show using memory-efficient batching
+      const traktShows = Array.from(allTraktShows.values());
+      const limitedTraktShows = memoryManager.limitArraySize(traktShows, 30); // Limit Trakt shows
+      
+      if (limitedTraktShows.length < traktShows.length) {
+        logger.warn(`[NotificationService] Limited Trakt shows sync from ${traktShows.length} to ${limitedTraktShows.length} to prevent memory issues`);
       }
+      
+      let syncedCount = 0;
+      await memoryManager.processArrayInBatches(
+        limitedTraktShows,
+        async (show) => {
+          try {
+            await this.updateNotificationsForSeries(show.id);
+            syncedCount++;
+          } catch (error) {
+            logger.error(`[NotificationService] Failed to sync notifications for ${show.name}:`, error);
+          }
+        },
+        2, // Even smaller batch size for Trakt shows
+        1000 // Longer delay to prevent API rate limiting
+      );
+      
+      // Clear Trakt shows array to free memory
+      memoryManager.clearObjects(traktShows, limitedTraktShows);
 
       // Reduced logging verbosity
       // logger.log(`[NotificationService] Successfully synced notifications for ${syncedCount}/${allTraktShows.size} Trakt shows`);
@@ -480,31 +512,42 @@ class NotificationService {
     }
   }
 
-  // Enhanced series notification update with TMDB fallback
+  // Enhanced series notification update with memory-efficient episode fetching
   async updateNotificationsForSeries(seriesId: string): Promise<void> {
     try {
-      // Reduced logging verbosity - only log for debug purposes
-      // logger.log(`[NotificationService] Updating notifications for series: ${seriesId}`);
+      // Check memory pressure before processing
+      memoryManager.checkMemoryPressure();
       
-      // Try Stremio first
-      let metadata = await stremioService.getMetaDetails('series', seriesId);
+      // Use the new memory-efficient method to fetch only upcoming episodes
+      const episodeData = await stremioService.getUpcomingEpisodes('series', seriesId, {
+        daysBack: 7,   // 1 week back for notifications
+        daysAhead: 28, // 4 weeks ahead for notifications
+        maxEpisodes: 10, // Limit to 10 episodes per series for notifications
+      });
+      
       let upcomingEpisodes: any[] = [];
+      let metadata: any = null;
       
-      if (metadata && metadata.videos) {
-        const now = new Date();
-        const fourWeeksLater = addDays(now, 28);
+      if (episodeData && episodeData.episodes.length > 0) {
+        metadata = {
+          name: episodeData.seriesName,
+          poster: episodeData.poster,
+        };
         
-        upcomingEpisodes = metadata.videos.filter(video => {
-          if (!video.released) return false;
-          const releaseDate = parseISO(video.released);
-          return releaseDate > now && releaseDate < fourWeeksLater;
-        }).map(video => ({
-          id: video.id,
-          title: (video as any).title || (video as any).name || `Episode ${video.episode}`,
-          season: video.season || 0,
-          episode: video.episode || 0,
-          released: video.released,
-        }));
+        upcomingEpisodes = episodeData.episodes
+          .filter(video => {
+            if (!video.released) return false;
+            const releaseDate = parseISO(video.released);
+            const now = new Date();
+            return releaseDate > now; // Only truly upcoming episodes for notifications
+          })
+          .map(video => ({
+            id: video.id,
+            title: video.title || `Episode ${video.episode}`,
+            season: video.season || 0,
+            episode: video.episode || 0,
+            released: video.released,
+          }));
       }
 
       // If no upcoming episodes from Stremio, try TMDB
@@ -576,9 +619,12 @@ class NotificationService {
         notification => notification.seriesId !== seriesId
       );
       
-      // Schedule new notifications for upcoming episodes
-      if (upcomingEpisodes.length > 0) {
-        const notificationItems: NotificationItem[] = upcomingEpisodes.map(episode => ({
+      // Schedule new notifications for upcoming episodes with memory limits
+      if (upcomingEpisodes.length > 0 && metadata) {
+        // Limit notifications per series to prevent memory overflow
+        const limitedEpisodes = memoryManager.limitArraySize(upcomingEpisodes, 5);
+        
+        const notificationItems: NotificationItem[] = limitedEpisodes.map(episode => ({
           id: episode.id,
           seriesId,
           seriesName: metadata.name,
@@ -591,13 +637,26 @@ class NotificationService {
         }));
         
         const scheduledCount = await this.scheduleMultipleEpisodeNotifications(notificationItems);
+        
+        // Clear notification items array to free memory
+        memoryManager.clearObjects(notificationItems, upcomingEpisodes);
+        
         // Reduced logging verbosity
         // logger.log(`[NotificationService] Scheduled ${scheduledCount} notifications for ${metadata.name}`);
       } else {
-        // logger.log(`[NotificationService] No upcoming episodes found for ${metadata.name}`);
+        // logger.log(`[NotificationService] No upcoming episodes found for ${metadata?.name || seriesId}`);
       }
+      
+      // Clear episode data to free memory
+      if (episodeData) {
+        memoryManager.clearObjects(episodeData.episodes);
+      }
+      
     } catch (error) {
       logger.error(`[NotificationService] Error updating notifications for series ${seriesId}:`, error);
+    } finally {
+      // Force cleanup after each series to prevent accumulation
+      memoryManager.forceGarbageCollection();
     }
   }
 
