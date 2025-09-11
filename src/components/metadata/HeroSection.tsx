@@ -9,7 +9,7 @@ import {
   InteractionManager,
   AppState,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -701,6 +701,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   const { isAuthenticated: isTraktAuthenticated } = useTraktContext();
   const { settings, updateSetting } = useSettings();
   const { isTrailerPlaying: globalTrailerPlaying, setTrailerPlaying } = useTrailer();
+  const isFocused = useIsFocused();
 
   // Performance optimization: Refs for avoiding re-renders
   const interactionComplete = useRef(false);
@@ -727,6 +728,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   const pausedByScrollSV = useSharedValue(0);
   const scrollGuardEnabledSV = useSharedValue(0);
   const isPlayingSV = useSharedValue(0);
+  const isFocusedSV = useSharedValue(0);
   // Guards to avoid repeated auto-starts
   const startedOnFocusRef = useRef(false);
   const startedOnReadyRef = useRef(false);
@@ -752,6 +754,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
 
   // Handle smooth transition when trailer is ready to play
   const handleTrailerReady = useCallback(() => {
+    if (!isFocused) return;
     if (!trailerPreloaded) {
       setTrailerPreloaded(true);
     }
@@ -763,17 +766,17 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     // Enable scroll guard after a brief delay to avoid immediate pause on entry
     scrollGuardEnabledSV.value = 0;
     setTimeout(() => { scrollGuardEnabledSV.value = 1; }, 1000);
-  }, [thumbnailOpacity, trailerOpacity, trailerPreloaded]);
+  }, [thumbnailOpacity, trailerOpacity, trailerPreloaded, isFocused]);
 
   // Auto-start trailer when ready on initial entry if enabled
   useEffect(() => {
-    if (trailerReady && settings?.showTrailers && !globalTrailerPlaying && !startedOnReadyRef.current) {
+    if (trailerReady && settings?.showTrailers && isFocused && !globalTrailerPlaying && !startedOnReadyRef.current) {
       startedOnReadyRef.current = true;
       logger.info('HeroSection', 'Trailer ready - auto-starting playback');
       setTrailerPlaying(true);
       isPlayingSV.value = 1;
     }
-  }, [trailerReady, settings?.showTrailers, globalTrailerPlaying, setTrailerPlaying]);
+  }, [trailerReady, settings?.showTrailers, isFocused, globalTrailerPlaying, setTrailerPlaying]);
 
   // Handle fullscreen toggle
   const handleFullscreenToggle = useCallback(async () => {
@@ -820,8 +823,10 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
 
   // Fetch trailer URL when component mounts (only if trailers are enabled)
   useEffect(() => {
+    let alive = true as boolean;
+    let timerId: any = null;
     const fetchTrailer = async () => {
-      if (!metadata?.name || !metadata?.year || !settings?.showTrailers) return;
+      if (!metadata?.name || !metadata?.year || !settings?.showTrailers || !isFocused) return;
       
       setTrailerLoading(true);
       setTrailerError(false);
@@ -851,7 +856,10 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
         };
 
         // Delay trailer fetch to prevent blocking UI
-        setTimeout(fetchWithDelay, 100);
+        timerId = setTimeout(() => {
+          if (!alive) return;
+          fetchWithDelay();
+        }, 100);
       } catch (error) {
         logger.error('HeroSection', 'Error in trailer fetch setup:', error);
         setTrailerError(true);
@@ -860,7 +868,11 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     };
 
     fetchTrailer();
-  }, [metadata?.name, metadata?.year, settings?.showTrailers]);
+    return () => {
+      alive = false;
+      try { if (timerId) clearTimeout(timerId); } catch (_e) {}
+    };
+  }, [metadata?.name, metadata?.year, settings?.showTrailers, isFocused]);
 
   // Optimized shimmer animation for loading state
   useEffect(() => {
@@ -1084,11 +1096,31 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     isPlayingSV.value = globalTrailerPlaying ? 1 : 0;
   }, [globalTrailerPlaying]);
 
+  // Mirror focus state to shared value for worklets and enforce pause when unfocused
+  useEffect(() => {
+    isFocusedSV.value = isFocused ? 1 : 0;
+    if (!isFocused) {
+      // Ensure trailer is not playing when screen loses focus
+      setTrailerPlaying(false);
+      isPlayingSV.value = 0;
+      startedOnFocusRef.current = false;
+      startedOnReadyRef.current = false;
+      // Also reset trailer state to prevent background start
+      try {
+        setTrailerReady(false);
+        setTrailerPreloaded(false);
+        setTrailerUrl(null);
+        trailerOpacity.value = 0;
+        thumbnailOpacity.value = 1;
+      } catch (_e) {}
+    }
+  }, [isFocused, setTrailerPlaying]);
+
   // Pause/resume trailer based on scroll with hysteresis and guard
   useDerivedValue(() => {
     'worklet';
     try {
-      if (!scrollGuardEnabledSV.value) return;
+      if (!scrollGuardEnabledSV.value || isFocusedSV.value === 0) return;
       const pauseThreshold = heroHeight.value * 0.7;   // pause when beyond 70%
       const resumeThreshold = heroHeight.value * 0.4;  // resume when back within 40%
 
