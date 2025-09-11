@@ -1254,11 +1254,11 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="AIChat" 
               component={AIChatScreen}
               options={{
-                animation: Platform.OS === 'android' ? 'none' : 'slide_from_bottom',
+                animation: Platform.OS === 'android' ? 'none' : 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 220 : 300,
-                presentation: 'modal',
+                presentation: Platform.OS === 'ios' ? 'fullScreenModal' : 'modal',
                 gestureEnabled: true,
-                gestureDirection: Platform.OS === 'android' ? 'vertical' : 'vertical',
+                gestureDirection: Platform.OS === 'ios' ? 'horizontal' : 'vertical',
                 headerShown: false,
                 contentStyle: {
                   backgroundColor: currentTheme.colors.darkBackground,

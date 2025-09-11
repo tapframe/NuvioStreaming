@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -64,7 +64,7 @@ interface ChatBubbleProps {
   isLast: boolean;
 }
 
-const ChatBubble: React.FC<ChatBubbleProps> = ({ message, isLast }) => {
+const ChatBubble: React.FC<ChatBubbleProps> = React.memo(({ message, isLast }) => {
   const { currentTheme } = useTheme();
   const isUser = message.role === 'user';
   
@@ -265,14 +265,22 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, isLast }) => {
       )}
     </Animated.View>
   );
-};
+}, (prev, next) => {
+  return (
+    prev.isLast === next.isLast &&
+    prev.message.id === next.message.id &&
+    prev.message.role === next.message.role &&
+    prev.message.content === next.message.content &&
+    prev.message.timestamp === next.message.timestamp
+  );
+});
 
 interface SuggestionChipProps {
   text: string;
   onPress: () => void;
 }
 
-const SuggestionChip: React.FC<SuggestionChipProps> = ({ text, onPress }) => {
+const SuggestionChip: React.FC<SuggestionChipProps> = React.memo(({ text, onPress }) => {
   const { currentTheme } = useTheme();
   
   return (
@@ -286,7 +294,7 @@ const SuggestionChip: React.FC<SuggestionChipProps> = ({ text, onPress }) => {
       </Text>
     </TouchableOpacity>
   );
-};
+}, (prev, next) => prev.text === next.text && prev.onPress === next.onPress);
 
 const AIChatScreen: React.FC = () => {
   const route = useRoute<AIChatScreenRouteProp>();
@@ -329,20 +337,35 @@ const AIChatScreen: React.FC = () => {
     loadContext();
   }, []);
 
-  // Track keyboard to adjust bottom padding only when hidden on iOS
+  // Track keyboard and animate input to avoid gaps on iOS
   useEffect(() => {
+    const onShow = (e: any) => {
+      setIsKeyboardVisible(true);
+      if (Platform.OS === 'ios') {
+        const kbHeight = e?.endCoordinates?.height ?? 0;
+        const lift = Math.max(0, kbHeight - insets.bottom);
+        inputContainerY.value = withTiming(-lift, { duration: 220 });
+      }
+    };
+    const onHide = () => {
+      setIsKeyboardVisible(false);
+      if (Platform.OS === 'ios') {
+        inputContainerY.value = withTiming(0, { duration: 220 });
+      }
+    };
+
     const showSub = Platform.OS === 'ios'
-      ? Keyboard.addListener('keyboardWillShow', () => setIsKeyboardVisible(true))
-      : Keyboard.addListener('keyboardDidShow', () => setIsKeyboardVisible(true));
+      ? Keyboard.addListener('keyboardWillShow', onShow)
+      : Keyboard.addListener('keyboardDidShow', onShow);
     const hideSub = Platform.OS === 'ios'
-      ? Keyboard.addListener('keyboardWillHide', () => setIsKeyboardVisible(false))
-      : Keyboard.addListener('keyboardDidHide', () => setIsKeyboardVisible(false));
+      ? Keyboard.addListener('keyboardWillHide', onHide)
+      : Keyboard.addListener('keyboardDidHide', onHide);
 
     return () => {
       showSub.remove();
       hideSub.remove();
     };
-  }, []);
+  }, [insets.bottom, inputContainerY]);
 
   // Animate in on Android for full-screen modal feel
   useEffect(() => {
@@ -601,7 +624,7 @@ const AIChatScreen: React.FC = () => {
         styles.header,
         { 
           backgroundColor: 'transparent',
-          paddingTop: Platform.OS === 'ios' ? 8 : insets.top 
+          paddingTop: Platform.OS === 'ios' ? insets.top : insets.top 
         },
         headerAnimatedStyle
       ]}>
@@ -639,17 +662,19 @@ const AIChatScreen: React.FC = () => {
       {/* Chat Messages */}
       <KeyboardAvoidingView 
         style={styles.chatContainer} 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 60 : 0}
+        behavior={Platform.OS === 'ios' ? undefined : undefined}
+        keyboardVerticalOffset={0}
       >
         <ScrollView
           ref={scrollViewRef}
           style={styles.messagesContainer}
           contentContainerStyle={[
             styles.messagesContent,
-            { paddingBottom: ((Platform.OS === 'ios' ? (isKeyboardVisible ? 120 : 190) : 120) + insets.bottom) }
+            { paddingBottom: isKeyboardVisible ? 20 : (56 + (isLoading ? 20 : 0)) }
           ]}
           showsVerticalScrollIndicator={false}
+          removeClippedSubviews
+          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
           keyboardShouldPersistTaps="handled"
         >
           {messages.length === 0 && suggestions.length > 0 && (
@@ -711,7 +736,7 @@ const AIChatScreen: React.FC = () => {
           styles.inputContainer,
           { 
             backgroundColor: 'transparent',
-            paddingBottom: Platform.OS === 'ios' ? (isKeyboardVisible ? 12 : 56) : 12
+            paddingBottom: 12
           },
           inputAnimatedStyle
         ]}>
