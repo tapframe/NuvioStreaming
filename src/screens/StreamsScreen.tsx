@@ -911,6 +911,25 @@ export const StreamsScreen = () => {
 
     // Show a quick full-screen black overlay to mask rotation flicker
     // by setting a transient state that renders a covering View (implementation already supported by dark backgrounds)
+    
+    // Infer video type for player (helps Android ExoPlayer choose correct extractor)
+    const inferVideoTypeFromUrl = (u?: string): string | undefined => {
+      if (!u) return undefined;
+      const lower = u.toLowerCase();
+      if (/(\.|ext=)(m3u8)(\b|$)/i.test(lower)) return 'm3u8';
+      if (/(\.|ext=)(mpd)(\b|$)/i.test(lower)) return 'mpd';
+      if (/(\.|ext=)(mp4)(\b|$)/i.test(lower)) return 'mp4';
+      return undefined;
+    };
+    let videoType = inferVideoTypeFromUrl(stream.url);
+    // Heuristic: certain providers (e.g., Xprime) serve HLS without .m3u8 extension
+    try {
+      const providerId = stream.addonId || (stream as any).addon || '';
+      if (!videoType && /xprime/i.test(providerId)) {
+        videoType = 'm3u8';
+      }
+    } catch {}
+
     navigation.navigate('Player', {
       uri: stream.url,
       title: metadata?.name || '',
@@ -931,7 +950,9 @@ export const StreamsScreen = () => {
       imdbId: imdbId || undefined,
       availableStreams: streamsToPass,
       backdrop: bannerImage || undefined,
-    });
+      // Hint for Android ExoPlayer/react-native-video
+      videoType: videoType,
+    } as any);
   }, [metadata, type, currentEpisode, navigation, id, selectedEpisode, imdbId, episodeStreams, groupedStreams, bannerImage]);
 
 

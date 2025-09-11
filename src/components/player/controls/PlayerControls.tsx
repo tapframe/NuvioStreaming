@@ -121,10 +121,9 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                   S{season}E{episode} {episodeTitle && `• ${episodeTitle}`}
                 </Text>
               )}
-              {/* Show year, quality, and provider */}
+              {/* Show year and provider (quality chip removed) */}
               <View style={styles.metadataRow}>
                 {year && <Text style={styles.metadataText}>{year}</Text>}
-                {quality && <View style={styles.qualityBadge}><Text style={styles.qualityText}>{quality}</Text></View>}
                 {streamName && <Text style={styles.providerText}>via {streamName}</Text>}
               </View>
             </View>

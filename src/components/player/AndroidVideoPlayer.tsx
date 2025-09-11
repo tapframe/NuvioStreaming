@@ -74,6 +74,18 @@ const AndroidVideoPlayer: React.FC = () => {
     backdrop
   } = route.params;
 
+  // Optional hint not yet in typed navigator params
+  const videoType = (route.params as any).videoType as string | undefined;
+
+  const defaultAndroidHeaders = () => {
+    if (Platform.OS !== 'android') return {} as any;
+    return {
+      'User-Agent': 'ExoPlayerLib/2.19.1 (Linux;Android) Nuvio/1.0',
+      'Accept': '*/*',
+      'Connection': 'keep-alive',
+    } as any;
+  };
+
   // Initialize Trakt autosync
   const traktAutosync = useTraktAutosync({
     id: id || '',
@@ -177,6 +189,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const [showSourcesModal, setShowSourcesModal] = useState<boolean>(false);
   const [availableStreams, setAvailableStreams] = useState<{ [providerId: string]: { streams: any[]; addonName: string } }>(passedAvailableStreams || {});
   const [currentStreamUrl, setCurrentStreamUrl] = useState<string>(uri);
+  const [currentVideoType, setCurrentVideoType] = useState<string | undefined>(videoType);
   // Track a single silent retry per source to avoid loops
   const retryAttemptRef = useRef<number>(0);
   const [isChangingSource, setIsChangingSource] = useState<boolean>(false);
@@ -1018,6 +1031,29 @@ const AndroidVideoPlayer: React.FC = () => {
           setPaused(false);
         }, 120);
         return; // Do not proceed to show error UI
+      }
+
+      // If format unrecognized, try flipping between HLS and MP4 once
+      const isUnrecognized = !!(error?.error?.errorString && String(error.error.errorString).includes('UnrecognizedInputFormatException'));
+      if (isUnrecognized && retryAttemptRef.current < 1) {
+        retryAttemptRef.current = 1;
+        const nextType = currentVideoType === 'm3u8' ? 'mp4' : 'm3u8';
+        logger.warn(`[AndroidVideoPlayer] Format not recognized. Retrying with type='${nextType}'`);
+        if (errorTimeoutRef.current) {
+          clearTimeout(errorTimeoutRef.current);
+          errorTimeoutRef.current = null;
+        }
+        safeSetState(() => setShowErrorModal(false));
+        setPaused(true);
+        setTimeout(() => {
+          if (!isMounted.current) return;
+          setCurrentVideoType(nextType);
+          // Force re-mount of source by tweaking URL param
+          const sep = currentStreamUrl.includes('?') ? '&' : '?';
+          setCurrentStreamUrl(`${currentStreamUrl}${sep}rn_type_retry=${Date.now()}`);
+          setPaused(false);
+        }, 120);
+        return;
       }
 
       // Check for specific AVFoundation server configuration errors (iOS)
@@ -2031,7 +2067,7 @@ const AndroidVideoPlayer: React.FC = () => {
                 <Video
                   ref={videoRef}
                   style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
-                  source={{ uri: currentStreamUrl, headers: headers || {} }}
+                  source={{ uri: currentStreamUrl, headers: headers || defaultAndroidHeaders(), type: (currentVideoType as any) }}
                   paused={paused}
                   onProgress={handleProgress}
                   onLoad={(e) => {
