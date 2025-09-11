@@ -6,22 +6,31 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  SafeAreaView,
   StatusBar,
   KeyboardAvoidingView,
   Platform,
   Dimensions,
   ActivityIndicator,
   Alert,
+  Keyboard,
 } from 'react-native';
 import { useRoute, useNavigation, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { Image } from 'expo-image';
 import { BlurView as ExpoBlurView } from 'expo-blur';
-import { BlurView as CommunityBlurView } from '@react-native-community/blur';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { aiService, ChatMessage, ContentContext, createMovieContext, createEpisodeContext, generateConversationStarters } from '../services/aiService';
+// Lazy-safe community blur import (avoid bundling issues on web)
+let AndroidBlurView: any = null;
+if (Platform.OS === 'android') {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    AndroidBlurView = require('@react-native-community/blur').BlurView;
+  } catch (_) {
+    AndroidBlurView = null;
+  }
+}
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
+import { aiService, ChatMessage, ContentContext, createMovieContext, createEpisodeContext, createSeriesContext, generateConversationStarters } from '../services/aiService';
 import { tmdbService } from '../services/tmdbService';
 import Markdown from 'react-native-markdown-display';
 import Animated, { 
@@ -112,9 +121,9 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, isLast }) => {
       ]}>
         {!isUser && (
           <View style={styles.assistantBlurBackdrop} pointerEvents="none">
-            {Platform.OS === 'ios' 
-              ? <ExpoBlurView intensity={70} tint="dark" style={StyleSheet.absoluteFill} />
-              : <CommunityBlurView blurAmount={16} blurRadius={8} style={StyleSheet.absoluteFill} />}
+            {Platform.OS === 'android' && AndroidBlurView
+              ? <AndroidBlurView blurAmount={16} blurRadius={8} style={StyleSheet.absoluteFill} />
+              : <ExpoBlurView intensity={70} tint="dark" style={StyleSheet.absoluteFill} />}
             <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.50)' }]} />
           </View>
         )}
@@ -294,6 +303,7 @@ const AIChatScreen: React.FC = () => {
   const [isLoadingContext, setIsLoadingContext] = useState(true);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [backdropUrl, setBackdropUrl] = useState<string | null>(null);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
   // Ensure Android cleans up heavy image resources when leaving the screen to avoid flash on back
   useFocusEffect(
@@ -317,6 +327,21 @@ const AIChatScreen: React.FC = () => {
 
   useEffect(() => {
     loadContext();
+  }, []);
+
+  // Track keyboard to adjust bottom padding only when hidden on iOS
+  useEffect(() => {
+    const showSub = Platform.OS === 'ios'
+      ? Keyboard.addListener('keyboardWillShow', () => setIsKeyboardVisible(true))
+      : Keyboard.addListener('keyboardDidShow', () => setIsKeyboardVisible(true));
+    const hideSub = Platform.OS === 'ios'
+      ? Keyboard.addListener('keyboardWillHide', () => setIsKeyboardVisible(false))
+      : Keyboard.addListener('keyboardDidHide', () => setIsKeyboardVisible(false));
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
   }, []);
 
   // Animate in on Android for full-screen modal feel
@@ -373,11 +398,9 @@ const AIChatScreen: React.FC = () => {
 
         if (!tmdbNumericId) throw new Error('Unable to resolve TMDB ID for series');
 
-        const [showData, episodeData] = await Promise.all([
+        const [showData, allEpisodes] = await Promise.all([
           tmdbService.getTVShowDetails(tmdbNumericId),
-          episodeId && seasonNumber && episodeNumber ? 
-            tmdbService.getEpisodeDetails(tmdbNumericId, seasonNumber, episodeNumber) : 
-            null
+          tmdbService.getAllEpisodes(tmdbNumericId)
         ]);
 
         if (!showData) throw new Error('Unable to load TV show details');
@@ -386,35 +409,9 @@ const AIChatScreen: React.FC = () => {
           if (path) setBackdropUrl(`https://image.tmdb.org/t/p/w780${path}`);
         } catch {}
         
-        if (episodeData && seasonNumber && episodeNumber) {
-          const episodeContext = createEpisodeContext(
-            episodeData, 
-            showData, 
-            seasonNumber, 
-            episodeNumber
-          );
-          setContext(episodeContext);
-        } else {
-          // Fallback: synthesize a show-level episode-like context so AI treats it as a series
-          const syntheticEpisode: any = {
-            id: `${showData?.id ?? ''}-overview`,
-            name: 'Series Overview',
-            overview: showData?.overview ?? '',
-            air_date: showData?.first_air_date ?? '',
-            runtime: undefined,
-            credits: {
-              guest_stars: [],
-              crew: [],
-            },
-          };
-          const episodeContext = createEpisodeContext(
-            syntheticEpisode,
-            showData,
-            0,
-            0
-          );
-          setContext(episodeContext);
-        }
+        if (!showData) throw new Error('Unable to load TV show details');
+        const seriesContext = createSeriesContext(showData, allEpisodes || {});
+        setContext(seriesContext);
       }
     } catch (error) {
       if (__DEV__) console.error('Error loading context:', error);
@@ -442,7 +439,14 @@ const AIChatScreen: React.FC = () => {
     try {
       // If series overview is loaded, parse user query for specific episode and fetch on-demand
       let requestContext = context;
-      if ('showTitle' in context) {
+      if ('episodesBySeason' in (context as any)) {
+        // Series-wide context; optionally detect SxE patterns to focus answer, but keep series context
+        const sxe = messageText.match(/s(\d+)e(\d+)/i) || messageText.match(/season\s+(\d+)[^\d]+episode\s+(\d+)/i);
+        if (sxe) {
+          // We will append a brief hint to the user question to scope, but still pass series context
+          messageText = `${messageText} (about Season ${sxe[1]}, Episode ${sxe[2]})`;
+        }
+      } else if ('showTitle' in (context as any)) {
         const sxe = messageText.match(/s(\d+)e(\d+)/i);
         const words = messageText.match(/season\s+(\d+)[^\d]+episode\s+(\d+)/i);
         const seasonOnly = messageText.match(/s(\d+)(?!e)/i) || messageText.match(/season\s+(\d+)/i);
@@ -543,15 +547,14 @@ const AIChatScreen: React.FC = () => {
   const getDisplayTitle = () => {
     if (!context) return title;
     
-    if ('showTitle' in context) {
-      const ep = context as any;
-      // For series overview (synthetic S0E0), show just the show title
-      if (ep.seasonNumber === 0 && ep.episodeNumber === 0) {
-        return ep.showTitle;
-      }
-      return `${ep.showTitle} S${ep.seasonNumber}E${ep.episodeNumber}`;
+    if ('episodesBySeason' in (context as any)) {
+      // Always show just the series title
+      return (context as any).title;
+    } else if ('showTitle' in (context as any)) {
+      // For episode contexts, now also only show show title to avoid episode in title per requirement
+      return (context as any).showTitle;
     }
-    return context.title || title;
+    return ('title' in (context as any) && (context as any).title) ? (context as any).title : title;
   };
 
   const headerAnimatedStyle = useAnimatedStyle(() => ({
@@ -576,7 +579,7 @@ const AIChatScreen: React.FC = () => {
 
   return (
     <Animated.View style={{ flex: 1, opacity: modalOpacity }}>
-    <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
+    <SafeAreaView edges={['top','bottom']} style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
       {backdropUrl && (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           <Image
@@ -585,9 +588,9 @@ const AIChatScreen: React.FC = () => {
             contentFit="cover"
             recyclingKey={backdropUrl || undefined}
           />
-          {Platform.OS === 'ios' 
-            ? <ExpoBlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
-            : <CommunityBlurView blurAmount={12} blurRadius={6} style={StyleSheet.absoluteFill} />}
+          {Platform.OS === 'android' && AndroidBlurView
+            ? <AndroidBlurView blurAmount={12} blurRadius={6} style={StyleSheet.absoluteFill} />
+            : <ExpoBlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />}
           <View style={[StyleSheet.absoluteFill, { backgroundColor: Platform.OS === 'android' ? 'rgba(0,0,0,0.28)' : 'rgba(0,0,0,0.45)' }]} />
         </View>
       )}
@@ -644,7 +647,7 @@ const AIChatScreen: React.FC = () => {
           style={styles.messagesContainer}
           contentContainerStyle={[
             styles.messagesContent,
-            { paddingBottom: 120 + insets.bottom }
+            { paddingBottom: ((Platform.OS === 'ios' ? (isKeyboardVisible ? 120 : 190) : 120) + insets.bottom) }
           ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -703,19 +706,20 @@ const AIChatScreen: React.FC = () => {
         </ScrollView>
 
         {/* Input Container */}
+        <SafeAreaView edges={['bottom']} style={{ backgroundColor: 'transparent' }}>
         <Animated.View style={[
           styles.inputContainer,
           { 
             backgroundColor: 'transparent',
-            paddingBottom: 12 + insets.bottom
+            paddingBottom: Platform.OS === 'ios' ? (isKeyboardVisible ? 12 : 56) : 12
           },
           inputAnimatedStyle
         ]}>
           <View style={[styles.inputWrapper, { backgroundColor: 'transparent' }]}>
             <View style={styles.inputBlurBackdrop} pointerEvents="none">
-              {Platform.OS === 'ios' 
-                ? <ExpoBlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
-                : <CommunityBlurView blurAmount={10} blurRadius={4} style={StyleSheet.absoluteFill} />}
+              {Platform.OS === 'android' && AndroidBlurView
+                ? <AndroidBlurView blurAmount={10} blurRadius={4} style={StyleSheet.absoluteFill} />
+                : <ExpoBlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />}
               <View style={[StyleSheet.absoluteFill, { backgroundColor: Platform.OS === 'android' ? 'rgba(0,0,0,0.15)' : 'rgba(0,0,0,0.25)' }]} />
             </View>
             <TextInput
@@ -754,6 +758,7 @@ const AIChatScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
         </Animated.View>
+        </SafeAreaView>
       </KeyboardAvoidingView>
     </SafeAreaView>
     </Animated.View>

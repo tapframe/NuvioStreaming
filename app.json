@@ -82,7 +82,7 @@
     ],
     "updates": {
       "enabled": true,
-      "checkAutomatically": "ON_ERROR",
+      "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 30000,
       "url": "https://grim-reyna-tapframe-69970143.koyeb.app/api/manifest"
     },

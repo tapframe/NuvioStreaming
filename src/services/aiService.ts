@@ -52,7 +52,34 @@ export interface EpisodeContext {
   }>;
 }
 
-export type ContentContext = MovieContext | EpisodeContext;
+export interface SeriesContext {
+  id: string;
+  title: string;
+  overview: string;
+  firstAirDate: string;
+  lastAirDate?: string;
+  totalSeasons: number;
+  totalEpisodes: number;
+  genres: string[];
+  cast: Array<{
+    name: string;
+    character: string;
+  }>;
+  crew: Array<{
+    name: string;
+    job: string;
+  }>;
+  episodesBySeason: Record<number, Array<{
+    seasonNumber: number;
+    episodeNumber: number;
+    title: string;
+    airDate: string;
+    released: boolean;
+    overview?: string;
+  }>>;
+}
+
+export type ContentContext = MovieContext | EpisodeContext | SeriesContext;
 
 interface OpenRouterResponse {
   choices: Array<{
@@ -101,9 +128,58 @@ class AIService {
   }
 
   private createSystemPrompt(context: ContentContext): string {
-    const isEpisode = 'showTitle' in context;
+    const isSeries = 'episodesBySeason' in (context as any);
+    const isEpisode = !isSeries && 'showTitle' in (context as any);
     
-    if (isEpisode) {
+    if (isSeries) {
+      const series = context as SeriesContext;
+      const currentDate = new Date().toISOString().split('T')[0];
+      const seasonsSummary = Object.keys(series.episodesBySeason)
+        .sort((a, b) => Number(a) - Number(b))
+        .map(sn => {
+          const episodes = series.episodesBySeason[Number(sn)] || [];
+          const releasedCount = episodes.filter(e => e.released).length;
+          return `- Season ${sn}: ${episodes.length} episodes (${releasedCount} released)`;
+        })
+        .join('\n');
+      return `You are an AI assistant with access to current, up-to-date information about the TV series "${series.title}" across ALL seasons and episodes.
+
+CRITICAL: Today's date is ${currentDate}. Use ONLY the verified information provided below from our database. IGNORE any conflicting information from your training data which may be outdated.
+
+VERIFIED CURRENT SERIES INFORMATION FROM DATABASE:
+- Title: ${series.title}
+- First Air Date: ${series.firstAirDate || 'Unknown'}
+- Last Air Date: ${series.lastAirDate || 'Unknown'}
+- Seasons: ${series.totalSeasons}
+- Episodes: ${series.totalEpisodes}
+- Genres: ${series.genres.join(', ') || 'Unknown'}
+- Synopsis: ${series.overview || 'No synopsis available'}
+
+Cast:
+${series.cast.map(c => `- ${c.name} as ${c.character}`).join('\n')}
+
+Crew:
+${series.crew.map(c => `- ${c.name} (${c.job})`).join('\n')}
+
+Seasons & Episode Counts:
+${seasonsSummary}
+
+CRITICAL INSTRUCTIONS:
+1. Never provide spoilers under any circumstances. Keep responses spoiler-safe.
+2. The information above is from our verified database and is more current than your training data.
+3. You can answer questions about ANY episode or season in the series. If dates indicate unreleased episodes, do not reveal plot details and clearly state they are unreleased.
+4. Compare air dates to today's date (${currentDate}) to determine if an episode has already aired.
+5. Base ALL responses on the verified information above, NOT on your training knowledge.
+6. If asked about release dates or availability of episodes, refer ONLY to the database information provided.
+
+FORMATTING RULES (use Markdown):
+- Use short paragraphs separated by blank lines.
+- Use clear headings (## or ###) when helpful.
+- Use bullet lists for points and steps.
+- Add a blank line before and after lists and headings.
+- Keep lines concise; avoid giant unbroken blocks of text.
+- Wrap inline code/terms with backticks only when appropriate.`;
+    } else if (isEpisode) {
       const ep = context as EpisodeContext;
       const currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
       return `You are an AI assistant with access to current, up-to-date information about "${ep.showTitle}" Season ${ep.seasonNumber}, Episode ${ep.episodeNumber}: "${ep.episodeTitle}".
@@ -407,11 +483,83 @@ Answer questions about this movie using only the verified database information a
     };
   }
 
+  // Helper to create a series-wide context including all episodes
+  static createSeriesContext(showData: any, episodesBySeason: Record<number, any[]>): SeriesContext {
+    // Build flattened cast/crew from show credits
+    const cast = showData.credits?.cast?.slice(0, 12).map((c: any) => ({
+      name: c.name,
+      character: c.character
+    })) || [];
+    const crew = showData.credits?.crew?.slice(0, 8).map((c: any) => ({
+      name: c.name,
+      job: c.job
+    })) || [];
+
+    // Normalize episodes map
+    const normalized: SeriesContext['episodesBySeason'] = {};
+    Object.keys(episodesBySeason || {}).forEach(k => {
+      const seasonNum = Number(k);
+      normalized[seasonNum] = (episodesBySeason[seasonNum] || []).map((ep: any) => {
+        const airDate: string = ep.air_date || '';
+        let released = false;
+        try {
+          if (airDate) {
+            const parsed = new Date(airDate);
+            if (!isNaN(parsed.getTime())) released = parsed.getTime() <= Date.now();
+          }
+        } catch {}
+        if (!released) {
+          const hasOverview = typeof ep.overview === 'string' && ep.overview.trim().length > 40;
+          const hasRuntime = typeof ep.runtime === 'number' && ep.runtime > 0;
+          const hasVotes = typeof ep.vote_average === 'number' && ep.vote_average > 0;
+          if (hasOverview || hasRuntime || hasVotes) released = true;
+        }
+        return {
+          seasonNumber: ep.season_number ?? seasonNum,
+          episodeNumber: ep.episode_number,
+          title: ep.name || `Episode ${ep.episode_number}`,
+          airDate,
+          released,
+          overview: ep.overview || ''
+        };
+      });
+    });
+
+    const totalSeasons = Array.isArray(showData.seasons)
+      ? showData.seasons.filter((s: any) => s.season_number > 0).length
+      : Object.keys(normalized).length;
+    const totalEpisodes = Object.values(normalized).reduce((sum, eps) => sum + (eps?.length || 0), 0);
+
+    return {
+      id: showData.id?.toString() || '',
+      title: showData.name || showData.title || '',
+      overview: showData.overview || '',
+      firstAirDate: showData.first_air_date || '',
+      lastAirDate: showData.last_air_date || '',
+      totalSeasons,
+      totalEpisodes,
+      genres: showData.genres?.map((g: any) => g.name) || [],
+      cast,
+      crew,
+      episodesBySeason: normalized,
+    };
+  }
+
   // Generate conversation starter suggestions
   static generateConversationStarters(context: ContentContext): string[] {
-    const isEpisode = 'showTitle' in context;
-    
-    if (isEpisode) {
+    const isSeries = 'episodesBySeason' in (context as any);
+    const isEpisode = !isSeries && 'showTitle' in (context as any);
+
+    if (isSeries) {
+      const series = context as SeriesContext;
+      return [
+        `What is ${series.title} about overall?`,
+        `Summarize key arcs across all seasons`,
+        `Which episodes are the highest rated and why?`,
+        `List pivotal episodes for character development`,
+        `How did themes evolve from Season 1 onward?`
+      ];
+    } else if (isEpisode) {
       const ep = context as EpisodeContext;
       return [
         `What happened in this episode of ${ep.showTitle}?`,
@@ -439,3 +587,4 @@ export const aiService = AIService.getInstance();
 export const createMovieContext = AIService.createMovieContext;
 export const createEpisodeContext = AIService.createEpisodeContext;
 export const generateConversationStarters = AIService.generateConversationStarters;
+export const createSeriesContext = AIService.createSeriesContext;
