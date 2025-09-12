@@ -751,7 +751,35 @@ const VideoPlayer: React.FC = () => {
       }
 
       if (data.audioTracks && data.audioTracks.length > 0) {
-        setVlcAudioTracks(data.audioTracks);
+        const formattedAudioTracks = data.audioTracks.map((track: any, index: number) => {
+          const trackIndex = track.index !== undefined ? track.index : index;
+          const trackName = track.title || track.language || `Audio ${index + 1}`;
+          const trackLanguage = track.language || 'Unknown';
+          
+          if (DEBUG_MODE) {
+            logger.log(`[VideoPlayer] Audio track ${index}: index=${trackIndex}, name="${trackName}", language="${trackLanguage}"`);
+          }
+          
+          return {
+            id: trackIndex, // Use the actual track index from VLC
+            name: trackName,
+            language: trackLanguage,
+          };
+        });
+        setVlcAudioTracks(formattedAudioTracks);
+        
+        // Auto-select the first audio track if none is selected
+        if (selectedAudioTrack === null && formattedAudioTracks.length > 0) {
+          const firstTrack = formattedAudioTracks[0];
+          setSelectedAudioTrack(firstTrack.id);
+          if (DEBUG_MODE) {
+            logger.log(`[VideoPlayer] Auto-selected first audio track: ${firstTrack.name} (ID: ${firstTrack.id})`);
+          }
+        }
+        
+        if (DEBUG_MODE) {
+          logger.log(`[VideoPlayer] Formatted audio tracks:`, formattedAudioTracks);
+        }
       }
       if (data.textTracks && data.textTracks.length > 0) {
         setVlcTextTracks(data.textTracks);
@@ -1024,7 +1052,42 @@ const VideoPlayer: React.FC = () => {
   };
 
   const selectAudioTrack = (trackId: number) => {
+    if (DEBUG_MODE) {
+      logger.log(`[VideoPlayer] Selecting audio track: ${trackId}`);
+      logger.log(`[VideoPlayer] Available tracks:`, vlcAudioTracks);
+    }
+    
+    // Validate that the track exists
+    const trackExists = vlcAudioTracks.some(track => track.id === trackId);
+    if (!trackExists) {
+      logger.error(`[VideoPlayer] Audio track ${trackId} not found in available tracks`);
+      return;
+    }
+    
+    // If changing tracks, briefly pause to allow smooth transition
+    const wasPlaying = !paused;
+    if (wasPlaying) {
+      setPaused(true);
+    }
+    
+    // Set the new audio track
     setSelectedAudioTrack(trackId);
+    
+    if (DEBUG_MODE) {
+      logger.log(`[VideoPlayer] Audio track changed to: ${trackId}`);
+    }
+    
+    // Resume playback after a brief delay if it was playing
+    if (wasPlaying) {
+      setTimeout(() => {
+        if (isMounted.current) {
+          setPaused(false);
+          if (DEBUG_MODE) {
+            logger.log(`[VideoPlayer] Resumed playback after audio track change`);
+          }
+        }
+      }, 300);
+    }
   };
 
   const selectTextTrack = (trackId: number) => {
@@ -1577,6 +1640,20 @@ const VideoPlayer: React.FC = () => {
   useEffect(() => {
     loadSubtitleSize();
   }, []);
+
+  // Handle audio track changes with proper logging
+  useEffect(() => {
+    if (selectedAudioTrack !== null && vlcAudioTracks.length > 0) {
+      const selectedTrack = vlcAudioTracks.find(track => track.id === selectedAudioTrack);
+      if (selectedTrack) {
+        if (DEBUG_MODE) {
+          logger.log(`[VideoPlayer] Audio track selected: ${selectedTrack.name} (${selectedTrack.language}) - ID: ${selectedAudioTrack}`);
+        }
+      } else {
+        logger.warn(`[VideoPlayer] Selected audio track ${selectedAudioTrack} not found in available tracks`);
+      }
+    }
+  }, [selectedAudioTrack, vlcAudioTracks]);
 
   const increaseSubtitleSize = () => {
     const newSize = Math.min(subtitleSize + 2, 32);

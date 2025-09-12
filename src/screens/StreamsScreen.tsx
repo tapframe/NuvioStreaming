@@ -17,6 +17,13 @@ import {
   Clipboard,
   Image as RNImage,
 } from 'react-native';
+import Animated, { 
+  useSharedValue, 
+  useAnimatedStyle, 
+  withTiming, 
+  withDelay,
+  runOnJS 
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -38,22 +45,6 @@ import { localScraperService } from '../services/localScraperService';
 import { VideoPlayerService } from '../services/videoPlayerService';
 import { useSettings } from '../hooks/useSettings';
 import QualityBadge from '../components/metadata/QualityBadge';
-import Animated, {
-  FadeIn,
-  FadeOut,
-  FadeInDown,
-  SlideInDown,
-  withSpring,
-  withTiming,
-  useAnimatedStyle,
-  useSharedValue,
-  interpolate,
-  Extrapolate,
-  runOnJS,
-  cancelAnimation,
-  SharedValue,
-  Layout
-} from 'react-native-reanimated';
 import { logger } from '../utils/logger';
 
 const TMDB_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tmdb.new.logo.svg/512px-Tmdb.new.logo.svg.png?20200406190906';
@@ -86,6 +77,102 @@ const detectMkvViaHead = async (url: string, headers?: Record<string, string>) =
     clearTimeout(timeout);
   }
 };
+
+// Animated Components
+const AnimatedImage = memo(({ 
+  source, 
+  style, 
+  contentFit, 
+  onLoad 
+}: { 
+  source: { uri: string } | undefined; 
+  style: any; 
+  contentFit: any; 
+  onLoad?: () => void;
+}) => {
+  const opacity = useSharedValue(0);
+  
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
+  
+  useEffect(() => {
+    if (source?.uri) {
+      opacity.value = withTiming(1, { duration: 300 });
+    }
+  }, [source?.uri]);
+  
+  return (
+    <Animated.View style={[style, animatedStyle]}>
+      <Image
+        source={source}
+        style={StyleSheet.absoluteFillObject}
+        contentFit={contentFit}
+        onLoad={onLoad}
+      />
+    </Animated.View>
+  );
+});
+
+const AnimatedText = memo(({ 
+  children, 
+  style, 
+  delay = 0,
+  numberOfLines
+}: { 
+  children: React.ReactNode; 
+  style: any; 
+  delay?: number;
+  numberOfLines?: number;
+}) => {
+  const opacity = useSharedValue(0);
+  const translateY = useSharedValue(20);
+  
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
+  }));
+  
+  useEffect(() => {
+    opacity.value = withDelay(delay, withTiming(1, { duration: 250 }));
+    translateY.value = withDelay(delay, withTiming(0, { duration: 250 }));
+  }, []);
+  
+  return (
+    <Animated.Text style={[style, animatedStyle]} numberOfLines={numberOfLines}>
+      {children}
+    </Animated.Text>
+  );
+});
+
+const AnimatedView = memo(({ 
+  children, 
+  style, 
+  delay = 0 
+}: { 
+  children: React.ReactNode; 
+  style?: any; 
+  delay?: number;
+}) => {
+  const opacity = useSharedValue(0);
+  const translateY = useSharedValue(20);
+  
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
+  }));
+  
+  useEffect(() => {
+    opacity.value = withDelay(delay, withTiming(1, { duration: 250 }));
+    translateY.value = withDelay(delay, withTiming(0, { duration: 250 }));
+  }, []);
+  
+  return (
+    <Animated.View style={[style, animatedStyle]}>
+      {children}
+    </Animated.View>
+  );
+});
 
 // Extracted Components
 const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, theme, showLogos, scraperLogo }: { 
@@ -269,22 +356,20 @@ const ProviderFilter = memo(({
   const styles = React.useMemo(() => createStyles(theme.colors), [theme.colors]);
   
   const renderItem = useCallback(({ item, index }: { item: { id: string; name: string }; index: number }) => (
-    <Animated.View entering={FadeIn.duration(300).delay(index * 75)}>
-      <TouchableOpacity
-        style={[
-          styles.filterChip,
-          selectedProvider === item.id && styles.filterChipSelected
-        ]}
-        onPress={() => onSelect(item.id)}
-      >
-        <Text style={[
-          styles.filterChipText,
-          selectedProvider === item.id && styles.filterChipTextSelected
-        ]}>
-          {item.name}
-        </Text>
-      </TouchableOpacity>
-    </Animated.View>
+    <TouchableOpacity
+      style={[
+        styles.filterChip,
+        selectedProvider === item.id && styles.filterChipSelected
+      ]}
+      onPress={() => onSelect(item.id)}
+    >
+      <Text style={[
+        styles.filterChipText,
+        selectedProvider === item.id && styles.filterChipTextSelected
+      ]}>
+        {item.name}
+      </Text>
+    </TouchableOpacity>
   ), [selectedProvider, onSelect, styles]);
 
   return (
@@ -383,10 +468,6 @@ export const StreamsScreen = () => {
   const [selectedProvider, setSelectedProvider] = React.useState('all');
   const [availableProviders, setAvailableProviders] = React.useState<Set<string>>(new Set());
 
-  // Optimize animation values with cleanup
-  const headerOpacity = useSharedValue(0);
-  const heroScale = useSharedValue(0.95);
-  const filterOpacity = useSharedValue(0);
 
   // Add state for provider loading status
   const [loadingProviders, setLoadingProviders] = useState<{[key: string]: boolean}>({});
@@ -571,34 +652,9 @@ export const StreamsScreen = () => {
     checkProviders();
   }, [type, id, episodeId, settings.autoplayBestStream, fromPlayer]);
 
-  React.useEffect(() => {
-    // Trigger entrance animations
-    headerOpacity.value = withTiming(1, { duration: 400 });
-    heroScale.value = withSpring(1, {
-      damping: 15,
-      stiffness: 100,
-      mass: 0.9,
-      restDisplacementThreshold: 0.01
-    });
-    filterOpacity.value = withTiming(1, { duration: 500 });
-
-    return () => {
-      // Cleanup animations on unmount
-      cancelAnimation(headerOpacity);
-      cancelAnimation(heroScale);
-      cancelAnimation(filterOpacity);
-    };
-  }, []);
 
   // Memoize handlers
   const handleBack = useCallback(() => {
-    const cleanup = () => {
-      headerOpacity.value = withTiming(0, { duration: 100 });
-      heroScale.value = withTiming(0.95, { duration: 100 });
-      filterOpacity.value = withTiming(0, { duration: 100 });
-    };
-    cleanup();
-
     if (type === 'series') {
       // Reset stack to ensure there is always a screen to go back to from Metadata
       (navigation as any).reset({
@@ -616,7 +672,7 @@ export const StreamsScreen = () => {
     } else {
       (navigation as any).navigate('MainTabs');
     }
-  }, [navigation, headerOpacity, heroScale, filterOpacity, type, id]);
+  }, [navigation, type, id]);
 
   const handleProviderChange = useCallback((provider: string) => {
     setSelectedProvider(provider);
@@ -1430,24 +1486,6 @@ export const StreamsScreen = () => {
   const showInitialLoading = streamsEmpty && (streamsLoadStart === null || loadElapsed < 10000);
   const showStillFetching = streamsEmpty && loadElapsed >= 10000;
 
-  const heroStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: heroScale.value }],
-    opacity: headerOpacity.value
-  }));
-
-  const filterStyle = useAnimatedStyle(() => ({
-    opacity: filterOpacity.value,
-    transform: [
-      { 
-        translateY: interpolate(
-          filterOpacity.value,
-          [0, 1],
-          [20, 0],
-          Extrapolate.CLAMP
-        )
-      }
-    ]
-  }));
 
   const renderItem = useCallback(({ item, index, section }: { item: Stream; index: number; section: any }) => {
     const stream = item;
@@ -1509,7 +1547,7 @@ export const StreamsScreen = () => {
       
       
       {Platform.OS !== 'ios' && (
-        <Animated.View
+        <View
           style={[styles.backButtonContainer]}
         >
           <TouchableOpacity 
@@ -1525,38 +1563,37 @@ export const StreamsScreen = () => {
               {type === 'series' ? 'Back to Episodes' : 'Back to Info'}
             </Text>
           </TouchableOpacity>
-        </Animated.View>
+        </View>
       )}
 
       {type === 'movie' && metadata && (
-        <Animated.View style={[styles.movieTitleContainer, heroStyle]}>
+        <View style={[styles.movieTitleContainer]}>
           <View style={styles.movieTitleContent}>
             {metadata.logo ? (
-              <Image
+              <AnimatedImage
                 source={{ uri: metadata.logo }}
                 style={styles.movieLogo}
                 contentFit="contain"
               />
             ) : (
-              <Text style={styles.movieTitle} numberOfLines={2}>
+              <AnimatedText style={styles.movieTitle} numberOfLines={2}>
                 {metadata.name}
-              </Text>
+              </AnimatedText>
             )}
           </View>
-        </Animated.View>
+        </View>
       )}
 
       {type === 'series' && (
-        <Animated.View style={[styles.streamsHeroContainer, heroStyle]}>
-          <Animated.View style={StyleSheet.absoluteFill}>
-            <Animated.View
+        <View style={[styles.streamsHeroContainer]}>
+          <View style={StyleSheet.absoluteFill}>
+            <View
               style={StyleSheet.absoluteFill}
             >
-              <Image
+              <AnimatedImage
                 source={episodeImage ? { uri: episodeImage } : undefined}
                 style={styles.streamsHeroBackground}
                 contentFit="cover"
-                transition={500}
               />
               <LinearGradient
                 colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.7)', colors.darkBackground]}
@@ -1565,58 +1602,60 @@ export const StreamsScreen = () => {
               >
                 <View style={styles.streamsHeroContent}>
                   {currentEpisode ? (
-                    <Animated.View style={styles.streamsHeroInfo}>
-                      <Text style={styles.streamsHeroEpisodeNumber}>{currentEpisode.episodeString}</Text>
-                      <Text style={styles.streamsHeroTitle} numberOfLines={1}>
+                    <View style={styles.streamsHeroInfo}>
+                      <AnimatedText style={styles.streamsHeroEpisodeNumber} delay={50}>
+                        {currentEpisode.episodeString}
+                      </AnimatedText>
+                      <AnimatedText style={styles.streamsHeroTitle} numberOfLines={1} delay={100}>
                         {currentEpisode.name}
-                      </Text>
+                      </AnimatedText>
                       {!!currentEpisode.overview && (
-                        <Animated.View>
+                        <AnimatedView delay={150}>
                           <Text style={styles.streamsHeroOverview} numberOfLines={2}>
                             {currentEpisode.overview}
                           </Text>
-                        </Animated.View>
+                        </AnimatedView>
                       )}
-                      <Animated.View style={styles.streamsHeroMeta}>
+                      <AnimatedView style={styles.streamsHeroMeta} delay={200}>
                         <Text style={styles.streamsHeroReleased}>
                           {tmdbService.formatAirDate(currentEpisode.air_date)}
                         </Text>
                         {effectiveEpisodeVote > 0 && (
-                          <Animated.View style={styles.streamsHeroRating}>
+                          <View style={styles.streamsHeroRating}>
                             <Image source={{ uri: TMDB_LOGO }} style={styles.tmdbLogo} contentFit="contain" />
                             <Text style={styles.streamsHeroRatingText}>
                               {effectiveEpisodeVote.toFixed(1)}
                             </Text>
-                          </Animated.View>
+                          </View>
                         )}
                         {!!effectiveEpisodeRuntime && (
-                          <Animated.View style={styles.streamsHeroRuntime}>
+                          <View style={styles.streamsHeroRuntime}>
                             <MaterialIcons name="schedule" size={16} color={colors.mediumEmphasis} />
                             <Text style={styles.streamsHeroRuntimeText}>
                               {effectiveEpisodeRuntime >= 60
                                 ? `${Math.floor(effectiveEpisodeRuntime / 60)}h ${effectiveEpisodeRuntime % 60}m`
                                 : `${effectiveEpisodeRuntime}m`}
                             </Text>
-                          </Animated.View>
+                          </View>
                         )}
-                      </Animated.View>
-                    </Animated.View>
+                      </AnimatedView>
+                    </View>
                   ) : (
                     // Placeholder to reserve space and avoid layout shift while loading
                     <View style={{ width: '100%', height: 120 }} />
                   )}
                 </View>
               </LinearGradient>
-            </Animated.View>
-          </Animated.View>
-        </Animated.View>
+            </View>
+          </View>
+        </View>
       )}
 
       <View style={[
         styles.streamsMainContent,
         type === 'movie' && styles.streamsMainContentMovie
       ]}>
-        <Animated.View style={[styles.filterContainer, filterStyle]}>
+        <View style={[styles.filterContainer]}>
           {Object.keys(streams).length > 0 && (
             <ProviderFilter
               selectedProvider={selectedProvider}
@@ -1625,11 +1664,11 @@ export const StreamsScreen = () => {
               theme={currentTheme}
             />
           )}
-        </Animated.View>
+        </View>
 
         {/* Active Scrapers Status */}
         {activeFetchingScrapers.length > 0 && (
-          <Animated.View 
+          <View 
             style={styles.activeScrapersContainer}
           >
             <Text style={styles.activeScrapersTitle}>Fetching from:</Text>
@@ -1638,13 +1677,12 @@ export const StreamsScreen = () => {
                 <PulsingChip key={scraperName} text={scraperName} delay={index * 200} />
               ))}
             </View>
-          </Animated.View>
+          </View>
         )}
 
         {/* Update the streams/loading state display logic */}
         { showNoSourcesError ? (
-            <Animated.View 
-              entering={FadeIn.duration(300)}
+            <View 
               style={styles.noStreams}
             >
               <MaterialIcons name="error-outline" size={48} color={colors.textMuted} />
@@ -1658,46 +1696,46 @@ export const StreamsScreen = () => {
               >
                 <Text style={styles.addSourcesButtonText}>Add Sources</Text>
               </TouchableOpacity>
-            </Animated.View>
+            </View>
         ) : streamsEmpty ? (
           showInitialLoading ? (
-            <Animated.View 
+            <View 
               style={styles.loadingContainer}
             >
               <ActivityIndicator size="large" color={colors.primary} />
               <Text style={styles.loadingText}>
                 {isAutoplayWaiting ? 'Finding best stream for autoplay...' : 'Finding available streams...'}
               </Text>
-            </Animated.View>
+            </View>
           ) : showStillFetching ? (
-            <Animated.View 
+            <View 
               style={styles.loadingContainer}
             >
               <MaterialIcons name="hourglass-bottom" size={32} color={colors.primary} />
               <Text style={styles.loadingText}>Still fetching streams…</Text>
-            </Animated.View>
+            </View>
           ) : (
             // No streams and not loading = no streams available
-            <Animated.View 
+            <View 
               style={styles.noStreams}
             >
               <MaterialIcons name="error-outline" size={48} color={colors.textMuted} />
               <Text style={styles.noStreamsText}>No streams available</Text>
-            </Animated.View>
+            </View>
           )
         ) : (
           // Show streams immediately when available, even if still loading others
           <View collapsable={false} style={{ flex: 1 }}>
             {/* Show autoplay loading overlay if waiting for autoplay */}
             {isAutoplayWaiting && !autoplayTriggered && (
-              <Animated.View 
+              <View 
                 style={styles.autoplayOverlay}
               >
                 <View style={styles.autoplayIndicator}>
                   <ActivityIndicator size="small" color={colors.primary} />
                   <Text style={styles.autoplayText}>Starting best stream...</Text>
                 </View>
-              </Animated.View>
+              </View>
             )}
             
             <SectionList
@@ -2133,17 +2171,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.mediumEmphasis,
     fontSize: 13,
     fontWeight: '600',
-  },
-  transitionOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: colors.darkBackground,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 9999,
   },
   sectionHeaderContainer: {
     paddingHorizontal: 12,

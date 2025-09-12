@@ -7,7 +7,8 @@ import Animated, {
   SlideInRight,
   SlideOutRight,
 } from 'react-native-reanimated';
-import { getTrackDisplayName } from '../utils/playerUtils';
+import { getTrackDisplayName, DEBUG_MODE } from '../utils/playerUtils';
+import { logger } from '../../../utils/logger';
 
 interface AudioTrackModalProps {
   showAudioModal: boolean;
@@ -30,6 +31,20 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
   const handleClose = () => {
     setShowAudioModal(false);
   };
+
+  // Debug logging when modal opens
+  React.useEffect(() => {
+    if (showAudioModal && DEBUG_MODE) {
+      logger.log(`[AudioTrackModal] Modal opened with selectedAudioTrack: ${selectedAudioTrack}`);
+      logger.log(`[AudioTrackModal] Available tracks:`, vlcAudioTracks);
+      const selectedTrack = vlcAudioTracks.find(track => track.id === selectedAudioTrack);
+      if (selectedTrack) {
+        logger.log(`[AudioTrackModal] Selected track found: ${selectedTrack.name} (${selectedTrack.language})`);
+      } else {
+        logger.warn(`[AudioTrackModal] Selected track ${selectedAudioTrack} not found in available tracks`);
+      }
+    }
+  }, [showAudioModal, selectedAudioTrack, vlcAudioTracks]);
 
   if (!showAudioModal) return null;
   
@@ -131,7 +146,9 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
             
             <View style={{ gap: 8 }}>
               {vlcAudioTracks.map((track) => {
-                const isSelected = selectedAudioTrack === track.id;
+                // If no track is selected, show the first track as selected
+                const isSelected = selectedAudioTrack === track.id || 
+                                 (selectedAudioTrack === null && track.id === vlcAudioTracks[0]?.id);
                 return (
                   <TouchableOpacity
                     key={track.id}
@@ -143,7 +160,14 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
                       borderColor: isSelected ? 'rgba(34, 197, 94, 0.3)' : 'rgba(255, 255, 255, 0.1)',
                     }}
                     onPress={() => {
+                      if (DEBUG_MODE) {
+                        logger.log(`[AudioTrackModal] Selecting track: ${track.id} (${track.name})`);
+                      }
                       selectAudioTrack(track.id);
+                      // Close modal after selection
+                      setTimeout(() => {
+                        setShowAudioModal(false);
+                      }, 200);
                     }}
                     activeOpacity={0.7}
                   >

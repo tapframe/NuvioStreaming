@@ -757,12 +757,35 @@ const AndroidVideoPlayer: React.FC = () => {
 
       // Handle audio tracks
       if (data.audioTracks && data.audioTracks.length > 0) {
-        const formattedAudioTracks = data.audioTracks.map((track: any, index: number) => ({
-          id: track.index || index,
-          name: track.title || track.language || `Audio ${index + 1}`,
-          language: track.language,
-        }));
+        const formattedAudioTracks = data.audioTracks.map((track: any, index: number) => {
+          const trackIndex = track.index !== undefined ? track.index : index;
+          const trackName = track.title || track.language || `Audio ${index + 1}`;
+          const trackLanguage = track.language || 'Unknown';
+          
+          if (DEBUG_MODE) {
+            logger.log(`[AndroidVideoPlayer] Audio track ${index}: index=${trackIndex}, name="${trackName}", language="${trackLanguage}"`);
+          }
+          
+          return {
+            id: trackIndex, // Use the actual track index from react-native-video
+            name: trackName,
+            language: trackLanguage,
+          };
+        });
         setRnVideoAudioTracks(formattedAudioTracks);
+        
+        // Auto-select the first audio track if none is selected
+        if (selectedAudioTrack === null && formattedAudioTracks.length > 0) {
+          const firstTrack = formattedAudioTracks[0];
+          setSelectedAudioTrack(firstTrack.id);
+          if (DEBUG_MODE) {
+            logger.log(`[AndroidVideoPlayer] Auto-selected first audio track: ${firstTrack.name} (ID: ${firstTrack.id})`);
+          }
+        }
+        
+        if (DEBUG_MODE) {
+          logger.log(`[AndroidVideoPlayer] Formatted audio tracks:`, formattedAudioTracks);
+        }
       }
 
       // Handle text tracks
@@ -1205,7 +1228,42 @@ const AndroidVideoPlayer: React.FC = () => {
   };
 
   const selectAudioTrack = (trackId: number) => {
+    if (DEBUG_MODE) {
+      logger.log(`[AndroidVideoPlayer] Selecting audio track: ${trackId}`);
+      logger.log(`[AndroidVideoPlayer] Available tracks:`, rnVideoAudioTracks);
+    }
+    
+    // Validate that the track exists
+    const trackExists = rnVideoAudioTracks.some(track => track.id === trackId);
+    if (!trackExists) {
+      logger.error(`[AndroidVideoPlayer] Audio track ${trackId} not found in available tracks`);
+      return;
+    }
+    
+    // If changing tracks, briefly pause to allow smooth transition
+    const wasPlaying = !paused;
+    if (wasPlaying) {
+      setPaused(true);
+    }
+    
+    // Set the new audio track
     setSelectedAudioTrack(trackId);
+    
+    if (DEBUG_MODE) {
+      logger.log(`[AndroidVideoPlayer] Audio track changed to: ${trackId}`);
+    }
+    
+    // Resume playback after a brief delay if it was playing
+    if (wasPlaying) {
+      setTimeout(() => {
+        if (isMounted.current) {
+          setPaused(false);
+          if (DEBUG_MODE) {
+            logger.log(`[AndroidVideoPlayer] Resumed playback after audio track change`);
+          }
+        }
+      }, 300);
+    }
   };
 
   const selectTextTrack = (trackId: number) => {
@@ -1736,6 +1794,20 @@ const AndroidVideoPlayer: React.FC = () => {
   useEffect(() => {
     loadSubtitleSize();
   }, []);
+
+  // Handle audio track changes with proper logging
+  useEffect(() => {
+    if (selectedAudioTrack !== null && rnVideoAudioTracks.length > 0) {
+      const selectedTrack = rnVideoAudioTracks.find(track => track.id === selectedAudioTrack);
+      if (selectedTrack) {
+        if (DEBUG_MODE) {
+          logger.log(`[AndroidVideoPlayer] Audio track selected: ${selectedTrack.name} (${selectedTrack.language}) - ID: ${selectedAudioTrack}`);
+        }
+      } else {
+        logger.warn(`[AndroidVideoPlayer] Selected audio track ${selectedAudioTrack} not found in available tracks`);
+      }
+    }
+  }, [selectedAudioTrack, rnVideoAudioTracks]);
 
   // Load global subtitle settings
   useEffect(() => {
