@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Video, { VideoRef, SelectedTrack, SelectedTrackType, BufferingStrategyType } from 'react-native-video';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
-import { PinchGestureHandler, State, PinchGestureHandlerGestureEvent } from 'react-native-gesture-handler';
+import { PinchGestureHandler, PanGestureHandler, State, PinchGestureHandlerGestureEvent, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import RNImmersiveMode from 'react-native-immersive-mode';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { storageService } from '../../services/storageService';
@@ -38,6 +38,8 @@ import CustomSubtitles from './subtitles/CustomSubtitles';
 import { SourcesModal } from './modals/SourcesModal';
 import { stremioService } from '../../services/stremioService';
 import axios from 'axios';
+import DeviceBrightness from '@adrianso/react-native-device-brightness';
+import { VolumeManager } from 'react-native-volume-manager';
 
 // Map VLC resize modes to react-native-video resize modes
 const getVideoResizeMode = (resizeMode: ResizeModeType) => {
@@ -214,6 +216,18 @@ const AndroidVideoPlayer: React.FC = () => {
   const [errorDetails, setErrorDetails] = useState<string>('');
   const errorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Volume and brightness controls
+  const [volume, setVolume] = useState(1.0);
+  const [brightness, setBrightness] = useState(1.0);
+  const [showVolumeOverlay, setShowVolumeOverlay] = useState(false);
+  const [showBrightnessOverlay, setShowBrightnessOverlay] = useState(false);
+  const volumeOverlayOpacity = useRef(new Animated.Value(0)).current;
+  const brightnessOverlayOpacity = useRef(new Animated.Value(0)).current;
+  const volumeOverlayTimeout = useRef<NodeJS.Timeout | null>(null);
+  const brightnessOverlayTimeout = useRef<NodeJS.Timeout | null>(null);
+  const lastVolumeChange = useRef<number>(0);
+  const lastBrightnessChange = useRef<number>(0);
+
   // iOS startup timing diagnostics
   const loadStartAtRef = useRef<number | null>(null);
   const firstFrameAtRef = useRef<number | null>(null);
@@ -357,6 +371,114 @@ const AndroidVideoPlayer: React.FC = () => {
     }
   };
 
+  // Volume gesture handler (right side of screen)
+  const onVolumeGestureEvent = async (event: PanGestureHandlerGestureEvent) => {
+    const { translationY, state } = event.nativeEvent;
+    const screenHeight = screenDimensions.height;
+    const sensitivity = 0.003; // Adjust sensitivity
+    
+    if (state === State.ACTIVE) {
+      const deltaY = -translationY; // Invert for natural feel (up = increase)
+      const volumeChange = deltaY * sensitivity;
+      const newVolume = Math.max(0, Math.min(1, volume + volumeChange));
+      
+      if (Math.abs(newVolume - volume) > 0.01) { // Only update if significant change
+        setVolume(newVolume);
+        lastVolumeChange.current = Date.now();
+        
+        // Set device volume using VolumeManager
+        try {
+          await VolumeManager.setVolume(newVolume);
+          if (DEBUG_MODE) {
+            logger.log(`[AndroidVideoPlayer] Device volume set to: ${newVolume}`);
+          }
+        } catch (error) {
+          logger.warn('[AndroidVideoPlayer] Error setting device volume:', error);
+        }
+        
+        // Show overlay
+        if (!showVolumeOverlay) {
+          setShowVolumeOverlay(true);
+          Animated.timing(volumeOverlayOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }).start();
+        }
+        
+        // Clear existing timeout
+        if (volumeOverlayTimeout.current) {
+          clearTimeout(volumeOverlayTimeout.current);
+        }
+        
+        // Hide overlay after 2 seconds
+        volumeOverlayTimeout.current = setTimeout(() => {
+          Animated.timing(volumeOverlayOpacity, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }).start(() => {
+            setShowVolumeOverlay(false);
+          });
+        }, 2000);
+      }
+    }
+  };
+
+  // Brightness gesture handler (left side of screen)
+  const onBrightnessGestureEvent = async (event: PanGestureHandlerGestureEvent) => {
+    const { translationY, state } = event.nativeEvent;
+    const screenHeight = screenDimensions.height;
+    const sensitivity = 0.003; // Adjust sensitivity
+    
+    if (state === State.ACTIVE) {
+      const deltaY = -translationY; // Invert for natural feel (up = increase)
+      const brightnessChange = deltaY * sensitivity;
+      const newBrightness = Math.max(0, Math.min(1, brightness + brightnessChange));
+      
+      if (Math.abs(newBrightness - brightness) > 0.01) { // Only update if significant change
+        setBrightness(newBrightness);
+        lastBrightnessChange.current = Date.now();
+        
+        // Set device brightness using DeviceBrightness
+        try {
+          await DeviceBrightness.setBrightnessLevel(newBrightness);
+          if (DEBUG_MODE) {
+            logger.log(`[AndroidVideoPlayer] Device brightness set to: ${newBrightness}`);
+          }
+        } catch (error) {
+          logger.warn('[AndroidVideoPlayer] Error setting device brightness:', error);
+        }
+        
+        // Show overlay
+        if (!showBrightnessOverlay) {
+          setShowBrightnessOverlay(true);
+          Animated.timing(brightnessOverlayOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }).start();
+        }
+        
+        // Clear existing timeout
+        if (brightnessOverlayTimeout.current) {
+          clearTimeout(brightnessOverlayTimeout.current);
+        }
+        
+        // Hide overlay after 2 seconds
+        brightnessOverlayTimeout.current = setTimeout(() => {
+          Animated.timing(brightnessOverlayOpacity, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }).start(() => {
+            setShowBrightnessOverlay(false);
+          });
+        }, 2000);
+      }
+    }
+  };
+
   const resetZoom = () => {
     const targetZoom = is16by9Content ? 1.1 : 1;
     setZoomScale(targetZoom);
@@ -385,10 +507,31 @@ const AndroidVideoPlayer: React.FC = () => {
     const subscription = Dimensions.addEventListener('change', ({ screen }) => {
       setScreenDimensions(screen);
     });
-    const initializePlayer = () => {
+    const initializePlayer = async () => {
       StatusBar.setHidden(true, 'none');
       enableImmersiveMode();
       startOpeningAnimation();
+      
+      // Initialize current volume and brightness levels
+      try {
+        const currentVolume = await VolumeManager.getVolume();
+        setVolume(currentVolume.volume);
+        if (DEBUG_MODE) {
+          logger.log(`[AndroidVideoPlayer] Initial volume: ${currentVolume.volume}`);
+        }
+      } catch (error) {
+        logger.warn('[AndroidVideoPlayer] Error getting initial volume:', error);
+      }
+      
+      try {
+        const currentBrightness = await DeviceBrightness.getBrightnessLevel();
+        setBrightness(currentBrightness);
+        if (DEBUG_MODE) {
+          logger.log(`[AndroidVideoPlayer] Initial brightness: ${currentBrightness}`);
+        }
+      } catch (error) {
+        logger.warn('[AndroidVideoPlayer] Error getting initial brightness:', error);
+      }
     };
     initializePlayer();
     return () => {
@@ -1767,6 +1910,12 @@ const AndroidVideoPlayer: React.FC = () => {
       if (errorTimeoutRef.current) {
         clearTimeout(errorTimeoutRef.current);
       }
+      if (volumeOverlayTimeout.current) {
+        clearTimeout(volumeOverlayTimeout.current);
+      }
+      if (brightnessOverlayTimeout.current) {
+        clearTimeout(brightnessOverlayTimeout.current);
+      }
     };
   }, []);
   
@@ -2139,6 +2288,40 @@ const AndroidVideoPlayer: React.FC = () => {
           onPress={toggleControls}
           activeOpacity={1}
         >
+          {/* Left side brightness gesture handler */}
+          <PanGestureHandler
+            onGestureEvent={onBrightnessGestureEvent}
+            activeOffsetY={[-10, 10]}
+            failOffsetX={[-50, 50]}
+            shouldCancelWhenOutside={false}
+          >
+            <View style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: screenDimensions.width * 0.3, // Left 30% of screen
+              height: screenDimensions.height,
+              zIndex: 10,
+            }} />
+          </PanGestureHandler>
+
+          {/* Right side volume gesture handler */}
+          <PanGestureHandler
+            onGestureEvent={onVolumeGestureEvent}
+            activeOffsetY={[-10, 10]}
+            failOffsetX={[-50, 50]}
+            shouldCancelWhenOutside={false}
+          >
+            <View style={{
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              width: screenDimensions.width * 0.3, // Right 30% of screen
+              height: screenDimensions.height,
+              zIndex: 10,
+            }} />
+          </PanGestureHandler>
+
           <PinchGestureHandler
             ref={pinchRef}
             onGestureEvent={onPinchGestureEvent}
@@ -2196,7 +2379,7 @@ const AndroidVideoPlayer: React.FC = () => {
                   selectedAudioTrack={selectedAudioTrack !== null ? { type: SelectedTrackType.INDEX, value: selectedAudioTrack } : undefined}
                   selectedTextTrack={useCustomSubtitles ? { type: SelectedTrackType.DISABLED } : (selectedTextTrack >= 0 ? { type: SelectedTrackType.INDEX, value: selectedTextTrack } : undefined)}
                   rate={1.0}
-                  volume={1.0}
+                  volume={volume}
                   muted={false}
                   repeat={false}
                   playInBackground={false}
@@ -2633,6 +2816,124 @@ const AndroidVideoPlayer: React.FC = () => {
             controlsVisible={showControls}
             controlsFixedOffset={Math.min(Dimensions.get('window').width, Dimensions.get('window').height) >= 768 ? 120 : 100}
           />
+
+          {/* Volume Overlay */}
+          {showVolumeOverlay && (
+            <Animated.View
+              style={{
+                position: 'absolute',
+                right: 20 + insets.right,
+                top: '50%',
+                transform: [{ translateY: -50 }],
+                opacity: volumeOverlayOpacity,
+                zIndex: 1000,
+              }}
+            >
+              <View style={{
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                borderRadius: 12,
+                padding: 16,
+                alignItems: 'center',
+                minWidth: 80,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+                elevation: 8,
+              }}>
+                <MaterialIcons 
+                  name={volume === 0 ? "volume-off" : volume < 0.5 ? "volume-down" : "volume-up"} 
+                  size={24} 
+                  color="#FFFFFF" 
+                  style={{ marginBottom: 8 }}
+                />
+                <View style={{
+                  width: 4,
+                  height: 60,
+                  backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                  borderRadius: 2,
+                  position: 'relative',
+                }}>
+                  <View style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    width: 4,
+                    height: `${volume * 100}%`,
+                    backgroundColor: '#E50914',
+                    borderRadius: 2,
+                  }} />
+                </View>
+                <Text style={{
+                  color: '#FFFFFF',
+                  fontSize: 12,
+                  fontWeight: '600',
+                  marginTop: 8,
+                }}>
+                  {Math.round(volume * 100)}%
+                </Text>
+              </View>
+            </Animated.View>
+          )}
+
+          {/* Brightness Overlay */}
+          {showBrightnessOverlay && (
+            <Animated.View
+              style={{
+                position: 'absolute',
+                left: 20 + insets.left,
+                top: '50%',
+                transform: [{ translateY: -50 }],
+                opacity: brightnessOverlayOpacity,
+                zIndex: 1000,
+              }}
+            >
+              <View style={{
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                borderRadius: 12,
+                padding: 16,
+                alignItems: 'center',
+                minWidth: 80,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+                elevation: 8,
+              }}>
+                <MaterialIcons 
+                  name={brightness < 0.3 ? "brightness-low" : brightness < 0.7 ? "brightness-medium" : "brightness-high"} 
+                  size={24} 
+                  color="#FFFFFF" 
+                  style={{ marginBottom: 8 }}
+                />
+                <View style={{
+                  width: 4,
+                  height: 60,
+                  backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                  borderRadius: 2,
+                  position: 'relative',
+                }}>
+                  <View style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    width: 4,
+                    height: `${brightness * 100}%`,
+                    backgroundColor: '#FFD700',
+                    borderRadius: 2,
+                  }} />
+                </View>
+                <Text style={{
+                  color: '#FFFFFF',
+                  fontSize: 12,
+                  fontWeight: '600',
+                  marginTop: 8,
+                }}>
+                  {Math.round(brightness * 100)}%
+                </Text>
+              </View>
+            </Animated.View>
+          )}
 
           {/* Resume overlay removed when AlwaysResume is enabled; overlay component omitted */}
         </TouchableOpacity> 
