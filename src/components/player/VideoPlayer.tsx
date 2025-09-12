@@ -242,6 +242,23 @@ const VideoPlayer: React.FC = () => {
   const [brightness, setBrightness] = useState(1.0);
   const [showVolumeOverlay, setShowVolumeOverlay] = useState(false);
   const [showBrightnessOverlay, setShowBrightnessOverlay] = useState(false);
+  const [showVlcVolumeWarning, setShowVlcVolumeWarning] = useState(false);
+  const [hasShownVlcWarning, setHasShownVlcWarning] = useState(false);
+
+  // Load VLC warning state from storage
+  useEffect(() => {
+    const loadWarningState = async () => {
+      try {
+        const warningShown = await AsyncStorage.getItem('vlc_volume_warning_shown');
+        if (warningShown === 'true') {
+          setHasShownVlcWarning(true);
+        }
+      } catch (error) {
+        // Ignore storage errors
+      }
+    };
+    loadWarningState();
+  }, []);
   const volumeOverlayOpacity = useRef(new Animated.Value(0)).current;
   const brightnessOverlayOpacity = useRef(new Animated.Value(0)).current;
   const volumeOverlayTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -379,57 +396,20 @@ const VideoPlayer: React.FC = () => {
   // Volume gesture handler (right side of screen)
   const onVolumeGestureEvent = async (event: PanGestureHandlerGestureEvent) => {
     const { translationY, state } = event.nativeEvent;
-    const screenHeight = screenDimensions.height;
-    const sensitivity = 0.2; // Reduced for finer control (VLC 0-100 range)
-    
+
     if (state === State.ACTIVE) {
-      const deltaY = -translationY; // Invert for natural feel (up = increase)
-      const volumeChange = deltaY * sensitivity;
-      const newVolume = Math.max(0, Math.min(100, volume + volumeChange));
-      
-      if (Math.abs(newVolume - volume) > 0.5) { // Reduced threshold for smoother updates
-        setVolume(newVolume);
-        lastVolumeChange.current = Date.now();
-        
-        if (DEBUG_MODE) {
-          logger.log(`[VideoPlayer] Volume set to: ${newVolume}`);
-        }
-        
-        // Set VLC volume as well
-        if (vlcRef.current) {
-          try {
-            vlcRef.current.setVolume(newVolume);
-          } catch (error) {
-            logger.warn('[VideoPlayer] Error setting VLC volume:', error);
-          }
-        }
-        
-        // Show overlay with smoother animation
-        if (!showVolumeOverlay) {
-          setShowVolumeOverlay(true);
-          Animated.spring(volumeOverlayOpacity, {
-            toValue: 1,
-            tension: 100,
-            friction: 8,
-            useNativeDriver: true,
-          }).start();
-        }
-        
-        // Clear existing timeout
-        if (volumeOverlayTimeout.current) {
-          clearTimeout(volumeOverlayTimeout.current);
-        }
-        
-        // Hide overlay after 1.5 seconds (reduced from 2 seconds)
-        volumeOverlayTimeout.current = setTimeout(() => {
-          Animated.timing(volumeOverlayOpacity, {
-            toValue: 0,
-            duration: 250,
-            useNativeDriver: true,
-          }).start(() => {
-            setShowVolumeOverlay(false);
-          });
-        }, 1500);
+      // Show VLC volume warning only once per session
+      if (!showVlcVolumeWarning && !hasShownVlcWarning) {
+        setShowVlcVolumeWarning(true);
+        setHasShownVlcWarning(true);
+
+        // Save to storage that warning has been shown
+        AsyncStorage.setItem('vlc_volume_warning_shown', 'true').catch(() => {});
+
+        // Hide warning after 4 seconds
+        setTimeout(() => {
+          setShowVlcVolumeWarning(false);
+        }, 4000);
       }
     }
   };
@@ -2214,6 +2194,7 @@ const VideoPlayer: React.FC = () => {
                   audioTrack={selectedAudioTrack ?? undefined}
                   textTrack={useCustomSubtitles ? -1 : (selectedTextTrack ?? undefined)}
                   autoAspectRatio
+                  volume={volume / 100}
                 />
               </TouchableOpacity>
             </View>
@@ -2262,6 +2243,7 @@ const VideoPlayer: React.FC = () => {
                 left: 0,
                 right: 0,
                 bottom: 0,
+                zIndex: 30,
               }}
             >
               <Animated.View
@@ -2279,16 +2261,16 @@ const VideoPlayer: React.FC = () => {
                   <LinearGradient
                     start={{ x: 0, y: 0.5 }}
                     end={{ x: 1, y: 0.5 }}
-                    colors={[ 'rgba(0,0,0,0.85)', 'rgba(0,0,0,0.0)' ]}
+                    colors={[ 'rgba(0,0,0,0.98)', 'rgba(0,0,0,0.2)' ]}
                     locations={[0, 1]}
                     style={StyleSheet.absoluteFill}
                   />
                 </View>
                 <LinearGradient
                   colors={[
-                    'rgba(0,0,0,0.6)',
+                    'rgba(0,0,0,0.9)',
+                    'rgba(0,0,0,0.7)',
                     'rgba(0,0,0,0.4)',
-                    'rgba(0,0,0,0.2)',
                     'rgba(0,0,0,0.0)'
                   ]}
                   locations={[0, 0.3, 0.6, 1]}
@@ -2718,7 +2700,7 @@ const VideoPlayer: React.FC = () => {
                   fontWeight: '600',
                   letterSpacing: 0.5,
                 }}>
-                  {volume}%
+                  {Math.round(volume)}%
                 </Text>
               </View>
             </Animated.View>
@@ -2819,6 +2801,74 @@ const VideoPlayer: React.FC = () => {
                 </Text>
               </View>
             </Animated.View>
+          )}
+
+          {/* VLC Volume Warning Overlay */}
+          {showVlcVolumeWarning && (
+            <View
+              style={{
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                top: 0,
+                bottom: 0,
+                justifyContent: 'center',
+                alignItems: 'center',
+                zIndex: 1000,
+                backgroundColor: 'rgba(0, 0, 0, 0.3)',
+              }}
+            >
+              <View style={{
+                backgroundColor: 'rgba(0, 0, 0, 0.95)',
+                borderRadius: 16,
+                padding: 20,
+                alignItems: 'center',
+                width: Math.min(280, screenDimensions.width * 0.8),
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 8 },
+                shadowOpacity: 0.6,
+                shadowRadius: 12,
+                elevation: 15,
+                borderWidth: 1,
+                borderColor: 'rgba(255, 255, 255, 0.1)',
+              }}>
+                <MaterialIcons
+                  name="volume-off"
+                  size={28}
+                  color="#FF6B6B"
+                  style={{ marginBottom: 12 }}
+                />
+
+                <Text style={{
+                  color: '#FFFFFF',
+                  fontSize: 16,
+                  fontWeight: '700',
+                  textAlign: 'center',
+                  marginBottom: 8,
+                }}>
+                  Volume Control Not Available
+                </Text>
+
+                <Text style={{
+                  color: '#CCCCCC',
+                  fontSize: 13,
+                  textAlign: 'center',
+                  lineHeight: 18,
+                  marginBottom: 12,
+                }}>
+                  VLC player doesn't support volume gestures.{'\n'}Use your device volume buttons instead.
+                </Text>
+
+                <Text style={{
+                  color: '#888888',
+                  fontSize: 11,
+                  textAlign: 'center',
+                  fontStyle: 'italic',
+                }}>
+                  This message won't be shown again
+                </Text>
+              </View>
+            </View>
           )}
 
           {/* Resume overlay removed when AlwaysResume is enabled; overlay component omitted */}

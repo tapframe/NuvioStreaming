@@ -90,14 +90,13 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
         {
           backgroundColor: bgColor,
           position: 'relative',
-          width: '100%',
           alignItems: 'center',
         }
       ]}>
         {useCrispSvgOutline ? (
           // Crisp outline using react-native-svg (stroke under, fill on top)
           <Svg
-            width={'100%'}
+            width={800}
             height={svgHeight}
             viewBox={`0 0 1000 ${svgHeight}`}
             preserveAspectRatio="xMidYMax meet"

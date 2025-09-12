@@ -2488,6 +2488,7 @@ const AndroidVideoPlayer: React.FC = () => {
                 left: 0,
                 right: 0,
                 bottom: 0,
+                zIndex: 30,
               }}
             >
               <Animated.View 
@@ -2505,16 +2506,16 @@ const AndroidVideoPlayer: React.FC = () => {
                   <LinearGradient
                     start={{ x: 0, y: 0.5 }}
                     end={{ x: 1, y: 0.5 }}
-                    colors={[ 'rgba(0,0,0,0.85)', 'rgba(0,0,0,0.0)' ]}
+                    colors={[ 'rgba(0,0,0,0.98)', 'rgba(0,0,0,0.2)' ]}
                     locations={[0, 1]}
                     style={StyleSheet.absoluteFill}
                   />
                 </View>
                 <LinearGradient
                   colors={[
-                    'rgba(0,0,0,0.6)',
+                    'rgba(0,0,0,0.9)',
+                    'rgba(0,0,0,0.7)',
                     'rgba(0,0,0,0.4)',
-                    'rgba(0,0,0,0.2)',
                     'rgba(0,0,0,0.0)'
                   ]}
                   locations={[0, 0.3, 0.6, 1]}
