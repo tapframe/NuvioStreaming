@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Slider from '@react-native-community/slider';
 import { styles } from '../utils/playerStyles';
 import { getTrackDisplayName } from '../utils/playerUtils';
+import { useTheme } from '../../../contexts/ThemeContext';
 
 interface PlayerControlsProps {
   showControls: boolean;
@@ -74,6 +75,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   buffered,
   formatTime,
 }) => {
+  const { currentTheme } = useTheme();
   return (
     <Animated.View
       style={[StyleSheet.absoluteFill, { opacity: fadeAnim }]}
@@ -93,12 +95,12 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
           onValueChange={onSliderValueChange}
           onSlidingStart={onSlidingStart}
           onSlidingComplete={onSlidingComplete}
-          minimumTrackTintColor="#FFFFFF"
-          maximumTrackTintColor="rgba(255, 255, 255, 0.3)"
-          thumbTintColor={Platform.OS === 'android' ? '#FFFFFF' : undefined}
+          minimumTrackTintColor={currentTheme.colors.primary}
+          maximumTrackTintColor={currentTheme.colors.mediumEmphasis}
+          thumbTintColor={Platform.OS === 'android' ? currentTheme.colors.white : undefined}
           tapToSeek={Platform.OS === 'ios'}
         />
-        <View style={styles.timeDisplay}>
+        <View style={[styles.timeDisplay, { paddingHorizontal: 14 }]}>
           <Text style={styles.duration}>{formatTime(currentTime)}</Text>
           <Text style={styles.duration}>{formatTime(duration)}</Text>
         </View>

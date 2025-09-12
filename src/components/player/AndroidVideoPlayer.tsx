@@ -647,7 +647,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const handleSliderValueChange = (value: number) => {
     if (isDragging && duration > 0) {
       const seekTime = Math.min(value, duration - END_EPSILON);
-      setCurrentTime(seekTime);
+      
       pendingSeekValue.current = seekTime;
     }
   };
