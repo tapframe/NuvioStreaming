@@ -2321,9 +2321,24 @@ const AndroidVideoPlayer: React.FC = () => {
           </TapGestureHandler>
         </PanGestureHandler>
 
-        {/* Center area tap handler */}
+        {/* Center area tap handler - handles both show and hide */}
         <TapGestureHandler
-          onActivated={toggleControls}
+          onActivated={() => {
+            if (showControls) {
+              // If controls are visible, hide them
+              const timeoutId = setTimeout(() => {
+                hideControls();
+              }, 0);
+              // Clear any existing timeout
+              if (controlsTimeout.current) {
+                clearTimeout(controlsTimeout.current);
+              }
+              controlsTimeout.current = timeoutId;
+            } else {
+              // If controls are hidden, show them
+              toggleControls();
+            }
+          }}
           shouldCancelWhenOutside={false}
           simultaneousHandlers={[]}
         >
@@ -2333,7 +2348,7 @@ const AndroidVideoPlayer: React.FC = () => {
             left: screenDimensions.width * 0.4, // Start after left gesture area
             width: screenDimensions.width * 0.2, // Center area (20% of screen)
             height: screenDimensions.height * 0.7,
-            zIndex: 10,
+            zIndex: 5, // Lower z-index, controls use box-none to allow touches through
           }} />
         </TapGestureHandler>
 

@@ -78,8 +78,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   const { currentTheme } = useTheme();
   return (
     <Animated.View
-      style={[StyleSheet.absoluteFill, { opacity: fadeAnim }]}
-      pointerEvents={showControls ? 'auto' : 'none'}
+      style={[StyleSheet.absoluteFill, { opacity: fadeAnim, zIndex: 20 }]}
+      pointerEvents={showControls ? 'box-none' : 'none'}
     >
       {/* Progress slider with native iOS slider */}
       <View style={styles.sliderContainer}>
