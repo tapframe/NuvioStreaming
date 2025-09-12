@@ -14,7 +14,7 @@
       "bundleIdentifier": "com.nuvio.app",
       "developerName": "Tapframe",
       "subtitle": "Streaming app for movies and TV shows",
-      "localizedDescription": "Nuvio is a comprehensive streaming application that provides access to a vast library of movies and TV shows. Latest beta includes trailer support in Hero Section, IMDb rating fixes, and various backend improvements.",
+      "localizedDescription": "Nuvio is a comprehensive streaming application that provides access to a vast library of movies and TV shows.",
       "iconURL": "https://github.com/tapframe/NuvioStreaming/blob/main/assets/android/playstore-icon.png?raw=true",
       "tintColor": "#04dcfc",
       "category": "entertainment",
@@ -30,6 +30,14 @@
         "https://github.com/tapframe/NuvioStreaming/blob/main/screesnhots/search-portrait.png?raw=true"
       ],
       "versions": [
+        {
+          "version": "0.6.0-beta.11",
+          "buildVersion": "11",
+          "date": "2025-09-12",
+          "localizedDescription": "## Version 0.6.0-beta.11 – Update Notes\n\n- Numerous bug fixes across the app.\n\n### Video Player\n- Fixed an issue on Android where sliders glitched while scrobbling.\n- Added new features: users can now adjust **volume** and **brightness** directly in the app.\n  - ⚠️ For iOS devices, the internal player (VLCKit) currently does not support adjusting audio through the player.\n    Please use hardware volume buttons or system volume until this is implemented.\n- Multiple fixes aimed at reducing **heating issues on iOS devices**.\n\n### AI Features\n- Initial implementation of **AI-powered insights** on each movie/show detail page (spoiler-free).\n- Uses your **OpenRouter free API key** for access.\n- More AI-driven features will be added in future updates.\n\n---\n\nℹ️ This will likely be the **final Beta build before Stable**.\nWhile not perfectly stable, it is more stable than expected for a beta release.",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/0.6.0-beta.11/Beta_0_6_0_11.ipa",
+          "size": 29700000
+        },
         {
           "version": "0.6.0-beta.10",
           "buildVersion": "10",
