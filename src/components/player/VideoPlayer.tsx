@@ -40,8 +40,7 @@ import CustomSubtitles from './subtitles/CustomSubtitles';
 import { SourcesModal } from './modals/SourcesModal';
 import axios from 'axios';
 import { stremioService } from '../../services/stremioService';
-import DeviceBrightness from '@adrianso/react-native-device-brightness';
-import { VolumeManager } from 'react-native-volume-manager';
+import * as Brightness from 'expo-brightness';
 
 const VideoPlayer: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -392,14 +391,8 @@ const VideoPlayer: React.FC = () => {
         setVolume(newVolume);
         lastVolumeChange.current = Date.now();
         
-        // Set device volume using VolumeManager
-        try {
-          await VolumeManager.setVolume(newVolume / 100); // Convert to 0-1 range
-          if (DEBUG_MODE) {
-            logger.log(`[VideoPlayer] Device volume set to: ${newVolume / 100}`);
-          }
-        } catch (error) {
-          logger.warn('[VideoPlayer] Error setting device volume:', error);
+        if (DEBUG_MODE) {
+          logger.log(`[VideoPlayer] Volume set to: ${newVolume}`);
         }
         
         // Set VLC volume as well
@@ -455,9 +448,9 @@ const VideoPlayer: React.FC = () => {
         setBrightness(newBrightness);
         lastBrightnessChange.current = Date.now();
         
-        // Set device brightness using DeviceBrightness
+        // Set device brightness using Expo Brightness
         try {
-          await DeviceBrightness.setBrightnessLevel(newBrightness);
+          await Brightness.setBrightnessAsync(newBrightness);
           if (DEBUG_MODE) {
             logger.log(`[VideoPlayer] Device brightness set to: ${newBrightness}`);
           }
@@ -538,24 +531,22 @@ const VideoPlayer: React.FC = () => {
       startOpeningAnimation();
       
       // Initialize current volume and brightness levels
-      try {
-        const currentVolume = await VolumeManager.getVolume();
-        setVolume(currentVolume.volume * 100); // Convert to 0-100 range for VLC
-        if (DEBUG_MODE) {
-          logger.log(`[VideoPlayer] Initial volume: ${currentVolume.volume * 100}`);
-        }
-      } catch (error) {
-        logger.warn('[VideoPlayer] Error getting initial volume:', error);
+      // Volume starts at 100 (full volume) for VLC
+      setVolume(100);
+      if (DEBUG_MODE) {
+        logger.log(`[VideoPlayer] Initial volume: 100 (VLC native)`);
       }
       
       try {
-        const currentBrightness = await DeviceBrightness.getBrightnessLevel();
+        const currentBrightness = await Brightness.getBrightnessAsync();
         setBrightness(currentBrightness);
         if (DEBUG_MODE) {
           logger.log(`[VideoPlayer] Initial brightness: ${currentBrightness}`);
         }
       } catch (error) {
         logger.warn('[VideoPlayer] Error getting initial brightness:', error);
+        // Fallback to 1.0 if brightness API fails
+        setBrightness(1.0);
       }
     };
     initializePlayer();

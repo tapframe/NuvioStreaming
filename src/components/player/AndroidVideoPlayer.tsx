@@ -38,8 +38,7 @@ import CustomSubtitles from './subtitles/CustomSubtitles';
 import { SourcesModal } from './modals/SourcesModal';
 import { stremioService } from '../../services/stremioService';
 import axios from 'axios';
-import DeviceBrightness from '@adrianso/react-native-device-brightness';
-import { VolumeManager } from 'react-native-volume-manager';
+import * as Brightness from 'expo-brightness';
 
 // Map VLC resize modes to react-native-video resize modes
 const getVideoResizeMode = (resizeMode: ResizeModeType) => {
@@ -386,14 +385,8 @@ const AndroidVideoPlayer: React.FC = () => {
         setVolume(newVolume);
         lastVolumeChange.current = Date.now();
         
-        // Set device volume using VolumeManager
-        try {
-          await VolumeManager.setVolume(newVolume);
-          if (DEBUG_MODE) {
-            logger.log(`[AndroidVideoPlayer] Device volume set to: ${newVolume}`);
-          }
-        } catch (error) {
-          logger.warn('[AndroidVideoPlayer] Error setting device volume:', error);
+        if (DEBUG_MODE) {
+          logger.log(`[AndroidVideoPlayer] Volume set to: ${newVolume}`);
         }
         
         // Show overlay
@@ -440,9 +433,9 @@ const AndroidVideoPlayer: React.FC = () => {
         setBrightness(newBrightness);
         lastBrightnessChange.current = Date.now();
         
-        // Set device brightness using DeviceBrightness
+        // Set device brightness using Expo Brightness
         try {
-          await DeviceBrightness.setBrightnessLevel(newBrightness);
+          await Brightness.setBrightnessAsync(newBrightness);
           if (DEBUG_MODE) {
             logger.log(`[AndroidVideoPlayer] Device brightness set to: ${newBrightness}`);
           }
@@ -513,24 +506,22 @@ const AndroidVideoPlayer: React.FC = () => {
       startOpeningAnimation();
       
       // Initialize current volume and brightness levels
-      try {
-        const currentVolume = await VolumeManager.getVolume();
-        setVolume(currentVolume.volume);
-        if (DEBUG_MODE) {
-          logger.log(`[AndroidVideoPlayer] Initial volume: ${currentVolume.volume}`);
-        }
-      } catch (error) {
-        logger.warn('[AndroidVideoPlayer] Error getting initial volume:', error);
+      // Volume starts at 1.0 (full volume) - React Native Video handles this natively
+      setVolume(1.0);
+      if (DEBUG_MODE) {
+        logger.log(`[AndroidVideoPlayer] Initial volume: 1.0 (native)`);
       }
       
       try {
-        const currentBrightness = await DeviceBrightness.getBrightnessLevel();
+        const currentBrightness = await Brightness.getBrightnessAsync();
         setBrightness(currentBrightness);
         if (DEBUG_MODE) {
           logger.log(`[AndroidVideoPlayer] Initial brightness: ${currentBrightness}`);
         }
       } catch (error) {
         logger.warn('[AndroidVideoPlayer] Error getting initial brightness:', error);
+        // Fallback to 1.0 if brightness API fails
+        setBrightness(1.0);
       }
     };
     initializePlayer();
