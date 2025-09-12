@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { VLCPlayer } from 'react-native-vlc-media-player';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { RootStackParamList, RootStackNavigationProp } from '../../navigation/AppNavigator';
-import { PinchGestureHandler, PanGestureHandler, State, PinchGestureHandlerGestureEvent, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
+import { PinchGestureHandler, PanGestureHandler, TapGestureHandler, State, PinchGestureHandlerGestureEvent, PanGestureHandlerGestureEvent, TapGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import RNImmersiveMode from 'react-native-immersive-mode';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { storageService } from '../../services/storageService';
@@ -2074,7 +2074,7 @@ const VideoPlayer: React.FC = () => {
         </Animated.View>
       )}
 
-      <Animated.View
+      <Animated.View 
         style={[
           styles.videoPlayerContainer,
           {
@@ -2085,49 +2085,76 @@ const VideoPlayer: React.FC = () => {
           }
         ]}
       >
-        <TouchableOpacity
+        {/* Combined gesture handler for left side - brightness + tap */}
+        <PanGestureHandler
+          onGestureEvent={onBrightnessGestureEvent}
+          activeOffsetY={[-10, 10]}
+          failOffsetX={[-50, 50]}
+          shouldCancelWhenOutside={true}
+          simultaneousHandlers={[]}
+        >
+          <TapGestureHandler
+            onActivated={toggleControls}
+            shouldCancelWhenOutside={false}
+            simultaneousHandlers={[]}
+          >
+            <View style={{
+              position: 'absolute',
+              top: screenDimensions.height * 0.15, // Back to original margin
+              left: 0,
+              width: screenDimensions.width * 0.4, // Back to larger area (40% of screen)
+              height: screenDimensions.height * 0.7, // Back to larger middle portion (70% of screen)
+              zIndex: 10, // Higher z-index to capture gestures
+            }} />
+          </TapGestureHandler>
+        </PanGestureHandler>
+
+        {/* Combined gesture handler for right side - volume + tap */}
+        <PanGestureHandler
+          onGestureEvent={onVolumeGestureEvent}
+          activeOffsetY={[-10, 10]}
+          failOffsetX={[-50, 50]}
+          shouldCancelWhenOutside={true}
+          simultaneousHandlers={[]}
+        >
+          <TapGestureHandler
+            onActivated={toggleControls}
+            shouldCancelWhenOutside={false}
+            simultaneousHandlers={[]}
+          >
+            <View style={{
+              position: 'absolute',
+              top: screenDimensions.height * 0.15, // Back to original margin
+              right: 0,
+              width: screenDimensions.width * 0.4, // Back to larger area (40% of screen)
+              height: screenDimensions.height * 0.7, // Back to larger middle portion (70% of screen)
+              zIndex: 10, // Higher z-index to capture gestures
+            }} />
+          </TapGestureHandler>
+        </PanGestureHandler>
+
+        {/* Center area tap handler */}
+        <TapGestureHandler
+          onActivated={toggleControls}
+          shouldCancelWhenOutside={false}
+          simultaneousHandlers={[]}
+        >
+          <View style={{
+            position: 'absolute',
+            top: screenDimensions.height * 0.15,
+            left: screenDimensions.width * 0.4, // Start after left gesture area
+            width: screenDimensions.width * 0.2, // Center area (20% of screen)
+            height: screenDimensions.height * 0.7,
+            zIndex: 10,
+          }} />
+        </TapGestureHandler>
+
+        <View
           style={[styles.videoContainer, {
             width: screenDimensions.width,
             height: screenDimensions.height,
           }]}
-          onPress={toggleControls}
-          activeOpacity={1}
         >
-          {/* Left side brightness gesture handler */}
-          <PanGestureHandler
-            onGestureEvent={onBrightnessGestureEvent}
-            activeOffsetY={[-10, 10]}
-            failOffsetX={[-50, 50]}
-            shouldCancelWhenOutside={true}
-            simultaneousHandlers={[]}
-          >
-            <View style={{
-              position: 'absolute',
-              top: screenDimensions.height * 0.15, // Minimal top margin
-              left: 0,
-              width: screenDimensions.width * 0.4, // Much wider area (40% of screen)
-              height: screenDimensions.height * 0.7, // Larger middle portion (70% of screen)
-              zIndex: 5, // Lower z-index than controls
-            }} />
-          </PanGestureHandler>
-
-          {/* Right side volume gesture handler */}
-          <PanGestureHandler
-            onGestureEvent={onVolumeGestureEvent}
-            activeOffsetY={[-10, 10]}
-            failOffsetX={[-50, 50]}
-            shouldCancelWhenOutside={true}
-            simultaneousHandlers={[]}
-          >
-            <View style={{
-              position: 'absolute',
-              top: screenDimensions.height * 0.15, // Minimal top margin
-              right: 0,
-              width: screenDimensions.width * 0.4, // Much wider area (40% of screen)
-              height: screenDimensions.height * 0.7, // Larger middle portion (70% of screen)
-              zIndex: 5, // Lower z-index than controls
-            }} />
-          </PanGestureHandler>
 
           <PinchGestureHandler
             ref={pinchRef}
@@ -2780,7 +2807,7 @@ const VideoPlayer: React.FC = () => {
           )}
 
           {/* Resume overlay removed when AlwaysResume is enabled; overlay component omitted */}
-        </TouchableOpacity>
+        </View>
       </Animated.View>
 
       <AudioTrackModal
