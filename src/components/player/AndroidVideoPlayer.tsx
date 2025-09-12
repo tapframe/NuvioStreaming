@@ -374,14 +374,14 @@ const AndroidVideoPlayer: React.FC = () => {
   const onVolumeGestureEvent = async (event: PanGestureHandlerGestureEvent) => {
     const { translationY, state } = event.nativeEvent;
     const screenHeight = screenDimensions.height;
-    const sensitivity = 0.003; // Adjust sensitivity
+    const sensitivity = 0.002; // Reduced for finer control
     
     if (state === State.ACTIVE) {
       const deltaY = -translationY; // Invert for natural feel (up = increase)
       const volumeChange = deltaY * sensitivity;
       const newVolume = Math.max(0, Math.min(1, volume + volumeChange));
       
-      if (Math.abs(newVolume - volume) > 0.01) { // Only update if significant change
+      if (Math.abs(newVolume - volume) > 0.005) { // Reduced threshold for smoother updates
         setVolume(newVolume);
         lastVolumeChange.current = Date.now();
         
@@ -389,12 +389,13 @@ const AndroidVideoPlayer: React.FC = () => {
           logger.log(`[AndroidVideoPlayer] Volume set to: ${newVolume}`);
         }
         
-        // Show overlay
+        // Show overlay with smoother animation
         if (!showVolumeOverlay) {
           setShowVolumeOverlay(true);
-          Animated.timing(volumeOverlayOpacity, {
+          Animated.spring(volumeOverlayOpacity, {
             toValue: 1,
-            duration: 200,
+            tension: 100,
+            friction: 8,
             useNativeDriver: true,
           }).start();
         }
@@ -404,16 +405,16 @@ const AndroidVideoPlayer: React.FC = () => {
           clearTimeout(volumeOverlayTimeout.current);
         }
         
-        // Hide overlay after 2 seconds
+        // Hide overlay after 1.5 seconds (reduced from 2 seconds)
         volumeOverlayTimeout.current = setTimeout(() => {
           Animated.timing(volumeOverlayOpacity, {
             toValue: 0,
-            duration: 300,
+            duration: 250,
             useNativeDriver: true,
           }).start(() => {
             setShowVolumeOverlay(false);
           });
-        }, 2000);
+        }, 1500);
       }
     }
   };
@@ -422,14 +423,14 @@ const AndroidVideoPlayer: React.FC = () => {
   const onBrightnessGestureEvent = async (event: PanGestureHandlerGestureEvent) => {
     const { translationY, state } = event.nativeEvent;
     const screenHeight = screenDimensions.height;
-    const sensitivity = 0.003; // Adjust sensitivity
+    const sensitivity = 0.002; // Reduced for finer control
     
     if (state === State.ACTIVE) {
       const deltaY = -translationY; // Invert for natural feel (up = increase)
       const brightnessChange = deltaY * sensitivity;
       const newBrightness = Math.max(0, Math.min(1, brightness + brightnessChange));
       
-      if (Math.abs(newBrightness - brightness) > 0.01) { // Only update if significant change
+      if (Math.abs(newBrightness - brightness) > 0.005) { // Reduced threshold for smoother updates
         setBrightness(newBrightness);
         lastBrightnessChange.current = Date.now();
         
@@ -443,12 +444,13 @@ const AndroidVideoPlayer: React.FC = () => {
           logger.warn('[AndroidVideoPlayer] Error setting device brightness:', error);
         }
         
-        // Show overlay
+        // Show overlay with smoother animation
         if (!showBrightnessOverlay) {
           setShowBrightnessOverlay(true);
-          Animated.timing(brightnessOverlayOpacity, {
+          Animated.spring(brightnessOverlayOpacity, {
             toValue: 1,
-            duration: 200,
+            tension: 100,
+            friction: 8,
             useNativeDriver: true,
           }).start();
         }
@@ -458,16 +460,16 @@ const AndroidVideoPlayer: React.FC = () => {
           clearTimeout(brightnessOverlayTimeout.current);
         }
         
-        // Hide overlay after 2 seconds
+        // Hide overlay after 1.5 seconds (reduced from 2 seconds)
         brightnessOverlayTimeout.current = setTimeout(() => {
           Animated.timing(brightnessOverlayOpacity, {
             toValue: 0,
-            duration: 300,
+            duration: 250,
             useNativeDriver: true,
           }).start(() => {
             setShowBrightnessOverlay(false);
           });
-        }, 2000);
+        }, 1500);
       }
     }
   };
@@ -2284,15 +2286,16 @@ const AndroidVideoPlayer: React.FC = () => {
             onGestureEvent={onBrightnessGestureEvent}
             activeOffsetY={[-10, 10]}
             failOffsetX={[-50, 50]}
-            shouldCancelWhenOutside={false}
+            shouldCancelWhenOutside={true}
+            simultaneousHandlers={[]}
           >
             <View style={{
               position: 'absolute',
-              top: 0,
+              top: screenDimensions.height * 0.15, // Minimal top margin
               left: 0,
-              width: screenDimensions.width * 0.3, // Left 30% of screen
-              height: screenDimensions.height,
-              zIndex: 10,
+              width: screenDimensions.width * 0.4, // Much wider area (40% of screen)
+              height: screenDimensions.height * 0.7, // Larger middle portion (70% of screen)
+              zIndex: 5, // Lower z-index than controls
             }} />
           </PanGestureHandler>
 
@@ -2301,15 +2304,16 @@ const AndroidVideoPlayer: React.FC = () => {
             onGestureEvent={onVolumeGestureEvent}
             activeOffsetY={[-10, 10]}
             failOffsetX={[-50, 50]}
-            shouldCancelWhenOutside={false}
+            shouldCancelWhenOutside={true}
+            simultaneousHandlers={[]}
           >
             <View style={{
               position: 'absolute',
-              top: 0,
+              top: screenDimensions.height * 0.15, // Minimal top margin
               right: 0,
-              width: screenDimensions.width * 0.3, // Right 30% of screen
-              height: screenDimensions.height,
-              zIndex: 10,
+              width: screenDimensions.width * 0.4, // Much wider area (40% of screen)
+              height: screenDimensions.height * 0.7, // Larger middle portion (70% of screen)
+              zIndex: 5, // Lower z-index than controls
             }} />
           </PanGestureHandler>
 
@@ -2813,53 +2817,91 @@ const AndroidVideoPlayer: React.FC = () => {
             <Animated.View
               style={{
                 position: 'absolute',
-                right: 20 + insets.right,
-                top: '50%',
-                transform: [{ translateY: -50 }],
+                left: screenDimensions.width / 2 - 60,
+                top: screenDimensions.height / 2 - 60,
                 opacity: volumeOverlayOpacity,
                 zIndex: 1000,
               }}
             >
               <View style={{
-                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                backgroundColor: 'rgba(0, 0, 0, 0.9)',
                 borderRadius: 12,
                 padding: 16,
                 alignItems: 'center',
-                minWidth: 80,
+                width: 120,
+                height: 120,
+                justifyContent: 'center',
                 shadowColor: '#000',
                 shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.3,
+                shadowOpacity: 0.5,
                 shadowRadius: 8,
-                elevation: 8,
+                elevation: 10,
+                borderWidth: 1,
+                borderColor: 'rgba(255, 255, 255, 0.1)',
               }}>
                 <MaterialIcons 
-                  name={volume === 0 ? "volume-off" : volume < 0.5 ? "volume-down" : "volume-up"} 
+                  name={volume === 0 ? "volume-off" : volume < 0.3 ? "volume-mute" : volume < 0.7 ? "volume-down" : "volume-up"} 
                   size={24} 
-                  color="#FFFFFF" 
+                  color={volume === 0 ? "#FF6B6B" : "#FFFFFF"} 
                   style={{ marginBottom: 8 }}
                 />
+                
+                {/* Horizontal Dotted Progress Bar */}
                 <View style={{
-                  width: 4,
-                  height: 60,
-                  backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                  borderRadius: 2,
+                  width: 80,
+                  height: 6,
+                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                  borderRadius: 3,
                   position: 'relative',
+                  overflow: 'hidden',
+                  marginBottom: 8,
                 }}>
+                  {/* Dotted background */}
                   <View style={{
                     position: 'absolute',
-                    bottom: 0,
+                    top: 0,
                     left: 0,
-                    width: 4,
-                    height: `${volume * 100}%`,
-                    backgroundColor: '#E50914',
-                    borderRadius: 2,
+                    right: 0,
+                    bottom: 0,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingHorizontal: 1,
+                  }}>
+                    {Array.from({ length: 16 }, (_, i) => (
+                      <View
+                        key={i}
+                        style={{
+                          width: 1.5,
+                          height: 1.5,
+                          backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                          borderRadius: 0.75,
+                        }}
+                      />
+                    ))}
+                  </View>
+                  
+                  {/* Progress fill */}
+                  <View style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: `${volume * 100}%`,
+                    height: 6,
+                    backgroundColor: volume === 0 ? '#FF6B6B' : '#E50914',
+                    borderRadius: 3,
+                    shadowColor: volume === 0 ? '#FF6B6B' : '#E50914',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.6,
+                    shadowRadius: 2,
                   }} />
                 </View>
+                
                 <Text style={{
                   color: '#FFFFFF',
                   fontSize: 12,
                   fontWeight: '600',
-                  marginTop: 8,
+                  letterSpacing: 0.5,
                 }}>
                   {Math.round(volume * 100)}%
                 </Text>
@@ -2872,53 +2914,91 @@ const AndroidVideoPlayer: React.FC = () => {
             <Animated.View
               style={{
                 position: 'absolute',
-                left: 20 + insets.left,
-                top: '50%',
-                transform: [{ translateY: -50 }],
+                left: screenDimensions.width / 2 - 60,
+                top: screenDimensions.height / 2 - 60,
                 opacity: brightnessOverlayOpacity,
                 zIndex: 1000,
               }}
             >
               <View style={{
-                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                backgroundColor: 'rgba(0, 0, 0, 0.9)',
                 borderRadius: 12,
                 padding: 16,
                 alignItems: 'center',
-                minWidth: 80,
+                width: 120,
+                height: 120,
+                justifyContent: 'center',
                 shadowColor: '#000',
                 shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.3,
+                shadowOpacity: 0.5,
                 shadowRadius: 8,
-                elevation: 8,
+                elevation: 10,
+                borderWidth: 1,
+                borderColor: 'rgba(255, 255, 255, 0.1)',
               }}>
                 <MaterialIcons 
-                  name={brightness < 0.3 ? "brightness-low" : brightness < 0.7 ? "brightness-medium" : "brightness-high"} 
+                  name={brightness < 0.2 ? "brightness-low" : brightness < 0.5 ? "brightness-medium" : brightness < 0.8 ? "brightness-high" : "brightness-auto"} 
                   size={24} 
-                  color="#FFFFFF" 
+                  color={brightness < 0.2 ? "#FFD700" : "#FFFFFF"} 
                   style={{ marginBottom: 8 }}
                 />
+                
+                {/* Horizontal Dotted Progress Bar */}
                 <View style={{
-                  width: 4,
-                  height: 60,
-                  backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                  borderRadius: 2,
+                  width: 80,
+                  height: 6,
+                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                  borderRadius: 3,
                   position: 'relative',
+                  overflow: 'hidden',
+                  marginBottom: 8,
                 }}>
+                  {/* Dotted background */}
                   <View style={{
                     position: 'absolute',
-                    bottom: 0,
+                    top: 0,
                     left: 0,
-                    width: 4,
-                    height: `${brightness * 100}%`,
-                    backgroundColor: '#FFD700',
-                    borderRadius: 2,
+                    right: 0,
+                    bottom: 0,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingHorizontal: 1,
+                  }}>
+                    {Array.from({ length: 16 }, (_, i) => (
+                      <View
+                        key={i}
+                        style={{
+                          width: 1.5,
+                          height: 1.5,
+                          backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                          borderRadius: 0.75,
+                        }}
+                      />
+                    ))}
+                  </View>
+                  
+                  {/* Progress fill */}
+                  <View style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: `${brightness * 100}%`,
+                    height: 6,
+                    backgroundColor: brightness < 0.2 ? '#FFD700' : '#FFA500',
+                    borderRadius: 3,
+                    shadowColor: brightness < 0.2 ? '#FFD700' : '#FFA500',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.6,
+                    shadowRadius: 2,
                   }} />
                 </View>
+                
                 <Text style={{
                   color: '#FFFFFF',
                   fontSize: 12,
                   fontWeight: '600',
-                  marginTop: 8,
+                  letterSpacing: 0.5,
                 }}>
                   {Math.round(brightness * 100)}%
                 </Text>
