@@ -28,7 +28,6 @@ export class MemoryManager {
       // Request garbage collection if available (development builds)
       if (global && typeof global.gc === 'function') {
         global.gc();
-        logger.log('[MemoryManager] Forced garbage collection');
       } else if (__DEV__) {
         // In development, we can try to trigger GC by creating and releasing large objects
         this.triggerGCInDev();

@@ -98,6 +98,10 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
 
   // Use a ref to track if a background refresh is in progress to avoid state updates
   const isRefreshingRef = useRef(false);
+  
+  // Track recently removed items to prevent immediate re-addition
+  const recentlyRemovedRef = useRef<Set<string>>(new Set());
+  const REMOVAL_IGNORE_DURATION = 10000; // 10 seconds
 
   // Cache for metadata to avoid redundant API calls
   const metadataCache = useRef<Record<string, { metadata: any; basicContent: StreamingContent | null; timestamp: number }>>({});
@@ -125,15 +129,17 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         return result;
       }
       return null;
-    } catch (error) {
-      logger.error(`Failed to fetch metadata for ${type}:${id}:`, error);
+    } catch (error: any) {
+      // Skip logging 404 errors to reduce noise
       return null;
     }
   }, []);
 
   // Modified loadContinueWatching to render incrementally
   const loadContinueWatching = useCallback(async (isBackgroundRefresh = false) => {
-    if (isRefreshingRef.current) return;
+    if (isRefreshingRef.current) {
+      return;
+    }
 
     if (!isBackgroundRefresh) {
       setLoading(true);
@@ -143,20 +149,30 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     // Helper to merge a batch of items into state (dedupe by type:id, keep newest)
     const mergeBatchIntoState = (batch: ContinueWatchingItem[]) => {
       if (!batch || batch.length === 0) return;
+
       setContinueWatchingItems((prev) => {
         const map = new Map<string, ContinueWatchingItem>();
         for (const it of prev) {
           map.set(`${it.type}:${it.id}`, it);
         }
+
         for (const it of batch) {
           const key = `${it.type}:${it.id}`;
+
+          // Skip recently removed items to prevent immediate re-addition
+          if (recentlyRemovedRef.current.has(key)) {
+            continue;
+          }
+
           const existing = map.get(key);
           if (!existing || (it.lastUpdated ?? 0) > (existing.lastUpdated ?? 0)) {
             map.set(key, it);
           }
         }
+
         const merged = Array.from(map.values());
         merged.sort((a, b) => (b.lastUpdated ?? 0) - (a.lastUpdated ?? 0));
+
         return merged;
       });
     };
@@ -274,7 +290,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
 
           if (batch.length > 0) mergeBatchIntoState(batch);
         } catch (error) {
-          logger.error(`Failed to process content group ${group.type}:${group.id}:`, error);
+          // Continue processing other groups even if one fails
         }
       });
 
@@ -302,6 +318,13 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
 
           const perShowPromises = Object.entries(latestWatchedByShow).map(async ([showId, info]) => {
             try {
+              // Check if this show was recently removed by the user
+              const showKey = `series:${showId}`;
+              if (recentlyRemovedRef.current.has(showKey)) {
+                logger.log(`🚫 [TraktSync] Skipping recently removed show: ${showKey}`);
+                return;
+              }
+              
               const nextEpisode = info.episode + 1;
               const cachedData = await getCachedMetadata('series', showId);
               if (!cachedData?.basicContent) return;
@@ -313,6 +336,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                 );
               }
               if (nextEpisodeVideo && isEpisodeReleased(nextEpisodeVideo)) {
+                logger.log(`➕ [TraktSync] Adding next episode for ${showId}: S${info.season}E${nextEpisode}`);
                 mergeBatchIntoState([
                   {
                     ...basicContent,
@@ -327,38 +351,43 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                 ]);
               }
 
-              // Persist "watched" progress for the episode that Trakt reported
-              const watchedEpisodeId = `${showId}:${info.season}:${info.episode}`;
-              const existingProgress = allProgress[`series:${showId}:${watchedEpisodeId}`];
-              const existingPercent = existingProgress ? (existingProgress.currentTime / existingProgress.duration) * 100 : 0;
-              if (!existingProgress || existingPercent < 85) {
-                await storageService.setWatchProgress(
-                  showId,
-                  'series',
-                  {
-                    currentTime: 1,
-                    duration: 1,
-                    lastUpdated: info.watchedAt,
-                    traktSynced: true,
-                    traktProgress: 100,
-                  } as any,
-                  `${info.season}:${info.episode}`
-                );
+              // Persist "watched" progress for the episode that Trakt reported (only if not recently removed)
+              if (!recentlyRemovedRef.current.has(showKey)) {
+                const watchedEpisodeId = `${showId}:${info.season}:${info.episode}`;
+                const existingProgress = allProgress[`series:${showId}:${watchedEpisodeId}`];
+                const existingPercent = existingProgress ? (existingProgress.currentTime / existingProgress.duration) * 100 : 0;
+                if (!existingProgress || existingPercent < 85) {
+                  logger.log(`💾 [TraktSync] Adding local progress for ${showId}: S${info.season}E${info.episode}`);
+                  await storageService.setWatchProgress(
+                    showId,
+                    'series',
+                    {
+                      currentTime: 1,
+                      duration: 1,
+                      lastUpdated: info.watchedAt,
+                      traktSynced: true,
+                      traktProgress: 100,
+                    } as any,
+                    `${info.season}:${info.episode}`
+                  );
+                }
+              } else {
+                logger.log(`🚫 [TraktSync] Skipping local progress for recently removed show: ${showKey}`);
               }
             } catch (err) {
-              logger.error('Failed to build placeholder from history:', err);
+              // Continue with other shows even if one fails
             }
           });
           await Promise.allSettled(perShowPromises);
         } catch (err) {
-          logger.error('Error merging Trakt history:', err);
+          // Continue even if Trakt history merge fails
         }
       })();
 
       // Wait for all groups and trakt merge to settle, then finalize loading state
       await Promise.allSettled([...groupPromises, traktMergePromise]);
     } catch (error) {
-      logger.error('Failed to load continue watching items:', error);
+      // Continue even if loading fails
     } finally {
       setLoading(false);
       isRefreshingRef.current = false;
@@ -474,26 +503,47 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
             try {
               // Trigger haptic feedback for confirmation
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              
+
               // Remove all watch progress for this content (all episodes if series)
               await storageService.removeAllWatchProgressForContent(item.id, item.type, { addBaseTombstone: true });
-              
+
               // Also remove from Trakt playback queue if authenticated
               const traktService = TraktService.getInstance();
               const isAuthed = await traktService.isAuthenticated();
+              logger.log(`🔍 [ContinueWatching] Trakt authentication status: ${isAuthed}`);
+
               if (isAuthed) {
-                await traktService.deletePlaybackForContent(
-                  item.id,
-                  item.type as 'movie' | 'series',
-                  undefined,
-                  undefined
-                );
+                logger.log(`🗑️ [ContinueWatching] Removing Trakt history for ${item.id}`);
+                let traktResult = false;
+
+                if (item.type === 'movie') {
+                  traktResult = await traktService.removeMovieFromHistory(item.id);
+                } else {
+                  traktResult = await traktService.removeShowFromHistory(item.id);
+                }
+
+                logger.log(`✅ [ContinueWatching] Trakt removal result: ${traktResult}`);
+              } else {
+                logger.log(`ℹ️ [ContinueWatching] Skipping Trakt removal - not authenticated`);
               }
-              
+
+              // Track this item as recently removed to prevent immediate re-addition
+              const itemKey = `${item.type}:${item.id}`;
+              recentlyRemovedRef.current.add(itemKey);
+
+              // Clear from recently removed after the ignore duration
+              setTimeout(() => {
+                recentlyRemovedRef.current.delete(itemKey);
+              }, REMOVAL_IGNORE_DURATION);
+
               // Update the list by filtering out the deleted item
-              setContinueWatchingItems(prev => prev.filter(i => i.id !== item.id));
+              setContinueWatchingItems(prev => {
+                const newList = prev.filter(i => i.id !== item.id);
+                return newList;
+              });
+
             } catch (error) {
-              logger.error('Failed to remove watch progress:', error);
+              // Continue even if removal fails
             } finally {
               setDeletingItemId(null);
             }

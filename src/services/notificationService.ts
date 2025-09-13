@@ -602,7 +602,6 @@ class NotificationService {
       }
       
       if (!metadata) {
-        logger.warn(`[NotificationService] No metadata found for series: ${seriesId}`);
         return;
       }
       

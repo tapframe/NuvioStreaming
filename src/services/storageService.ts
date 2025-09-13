@@ -415,22 +415,35 @@ class StorageService {
     options?: { addBaseTombstone?: boolean }
   ): Promise<void> {
     try {
+      logger.log(`🗑️ [StorageService] removeAllWatchProgressForContent called for ${type}:${id}`);
+      
       const all = await this.getAllWatchProgress();
       const prefix = `${type}:${id}`;
+      logger.log(`🔍 [StorageService] Looking for keys with prefix: ${prefix}`);
+      
+      const matchingKeys = Object.keys(all).filter(key => key === prefix || key.startsWith(`${prefix}:`));
+      logger.log(`📊 [StorageService] Found ${matchingKeys.length} matching keys:`, matchingKeys);
+      
       const removals: Array<Promise<void>> = [];
-      for (const key of Object.keys(all)) {
-        if (key === prefix || key.startsWith(`${prefix}:`)) {
-          // Compute episodeId if present
-          const episodeId = key.length > prefix.length + 1 ? key.slice(prefix.length + 1) : undefined;
-          removals.push(this.removeWatchProgress(id, type, episodeId));
-        }
+      for (const key of matchingKeys) {
+        // Compute episodeId if present
+        const episodeId = key.length > prefix.length + 1 ? key.slice(prefix.length + 1) : undefined;
+        logger.log(`🗑️ [StorageService] Removing progress for key: ${key} (episodeId: ${episodeId})`);
+        removals.push(this.removeWatchProgress(id, type, episodeId));
       }
+      
       await Promise.allSettled(removals);
+      logger.log(`✅ [StorageService] All watch progress removals completed`);
+      
       if (options?.addBaseTombstone) {
+        logger.log(`🪦 [StorageService] Adding tombstone for ${type}:${id}`);
         await this.addWatchProgressTombstone(id, type);
+        logger.log(`✅ [StorageService] Tombstone added successfully`);
       }
+      
+      logger.log(`✅ [StorageService] removeAllWatchProgressForContent completed for ${type}:${id}`);
     } catch (error) {
-      logger.error('Error removing all watch progress for content:', error);
+      logger.error(`❌ [StorageService] Error removing all watch progress for content ${type}:${id}:`, error);
     }
   }
 

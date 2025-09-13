@@ -252,6 +252,133 @@ export interface TraktContentData {
   showImdbId?: string;
 }
 
+export interface TraktHistoryItem {
+  id: number;
+  watched_at: string;
+  action: 'scrobble' | 'checkin' | 'watch';
+  type: 'movie' | 'episode';
+  movie?: {
+    title: string;
+    year: number;
+    ids: {
+      trakt: number;
+      slug: string;
+      imdb: string;
+      tmdb: number;
+    };
+  };
+  episode?: {
+    season: number;
+    number: number;
+    title: string;
+    ids: {
+      trakt: number;
+      tvdb?: number;
+      imdb?: string;
+      tmdb?: number;
+    };
+  };
+  show?: {
+    title: string;
+    year: number;
+    ids: {
+      trakt: number;
+      slug: string;
+      tvdb?: number;
+      imdb: string;
+      tmdb: number;
+    };
+  };
+}
+
+export interface TraktHistoryRemovePayload {
+  movies?: Array<{
+    title?: string;
+    year?: number;
+    ids: {
+      trakt?: number;
+      slug?: string;
+      imdb?: string;
+      tmdb?: number;
+    };
+  }>;
+  shows?: Array<{
+    title?: string;
+    year?: number;
+    ids: {
+      trakt?: number;
+      slug?: string;
+      tvdb?: number;
+      imdb?: string;
+      tmdb?: number;
+    };
+    seasons?: Array<{
+      number: number;
+      episodes?: Array<{
+        number: number;
+      }>;
+    }>;
+  }>;
+  seasons?: Array<{
+    ids: {
+      trakt?: number;
+      tvdb?: number;
+      tmdb?: number;
+    };
+  }>;
+  episodes?: Array<{
+    ids: {
+      trakt?: number;
+      tvdb?: number;
+      imdb?: string;
+      tmdb?: number;
+    };
+  }>;
+  ids?: number[];
+}
+
+export interface TraktHistoryRemoveResponse {
+  deleted: {
+    movies: number;
+    episodes: number;
+    shows?: number;
+    seasons?: number;
+  };
+  not_found: {
+    movies: Array<{
+      ids: {
+        imdb?: string;
+        trakt?: number;
+        tmdb?: number;
+      };
+    }>;
+    shows: Array<{
+      ids: {
+        imdb?: string;
+        trakt?: number;
+        tvdb?: number;
+        tmdb?: number;
+      };
+    }>;
+    seasons: Array<{
+      ids: {
+        trakt?: number;
+        tvdb?: number;
+        tmdb?: number;
+      };
+    }>;
+    episodes: Array<{
+      ids: {
+        trakt?: number;
+        tvdb?: number;
+        imdb?: string;
+        tmdb?: number;
+      };
+    }>;
+    ids: number[];
+  };
+}
+
 export class TraktService {
   private static instance: TraktService;
   private accessToken: string | null = null;
@@ -1524,26 +1651,47 @@ export class TraktService {
    */
   public async deletePlaybackForContent(imdbId: string, type: 'movie' | 'series', season?: number, episode?: number): Promise<boolean> {
     try {
-      if (!this.accessToken) return false;
+      logger.log(`🔍 [TraktService] deletePlaybackForContent called for ${type}:${imdbId} (season:${season}, episode:${episode})`);
+      
+      if (!this.accessToken) {
+        logger.log(`❌ [TraktService] No access token - cannot delete playback`);
+        return false;
+      }
+      
+      logger.log(`🔍 [TraktService] Fetching current playback progress...`);
       const progressItems = await this.getPlaybackProgress();
+      logger.log(`📊 [TraktService] Found ${progressItems.length} playback items`);
+      
       const target = progressItems.find(item => {
         if (type === 'movie' && item.type === 'movie' && item.movie?.ids.imdb === imdbId) {
+          logger.log(`🎯 [TraktService] Found matching movie: ${item.movie?.title}`);
           return true;
         }
         if (type === 'series' && item.type === 'episode' && item.show?.ids.imdb === imdbId) {
           if (season !== undefined && episode !== undefined) {
-            return item.episode?.season === season && item.episode?.number === episode;
+            const matches = item.episode?.season === season && item.episode?.number === episode;
+            if (matches) {
+              logger.log(`🎯 [TraktService] Found matching episode: ${item.show?.title} S${season}E${episode}`);
+            }
+            return matches;
           }
+          logger.log(`🎯 [TraktService] Found matching series episode: ${item.show?.title} S${item.episode?.season}E${item.episode?.number}`);
           return true; // match any episode of the show if specific not provided
         }
         return false;
       });
+      
       if (target) {
-        return await this.deletePlaybackItem(target.id);
+        logger.log(`🗑️ [TraktService] Deleting playback item with ID: ${target.id}`);
+        const result = await this.deletePlaybackItem(target.id);
+        logger.log(`✅ [TraktService] Delete result: ${result}`);
+        return result;
+      } else {
+        logger.log(`ℹ️ [TraktService] No matching playback item found for ${type}:${imdbId}`);
+        return false;
       }
-      return false;
     } catch (error) {
-      logger.error('[TraktService] Error deleting playback for content:', error);
+      logger.error(`❌ [TraktService] Error deleting playback for content ${type}:${imdbId}:`, error);
       return false;
     }
   }
@@ -1568,6 +1716,238 @@ export class TraktService {
     } catch (error) {
       logger.error('[TraktService] Failed to fetch watched episodes history:', error);
       return [];
+    }
+  }
+
+  /**
+   * Remove items from user's watched history
+   */
+  public async removeFromHistory(payload: TraktHistoryRemovePayload): Promise<TraktHistoryRemoveResponse | null> {
+    try {
+      logger.log(`🔍 [TraktService] removeFromHistory called with payload:`, JSON.stringify(payload, null, 2));
+
+      if (!await this.isAuthenticated()) {
+        logger.log(`❌ [TraktService] Not authenticated for removeFromHistory`);
+        return null;
+      }
+
+      const result = await this.apiRequest<TraktHistoryRemoveResponse>('/sync/history/remove', 'POST', payload);
+
+      logger.log(`📥 [TraktService] removeFromHistory API response:`, JSON.stringify(result, null, 2));
+
+      return result;
+    } catch (error) {
+      logger.error('[TraktService] Failed to remove from history:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get user's watch history with optional filtering
+   */
+  public async getHistory(
+    type?: 'movies' | 'shows' | 'episodes',
+    id?: number,
+    startAt?: Date,
+    endAt?: Date,
+    page: number = 1,
+    limit: number = 100
+  ): Promise<TraktHistoryItem[]> {
+    try {
+      if (!await this.isAuthenticated()) {
+        return [];
+      }
+
+      let endpoint = '/sync/history';
+      if (type) {
+        endpoint += `/${type}`;
+        if (id) {
+          endpoint += `/${id}`;
+        }
+      }
+
+      const params = new URLSearchParams();
+      params.append('page', page.toString());
+      params.append('limit', limit.toString());
+
+      if (startAt) {
+        params.append('start_at', startAt.toISOString());
+      }
+
+      if (endAt) {
+        params.append('end_at', endAt.toISOString());
+      }
+
+      const queryString = params.toString();
+      if (queryString) {
+        endpoint += `?${queryString}`;
+      }
+
+      return this.apiRequest<TraktHistoryItem[]>(endpoint, 'GET');
+    } catch (error) {
+      logger.error('[TraktService] Failed to get history:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get user's movie watch history
+   */
+  public async getHistoryMovies(
+    startAt?: Date,
+    endAt?: Date,
+    page: number = 1,
+    limit: number = 100
+  ): Promise<TraktHistoryItem[]> {
+    return this.getHistory('movies', undefined, startAt, endAt, page, limit);
+  }
+
+  /**
+   * Get user's episode watch history
+   */
+  public async getHistoryEpisodes(
+    startAt?: Date,
+    endAt?: Date,
+    page: number = 1,
+    limit: number = 100
+  ): Promise<TraktHistoryItem[]> {
+    return this.getHistory('episodes', undefined, startAt, endAt, page, limit);
+  }
+
+  /**
+   * Get user's show watch history
+   */
+  public async getHistoryShows(
+    startAt?: Date,
+    endAt?: Date,
+    page: number = 1,
+    limit: number = 100
+  ): Promise<TraktHistoryItem[]> {
+    return this.getHistory('shows', undefined, startAt, endAt, page, limit);
+  }
+
+  /**
+   * Remove a movie from watched history by IMDB ID
+   */
+  public async removeMovieFromHistory(imdbId: string): Promise<boolean> {
+    try {
+      const payload: TraktHistoryRemovePayload = {
+        movies: [
+          {
+            ids: {
+              imdb: imdbId.startsWith('tt') ? imdbId : `tt${imdbId}`
+            }
+          }
+        ]
+      };
+
+      const result = await this.removeFromHistory(payload);
+      return result !== null && result.deleted.movies > 0;
+    } catch (error) {
+      logger.error('[TraktService] Failed to remove movie from history:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Remove an episode from watched history by IMDB IDs
+   */
+  public async removeEpisodeFromHistory(showImdbId: string, season: number, episode: number): Promise<boolean> {
+    try {
+      const payload: TraktHistoryRemovePayload = {
+        shows: [
+          {
+            ids: {
+              imdb: showImdbId.startsWith('tt') ? showImdbId : `tt${showImdbId}`
+            },
+            seasons: [
+              {
+                number: season,
+                episodes: [
+                  {
+                    number: episode
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      };
+
+      const result = await this.removeFromHistory(payload);
+      return result !== null && result.deleted.episodes > 0;
+    } catch (error) {
+      logger.error('[TraktService] Failed to remove episode from history:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Remove entire show from watched history by IMDB ID
+   */
+  public async removeShowFromHistory(imdbId: string): Promise<boolean> {
+    try {
+      logger.log(`🔍 [TraktService] removeShowFromHistory called for ${imdbId}`);
+
+      // First, let's check if this show exists in history
+      logger.log(`🔍 [TraktService] Checking if ${imdbId} exists in watch history...`);
+      const history = await this.getHistoryEpisodes(undefined, undefined, 1, 200); // Get recent episode history
+      const fullImdbId = imdbId.startsWith('tt') ? imdbId : `tt${imdbId}`;
+      const showInHistory = history.some(item =>
+        item.show?.ids?.imdb === fullImdbId
+      );
+
+      logger.log(`📊 [TraktService] Show ${imdbId} found in history: ${showInHistory}`);
+
+      if (!showInHistory) {
+        logger.log(`ℹ️ [TraktService] Show ${imdbId} not found in watch history - nothing to remove`);
+        return true; // Consider this a success since there's nothing to remove
+      }
+
+      const payload: TraktHistoryRemovePayload = {
+        shows: [
+          {
+            ids: {
+              imdb: imdbId.startsWith('tt') ? imdbId : `tt${imdbId}`
+            }
+          }
+        ]
+      };
+
+      logger.log(`📤 [TraktService] Sending removeFromHistory payload:`, JSON.stringify(payload, null, 2));
+
+      const result = await this.removeFromHistory(payload);
+
+      logger.log(`📥 [TraktService] removeFromHistory response:`, JSON.stringify(result, null, 2));
+
+      if (result) {
+        const success = result.deleted.episodes > 0;
+        logger.log(`✅ [TraktService] Show removal success: ${success} (${result.deleted.episodes} episodes deleted)`);
+        return success;
+      }
+
+      logger.log(`❌ [TraktService] No response from removeFromHistory API`);
+      return false;
+    } catch (error) {
+      logger.error('[TraktService] Failed to remove show from history:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Remove items from history by history IDs
+   */
+  public async removeHistoryByIds(historyIds: number[]): Promise<boolean> {
+    try {
+      const payload: TraktHistoryRemovePayload = {
+        ids: historyIds
+      };
+
+      const result = await this.removeFromHistory(payload);
+      return result !== null && (result.deleted.movies > 0 || result.deleted.episodes > 0);
+    } catch (error) {
+      logger.error('[TraktService] Failed to remove history by IDs:', error);
+      return false;
     }
   }
 

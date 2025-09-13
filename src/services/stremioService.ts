@@ -220,9 +220,7 @@ class StremioService {
         try {
           const cinemetaManifest = await this.getManifest('https://v3-cinemeta.strem.io/manifest.json');
           this.installedAddons.set(cinemetaId, cinemetaManifest);
-          logger.log('✅ Cinemeta pre-installed as default addon with full manifest');
         } catch (error) {
-          logger.error('Failed to fetch Cinemeta manifest, using fallback:', error);
           // Fallback to minimal manifest if fetch fails
           const fallbackManifest: Manifest = {
             id: cinemetaId,
@@ -263,7 +261,6 @@ class StremioService {
             }
           };
           this.installedAddons.set(cinemetaId, fallbackManifest);
-          logger.log('✅ Cinemeta pre-installed with fallback manifest');
         }
       }
 
@@ -273,9 +270,7 @@ class StremioService {
         try {
           const opensubsManifest = await this.getManifest('https://opensubtitles-v3.strem.io/manifest.json');
           this.installedAddons.set(opensubsId, opensubsManifest);
-          logger.log('✅ OpenSubtitles v3 pre-installed as default subtitles addon');
         } catch (error) {
-          logger.error('Failed to fetch OpenSubtitles manifest, using fallback:', error);
           const fallbackManifest: Manifest = {
             id: opensubsId,
             name: 'OpenSubtitles v3',
@@ -297,7 +292,6 @@ class StremioService {
             }
           };
           this.installedAddons.set(opensubsId, fallbackManifest);
-          logger.log('✅ OpenSubtitles v3 pre-installed with fallback manifest');
         }
       }
       
@@ -330,7 +324,6 @@ class StremioService {
       
       this.initialized = true;
     } catch (error) {
-      logger.error('Failed to initialize addons:', error);
       // Initialize with empty state on error
       this.installedAddons = new Map();
       this.addonOrder = [];
@@ -352,12 +345,21 @@ class StremioService {
         return await request();
       } catch (error: any) {
         lastError = error;
-        logger.warn(`Request failed (attempt ${attempt + 1}/${retries + 1}):`, {
-          message: error.message,
-          code: error.code,
-          isAxiosError: error.isAxiosError,
-          status: error.response?.status,
-        });
+        
+        // Don't retry on 404 errors (content not found) - these are expected for some content
+        if (error.response?.status === 404) {
+          throw error;
+        }
+        
+        // Only log warnings for non-404 errors to reduce noise
+        if (error.response?.status !== 404) {
+          logger.warn(`Request failed (attempt ${attempt + 1}/${retries + 1}):`, {
+            message: error.message,
+            code: error.code,
+            isAxiosError: error.isAxiosError,
+            status: error.response?.status,
+          });
+        }
         
         if (attempt < retries) {
           const backoffDelay = delay * Math.pow(2, attempt);
@@ -375,7 +377,7 @@ class StremioService {
       const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
       await AsyncStorage.setItem(`@user:${scope}:${this.STORAGE_KEY}`, JSON.stringify(addonsArray));
     } catch (error) {
-      logger.error('Failed to save addons:', error);
+      // Continue even if save fails
     }
   }
 
@@ -388,7 +390,7 @@ class StremioService {
         AsyncStorage.setItem(this.ADDON_ORDER_KEY, JSON.stringify(this.addonOrder)),
       ]);
     } catch (error) {
-      logger.error('Failed to save addon order:', error);
+      // Continue even if save fails
     }
   }
 
@@ -444,7 +446,6 @@ class StremioService {
   removeAddon(id: string): void {
     // Prevent removal of Cinemeta as it's a pre-installed addon
     if (id === 'com.linvo.cinemeta') {
-      logger.warn('❌ Cannot remove Cinemeta - it is a pre-installed addon');
       return;
     }
     
@@ -548,10 +549,8 @@ class StremioService {
       
       // Add filters
       if (filters.length > 0) {
-        logger.log(`Adding ${filters.length} filters to Cinemeta request`);
         filters.forEach(filter => {
           if (filter.value) {
-            logger.log(`Adding filter ${filter.title}=${filter.value}`);
             url += `&${encodeURIComponent(filter.title)}=${encodeURIComponent(filter.value)}`;
           }
         });
@@ -592,6 +591,8 @@ class StremioService {
         });
       }
       
+      logger.log(`🔗 [${manifest.name}] Requesting catalog: ${url}`);
+      
       const response = await this.retryRequest(async () => {
         return await axios.get(url);
       });
@@ -612,18 +613,13 @@ class StremioService {
       
       // If a preferred addon is specified, try it first
       if (preferredAddonId) {
-        logger.log(`🎯 Trying preferred addon first: ${preferredAddonId}`);
         const preferredAddon = addons.find(addon => addon.id === preferredAddonId);
-        
+
         if (preferredAddon && preferredAddon.resources) {
-          // Log what URL would be used for debugging
+          // Build URL for metadata request
           const { baseUrl, queryParams } = this.getAddonBaseURL(preferredAddon.url || '');
-          const wouldBeUrl = queryParams ? `${baseUrl}/meta/${type}/${id}.json?${queryParams}` : `${baseUrl}/meta/${type}/${id}.json`;
-          logger.log(`🔍 Would check URL: ${wouldBeUrl} (addon: ${preferredAddon.name})`);
-          
-          // Log addon resources for debugging
-          logger.log(`🔍 Addon resources:`, JSON.stringify(preferredAddon.resources, null, 2));
-          
+          const url = queryParams ? `${baseUrl}/meta/${type}/${id}.json?${queryParams}` : `${baseUrl}/meta/${type}/${id}.json`;
+
           // Check if addon supports meta resource for this type
           let hasMetaSupport = false;
           
@@ -653,20 +649,16 @@ class StremioService {
             try {
              
               const response = await this.retryRequest(async () => {
-                return await axios.get(wouldBeUrl, { timeout: 10000 });
+                return await axios.get(url, { timeout: 10000 });
               });
               
               if (response.data && response.data.meta) {
                 return response.data.meta;
               }
             } catch (error) {
-              logger.warn(`❌ Failed to fetch meta from preferred addon ${preferredAddon.name}:`, error);
+              // Continue trying other addons
             }
-          } else {
-            logger.warn(`⚠️ Preferred addon ${preferredAddonId} does not support meta for type ${type}`);
           }
-        } else {
-          logger.warn(`⚠️ Preferred addon ${preferredAddonId} not found or has no resources`);
         }
       }
       
@@ -679,7 +671,7 @@ class StremioService {
       for (const baseUrl of cinemetaUrls) {
         try {
           const url = `${baseUrl}/meta/${type}/${id}.json`;
-          
+
           const response = await this.retryRequest(async () => {
             return await axios.get(url, { timeout: 10000 });
           });
@@ -687,8 +679,7 @@ class StremioService {
           if (response.data && response.data.meta) {
             return response.data.meta;
           }
-        } catch (error) {
-          logger.warn(`❌ Failed to fetch meta from ${baseUrl}:`, error);
+        } catch (error: any) {
           continue; // Try next URL
         }
       }
@@ -727,7 +718,7 @@ class StremioService {
           const { baseUrl, queryParams } = this.getAddonBaseURL(addon.url || '');
           const url = queryParams ? `${baseUrl}/meta/${type}/${id}.json?${queryParams}` : `${baseUrl}/meta/${type}/${id}.json`;
           
-          logger.log(`HTTP GET: ${url}`);
+          logger.log(`🔗 [${addon.name}] Requesting metadata: ${url}`);
           const response = await this.retryRequest(async () => {
             return await axios.get(url, { timeout: 10000 });
           });
@@ -741,7 +732,10 @@ class StremioService {
         }
       }
       
-      logger.warn('No metadata found from any addon');
+      // Only log this warning in debug mode to reduce noise
+      if (__DEV__) {
+        logger.warn('No metadata found from any addon');
+      }
       return null;
     } catch (error) {
       logger.error('Error in getMetaDetails:', error);
@@ -795,8 +789,6 @@ class StremioService {
         })
         .sort((a, b) => new Date(a.released).getTime() - new Date(b.released).getTime())
         .slice(0, maxEpisodes); // Limit number of episodes to prevent memory overflow
-
-      logger.log(`[StremioService] Filtered ${metadata.videos.length} episodes down to ${filteredEpisodes.length} upcoming episodes for ${metadata.name}`);
 
       return {
         seriesName: metadata.name,
@@ -872,25 +864,20 @@ class StremioService {
             
             if (tmdbIdNumber) {
               tmdbId = tmdbIdNumber.toString();
-              logger.log(`🔄 [getStreams] Converted IMDb ID ${baseImdbId} to TMDB ID ${tmdbId}${scraperType === 'tv' ? ` (S${season}E${episode})` : ''}`);
             } else {
-              logger.warn(`⚠️ [getStreams] Could not convert IMDb ID ${baseImdbId} to TMDB ID`);
               return; // Skip local scrapers if we can't convert the ID
             }
           } catch (error) {
-            logger.error(`❌ [getStreams] Failed to parse Stremio ID or convert to TMDB ID:`, error);
             return; // Skip local scrapers if ID parsing fails
           }
           
           // Execute local scrapers asynchronously with TMDB ID
           localScraperService.getStreams(scraperType, tmdbId, season, episode, (streams, scraperId, scraperName, error) => {
             if (error) {
-              logger.error(`❌ [getStreams] Local scraper ${scraperName} failed:`, error);
               if (callback) {
                 callback(null, scraperId, scraperName, error);
               }
             } else if (streams && streams.length > 0) {
-              logger.log(`✅ [getStreams] Local scraper ${scraperName} returned ${streams.length} streams`);
               if (callback) {
                 callback(streams, scraperId, scraperName, null);
               }
@@ -899,21 +886,13 @@ class StremioService {
         }
       }
     } catch (error) {
-      logger.error('❌ [getStreams] Failed to execute local scrapers:', error);
+      // Continue even if local scrapers fail
     }
     
     // Check specifically for TMDB Embed addon
     const tmdbEmbed = addons.find(addon => addon.id === 'org.tmdbembedapi');
-    if (tmdbEmbed) {
-      logger.log('🔍 [getStreams] Found TMDB Embed Streams addon:', {
-        id: tmdbEmbed.id,
-        name: tmdbEmbed.name,
-        url: tmdbEmbed.url,
-        resources: tmdbEmbed.resources,
-        types: tmdbEmbed.types
-      });
-    } else {
-      logger.log('⚠️ [getStreams] TMDB Embed Streams addon not found among installed addons');
+    if (!tmdbEmbed) {
+      // TMDB Embed addon not found
     }
     
     // Find addons that provide streams and sort them by installation order
@@ -1002,7 +981,6 @@ class StremioService {
             callback(processedStreams, addon.id, addon.name, null);
           }
         } catch (error) {
-          logger.error(`❌ [getStreams] Failed to get streams from ${addon.name} (${addon.id}):`, error);
           if (callback) {
             // Call callback with error
             callback(null, addon.id, addon.name, error as Error);
@@ -1067,8 +1045,6 @@ class StremioService {
         status: error.response?.status,
         responseData: error.response?.data
       };
-      logger.error('Failed to fetch streams from addon:', errorDetails);
-      
       // Re-throw the error with more context
       throw new Error(`Failed to fetch streams from ${addon.name}: ${error.message}`);
     }
