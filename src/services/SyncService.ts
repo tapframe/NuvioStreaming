@@ -427,6 +427,12 @@ class SyncService {
 
             await AsyncStorage.setItem(`@user:${userId}:app_settings`, JSON.stringify(mergedSettings));
             await AsyncStorage.setItem('app_settings', JSON.stringify(mergedSettings));
+
+            // Sync continue watching removed items (stored in app_settings)
+            if (remoteSettingsSansLocalOnly?.continue_watching_removed) {
+              await AsyncStorage.setItem(`@user:${userId}:@continue_watching_removed`, JSON.stringify(remoteSettingsSansLocalOnly.continue_watching_removed));
+            }
+
             await storageService.saveSubtitleSettings(us.subtitle_settings || {});
             // Notify listeners that settings changed due to sync
             try { settingsEmitter.emit(); } catch {}
@@ -436,6 +442,12 @@ class SyncService {
             const { episodeLayoutStyle: _remoteEpisodeLayoutStyle, ...remoteSettingsSansLocalOnly } = remoteRaw || {};
             await AsyncStorage.setItem(`@user:${userId}:app_settings`, JSON.stringify(remoteSettingsSansLocalOnly));
             await AsyncStorage.setItem('app_settings', JSON.stringify(remoteSettingsSansLocalOnly));
+
+            // Sync continue watching removed items in fallback (stored in app_settings)
+            if (remoteSettingsSansLocalOnly?.continue_watching_removed) {
+              await AsyncStorage.setItem(`@user:${userId}:@continue_watching_removed`, JSON.stringify(remoteSettingsSansLocalOnly.continue_watching_removed));
+            }
+
             await storageService.saveSubtitleSettings(us.subtitle_settings || {});
             try { settingsEmitter.emit(); } catch {}
           }
@@ -762,9 +774,17 @@ class SyncService {
     // Exclude local-only settings from push
     const { episodeLayoutStyle: _localEpisodeLayoutStyle, ...appSettings } = parsed || {};
     const subtitleSettings = (await storageService.getSubtitleSettings()) || {};
+    const continueWatchingRemoved = await storageService.getContinueWatchingRemoved();
+
+    // Include continue watching removed items in app_settings
+    const appSettingsWithRemoved = {
+      ...appSettings,
+      continue_watching_removed: continueWatchingRemoved
+    };
+
     const { error } = await supabase.from('user_settings').upsert({
       user_id: userId,
-      app_settings: appSettings,
+      app_settings: appSettingsWithRemoved,
       subtitle_settings: subtitleSettings,
     });
     if (error && __DEV__) console.warn('[SyncService] push settings error', error);

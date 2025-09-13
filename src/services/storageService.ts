@@ -16,6 +16,7 @@ class StorageService {
   private readonly CONTENT_DURATION_KEY = '@content_duration:';
   private readonly SUBTITLE_SETTINGS_KEY = '@subtitle_settings';
   private readonly WP_TOMBSTONES_KEY = '@wp_tombstones';
+  private readonly CONTINUE_WATCHING_REMOVED_KEY = '@continue_watching_removed';
   private watchProgressSubscribers: (() => void)[] = [];
   private watchProgressRemoveListeners: ((id: string, type: string, episodeId?: string) => void)[] = [];
   private notificationDebounceTimer: NodeJS.Timeout | null = null;
@@ -61,6 +62,11 @@ class StorageService {
     return `@user:${scope}:${this.WP_TOMBSTONES_KEY}`;
   }
 
+  private async getContinueWatchingRemovedKeyScoped(): Promise<string> {
+    const scope = await this.getUserScope();
+    return `@user:${scope}:${this.CONTINUE_WATCHING_REMOVED_KEY}`;
+  }
+
   private buildWpKeyString(id: string, type: string, episodeId?: string): string {
     return `${type}:${id}${episodeId ? `:${episodeId}` : ''}`;
   }
@@ -104,6 +110,61 @@ class StorageService {
       return JSON.parse(json) as Record<string, number>;
     } catch {
       return {};
+    }
+  }
+
+  public async addContinueWatchingRemoved(
+    id: string,
+    type: string,
+    removedAtMs?: number
+  ): Promise<void> {
+    try {
+      const key = await this.getContinueWatchingRemovedKeyScoped();
+      const json = (await AsyncStorage.getItem(key)) || '{}';
+      const map = JSON.parse(json) as Record<string, number>;
+      map[this.buildWpKeyString(id, type)] = removedAtMs || Date.now();
+      await AsyncStorage.setItem(key, JSON.stringify(map));
+    } catch (error) {
+      logger.error('Error adding continue watching removed item:', error);
+    }
+  }
+
+  public async removeContinueWatchingRemoved(
+    id: string,
+    type: string
+  ): Promise<void> {
+    try {
+      const key = await this.getContinueWatchingRemovedKeyScoped();
+      const json = (await AsyncStorage.getItem(key)) || '{}';
+      const map = JSON.parse(json) as Record<string, number>;
+      const k = this.buildWpKeyString(id, type);
+      if (map[k] != null) {
+        delete map[k];
+        await AsyncStorage.setItem(key, JSON.stringify(map));
+      }
+    } catch (error) {
+      logger.error('Error removing continue watching removed item:', error);
+    }
+  }
+
+  public async getContinueWatchingRemoved(): Promise<Record<string, number>> {
+    try {
+      const key = await this.getContinueWatchingRemovedKeyScoped();
+      const json = (await AsyncStorage.getItem(key)) || '{}';
+      return JSON.parse(json) as Record<string, number>;
+    } catch (error) {
+      logger.error('Error getting continue watching removed items:', error);
+      return {};
+    }
+  }
+
+  public async isContinueWatchingRemoved(id: string, type: string): Promise<boolean> {
+    try {
+      const removedItems = await this.getContinueWatchingRemoved();
+      const key = this.buildWpKeyString(id, type);
+      return removedItems[key] != null;
+    } catch {
+      return false;
     }
   }
 

@@ -147,7 +147,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     isRefreshingRef.current = true;
 
     // Helper to merge a batch of items into state (dedupe by type:id, keep newest)
-    const mergeBatchIntoState = (batch: ContinueWatchingItem[]) => {
+    const mergeBatchIntoState = async (batch: ContinueWatchingItem[]) => {
       if (!batch || batch.length === 0) return;
 
       setContinueWatchingItems((prev) => {
@@ -156,25 +156,45 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
           map.set(`${it.type}:${it.id}`, it);
         }
 
-        for (const it of batch) {
-          const key = `${it.type}:${it.id}`;
-
-          // Skip recently removed items to prevent immediate re-addition
-          if (recentlyRemovedRef.current.has(key)) {
-            continue;
-          }
-
-          const existing = map.get(key);
-          if (!existing || (it.lastUpdated ?? 0) > (existing.lastUpdated ?? 0)) {
-            map.set(key, it);
-          }
-        }
-
         const merged = Array.from(map.values());
         merged.sort((a, b) => (b.lastUpdated ?? 0) - (a.lastUpdated ?? 0));
 
         return merged;
       });
+
+      // Process batch items asynchronously to check removal status
+      for (const it of batch) {
+        const key = `${it.type}:${it.id}`;
+
+        // Skip recently removed items to prevent immediate re-addition
+        if (recentlyRemovedRef.current.has(key)) {
+          continue;
+        }
+
+        // Skip items that have been persistently marked as removed
+        const isRemoved = await storageService.isContinueWatchingRemoved(it.id, it.type);
+        if (isRemoved) {
+          continue;
+        }
+
+        // Add the item to state
+        setContinueWatchingItems((prev) => {
+          const map = new Map<string, ContinueWatchingItem>();
+          for (const existing of prev) {
+            map.set(`${existing.type}:${existing.id}`, existing);
+          }
+
+          const existing = map.get(key);
+          if (!existing || (it.lastUpdated ?? 0) > (existing.lastUpdated ?? 0)) {
+            map.set(key, it);
+            const merged = Array.from(map.values());
+            merged.sort((a, b) => (b.lastUpdated ?? 0) - (a.lastUpdated ?? 0));
+            return merged;
+          }
+
+          return prev;
+        });
+      }
     };
 
     try {
@@ -288,7 +308,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
             } as ContinueWatchingItem);
           }
 
-          if (batch.length > 0) mergeBatchIntoState(batch);
+          if (batch.length > 0) await mergeBatchIntoState(batch);
         } catch (error) {
           // Continue processing other groups even if one fails
         }
@@ -337,7 +357,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
               }
               if (nextEpisodeVideo && isEpisodeReleased(nextEpisodeVideo)) {
                 logger.log(`➕ [TraktSync] Adding next episode for ${showId}: S${info.season}E${nextEpisode}`);
-                mergeBatchIntoState([
+                await mergeBatchIntoState([
                   {
                     ...basicContent,
                     id: showId,
@@ -535,6 +555,9 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
               // Track this item as recently removed to prevent immediate re-addition
               const itemKey = `${item.type}:${item.id}`;
               recentlyRemovedRef.current.add(itemKey);
+
+              // Persist the removed state for long-term tracking
+              await storageService.addContinueWatchingRemoved(item.id, item.type);
 
               // Clear from recently removed after the ignore duration
               setTimeout(() => {
