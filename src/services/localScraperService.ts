@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import { logger } from '../utils/logger';
 import { Stream } from '../types/streams';
 import { cacheService } from './cacheService';
+import CryptoJS from 'crypto-js';
 
 // Types for local scrapers
 export interface ScraperManifest {
@@ -1043,6 +1044,10 @@ class LocalScraperService {
         }
       }
       
+      // MovieBox constants - hardcoded for security
+      const MOVIEBOX_PRIMARY_KEY = '76iRl07s0xSN9jqmEWAt79EBJZulIQIsV64FZr2O';
+      const MOVIEBOX_TMDB_API_KEY = '439c478a771f35c05022f9feabcca01c';
+      
       const sandbox = {
         console: {
           log: (...args: any[]) => logger.log('[Scraper]', ...args),
@@ -1068,32 +1073,106 @@ class LocalScraperService {
             case 'react-native-cheerio':
               if (cheerio) return cheerio;
               throw new Error('react-native-cheerio not available');
+            case 'crypto-js':
+              return CryptoJS;
             default:
               throw new Error(`Module '${moduleName}' is not available in sandbox`);
           }
         },
-        // Add fetch for HTTP requests (using axios as polyfill)
+        // Add fetch for HTTP requests (using native fetch for MovieBox, axios for others)
         fetch: async (url: string, options: any = {}) => {
-          const axiosConfig = {
-            url,
-            method: options.method || 'GET',
-            headers: options.headers || {},
-            data: options.body,
-            timeout: 30000
-          };
+          const isMovieBoxRequest = url.includes('api.inmoviebox.com') || url.includes('themoviedb.org');
           
-          try {
-            const response = await axios(axiosConfig);
-            return {
-              ok: response.status >= 200 && response.status < 300,
-              status: response.status,
-              statusText: response.statusText,
-              headers: response.headers,
-              json: async () => response.data,
-              text: async () => typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
+          if (isMovieBoxRequest) {
+            // Always use native fetch for MovieBox requests
+            try {
+              logger.log(`[Sandbox] Using native fetch for MovieBox request: ${url}`, {
+                method: options.method || 'GET',
+                hasBody: !!options.body
+              });
+              
+              const nativeResponse = await fetch(url, {
+                method: options.method || 'GET',
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                  'Accept': 'application/json',
+                  ...options.headers
+                },
+                body: options.body
+              });
+              
+              const responseData = await nativeResponse.text();
+              logger.log(`[Sandbox] Native fetch successful for MovieBox:`, {
+                status: nativeResponse.status,
+                ok: nativeResponse.ok
+              });
+              
+              return {
+                ok: nativeResponse.ok,
+                status: nativeResponse.status,
+                statusText: nativeResponse.statusText || 'OK',
+                headers: nativeResponse.headers,
+                json: async () => {
+                  try {
+                    return JSON.parse(responseData);
+                  } catch (e) {
+                    logger.error(`[Sandbox] Failed to parse JSON from native fetch: ${e}`);
+                    throw e;
+                  }
+                },
+                text: async () => responseData
+              };
+            } catch (error: any) {
+              logger.error(`[Sandbox] Native fetch failed for MovieBox ${url}:`, error.message);
+              throw new Error(`Fetch failed: ${error.message}`);
+            }
+          } else {
+            // Use axios for other requests
+            const axiosConfig = {
+              url,
+              method: options.method || 'GET',
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': 'application/json',
+                ...options.headers
+              },
+              data: options.body,
+              timeout: 30000,
+              validateStatus: () => true // Don't throw on HTTP error status codes
             };
-          } catch (error: any) {
-            throw new Error(`Fetch failed: ${error.message}`);
+            
+            try {
+              logger.log(`[Sandbox] Using axios for request: ${url}`, {
+                method: axiosConfig.method,
+                headers: axiosConfig.headers,
+                hasBody: !!axiosConfig.data
+              });
+              const response = await axios(axiosConfig);
+              logger.log(`[Sandbox] Axios response received:`, {
+                status: response.status,
+                statusText: response.statusText,
+                dataType: typeof response.data
+              });
+              
+              return {
+                ok: response.status >= 200 && response.status < 300,
+                status: response.status,
+                statusText: response.statusText || 'OK',
+                headers: response.headers,
+                json: async () => {
+                  try {
+                    return typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+                  } catch (e) {
+                    logger.error(`[Sandbox] Failed to parse JSON response: ${e}`);
+                    throw e;
+                  }
+                },
+                text: async () => typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
+              };
+            } catch (error: any) {
+              logger.error(`[Sandbox] Axios error for ${url}:`, error.message);
+              throw new Error(`Fetch failed: ${error.message}`);
+            }
           }
         },
         // Add axios for HTTP requests
@@ -1118,8 +1197,15 @@ class LocalScraperService {
       const executionPromise = new Promise<LocalScraperResult[]>((resolve, reject) => {
         try {
           // Create function from code
-          const func = new Function('sandbox', 'params', `
+          const func = new Function('sandbox', 'params', 'PRIMARY_KEY', 'TMDB_API_KEY', `
             const { console, setTimeout, clearTimeout, Promise, JSON, Date, Math, parseInt, parseFloat, encodeURIComponent, decodeURIComponent, require, axios, fetch, module, exports, global, URL_VALIDATION_ENABLED } = sandbox;
+            
+            // Inject MovieBox constants into global scope
+            global.PRIMARY_KEY = PRIMARY_KEY;
+            global.TMDB_API_KEY = TMDB_API_KEY;
+            window.PRIMARY_KEY = PRIMARY_KEY;
+            window.TMDB_API_KEY = TMDB_API_KEY;
+            
             ${code}
             
             // Call the main function (assuming it's exported)
@@ -1134,7 +1220,7 @@ class LocalScraperService {
             }
           `);
           
-          const result = func(sandbox, params);
+          const result = func(sandbox, params, MOVIEBOX_PRIMARY_KEY, MOVIEBOX_TMDB_API_KEY);
           
           // Handle both sync and async results
           if (result && typeof result.then === 'function') {
