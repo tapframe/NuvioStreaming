@@ -1854,6 +1854,7 @@ export class TraktService {
    */
   public async removeEpisodeFromHistory(showImdbId: string, season: number, episode: number): Promise<boolean> {
     try {
+      logger.log(`🔍 [TraktService] removeEpisodeFromHistory called for ${showImdbId} S${season}E${episode}`);
       const payload: TraktHistoryRemovePayload = {
         shows: [
           {
@@ -1874,8 +1875,18 @@ export class TraktService {
         ]
       };
 
+      logger.log(`📤 [TraktService] Sending removeEpisodeFromHistory payload:`, JSON.stringify(payload, null, 2));
+
       const result = await this.removeFromHistory(payload);
-      return result !== null && result.deleted.episodes > 0;
+
+      if (result) {
+        const success = result.deleted.episodes > 0;
+        logger.log(`✅ [TraktService] Episode removal success: ${success} (${result.deleted.episodes} episodes deleted)`);
+        return success;
+      }
+
+      logger.log(`❌ [TraktService] No result from removeEpisodeFromHistory`);
+      return false;
     } catch (error) {
       logger.error('[TraktService] Failed to remove episode from history:', error);
       return false;

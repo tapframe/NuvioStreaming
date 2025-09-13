@@ -517,8 +517,13 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                 let traktResult = false;
 
                 if (item.type === 'movie') {
+                  logger.log(`🎬 [ContinueWatching] Removing movie from Trakt history: ${item.name}`);
                   traktResult = await traktService.removeMovieFromHistory(item.id);
+                } else if (item.type === 'series' && item.season !== undefined && item.episode !== undefined) {
+                  logger.log(`📺 [ContinueWatching] Removing specific episode from Trakt history: ${item.name} S${item.season}E${item.episode}`);
+                  traktResult = await traktService.removeEpisodeFromHistory(item.id, item.season, item.episode);
                 } else {
+                  logger.log(`📺 [ContinueWatching] Removing entire show from Trakt history: ${item.name} (no specific episode info)`);
                   traktResult = await traktService.removeShowFromHistory(item.id);
                 }
 
