@@ -11,12 +11,12 @@ import {
   RefreshControl,
   StatusBar,
   Platform,
-  Image,
   ActivityIndicator,
   Modal,
   Dimensions,
   Animated,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -1475,8 +1475,8 @@ const PluginsScreen: React.FC = () => {
                         {scraper.logo ? (
                           <Image
                             source={{ uri: scraper.logo }}
-                        style={styles.scraperLogo}
-                            resizeMode="contain"
+                            style={styles.scraperLogo}
+                            contentFit="contain"
                           />
                         ) : (
                       <View style={styles.scraperLogo} />

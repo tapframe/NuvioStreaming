@@ -1,0 +1,27 @@
+[build]
+  command = "npm install"
+  functions = "netlify/functions"
+  publish = "public"
+
+[functions]
+  node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/trailer"
+  to = "/.netlify/functions/trailer"
+  status = 200
+
+[[redirects]]
+  from = "/health"
+  to = "/.netlify/functions/health"
+  status = 200
+
+[[redirects]]
+  from = "/cache"
+  to = "/.netlify/functions/cache"
+  status = 200
+
+[dev]
+  command = "npm run dev"
+  port = 3001
+  publish = "public"
