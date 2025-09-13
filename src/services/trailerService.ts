@@ -17,12 +17,14 @@ export class TrailerService {
    * Fetches trailer URL for a given title and year
    * @param title - The movie/series title
    * @param year - The release year
+   * @param tmdbId - Optional TMDB ID for more accurate results
+   * @param type - Optional content type ('movie' or 'tv')
    * @returns Promise<string | null> - The trailer URL or null if not found
    */
-  static async getTrailerUrl(title: string, year: number): Promise<string | null> {
+  static async getTrailerUrl(title: string, year: number, tmdbId?: string, type?: 'movie' | 'tv'): Promise<string | null> {
     if (this.USE_LOCAL_SERVER) {
       // Try local server first, fallback to XPrime if it fails
-      const localResult = await this.getTrailerFromLocalServer(title, year);
+      const localResult = await this.getTrailerFromLocalServer(title, year, tmdbId, type);
       if (localResult) {
         return localResult;
       }
@@ -35,19 +37,34 @@ export class TrailerService {
   }
 
   /**
-   * Fetches trailer from local server using auto-search (no YouTube URL needed)
+   * Fetches trailer from local server using TMDB API or auto-search
    * @param title - The movie/series title
    * @param year - The release year
+   * @param tmdbId - Optional TMDB ID for more accurate results
+   * @param type - Optional content type ('movie' or 'tv')
    * @returns Promise<string | null> - The trailer URL or null if not found
    */
-  private static async getTrailerFromLocalServer(title: string, year: number): Promise<string | null> {
+  private static async getTrailerFromLocalServer(title: string, year: number, tmdbId?: string, type?: 'movie' | 'tv'): Promise<string | null> {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.TIMEOUT);
 
-      const url = `${this.AUTO_SEARCH_URL}?title=${encodeURIComponent(title)}&year=${year}`;
+      // Build URL with parameters
+      const params = new URLSearchParams();
       
-      logger.info('TrailerService', `Auto-searching trailer for: ${title} (${year})`);
+      // Always send title and year for logging and fallback
+      params.append('title', title);
+      params.append('year', year.toString());
+      
+      if (tmdbId) {
+        params.append('tmdbId', tmdbId);
+        params.append('type', type || 'movie');
+        logger.info('TrailerService', `Using TMDB API for: ${title} (TMDB ID: ${tmdbId})`);
+      } else {
+        logger.info('TrailerService', `Auto-searching trailer for: ${title} (${year})`);
+      }
+
+      const url = `${this.AUTO_SEARCH_URL}?${params.toString()}`;
       
       const response = await fetch(url, {
         method: 'GET',
@@ -275,9 +292,12 @@ export class TrailerService {
     localServer: { status: 'online' | 'offline'; responseTime?: number };
     xprimeServer: { status: 'online' | 'offline'; responseTime?: number };
   }> {
-    const results = {
-      localServer: { status: 'offline' as const },
-      xprimeServer: { status: 'offline' as const }
+    const results: {
+      localServer: { status: 'online' | 'offline'; responseTime?: number };
+      xprimeServer: { status: 'online' | 'offline'; responseTime?: number };
+    } = {
+      localServer: { status: 'offline' },
+      xprimeServer: { status: 'offline' }
     };
 
     // Test local server

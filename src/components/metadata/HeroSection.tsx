@@ -80,6 +80,7 @@ interface HeroSectionProps {
   groupedEpisodes?: { [seasonNumber: number]: any[] };
   dynamicBackgroundColor?: string;
   handleBack: () => void;
+  tmdbId?: number | null;
 }
 
 // Ultra-optimized ActionButtons Component - minimal re-renders
@@ -741,6 +742,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   groupedEpisodes,
   dynamicBackgroundColor,
   handleBack,
+  tmdbId,
 }) => {
   const { currentTheme } = useTheme();
   const { isAuthenticated: isTraktAuthenticated } = useTraktContext();
@@ -873,6 +875,12 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     const fetchTrailer = async () => {
       if (!metadata?.name || !metadata?.year || !settings?.showTrailers || !isFocused) return;
       
+      // If we expect TMDB ID but don't have it yet, wait a bit more
+      if (!metadata?.tmdbId && metadata?.id?.startsWith('tmdb:')) {
+        logger.info('HeroSection', `Waiting for TMDB ID for ${metadata.name}`);
+        return;
+      }
+      
       setTrailerLoading(true);
       setTrailerError(false);
       setTrailerReady(false);
@@ -881,12 +889,25 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       try {
         // Use requestIdleCallback or setTimeout to prevent blocking main thread
         const fetchWithDelay = () => {
-          TrailerService.getTrailerUrl(metadata.name, metadata.year)
+          // Extract TMDB ID if available
+          const tmdbIdString = tmdbId ? String(tmdbId) : undefined;
+          const contentType = type === 'series' ? 'tv' : 'movie';
+          
+          // Debug logging to see what we have
+          logger.info('HeroSection', `Trailer request for ${metadata.name}:`, {
+            hasTmdbId: !!tmdbId,
+            tmdbId: tmdbId,
+            contentType,
+            metadataKeys: Object.keys(metadata || {}),
+            metadataId: metadata?.id
+          });
+          
+          TrailerService.getTrailerUrl(metadata.name, metadata.year, tmdbIdString, contentType)
             .then(url => {
               if (url) {
                 const bestUrl = TrailerService.getBestFormatUrl(url);
                 setTrailerUrl(bestUrl);
-                logger.info('HeroSection', `Trailer URL loaded for ${metadata.name}`);
+                logger.info('HeroSection', `Trailer URL loaded for ${metadata.name}${tmdbId ? ` (TMDB: ${tmdbId})` : ''}`);
               } else {
                 logger.info('HeroSection', `No trailer found for ${metadata.name}`);
               }
@@ -917,7 +938,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       alive = false;
       try { if (timerId) clearTimeout(timerId); } catch (_e) {}
     };
-  }, [metadata?.name, metadata?.year, settings?.showTrailers, isFocused]);
+  }, [metadata?.name, metadata?.year, tmdbId, settings?.showTrailers, isFocused]);
 
   // Optimized shimmer animation for loading state
   useEffect(() => {

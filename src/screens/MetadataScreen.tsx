@@ -102,6 +102,7 @@ const MetadataScreen: React.FC = () => {
     loadingRecommendations,
     setMetadata,
     imdbId,
+    tmdbId,
   } = useMetadata({ id, type, addonId });
 
   // Optimized hooks with memoization and conditional loading
@@ -627,6 +628,7 @@ const MetadataScreen: React.FC = () => {
               groupedEpisodes={groupedEpisodes}
               dynamicBackgroundColor={dynamicBackgroundColor}
               handleBack={handleBack}
+              tmdbId={tmdbId}
             />
 
             {/* Main Content - Optimized */}

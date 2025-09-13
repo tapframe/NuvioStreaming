@@ -1329,13 +1329,13 @@ export const StreamsScreen = () => {
         if (selectedProvider === 'all') {
           return true;
         }
-        
+
         // In grouped mode, handle special 'grouped-plugins' filter
         if (settings.streamDisplayMode === 'grouped' && selectedProvider === 'grouped-plugins') {
           const isInstalledAddon = installedAddons.some(addon => addon.id === addonId);
           return !isInstalledAddon; // Show only plugins (non-installed addons)
         }
-        
+
         // Otherwise only show the selected provider
         return addonId === selectedProvider;
       })
@@ -1343,7 +1343,7 @@ export const StreamsScreen = () => {
         // Sort by Stremio addon installation order
         const indexA = installedAddons.findIndex(addon => addon.id === addonIdA);
         const indexB = installedAddons.findIndex(addon => addon.id === addonIdB);
-        
+
         if (indexA !== -1 && indexB !== -1) return indexA - indexB;
         if (indexA !== -1) return -1;
         if (indexB !== -1) return 1;
@@ -1357,14 +1357,23 @@ export const StreamsScreen = () => {
       const pluginStreams: Stream[] = [];
       const addonNames: string[] = [];
       const pluginNames: string[] = [];
-      
+      let addonOriginalCount = 0;
+      let pluginOriginalCount = 0;
+
       filteredEntries.forEach(([addonId, { addonName, streams: providerStreams }]) => {
         const isInstalledAddon = installedAddons.some(addon => addon.id === addonId);
-        
+
+        // Count original streams before filtering
+        if (isInstalledAddon) {
+          addonOriginalCount += providerStreams.length;
+        } else {
+          pluginOriginalCount += providerStreams.length;
+        }
+
         // Apply quality filtering and sorting to streams
         const filteredStreams = filterStreamsByQuality(providerStreams);
         const sortedStreams = sortStreams(filteredStreams);
-        
+
         if (isInstalledAddon) {
           addonStreams.push(...sortedStreams);
           if (!addonNames.includes(addonName)) {
@@ -1377,43 +1386,66 @@ export const StreamsScreen = () => {
           }
         }
       });
-      
+
       const sections = [];
       if (addonStreams.length > 0) {
         // Apply final sorting to the combined addon streams for quality-first mode
-        const finalSortedAddonStreams = settings.streamSortMode === 'quality-then-scraper' ? 
+        const finalSortedAddonStreams = settings.streamSortMode === 'quality-then-scraper' ?
           sortStreams(addonStreams) : addonStreams;
-        
+
         sections.push({
           title: addonNames.join(', '),
           addonId: 'grouped-addons',
           data: finalSortedAddonStreams
         });
+      } else if (addonOriginalCount > 0 && addonStreams.length === 0) {
+        // Show empty section with message for addons that had streams but all were filtered
+        sections.push({
+          title: addonNames.join(', '),
+          addonId: 'grouped-addons',
+          data: [{ isEmptyPlaceholder: true } as any],
+          isEmptyDueToQualityFilter: true
+        });
       }
+
       if (pluginStreams.length > 0) {
         // Apply final sorting to the combined plugin streams for quality-first mode
-        const finalSortedPluginStreams = settings.streamSortMode === 'quality-then-scraper' ? 
+        const finalSortedPluginStreams = settings.streamSortMode === 'quality-then-scraper' ?
           sortStreams(pluginStreams) : pluginStreams;
-        
+
         sections.push({
           title: localScraperService.getRepositoryName(),
           addonId: 'grouped-plugins',
           data: finalSortedPluginStreams
         });
+      } else if (pluginOriginalCount > 0 && pluginStreams.length === 0) {
+        // Show empty section with message for plugins that had streams but all were filtered
+        sections.push({
+          title: localScraperService.getRepositoryName(),
+          addonId: 'grouped-plugins',
+          data: [{ isEmptyPlaceholder: true } as any],
+          isEmptyDueToQualityFilter: true
+        });
       }
-      
+
       return sections;
     } else {
       // Use separate sections for each provider (current behavior)
       return filteredEntries.map(([addonId, { addonName, streams: providerStreams }]) => {
+        // Count original streams before filtering
+        const originalCount = providerStreams.length;
+
         // Apply quality filtering and sorting to streams
         const filteredStreams = filterStreamsByQuality(providerStreams);
         const sortedStreams = sortStreams(filteredStreams);
-        
+
+        const isEmptyDueToQualityFilter = originalCount > 0 && sortedStreams.length === 0;
+
         return {
           title: addonName,
           addonId,
-          data: sortedStreams
+          data: isEmptyDueToQualityFilter ? [{ isEmptyPlaceholder: true } as any] : sortedStreams,
+          isEmptyDueToQualityFilter
         };
       });
     }
@@ -1475,16 +1507,33 @@ export const StreamsScreen = () => {
   const showStillFetching = streamsEmpty && loadElapsed >= 10000;
 
 
-  const renderItem = useCallback(({ item, index, section }: { item: Stream; index: number; section: any }) => {
-    const stream = item;
+  const renderItem = useCallback(({ item, index, section }: { item: any; index: number; section: any }) => {
+    // Handle empty sections due to quality filtering
+    if (item.isEmptyPlaceholder && section.isEmptyDueToQualityFilter) {
+      return (
+        <View style={styles.emptySectionContainer}>
+          <View style={styles.emptySectionContent}>
+            <MaterialIcons name="filter-list-off" size={32} color={colors.mediumEmphasis} />
+            <Text style={[styles.emptySectionTitle, { color: colors.mediumEmphasis }]}>
+              No streams available
+            </Text>
+            <Text style={[styles.emptySectionSubtitle, { color: colors.textMuted }]}>
+              All streams were filtered by your quality settings
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
+    const stream = item as Stream;
     // Don't show loading for individual streams that are already available and displayed
     const isLoading = false; // If streams are being rendered, they're available and shouldn't be loading
-    
+
     return (
       <View>
-        <StreamCard 
-          stream={stream} 
-          onPress={() => handleStreamPress(stream)} 
+        <StreamCard
+          stream={stream}
+          onPress={() => handleStreamPress(stream)}
           index={index}
           isLoading={isLoading}
           statusMessage={undefined}
@@ -1494,11 +1543,11 @@ export const StreamsScreen = () => {
         />
       </View>
     );
-  }, [handleStreamPress, currentTheme, settings.showScraperLogos, scraperLogos]);
+  }, [handleStreamPress, currentTheme, settings.showScraperLogos, scraperLogos, colors.mediumEmphasis, colors.textMuted, styles.emptySectionContainer, styles.emptySectionContent, styles.emptySectionTitle, styles.emptySectionSubtitle]);
 
-  const renderSectionHeader = useCallback(({ section }: { section: { title: string; addonId: string } }) => {
+  const renderSectionHeader = useCallback(({ section }: { section: { title: string; addonId: string; isEmptyDueToQualityFilter?: boolean } }) => {
     const isProviderLoading = loadingProviders[section.addonId];
-    
+
     return (
       <View style={styles.sectionHeaderContainer}>
         <View style={styles.sectionHeaderContent}>
@@ -1728,7 +1777,13 @@ export const StreamsScreen = () => {
             
             <SectionList
               sections={sections}
-              keyExtractor={(item) => item.url || `${item.name}-${item.title}`}
+              keyExtractor={(item, index) => {
+                if (item && item.url) {
+                  return item.url;
+                }
+                // For empty sections, use a special key
+                return `empty-${index}`;
+              }}
               renderItem={renderItem}
               renderSectionHeader={renderSectionHeader}
               stickySectionHeadersEnabled={false}
@@ -1741,6 +1796,7 @@ export const StreamsScreen = () => {
               showsVerticalScrollIndicator={false}
               bounces={true}
               overScrollMode="never"
+              ListEmptyComponent={null}
               ListFooterComponent={
                 (loadingStreams || loadingEpisodeStreams) && hasStremioStreamProviders ? (
                   <View style={styles.footerLoading}>
@@ -2248,6 +2304,28 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.mediumEmphasis,
     fontSize: 11,
     fontWeight: '400',
+  },
+  emptySectionContainer: {
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 80,
+  },
+  emptySectionContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptySectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  emptySectionSubtitle: {
+    fontSize: 12,
+    marginTop: 4,
+    textAlign: 'center',
+    lineHeight: 16,
   },
 });
 
