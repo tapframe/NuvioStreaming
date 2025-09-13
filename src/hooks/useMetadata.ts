@@ -136,9 +136,85 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
   const [activeFetchingScrapers, setActiveFetchingScrapers] = useState<string[]>([]);
   // Prevent re-initializing season selection repeatedly for the same series
   const initializedSeasonRef = useRef(false);
+  
+  // Memory optimization: Track stream counts and implement cleanup
+  const streamCountRef = useRef(0);
+  const maxStreamsPerAddon = 50; // Limit streams per addon to prevent memory bloat
+  const maxTotalStreams = 200; // Maximum total streams across all addons
+  const cleanupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Add hook for persistent seasons
   const { getSeason, saveSeason } = usePersistentSeasons();
+
+  // Memory optimization: Stream cleanup and garbage collection
+  const cleanupStreams = useCallback(() => {
+    if (__DEV__) console.log('[useMetadata] Running stream cleanup to free memory');
+    
+    // Clear preloaded streams cache
+    setPreloadedStreams({});
+    setPreloadedEpisodeStreams({});
+    
+    // Reset stream count
+    streamCountRef.current = 0;
+    
+    // Force garbage collection if available (development only)
+    if (__DEV__ && global.gc) {
+      global.gc();
+    }
+  }, []);
+
+  // Memory optimization: Debounced stream state updates
+  const debouncedStreamUpdate = useCallback((updateFn: () => void) => {
+    // Clear existing timeout
+    if (cleanupTimeoutRef.current) {
+      clearTimeout(cleanupTimeoutRef.current);
+    }
+    
+    // Set new timeout for cleanup
+    cleanupTimeoutRef.current = setTimeout(() => {
+      cleanupStreams();
+    }, 30000); // Cleanup after 30 seconds of inactivity
+    
+    // Execute the update
+    updateFn();
+  }, [cleanupStreams]);
+
+  // Memory optimization: Limit and optimize stream data
+  const optimizeStreams = useCallback((streams: Stream[]): Stream[] => {
+    if (!streams || streams.length === 0) return streams;
+    
+    // Sort streams by quality/priority and limit count
+    const sortedStreams = streams
+      .sort((a, b) => {
+        // Prioritize free streams, then debrid, then by size
+        if (a.isFree && !b.isFree) return -1;
+        if (!a.isFree && b.isFree) return 1;
+        if (a.isDebrid && !b.isDebrid) return -1;
+        if (!a.isDebrid && b.isDebrid) return 1;
+        
+        // Sort by size (larger files often better quality)
+        const sizeA = a.size || 0;
+        const sizeB = b.size || 0;
+        return sizeB - sizeA;
+      })
+      .slice(0, maxStreamsPerAddon); // Limit streams per addon
+    
+    // Optimize individual stream objects
+    return sortedStreams.map(stream => ({
+      ...stream,
+      // Truncate long descriptions to prevent memory bloat
+      description: stream.description && stream.description.length > 200 
+        ? stream.description.substring(0, 200) + '...' 
+        : stream.description,
+      // Simplify behaviorHints to essential data only
+      behaviorHints: stream.behaviorHints ? {
+        cached: stream.behaviorHints.cached,
+        notWebReady: stream.behaviorHints.notWebReady,
+        bingeGroup: stream.behaviorHints.bingeGroup,
+        // Remove large objects like magnetUrl, sources, etc.
+      } : undefined,
+    }));
+  }, [maxStreamsPerAddon]);
 
   const processStremioSource = async (type: string, id: string, isEpisode = false) => {
     const sourceStartTime = Date.now();
@@ -185,27 +261,40 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             if (__DEV__) logger.log(`✅ [${logPrefix}:${sourceName}] Received ${streams.length} streams from ${addonName} (${addonId}) after ${processTime}ms`);
             
             if (streams.length > 0) {
-              // Use the streams directly as they are already processed by stremioService
-              const updateState = (prevState: GroupedStreams): GroupedStreams => {
-                 if (__DEV__) logger.log(`🔄 [${logPrefix}:${sourceName}] Updating state for addon ${addonName} (${addonId})`);
-                 return {
-                   ...prevState,
-                   [addonId]: {
-                     addonName: addonName,
-                     streams: streams // Use the received streams directly
-                   }
-                 };
-              };
-              
-              if (isEpisode) {
-                setEpisodeStreams(updateState);
-                // Turn off loading when we get streams
-                setLoadingEpisodeStreams(false);
-              } else {
-                setGroupedStreams(updateState);
-                // Turn off loading when we get streams
-                setLoadingStreams(false);
+              // Memory optimization: Check total stream count and cleanup if needed
+              const currentTotalStreams = streamCountRef.current;
+              if (currentTotalStreams >= maxTotalStreams) {
+                if (__DEV__) logger.log(`🧹 [${logPrefix}:${sourceName}] Memory limit reached (${currentTotalStreams} streams), cleaning up`);
+                cleanupStreams();
               }
+              
+              // Optimize streams before storing
+              const optimizedStreams = optimizeStreams(streams);
+              streamCountRef.current += optimizedStreams.length;
+              
+              if (__DEV__) logger.log(`📊 [${logPrefix}:${sourceName}] Optimized ${streams.length} → ${optimizedStreams.length} streams, total: ${streamCountRef.current}`);
+              
+              // Use debounced update to prevent rapid state changes
+              debouncedStreamUpdate(() => {
+                const updateState = (prevState: GroupedStreams): GroupedStreams => {
+                  if (__DEV__) logger.log(`🔄 [${logPrefix}:${sourceName}] Updating state for addon ${addonName} (${addonId})`);
+                  return {
+                    ...prevState,
+                    [addonId]: {
+                      addonName: addonName,
+                      streams: optimizedStreams // Use optimized streams
+                    }
+                  };
+                };
+                
+                if (isEpisode) {
+                  setEpisodeStreams(updateState);
+                  setLoadingEpisodeStreams(false);
+                } else {
+                  setGroupedStreams(updateState);
+                  setLoadingStreams(false);
+                }
+              });
             } else {
                if (__DEV__) logger.log(`🤷 [${logPrefix}:${sourceName}] No streams found for addon ${addonName} (${addonId})`);
             }
@@ -1088,7 +1177,16 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
   useEffect(() => {
     setLoadAttempts(0);
     initializedSeasonRef.current = false;
-  }, [id, type]);
+    
+    // Memory optimization: Clean up streams when content changes
+    cleanupStreams();
+    
+    // Clear any pending cleanup timeouts
+    if (cleanupTimeoutRef.current) {
+      clearTimeout(cleanupTimeoutRef.current);
+      cleanupTimeoutRef.current = null;
+    }
+  }, [id, type, cleanupStreams]);
 
   // Auto-retry on error with delay
   useEffect(() => {
@@ -1229,6 +1327,21 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
     return () => unsubscribe();
   }, [id]);
+
+  // Memory optimization: Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Clear cleanup timeout
+      if (cleanupTimeoutRef.current) {
+        clearTimeout(cleanupTimeoutRef.current);
+      }
+      
+      // Force cleanup
+      cleanupStreams();
+      
+      if (__DEV__) console.log('[useMetadata] Component unmounted, memory cleaned up');
+    };
+  }, [cleanupStreams]);
 
   return {
     metadata,

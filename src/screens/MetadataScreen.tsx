@@ -322,6 +322,37 @@ const MetadataScreen: React.FC = () => {
     }
   }, [metadata]);
 
+  // Memory monitoring and cleanup
+  useEffect(() => {
+    if (__DEV__) {
+      const memoryMonitor = () => {
+        // Check if we have access to memory info
+        if (performance && (performance as any).memory) {
+          const memory = (performance as any).memory;
+          const usedMB = Math.round(memory.usedJSHeapSize / 1048576);
+          const totalMB = Math.round(memory.totalJSHeapSize / 1048576);
+          const limitMB = Math.round(memory.jsHeapSizeLimit / 1048576);
+          
+          if (__DEV__) console.log(`[MetadataScreen] Memory usage: ${usedMB}MB / ${totalMB}MB (limit: ${limitMB}MB)`);
+          
+          // Trigger cleanup if memory usage is high
+          if (usedMB > limitMB * 0.8) {
+            if (__DEV__) console.warn(`[MetadataScreen] High memory usage detected (${usedMB}MB), triggering cleanup`);
+            // Force garbage collection if available
+            if (global.gc) {
+              global.gc();
+            }
+          }
+        }
+      };
+      
+      // Monitor memory every 10 seconds
+      const interval = setInterval(memoryMonitor, 10000);
+      
+      return () => clearInterval(interval);
+    }
+  }, []);
+
   // Memoized derived values for performance
   const isReady = useMemo(() => !loading && metadata && !metadataError, [loading, metadata, metadataError]);
   

@@ -1120,67 +1120,59 @@ class StremioService {
         const isDirectStreamingUrl = this.isDirectStreamingUrl(streamUrl);
         const isMagnetStream = streamUrl?.startsWith('magnet:');
 
-        // Determine the best title: Prioritize description if it seems detailed,
-        // otherwise fall back to title or name.
+        // Memory optimization: Limit title length to prevent memory bloat
         let displayTitle = stream.title || stream.name || 'Unnamed Stream';
         if (stream.description && stream.description.includes('\n') && stream.description.length > (stream.title?.length || 0)) {
           // If description exists, contains newlines (likely formatted metadata), 
-          // and is longer than the title, prefer it.
-          displayTitle = stream.description;
+          // and is longer than the title, prefer it but truncate if too long
+          displayTitle = stream.description.length > 150 
+            ? stream.description.substring(0, 150) + '...' 
+            : stream.description;
+        }
+        
+        // Truncate display title if still too long
+        if (displayTitle.length > 100) {
+          displayTitle = displayTitle.substring(0, 100) + '...';
         }
         
         // Use the original name field for the primary identifier if available
-        const name = stream.name || stream.title || 'Unnamed Stream';
+        let name = stream.name || stream.title || 'Unnamed Stream';
+        if (name.length > 80) {
+          name = name.substring(0, 80) + '...';
+        }
 
         // Extract size: Prefer behaviorHints.videoSize, fallback to top-level size
         const sizeInBytes = stream.behaviorHints?.videoSize || stream.size || undefined;
 
-        // Consolidate behavior hints, prioritizing specific data extraction
-        let behaviorHints: Stream['behaviorHints'] = {
-          ...(stream.behaviorHints || {}), // Start with existing hints
+        // Memory optimization: Minimize behaviorHints to essential data only
+        const behaviorHints: Stream['behaviorHints'] = {
           notWebReady: !isDirectStreamingUrl,
-          isMagnetStream,
-          // Addon Info
-          addonName: addon.name,
-          addonId: addon.id,
-          // Extracted data (provide defaults or undefined)
-          cached: stream.behaviorHints?.cached || undefined, // For RD/AD detection
-          filename: stream.behaviorHints?.filename || undefined, // Filename if available
+          cached: stream.behaviorHints?.cached || undefined,
           bingeGroup: stream.behaviorHints?.bingeGroup || undefined,
-          // Add size here if extracted
-          size: sizeInBytes, 
-        };
-
-        // Specific handling for magnet/torrent streams to extract more details
-        if (isMagnetStream) {
-          behaviorHints = {
-            ...behaviorHints,
+          // Only include essential torrent data for magnet streams
+          ...(isMagnetStream ? {
             infoHash: stream.infoHash || streamUrl?.match(/btih:([a-zA-Z0-9]+)/)?.[1],
             fileIdx: stream.fileIdx,
-            magnetUrl: streamUrl,
             type: 'torrent',
-            sources: stream.sources || [],
-            seeders: stream.seeders, // Explicitly map seeders if present
-            size: sizeInBytes || stream.seeders, // Use extracted size, fallback for torrents
-            title: stream.title, // Torrent title might be different
-          };
-        }
+          } : {}),
+        };
 
-        // Explicitly construct the final Stream object
+        // Explicitly construct the final Stream object with minimal data
         const processedStream: Stream = {
           url: streamUrl,
-          name: name, // Use the original name/title for primary ID
-          title: displayTitle, // Use the potentially more detailed title from description
+          name: name,
+          title: displayTitle,
           addonName: addon.name,
           addonId: addon.id,
-          // Map other potential top-level fields if they exist
-          description: stream.description || undefined, // Keep original description too
+          // Memory optimization: Only include essential fields
+          description: stream.description && stream.description.length <= 100 
+            ? stream.description 
+            : undefined, // Skip long descriptions
           infoHash: stream.infoHash || undefined,
           fileIdx: stream.fileIdx,
-          size: sizeInBytes, // Assign the extracted size
+          size: sizeInBytes,
           isFree: stream.isFree,
-          isDebrid: !!(stream.behaviorHints?.cached), // Map debrid status more reliably
-          // Assign the consolidated behaviorHints
+          isDebrid: !!(stream.behaviorHints?.cached),
           behaviorHints: behaviorHints,
         };
 

@@ -274,6 +274,19 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
     }, [episodes, metadata?.id])
   );
 
+  // Memory optimization: Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Clear any pending timeouts
+      if (__DEV__) console.log('[SeriesContent] Component unmounted, cleaning up memory');
+      
+      // Force garbage collection if available (development only)
+      if (__DEV__ && global.gc) {
+        global.gc();
+      }
+    };
+  }, []);
+
   // Add effect to scroll to selected season
   useEffect(() => {
     if (selectedSeason && seasonScrollViewRef.current && Object.keys(groupedEpisodes).length > 0) {
