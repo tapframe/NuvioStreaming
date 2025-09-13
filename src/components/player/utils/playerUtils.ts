@@ -90,16 +90,55 @@ export const formatLanguage = (code?: string): string => {
 };
 
 // Helper function to extract a display name from the track's name property
-export const getTrackDisplayName = (track: { name?: string, id: number }): string => {
-  if (!track || !track.name) return `Track ${track.id}`;
+export const getTrackDisplayName = (track: { name?: string, id: number, language?: string }): string => {
+  if (!track) return 'Unknown Track';
+
+  // If we have a language field, use that for better display
+  if (track.language && track.language !== 'Unknown') {
+    const formattedLanguage = formatLanguage(track.language);
+    if (formattedLanguage !== 'Unknown' && !formattedLanguage.includes('Unknown')) {
+      return formattedLanguage;
+    }
+  }
+
+  // If no name, use track number
+  if (!track.name) return `Track ${track.id}`;
 
   // Try to extract language from name like "Some Info - [English]"
   const languageMatch = track.name.match(/\[(.*?)\]/);
   if (languageMatch && languageMatch[1]) {
-      return languageMatch[1];
+    return languageMatch[1];
   }
-  
-  // If no language in brackets, or if the name is simple, use the full name
+
+  // Handle generic VLC track names like "Audio 1", "Track 1"
+  const genericTrackMatch = track.name.match(/^(Audio|Track)\s+(\d+)$/i);
+  if (genericTrackMatch) {
+    return `Audio ${genericTrackMatch[2]}`;
+  }
+
+  // Check for common language patterns in the name
+  const languagePatterns = [
+    /\b(english|spanish|french|german|italian|japanese|korean|chinese|russian|portuguese|hindi|arabic|dutch|swedish|norwegian|finnish|danish|polish|turkish|czech|hungarian|greek|thai|vietnamese)\b/i,
+    /\b(en|es|fr|de|it|ja|ko|zh|ru|pt|hi|ar|nl|sv|no|fi|da|pl|tr|cs|hu|el|th|vi)\b/i
+  ];
+
+  for (const pattern of languagePatterns) {
+    const match = track.name.match(pattern);
+    if (match) {
+      const detectedLang = match[1];
+      const formatted = formatLanguage(detectedLang);
+      if (formatted !== 'Unknown' && !formatted.includes('Unknown')) {
+        return formatted;
+      }
+    }
+  }
+
+  // If name contains only numbers or is very short, it's probably not meaningful
+  if (/^\d+$/.test(track.name.trim()) || track.name.trim().length <= 2) {
+    return `Audio ${track.id}`;
+  }
+
+  // Use the name as-is if it seems meaningful
   return track.name;
 };
 

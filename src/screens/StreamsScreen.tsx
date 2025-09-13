@@ -655,24 +655,12 @@ export const StreamsScreen = () => {
 
   // Memoize handlers
   const handleBack = useCallback(() => {
-    if (type === 'series') {
-      // Reset stack to ensure there is always a screen to go back to from Metadata
-      (navigation as any).reset({
-        index: 1,
-        routes: [
-          { name: 'MainTabs' },
-          { name: 'Metadata', params: { id, type } }
-        ]
-      });
-      return;
-    }
-
     if (navigation.canGoBack()) {
       navigation.goBack();
     } else {
       (navigation as any).navigate('MainTabs');
     }
-  }, [navigation, type, id]);
+  }, [navigation]);
 
   const handleProviderChange = useCallback((provider: string) => {
     setSelectedProvider(provider);
