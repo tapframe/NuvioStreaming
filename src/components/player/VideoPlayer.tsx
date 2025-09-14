@@ -54,7 +54,7 @@ const VideoPlayer: React.FC = () => {
   // Xprime-specific headers for better compatibility (from local-scrapers-repo)
   const getXprimeHeaders = () => {
     if (!isXprimeStream) return {};
-    return {
+    const xprimeHeaders = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       'Accept': 'video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5',
       'Accept-Language': 'en-US,en;q=0.9',
@@ -66,6 +66,8 @@ const VideoPlayer: React.FC = () => {
       'Sec-Fetch-Site': 'cross-site',
       'DNT': '1'
     } as any;
+    logger.log('[VideoPlayer] Applying Xprime headers for stream:', uri);
+    return xprimeHeaders;
   };
   
   // Check if the file format is MKV
@@ -2240,10 +2242,11 @@ const VideoPlayer: React.FC = () => {
                   ref={vlcRef}
                   style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
                   source={(() => {
-                     // FORCEFULLY use headers from route params if available - no filtering or modification
-                     const sourceWithHeaders = headers ? {
+                     // Use Xprime headers if detected, otherwise use headers from route params
+                     const finalHeaders = getXprimeHeaders() || headers;
+                     const sourceWithHeaders = finalHeaders ? {
                        uri: currentStreamUrl,
-                       headers: headers
+                       headers: finalHeaders
                      } : { uri: currentStreamUrl };
                      
                      return sourceWithHeaders;

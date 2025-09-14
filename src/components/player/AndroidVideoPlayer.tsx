@@ -75,6 +75,29 @@ const AndroidVideoPlayer: React.FC = () => {
     backdrop
   } = route.params;
 
+  // Check if the stream is from Xprime (by provider name or URL pattern)
+  const isXprimeStream = streamProvider === 'xprime' || streamProvider === 'Xprime' || 
+    (uri && /flutch.*\.workers\.dev|fsl\.fastcloud\.casa|xprime/i.test(uri));
+
+  // Xprime-specific headers for better compatibility (from local-scrapers-repo)
+  const getXprimeHeaders = () => {
+    if (!isXprimeStream) return {};
+    const xprimeHeaders = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept-Encoding': 'identity',
+      'Origin': 'https://xprime.tv',
+      'Referer': 'https://xprime.tv/',
+      'Sec-Fetch-Dest': 'video',
+      'Sec-Fetch-Mode': 'no-cors',
+      'Sec-Fetch-Site': 'cross-site',
+      'DNT': '1'
+    } as any;
+    logger.log('[AndroidVideoPlayer] Applying Xprime headers for stream:', uri);
+    return xprimeHeaders;
+  };
+
   // Optional hint not yet in typed navigator params
   const videoType = (route.params as any).videoType as string | undefined;
 
@@ -2414,7 +2437,7 @@ const AndroidVideoPlayer: React.FC = () => {
                 <Video
                   ref={videoRef}
                   style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
-                  source={{ uri: currentStreamUrl, headers: headers || (Platform.OS === 'android' ? defaultAndroidHeaders() : defaultIosHeaders()), type: (currentVideoType as any) }}
+                  source={{ uri: currentStreamUrl, headers: getXprimeHeaders() || headers || (Platform.OS === 'android' ? defaultAndroidHeaders() : defaultIosHeaders()), type: (currentVideoType as any) }}
                   paused={paused}
                   onLoadStart={() => {
                     loadStartAtRef.current = Date.now();
