@@ -938,20 +938,6 @@ export const StreamsScreen = () => {
       logger.warn('[StreamsScreen] MKV support detection failed:', e);
     }
 
-    // Add pre-navigation orientation lock to reduce glitch on phones only; tablets can rotate freely
-    try {
-      const { width: dw, height: dh } = Dimensions.get('window');
-      const isTablet = Math.min(dw, dh) >= 768 || ((Platform as any).isPad === true);
-      if (!isTablet) {
-        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-      } else {
-        await ScreenOrientation.unlockAsync();
-      }
-    } catch (e) {
-      logger.warn('[StreamsScreen] Pre-navigation orientation lock failed:', e);
-    }
-    // Small delay to allow orientation to settle
-    await new Promise(res => setTimeout(res, Platform.OS === 'ios' ? 120 : 60));
 
     // Show a quick full-screen black overlay to mask rotation flicker
     // by setting a transient state that renders a covering View (implementation already supported by dark backgrounds)
