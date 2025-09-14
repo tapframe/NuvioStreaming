@@ -34,6 +34,7 @@ interface TrailerPlayerProps {
   onError?: (error: string) => void;
   onProgress?: (data: OnProgressData) => void;
   onPlaybackStatusUpdate?: (status: { isLoaded: boolean; didJustFinish: boolean }) => void;
+  onEnd?: () => void;
   style?: any;
   hideLoadingSpinner?: boolean;
   onFullscreenToggle?: () => void;
@@ -49,6 +50,7 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
   onError,
   onProgress,
   onPlaybackStatusUpdate,
+  onEnd,
   style,
   hideLoadingSpinner = false,
   onFullscreenToggle,
@@ -351,6 +353,10 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
           // Stop playback when trailer finishes to avoid continuous GPU/decoder use
           if (isComponentMounted) {
             setIsPlaying(false);
+            // Notify parent component that trailer has ended
+            if (onEnd) {
+              onEnd();
+            }
           }
         }}
         onFullscreenPlayerWillPresent={() => setIsFullscreen(true)}

@@ -116,7 +116,7 @@ echo "📊 File size: $(du -h ${timestamp}.zip | cut -f1)"
 
 # Check server health before upload
 echo "🔍 Checking server status..."
-if ! curl --max-time 10 --connect-timeout 5 -s -o /dev/null "$serverHost/api/manifest"; then
+if ! curl --http1.1 --max-time 10 --connect-timeout 5 -s -o /dev/null "$serverHost/api/manifest"; then
   echo "⚠️  Warning: Server may be slow or unresponsive"
   echo "💡 Proceeding with upload anyway..."
 else
@@ -131,7 +131,7 @@ retry_count=0
 while [ $retry_count -lt $max_retries ]; do
   echo "🔄 Upload attempt $((retry_count + 1))/$max_retries..."
   
-  response=$(curl --max-time 300 --connect-timeout 30 -X POST $serverHost/api/upload \
+  response=$(curl --http1.1 --max-time 300 --connect-timeout 30 -X POST $serverHost/api/upload \
     -F "file=@${timestamp}.zip" \
     -F "runtimeVersion=$runtimeVersion" \
     -F "commitHash=$commitHash" \

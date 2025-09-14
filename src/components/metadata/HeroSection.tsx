@@ -850,6 +850,26 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     trailerOpacity.value = withTiming(0, { duration: 300 });
     thumbnailOpacity.value = withTiming(1, { duration: 300 });
   }, [trailerOpacity, thumbnailOpacity]);
+
+  // Handle trailer end - seamless transition back to thumbnail
+  const handleTrailerEnd = useCallback(() => {
+    logger.info('HeroSection', 'Trailer ended - transitioning back to thumbnail');
+    setTrailerPlaying(false);
+    
+    // Reset trailer state to prevent auto-restart
+    setTrailerReady(false);
+    setTrailerPreloaded(false);
+    
+    // Smooth fade transition: trailer out, thumbnail in
+    trailerOpacity.value = withTiming(0, { duration: 500 });
+    thumbnailOpacity.value = withTiming(1, { duration: 500 });
+    
+    // Show UI elements again
+    actionButtonsOpacity.value = withTiming(1, { duration: 500 });
+    genreOpacity.value = withTiming(1, { duration: 500 });
+    titleCardTranslateY.value = withTiming(0, { duration: 500 });
+    watchProgressOpacity.value = withTiming(1, { duration: 500 });
+  }, [trailerOpacity, thumbnailOpacity, actionButtonsOpacity, genreOpacity, titleCardTranslateY, watchProgressOpacity, setTrailerPlaying]);
   
   // Memoized image source
   const imageSource = useMemo(() => 
@@ -1320,6 +1340,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
               onFullscreenToggle={handleFullscreenToggle}
               onLoad={handleTrailerReady}
               onError={handleTrailerError}
+              onEnd={handleTrailerEnd}
               onPlaybackStatusUpdate={(status) => {
                 if (status.isLoaded && !trailerReady) {
                   handleTrailerReady();
