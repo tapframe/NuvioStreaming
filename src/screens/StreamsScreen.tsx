@@ -926,16 +926,24 @@ export const StreamsScreen = () => {
     const streamName = stream.name || stream.title || 'Unnamed Stream';
     const streamProvider = stream.addonId || stream.addonName || stream.name;
     
-    // Determine if we should force VLC on iOS based on provider-declared formats (e.g., MKV)
+    // Determine if we should force VLC on iOS based on actual stream format (not provider capability)
     let forceVlc = !!options?.forceVlc;
     try {
-      const providerId = stream.addonId || (stream as any).addon;
-      if (Platform.OS === 'ios' && providerId && !forceVlc) {
-        forceVlc = await localScraperService.supportsFormat(providerId, 'mkv');
-        logger.log(`[StreamsScreen] Provider '${providerId}' MKV support -> ${forceVlc}`);
+      if (Platform.OS === 'ios' && !forceVlc) {
+        // Check if the actual stream is an MKV file
+        const lowerUri = (stream.url || '').toLowerCase();
+        const contentType = (stream.headers && ((stream.headers as any)['Content-Type'] || (stream.headers as any)['content-type'])) || '';
+        const isMkvByHeader = typeof contentType === 'string' && contentType.includes('matroska');
+        const isMkvByPath = lowerUri.includes('.mkv') || /[?&]ext=mkv\b/.test(lowerUri) || /format=mkv\b/.test(lowerUri) || /container=mkv\b/.test(lowerUri);
+        const isMkvFile = Boolean(isMkvByHeader || isMkvByPath);
+        
+        if (isMkvFile) {
+          forceVlc = true;
+          logger.log(`[StreamsScreen] Stream is MKV format -> forcing VLC`);
+        }
       }
     } catch (e) {
-      logger.warn('[StreamsScreen] MKV support detection failed:', e);
+      logger.warn('[StreamsScreen] Stream format detection failed:', e);
     }
 
 
@@ -997,19 +1005,24 @@ export const StreamsScreen = () => {
           } catch (_e) {}
           return;
         }
-        // If provider declares MKV support, force the in-app VLC-based player on iOS
+        // If stream is actually MKV format, force the in-app VLC-based player on iOS
         try {
-          const providerId = stream.addonId || (stream as any).addon;
-          if (Platform.OS === 'ios' && providerId) {
-            const providerRequiresVlc = await localScraperService.supportsFormat(providerId, 'mkv');
-            if (providerRequiresVlc) {
-              logger.log(`[StreamsScreen] Forcing in-app VLC for provider '${providerId}' on iOS due to MKV support`);
-              navigateToPlayer(stream);
+          if (Platform.OS === 'ios') {
+            // Check if the actual stream is an MKV file
+            const lowerUri = (stream.url || '').toLowerCase();
+            const contentType = (stream.headers && ((stream.headers as any)['Content-Type'] || (stream.headers as any)['content-type'])) || '';
+            const isMkvByHeader = typeof contentType === 'string' && contentType.includes('matroska');
+            const isMkvByPath = lowerUri.includes('.mkv') || /[?&]ext=mkv\b/.test(lowerUri) || /format=mkv\b/.test(lowerUri) || /container=mkv\b/.test(lowerUri);
+            const isMkvFile = Boolean(isMkvByHeader || isMkvByPath);
+            
+            if (isMkvFile) {
+              logger.log(`[StreamsScreen] Stream is MKV format -> forcing VLC on iOS`);
+              navigateToPlayer(stream, { forceVlc: true });
               return;
             }
           }
         } catch (err) {
-          logger.warn('[StreamsScreen] MKV pre-check failed:', err);
+          logger.warn('[StreamsScreen] Stream format pre-check failed:', err);
         }
 
         // iOS: very short MKV detection race; never block longer than MKV_HEAD_TIMEOUT_MS

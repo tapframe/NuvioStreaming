@@ -47,8 +47,26 @@ const VideoPlayer: React.FC = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'Player'>>();
   const { streamProvider, uri, headers, forceVlc } = route.params as any;
   
-  // Check if the stream is from Xprime
-  const isXprimeStream = streamProvider === 'xprime' || streamProvider === 'Xprime';
+  // Check if the stream is from Xprime (by provider name or URL pattern)
+  const isXprimeStream = streamProvider === 'xprime' || streamProvider === 'Xprime' || 
+    (uri && /flutch.*\.workers\.dev|fsl\.fastcloud\.casa|xprime/i.test(uri));
+
+  // Xprime-specific headers for better compatibility (from local-scrapers-repo)
+  const getXprimeHeaders = () => {
+    if (!isXprimeStream) return {};
+    return {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept-Encoding': 'identity',
+      'Origin': 'https://xprime.tv',
+      'Referer': 'https://xprime.tv/',
+      'Sec-Fetch-Dest': 'video',
+      'Sec-Fetch-Mode': 'no-cors',
+      'Sec-Fetch-Site': 'cross-site',
+      'DNT': '1'
+    } as any;
+  };
   
   // Check if the file format is MKV
   const lowerUri = (uri || '').toLowerCase();
@@ -61,6 +79,8 @@ const VideoPlayer: React.FC = () => {
   // - Android devices
   // - Xprime streams on any platform
   // - Non-MKV files on iOS (unless forceVlc is set)
+  // Use VideoPlayer (VLC) for:
+  // - MKV files on iOS (unless forceVlc is set)
   const shouldUseAndroidPlayer = Platform.OS === 'android' || isXprimeStream || (Platform.OS === 'ios' && !isMkvFile && !forceVlc);
   if (__DEV__) {
     logger.log('[VideoPlayer] Player selection:', {
@@ -203,7 +223,20 @@ const VideoPlayer: React.FC = () => {
   const [isLoadingSubtitleList, setIsLoadingSubtitleList] = useState<boolean>(false);
   const [showSourcesModal, setShowSourcesModal] = useState<boolean>(false);
   const [availableStreams, setAvailableStreams] = useState<{ [providerId: string]: { streams: any[]; addonName: string } }>(passedAvailableStreams || {});
-  const [currentStreamUrl, setCurrentStreamUrl] = useState<string>(uri);
+  // Decode URLs for VLC compatibility - VLC has issues with encoded URLs
+  const decodeUrlForVlc = (url: string): string => {
+    try {
+      // Always decode URLs for VLC as it has trouble with encoded characters
+      const decoded = decodeURIComponent(url);
+      logger.log('[VideoPlayer] Decoded URL for VLC:', { original: url, decoded });
+      return decoded;
+    } catch (e) {
+      logger.warn('[VideoPlayer] URL decoding failed, using original:', e);
+      return url;
+    }
+  };
+
+  const [currentStreamUrl, setCurrentStreamUrl] = useState<string>(decodeUrlForVlc(uri));
   const [isChangingSource, setIsChangingSource] = useState<boolean>(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string>('');
@@ -1913,8 +1946,8 @@ const VideoPlayer: React.FC = () => {
       // Set pending seek state
       setPendingSeek({ position: savedPosition, shouldPlay: wasPlaying });
 
-      // Update the stream URL and details immediately
-      setCurrentStreamUrl(newStream.url);
+      // Update the stream URL and details immediately (decode URL for VLC)
+      setCurrentStreamUrl(decodeUrlForVlc(newStream.url));
       setCurrentQuality(newQuality);
       setCurrentStreamProvider(newProvider);
       setCurrentStreamName(newStreamName);
