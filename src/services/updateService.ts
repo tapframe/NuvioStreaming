@@ -191,21 +191,13 @@ export class UpdateService {
     this.addLog(`Update URL: ${this.getUpdateUrl()}`, 'INFO');
     
     try {
-      // Always perform update check regardless of environment for debugging
-      this.addLog('Performing initial update check...', 'INFO');
-      const updateInfo = await this.checkForUpdates();
-      
-      if (updateInfo.isAvailable) {
-        this.addLog(`Update available: ${updateInfo.manifest?.id || 'unknown'}`, 'INFO');
-      } else {
-        this.addLog('No updates available', 'INFO');
-      }
+      // Only log initialization info, don't perform automatic update checks
+      this.addLog('UpdateService initialized - updates will be handled manually via popup', 'INFO');
 
       // Check if we're running in a development environment
       if (__DEV__) {
-        this.addLog('Running in development mode, but allowing update checks for testing', 'WARN');
+        this.addLog('Running in development mode', 'WARN');
         this.addLog('UpdateService initialization completed (dev mode)', 'INFO');
-        // Don't return early - allow update checks in dev mode for testing
       }
 
       // Check if updates are enabled
@@ -215,7 +207,7 @@ export class UpdateService {
         return;
       }
 
-      this.addLog('Updates are enabled, skipping automatic periodic checks', 'INFO');
+      this.addLog('Updates are enabled, manual update checks only', 'INFO');
       this.addLog('UpdateService initialization completed successfully', 'INFO');
     } catch (error) {
       this.addLog(`Initialization failed: ${error instanceof Error ? error.message : String(error)}`, 'ERROR');

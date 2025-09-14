@@ -919,6 +919,9 @@ export const StreamsScreen = () => {
   }, [type, id, currentEpisode?.season_number, currentEpisode?.episode_number]);
 
   const navigateToPlayer = useCallback(async (stream: Stream, options?: { forceVlc?: boolean; headers?: Record<string, string> }) => {
+    // Add 50ms delay before navigating to player
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
     // Prepare available streams for the change source feature
     const streamsToPass = type === 'series' ? episodeStreams : groupedStreams;
     
