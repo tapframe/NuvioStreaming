@@ -157,6 +157,8 @@ const VideoPlayer: React.FC = () => {
   const openingFadeAnim = useRef(new Animated.Value(0)).current;
   const openingScaleAnim = useRef(new Animated.Value(0.8)).current;
   const backgroundFadeAnim = useRef(new Animated.Value(1)).current;
+  const [isBackdropLoaded, setIsBackdropLoaded] = useState(false);
+  const backdropImageOpacityAnim = useRef(new Animated.Value(0)).current;
   const [isBuffering, setIsBuffering] = useState(false);
   const [vlcAudioTracks, setVlcAudioTracks] = useState<Array<{ id: number, name: string, language?: string }>>([]);
   const [vlcTextTracks, setVlcTextTracks] = useState<Array<{ id: number, name: string, language?: string }>>([]);
@@ -286,7 +288,31 @@ const VideoPlayer: React.FC = () => {
   // Prefetch backdrop and title logo for faster loading screen appearance
   useEffect(() => {
     if (backdrop && typeof backdrop === 'string') {
-      Image.prefetch(backdrop).catch(() => {});
+      // Reset loading state
+      setIsBackdropLoaded(false);
+      backdropImageOpacityAnim.setValue(0);
+
+      // Prefetch the image
+      Image.prefetch(backdrop)
+        .then(() => {
+          // Image loaded successfully, fade it in smoothly
+          setIsBackdropLoaded(true);
+          Animated.timing(backdropImageOpacityAnim, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }).start();
+        })
+        .catch((error) => {
+          // If prefetch fails, still show the image but without animation
+          if (__DEV__) logger.warn('[VideoPlayer] Backdrop prefetch failed, showing anyway:', error);
+          setIsBackdropLoaded(true);
+          backdropImageOpacityAnim.setValue(1);
+        });
+    } else {
+      // No backdrop provided, consider it "loaded"
+      setIsBackdropLoaded(true);
+      backdropImageOpacityAnim.setValue(0);
     }
   }, [backdrop]);
 
@@ -1961,9 +1987,16 @@ const VideoPlayer: React.FC = () => {
         pointerEvents={isOpeningAnimationComplete ? 'none' : 'auto'}
       >
         {backdrop && (
-          <Image
+          <Animated.Image
             source={{ uri: backdrop }}
-            style={[StyleSheet.absoluteFill, { width: screenDimensions.width, height: screenDimensions.height }]}
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                width: screenDimensions.width,
+                height: screenDimensions.height,
+                opacity: backdropImageOpacityAnim
+              }
+            ]}
             resizeMode="cover"
             blurRadius={0}
           />
