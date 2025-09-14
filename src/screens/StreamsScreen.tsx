@@ -929,7 +929,7 @@ export const StreamsScreen = () => {
     const streamName = stream.name || stream.title || 'Unnamed Stream';
     const streamProvider = stream.addonId || stream.addonName || stream.name;
     
-    // Determine if we should force VLC on iOS based on actual stream format (not provider capability)
+    // Determine if we should force VLC on iOS based on actual stream format and provider capability
     let forceVlc = !!options?.forceVlc;
     try {
       if (Platform.OS === 'ios' && !forceVlc) {
@@ -940,9 +940,22 @@ export const StreamsScreen = () => {
         const isMkvByPath = lowerUri.includes('.mkv') || /[?&]ext=mkv\b/.test(lowerUri) || /format=mkv\b/.test(lowerUri) || /container=mkv\b/.test(lowerUri);
         const isMkvFile = Boolean(isMkvByHeader || isMkvByPath);
         
-        if (isMkvFile) {
+        // Also check if the provider declares MKV format support
+        let providerSupportsMkv = false;
+        try {
+          const availableScrapers = await localScraperService.getAvailableScrapers();
+          const provider = availableScrapers.find(scraper => scraper.id === streamProvider);
+          if (provider && provider.formats) {
+            providerSupportsMkv = provider.formats.includes('mkv');
+            logger.log(`[StreamsScreen] Provider ${streamProvider} formats:`, provider.formats, 'supports MKV:', providerSupportsMkv);
+          }
+        } catch (providerError) {
+          logger.warn('[StreamsScreen] Failed to check provider formats:', providerError);
+        }
+        
+        if (isMkvFile || providerSupportsMkv) {
           forceVlc = true;
-          logger.log(`[StreamsScreen] Stream is MKV format -> forcing VLC`);
+          logger.log(`[StreamsScreen] Stream is MKV format (detected: ${isMkvFile}, provider supports: ${providerSupportsMkv}) -> forcing VLC`);
         }
       }
     } catch (e) {
@@ -1199,7 +1212,22 @@ export const StreamsScreen = () => {
   useFocusEffect(
     useCallback(() => {
       if (Platform.OS === 'ios') {
-        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+        // Add delay before locking orientation to prevent background glitches
+        const orientationTimer = setTimeout(() => {
+          ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+        }, 200); // Small delay to let the screen render properly
+        
+        // iOS-specific: Force a re-render to prevent background glitches
+        // This helps ensure the background is properly rendered when returning from player
+        const renderTimer = setTimeout(() => {
+          // Trigger a small state update to force re-render
+          setStreamsLoadStart(prev => prev);
+        }, 100);
+        
+        return () => {
+          clearTimeout(orientationTimer);
+          clearTimeout(renderTimer);
+        };
       }
       return () => {};
     }, [])
@@ -1509,43 +1537,6 @@ export const StreamsScreen = () => {
   const showStillFetching = streamsEmpty && loadElapsed >= 10000;
 
 
-  const renderItem = useCallback(({ item, index, section }: { item: any; index: number; section: any }) => {
-    // Handle empty sections due to quality filtering
-    if (item.isEmptyPlaceholder && section.isEmptyDueToQualityFilter) {
-      return (
-        <View style={styles.emptySectionContainer}>
-          <View style={styles.emptySectionContent}>
-            <MaterialIcons name="filter-list-off" size={32} color={colors.mediumEmphasis} />
-            <Text style={[styles.emptySectionTitle, { color: colors.mediumEmphasis }]}>
-              No streams available
-            </Text>
-            <Text style={[styles.emptySectionSubtitle, { color: colors.textMuted }]}>
-              All streams were filtered by your quality settings
-            </Text>
-          </View>
-        </View>
-      );
-    }
-
-    const stream = item as Stream;
-    // Don't show loading for individual streams that are already available and displayed
-    const isLoading = false; // If streams are being rendered, they're available and shouldn't be loading
-
-    return (
-      <View>
-        <StreamCard
-          stream={stream}
-          onPress={() => handleStreamPress(stream)}
-          index={index}
-          isLoading={isLoading}
-          statusMessage={undefined}
-          theme={currentTheme}
-          showLogos={settings.showScraperLogos}
-          scraperLogo={(stream.addonId && scraperLogos[stream.addonId]) || (stream as any).addon ? scraperLogoCache.get((stream.addonId || (stream as any).addon) as string) || null : null}
-        />
-      </View>
-    );
-  }, [handleStreamPress, currentTheme, settings.showScraperLogos, scraperLogos, colors.mediumEmphasis, colors.textMuted, styles.emptySectionContainer, styles.emptySectionContent, styles.emptySectionTitle, styles.emptySectionSubtitle]);
 
   const renderSectionHeader = useCallback(({ section }: { section: { title: string; addonId: string; isEmptyDueToQualityFilter?: boolean } }) => {
     const isProviderLoading = loadingProviders[section.addonId];
@@ -1777,37 +1768,84 @@ export const StreamsScreen = () => {
               </View>
             )}
             
-            <SectionList
-              sections={sections}
-              keyExtractor={(item, index) => {
-                if (item && item.url) {
-                  return item.url;
-                }
-                // For empty sections, use a special key
-                return `empty-${index}`;
-              }}
-              renderItem={renderItem}
-              renderSectionHeader={renderSectionHeader}
-              stickySectionHeadersEnabled={false}
-              initialNumToRender={6}
-              maxToRenderPerBatch={2}
-              windowSize={3}
-              removeClippedSubviews={true}
-              contentContainerStyle={styles.streamsContainer}
+            <ScrollView
               style={styles.streamsContent}
+              contentContainerStyle={[
+                styles.streamsContainer,
+                { paddingBottom: insets.bottom + 100 } // Add safe area + extra padding
+              ]}
               showsVerticalScrollIndicator={false}
               bounces={true}
               overScrollMode="never"
-              ListEmptyComponent={null}
-              ListFooterComponent={
-                (loadingStreams || loadingEpisodeStreams) && hasStremioStreamProviders ? (
-                  <View style={styles.footerLoading}>
-                    <ActivityIndicator size="small" color={colors.primary} />
-                    <Text style={styles.footerLoadingText}>Loading more sources...</Text>
-                  </View>
-                ) : null
-              }
-            />
+              // iOS-specific fixes for navigation transition glitches
+              {...(Platform.OS === 'ios' && {
+                // Ensure proper rendering during transitions
+                removeClippedSubviews: false, // Prevent iOS from clipping views during transitions
+                // Force hardware acceleration for smoother transitions
+                scrollEventThrottle: 16,
+              })}
+            >
+              {sections.map((section, sectionIndex) => (
+                <View key={section.addonId || sectionIndex}>
+                  {/* Section Header */}
+                  {renderSectionHeader({ section })}
+                  
+                  {/* Stream Cards using FlatList */}
+                  {section.data && section.data.length > 0 ? (
+                    <FlatList
+                      data={section.data}
+                      keyExtractor={(item, index) => {
+                        if (item && item.url) {
+                          return item.url;
+                        }
+                        return `empty-${sectionIndex}-${index}`;
+                      }}
+                      renderItem={({ item, index }) => (
+                        <View>
+                          <StreamCard
+                            stream={item}
+                            onPress={() => handleStreamPress(item)}
+                            index={index}
+                            isLoading={false}
+                            statusMessage={undefined}
+                            theme={currentTheme}
+                            showLogos={settings.showScraperLogos}
+                            scraperLogo={(item.addonId && scraperLogos[item.addonId]) || (item as any).addon ? scraperLogoCache.get((item.addonId || (item as any).addon) as string) || null : null}
+                          />
+                        </View>
+                      )}
+                      scrollEnabled={false}
+                      initialNumToRender={6}
+                      maxToRenderPerBatch={2}
+                      windowSize={3}
+                      removeClippedSubviews={true}
+                      showsVerticalScrollIndicator={false}
+                    />
+                  ) : (
+                    // Empty section placeholder
+                    <View style={styles.emptySectionContainer}>
+                      <View style={styles.emptySectionContent}>
+                        <MaterialIcons name="filter-list-off" size={32} color={colors.mediumEmphasis} />
+                        <Text style={[styles.emptySectionTitle, { color: colors.mediumEmphasis }]}>
+                          No streams available
+                        </Text>
+                        <Text style={[styles.emptySectionSubtitle, { color: colors.textMuted }]}>
+                          All streams were filtered by your quality settings
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+              ))}
+              
+              {/* Footer Loading */}
+              {(loadingStreams || loadingEpisodeStreams) && hasStremioStreamProviders && (
+                <View style={styles.footerLoading}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={styles.footerLoadingText}>Loading more sources...</Text>
+                </View>
+              )}
+            </ScrollView>
           </View>
         )}
       </View>
@@ -1820,6 +1858,15 @@ const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.darkBackground,
+    // iOS-specific fixes for navigation transition glitches
+    ...(Platform.OS === 'ios' && {
+      // Ensure the background is properly rendered during transitions
+      opacity: 1,
+      // Prevent iOS from trying to optimize the background during transitions
+      shouldRasterizeIOS: false,
+      // Ensure the view is properly composited
+      renderToHardwareTextureAndroid: false,
+    }),
   },
   backButtonContainer: {
     position: 'absolute',
@@ -1848,6 +1895,13 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.darkBackground,
     paddingTop: 12,
     zIndex: 1,
+    // iOS-specific fixes for navigation transition glitches
+    ...(Platform.OS === 'ios' && {
+      // Ensure proper rendering during transitions
+      opacity: 1,
+      // Prevent iOS optimization that can cause glitches
+      shouldRasterizeIOS: false,
+    }),
   },
   streamsMainContentMovie: {
     paddingTop: Platform.OS === 'android' ? 10 : 15,

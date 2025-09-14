@@ -363,7 +363,8 @@ const WatchProgressDisplay = memo(({
   animatedStyle,
   isWatched,
   isTrailerPlaying,
-  trailerMuted
+  trailerMuted,
+  trailerReady
 }: {
   watchProgress: { 
     currentTime: number; 
@@ -379,6 +380,7 @@ const WatchProgressDisplay = memo(({
   isWatched: boolean;
   isTrailerPlaying: boolean;
   trailerMuted: boolean;
+  trailerReady: boolean;
 }) => {
   const { currentTheme } = useTheme();
   const { isAuthenticated: isTraktAuthenticated, forceSyncTraktProgress } = useTraktContext();
@@ -589,8 +591,8 @@ const WatchProgressDisplay = memo(({
 
   if (!progressData) return null;
   
-  // Hide watch progress when trailer is playing AND unmuted
-  if (isTrailerPlaying && !trailerMuted) return null;
+  // Hide watch progress when trailer is playing AND unmuted AND trailer is ready
+  if (isTrailerPlaying && !trailerMuted && trailerReady) return null;
 
   const isCompleted = progressData.isWatched || progressData.progressPercent >= 85;
 
@@ -1488,6 +1490,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
             isWatched={isWatched}
             isTrailerPlaying={globalTrailerPlaying}
             trailerMuted={trailerMuted}
+            trailerReady={trailerReady}
           />
 
           {/* Optimized genre display with lazy loading */}

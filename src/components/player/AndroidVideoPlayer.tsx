@@ -79,6 +79,26 @@ const AndroidVideoPlayer: React.FC = () => {
   const isXprimeStream = streamProvider === 'xprime' || streamProvider === 'Xprime' || 
     (uri && /flutch.*\.workers\.dev|fsl\.fastcloud\.casa|xprime/i.test(uri));
 
+  // Check if the stream is HLS (m3u8 playlist)
+  const isHlsStream = (url: string) => {
+    return url.includes('.m3u8') || url.includes('m3u8') || 
+           url.includes('hls') || url.includes('playlist') ||
+           (currentVideoType && currentVideoType.toLowerCase() === 'm3u8');
+  };
+
+  // HLS-specific headers for better ExoPlayer compatibility
+  const getHlsHeaders = () => {
+    return {
+      'User-Agent': 'Mozilla/5.0 (Linux; Android 10; SM-G975F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36',
+      'Accept': 'application/vnd.apple.mpegurl, application/x-mpegurl, application/vnd.apple.mpegurl, video/mp2t, video/mp4, */*',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept-Encoding': 'identity',
+      'Connection': 'keep-alive',
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache'
+    } as any;
+  };
+
   // Xprime-specific headers for better compatibility (from local-scrapers-repo)
   const getXprimeHeaders = () => {
     if (!isXprimeStream) return {};
@@ -96,6 +116,24 @@ const AndroidVideoPlayer: React.FC = () => {
     } as any;
     logger.log('[AndroidVideoPlayer] Applying Xprime headers for stream:', uri);
     return xprimeHeaders;
+  };
+
+  // Get appropriate headers based on stream type
+  const getStreamHeaders = () => {
+    // For Xprime streams, be more flexible - only use HLS headers if it actually looks like HLS
+    if (isXprimeStream) {
+      if (isHlsStream(currentStreamUrl)) {
+        logger.log('[AndroidVideoPlayer] Xprime HLS stream detected, applying HLS headers');
+        return getXprimeHeaders();
+      } else {
+        logger.log('[AndroidVideoPlayer] Xprime MP4 stream detected, using default headers');
+        return Platform.OS === 'android' ? defaultAndroidHeaders() : defaultIosHeaders();
+      }
+    } else if (isHlsStream(currentStreamUrl)) {
+      logger.log('[AndroidVideoPlayer] Detected HLS stream, applying HLS headers');
+      return getHlsHeaders();
+    }
+    return Platform.OS === 'android' ? defaultAndroidHeaders() : defaultIosHeaders();
   };
 
   // Optional hint not yet in typed navigator params
@@ -1263,12 +1301,64 @@ const AndroidVideoPlayer: React.FC = () => {
         return; // Do not proceed to show error UI
       }
 
-      // If format unrecognized, try flipping between HLS and MP4 once
+      // If format unrecognized, try different approaches for HLS streams
       const isUnrecognized = !!(error?.error?.errorString && String(error.error.errorString).includes('UnrecognizedInputFormatException'));
       if (isUnrecognized && retryAttemptRef.current < 1) {
         retryAttemptRef.current = 1;
-        const nextType = currentVideoType === 'm3u8' ? 'mp4' : 'm3u8';
-        logger.warn(`[AndroidVideoPlayer] Format not recognized. Retrying with type='${nextType}'`);
+        
+        // Check if this might be an HLS stream that needs different handling
+        const mightBeHls = currentStreamUrl.includes('.m3u8') || currentStreamUrl.includes('playlist') || 
+                          currentStreamUrl.includes('hls') || currentStreamUrl.includes('stream');
+        
+        if (mightBeHls) {
+          logger.warn(`[AndroidVideoPlayer] HLS stream format not recognized. Retrying with explicit HLS type and headers`);
+          if (errorTimeoutRef.current) {
+            clearTimeout(errorTimeoutRef.current);
+            errorTimeoutRef.current = null;
+          }
+          safeSetState(() => setShowErrorModal(false));
+          setPaused(true);
+          setTimeout(() => {
+            if (!isMounted.current) return;
+            // Force HLS type and add cache-busting
+            setCurrentVideoType('m3u8');
+            const sep = currentStreamUrl.includes('?') ? '&' : '?';
+            setCurrentStreamUrl(`${currentStreamUrl}${sep}hls_retry=${Date.now()}`);
+            setPaused(false);
+          }, 120);
+          return;
+        } else {
+          // For non-HLS streams, try flipping between HLS and MP4
+          const nextType = currentVideoType === 'm3u8' ? 'mp4' : 'm3u8';
+          logger.warn(`[AndroidVideoPlayer] Format not recognized. Retrying with type='${nextType}'`);
+          if (errorTimeoutRef.current) {
+            clearTimeout(errorTimeoutRef.current);
+            errorTimeoutRef.current = null;
+          }
+          safeSetState(() => setShowErrorModal(false));
+          setPaused(true);
+          setTimeout(() => {
+            if (!isMounted.current) return;
+            setCurrentVideoType(nextType);
+            // Force re-mount of source by tweaking URL param
+            const sep = currentStreamUrl.includes('?') ? '&' : '?';
+            setCurrentStreamUrl(`${currentStreamUrl}${sep}rn_type_retry=${Date.now()}`);
+            setPaused(false);
+          }, 120);
+          return;
+        }
+      }
+
+      // Handle HLS manifest parsing errors (when content isn't actually M3U8)
+      const isManifestParseError = error?.error?.errorCode === '23002' ||
+                                   error?.errorCode === '23002' ||
+                                   (error?.error?.errorString &&
+                                    error.error.errorString.includes('ERROR_CODE_PARSING_MANIFEST_MALFORMED'));
+
+      if (isManifestParseError && retryAttemptRef.current < 2) {
+        retryAttemptRef.current = 2;
+        logger.warn('[AndroidVideoPlayer] HLS manifest parsing failed, likely not M3U8. Retrying as MP4');
+
         if (errorTimeoutRef.current) {
           clearTimeout(errorTimeoutRef.current);
           errorTimeoutRef.current = null;
@@ -1277,10 +1367,10 @@ const AndroidVideoPlayer: React.FC = () => {
         setPaused(true);
         setTimeout(() => {
           if (!isMounted.current) return;
-          setCurrentVideoType(nextType);
+          setCurrentVideoType('mp4');
           // Force re-mount of source by tweaking URL param
           const sep = currentStreamUrl.includes('?') ? '&' : '?';
-          setCurrentStreamUrl(`${currentStreamUrl}${sep}rn_type_retry=${Date.now()}`);
+          setCurrentStreamUrl(`${currentStreamUrl}${sep}manifest_fix_retry=${Date.now()}`);
           setPaused(false);
         }, 120);
         return;
@@ -2437,11 +2527,25 @@ const AndroidVideoPlayer: React.FC = () => {
                 <Video
                   ref={videoRef}
                   style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
-                  source={{ uri: currentStreamUrl, headers: getXprimeHeaders() || headers || (Platform.OS === 'android' ? defaultAndroidHeaders() : defaultIosHeaders()), type: (currentVideoType as any) }}
+                  source={{ 
+                    uri: currentStreamUrl, 
+                    headers: headers || getStreamHeaders(), 
+                    type: isHlsStream(currentStreamUrl) ? 'm3u8' : (currentVideoType as any)
+                  }}
                   paused={paused}
                   onLoadStart={() => {
                     loadStartAtRef.current = Date.now();
                     logger.log('[AndroidVideoPlayer] onLoadStart');
+                    
+                    // Log stream information for debugging
+                    const streamInfo = {
+                      url: currentStreamUrl,
+                      isHls: isHlsStream(currentStreamUrl),
+                      videoType: currentVideoType,
+                      headers: headers || getStreamHeaders(),
+                      provider: currentStreamProvider || streamProvider
+                    };
+                    logger.log('[AndroidVideoPlayer] Stream info:', streamInfo);
                   }}
                   onProgress={handleProgress}
                   onLoad={(e) => {
@@ -2487,6 +2591,13 @@ const AndroidVideoPlayer: React.FC = () => {
                   preferredForwardBufferDuration={1 as any}
                   allowsExternalPlayback={false as any}
                   preventsDisplaySleepDuringVideoPlayback={true as any}
+                  // ExoPlayer HLS optimization
+                  bufferConfig={{
+                    minBufferMs: 15000,
+                    maxBufferMs: 50000,
+                    bufferForPlaybackMs: 2500,
+                    bufferForPlaybackAfterRebufferMs: 5000,
+                  } as any}
                 />
               </TouchableOpacity>
             </View>

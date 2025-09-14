@@ -124,14 +124,50 @@ else
 fi
 echo ""
 
-# Try upload with extended timeout and retry logic
-max_retries=3
-retry_count=0
+# Upload with multiple strategies to handle server issues
+echo "🔄 Uploading with extended timeout..."
+echo "📊 File size: $(du -h ${timestamp}.zip | cut -f1)"
 
-while [ $retry_count -lt $max_retries ]; do
-  echo "🔄 Upload attempt $((retry_count + 1))/$max_retries..."
+# Strategy 1: Try with HTTP/2 disabled and longer timeouts
+echo "🔍 Attempt 1: HTTP/1.1 with extended timeout..."
+response=$(curl --http1.1 --max-time 600 --connect-timeout 60 -X POST $serverHost/api/upload \
+  -F "file=@${timestamp}.zip" \
+  -F "runtimeVersion=$runtimeVersion" \
+  -F "commitHash=$commitHash" \
+  -F "commitMessage=$commitMessage" \
+  ${RELEASE_NOTES:+-F "releaseNotes=$RELEASE_NOTES"} \
+  --write-out "HTTP_CODE:%{http_code}" \
+  --silent \
+  --show-error \
+  --retry 2 \
+  --retry-delay 5)
+
+# Extract HTTP code from response
+http_code=$(echo "$response" | grep -o "HTTP_CODE:[0-9]*" | cut -d: -f2)
+
+# Check if we got a valid HTTP code
+if [ -z "$http_code" ] || ! [[ "$http_code" =~ ^[0-9]+$ ]]; then
+  echo "❌ Failed to extract HTTP status code from response"
+  echo "Response: $response"
+  http_code="000"
+fi
+
+echo "HTTP Status: $http_code"
+
+if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+  echo ""
+  echo "✅ Successfully uploaded to $serverHost/api/upload"
+  # Extract the response body (everything before HTTP_CODE)
+  response_body=$(echo "$response" | sed 's/HTTP_CODE:[0-9]*$//')
+  if [ -n "$response_body" ]; then
+    echo "📦 Server response: $response_body"
+  fi
+else
+  echo "❌ Strategy 1 failed, trying alternative approach..."
   
-  response=$(curl --http1.1 --max-time 300 --connect-timeout 30 -X POST $serverHost/api/upload \
+  # Strategy 2: Try with different curl options
+  echo "🔍 Attempt 2: Alternative curl configuration..."
+  response=$(curl --http1.1 --max-time 900 --connect-timeout 120 -X POST $serverHost/api/upload \
     -F "file=@${timestamp}.zip" \
     -F "runtimeVersion=$runtimeVersion" \
     -F "commitHash=$commitHash" \
@@ -139,12 +175,13 @@ while [ $retry_count -lt $max_retries ]; do
     ${RELEASE_NOTES:+-F "releaseNotes=$RELEASE_NOTES"} \
     --write-out "HTTP_CODE:%{http_code}" \
     --silent \
-    --show-error)
+    --show-error \
+    --no-buffer \
+    --tcp-nodelay)
   
   # Extract HTTP code from response
   http_code=$(echo "$response" | grep -o "HTTP_CODE:[0-9]*" | cut -d: -f2)
   
-  # Check if we got a valid HTTP code
   if [ -z "$http_code" ] || ! [[ "$http_code" =~ ^[0-9]+$ ]]; then
     echo "❌ Failed to extract HTTP status code from response"
     echo "Response: $response"
@@ -156,28 +193,30 @@ while [ $retry_count -lt $max_retries ]; do
   if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
     echo ""
     echo "✅ Successfully uploaded to $serverHost/api/upload"
-    break
-  else
-    retry_count=$((retry_count + 1))
-    if [ $retry_count -lt $max_retries ]; then
-      echo "⚠️  Upload attempt $retry_count failed, retrying in 5 seconds..."
-      sleep 5
-    else
-      echo "❌ Error: Upload failed after $max_retries attempts"
-      echo "📊 Final HTTP Status: $http_code"
-      if [ "$http_code" = "524" ]; then
-        echo "💡 Error 524: Server timeout - try again later or check server capacity"
-      elif [ "$http_code" = "413" ]; then
-        echo "💡 Error 413: File too large - consider reducing bundle size"
-      elif [ "$http_code" = "500" ]; then
-        echo "💡 Error 500: Server error - check server logs"
-      else
-        echo "💡 Check server status and try again"
-      fi
-      exit 1
+    # Extract the response body (everything before HTTP_CODE)
+    response_body=$(echo "$response" | sed 's/HTTP_CODE:[0-9]*$//')
+    if [ -n "$response_body" ]; then
+      echo "📦 Server response: $response_body"
     fi
+  else
+    echo "❌ Error: All upload attempts failed"
+    echo "📊 Final HTTP Status: $http_code"
+    if [ "$http_code" = "524" ]; then
+      echo "💡 Error 524: Server timeout - try again later or check server capacity"
+    elif [ "$http_code" = "413" ]; then
+      echo "💡 Error 413: File too large - consider reducing bundle size"
+    elif [ "$http_code" = "500" ]; then
+      echo "💡 Error 500: Server error - check server logs"
+    elif [ "$http_code" = "502" ]; then
+      echo "💡 Error 502: Bad Gateway - server may be overloaded"
+      echo "💡 Try running the script again in a few minutes"
+      echo "💡 Or use manual curl: curl -X POST $serverHost/api/upload -F \"file=@${timestamp}.zip\" -F \"runtimeVersion=$runtimeVersion\" -F \"commitHash=$commitHash\" -F \"commitMessage=$commitMessage\""
+    else
+      echo "💡 Check server status and try again"
+    fi
+    exit 1
   fi
-done
+fi
 
 cd ..
 
