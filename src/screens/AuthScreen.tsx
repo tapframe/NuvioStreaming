@@ -173,6 +173,9 @@ const AuthScreen: React.FC = () => {
       const msg = mode === 'signin' ? 'Logged in successfully' : 'Sign up successful';
       toast.success(msg);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+
+      // Navigate to main tabs after successful authentication
+      navigation.reset({ index: 0, routes: [{ name: 'MainTabs' as never }] } as any);
     }
     setLoading(false);
   };
