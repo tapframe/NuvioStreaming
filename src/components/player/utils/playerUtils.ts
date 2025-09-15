@@ -5,7 +5,7 @@ import { SubtitleCue } from './playerTypes';
 // Debug flag - set back to false to disable verbose logging
 // WARNING: Setting this to true currently causes infinite render loops
 // Use selective logging instead if debugging is needed
-export const DEBUG_MODE = false;
+export const DEBUG_MODE = true;
 
 // Safer debug function that won't cause render loops
 // Call this with any debugging info you need instead of using inline DEBUG_MODE checks
@@ -93,6 +93,14 @@ export const formatLanguage = (code?: string): string => {
 export const getTrackDisplayName = (track: { name?: string, id: number, language?: string }): string => {
   if (!track) return 'Unknown Track';
 
+  // If no name, use track number
+  if (!track.name) return `Track ${track.id}`;
+
+  // If the name is already well-formatted (contains • separators), use it as-is
+  if (track.name.includes('•')) {
+    return track.name;
+  }
+
   // If we have a language field, use that for better display
   if (track.language && track.language !== 'Unknown') {
     const formattedLanguage = formatLanguage(track.language);
@@ -100,9 +108,6 @@ export const getTrackDisplayName = (track: { name?: string, id: number, language
       return formattedLanguage;
     }
   }
-
-  // If no name, use track number
-  if (!track.name) return `Track ${track.id}`;
 
   // Try to extract language from name like "Some Info - [English]"
   const languageMatch = track.name.match(/\[(.*?)\]/);

@@ -165,16 +165,19 @@ const PlayerSettingsScreen: React.FC = () => {
             size={24}
             color={currentTheme.colors.text}
           />
+          <Text style={[styles.backText, { color: currentTheme.colors.text }]}>
+            Settings
+          </Text>
         </TouchableOpacity>
-        <Text
-          style={[
-            styles.headerTitle,
-            { color: currentTheme.colors.text },
-          ]}
-        >
-          Video Player
-        </Text>
+        
+        <View style={styles.headerActions}>
+          {/* Empty for now, but ready for future actions */}
+        </View>
       </View>
+      
+      <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
+        Video Player
+      </Text>
 
       <ScrollView 
         style={styles.scrollView}
@@ -327,18 +330,32 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 16 : 16,
-    paddingBottom: 8,
+    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 8 : 8,
   },
   backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 8,
-    marginRight: 16,
-    borderRadius: 20,
+  },
+  backText: {
+    fontSize: 17,
+    marginLeft: 8,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerButton: {
+    padding: 8,
+    marginLeft: 8,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 34,
+    fontWeight: 'bold',
+    paddingHorizontal: 16,
+    marginBottom: 24,
   },
   scrollView: {
     flex: 1,

@@ -80,18 +80,34 @@ const createStyles = (colors: any) => StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 16,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 16 : 16,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 8 : 8,
     backgroundColor: colors.darkBackground,
   },
   backButton: {
-    padding: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+  },
+  backText: {
+    fontSize: 17,
+    marginLeft: 8,
+    color: colors.white,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerButton: {
+    padding: 8,
+    marginLeft: 8,
   },
   headerTitle: {
-    fontSize: 22,
-    fontWeight: '600',
-    marginLeft: 16,
+    fontSize: 34,
+    fontWeight: 'bold',
+    paddingHorizontal: 16,
+    marginBottom: 24,
     color: colors.white,
   },
   headerRight: {
@@ -685,9 +701,15 @@ const LogoSourceSettings = () => {
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <MaterialIcons name="arrow-back" size={24} color={colors.white} />
+            <Text style={styles.backText}>Settings</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Logo Source</Text>
+          
+          <View style={styles.headerActions}>
+            {/* Empty for now, but ready for future actions */}
+          </View>
         </View>
+        
+        <Text style={styles.headerTitle}>Logo Source</Text>
         
         <ScrollView 
           style={styles.scrollView}

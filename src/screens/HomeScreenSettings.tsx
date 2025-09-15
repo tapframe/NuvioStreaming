@@ -264,11 +264,19 @@ const HomeScreenSettings: React.FC = () => {
             size={24} 
             color={isDarkMode ? colors.highEmphasis : colors.textDark} 
           />
+          <Text style={[styles.backText, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
+            Settings
+          </Text>
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
-          Home Screen Settings
-        </Text>
+        
+        <View style={styles.headerActions}>
+          {/* Empty for now, but ready for future actions */}
+        </View>
       </View>
+      
+      <Text style={[styles.headerTitle, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
+        Home Screen Settings
+      </Text>
 
       {/* Saved indicator */}
       <Animated.View 
@@ -426,18 +434,32 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 12 : 8,
+    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 8 : 8,
   },
   backButton: {
-    marginRight: 16,
-    padding: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+  },
+  backText: {
+    fontSize: 17,
+    marginLeft: 8,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerButton: {
+    padding: 8,
+    marginLeft: 8,
   },
   headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontSize: 34,
+    fontWeight: 'bold',
+    paddingHorizontal: 16,
+    marginBottom: 24,
   },
   scrollView: {
     flex: 1,

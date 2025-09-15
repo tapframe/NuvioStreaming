@@ -12,6 +12,7 @@ import {
   Dimensions,
   StatusBar,
   FlatList,
+  SafeAreaView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -438,41 +439,50 @@ const ThemeScreen: React.FC = () => {
     };
 
     return (
-      <View style={[
+      <SafeAreaView style={[
         styles.container, 
         { 
           backgroundColor: currentTheme.colors.darkBackground,
-          paddingTop: insets.top,
-          paddingBottom: insets.bottom,
         }
       ]}>
+        <StatusBar barStyle="light-content" />
         <ThemeColorEditor
           initialColors={initialColors}
           onSave={handleSaveTheme}
           onCancel={handleCancelEdit}
         />
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={[
+    <SafeAreaView style={[
       styles.container, 
       { 
         backgroundColor: currentTheme.colors.darkBackground,
-        paddingTop: insets.top,
-        paddingBottom: insets.bottom,
       }
     ]}>
+      <StatusBar barStyle="light-content" />
+      
       <View style={styles.header}>
         <TouchableOpacity 
-          style={[styles.backButton, styles.buttonShadow]}
+          style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
           <MaterialIcons name="arrow-back" size={24} color={currentTheme.colors.text} />
+          <Text style={[styles.backText, { color: currentTheme.colors.text }]}>
+            Settings
+          </Text>
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>App Themes</Text>
+        
+        <View style={styles.headerActions}>
+          {/* Empty for now, but ready for future actions */}
+        </View>
       </View>
+      
+      <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
+        App Themes
+      </Text>
       
       {/* Category filter */}
       <View style={styles.filterContainer}>
@@ -543,7 +553,7 @@ const ThemeScreen: React.FC = () => {
           />
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -554,18 +564,32 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 0 + 8 : 8,
   },
   backButton: {
-    padding: 6,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+  },
+  backText: {
+    fontSize: 17,
+    marginLeft: 8,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerButton: {
+    padding: 8,
+    marginLeft: 8,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 34,
     fontWeight: 'bold',
-    marginLeft: 12,
+    paddingHorizontal: 16,
+    marginBottom: 24,
   },
   content: {
     flex: 1,

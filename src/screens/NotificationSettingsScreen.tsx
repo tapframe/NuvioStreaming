@@ -218,16 +218,25 @@ const NotificationSettingsScreen = () => {
     <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
       <StatusBar barStyle="light-content" />
       
-      <View style={[styles.header, { borderBottomColor: currentTheme.colors.border }]}>
+      <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
           <MaterialIcons name="arrow-back" size={24} color={currentTheme.colors.text} />
+          <Text style={[styles.backText, { color: currentTheme.colors.text }]}>
+            Settings
+          </Text>
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>Notification Settings</Text>
-        <View style={{ width: 40 }} />
+        
+        <View style={styles.headerActions}>
+          {/* Empty for now, but ready for future actions */}
+        </View>
       </View>
+      
+      <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
+        Notification Settings
+      </Text>
       
       <ScrollView style={styles.content}>
         <Animated.View 
@@ -455,16 +464,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 12 : 12,
-    borderBottomWidth: 1,
+    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 8 : 8,
   },
   backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 8,
   },
+  backText: {
+    fontSize: 17,
+    marginLeft: 8,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerButton: {
+    padding: 8,
+    marginLeft: 8,
+  },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 34,
     fontWeight: 'bold',
+    paddingHorizontal: 16,
+    marginBottom: 24,
   },
   content: {
     flex: 1,

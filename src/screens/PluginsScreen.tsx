@@ -36,15 +36,24 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingTop: Platform.OS === 'ios' ? 44 : ANDROID_STATUSBAR_HEIGHT + 16,
-      paddingBottom: 16,
-    },
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 8 : 8,
+  },
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 8,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerButton: {
+    padding: 8,
+    marginLeft: 8,
   },
   backText: {
     fontSize: 17,
@@ -471,16 +480,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.white,
     fontSize: 14,
     fontWeight: '500',
-  },
-  helpButton: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 44 : ANDROID_STATUSBAR_HEIGHT + 16,
-    right: 16,
-    backgroundColor: 'transparent',
-    borderRadius: 20,
-    padding: 8,
-    borderWidth: 1,
-    borderColor: colors.elevation3,
   },
   modalOverlay: {
     flex: 1,
@@ -1163,11 +1162,8 @@ const PluginsScreen: React.FC = () => {
 
 
   return (
-    <View style={styles.container}>
-      <StatusBar
-        barStyle={Platform.OS === 'ios' ? 'light-content' : 'light-content'}
-        backgroundColor={colors.background}
-      />
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" />
       
       {/* Header */}
       <View style={styles.header}>
@@ -1179,13 +1175,15 @@ const PluginsScreen: React.FC = () => {
           <Text style={styles.backText}>Settings</Text>
         </TouchableOpacity>
         
-        {/* Help Button */}
-        <TouchableOpacity
-          style={styles.helpButton}
-          onPress={() => setShowHelpModal(true)}
-        >
-          <Ionicons name="help-circle-outline" size={20} color={colors.primary} />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          {/* Help Button */}
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => setShowHelpModal(true)}
+          >
+            <Ionicons name="help-circle-outline" size={20} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
       </View>
       
       <Text style={styles.headerTitle}>Plugins</Text>
@@ -1769,7 +1767,7 @@ const PluginsScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
 

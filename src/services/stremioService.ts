@@ -200,7 +200,10 @@ class StremioService {
     
     try {
       const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
-      const storedAddons = await AsyncStorage.getItem(`@user:${scope}:${this.STORAGE_KEY}`);
+      // Prefer scoped storage, but fall back to legacy keys to preserve older installs
+      let storedAddons = await AsyncStorage.getItem(`@user:${scope}:${this.STORAGE_KEY}`);
+      if (!storedAddons) storedAddons = await AsyncStorage.getItem(this.STORAGE_KEY);
+      if (!storedAddons) storedAddons = await AsyncStorage.getItem(`@user:local:${this.STORAGE_KEY}`);
       
       if (storedAddons) {
         const parsed = JSON.parse(storedAddons);
@@ -375,7 +378,11 @@ class StremioService {
     try {
       const addonsArray = Array.from(this.installedAddons.values());
       const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
-      await AsyncStorage.setItem(`@user:${scope}:${this.STORAGE_KEY}`, JSON.stringify(addonsArray));
+      // Write to both scoped and legacy keys for compatibility
+      await Promise.all([
+        AsyncStorage.setItem(`@user:${scope}:${this.STORAGE_KEY}`, JSON.stringify(addonsArray)),
+        AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(addonsArray)),
+      ]);
     } catch (error) {
       // Continue even if save fails
     }

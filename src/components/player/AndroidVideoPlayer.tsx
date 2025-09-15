@@ -271,6 +271,8 @@ const AndroidVideoPlayer: React.FC = () => {
   const [currentQuality, setCurrentQuality] = useState<string | undefined>(quality);
   const [currentStreamProvider, setCurrentStreamProvider] = useState<string | undefined>(streamProvider);
   const [currentStreamName, setCurrentStreamName] = useState<string | undefined>(streamName);
+  const [lastAudioTrackCheck, setLastAudioTrackCheck] = useState<number>(0);
+  const [audioTrackFallbackAttempts, setAudioTrackFallbackAttempts] = useState<number>(0);
   const isMounted = useRef(true);
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null);
   const [isSyncingBeforeClose, setIsSyncingBeforeClose] = useState(false);
@@ -961,6 +963,54 @@ const AndroidVideoPlayer: React.FC = () => {
       const bufferedTime = data.playableDuration || currentTimeInSeconds;
       safeSetState(() => setBuffered(bufferedTime));
     }
+    
+    // Periodic check for disabled audio track (every 3 seconds, max 3 attempts)
+    const now = Date.now();
+    if (now - lastAudioTrackCheck > 3000 && !paused && duration > 0 && audioTrackFallbackAttempts < 3) {
+      setLastAudioTrackCheck(now);
+      
+      // Check if audio track is disabled (-1) and we have available tracks
+      if (selectedAudioTrack === -1 && rnVideoAudioTracks.length > 1) {
+        logger.warn('[AndroidVideoPlayer] Detected disabled audio track, attempting fallback');
+        
+        // Find a fallback audio track (prefer stereo/standard formats)
+        const fallbackTrack = rnVideoAudioTracks.find((track, index) => {
+          const trackName = (track.name || '').toLowerCase();
+          const trackLang = (track.language || '').toLowerCase();
+          // Prefer stereo, AAC, or standard audio formats, avoid heavy codecs
+          return !trackName.includes('truehd') && 
+                 !trackName.includes('dts') && 
+                 !trackName.includes('dolby') &&
+                 !trackName.includes('atmos') &&
+                 !trackName.includes('7.1') &&
+                 !trackName.includes('5.1') &&
+                 index !== selectedAudioTrack; // Don't select the same track
+        });
+        
+        if (fallbackTrack) {
+          const fallbackIndex = rnVideoAudioTracks.indexOf(fallbackTrack);
+          logger.warn(`[AndroidVideoPlayer] Switching to fallback audio track: ${fallbackTrack.name || 'Unknown'} (index: ${fallbackIndex})`);
+          
+          // Increment fallback attempts counter
+          setAudioTrackFallbackAttempts(prev => prev + 1);
+          
+          // Switch to fallback audio track
+          setSelectedAudioTrack(fallbackIndex);
+          
+          // Brief pause to allow track switching
+          setPaused(true);
+          setTimeout(() => {
+            if (isMounted.current) {
+              setPaused(false);
+            }
+          }, 500);
+        } else {
+          logger.warn('[AndroidVideoPlayer] No suitable fallback audio track found');
+          // Increment attempts even if no fallback found to prevent infinite checking
+          setAudioTrackFallbackAttempts(prev => prev + 1);
+        }
+      }
+    }
   };
 
   const onLoad = (data: any) => {
@@ -1003,13 +1053,132 @@ const AndroidVideoPlayer: React.FC = () => {
 
       // Handle audio tracks
       if (data.audioTracks && data.audioTracks.length > 0) {
+        // Enhanced debug logging to see all available fields
+        if (DEBUG_MODE) {
+          logger.log(`[AndroidVideoPlayer] Raw audio tracks data:`, data.audioTracks);
+          data.audioTracks.forEach((track: any, idx: number) => {
+            logger.log(`[AndroidVideoPlayer] Track ${idx} raw data:`, {
+              index: track.index,
+              title: track.title,
+              language: track.language,
+              type: track.type,
+              channels: track.channels,
+              bitrate: track.bitrate,
+              codec: track.codec,
+              sampleRate: track.sampleRate,
+              name: track.name,
+              label: track.label,
+              allKeys: Object.keys(track),
+              fullTrackObject: track
+            });
+          });
+        }
+        
         const formattedAudioTracks = data.audioTracks.map((track: any, index: number) => {
           const trackIndex = track.index !== undefined ? track.index : index;
-          const trackName = track.title || track.language || `Audio ${index + 1}`;
-          const trackLanguage = track.language || 'Unknown';
+          
+          // Build comprehensive track name from available fields
+          let trackName = '';
+          const parts = [];
+          
+          // Add language if available (try multiple possible fields)
+          let language = track.language || track.lang || track.languageCode;
+          
+          // If no language field, try to extract from track name (e.g., "[Russian]", "[English]")
+          if ((!language || language === 'Unknown' || language === 'und' || language === '') && track.name) {
+            const languageMatch = track.name.match(/\[([^\]]+)\]/);
+            if (languageMatch && languageMatch[1]) {
+              language = languageMatch[1].trim();
+            }
+          }
+          
+          if (language && language !== 'Unknown' && language !== 'und' && language !== '') {
+            parts.push(language.toUpperCase());
+          }
+          
+          // Add codec information if available (try multiple possible fields)
+          const codec = track.type || track.codec || track.format;
+          if (codec && codec !== 'Unknown') {
+            parts.push(codec.toUpperCase());
+          }
+          
+          // Add channel information if available
+          const channels = track.channels || track.channelCount;
+          if (channels && channels > 0) {
+            if (channels === 1) {
+              parts.push('MONO');
+            } else if (channels === 2) {
+              parts.push('STEREO');
+            } else if (channels === 6) {
+              parts.push('5.1CH');
+            } else if (channels === 8) {
+              parts.push('7.1CH');
+            } else {
+              parts.push(`${channels}CH`);
+            }
+          }
+          
+          // Add bitrate if available
+          const bitrate = track.bitrate || track.bitRate;
+          if (bitrate && bitrate > 0) {
+            parts.push(`${Math.round(bitrate / 1000)}kbps`);
+          }
+          
+          // Add sample rate if available
+          const sampleRate = track.sampleRate || track.sample_rate;
+          if (sampleRate && sampleRate > 0) {
+            parts.push(`${Math.round(sampleRate / 1000)}kHz`);
+          }
+          
+          // Add title if available and not generic
+          let title = track.title || track.name || track.label;
+          if (title && !title.match(/^(Audio|Track)\s*\d*$/i) && title !== 'Unknown') {
+            // Clean up title by removing language brackets and trailing punctuation
+            title = title.replace(/\s*\[[^\]]+\]\s*[-–—]*\s*$/, '').trim();
+            if (title && title !== 'Unknown') {
+              parts.push(title);
+            }
+          }
+          
+          // Combine parts or fallback to generic name
+          if (parts.length > 0) {
+            trackName = parts.join(' • ');
+          } else {
+            // For simple track names like "Track 1", "Audio 1", etc., use them as-is
+            const simpleName = track.name || track.title || track.label;
+            if (simpleName && simpleName.match(/^(Track|Audio)\s*\d*$/i)) {
+              trackName = simpleName;
+            } else {
+              // Try to extract any meaningful info from the track object
+              const meaningfulFields: string[] = [];
+              Object.keys(track).forEach(key => {
+                const value = track[key];
+                if (value && typeof value === 'string' && value !== 'Unknown' && value !== 'und' && value.length > 1) {
+                  meaningfulFields.push(`${key}: ${value}`);
+                }
+              });
+              
+              if (meaningfulFields.length > 0) {
+                trackName = `Audio ${index + 1} (${meaningfulFields.slice(0, 2).join(', ')})`;
+              } else {
+                trackName = `Audio ${index + 1}`;
+              }
+            }
+          }
+          
+          const trackLanguage = language || 'Unknown';
           
           if (DEBUG_MODE) {
-            logger.log(`[AndroidVideoPlayer] Audio track ${index}: index=${trackIndex}, name="${trackName}", language="${trackLanguage}"`);
+            logger.log(`[AndroidVideoPlayer] Processed track ${index}:`, {
+              index: trackIndex,
+              name: trackName,
+              language: trackLanguage,
+              parts: parts,
+              meaningfulFields: Object.keys(track).filter(key => {
+                const value = track[key];
+                return value && typeof value === 'string' && value !== 'Unknown' && value !== 'und' && value.length > 1;
+              })
+            });
           }
           
           return {
@@ -1020,12 +1189,24 @@ const AndroidVideoPlayer: React.FC = () => {
         });
         setRnVideoAudioTracks(formattedAudioTracks);
         
-        // Auto-select the first audio track if none is selected
+        // Auto-select English audio track if available, otherwise first track
         if (selectedAudioTrack === null && formattedAudioTracks.length > 0) {
-          const firstTrack = formattedAudioTracks[0];
-          setSelectedAudioTrack(firstTrack.id);
+          // Look for English track first
+          const englishTrack = formattedAudioTracks.find((track: {id: number, name: string, language?: string}) => {
+            const lang = (track.language || '').toLowerCase();
+            return lang === 'english' || lang === 'en' || lang === 'eng' || 
+                   (track.name && track.name.toLowerCase().includes('english'));
+          });
+          
+          const selectedTrack = englishTrack || formattedAudioTracks[0];
+          setSelectedAudioTrack(selectedTrack.id);
+          
           if (DEBUG_MODE) {
-            logger.log(`[AndroidVideoPlayer] Auto-selected first audio track: ${firstTrack.name} (ID: ${firstTrack.id})`);
+            if (englishTrack) {
+              logger.log(`[AndroidVideoPlayer] Auto-selected English audio track: ${selectedTrack.name} (ID: ${selectedTrack.id})`);
+            } else {
+              logger.log(`[AndroidVideoPlayer] No English track found, auto-selected first audio track: ${selectedTrack.name} (ID: ${selectedTrack.id})`);
+            }
           }
         }
         
@@ -1046,6 +1227,10 @@ const AndroidVideoPlayer: React.FC = () => {
 
       setIsVideoLoaded(true);
       setIsPlayerReady(true);
+      
+      // Reset audio track fallback attempts when new video loads
+      setAudioTrackFallbackAttempts(0);
+      setLastAudioTrackCheck(0);
       
       // Start Trakt watching session when video loads with proper duration
       if (videoDuration > 0) {
@@ -1245,27 +1430,33 @@ const AndroidVideoPlayer: React.FC = () => {
         return;
       }
       
-      // Check for Dolby Digital Plus audio codec errors (ExoPlayer)
-      const isDolbyCodecError = error?.error?.errorCode === '24001' ||
-                               error?.errorCode === '24001' ||
-                               (error?.error?.errorString && 
-                                error.error.errorString.includes('ERROR_CODE_DECODER_INIT_FAILED')) ||
-                               (error?.error?.errorException && 
-                                error.error.errorException.includes('audio/eac3')) ||
-                               (error?.error?.errorException && 
-                                error.error.errorException.includes('Dolby Digital Plus'));
+      // Check for audio codec errors (TrueHD, DTS, Dolby, etc.)
+      const isAudioCodecError = 
+        error?.error?.errorCode === '24001' ||
+        error?.errorCode === '24001' ||
+        (error?.error?.errorString && 
+         error.error.errorString.includes('ERROR_CODE_DECODER_INIT_FAILED')) ||
+        (error?.error?.errorException && 
+         error.error.errorException.includes('audio/eac3')) ||
+        (error?.error?.errorException && 
+         error.error.errorException.includes('Dolby Digital Plus')) ||
+        (error?.message && /(trhd|truehd|true\s?hd|dts|dolby|atmos|e-ac3|ac3)/i.test(error.message)) ||
+        (error?.error?.message && /(trhd|truehd|true\s?hd|dts|dolby|atmos|e-ac3|ac3)/i.test(error.error.message)) ||
+        (error?.title && /codec not supported/i.test(error.title));
       
-      // Handle Dolby Digital Plus codec errors with audio track fallback
-      if (isDolbyCodecError && rnVideoAudioTracks.length > 1) {
-        logger.warn('[AndroidVideoPlayer] Dolby Digital Plus codec error detected, attempting audio track fallback');
+      // Handle audio codec errors with automatic fallback
+      if (isAudioCodecError && rnVideoAudioTracks.length > 1) {
+        logger.warn('[AndroidVideoPlayer] Audio codec error detected, attempting audio track fallback');
         
-        // Find a non-Dolby audio track (usually index 0 is stereo/standard)
+        // Find a fallback audio track (prefer stereo/standard formats)
         const fallbackTrack = rnVideoAudioTracks.find((track, index) => {
           const trackName = (track.name || '').toLowerCase();
           const trackLang = (track.language || '').toLowerCase();
-          // Prefer stereo, AAC, or standard audio formats
-          return !trackName.includes('dolby') && 
+          // Prefer stereo, AAC, or standard audio formats, avoid heavy codecs
+          return !trackName.includes('truehd') && 
                  !trackName.includes('dts') && 
+                 !trackName.includes('dolby') &&
+                 !trackName.includes('atmos') &&
                  !trackName.includes('7.1') &&
                  !trackName.includes('5.1') &&
                  index !== selectedAudioTrack; // Don't select the same track
@@ -1415,8 +1606,8 @@ const AndroidVideoPlayer: React.FC = () => {
       // Format error details for user display
       let errorMessage = 'An unknown error occurred';
       if (error) {
-        if (isDolbyCodecError) {
-          errorMessage = 'Audio codec compatibility issue detected. The video contains Dolby Digital Plus audio which is not supported on this device. Please try selecting a different audio track or use an alternative video source.';
+        if (isAudioCodecError) {
+          errorMessage = 'Audio codec compatibility issue detected. The video contains unsupported audio codec (TrueHD/DTS/Dolby). Please try selecting a different audio track or use an alternative video source.';
         } else if (isHeavyCodecDecoderError) {
           errorMessage = 'Audio codec issue (DTS/TrueHD/Atmos). Switching to a stereo/standard audio track may help.';
         } else if (isServerConfigError) {

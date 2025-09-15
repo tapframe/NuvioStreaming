@@ -114,32 +114,34 @@ const AISettingsScreen: React.FC = () => {
     Linking.openURL('https://openrouter.ai/keys');
   };
 
-  const headerBaseHeight = Platform.OS === 'android' ? 80 : 60;
-  const topSpacing = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top;
-  const headerHeight = headerBaseHeight + topSpacing;
-
   return (
-    <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
       <StatusBar barStyle="light-content" />
       
       {/* Header */}
-      <View style={[styles.header, { height: headerHeight, paddingTop: topSpacing }]}>
-        <View style={styles.headerContent}>
-          <TouchableOpacity 
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-          >
-            <MaterialIcons 
-              name="arrow-back" 
-              size={24} 
-              color={currentTheme.colors.text} 
-            />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
-            AI Assistant
+      <View style={styles.header}>
+        <TouchableOpacity 
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          <MaterialIcons 
+            name="arrow-back" 
+            size={24} 
+            color={currentTheme.colors.text} 
+          />
+          <Text style={[styles.backText, { color: currentTheme.colors.text }]}>
+            Settings
           </Text>
+        </TouchableOpacity>
+        
+        <View style={styles.headerActions}>
+          {/* Empty for now, but ready for future actions */}
         </View>
       </View>
+      
+      <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
+        AI Assistant
+      </Text>
 
       <ScrollView 
         style={styles.scrollView}
@@ -342,7 +344,7 @@ const AISettingsScreen: React.FC = () => {
           <SvgXml xml={OPENROUTER_SVG.replace(/CURRENTCOLOR/g, currentTheme.colors.mediumEmphasis)} width={180} height={60} />
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -351,33 +353,45 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: Math.max(16, width * 0.05),
-    justifyContent: 'flex-end',
-    paddingBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 8 : 8,
   },
-  headerContent: {
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+  },
+  backText: {
+    fontSize: 17,
+    marginLeft: 8,
+  },
+  headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  backButton: {
-    marginRight: 16,
+  headerButton: {
     padding: 8,
+    marginLeft: 8,
   },
   headerTitle: {
-    fontSize: Math.min(28, width * 0.07),
-    fontWeight: '800',
-    letterSpacing: 0.3,
+    fontSize: 34,
+    fontWeight: 'bold',
+    paddingHorizontal: 20,
+    marginBottom: 24,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: Math.max(16, width * 0.05),
     paddingBottom: 40,
   },
   infoCard: {
     borderRadius: 16,
     padding: 20,
+    marginHorizontal: 16,
     marginBottom: 20,
   },
   infoHeader: {
@@ -410,6 +424,7 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 16,
     padding: 20,
+    marginHorizontal: 16,
     marginBottom: 20,
   },
   cardTitle: {

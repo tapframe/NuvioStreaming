@@ -274,30 +274,34 @@ const UpdateScreen: React.FC = () => {
     }
   };
 
-  const headerBaseHeight = Platform.OS === 'android' ? 80 : 60;
-  const topSpacing = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top;
-  const headerHeight = headerBaseHeight + topSpacing;
 
   return (
-    <View style={[
+    <SafeAreaView style={[
       styles.container,
       { backgroundColor: currentTheme.colors.darkBackground }
     ]}>
-      <StatusBar barStyle={'light-content'} />
-      <View style={{ flex: 1 }}>
-        <View style={[styles.header, { height: headerHeight, paddingTop: topSpacing }]}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons name="arrow-back" size={24} color={currentTheme.colors.highEmphasis} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
-            App Updates
+      <StatusBar barStyle="light-content" />
+      
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.7}
+        >
+          <MaterialIcons name="arrow-back" size={24} color={currentTheme.colors.highEmphasis} />
+          <Text style={[styles.backText, { color: currentTheme.colors.highEmphasis }]}>
+            Settings
           </Text>
-          <View style={styles.headerSpacer} />
+        </TouchableOpacity>
+        
+        <View style={styles.headerActions}>
+          {/* Empty for now, but ready for future actions */}
         </View>
+      </View>
+      
+      <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
+        App Updates
+      </Text>
 
         <View style={styles.contentContainer}>
           <ScrollView 
@@ -547,8 +551,7 @@ const UpdateScreen: React.FC = () => {
             )}
           </ScrollView>
         </View>
-      </View>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -557,27 +560,34 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: Math.max(12, width * 0.04),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: 8,
-    backgroundColor: 'transparent',
-    zIndex: 2,
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 8 : 8,
   },
   backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 8,
-    marginLeft: -8,
+  },
+  backText: {
+    fontSize: 17,
+    marginLeft: 8,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerButton: {
+    padding: 8,
+    marginLeft: 8,
   },
   headerTitle: {
-    fontSize: Math.min(24, width * 0.06),
-    fontWeight: '800',
-    letterSpacing: 0.3,
-    flex: 1,
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 40, // Same width as back button to center the title
+    fontSize: 34,
+    fontWeight: 'bold',
+    paddingHorizontal: 16,
+    marginBottom: 24,
   },
   contentContainer: {
     flex: 1,

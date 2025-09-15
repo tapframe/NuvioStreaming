@@ -292,7 +292,7 @@ class SyncService {
         migrations.push(moveKey('app_settings', `@user:${userId}:app_settings`));
       } else if (k === '@user:local:app_settings') {
         migrations.push(moveKey(k, `@user:${userId}:app_settings`));
-      } else if (k === '@user:local:stremio-addons') {
+      } else if (k === '@user:local:stremio-addons' || k === 'stremio-addons') {
         migrations.push(moveKey(k, `@user:${userId}:stremio-addons`));
       } else if (k === '@user:local:stremio-addon-order') {
         migrations.push(moveKey(k, `@user:${userId}:stremio-addon-order`));
