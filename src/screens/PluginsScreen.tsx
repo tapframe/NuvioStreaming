@@ -705,26 +705,36 @@ const StatusBadge: React.FC<{
   const getStatusConfig = () => {
     switch (status) {
       case 'enabled':
-        return { color: '#34C759', text: 'Active', icon: 'checkmark-circle' };
+        return { color: '#34C759', text: 'Active' };
       case 'disabled':
-        return { color: colors.mediumGray, text: 'Disabled', icon: 'close-circle' };
+        return { color: colors.mediumGray, text: 'Disabled' };
       case 'available':
-        return { color: colors.primary, text: 'Available', icon: 'download' };
+        return { color: colors.primary, text: 'Available' };
       case 'platform-disabled':
-        return { color: '#FF9500', text: 'Platform Disabled', icon: 'phone-portrait' };
+        return { color: '#FF9500', text: 'Platform Disabled' };
       case 'error':
-        return { color: '#FF3B30', text: 'Error', icon: 'warning' };
+        return { color: '#FF3B30', text: 'Error' };
       default:
-        return { color: colors.mediumGray, text: 'Unknown', icon: 'help-circle' };
+        return { color: colors.mediumGray, text: 'Unknown' };
     }
   };
 
   const config = getStatusConfig();
   
   return (
-    <View style={[{ backgroundColor: config.color, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, gap: 4 }]}>
-      <Ionicons name={config.icon as any} size={12} color="white" />
-      <Text style={{ color: 'white', fontSize: 11, fontWeight: '600' }}>{config.text}</Text>
+    <View style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 10,
+      paddingVertical: 3,
+      borderRadius: 9999,
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: config.color,
+      gap: 6,
+    }}>
+      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: config.color }} />
+      <Text style={{ color: config.color, fontSize: 11, fontWeight: '600' }}>{config.text}</Text>
     </View>
   );
 };
@@ -874,7 +884,7 @@ const PluginsScreen: React.FC = () => {
       setShowAddRepositoryModal(false);
       Alert.alert('Success', 'Repository added and refreshed successfully');
     } catch (error) {
-      logger.error('[ScraperSettings] Failed to add repository:', error);
+      logger.error('[PluginsScreen] Failed to add repository:', error);
       Alert.alert('Error', 'Failed to add repository');
     } finally {
       setIsLoading(false);
@@ -1447,7 +1457,7 @@ const PluginsScreen: React.FC = () => {
                       <View style={styles.scraperLogo} />
                     )}
                     <View style={styles.scraperCardInfo}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4, gap: 8 }}>
                         <Text style={styles.scraperName}>{scraper.name}</Text>
                         <StatusBadge status={getScraperStatus(scraper)} colors={colors} />
                                </View>

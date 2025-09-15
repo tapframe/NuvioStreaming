@@ -455,6 +455,7 @@ export const StreamsScreen = () => {
     imdbId,
     scraperStatuses,
     activeFetchingScrapers,
+    addonResponseOrder,
   } = useMetadata({ id, type });
 
   // Get backdrop from metadata assets
@@ -1378,13 +1379,20 @@ export const StreamsScreen = () => {
         return addonId === selectedProvider;
       })
       .sort(([addonIdA], [addonIdB]) => {
-        // Sort by Stremio addon installation order
-        const indexA = installedAddons.findIndex(addon => addon.id === addonIdA);
-        const indexB = installedAddons.findIndex(addon => addon.id === addonIdB);
-
-        if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+        // Sort by response order (actual order addons responded)
+        const indexA = addonResponseOrder.indexOf(addonIdA);
+        const indexB = addonResponseOrder.indexOf(addonIdB);
+        
+        // If both are in response order, sort by response order
+        if (indexA !== -1 && indexB !== -1) {
+          return indexA - indexB;
+        }
+        
+        // If only one is in response order, prioritize it
         if (indexA !== -1) return -1;
         if (indexB !== -1) return 1;
+        
+        // If neither is in response order, maintain original order
         return 0;
       });
 
@@ -1408,17 +1416,16 @@ export const StreamsScreen = () => {
           pluginOriginalCount += providerStreams.length;
         }
 
-        // Apply quality filtering and sorting to streams
+        // Apply quality filtering only; keep original addon stream order
         const filteredStreams = filterStreamsByQuality(providerStreams);
-        const sortedStreams = sortStreams(filteredStreams);
 
         if (isInstalledAddon) {
-          addonStreams.push(...sortedStreams);
+          addonStreams.push(...filteredStreams);
           if (!addonNames.includes(addonName)) {
             addonNames.push(addonName);
           }
         } else {
-          pluginStreams.push(...sortedStreams);
+          pluginStreams.push(...filteredStreams);
           if (!pluginNames.includes(addonName)) {
             pluginNames.push(addonName);
           }
@@ -1427,14 +1434,10 @@ export const StreamsScreen = () => {
 
       const sections = [];
       if (addonStreams.length > 0) {
-        // Apply final sorting to the combined addon streams for quality-first mode
-        const finalSortedAddonStreams = settings.streamSortMode === 'quality-then-scraper' ?
-          sortStreams(addonStreams) : addonStreams;
-
         sections.push({
           title: addonNames.join(', '),
           addonId: 'grouped-addons',
-          data: finalSortedAddonStreams
+          data: addonStreams
         });
       } else if (addonOriginalCount > 0 && addonStreams.length === 0) {
         // Show empty section with message for addons that had streams but all were filtered
@@ -1447,14 +1450,10 @@ export const StreamsScreen = () => {
       }
 
       if (pluginStreams.length > 0) {
-        // Apply final sorting to the combined plugin streams for quality-first mode
-        const finalSortedPluginStreams = settings.streamSortMode === 'quality-then-scraper' ?
-          sortStreams(pluginStreams) : pluginStreams;
-
         sections.push({
           title: localScraperService.getRepositoryName(),
           addonId: 'grouped-plugins',
-          data: finalSortedPluginStreams
+          data: pluginStreams
         });
       } else if (pluginOriginalCount > 0 && pluginStreams.length === 0) {
         // Show empty section with message for plugins that had streams but all were filtered
@@ -1473,21 +1472,20 @@ export const StreamsScreen = () => {
         // Count original streams before filtering
         const originalCount = providerStreams.length;
 
-        // Apply quality filtering and sorting to streams
+        // Apply quality filtering only; keep original addon stream order
         const filteredStreams = filterStreamsByQuality(providerStreams);
-        const sortedStreams = sortStreams(filteredStreams);
 
-        const isEmptyDueToQualityFilter = originalCount > 0 && sortedStreams.length === 0;
+        const isEmptyDueToQualityFilter = originalCount > 0 && filteredStreams.length === 0;
 
         return {
           title: addonName,
           addonId,
-          data: isEmptyDueToQualityFilter ? [{ isEmptyPlaceholder: true } as any] : sortedStreams,
+          data: isEmptyDueToQualityFilter ? [{ isEmptyPlaceholder: true } as any] : filteredStreams,
           isEmptyDueToQualityFilter
         };
       });
     }
-  }, [selectedProvider, type, episodeStreams, groupedStreams, settings.streamDisplayMode, filterStreamsByQuality, sortStreams]);
+  }, [selectedProvider, type, episodeStreams, groupedStreams, settings.streamDisplayMode, filterStreamsByQuality, sortStreams, addonResponseOrder]);
 
   const episodeImage = useMemo(() => {
     if (episodeThumbnail) {

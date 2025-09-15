@@ -88,6 +88,7 @@ interface UseMetadataReturn {
   loadingStreams: boolean;
   episodeStreams: GroupedStreams;
   loadingEpisodeStreams: boolean;
+  addonResponseOrder: string[];
   preloadedStreams: GroupedStreams;
   preloadedEpisodeStreams: { [episodeId: string]: GroupedStreams };
   selectedEpisode: string | null;
@@ -134,6 +135,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
   const [availableStreams, setAvailableStreams] = useState<{ [sourceType: string]: Stream }>({});
   const [scraperStatuses, setScraperStatuses] = useState<ScraperStatus[]>([]);
   const [activeFetchingScrapers, setActiveFetchingScrapers] = useState<string[]>([]);
+  // Track response order for addons to preserve actual response order
+  const [addonResponseOrder, setAddonResponseOrder] = useState<string[]>([]);
   // Prevent re-initializing season selection repeatedly for the same series
   const initializedSeasonRef = useRef(false);
   
@@ -286,6 +289,14 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
                     }
                   };
                 };
+                
+                // Track response order for addons
+                setAddonResponseOrder(prevOrder => {
+                  if (!prevOrder.includes(addonId)) {
+                    return [...prevOrder, addonId];
+                  }
+                  return prevOrder;
+                });
                 
                 if (isEpisode) {
                   setEpisodeStreams(updateState);
@@ -824,6 +835,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       // Reset scraper tracking
       setScraperStatuses([]);
       setActiveFetchingScrapers([]);
+      setAddonResponseOrder([]); // Reset response order
 
       // Get TMDB ID for external sources and determine the correct ID for Stremio addons
       if (__DEV__) console.log('🔍 [loadStreams] Getting TMDB ID for:', id);
@@ -990,6 +1002,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       // Reset scraper tracking for episodes
       setScraperStatuses([]);
       setActiveFetchingScrapers([]);
+      setAddonResponseOrder([]); // Reset response order
 
       // Initialize scraper tracking for episodes
        try {
@@ -1358,6 +1371,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     loadingStreams,
     episodeStreams,
     loadingEpisodeStreams,
+    addonResponseOrder,
     preloadedStreams,
     preloadedEpisodeStreams,
     selectedEpisode,

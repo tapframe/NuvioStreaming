@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { StreamingContent, catalogService } from '../../services/catalogService';
@@ -214,6 +214,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         const progressPercent = (progress.currentTime / progress.duration) * 100;
         // Skip fully watched movies
         if (type === 'movie' && progressPercent >= 85) continue;
+        // Skip movies with no actual progress (ensure > 0%)
+        if (type === 'movie' && (!isFinite(progressPercent) || progressPercent <= 0)) continue;
         const contentKey = `${type}:${id}`;
         if (!contentGroups[contentKey]) contentGroups[contentKey] = { type, id, episodes: [] };
         contentGroups[contentKey].episodes.push({ key, episodeId, progress, progressPercent });
@@ -447,7 +449,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       refreshTimerRef.current = setTimeout(() => {
         // Trigger a background refresh
         loadContinueWatching(true);
-      }, 2000); // Increased debounce time significantly to reduce churn
+      }, 800); // Shorter debounce for snappier UI without battery impact
     };
 
     // Try to set up a custom event listener or use a timer as fallback
@@ -483,6 +485,14 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   useEffect(() => {
     loadContinueWatching();
   }, [loadContinueWatching]);
+
+  // Refresh on screen focus (lightweight, no polling)
+  useFocusEffect(
+    useCallback(() => {
+      loadContinueWatching(true);
+      return () => {};
+    }, [loadContinueWatching])
+  );
 
   // Expose the refresh function via the ref
   React.useImperativeHandle(ref, () => ({
@@ -619,7 +629,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       <View style={styles.contentDetails}>
         <View style={styles.titleRow}>
           {(() => {
-            const isUpNext = item.progress === 0;
+            const isUpNext = item.type === 'series' && item.progress === 0;
             return (
               <View style={styles.titleRow}>
                 <Text 

@@ -1407,11 +1407,18 @@ const AndroidVideoPlayer: React.FC = () => {
                                   (error?.error?.localizedDescription &&
                                    error.error.localizedDescription.includes('server is not correctly configured'));
       
+      // Expand audio decoder error detection to include DTS/TrueHD/Atmos families
+      const isHeavyCodecDecoderError =
+        (error?.error?.errorString && /(dts|true\s?hd|truehd|atmos)/i.test(String(error.error.errorString))) ||
+        (error?.error?.errorException && /(dts|true\s?hd|truehd|atmos)/i.test(String(error.error.errorException)));
+      
       // Format error details for user display
       let errorMessage = 'An unknown error occurred';
       if (error) {
         if (isDolbyCodecError) {
           errorMessage = 'Audio codec compatibility issue detected. The video contains Dolby Digital Plus audio which is not supported on this device. Please try selecting a different audio track or use an alternative video source.';
+        } else if (isHeavyCodecDecoderError) {
+          errorMessage = 'Audio codec issue (DTS/TrueHD/Atmos). Switching to a stereo/standard audio track may help.';
         } else if (isServerConfigError) {
           errorMessage = 'Stream server configuration issue. This may be a temporary problem with the video source.';
         } else if (typeof error === 'string') {
@@ -2627,7 +2634,8 @@ const AndroidVideoPlayer: React.FC = () => {
                   ignoreSilentSwitch="ignore"
                   mixWithOthers="inherit"
                   progressUpdateInterval={1000}
-                  maxBitRate={2000000}
+                  // Remove artificial bit rate cap to allow high-bitrate streams (e.g., Blu-ray remux) to play
+                  // maxBitRate intentionally omitted
                   disableFocus={true}
                   // iOS AVPlayer startup tuning
                   automaticallyWaitsToMinimizeStalling={true as any}
@@ -2636,11 +2644,14 @@ const AndroidVideoPlayer: React.FC = () => {
                   preventsDisplaySleepDuringVideoPlayback={true as any}
                   // ExoPlayer HLS optimization
                   bufferConfig={{
-                    minBufferMs: 15000,
-                    maxBufferMs: 50000,
+                    // Larger buffers for high-bitrate remuxes to reduce rebuffering/crashes
+                    minBufferMs: 60000,
+                    maxBufferMs: 180000,
                     bufferForPlaybackMs: 2500,
-                    bufferForPlaybackAfterRebufferMs: 5000,
+                    bufferForPlaybackAfterRebufferMs: 8000,
                   } as any}
+                  // Use SurfaceView on Android to lower memory pressure with 4K/high-bitrate content
+                  useTextureView={Platform.OS === 'android' ? false : (undefined as any)}
                 />
               </TouchableOpacity>
             </View>

@@ -223,10 +223,11 @@ class StorageService {
   }
 
   public async setWatchProgress(
-    id: string, 
-    type: string, 
+    id: string,
+    type: string,
     progress: WatchProgress,
-    episodeId?: string
+    episodeId?: string,
+    options?: { preserveTimestamp?: boolean; forceNotify?: boolean; forceWrite?: boolean }
   ): Promise<void> {
     try {
       const key = await this.getWatchProgressKeyScoped(id, type, episodeId);
@@ -243,23 +244,32 @@ class StorageService {
         }
       } catch {}
       
-      // Check if progress has actually changed significantly
-      const existingProgress = await this.getWatchProgress(id, type, episodeId);
-      if (existingProgress) {
-        const timeDiff = Math.abs(progress.currentTime - existingProgress.currentTime);
-        const durationDiff = Math.abs(progress.duration - existingProgress.duration);
-        
-        // Only update if there's a significant change (>5 seconds or duration change)
-        if (timeDiff < 5 && durationDiff < 1) {
-          return; // Skip update for minor changes
+      // Check if progress has actually changed significantly, unless forceWrite is requested
+      if (!options?.forceWrite) {
+        const existingProgress = await this.getWatchProgress(id, type, episodeId);
+        if (existingProgress) {
+          const timeDiff = Math.abs(progress.currentTime - existingProgress.currentTime);
+          const durationDiff = Math.abs(progress.duration - existingProgress.duration);
+          
+          // Only update if there's a significant change (>5 seconds or duration change)
+          if (timeDiff < 5 && durationDiff < 1) {
+            return; // Skip update for minor changes
+          }
         }
       }
-      
-       const updated = { ...progress, lastUpdated: Date.now() };
-       await AsyncStorage.setItem(key, JSON.stringify(updated));
-      
-      // Use debounced notification to reduce spam
-      this.debouncedNotifySubscribers();
+
+      const timestamp = (options?.preserveTimestamp && typeof progress.lastUpdated === 'number')
+        ? progress.lastUpdated
+        : Date.now();
+      const updated = { ...progress, lastUpdated: timestamp };
+      await AsyncStorage.setItem(key, JSON.stringify(updated));
+
+      // Notify subscribers; allow forcing immediate notification
+      if (options?.forceNotify) {
+        this.notifyWatchProgressSubscribers();
+      } else {
+        this.debouncedNotifySubscribers();
+      }
     } catch (error) {
       logger.error('Error setting watch progress:', error);
     }

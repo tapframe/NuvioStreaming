@@ -113,19 +113,28 @@ class SyncService {
               await storageService.addWatchProgressTombstone(id, type, episodeId || undefined, remoteUpdated);
             } catch {}
           } else {
+            // Preserve the most recent timestamp between local and remote to maintain proper continue watching order
+            const remoteTimestamp = row.last_updated_ms || Date.now();
+            const existingProgress = await storageService.getWatchProgress(id, type, (row.episode_id && row.episode_id.length > 0) ? row.episode_id : undefined);
+            const localTimestamp = existingProgress?.lastUpdated || 0;
+            
+            // Use the newer timestamp to maintain proper continue watching order across devices
+            const finalTimestamp = Math.max(remoteTimestamp, localTimestamp);
+            
             await storageService.setWatchProgress(
               id,
               type,
               {
                 currentTime: row.current_time_seconds || 0,
                 duration: row.duration_seconds || 0,
-                lastUpdated: row.last_updated_ms || Date.now(),
+                lastUpdated: finalTimestamp,
                 traktSynced: row.trakt_synced ?? undefined,
                 traktLastSynced: row.trakt_last_synced_ms ?? undefined,
                 traktProgress: row.trakt_progress_percent ?? undefined,
               },
               // Ensure we pass through the full remote episode_id as-is; empty string becomes undefined
-              (row.episode_id && row.episode_id.length > 0) ? row.episode_id : undefined
+              (row.episode_id && row.episode_id.length > 0) ? row.episode_id : undefined,
+              { preserveTimestamp: true, forceNotify: true, forceWrite: true }
             );
           }
         } catch {}
@@ -372,19 +381,32 @@ class SyncService {
         if (wp && Array.isArray(wp)) {
           const remoteActiveKeys = new Set<string>();
           for (const row of wp as any[]) {
+            // Preserve the most recent timestamp between local and remote to maintain proper continue watching order
+            const remoteTimestamp = row.last_updated_ms || Date.now();
+            const existingProgress = await storageService.getWatchProgress(
+              row.media_id, 
+              row.media_type, 
+              (row.episode_id && row.episode_id.length > 0) ? row.episode_id : undefined
+            );
+            const localTimestamp = existingProgress?.lastUpdated || 0;
+            
+            // Use the newer timestamp to maintain proper continue watching order across devices
+            const finalTimestamp = Math.max(remoteTimestamp, localTimestamp);
+            
             await storageService.setWatchProgress(
               row.media_id,
               row.media_type,
               {
                 currentTime: row.current_time_seconds,
                 duration: row.duration_seconds,
-                lastUpdated: row.last_updated_ms,
+                lastUpdated: finalTimestamp,
                 traktSynced: row.trakt_synced ?? undefined,
                 traktLastSynced: row.trakt_last_synced_ms ?? undefined,
                 traktProgress: row.trakt_progress_percent ?? undefined,
               },
               // Ensure full episode_id is preserved; treat empty as undefined
-              (row.episode_id && row.episode_id.length > 0) ? row.episode_id : undefined
+              (row.episode_id && row.episode_id.length > 0) ? row.episode_id : undefined,
+              { preserveTimestamp: true, forceNotify: true, forceWrite: true }
             );
             remoteActiveKeys.add(`${row.media_type}|${row.media_id}|${row.episode_id || ''}`);
           }
