@@ -326,6 +326,17 @@ const TraktSettingsScreen: React.FC = () => {
               ]}>
                 Sync Settings
               </Text>
+              <View style={[
+                styles.infoBox,
+                { backgroundColor: isDarkMode ? currentTheme.colors.elevation1 : '#F5F7FB', borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#E3E8F0' }
+              ]}>
+                <Text style={[
+                  styles.infoText,
+                  { color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark }
+                ]}>
+                  When connected to Trakt, Continue Watching is sourced from Trakt. Account sync for watch progress is disabled to avoid conflicts.
+                </Text>
+              </View>
               <View style={styles.settingItem}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <View style={{ flex: 1 }}>
@@ -563,6 +574,16 @@ const styles = StyleSheet.create({
   },
   settingDescription: {
     fontSize: 14,
+  },
+  infoBox: {
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  infoText: {
+    fontSize: 13,
+    lineHeight: 18,
   },
 });
 

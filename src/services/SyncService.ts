@@ -7,6 +7,7 @@ import { catalogService, StreamingContent } from './catalogService';
 // import localScraperService from './localScraperService';
 import { settingsEmitter } from '../hooks/useSettings';
 import { logger } from '../utils/logger';
+import { traktService } from './traktService';
 
 type WatchProgressRow = {
   user_id: string;
@@ -81,6 +82,7 @@ class SyncService {
     const user = await accountService.getCurrentUser();
     if (!user) return;
     const userId = user.id;
+    const traktActive = await traktService.isAuthenticated();
 
     const addChannel = (table: string, handler: (payload: any) => void) => {
       const channel = supabase
@@ -91,44 +93,49 @@ class SyncService {
       logger.log(`[Sync] Realtime subscribed: ${table}`);
     };
 
-    // Watch progress: apply granular updates (ignore self-caused pushes via suppressPush)
-    addChannel('watch_progress', async (payload) => {
-      try {
-        const row = (payload.new || payload.old);
-        if (!row) return;
-        const type = row.media_type as string;
-        const id = row.media_id as string;
-        const episodeId = (payload.eventType === 'DELETE') ? (row.episode_id || '') : (row.episode_id || '');
-        this.suppressPush = true;
-        const deletedAt = (row as any).deleted_at;
-        if (payload.eventType === 'DELETE' || deletedAt) {
-          await storageService.removeWatchProgress(id, type, episodeId || undefined);
-          // Record tombstone with remote timestamp if available
-          try {
-            const remoteUpdated = (row as any).updated_at ? new Date((row as any).updated_at).getTime() : Date.now();
-            await storageService.addWatchProgressTombstone(id, type, episodeId || undefined, remoteUpdated);
-          } catch {}
-        } else {
-          await storageService.setWatchProgress(
-            id,
-            type,
-            {
-              currentTime: row.current_time_seconds || 0,
-              duration: row.duration_seconds || 0,
-              lastUpdated: row.last_updated_ms || Date.now(),
-              traktSynced: row.trakt_synced ?? undefined,
-              traktLastSynced: row.trakt_last_synced_ms ?? undefined,
-              traktProgress: row.trakt_progress_percent ?? undefined,
-            },
-            // Ensure we pass through the full remote episode_id as-is; empty string becomes undefined
-            (row.episode_id && row.episode_id.length > 0) ? row.episode_id : undefined
-          );
+    // Watch progress realtime is disabled when Trakt is active
+    if (!traktActive) {
+      // Watch progress: apply granular updates (ignore self-caused pushes via suppressPush)
+      addChannel('watch_progress', async (payload) => {
+        try {
+          const row = (payload.new || payload.old);
+          if (!row) return;
+          const type = row.media_type as string;
+          const id = row.media_id as string;
+          const episodeId = (payload.eventType === 'DELETE') ? (row.episode_id || '') : (row.episode_id || '');
+          this.suppressPush = true;
+          const deletedAt = (row as any).deleted_at;
+          if (payload.eventType === 'DELETE' || deletedAt) {
+            await storageService.removeWatchProgress(id, type, episodeId || undefined);
+            // Record tombstone with remote timestamp if available
+            try {
+              const remoteUpdated = (row as any).updated_at ? new Date((row as any).updated_at).getTime() : Date.now();
+              await storageService.addWatchProgressTombstone(id, type, episodeId || undefined, remoteUpdated);
+            } catch {}
+          } else {
+            await storageService.setWatchProgress(
+              id,
+              type,
+              {
+                currentTime: row.current_time_seconds || 0,
+                duration: row.duration_seconds || 0,
+                lastUpdated: row.last_updated_ms || Date.now(),
+                traktSynced: row.trakt_synced ?? undefined,
+                traktLastSynced: row.trakt_last_synced_ms ?? undefined,
+                traktProgress: row.trakt_progress_percent ?? undefined,
+              },
+              // Ensure we pass through the full remote episode_id as-is; empty string becomes undefined
+              (row.episode_id && row.episode_id.length > 0) ? row.episode_id : undefined
+            );
+          }
+        } catch {}
+        finally {
+          this.suppressPush = false;
         }
-      } catch {}
-      finally {
-        this.suppressPush = false;
-      }
-    });
+      });
+    } else {
+      logger.log('[Sync] Trakt active → skipping watch_progress realtime subscription');
+    }
 
     const debouncedPull = (payload?: any) => {
       if (payload?.table) logger.log(`[Sync][rt] change on ${payload.table} → debounced fullPull`);
@@ -352,9 +359,10 @@ class SyncService {
     const user = await accountService.getCurrentUser();
     if (!user) return;
     const userId = user.id;
+    const traktActive = await traktService.isAuthenticated();
 
     await Promise.allSettled([
-      (async () => {
+      (!traktActive ? (async () => {
         logger.log('[Sync] pull watch_progress');
         const { data: wp } = await supabase
           .from('watch_progress')
@@ -397,7 +405,7 @@ class SyncService {
             }
           } catch {}
         }
-      })(),
+      })() : Promise.resolve()),
       (async () => {
         logger.log('[Sync] pull user_settings');
         const { data: us } = await supabase
@@ -673,6 +681,13 @@ class SyncService {
   async pushWatchProgress(): Promise<void> {
     const user = await accountService.getCurrentUser();
     if (!user) return;
+    // When Trakt is authenticated, disable account push for continue watching
+    try {
+      if (await traktService.isAuthenticated()) {
+        logger.log('[Sync] Trakt active → skipping push watch_progress');
+        return;
+      }
+    } catch {}
     const userId = user.id;
     const unsynced = await storageService.getUnsyncedProgress();
     logger.log(`[Sync] push watch_progress rows=${unsynced.length}`);
@@ -746,6 +761,13 @@ class SyncService {
   private async softDeleteWatchProgress(type: string, id: string, episodeId?: string): Promise<void> {
     const user = await accountService.getCurrentUser();
     if (!user) return;
+    // When Trakt is authenticated, do not propagate deletes to account server for watch progress
+    try {
+      if (await traktService.isAuthenticated()) {
+        logger.log('[Sync] Trakt active → skipping softDelete watch_progress');
+        return;
+      }
+    } catch {}
     try {
       const { error } = await supabase
         .from('watch_progress')

@@ -4,6 +4,7 @@
     "slug": "nuvio",
     "version": "0.6.0-beta.11",
     "orientation": "default",
+    "backgroundColor": "#020404",
     "icon": "./assets/ios/AppIcon.appiconset/Icon-App-60x60@3x.png",
     "userInterfaceStyle": "dark",
     "scheme": "stremioexpo",
