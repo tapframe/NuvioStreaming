@@ -31,6 +31,14 @@
       ],
       "versions": [
         {
+          "version": "1.0.0",
+          "buildVersion": "12",
+          "date": "2025-09-15",
+          "localizedDescription": "## Version 1.0.0 – Stable Release\n\nAfter many beta builds and countless bug reports, Nuvio Streaming App has reached its **first Stable release**!\n\n## Highlights\n- All major features from the beta phase are now included and refined.\n- Stability improvements across the app.\n- Numerous bug fixes and performance optimizations.\n\n---\n\n## A Note on Stability\nThis marks the **first Stable release (v1.0.0)** of Nuvio Streaming App.\nWhile it's not completely bug-free, it is much more stable compared to previous beta builds. Remaining issues will continue to be addressed in future updates.",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/1.0.0/Stable_1-0-0.ipa",
+          "size": 29700000
+        },
+        {
           "version": "0.6.0-beta.11",
           "buildVersion": "11",
           "date": "2025-09-12",
