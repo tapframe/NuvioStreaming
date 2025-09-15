@@ -2614,6 +2614,7 @@ const VideoPlayer: React.FC = () => {
                 right: 8 + insets.right,
                 opacity: nextEpisodeButtonOpacity,
                 transform: [{ scale: nextEpisodeButtonScale }],
+                zIndex: 50,
               }}
             >
               <TouchableOpacity

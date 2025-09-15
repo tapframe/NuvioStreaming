@@ -2950,13 +2950,14 @@ const AndroidVideoPlayer: React.FC = () => {
 
           {/* Next Episode Button */}
           {showNextEpisodeButton && nextEpisode && (
-            <Animated.View 
+            <Animated.View
               style={{
                 position: 'absolute',
                 bottom: 80 + insets.bottom,
                 right: 8 + insets.right,
                 opacity: nextEpisodeButtonOpacity,
                 transform: [{ scale: nextEpisodeButtonScale }],
+                zIndex: 50,
               }}
             >
               <TouchableOpacity

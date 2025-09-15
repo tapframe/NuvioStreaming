@@ -940,22 +940,30 @@ export const StreamsScreen = () => {
         const isMkvByPath = lowerUri.includes('.mkv') || /[?&]ext=mkv\b/.test(lowerUri) || /format=mkv\b/.test(lowerUri) || /container=mkv\b/.test(lowerUri);
         const isMkvFile = Boolean(isMkvByHeader || isMkvByPath);
         
-        // Also check if the provider declares MKV format support
-        let providerSupportsMkv = false;
-        try {
-          const availableScrapers = await localScraperService.getAvailableScrapers();
-          const provider = availableScrapers.find(scraper => scraper.id === streamProvider);
-          if (provider && provider.formats) {
-            providerSupportsMkv = provider.formats.includes('mkv');
-            logger.log(`[StreamsScreen] Provider ${streamProvider} formats:`, provider.formats, 'supports MKV:', providerSupportsMkv);
+        // Special case: moviebox should always use AndroidVideoPlayer
+        if (streamProvider === 'moviebox') {
+          forceVlc = false;
+          logger.log(`[StreamsScreen] Provider ${streamProvider} -> always using AndroidVideoPlayer`);
+        } else {
+          // Also check if the provider declares MKV format support
+          let providerSupportsMkv = false;
+          try {
+            const availableScrapers = await localScraperService.getAvailableScrapers();
+            const provider = availableScrapers.find(scraper => scraper.id === streamProvider);
+            if (provider && provider.formats) {
+              providerSupportsMkv = provider.formats.includes('mkv');
+              logger.log(`[StreamsScreen] Provider ${streamProvider} formats:`, provider.formats, 'supports MKV:', providerSupportsMkv);
+            }
+          } catch (providerError) {
+            logger.warn('[StreamsScreen] Failed to check provider formats:', providerError);
           }
-        } catch (providerError) {
-          logger.warn('[StreamsScreen] Failed to check provider formats:', providerError);
-        }
-        
-        if (isMkvFile || providerSupportsMkv) {
-          forceVlc = true;
-          logger.log(`[StreamsScreen] Stream is MKV format (detected: ${isMkvFile}, provider supports: ${providerSupportsMkv}) -> forcing VLC`);
+          
+          if (isMkvFile || providerSupportsMkv) {
+            forceVlc = true;
+            logger.log(`[StreamsScreen] Stream is MKV format (detected: ${isMkvFile}, provider supports: ${providerSupportsMkv}) -> forcing VLC`);
+          } else {
+            logger.log(`[StreamsScreen] Stream is NOT MKV format (detected: ${isMkvFile}, provider supports: ${providerSupportsMkv}) -> using AndroidVideoPlayer`);
+          }
         }
       }
     } catch (e) {
