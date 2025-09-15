@@ -10,14 +10,14 @@
 
 ---
 
-## ⚠️ Beta Release
+## Beta Release
 This application is currently in beta. Please report any issues you encounter.
 
 [Download Latest Release](https://github.com/tapframe/NuvioStreaming/tags)
 
 ---
 
-## 📱 Installation
+## Installation
 
 ### AltStore Installation
 <img src="https://upload.wikimedia.org/wikipedia/commons/2/20/AltStore_logo.png" width="32" height="32" align="left"> [![Add to AltStore](https://img.shields.io/badge/Add%20to-AltStore-blue?style=for-the-badge)](https://tinyurl.com/NuvioAltstore)
@@ -29,42 +29,42 @@ This application is currently in beta. Please report any issues you encounter.
 
 ---
 
-## ✨ Core Features
+## Core Features
 
-### 🎬 Content Discovery
+### Content Discovery
 - **Personalized Recommendations:** Smart home screen with continue watching functionality
 - **Advanced Search:** Comprehensive filtering and instant search results
 - **Rich Metadata:** Detailed content information, cast, crew, and ratings
 - **Calendar Integration:** Track upcoming episodes and releases
 - **Library Management:** Personal collections with watch history tracking
 
-### 🎥 Streaming Experience
+### Streaming Experience
 - **Dual Player Support:** Built-in video player with gesture controls and external player integration
 - **Intelligent Quality Selection:** Automatic stream optimization and subtitle support
 - **Trailer Playback:** Seamless trailer integration with preloading
 - **Continuous Playback:** Auto-play functionality for uninterrupted viewing
 - **Progress Synchronization:** Resume playback across devices
 
-### 🔗 Platform Integrations
+### Platform Integrations
 - **Trakt.tv Sync:** Complete watch history, ratings, and library synchronization
 - **Stremio Ecosystem:** Full addon compatibility with easy management
 - **TMDB Integration:** Comprehensive metadata and high-quality imagery
 - **MDBList Support:** Enhanced ratings and recommendations
 - **Custom Scrapers:** Local content source integration
 
-### 🎨 User Interface
+### User Interface
 - **Material Design:** Clean, modern interface with smooth animations
 - **Dynamic Theming:** Content-based color extraction and customization
 - **Cross-Platform:** Native experience on iOS and Android
 - **Performance Optimized:** Efficient rendering and image caching
 
-### 🔔 Advanced Features
+### Advanced Features
 - **Push Notifications:** New episode alerts and content reminders
 - **Background Synchronization:** Automatic data updates and content sync
 
 ---
 
-## 📸 Screenshots
+## Screenshots
 
 | Home Screen | Details Page | Home Screen 2 |
 |:-----------:|:------------:|:-------------:|
@@ -80,7 +80,7 @@ This application is currently in beta. Please report any issues you encounter.
 
 ---
 
-## 🧰 Tools & Technologies
+## Tools & Technologies
 
 <p align="left">
   <a href="https://skillicons.dev">
@@ -90,7 +90,7 @@ This application is currently in beta. Please report any issues you encounter.
 
 ---
 
-## 🛠️ Development
+## Development
 
 ### Prerequisites
 - Node.js 18+
@@ -113,7 +113,7 @@ npx expo run:ios      # iOS build
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -122,7 +122,7 @@ npx expo run:ios      # iOS build
 
 ---
 
-## 🐛 Issues
+## Issues
 
 Report bugs and request features via [GitHub Issues](https://github.com/tapframe/NuvioStreaming/issues)
 
@@ -130,7 +130,7 @@ Report bugs and request features via [GitHub Issues](https://github.com/tapframe
 
 
 
-## 📄 License
+## License
 
 [![GNU GPLv3](https://www.gnu.org/graphics/gplv3-127x51.png)](http://www.gnu.org/licenses/gpl-3.0.en.html)
 
@@ -138,13 +138,13 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 
 ---
 
-## ⚖️ Disclaimer
+## Disclaimer
 
 This application functions as a content aggregator, accessing publicly available streams from third-party sources. No media content is hosted by this application. Users are responsible for compliance with applicable laws and regulations.
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 Built with support from:
 - React Native & Expo
