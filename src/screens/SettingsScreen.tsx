@@ -419,19 +419,9 @@ const SettingsScreen: React.FC = () => {
               icon="person"
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('TraktSettings')}
+              isLast={true}
               isTablet={isTablet}
             />
-            {isAuthenticated && (
-              <SettingItem
-                title="Profiles"
-                description="Manage multiple users"
-                icon="people"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('ProfilesSettings')}
-                isLast={true}
-                isTablet={isTablet}
-              />
-            )}
           </SettingsCard>
         );
 
