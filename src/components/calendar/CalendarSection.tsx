@@ -7,6 +7,7 @@ import {
   TouchableOpacity, 
   Dimensions 
 } from 'react-native';
+import { InteractionManager } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isSameDay } from 'date-fns';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -79,26 +80,35 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
+  const [uiReady, setUiReady] = useState(false);
 
   // Map of dates with episodes
   const [datesWithEpisodes, setDatesWithEpisodes] = useState<{ [key: string]: boolean }>({});
 
-  // Process episodes to identify dates with content
+  // Defer initial heavy work until after interactions
   useEffect(() => {
-    if (__DEV__) console.log(`[CalendarSection] Processing ${episodes.length} episodes for calendar dots`);
+    const task = InteractionManager.runAfterInteractions(() => setUiReady(true));
+    return () => task.cancel();
+  }, []);
+
+  // Process episodes to identify dates with content (bounded and deferred)
+  useEffect(() => {
+    if (!uiReady) return;
+    const MAX_TO_PROCESS = 3000; // cap to prevent massive loops
     const dateMap: { [key: string]: boolean } = {};
-    
-    episodes.forEach(episode => {
-      if (episode.releaseDate) {
+    const len = Math.min(episodes.length, MAX_TO_PROCESS);
+    for (let i = 0; i < len; i++) {
+      const episode = episodes[i];
+      if (episode && episode.releaseDate) {
         const releaseDate = new Date(episode.releaseDate);
-        const dateKey = format(releaseDate, 'yyyy-MM-dd');
-        dateMap[dateKey] = true;
+        if (!isNaN(releaseDate.getTime())) {
+          const dateKey = format(releaseDate, 'yyyy-MM-dd');
+          dateMap[dateKey] = true;
+        }
       }
-    });
-    
-    if (__DEV__) console.log(`[CalendarSection] Found ${Object.keys(dateMap).length} unique dates with episodes`);
+    }
     setDatesWithEpisodes(dateMap);
-  }, [episodes]);
+  }, [episodes, uiReady]);
 
   const goToPreviousMonth = useCallback(() => {
     setCurrentDate(prev => subMonths(prev, 1));
@@ -213,9 +223,13 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
         ))}
       </View>
       
-      <View style={styles.daysContainer}>
-        {renderDays()}
-      </View>
+      {uiReady ? (
+        <View style={styles.daysContainer}>
+          {renderDays()}
+        </View>
+      ) : (
+        <View style={styles.daysContainer} />
+      )}
     </View>
   );
 };

@@ -10,7 +10,6 @@ import {
   StatusBar,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
@@ -20,6 +19,10 @@ import Animated, {
   withTiming,
   FadeInDown,
   FadeInUp,
+  useAnimatedScrollHandler,
+  runOnJS,
+  interpolateColor,
+  interpolate,
 } from 'react-native-reanimated';
 import { useTheme } from '../contexts/ThemeContext';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
@@ -71,6 +74,14 @@ const onboardingData: OnboardingSlide[] = [
     icon: 'library-books',
     gradient: ['#43e97b', '#38f9d7'],
   },
+  {
+    id: '5',
+    title: 'Plugins',
+    subtitle: 'Stream Sources Only',
+    description: 'Plugins add streaming sources to Nuvio.',
+    icon: 'widgets',
+    gradient: ['#ff9a9e', '#fad0c4'],
+  },
 ];
 
 const OnboardingScreen = () => {
@@ -80,6 +91,30 @@ const OnboardingScreen = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const progressValue = useSharedValue(0);
+  const scrollX = useSharedValue(0);
+  const currentSlide = onboardingData[currentIndex];
+
+  const onScroll = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollX.value = event.contentOffset.x;
+    },
+  });
+
+  const getAnimatedBackgroundStyle = (slideIndex: number) => {
+    return useAnimatedStyle(() => {
+      const inputRange = [(slideIndex - 1) * width, slideIndex * width, (slideIndex + 1) * width];
+      const opacity = interpolate(
+        scrollX.value,
+        inputRange,
+        [0, 1, 0],
+        'clamp'
+      );
+
+      return {
+        opacity,
+      };
+    });
+  };
 
   const animatedProgressStyle = useAnimatedStyle(() => ({
     width: withSpring(`${((currentIndex + 1) / onboardingData.length) * 100}%`),
@@ -149,13 +184,13 @@ const OnboardingScreen = () => {
           entering={FadeInUp.delay(500).duration(800)}
           style={styles.textContainer}
         >
-          <Text style={[styles.title, { color: currentTheme.colors.highEmphasis }]}>
+          <Text style={[styles.title, { color: 'white' }]}>
             {item.title}
           </Text>
-          <Text style={[styles.subtitle, { color: currentTheme.colors.primary }]}>
+          <Text style={[styles.subtitle, { color: 'rgba(255,255,255,0.9)' }]}>
             {item.subtitle}
           </Text>
-          <Text style={[styles.description, { color: currentTheme.colors.mediumEmphasis }]}>
+          <Text style={[styles.description, { color: 'rgba(255,255,255,0.85)' }]}>
             {item.description}
           </Text>
         </Animated.View>
@@ -183,71 +218,106 @@ const OnboardingScreen = () => {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
-      <StatusBar barStyle="light-content" backgroundColor={currentTheme.colors.darkBackground} />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
-          <Text style={[styles.skipText, { color: currentTheme.colors.mediumEmphasis }]}>
-            Skip
-          </Text>
-        </TouchableOpacity>
-        
-        {/* Progress Bar */}
-        <View style={[styles.progressContainer, { backgroundColor: currentTheme.colors.elevation1 }]}>
-          <Animated.View 
-            style={[
-              styles.progressBar, 
-              { backgroundColor: currentTheme.colors.primary },
-              animatedProgressStyle
-            ]} 
+    <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
+      {/* Layered animated gradient backgrounds */}
+      {onboardingData.map((slide, index) => (
+        <Animated.View key={`bg-${index}`} style={[styles.backgroundPanel, getAnimatedBackgroundStyle(index)]}>
+          <LinearGradient
+            colors={[slide.gradient[0], slide.gradient[1]]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
           />
-        </View>
-      </View>
-
-      {/* Content */}
-      <FlatList
-        ref={flatListRef}
-        data={onboardingData}
-        renderItem={renderSlide}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={(item) => item.id}
-        onMomentumScrollEnd={(event) => {
-          const slideIndex = Math.round(event.nativeEvent.contentOffset.x / width);
-          setCurrentIndex(slideIndex);
-        }}
-        style={{ flex: 1 }}
+        </Animated.View>
+      ))}
+      <LinearGradient
+        colors={["rgba(0,0,0,0.2)", "rgba(0,0,0,0.45)"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={styles.overlayPanel}
       />
+      {/* Decorative gradient blobs that change with current slide */}
+      <LinearGradient
+        colors={[currentSlide.gradient[1], 'transparent']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.blobTopRight}
+      />
+      <LinearGradient
+        colors={[currentSlide.gradient[0], 'transparent']}
+        start={{ x: 1, y: 1 }}
+        end={{ x: 0, y: 0 }}
+        style={styles.blobBottomLeft}
+      />
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      {/* Footer */}
-      <View style={styles.footer}>
-        {renderPagination()}
-        
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={[
-              styles.button,
-              styles.nextButton,
-              { backgroundColor: currentTheme.colors.primary }
-            ]}
-            onPress={handleNext}
-          >
-            <Text style={[styles.buttonText, { color: 'white' }]}>
-              {currentIndex === onboardingData.length - 1 ? 'Get Started' : 'Next'}
+      {/* Content container with status bar padding */}
+      <View style={styles.fullScreenContainer}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
+            <Text style={[styles.skipText, { color: currentTheme.colors.mediumEmphasis }]}>
+              Skip
             </Text>
-            <MaterialIcons 
-              name={currentIndex === onboardingData.length - 1 ? 'check' : 'arrow-forward'} 
-              size={20} 
-              color="white" 
-              style={styles.buttonIcon}
-            />
           </TouchableOpacity>
+
+          {/* Progress Bar */}
+          <View style={[styles.progressContainer, { backgroundColor: currentTheme.colors.elevation1 }]}>
+            <Animated.View
+              style={[
+                styles.progressBar,
+                { backgroundColor: currentTheme.colors.primary },
+                animatedProgressStyle
+              ]}
+            />
+          </View>
+        </View>
+
+        {/* Content */}
+        <Animated.FlatList
+          ref={flatListRef}
+          data={onboardingData}
+          renderItem={renderSlide}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(item) => item.id}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          onMomentumScrollEnd={(event) => {
+            const slideIndex = Math.round(event.nativeEvent.contentOffset.x / width);
+            setCurrentIndex(slideIndex);
+          }}
+          style={{ flex: 1 }}
+        />
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          {renderPagination()}
+
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={[
+                styles.button,
+                styles.nextButton,
+                { backgroundColor: currentTheme.colors.primary }
+              ]}
+              onPress={handleNext}
+            >
+              <Text style={[styles.buttonText, { color: 'white' }]}>
+                {currentIndex === onboardingData.length - 1 ? 'Get Started' : 'Next'}
+              </Text>
+              <MaterialIcons
+                name={currentIndex === onboardingData.length - 1 ? 'check' : 'arrow-forward'}
+                size={20}
+                color="white"
+                style={styles.buttonIcon}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -260,7 +330,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 10 : 20,
+    paddingTop: 10,
     paddingBottom: 20,
   },
   skipButton: {
@@ -287,6 +357,46 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 40,
+  },
+  backgroundPanel: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderRadius: 0,
+  },
+  overlayPanel: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderRadius: 0,
+  },
+  fullScreenContainer: {
+    flex: 1,
+    paddingTop: Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24,
+  },
+  blobTopRight: {
+    position: 'absolute',
+    top: -60,
+    right: -60,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    opacity: 0.35,
+    transform: [{ rotate: '15deg' }],
+  },
+  blobBottomLeft: {
+    position: 'absolute',
+    bottom: -70,
+    left: -70,
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    opacity: 0.28,
+    transform: [{ rotate: '-20deg' }],
   },
   iconContainer: {
     width: 160,

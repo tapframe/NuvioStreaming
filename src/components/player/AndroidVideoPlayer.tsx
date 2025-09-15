@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { View, TouchableOpacity, TouchableWithoutFeedback, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, Image, StyleSheet, Modal } from 'react-native';
+import { View, TouchableOpacity, TouchableWithoutFeedback, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, Image, StyleSheet, Modal, AppState } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Video, { VideoRef, SelectedTrack, SelectedTrackType, BufferingStrategyType } from 'react-native-video';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { PinchGestureHandler, PanGestureHandler, TapGestureHandler, State, PinchGestureHandlerGestureEvent, PanGestureHandlerGestureEvent, TapGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import RNImmersiveMode from 'react-native-immersive-mode';
@@ -588,6 +588,8 @@ const AndroidVideoPlayer: React.FC = () => {
   useEffect(() => {
     const subscription = Dimensions.addEventListener('change', ({ screen }) => {
       setScreenDimensions(screen);
+      // Re-apply immersive mode on layout changes to keep system bars hidden
+      enableImmersiveMode();
     });
     const initializePlayer = async () => {
       StatusBar.setHidden(true, 'none');
@@ -617,6 +619,27 @@ const AndroidVideoPlayer: React.FC = () => {
     return () => {
       subscription?.remove();
       disableImmersiveMode();
+    };
+  }, []);
+
+  // Re-apply immersive mode when screen gains focus
+  useFocusEffect(
+    useCallback(() => {
+      enableImmersiveMode();
+      return () => {};
+    }, [])
+  );
+
+  // Re-apply immersive mode when app returns to foreground
+  useEffect(() => {
+    const onAppStateChange = (state: string) => {
+      if (state === 'active') {
+        enableImmersiveMode();
+      }
+    };
+    const sub = AppState.addEventListener('change', onAppStateChange);
+    return () => {
+      sub.remove();
     };
   }, []);
 
@@ -1206,6 +1229,8 @@ const AndroidVideoPlayer: React.FC = () => {
       if (newShowControls) {
         controlsTimeout.current = setTimeout(hideControls, 5000);
       }
+      // Reinforce immersive mode after any UI toggle
+      enableImmersiveMode();
       return newShowControls;
     });
   };

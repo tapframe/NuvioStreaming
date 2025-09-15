@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { View, TouchableOpacity, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, Image, StyleSheet, Modal } from 'react-native';
+import { View, TouchableOpacity, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, Image, StyleSheet, Modal, AppState } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { VLCPlayer } from 'react-native-vlc-media-player';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList, RootStackNavigationProp } from '../../navigation/AppNavigator';
 import { PinchGestureHandler, PanGestureHandler, TapGestureHandler, State, PinchGestureHandlerGestureEvent, PanGestureHandlerGestureEvent, TapGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import RNImmersiveMode from 'react-native-immersive-mode';
@@ -567,6 +567,8 @@ const VideoPlayer: React.FC = () => {
   useEffect(() => {
     const subscription = Dimensions.addEventListener('change', ({ screen }) => {
       setScreenDimensions(screen);
+      // Re-apply immersive mode on layout changes (Android)
+      enableImmersiveMode();
     });
     const initializePlayer = async () => {
       StatusBar.setHidden(true, 'none');
@@ -596,6 +598,27 @@ const VideoPlayer: React.FC = () => {
     return () => {
       subscription?.remove();
       disableImmersiveMode();
+    };
+  }, []);
+
+  // Re-apply immersive mode when screen gains focus (Android)
+  useFocusEffect(
+    useCallback(() => {
+      enableImmersiveMode();
+      return () => {};
+    }, [])
+  );
+
+  // Re-apply immersive mode when app returns to foreground (Android)
+  useEffect(() => {
+    const onAppStateChange = (state: string) => {
+      if (state === 'active') {
+        enableImmersiveMode();
+      }
+    };
+    const sub = AppState.addEventListener('change', onAppStateChange);
+    return () => {
+      sub.remove();
     };
   }, []);
 
@@ -1166,6 +1189,8 @@ const VideoPlayer: React.FC = () => {
       if (newShowControls) {
         controlsTimeout.current = setTimeout(hideControls, 5000);
       }
+      // Reinforce immersive mode after any UI toggle (Android)
+      enableImmersiveMode();
       return newShowControls;
     });
   };

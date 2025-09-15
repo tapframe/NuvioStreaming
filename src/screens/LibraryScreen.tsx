@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Platform,
   ScrollView,
+  BackHandler,
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useNavigation } from '@react-navigation/native';
@@ -109,49 +110,33 @@ const TraktItem = React.memo(({ item, width, navigation, currentTheme }: { item:
       onPress={handlePress}
       activeOpacity={0.7}
     >
-      <View style={[styles.posterContainer, { shadowColor: currentTheme.colors.black }]}>
-        {posterUrl ? (
-          <Image
-            source={{ uri: posterUrl }}
-            style={styles.poster}
-            contentFit="cover"
-            cachePolicy="disk"
-            transition={0}
-            allowDownscaling
-          />
-        ) : (
-          <View style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, justifyContent: 'center', alignItems: 'center' }]}>
-            <ActivityIndicator color={currentTheme.colors.primary} />
+      <View>
+        <View style={[styles.posterContainer, { shadowColor: currentTheme.colors.black }]}>
+          {posterUrl ? (
+            <Image
+              source={{ uri: posterUrl }}
+              style={styles.poster}
+              contentFit="cover"
+              cachePolicy="disk"
+              transition={0}
+              allowDownscaling
+            />
+          ) : (
+            <View style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, justifyContent: 'center', alignItems: 'center' }]}>
+              <ActivityIndicator color={currentTheme.colors.primary} />
+            </View>
+          )}
+
+          <View style={[styles.badgeContainer, { backgroundColor: 'rgba(45,55,72,0.9)' }]}>
+            <TraktIcon width={12} height={12} style={{ marginRight: 4 }} />
+            <Text style={[styles.badgeText, { color: currentTheme.colors.white }]}>
+              {item.type === 'movie' ? 'Movie' : 'Series'}
+            </Text>
           </View>
-        )}
-        <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.85)']}
-          style={styles.posterGradient}
-        >
-          <Text 
-            style={[styles.itemTitle, { color: currentTheme.colors.white }]}
-            numberOfLines={2}
-          >
-            {item.name}
-          </Text>
-          {item.lastWatched && (
-            <Text style={styles.lastWatched}>
-              Last watched: {item.lastWatched}
-            </Text>
-          )}
-          {item.plays && item.plays > 1 && (
-            <Text style={styles.playsCount}>
-              {item.plays} plays
-            </Text>
-          )}
-        </LinearGradient>
-        
-        <View style={[styles.badgeContainer, { backgroundColor: 'rgba(232,37,75,0.9)' }]}>
-          <TraktIcon width={12} height={12} style={{ marginRight: 4 }} />
-          <Text style={[styles.badgeText, { color: currentTheme.colors.white }]}>
-            {item.type === 'movie' ? 'Movie' : 'Series'}
-          </Text>
         </View>
+        <Text style={[styles.cardTitle, { color: currentTheme.colors.white }]}>
+          {item.name}
+        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -255,13 +240,34 @@ const LibraryScreen = () => {
         StatusBar.setBackgroundColor('transparent');
       }
     };
-    
+
     applyStatusBarConfig();
-    
+
     // Re-apply on focus
     const unsubscribe = navigation.addListener('focus', applyStatusBarConfig);
     return unsubscribe;
   }, [navigation]);
+
+  // Handle hardware back button and gesture navigation
+  useEffect(() => {
+    const backAction = () => {
+      if (showTraktContent) {
+        if (selectedTraktFolder) {
+          // If in a specific folder, go back to folder list
+          setSelectedTraktFolder(null);
+        } else {
+          // If in Trakt collections view, go back to main library
+          setShowTraktContent(false);
+        }
+        return true; // Prevent default back behavior
+      }
+      return false; // Allow default back behavior (navigate back)
+    };
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+
+    return () => backHandler.remove();
+  }, [showTraktContent, selectedTraktFolder]);
 
   useEffect(() => {
     const loadLibrary = async () => {
@@ -306,7 +312,7 @@ const LibraryScreen = () => {
         icon: 'visibility',
         description: 'Your watched content',
         itemCount: (watchedMovies?.length || 0) + (watchedShows?.length || 0),
-        gradient: ['#4CAF50', '#2E7D32']
+        gradient: ['#2C3E50', '#34495E']
       },
       {
         id: 'continue-watching',
@@ -314,7 +320,7 @@ const LibraryScreen = () => {
         icon: 'play-circle-outline',
         description: 'Resume your progress',
         itemCount: continueWatching?.length || 0,
-        gradient: ['#FF9800', '#F57C00']
+        gradient: ['#2980B9', '#3498DB']
       },
       {
         id: 'watchlist',
@@ -322,7 +328,7 @@ const LibraryScreen = () => {
         icon: 'bookmark',
         description: 'Want to watch',
         itemCount: (watchlistMovies?.length || 0) + (watchlistShows?.length || 0),
-        gradient: ['#2196F3', '#1976D2']
+        gradient: ['#6C3483', '#9B59B6']
       },
       {
         id: 'collection',
@@ -330,7 +336,7 @@ const LibraryScreen = () => {
         icon: 'library-add',
         description: 'Your collection',
         itemCount: (collectionMovies?.length || 0) + (collectionShows?.length || 0),
-        gradient: ['#9C27B0', '#7B1FA2']
+        gradient: ['#1B2631', '#283747']
       },
       {
         id: 'ratings',
@@ -338,7 +344,7 @@ const LibraryScreen = () => {
         icon: 'star',
         description: 'Your ratings',
         itemCount: ratedContent?.length || 0,
-        gradient: ['#FF5722', '#D84315']
+        gradient: ['#5D6D7E', '#85929E']
       }
     ];
 
@@ -352,51 +358,40 @@ const LibraryScreen = () => {
       onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type })}
       activeOpacity={0.7}
     >
-      <View style={[styles.posterContainer, { shadowColor: currentTheme.colors.black }]}>
-        <Image
-          source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
-          style={styles.poster}
-          contentFit="cover"
-          transition={300}
-        />
-        <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.85)']}
-          style={styles.posterGradient}
-        >
-          <Text 
-            style={[styles.itemTitle, { color: currentTheme.colors.white }]}
-            numberOfLines={2}
-          >
-            {item.name}
-          </Text>
-          {item.lastWatched && (
-            <Text style={styles.lastWatched}>
-              {item.lastWatched}
-            </Text>
+      <View>
+        <View style={[styles.posterContainer, { shadowColor: currentTheme.colors.black }]}>
+          <Image
+            source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
+            style={styles.poster}
+            contentFit="cover"
+            transition={300}
+          />
+
+          {item.progress !== undefined && item.progress < 1 && (
+            <View style={styles.progressBarContainer}>
+              <View
+                style={[
+                  styles.progressBar,
+                  { width: `${item.progress * 100}%`, backgroundColor: currentTheme.colors.primary }
+                ]}
+              />
+            </View>
           )}
-        </LinearGradient>
-        
-        {item.progress !== undefined && item.progress < 1 && (
-          <View style={styles.progressBarContainer}>
-            <View 
-              style={[
-                styles.progressBar,
-                { width: `${item.progress * 100}%`, backgroundColor: currentTheme.colors.primary }
-              ]} 
-            />
-          </View>
-        )}
-        {item.type === 'series' && (
-          <View style={styles.badgeContainer}>
-            <MaterialIcons
-              name="live-tv"
-              size={14}
-              color={currentTheme.colors.white}
-              style={{ marginRight: 4 }}
-            />
-            <Text style={[styles.badgeText, { color: currentTheme.colors.white }]}>Series</Text>
-          </View>
-        )}
+          {item.type === 'series' && (
+            <View style={styles.badgeContainer}>
+              <MaterialIcons
+                name="live-tv"
+                size={14}
+                color={currentTheme.colors.white}
+                style={{ marginRight: 4 }}
+              />
+              <Text style={[styles.badgeText, { color: currentTheme.colors.white }]}>Series</Text>
+            </View>
+          )}
+        </View>
+        <Text style={[styles.cardTitle, { color: currentTheme.colors.white }]}>
+          {item.name}
+        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -450,34 +445,31 @@ const LibraryScreen = () => {
       }}
       activeOpacity={0.7}
     >
-      <View style={[styles.posterContainer, styles.folderContainer, { shadowColor: currentTheme.colors.black }]}>
-        <LinearGradient
-          colors={['#E8254B', '#C41E3A']}
-          style={styles.folderGradient}
-        >
-          <TraktIcon width={60} height={60} style={{ marginBottom: 12 }} />
-          <Text style={[styles.folderTitle, { color: currentTheme.colors.white }]}>
-            Trakt Collection
-          </Text>
-          {traktAuthenticated && traktFolders.length > 0 && (
-            <Text style={styles.folderCount}>
-              {traktFolders.length} items
+      <View>
+        <View style={[styles.posterContainer, styles.folderContainer, { shadowColor: currentTheme.colors.black }]}>
+          <LinearGradient
+            colors={['#666666', '#444444']}
+            style={styles.folderGradient}
+          >
+            <TraktIcon width={60} height={60} style={{ marginBottom: 12 }} />
+            <Text style={[styles.folderTitle, { color: currentTheme.colors.white }]}>
+              Trakt
             </Text>
-          )}
-          {!traktAuthenticated && (
-            <Text style={styles.folderSubtitle}>
-              Tap to connect
-            </Text>
-          )}
-        </LinearGradient>
-        
-        {/* Trakt badge */}
-        <View style={[styles.badgeContainer, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-          <TraktIcon width={12} height={12} style={{ marginRight: 4 }} />
-          <Text style={[styles.badgeText, { color: currentTheme.colors.white }]}>
-            Trakt
-          </Text>
+            {traktAuthenticated && traktFolders.length > 0 && (
+              <Text style={styles.folderCount}>
+                {traktFolders.length} items
+              </Text>
+            )}
+            {!traktAuthenticated && (
+              <Text style={styles.folderSubtitle}>
+                Tap to connect
+              </Text>
+            )}
+          </LinearGradient>
         </View>
+        <Text style={[styles.cardTitle, { color: currentTheme.colors.white }]}>
+          Trakt collections
+        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -921,7 +913,7 @@ const LibraryScreen = () => {
               <>
                 <Text style={[styles.headerTitle, { color: currentTheme.colors.white }]}>Library</Text>
                 <TouchableOpacity
-                  style={[styles.calendarButton, { backgroundColor: currentTheme.colors.primary }]}
+                  style={styles.calendarButton}
                   onPress={() => navigation.navigate('Calendar')}
                   activeOpacity={0.7}
                 >
@@ -1096,6 +1088,13 @@ const styles = StyleSheet.create({
     textShadowRadius: 2,
     letterSpacing: 0.3,
   },
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 8,
+    textAlign: 'center',
+    paddingHorizontal: 4,
+  },
   lastWatched: {
     fontSize: 12,
     color: 'rgba(255,255,255,0.7)',
@@ -1246,13 +1245,8 @@ const styles = StyleSheet.create({
   calendarButton: {
     width: 44,
     height: 44,
-    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 3,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
   },
 });
 

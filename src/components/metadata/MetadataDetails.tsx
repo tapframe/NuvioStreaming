@@ -10,6 +10,12 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import Animated, {
   FadeIn,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  runOnJS,
+  interpolate,
+  Extrapolate,
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
 import { isMDBListEnabled } from '../../screens/MDBListSettingsScreen';
@@ -36,6 +42,11 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
   const { currentTheme } = useTheme();
   const [isFullDescriptionOpen, setIsFullDescriptionOpen] = useState(false);
   const [isMDBEnabled, setIsMDBEnabled] = useState(false);
+  const [isTextTruncated, setIsTextTruncated] = useState(false);
+
+  // Animation values for smooth height transition
+  const animatedHeight = useSharedValue(0);
+  const [measuredHeights, setMeasuredHeights] = useState({ collapsed: 0, expanded: 0 });
 
   useEffect(() => {
     const checkMDBListEnabled = async () => {
@@ -49,6 +60,42 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
     
     checkMDBListEnabled();
   }, []);
+
+  const handleTextLayout = (event: any) => {
+    const { lines } = event.nativeEvent;
+    // If we have 3 or more lines, it means the text was truncated
+    setIsTextTruncated(lines.length >= 3);
+  };
+
+  const handleCollapsedTextLayout = (event: any) => {
+    const { height } = event.nativeEvent.layout;
+    setMeasuredHeights(prev => ({ ...prev, collapsed: height }));
+  };
+
+  const handleExpandedTextLayout = (event: any) => {
+    const { height } = event.nativeEvent.layout;
+    setMeasuredHeights(prev => ({ ...prev, expanded: height }));
+  };
+
+  // Animate height changes
+  const toggleDescription = () => {
+    const targetHeight = isFullDescriptionOpen ? measuredHeights.collapsed : measuredHeights.expanded;
+    animatedHeight.value = withTiming(targetHeight, { duration: 300 });
+    setIsFullDescriptionOpen(!isFullDescriptionOpen);
+  };
+
+  // Initialize height when component mounts or text changes
+  useEffect(() => {
+    if (measuredHeights.collapsed > 0) {
+      animatedHeight.value = measuredHeights.collapsed;
+    }
+  }, [measuredHeights.collapsed]);
+
+  // Animated style for smooth height transition
+  const animatedDescriptionStyle = useAnimatedStyle(() => ({
+    height: animatedHeight.value,
+    overflow: 'hidden',
+  }));
 
   return (
     <>
@@ -115,23 +162,47 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
           style={[styles.descriptionContainer, loadingMetadata && styles.dimmed]}
           entering={FadeIn.duration(300)}
         >
-          <TouchableOpacity
-            onPress={() => setIsFullDescriptionOpen(!isFullDescriptionOpen)}
-            activeOpacity={0.7}
+          {/* Hidden text elements to measure heights */}
+          <Text
+            style={[styles.description, { color: currentTheme.colors.mediumEmphasis, position: 'absolute', opacity: 0 }]}
+            numberOfLines={3}
+            onLayout={handleCollapsedTextLayout}
           >
-            <Text style={[styles.description, { color: currentTheme.colors.mediumEmphasis }]} numberOfLines={isFullDescriptionOpen ? undefined : 3}>
-              {metadata.description}
-            </Text>
-            <View style={styles.showMoreButton}>
-              <Text style={[styles.showMoreText, { color: currentTheme.colors.textMuted }]}>
-                {isFullDescriptionOpen ? 'Show Less' : 'Show More'}
+            {metadata.description}
+          </Text>
+          <Text
+            style={[styles.description, { color: currentTheme.colors.mediumEmphasis, position: 'absolute', opacity: 0 }]}
+            onLayout={handleExpandedTextLayout}
+          >
+            {metadata.description}
+          </Text>
+
+          <TouchableOpacity
+            onPress={toggleDescription}
+            activeOpacity={0.7}
+            disabled={!isTextTruncated && !isFullDescriptionOpen}
+          >
+            <Animated.View style={animatedDescriptionStyle}>
+              <Text
+                style={[styles.description, { color: currentTheme.colors.mediumEmphasis }]}
+                numberOfLines={isFullDescriptionOpen ? undefined : 3}
+                onTextLayout={handleTextLayout}
+              >
+                {metadata.description}
               </Text>
-              <MaterialIcons
-                name={isFullDescriptionOpen ? "keyboard-arrow-up" : "keyboard-arrow-down"}
-                size={18}
-                color={currentTheme.colors.textMuted}
-              />
-            </View>
+            </Animated.View>
+            {(isTextTruncated || isFullDescriptionOpen) && (
+              <View style={styles.showMoreButton}>
+                <Text style={[styles.showMoreText, { color: currentTheme.colors.textMuted }]}>
+                  {isFullDescriptionOpen ? 'Show Less' : 'Show More'}
+                </Text>
+                <MaterialIcons
+                  name={isFullDescriptionOpen ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+                  size={18}
+                  color={currentTheme.colors.textMuted}
+                />
+              </View>
+            )}
           </TouchableOpacity>
         </Animated.View>
       )}

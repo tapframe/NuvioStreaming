@@ -13,6 +13,7 @@ import {
   SectionList,
   Platform
 } from 'react-native';
+import { InteractionManager } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { Image } from 'expo-image';
@@ -69,6 +70,7 @@ const CalendarScreen = () => {
   
   logger.log(`[Calendar] Initial load - Library has ${libraryItems?.length || 0} items, loading: ${libraryLoading}`);
   const [refreshing, setRefreshing] = useState(false);
+  const [uiReady, setUiReady] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [filteredEpisodes, setFilteredEpisodes] = useState<CalendarEpisode[]>([]);
 
@@ -79,6 +81,14 @@ const CalendarScreen = () => {
     refresh(true);
     setRefreshing(false);
   }, [refresh]);
+
+  // Defer heavy UI work until after interactions to reduce jank/crashes
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      setUiReady(true);
+    });
+    return () => task.cancel();
+  }, []);
   
   const handleSeriesPress = useCallback((seriesId: string, episode?: CalendarEpisode) => {
     navigation.navigate('Metadata', {
@@ -211,12 +221,15 @@ const CalendarScreen = () => {
   
   // Process all episodes once data is loaded - using memory-efficient approach
   const allEpisodes = React.useMemo(() => {
-    const episodes = calendarData.reduce((acc: CalendarEpisode[], section: CalendarSection) => 
-      [...acc, ...section.data], [] as CalendarEpisode[]);
-    
-    // Limit episodes to prevent memory issues in large libraries
-    return memoryManager.limitArraySize(episodes, 1000);
-  }, [calendarData]);
+    if (!uiReady) return [] as CalendarEpisode[];
+    const episodes = calendarData.reduce((acc: CalendarEpisode[], section: CalendarSection) => {
+      // Pre-trim section arrays defensively
+      const trimmed = memoryManager.limitArraySize(section.data, 500);
+      return acc.length > 1500 ? acc : [...acc, ...trimmed];
+    }, [] as CalendarEpisode[]);
+    // Global cap to keep memory bounded
+    return memoryManager.limitArraySize(episodes, 1500);
+  }, [calendarData, uiReady]);
   
   // Log when rendering with relevant state info
   logger.log(`[Calendar] Rendering: loading=${loading}, calendarData sections=${calendarData.length}, allEpisodes=${allEpisodes.length}`);
@@ -244,7 +257,7 @@ const CalendarScreen = () => {
     setFilteredEpisodes([]);
   }, []);
   
-  if (loading && !refreshing) {
+  if ((loading || !uiReady) && !refreshing) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
         <StatusBar barStyle="light-content" />
@@ -293,6 +306,11 @@ const CalendarScreen = () => {
           keyExtractor={(item) => item.id}
           renderItem={renderEpisodeItem}
           contentContainerStyle={styles.listContent}
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          updateCellsBatchingPeriod={50}
+          windowSize={7}
+          removeClippedSubviews
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -324,7 +342,11 @@ const CalendarScreen = () => {
           renderItem={renderEpisodeItem}
           renderSectionHeader={renderSectionHeader}
           contentContainerStyle={styles.listContent}
-          removeClippedSubviews={false}
+          removeClippedSubviews
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          updateCellsBatchingPeriod={50}
+          windowSize={7}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

@@ -333,7 +333,8 @@ export const CustomNavigationDarkTheme: Theme = {
 type IconNameType = 'home' | 'home-outline' | 'compass' | 'compass-outline' | 
                    'play-box-multiple' | 'play-box-multiple-outline' | 
                    'puzzle' | 'puzzle-outline' | 
-                   'cog' | 'cog-outline' | 'feature-search' | 'feature-search-outline';
+                   'cog' | 'cog-outline' | 'feature-search' | 'feature-search-outline' |
+                   'magnify' | 'heart' | 'heart-outline';
 
 // Add TabIcon component
 const TabIcon = React.memo(({ focused, color, iconName }: { 
@@ -352,7 +353,11 @@ const TabIcon = React.memo(({ focused, color, iconName }: {
     }).start();
   }, [focused]);
 
-  const finalIconName = focused ? iconName : `${iconName}-outline` as IconNameType;
+  // Use outline variant when available, but keep single-form icons (like 'magnify') the same
+  const finalIconName = (() => {
+    if (iconName === 'magnify') return 'magnify';
+    return focused ? iconName : `${iconName}-outline` as IconNameType;
+  })();
 
   return (
     <Animated.View style={{ 
@@ -637,10 +642,10 @@ const MainTabs = () => {
                   iconName = 'home';
                   break;
                 case 'Library':
-                  iconName = 'play-box-multiple';
+                  iconName = 'heart';
                   break;
                 case 'Search':
-                  iconName = 'feature-search';
+                  iconName = 'magnify';
                   break;
                 case 'Settings':
                   iconName = 'cog';
@@ -755,7 +760,7 @@ const MainTabs = () => {
           options={{
             tabBarLabel: 'Library',
             tabBarIcon: ({ color, size, focused }) => (
-              <MaterialCommunityIcons name={focused ? 'play-box-multiple' : 'play-box-multiple-outline'} size={size} color={color} />
+              <MaterialCommunityIcons name={focused ? 'heart' : 'heart-outline'} size={size} color={color} />
             ),
           }}
         />
@@ -764,8 +769,8 @@ const MainTabs = () => {
           component={SearchScreen}
           options={{
             tabBarLabel: 'Search',
-            tabBarIcon: ({ color, size, focused }) => (
-              <MaterialCommunityIcons name={focused ? 'feature-search' : 'feature-search-outline'} size={size} color={color} />
+            tabBarIcon: ({ color, size }) => (
+              <MaterialCommunityIcons name={'magnify'} size={size} color={color} />
             ),
           }}
         />
