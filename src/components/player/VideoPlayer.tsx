@@ -1288,9 +1288,24 @@ const VideoPlayer: React.FC = () => {
 
   const loadSubtitleSize = async () => {
     try {
-      const savedSize = await AsyncStorage.getItem(SUBTITLE_SIZE_KEY);
-      if (savedSize) {
-        setSubtitleSize(parseInt(savedSize, 10));
+      // Prefer scoped subtitle settings
+      const saved = await storageService.getSubtitleSettings();
+      if (saved && typeof saved.subtitleSize === 'number') {
+        setSubtitleSize(saved.subtitleSize);
+        return;
+      }
+      // One-time migrate legacy key if present
+      const legacy = await AsyncStorage.getItem(SUBTITLE_SIZE_KEY);
+      if (legacy) {
+        const migrated = parseInt(legacy, 10);
+        if (!Number.isNaN(migrated) && migrated > 0) {
+          setSubtitleSize(migrated);
+          try {
+            const merged = { ...(saved || {}), subtitleSize: migrated };
+            await storageService.saveSubtitleSettings(merged);
+          } catch {}
+        }
+        try { await AsyncStorage.removeItem(SUBTITLE_SIZE_KEY); } catch {}
       }
     } catch (error) {
       logger.error('[VideoPlayer] Error loading subtitle size:', error);
@@ -1299,8 +1314,11 @@ const VideoPlayer: React.FC = () => {
 
   const saveSubtitleSize = async (size: number) => {
     try {
-      await AsyncStorage.setItem(SUBTITLE_SIZE_KEY, size.toString());
       setSubtitleSize(size);
+      // Persist via scoped subtitle settings so it survives restarts and account switches
+      const saved = await storageService.getSubtitleSettings();
+      const next = { ...(saved || {}), subtitleSize: size };
+      await storageService.saveSubtitleSettings(next);
     } catch (error) {
       logger.error('[VideoPlayer] Error saving subtitle size:', error);
     }

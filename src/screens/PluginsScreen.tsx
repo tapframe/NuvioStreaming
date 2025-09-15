@@ -1186,42 +1186,7 @@ const PluginsScreen: React.FC = () => {
           <RefreshControl refreshing={isRefreshing} onRefresh={loadScrapers} />
         }
       >
-        {/* Quick Setup for New Users */}
-        {!hasRepository && (
-          <View style={styles.quickSetupContainer}>
-            <Text style={styles.quickSetupTitle}>🚀 Quick Start with Official Plugins</Text>
-            <Text style={styles.quickSetupText}>
-              Get instant access to 9+ premium streaming scrapers from Tapframe's official repository. Enable local scrapers and start streaming movies and TV shows immediately.
-            </Text>
-            <TouchableOpacity
-              style={styles.quickSetupButton}
-              onPress={async () => {
-                try {
-                  setIsLoading(true);
-                  // Add the official tapframe repository
-                  const tapframeInfo = localScraperService.getTapframeRepositoryInfo();
-                  const repoId = await localScraperService.addRepository(tapframeInfo);
-
-                  // Switch to the new repository and refresh it
-                  await localScraperService.setCurrentRepository(repoId);
-                  await loadRepositories();
-                  await loadScrapers();
-
-                  Alert.alert('Success', 'Official repository added! Enable local scrapers above to start using plugins.');
-                } catch (error) {
-                  logger.error('[PluginsScreen] Failed to add tapframe repository:', error);
-                  Alert.alert('Error', 'Failed to add official repository');
-                } finally {
-                  setIsLoading(false);
-                }
-              }}
-            >
-              <Text style={styles.quickSetupButtonText}>
-                {isLoading ? 'Adding Repository...' : 'Add Official Repository'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        {/* Quick Setup banner removed */}
 
         {/* Enable Local Scrapers */}
         <CollapsibleSection
