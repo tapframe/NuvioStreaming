@@ -5,198 +5,133 @@
 </p>
 
 <p align="center">
-  A modern streaming app built with React Native and Expo, featuring Stremio addon integration, Trakt synchronization, and a beautiful user interface.
+  A cross‑platform streaming client built with React Native and Expo, featuring Stremio addon support and Trakt synchronization.
 </p>
 
 ---
 
-## ⚠️ Beta Testing
-This app is currently in Beta testing. Please report any bugs or issues you encounter.
-
-[Download Latest Release](https://github.com/tapframe/NuvioStreaming/tags)
-
----
-
-## 📱 Installation
-
-### AltStore Installation
-<img src="https://upload.wikimedia.org/wikipedia/commons/2/20/AltStore_logo.png" width="32" height="32" align="left"> [![Add to AltStore](https://img.shields.io/badge/Add%20to-AltStore-blue?style=for-the-badge)](https://tinyurl.com/NuvioAltstore)
-
-### SideStore Installation
-<img src="https://github.com/SideStore/assets/blob/main/icon.png?raw=true" width="32" height="32" align="left"> [![Add to SideStore](https://img.shields.io/badge/Add%20to-SideStore-green?style=for-the-badge)](https://tinyurl.com/NuvioSidestore)
-
-**Manual URL:** `https://raw.githubusercontent.com/tapframe/NuvioStreaming/main/nuvio-source.json`
+## Status and Downloads
+- This project is currently in Beta. Issues and PRs are welcome.
+- Download: [Releases](https://github.com/tapframe/NuvioStreaming/tags)
 
 ---
 
-## ✨ Key Features 
+## Installation
 
-### 🎬 Content Discovery & Management
-- **Smart Home Screen:** Personalized content recommendations and continue watching functionality
-- **Advanced Search:** Instant results with comprehensive filtering capabilities
-- **Rich Metadata Display:** Detailed information, cast, crew, ratings, and similar content
-- **Calendar Integration:** Track upcoming episodes and releases with notification support
-- **Library Management:** Personal collections with watch history and progress tracking
-- **Cast & Crew Exploration:** Dedicated actor/director filmographies and detailed profiles
+### AltStore
+<img src="https://upload.wikimedia.org/wikipedia/commons/2/20/AltStore_logo.png" width="16" height="16" align="left"> [Add to AltStore](https://tinyurl.com/NuvioAltstore)
 
-### 🎥 Streaming & Playbook
-- **Dual Video Player Support:** 
-  - Built-in React Native Video player with gesture controls
-  - External player integration for enhanced compatibility
-  - Auto-quality selection and subtitle customization
-- **Intelligent Stream Selection:** Automatically finds the best available quality
-- **Trailer Integration:** Seamless trailer playback with preloading capabilities
-- **Auto-Play Functionality:** Continuous episode watching experience
-- **Progress Tracking:** Resume from where you left off across devices
+### SideStore
+<img src="https://github.com/SideStore/assets/blob/main/icon.png?raw=true" width="16" height="16" align="left"> [Add to SideStore](https://tinyurl.com/NuvioSidestore)
 
-### 🔗 Third-Party Integrations
-- **Trakt.tv Synchronization:**
-  - Complete watch history and rating sync
-  - Library management and progress tracking
-  - Auto-sync capabilities with background updates
-- **Stremio Addon Ecosystem:**
-  - Full compatibility with Stremio addon system
-  - Easy addon management and installation
-  - Support for multiple content sources
-- **TMDB Integration:** Comprehensive metadata and high-quality imagery
-- **MDBList Support:** Additional ratings and personalized recommendations
-- **Local Scraper System:** Custom content source integration
-
-### 🎨 User Experience & Interface
-- **Modern Material Design:** Clean, intuitive interface with smooth animations
-- **Dynamic Theming:** Dominant color extraction for content-based UI theming
-- **Theme Customization:** Multiple color schemes and display preferences
-- **Optimized Performance:** Image caching and efficient list rendering
-- **Cross-Platform Support:** Native experience on both iOS and Android
-
-### 🔔 Smart Features
-- **Push Notifications:** New episode alerts and personalized reminders
-- **Background Sync:** Automatic data updates and content synchronization
-- **Onboarding Experience:** Guided setup for new users
-- **Comprehensive Settings:** Extensive customization options
-- **Offline Functionality:** Robust caching system for improved performance
+Manual source URL: `https://raw.githubusercontent.com/tapframe/NuvioStreaming/main/nuvio-source.json`
 
 ---
 
-## 📸 Screenshots
+## Core Capabilities
 
-| Home Screen | Details Page | Home Screen 2 |
-|:-----------:|:------------:|:-------------:|
-| ![Home Screen](screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.08.32-portrait.png) | ![Details Page](screesnhots/WhatsApp%20Image%202025-09-02%20at%2000.24.31-portrait.png) | ![Home Screen 2](screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.09.43-portrait.png) |
+- **Streaming and Playback**
+  - Built‑in React Native Video player with gesture controls
+  - External player handoff for broader compatibility
+  - Subtitle selection and basic quality preferences
 
-| Library | Player Loading | Video Player |
-|:-------:|:--------------:|:------------:|
-| ![Library](screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.10.14-portrait.png) | ![Player Loading](screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.12.41-landscape.png) | ![Video Player](screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.13.36-landscape.png) |
+- **Discovery and Library**
+  - Search with filters and rich title/episode metadata
+  - Continue watching and progress tracking
+  - Cast and crew details, similar titles
 
-| Ratings | Episodes & Seasons | Search & Details |
-|:-------:|:------------------:|:----------------:|
-| ![Ratings](screesnhots/ratingscreen-portrait.png) | ![Episodes & Seasons](screesnhots/seasonandepisode-portrait.png) | ![Search & Details](screesnhots/search-portrait.png) |
+- **Integrations**
+  - Trakt: watch history, ratings, library sync (foreground and background)
+  - Stremio addons: multiple content sources and addon management
+  - TMDB: imagery and metadata; MDBList ratings support
+  - Local scraper provider support
+
+- **UX and Performance**
+  - Modern UI with dynamic theming from artwork
+  - Optimized image caching and list virtualization
+  - iOS and Android support
 
 ---
 
-## 🧰 Tools & Technologies
+## Screenshots
 
-<p align="left">
-  <a href="https://skillicons.dev">
-    <img src="https://skillicons.dev/icons?i=react,typescript,nodejs,expo,github,githubactions&theme=light&perline=6" />
-  </a>
-</p>
+| Home | Details | Library |
+|:----:|:-------:|:-------:|
+| ![Home](screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.08.32-portrait.png) | ![Details](screesnhots/WhatsApp%20Image%202025-09-02%20at%2000.24.31-portrait.png) | ![Library](screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.10.14-portrait.png) |
+
+Additional images are available in `screesnhots/`.
 
 ---
 
-## 🚀 Getting Started
+## Tech Stack
+- React Native, Expo, TypeScript
+- React Navigation, Reanimated/Gesture Handler
+- react-native-video, MMKV/AsyncStorage, FastImage
+- Tooling: Metro, EAS, GitHub Actions
+
+---
+
+## Development
 
 ### Prerequisites
-- Node.js 18 or newer
+- Node.js 18+
 - npm or yarn
-- Expo Go app (for development)
-- Android Studio (for Android builds)
-- Xcode (for iOS builds)
+- Android Studio (Android) and/or Xcode (iOS)
 
-### Development Setup
+### Setup
 1. Clone the repository:
    ```bash
    git clone https://github.com/tapframe/NuvioStreaming.git
    cd NuvioStreaming
    ```
-
 2. Install dependencies:
    ```bash
    npm install
    # or
    yarn install
    ```
-
-3. Start the development server:
+3. Start development server:
    ```bash
    npx expo start
    ```
-
 4. Run on device/simulator:
-   - Scan QR code with Expo Go app
-   - Or run native builds:
-     ```bash
-     npx expo run:android
-     # or
-     npx expo run:ios
-     ```
+   ```bash
+   npx expo run:android
+   # or
+   npx expo run:ios
+   ```
 
 ---
 
-## 🤝 Contributing
-
-We welcome contributions! Here's how you can help:
-
-1. Fork the repository
-2. Create your feature branch 
-3. Commit your changes 
-4. Push to the branch 
-5. Open a Pull Request
+## Contributing
+Contributions are welcome. Please open an issue to discuss significant changes before submitting a PR.
 
 ---
 
-## 🐛 Bug Reports & Feature Requests
+## Support and Feedback
+For bugs and feature requests, open an issue: `https://github.com/tapframe/NuvioStreaming/issues`
 
-Found a bug or have an idea? Please open an [issue](https://github.com/tapframe/NuvioStreaming/issues) with:
-- Clear description of the problem/suggestion
-- Steps to reproduce (for bugs)
-- Expected behavior
-- Screenshots if applicable
+Please include a clear description, reproduction steps, expected behavior, and screenshots if applicable.
 
 ---
 
-
-
-## 📄 License
+## License
 
 [![GNU GPLv3 Image](https://www.gnu.org/graphics/gplv3-127x51.png)](http://www.gnu.org/licenses/gpl-3.0.en.html)
 
-This application is **free software**: you can use, study, share, and modify it as you wish.
-
-It is distributed under the terms of the [GNU General Public License](https://www.gnu.org/licenses/gpl.html) version 3 or later, published by the Free Software Foundation.
+This application is distributed under the [GNU GPLv3 or later](https://www.gnu.org/licenses/gpl.html).
 
 ---
 
-## ⚖️ DMCA Disclaimer
-
-We hereby issue this notice to clarify that this application functions similarly to a standard web browser by fetching video files from the internet.
-
-- **No content is hosted by this repository or the Nuvio application.**
-- Any content accessed is hosted by third-party websites.
-- Users are solely responsible for their usage and must comply with their local laws.
-
-If you believe content is violating copyright laws, please contact the **actual file hosts**, **not** the developers of this repository or the Nuvio app.
+## Legal
+- No content is hosted by this repository or the Nuvio application.
+- Any content accessed is hosted by third‑party websites. Users are responsible for compliance with local laws.
+- For takedown requests, contact the hosting providers, not the Nuvio developers.
 
 ---
 
-## 🙏 Acknowledgments
-
-Built with help from the amazing communities behind:
+## Acknowledgments
 - React Native & Expo
-- TMDB API
+- TMDB
 - Trakt.tv
 - Stremio
-
----
-
-**Thank You for using Nuvio!**
