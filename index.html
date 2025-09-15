@@ -1369,6 +1369,11 @@
             filter: invert(1);
         }
 
+        /* Discord icon styling to make it white */
+        .footer-links a[href*="discord"] .github-logo {
+            filter: brightness(0) invert(1);
+        }
+
         @media (max-width: 768px) {
             .credits-grid {
                 gap: 2rem;
@@ -1824,6 +1829,10 @@
             </div>
             <p>Built with ❤️ using React Native & Expo</p>
             <div class="footer-links">
+                <a href="https://discord.gg/6w8dr3TSDN" class="github-link" target="_blank">
+                    <img src="https://cdn.prod.website-files.com/6257adef93867e50d84d30e2/66e3d7f4ef6498ac018f2c55_Symbol.svg" alt="Discord" class="github-logo">
+                    Discord
+                </a>
                 <a href="https://github.com/tapframe/NuvioStreaming" class="github-link">
                     <img src="https://github.githubassets.com/assets/GitHub-Mark-ea2971cee799.png" alt="GitHub" class="github-logo">
                     GitHub

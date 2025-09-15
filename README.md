@@ -10,8 +10,8 @@
 
 ---
 
-## Beta Release
-This application is currently in beta. Please report any issues you encounter.
+## Stable Release
+Nuvio is now available as a stable release! Version 1.0.0 brings all major features from the beta phase, refined and optimized for the best user experience.
 
 [Download Latest Release](https://github.com/tapframe/NuvioStreaming/tags)
 
