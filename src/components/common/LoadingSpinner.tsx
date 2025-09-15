@@ -65,7 +65,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   return (
     <View style={[styles.container, { transform: [{ translateY: offsetY }] }, style]}>
       <LottieView
-        source={source || require('../../../assets/Ripple loading animation.zip')}
+        source={source || require('../../../assets/lottie/loading.json')}
         autoPlay
         loop
         style={[styles.animation, getSizeStyles()]}
