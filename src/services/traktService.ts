@@ -10,9 +10,13 @@ export const TRAKT_TOKEN_EXPIRY_KEY = 'trakt_token_expiry';
 
 // Trakt API configuration
 const TRAKT_API_URL = 'https://api.trakt.tv';
-const TRAKT_CLIENT_ID = 'd7271f7dd57d8aeff63e99408610091a6b1ceac3b3a541d1031a48f429b7942c';
-const TRAKT_CLIENT_SECRET = '0abf42c39aaad72c74696fb5229b558a6ac4b747caf3d380d939e950e8a5449c';
-const TRAKT_REDIRECT_URI = 'stremioexpo://auth/trakt'; // This should match your registered callback URL
+const TRAKT_CLIENT_ID = process.env.EXPO_PUBLIC_TRAKT_CLIENT_ID as string;
+const TRAKT_CLIENT_SECRET = process.env.EXPO_PUBLIC_TRAKT_CLIENT_SECRET as string;
+const TRAKT_REDIRECT_URI = process.env.EXPO_PUBLIC_TRAKT_REDIRECT_URI || 'stremioexpo://auth/trakt'; // Must match registered callback URL
+
+if (!TRAKT_CLIENT_ID || !TRAKT_CLIENT_SECRET) {
+  throw new Error('Missing Trakt env vars. Set EXPO_PUBLIC_TRAKT_CLIENT_ID and EXPO_PUBLIC_TRAKT_CLIENT_SECRET');
+}
 
 // Types
 export interface TraktUser {
@@ -712,7 +716,7 @@ export class TraktService {
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       'trakt-api-version': '2',
-      'trakt-api-key': TRAKT_CLIENT_ID,
+      'trakt-api-key': TRAKT_CLIENT_ID as string,
       'Authorization': `Bearer ${this.accessToken}`
     };
 

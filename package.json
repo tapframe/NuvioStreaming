@@ -10,6 +10,7 @@
   "dependencies": {
     "@adrianso/react-native-device-brightness": "^1.2.7",
     "@backpackapp-io/react-native-toast": "^0.14.0",
+    "@expo/env": "^2.0.7",
     "@expo/metro-runtime": "~4.0.1",
     "@expo/vector-icons": "~14.0.4",
     "@lottiefiles/dotlottie-react": "^0.6.5",
