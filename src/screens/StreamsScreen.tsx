@@ -688,83 +688,7 @@ export const StreamsScreen = () => {
     });
   }, [settings.excludedQualities]);
 
-  // Helper function to sort streams based on user preference
-  const sortStreams = useCallback((streams: Stream[]) => {
-    const installedAddons = stremioService.getInstalledAddons();
-    
-    // Helper function to extract quality as number
-    const getQualityNumeric = (title: string | undefined): number => {
-      if (!title) return 0;
-      
-      // Check for 4K first (treat as 2160p)
-      if (/\b4k\b/i.test(title)) {
-        return 2160;
-      }
-      
-      const matchWithP = title.match(/(\d+)p/i);
-      if (matchWithP) return parseInt(matchWithP[1], 10);
-      
-      const qualityPatterns = [
-        /\b(240|360|480|720|1080|1440|2160|4320|8000)\b/i
-      ];
-      
-      for (const pattern of qualityPatterns) {
-        const match = title.match(pattern);
-        if (match) {
-          const quality = parseInt(match[1], 10);
-          if (quality >= 240 && quality <= 8000) return quality;
-        }
-      }
-      return 0;
-    };
-
-    // Provider priority (higher number = higher priority)
-    const getProviderPriority = (stream: Stream): number => {
-      const addonId = stream.addonId || stream.addonName || '';
-      const addonIndex = installedAddons.findIndex(addon => addon.id === addonId);
-      
-      if (addonIndex !== -1) {
-        // Higher priority for addons installed earlier (reverse index)
-        return 50 - addonIndex;
-      }
-      
-      return 0; // Unknown providers get lowest priority
-    };
-
-    return [...streams].sort((a, b) => {
-      const qualityA = getQualityNumeric(a.name || a.title);
-      const qualityB = getQualityNumeric(b.name || b.title);
-      const providerPriorityA = getProviderPriority(a);
-      const providerPriorityB = getProviderPriority(b);
-      const isCachedA = a.behaviorHints?.cached || false;
-      const isCachedB = b.behaviorHints?.cached || false;
-
-      // Always prioritize cached/debrid streams first
-      if (isCachedA !== isCachedB) {
-        return isCachedA ? -1 : 1;
-      }
-
-      if (settings.streamSortMode === 'quality-then-scraper') {
-        // Sort by quality first, then by provider
-        if (qualityA !== qualityB) {
-          return qualityB - qualityA; // Higher quality first
-        }
-        if (providerPriorityA !== providerPriorityB) {
-          return providerPriorityB - providerPriorityA; // Better provider first
-        }
-      } else {
-        // Default: Sort by provider first, then by quality
-        if (providerPriorityA !== providerPriorityB) {
-          return providerPriorityB - providerPriorityA; // Better provider first
-        }
-        if (qualityA !== qualityB) {
-          return qualityB - qualityA; // Higher quality first
-        }
-      }
-
-      return 0;
-    });
-  }, [settings.excludedQualities, settings.streamSortMode]);
+  // Note: No additional sorting applied to stream cards; preserve provider order
 
   // Function to determine the best stream based on quality, provider priority, and other factors
   const getBestStream = useCallback((streamsData: typeof groupedStreams): Stream | null => {
@@ -817,8 +741,6 @@ export const StreamsScreen = () => {
       stream: Stream;
       quality: number;
       providerPriority: number;
-      isDebrid: boolean;
-      isCached: boolean;
     }> = [];
 
     Object.entries(streamsData).forEach(([addonId, { streams }]) => {
@@ -828,15 +750,10 @@ export const StreamsScreen = () => {
       filteredStreams.forEach(stream => {
         const quality = getQualityNumeric(stream.name || stream.title);
         const providerPriority = getProviderPriority(addonId);
-        const isDebrid = stream.behaviorHints?.cached || false;
-        const isCached = isDebrid;
-
         allStreams.push({
           stream,
           quality,
           providerPriority,
-          isDebrid,
-          isCached,
         });
       });
     });
@@ -845,17 +762,12 @@ export const StreamsScreen = () => {
 
     // Sort streams by multiple criteria (best first)
     allStreams.sort((a, b) => {
-      // 1. Prioritize cached/debrid streams
-      if (a.isCached !== b.isCached) {
-        return a.isCached ? -1 : 1;
-      }
-
-      // 2. Prioritize higher quality
+      // 1. Prioritize higher quality
       if (a.quality !== b.quality) {
         return b.quality - a.quality;
       }
 
-      // 3. Prioritize better providers
+      // 2. Prioritize better providers
       if (a.providerPriority !== b.providerPriority) {
         return b.providerPriority - a.providerPriority;
       }
@@ -863,7 +775,7 @@ export const StreamsScreen = () => {
       return 0;
     });
 
-    logger.log(`🎯 Best stream selected: ${allStreams[0].stream.name || allStreams[0].stream.title} (Quality: ${allStreams[0].quality}p, Provider Priority: ${allStreams[0].providerPriority}, Cached: ${allStreams[0].isCached})`);
+    logger.log(`🎯 Best stream selected: ${allStreams[0].stream.name || allStreams[0].stream.title} (Quality: ${allStreams[0].quality}p, Provider Priority: ${allStreams[0].providerPriority})`);
     
     return allStreams[0].stream;
   }, [filterStreamsByQuality]);
@@ -1032,7 +944,7 @@ export const StreamsScreen = () => {
         }
         // If stream is actually MKV format, force the in-app VLC-based player on iOS
         try {
-          if (Platform.OS === 'ios') {
+          if (Platform.OS === 'ios' && settings.preferredPlayer === 'internal') {
             // Check if the actual stream is an MKV file
             const lowerUri = (stream.url || '').toLowerCase();
             const contentType = (stream.headers && ((stream.headers as any)['Content-Type'] || (stream.headers as any)['content-type'])) || '';
@@ -1041,7 +953,7 @@ export const StreamsScreen = () => {
             const isMkvFile = Boolean(isMkvByHeader || isMkvByPath);
             
             if (isMkvFile) {
-              logger.log(`[StreamsScreen] Stream is MKV format -> forcing VLC on iOS`);
+              logger.log(`[StreamsScreen] Stream is MKV format -> forcing VLC on iOS (internal preferred)`);
               navigateToPlayer(stream, { forceVlc: true });
               return;
             }
@@ -1051,7 +963,7 @@ export const StreamsScreen = () => {
         }
 
         // iOS: very short MKV detection race; never block longer than MKV_HEAD_TIMEOUT_MS
-        if (Platform.OS === 'ios') {
+        if (Platform.OS === 'ios' && settings.preferredPlayer === 'internal') {
           const lowerUrl = (stream.url || '').toLowerCase();
           const isMkvByPath = lowerUrl.includes('.mkv') || /[?&]ext=mkv\b/i.test(lowerUrl) || /format=mkv\b/i.test(lowerUrl) || /container=mkv\b/i.test(lowerUrl);
           const isHttp = lowerUrl.startsWith('http://') || lowerUrl.startsWith('https://');
@@ -1066,7 +978,7 @@ export const StreamsScreen = () => {
                   ...(stream.headers || {}),
                   'Content-Type': 'video/x-matroska',
                 } as Record<string, string>;
-                logger.log('[StreamsScreen] HEAD detected MKV via Content-Type quickly, forcing in-app VLC on iOS');
+                logger.log('[StreamsScreen] HEAD detected MKV via Content-Type quickly, forcing in-app VLC on iOS (internal preferred)');
                 navigateToPlayer(stream, { forceVlc: true, headers: mergedHeaders });
                 return;
               }
@@ -1485,7 +1397,7 @@ export const StreamsScreen = () => {
         };
       });
     }
-  }, [selectedProvider, type, episodeStreams, groupedStreams, settings.streamDisplayMode, filterStreamsByQuality, sortStreams, addonResponseOrder]);
+  }, [selectedProvider, type, episodeStreams, groupedStreams, settings.streamDisplayMode, filterStreamsByQuality, addonResponseOrder]);
 
   const episodeImage = useMemo(() => {
     if (episodeThumbnail) {

@@ -213,9 +213,9 @@ const PlayerSettingsScreen: React.FC = () => {
                 }
                 onPress={() => {
                   if (Platform.OS === 'ios') {
-                    updateSetting('preferredPlayer', option.id as AppSettings['preferredPlayer'], false);
+                    updateSetting('preferredPlayer', option.id as AppSettings['preferredPlayer']);
                   } else {
-                    updateSetting('useExternalPlayer', option.id === 'external', false);
+                    updateSetting('useExternalPlayer', option.id === 'external');
                   }
                 }}
                 isLast={index === playerOptions.length - 1}

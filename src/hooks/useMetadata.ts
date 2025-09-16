@@ -140,10 +140,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
   // Prevent re-initializing season selection repeatedly for the same series
   const initializedSeasonRef = useRef(false);
   
-  // Memory optimization: Track stream counts and implement cleanup
+  // Memory optimization: Track stream counts and implement cleanup (limits removed)
   const streamCountRef = useRef(0);
-  const maxStreamsPerAddon = 50; // Limit streams per addon to prevent memory bloat
-  const maxTotalStreams = 200; // Maximum total streams across all addons
   const cleanupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Add hook for persistent seasons
@@ -182,42 +180,21 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     updateFn();
   }, [cleanupStreams]);
 
-  // Memory optimization: Limit and optimize stream data
+  // Memory optimization: Lightly optimize stream data (no sorting or limiting)
   const optimizeStreams = useCallback((streams: Stream[]): Stream[] => {
     if (!streams || streams.length === 0) return streams;
-    
-    // Sort streams by quality/priority and limit count
-    const sortedStreams = streams
-      .sort((a, b) => {
-        // Prioritize free streams, then debrid, then by size
-        if (a.isFree && !b.isFree) return -1;
-        if (!a.isFree && b.isFree) return 1;
-        if (a.isDebrid && !b.isDebrid) return -1;
-        if (!a.isDebrid && b.isDebrid) return 1;
-        
-        // Sort by size (larger files often better quality)
-        const sizeA = a.size || 0;
-        const sizeB = b.size || 0;
-        return sizeB - sizeA;
-      })
-      .slice(0, maxStreamsPerAddon); // Limit streams per addon
-    
-    // Optimize individual stream objects
-    return sortedStreams.map(stream => ({
+    return streams.map(stream => ({
       ...stream,
-      // Truncate long descriptions to prevent memory bloat
       description: stream.description && stream.description.length > 200 
         ? stream.description.substring(0, 200) + '...' 
         : stream.description,
-      // Simplify behaviorHints to essential data only
       behaviorHints: stream.behaviorHints ? {
         cached: stream.behaviorHints.cached,
         notWebReady: stream.behaviorHints.notWebReady,
         bingeGroup: stream.behaviorHints.bingeGroup,
-        // Remove large objects like magnetUrl, sources, etc.
       } : undefined,
     }));
-  }, [maxStreamsPerAddon]);
+  }, []);
 
   const processStremioSource = async (type: string, id: string, isEpisode = false) => {
     const sourceStartTime = Date.now();
@@ -264,13 +241,6 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             if (__DEV__) logger.log(`✅ [${logPrefix}:${sourceName}] Received ${streams.length} streams from ${addonName} (${addonId}) after ${processTime}ms`);
             
             if (streams.length > 0) {
-              // Memory optimization: Check total stream count and cleanup if needed
-              const currentTotalStreams = streamCountRef.current;
-              if (currentTotalStreams >= maxTotalStreams) {
-                if (__DEV__) logger.log(`🧹 [${logPrefix}:${sourceName}] Memory limit reached (${currentTotalStreams} streams), cleaning up`);
-                cleanupStreams();
-              }
-              
               // Optimize streams before storing
               const optimizedStreams = optimizeStreams(streams);
               streamCountRef.current += optimizedStreams.length;
