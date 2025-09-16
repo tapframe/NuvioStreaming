@@ -149,6 +149,13 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
                 // If no track is selected, show the first track as selected
                 const isSelected = selectedAudioTrack === track.id || 
                                  (selectedAudioTrack === null && track.id === vlcAudioTracks[0]?.id);
+                
+                // Check if track uses unsupported codec
+                const trackName = (track.name || '').toLowerCase();
+                const isUnsupported = trackName.includes('truehd') || 
+                                      trackName.includes('dts') || 
+                                      trackName.includes('atmos');
+                
                 return (
                   <TouchableOpacity
                     key={track.id}
@@ -158,8 +165,15 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
                       padding: 16,
                       borderWidth: 1,
                       borderColor: isSelected ? 'rgba(34, 197, 94, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+                      opacity: isUnsupported ? 0.5 : 1,
                     }}
                     onPress={() => {
+                      if (isUnsupported) {
+                        if (DEBUG_MODE) {
+                          logger.log(`[AudioTrackModal] Attempted to select unsupported track: ${track.id} (${track.name})`);
+                        }
+                        return; // Don't allow selection of unsupported tracks
+                      }
                       if (DEBUG_MODE) {
                         logger.log(`[AudioTrackModal] Selecting track: ${track.id} (${track.name})`);
                       }
@@ -169,29 +183,53 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
                         setShowAudioModal(false);
                       }, 200);
                     }}
-                    activeOpacity={0.7}
+                    activeOpacity={isUnsupported ? 1 : 0.7}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                       <View style={{ flex: 1 }}>
-                        <Text style={{
-                          color: '#FFFFFF',
-                          fontSize: 15,
-                          fontWeight: '500',
-                          marginBottom: 4,
-                        }}>
-                          {getTrackDisplayName(track)}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                          <Text style={{
+                            color: isUnsupported ? 'rgba(255, 255, 255, 0.4)' : '#FFFFFF',
+                            fontSize: 15,
+                            fontWeight: '500',
+                            flex: 1,
+                          }}>
+                            {getTrackDisplayName(track)}
+                          </Text>
+                          {isUnsupported && (
+                            <View style={{
+                              backgroundColor: 'rgba(255, 107, 107, 0.2)',
+                              borderRadius: 8,
+                              paddingHorizontal: 8,
+                              paddingVertical: 2,
+                              marginLeft: 8,
+                            }}>
+                              <Text style={{
+                                color: '#FF6B6B',
+                                fontSize: 10,
+                                fontWeight: '600',
+                                textTransform: 'uppercase',
+                                letterSpacing: 0.5,
+                              }}>
+                                Unsupported
+                              </Text>
+                            </View>
+                          )}
+                        </View>
                         {track.language && (
                           <Text style={{
-                            color: 'rgba(255, 255, 255, 0.6)',
+                            color: isUnsupported ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.6)',
                             fontSize: 13,
                           }}>
                             {track.language.toUpperCase()}
                           </Text>
                         )}
                       </View>
-                      {isSelected && (
+                      {isSelected && !isUnsupported && (
                         <MaterialIcons name="check" size={20} color="#22C55E" />
+                      )}
+                      {isSelected && isUnsupported && (
+                        <MaterialIcons name="warning" size={20} color="#FF6B6B" />
                       )}
                     </View>
                   </TouchableOpacity>
