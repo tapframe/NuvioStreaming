@@ -267,9 +267,11 @@ class StremioService {
         }
       }
 
-      // Ensure OpenSubtitles v3 is always installed as a pre-installed addon
+      // Install OpenSubtitles v3 by default unless user has explicitly removed it
       const opensubsId = 'org.stremio.opensubtitlesv3';
-      if (!this.installedAddons.has(opensubsId)) {
+      const hasUserRemovedOpenSubtitles = await this.hasUserRemovedAddon(opensubsId);
+      
+      if (!this.installedAddons.has(opensubsId) && !hasUserRemovedOpenSubtitles) {
         try {
           const opensubsManifest = await this.getManifest('https://opensubtitles-v3.strem.io/manifest.json');
           this.installedAddons.set(opensubsId, opensubsManifest);
@@ -312,7 +314,10 @@ class StremioService {
       if (!this.addonOrder.includes(cinemetaId) && this.installedAddons.has(cinemetaId)) {
         this.addonOrder.push(cinemetaId);
       }
-      if (!this.addonOrder.includes(opensubsId) && this.installedAddons.has(opensubsId)) {
+      
+      // Only add OpenSubtitles to order if user hasn't removed it
+      const hasUserRemovedOpenSubtitlesOrder = await this.hasUserRemovedAddon(opensubsId);
+      if (!this.addonOrder.includes(opensubsId) && this.installedAddons.has(opensubsId) && !hasUserRemovedOpenSubtitlesOrder) {
         this.addonOrder.push(opensubsId);
       }
       
@@ -435,6 +440,13 @@ class StremioService {
     if (manifest && manifest.id) {
       this.installedAddons.set(manifest.id, manifest);
       
+      // If this is OpenSubtitles being reinstalled, remove it from the user removed list
+      if (manifest.id === 'org.stremio.opensubtitlesv3') {
+        await this.unmarkAddonAsRemovedByUser(manifest.id);
+        // Also clean up any storage references
+        await this.cleanupRemovedAddonFromStorage(manifest.id);
+      }
+      
       // Add to order if not already present (new addons go to the end)
       if (!this.addonOrder.includes(manifest.id)) {
         this.addonOrder.push(manifest.id);
@@ -460,6 +472,14 @@ class StremioService {
       this.installedAddons.delete(id);
       // Remove from order
       this.addonOrder = this.addonOrder.filter(addonId => addonId !== id);
+      
+      // Track if user explicitly removed OpenSubtitles
+      if (id === 'org.stremio.opensubtitlesv3') {
+        this.markAddonAsRemovedByUser(id);
+        // Also remove from any stored addon order to prevent it from being added back
+        this.cleanupRemovedAddonFromStorage(id);
+      }
+      
       this.saveInstalledAddons();
       this.saveAddonOrder();
       try { (require('./SyncService').syncService as any).pushAddons?.(); } catch {}
@@ -479,7 +499,10 @@ class StremioService {
     if (!result.find(a => a.id === cinId) && this.installedAddons.has(cinId)) {
       result.unshift(this.installedAddons.get(cinId)!);
     }
+    // Only include OpenSubtitles if user hasn't explicitly removed it
     if (!result.find(a => a.id === osId) && this.installedAddons.has(osId)) {
+      // Check if user has removed OpenSubtitles (async check, but we'll handle it synchronously for now)
+      // For now, we'll rely on the fact that if user removed it, it shouldn't be in installedAddons
       // Put OpenSubtitles right after Cinemeta if possible, else at start
       const cinIdx = result.findIndex(a => a.id === cinId);
       const osManifest = this.installedAddons.get(osId)!;
@@ -500,6 +523,77 @@ class StremioService {
   // Check if an addon is pre-installed and cannot be removed
   isPreInstalledAddon(id: string): boolean {
     return id === 'com.linvo.cinemeta';
+  }
+
+  // Check if user has explicitly removed an addon
+  async hasUserRemovedAddon(addonId: string): Promise<boolean> {
+    try {
+      const removedAddons = await AsyncStorage.getItem('user_removed_addons');
+      if (!removedAddons) return false;
+      const removedList = JSON.parse(removedAddons);
+      return Array.isArray(removedList) && removedList.includes(addonId);
+    } catch (error) {
+      return false;
+    }
+  }
+
+  // Mark an addon as removed by user
+  private async markAddonAsRemovedByUser(addonId: string): Promise<void> {
+    try {
+      const removedAddons = await AsyncStorage.getItem('user_removed_addons');
+      let removedList = removedAddons ? JSON.parse(removedAddons) : [];
+      if (!Array.isArray(removedList)) removedList = [];
+      
+      if (!removedList.includes(addonId)) {
+        removedList.push(addonId);
+        await AsyncStorage.setItem('user_removed_addons', JSON.stringify(removedList));
+      }
+    } catch (error) {
+      // Silently fail - this is not critical functionality
+    }
+  }
+
+  // Remove an addon from the user removed list (allows reinstallation)
+  async unmarkAddonAsRemovedByUser(addonId: string): Promise<void> {
+    try {
+      const removedAddons = await AsyncStorage.getItem('user_removed_addons');
+      if (!removedAddons) return;
+      
+      let removedList = JSON.parse(removedAddons);
+      if (!Array.isArray(removedList)) return;
+      
+      const updatedList = removedList.filter(id => id !== addonId);
+      await AsyncStorage.setItem('user_removed_addons', JSON.stringify(updatedList));
+    } catch (error) {
+      // Silently fail - this is not critical functionality
+    }
+  }
+
+  // Clean up removed addon from all storage locations
+  private async cleanupRemovedAddonFromStorage(addonId: string): Promise<void> {
+    try {
+      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      
+      // Remove from all possible addon order storage keys
+      const keys = [
+        `@user:${scope}:${this.ADDON_ORDER_KEY}`,
+        this.ADDON_ORDER_KEY,
+        `@user:local:${this.ADDON_ORDER_KEY}`
+      ];
+      
+      for (const key of keys) {
+        const storedOrder = await AsyncStorage.getItem(key);
+        if (storedOrder) {
+          const order = JSON.parse(storedOrder);
+          if (Array.isArray(order)) {
+            const updatedOrder = order.filter(id => id !== addonId);
+            await AsyncStorage.setItem(key, JSON.stringify(updatedOrder));
+          }
+        }
+      }
+    } catch (error) {
+      // Silently fail - this is not critical functionality
+    }
   }
 
   private formatId(id: string): string {

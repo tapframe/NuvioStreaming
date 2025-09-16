@@ -9,13 +9,14 @@ import Animated, {
 } from 'react-native-reanimated';
 import { getTrackDisplayName, DEBUG_MODE } from '../utils/playerUtils';
 import { logger } from '../../../utils/logger';
+import { SelectedTrack, SelectedTrackType } from 'react-native-video';
 
 interface AudioTrackModalProps {
   showAudioModal: boolean;
   setShowAudioModal: (show: boolean) => void;
   vlcAudioTracks: Array<{id: number, name: string, language?: string}>;
-  selectedAudioTrack: number | null;
-  selectAudioTrack: (trackId: number) => void;
+  selectedAudioTrack: SelectedTrack | null;
+  selectAudioTrack: (trackSelection: SelectedTrack) => void;
 }
 
 const { width } = Dimensions.get('window');
@@ -35,13 +36,17 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
   // Debug logging when modal opens
   React.useEffect(() => {
     if (showAudioModal && DEBUG_MODE) {
-      logger.log(`[AudioTrackModal] Modal opened with selectedAudioTrack: ${selectedAudioTrack}`);
+      logger.log(`[AudioTrackModal] Modal opened with selectedAudioTrack:`, selectedAudioTrack);
       logger.log(`[AudioTrackModal] Available tracks:`, vlcAudioTracks);
-      const selectedTrack = vlcAudioTracks.find(track => track.id === selectedAudioTrack);
-      if (selectedTrack) {
-        logger.log(`[AudioTrackModal] Selected track found: ${selectedTrack.name} (${selectedTrack.language})`);
-      } else {
-        logger.warn(`[AudioTrackModal] Selected track ${selectedAudioTrack} not found in available tracks`);
+      if (selectedAudioTrack?.type === 'index' && selectedAudioTrack.value !== undefined) {
+        const selectedTrack = vlcAudioTracks.find(track => track.id === selectedAudioTrack.value);
+        if (selectedTrack) {
+          logger.log(`[AudioTrackModal] Selected track found: ${selectedTrack.name} (${selectedTrack.language})`);
+        } else {
+          logger.warn(`[AudioTrackModal] Selected track ${selectedAudioTrack.value} not found in available tracks`);
+        }
+      } else if (selectedAudioTrack?.type === 'system') {
+        logger.log(`[AudioTrackModal] Using system auto-selection`);
       }
     }
   }, [showAudioModal, selectedAudioTrack, vlcAudioTracks]);
@@ -146,15 +151,16 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
             
             <View style={{ gap: 8 }}>
               {vlcAudioTracks.map((track) => {
-                // If no track is selected, show the first track as selected
-                const isSelected = selectedAudioTrack === track.id || 
-                                 (selectedAudioTrack === null && track.id === vlcAudioTracks[0]?.id);
+                // Determine if track is selected
+                let isSelected = false;
+                if (selectedAudioTrack?.type === 'index' && selectedAudioTrack.value === track.id) {
+                  isSelected = true;
+                } else if (selectedAudioTrack?.type === 'system' && track.id === vlcAudioTracks[0]?.id) {
+                  // Show first track as selected when using system selection
+                  isSelected = true;
+                }
                 
-                // Check if track uses unsupported codec
-                const trackName = (track.name || '').toLowerCase();
-                const isUnsupported = trackName.includes('truehd') || 
-                                      trackName.includes('dts') || 
-                                      trackName.includes('atmos');
+                // All tracks are now available for selection
                 
                 return (
                   <TouchableOpacity
@@ -165,71 +171,42 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
                       padding: 16,
                       borderWidth: 1,
                       borderColor: isSelected ? 'rgba(34, 197, 94, 0.3)' : 'rgba(255, 255, 255, 0.1)',
-                      opacity: isUnsupported ? 0.5 : 1,
                     }}
                     onPress={() => {
-                      if (isUnsupported) {
-                        if (DEBUG_MODE) {
-                          logger.log(`[AudioTrackModal] Attempted to select unsupported track: ${track.id} (${track.name})`);
-                        }
-                        return; // Don't allow selection of unsupported tracks
-                      }
                       if (DEBUG_MODE) {
                         logger.log(`[AudioTrackModal] Selecting track: ${track.id} (${track.name})`);
                       }
-                      selectAudioTrack(track.id);
+                      selectAudioTrack({ type: SelectedTrackType.INDEX, value: track.id });
                       // Close modal after selection
                       setTimeout(() => {
                         setShowAudioModal(false);
                       }, 200);
                     }}
-                    activeOpacity={isUnsupported ? 1 : 0.7}
+                    activeOpacity={0.7}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                       <View style={{ flex: 1 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                           <Text style={{
-                            color: isUnsupported ? 'rgba(255, 255, 255, 0.4)' : '#FFFFFF',
+                            color: '#FFFFFF',
                             fontSize: 15,
                             fontWeight: '500',
                             flex: 1,
                           }}>
                             {getTrackDisplayName(track)}
                           </Text>
-                          {isUnsupported && (
-                            <View style={{
-                              backgroundColor: 'rgba(255, 107, 107, 0.2)',
-                              borderRadius: 8,
-                              paddingHorizontal: 8,
-                              paddingVertical: 2,
-                              marginLeft: 8,
-                            }}>
-                              <Text style={{
-                                color: '#FF6B6B',
-                                fontSize: 10,
-                                fontWeight: '600',
-                                textTransform: 'uppercase',
-                                letterSpacing: 0.5,
-                              }}>
-                                Unsupported
-                              </Text>
-                            </View>
-                          )}
                         </View>
                         {track.language && (
                           <Text style={{
-                            color: isUnsupported ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.6)',
+                            color: 'rgba(255, 255, 255, 0.6)',
                             fontSize: 13,
                           }}>
                             {track.language.toUpperCase()}
                           </Text>
                         )}
                       </View>
-                      {isSelected && !isUnsupported && (
+                      {isSelected && (
                         <MaterialIcons name="check" size={20} color="#22C55E" />
-                      )}
-                      {isSelected && isUnsupported && (
-                        <MaterialIcons name="warning" size={20} color="#FF6B6B" />
                       )}
                     </View>
                   </TouchableOpacity>

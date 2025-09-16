@@ -189,7 +189,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const [duration, setDuration] = useState(0);
   const [showControls, setShowControls] = useState(true);
   const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
-  const [selectedAudioTrack, setSelectedAudioTrack] = useState<number | null>(null);
+  const [selectedAudioTrack, setSelectedAudioTrack] = useState<SelectedTrack | null>({ type: SelectedTrackType.SYSTEM });
   const [textTracks, setTextTracks] = useState<TextTrack[]>([]);
   const [selectedTextTrack, setSelectedTextTrack] = useState<number>(-1);
   const [resizeMode, setResizeMode] = useState<ResizeModeType>('contain');
@@ -279,6 +279,13 @@ const AndroidVideoPlayer: React.FC = () => {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string>('');
   const errorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Toast state for codec unsupported notifications
+  const [showCodecToast, setShowCodecToast] = useState(false);
+  const [codecToastMessage, setCodecToastMessage] = useState<string>('');
+  const codecToastOpacity = useRef(new Animated.Value(0)).current;
+  const codecToastTranslateY = useRef(new Animated.Value(-20)).current;
+  const codecToastTimeout = useRef<NodeJS.Timeout | null>(null);
 
   // Volume and brightness controls
   const [volume, setVolume] = useState(1.0);
@@ -794,8 +801,8 @@ const AndroidVideoPlayer: React.FC = () => {
         clearInterval(progressSaveInterval);
       }
       
-      // HEATING FIX: Increase sync interval to 15 seconds to reduce CPU load
-      const syncInterval = 15000; // 15 seconds to prevent heating
+      // Sync interval for progress updates
+      const syncInterval = 5000; // 5 seconds for responsive progress tracking
       
       const interval = setInterval(() => {
         saveWatchProgress();
@@ -969,33 +976,13 @@ const AndroidVideoPlayer: React.FC = () => {
     if (now - lastAudioTrackCheck > 3000 && !paused && duration > 0 && audioTrackFallbackAttempts < 3) {
       setLastAudioTrackCheck(now);
       
-      // Check if audio track is disabled (-1) and we have available tracks
-      if (selectedAudioTrack === -1 && rnVideoAudioTracks.length > 1) {
+        // Check if audio track is disabled and we have available tracks
+        if (selectedAudioTrack?.type === SelectedTrackType.DISABLED && rnVideoAudioTracks.length > 1) {
         logger.warn('[AndroidVideoPlayer] Detected disabled audio track, attempting fallback');
         
-        // Find a fallback audio track (prioritize AAC/stereo over heavy codecs)
+        // Find any available audio track
         const fallbackTrack = rnVideoAudioTracks.find((track) => {
-          const trackName = (track.name || '').toLowerCase();
-          // Prefer AAC, stereo, or standard audio formats, avoid heavy codecs
-          const isCompatible = !trackName.includes('truehd') && 
-                               !trackName.includes('dts') && 
-                               !trackName.includes('atmos') &&
-                               track.id !== selectedAudioTrack; // Don't select the same track
-          
-          // Prioritize AAC and stereo tracks
-          const isPreferred = trackName.includes('aac') || 
-                              trackName.includes('stereo') ||
-                              trackName.includes('2.0') ||
-                              trackName.includes('2ch');
-          
-          return isCompatible && isPreferred;
-        }) || rnVideoAudioTracks.find((track) => {
-          // Fallback: any compatible track (even if not preferred)
-          const trackName = (track.name || '').toLowerCase();
-          return !trackName.includes('truehd') && 
-                 !trackName.includes('dts') && 
-                 !trackName.includes('atmos') &&
-                 track.id !== selectedAudioTrack;
+          return track.id !== (selectedAudioTrack?.type === SelectedTrackType.INDEX ? selectedAudioTrack.value : null);
         });
         
         if (fallbackTrack) {
@@ -1004,8 +991,8 @@ const AndroidVideoPlayer: React.FC = () => {
           // Increment fallback attempts counter
           setAudioTrackFallbackAttempts(prev => prev + 1);
           
-          // Switch to fallback audio track
-          setSelectedAudioTrack(fallbackTrack.id);
+          // Switch to manual track selection
+          setSelectedAudioTrack({ type: SelectedTrackType.INDEX, value: fallbackTrack.id });
           
           // Brief pause to allow track switching
           setPaused(true);
@@ -1199,41 +1186,13 @@ const AndroidVideoPlayer: React.FC = () => {
         });
         setRnVideoAudioTracks(formattedAudioTracks);
         
-        // Auto-select compatible audio track (prioritize AAC/stereo over heavy codecs)
-        if (selectedAudioTrack === null && formattedAudioTracks.length > 0) {
-          // First, try to find a compatible English track
-          const compatibleEnglishTrack = formattedAudioTracks.find((track: {id: number, name: string, language?: string}) => {
-            const lang = (track.language || '').toLowerCase();
-            const trackName = (track.name || '').toLowerCase();
-            const isEnglish = lang === 'english' || lang === 'en' || lang === 'eng' || 
-                             (track.name && track.name.toLowerCase().includes('english'));
-            const isCompatible = !trackName.includes('truehd') && 
-                                !trackName.includes('dts') && 
-                                !trackName.includes('atmos');
-            return isEnglish && isCompatible;
-          });
-          
-          // If no compatible English track, find any compatible track
-          const compatibleTrack = compatibleEnglishTrack || formattedAudioTracks.find((track: {id: number, name: string, language?: string}) => {
-            const trackName = (track.name || '').toLowerCase();
-            return !trackName.includes('truehd') && 
-                   !trackName.includes('dts') && 
-                   !trackName.includes('atmos');
-          });
-          
-          // Fallback to any track if no compatible ones found
-          const selectedTrack = compatibleTrack || formattedAudioTracks[0];
-          setSelectedAudioTrack(selectedTrack.id);
-          
+        // Use system auto-selection
+        if (selectedAudioTrack?.type === SelectedTrackType.SYSTEM && formattedAudioTracks.length > 0) {
           if (DEBUG_MODE) {
-            if (compatibleEnglishTrack) {
-              logger.log(`[AndroidVideoPlayer] Auto-selected compatible English audio track: ${selectedTrack.name} (ID: ${selectedTrack.id})`);
-            } else if (compatibleTrack) {
-              logger.log(`[AndroidVideoPlayer] Auto-selected compatible audio track: ${selectedTrack.name} (ID: ${selectedTrack.id})`);
-            } else {
-              logger.log(`[AndroidVideoPlayer] No compatible tracks found, auto-selected first audio track: ${selectedTrack.name} (ID: ${selectedTrack.id})`);
-            }
+            logger.log(`[AndroidVideoPlayer] Using system auto-selection for ${formattedAudioTracks.length} audio tracks`);
+            logger.log(`[AndroidVideoPlayer] Available tracks:`, formattedAudioTracks.map((t: any) => `${t.name} (${t.language})`));
           }
+          // Keep using system selection
         }
         
         if (DEBUG_MODE) {
@@ -1474,68 +1433,92 @@ const AndroidVideoPlayer: React.FC = () => {
       if (isAudioCodecError && rnVideoAudioTracks.length > 0) {
         logger.warn('[AndroidVideoPlayer] Audio codec error detected, attempting audio track fallback');
         
-        // Find a fallback audio track (prioritize AAC/stereo over heavy codecs)
-        const fallbackTrack = rnVideoAudioTracks.find((track) => {
-          const trackName = (track.name || '').toLowerCase();
-          // Prefer AAC, stereo, or standard audio formats, avoid heavy codecs
-          const isCompatible = !trackName.includes('truehd') && 
-                               !trackName.includes('dts') && 
-                               !trackName.includes('atmos') &&
-                               track.id !== selectedAudioTrack; // Don't select the same track
-          
-          // Prioritize AAC and stereo tracks
-          const isPreferred = trackName.includes('aac') || 
-                              trackName.includes('stereo') ||
-                              trackName.includes('2.0') ||
-                              trackName.includes('2ch');
-          
-          return isCompatible && isPreferred;
-        }) || rnVideoAudioTracks.find((track) => {
-          // Fallback: any compatible track (even if not preferred)
-          const trackName = (track.name || '').toLowerCase();
-          return !trackName.includes('truehd') && 
-                 !trackName.includes('dts') && 
-                 !trackName.includes('atmos') &&
-                 track.id !== selectedAudioTrack;
-        });
+        // Show toast notification about codec issue
+        showCodecUnsupportedToast('Audio codec not supported on this device. Switching to compatible track...');
         
-        if (fallbackTrack) {
-          logger.warn(`[AndroidVideoPlayer] Switching to fallback audio track: ${fallbackTrack.name || 'Unknown'} (id: ${fallbackTrack.id})`);
+        // If using system selection failed, try manual selection
+        if (selectedAudioTrack?.type === SelectedTrackType.SYSTEM) {
+          logger.log('[AndroidVideoPlayer] System audio selection failed, falling back to manual selection');
           
-          // Clear any existing error state
-          if (errorTimeoutRef.current) {
-            clearTimeout(errorTimeoutRef.current);
-            errorTimeoutRef.current = null;
+          // Find any available audio track
+          const fallbackTrack = rnVideoAudioTracks[0];
+          
+          if (fallbackTrack) {
+            logger.warn(`[AndroidVideoPlayer] Switching to fallback audio track: ${fallbackTrack.name || 'Unknown'} (id: ${fallbackTrack.id})`);
+            
+            // Clear any existing error state
+            if (errorTimeoutRef.current) {
+              clearTimeout(errorTimeoutRef.current);
+              errorTimeoutRef.current = null;
+            }
+            safeSetState(() => setShowErrorModal(false));
+            
+            // Switch to manual track selection
+            setSelectedAudioTrack({ type: SelectedTrackType.INDEX, value: fallbackTrack.id });
+            
+            // Brief pause to allow track switching
+            setPaused(true);
+            setTimeout(() => {
+              if (!isMounted.current) return;
+              setPaused(false);
+            }, 500);
+            
+            return; // Don't show error UI, attempt recovery
           }
-          safeSetState(() => setShowErrorModal(false));
-          
-          // Switch to fallback audio track
-          setSelectedAudioTrack(fallbackTrack.id);
-          
-          // Brief pause to allow track switching
-          setPaused(true);
-          setTimeout(() => {
-            if (!isMounted.current) return;
-            setPaused(false);
-          }, 500);
-          
-          return; // Don't show error UI, attempt recovery
-        } else {
-          // As a last resort, disable audio entirely to keep video playing
-          logger.warn('[AndroidVideoPlayer] No compatible audio track found. Disabling audio to keep playback.');
-          if (errorTimeoutRef.current) {
-            clearTimeout(errorTimeoutRef.current);
-            errorTimeoutRef.current = null;
-          }
-          safeSetState(() => setShowErrorModal(false));
-          setSelectedAudioTrack(-1); // handled as DISABLED by selectedTextTrack prop
-          setPaused(true);
-          setTimeout(() => {
-            if (!isMounted.current) return;
-            setPaused(false);
-          }, 300);
-          return;
         }
+        
+        // For manual selections that failed, try a different manual track
+        const currentTrackId = selectedAudioTrack?.type === SelectedTrackType.INDEX ? selectedAudioTrack.value : null;
+        if (currentTrackId !== null) {
+          const fallbackTrack = rnVideoAudioTracks.find((track) => {
+            return track.id !== currentTrackId;
+          });
+          
+          if (fallbackTrack) {
+            logger.warn(`[AndroidVideoPlayer] Switching from failed track ${currentTrackId} to: ${fallbackTrack.name || 'Unknown'} (id: ${fallbackTrack.id})`);
+            
+            // Show toast notification about track switching
+            showCodecUnsupportedToast('Audio codec not supported. Trying alternative track...');
+            
+            // Clear any existing error state
+            if (errorTimeoutRef.current) {
+              clearTimeout(errorTimeoutRef.current);
+              errorTimeoutRef.current = null;
+            }
+            safeSetState(() => setShowErrorModal(false));
+            
+            // Switch to different manual track
+            setSelectedAudioTrack({ type: SelectedTrackType.INDEX, value: fallbackTrack.id });
+            
+            // Brief pause to allow track switching
+            setPaused(true);
+            setTimeout(() => {
+              if (!isMounted.current) return;
+              setPaused(false);
+            }, 500);
+            
+            return; // Don't show error UI, attempt recovery
+          }
+        }
+        
+        // As a last resort, disable audio entirely to keep video playing
+        logger.warn('[AndroidVideoPlayer] No compatible audio track found. Disabling audio to keep playback.');
+        
+        // Show toast notification about audio being disabled
+        showCodecUnsupportedToast('No compatible audio tracks found. Audio disabled to continue playback.');
+        
+        if (errorTimeoutRef.current) {
+          clearTimeout(errorTimeoutRef.current);
+          errorTimeoutRef.current = null;
+        }
+        safeSetState(() => setShowErrorModal(false));
+        setSelectedAudioTrack({ type: SelectedTrackType.DISABLED });
+        setPaused(true);
+        setTimeout(() => {
+          if (!isMounted.current) return;
+          setPaused(false);
+        }, 300);
+        return;
       }
       
       // Detect Xprime provider to enable a one-shot silent retry (warms upstream/cache)
@@ -1649,7 +1632,7 @@ const AndroidVideoPlayer: React.FC = () => {
                                   (error?.error?.localizedDescription &&
                                    error.error.localizedDescription.includes('server is not correctly configured'));
       
-      // Expand audio decoder error detection to include DTS/TrueHD/Atmos families
+      // Audio decoder error detection
       const isHeavyCodecDecoderError =
         (error?.error?.errorString && /(dts|true\s?hd|truehd|atmos)/i.test(String(error.error.errorString))) ||
         (error?.error?.errorException && /(dts|true\s?hd|truehd|atmos)/i.test(String(error.error.errorException)));
@@ -1658,9 +1641,9 @@ const AndroidVideoPlayer: React.FC = () => {
       let errorMessage = 'An unknown error occurred';
       if (error) {
         if (isAudioCodecError) {
-          errorMessage = 'Audio codec compatibility issue detected. The video contains unsupported audio codec (TrueHD/DTS/Dolby). Please try selecting a different audio track or use an alternative video source.';
+          errorMessage = 'Audio compatibility issue detected. Please try selecting a different audio track or use an alternative video source.';
         } else if (isHeavyCodecDecoderError) {
-          errorMessage = 'Audio codec issue (DTS/TrueHD/Atmos). Switching to a stereo/standard audio track may help.';
+          errorMessage = 'Audio decoder issue detected. Please try selecting a different audio track.';
         } else if (isServerConfigError) {
           errorMessage = 'Stream server configuration issue. This may be a temporary problem with the video source.';
         } else if (typeof error === 'string') {
@@ -1682,7 +1665,7 @@ const AndroidVideoPlayer: React.FC = () => {
         }
       }
       
-      // For audio codec errors we already attempted recovery; avoid showing the modal
+      // For audio errors we already attempted recovery; avoid showing the modal
       if (!isAudioCodecError) {
         // Use safeSetState to prevent crashes on iOS when component is unmounted
         safeSetState(() => {
@@ -1783,17 +1766,32 @@ const AndroidVideoPlayer: React.FC = () => {
     }
   };
 
-  const selectAudioTrack = (trackId: number) => {
+  const selectAudioTrack = (trackSelection: SelectedTrack) => {
     if (DEBUG_MODE) {
-      logger.log(`[AndroidVideoPlayer] Selecting audio track: ${trackId}`);
+      logger.log(`[AndroidVideoPlayer] Selecting audio track:`, trackSelection);
       logger.log(`[AndroidVideoPlayer] Available tracks:`, rnVideoAudioTracks);
     }
     
-    // Validate that the track exists
-    const trackExists = rnVideoAudioTracks.some(track => track.id === trackId);
-    if (!trackExists) {
-      logger.error(`[AndroidVideoPlayer] Audio track ${trackId} not found in available tracks`);
-      return;
+    // Validate track selection
+    if (trackSelection.type === SelectedTrackType.INDEX) {
+      const trackExists = rnVideoAudioTracks.some(track => track.id === trackSelection.value);
+      if (!trackExists) {
+        logger.error(`[AndroidVideoPlayer] Audio track ${trackSelection.value} not found in available tracks`);
+        return;
+      }
+      
+      // Check if the selected track might have codec compatibility issues
+      const selectedTrack = rnVideoAudioTracks.find(track => track.id === trackSelection.value);
+      if (selectedTrack) {
+        const trackName = (selectedTrack.name || '').toLowerCase();
+        const hasHeavyCodec = trackName.includes('truehd') || trackName.includes('dts') || trackName.includes('atmos') || 
+                             trackName.includes('eac3') || trackName.includes('dolby') || trackName.includes('hdma');
+        
+        if (hasHeavyCodec) {
+          // Show toast warning about potential codec issues
+          showCodecUnsupportedToast(`Audio codec may not be supported on this device. Try selecting a different track if playback fails.`);
+        }
+      }
     }
     
     // If changing tracks, briefly pause to allow smooth transition
@@ -1803,10 +1801,10 @@ const AndroidVideoPlayer: React.FC = () => {
     }
     
     // Set the new audio track
-    setSelectedAudioTrack(trackId);
+    setSelectedAudioTrack(trackSelection);
     
     if (DEBUG_MODE) {
-      logger.log(`[AndroidVideoPlayer] Audio track changed to: ${trackId}`);
+      logger.log(`[AndroidVideoPlayer] Audio track changed to:`, trackSelection);
     }
     
     // Resume playback after a brief delay if it was playing
@@ -2347,6 +2345,9 @@ const AndroidVideoPlayer: React.FC = () => {
       if (brightnessOverlayTimeout.current) {
         clearTimeout(brightnessOverlayTimeout.current);
       }
+      if (codecToastTimeout.current) {
+        clearTimeout(codecToastTimeout.current);
+      }
     };
   }, []);
   
@@ -2354,6 +2355,55 @@ const AndroidVideoPlayer: React.FC = () => {
     if (isMounted.current) {
       setter();
     }
+  };
+
+  // Function to show codec unsupported toast
+  const showCodecUnsupportedToast = (message: string) => {
+    if (!isMounted.current) return;
+    
+    // Clear any existing timeout
+    if (codecToastTimeout.current) {
+      clearTimeout(codecToastTimeout.current);
+    }
+    
+    setCodecToastMessage(message);
+    setShowCodecToast(true);
+    
+    // Animate toast in
+    Animated.parallel([
+      Animated.timing(codecToastOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(codecToastTranslateY, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      })
+    ]).start();
+    
+    // Auto-hide after 3 seconds
+    codecToastTimeout.current = setTimeout(() => {
+      if (isMounted.current) {
+        Animated.parallel([
+          Animated.timing(codecToastOpacity, {
+            toValue: 0,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+          Animated.timing(codecToastTranslateY, {
+            toValue: -20,
+            duration: 250,
+            useNativeDriver: true,
+          })
+        ]).start(() => {
+          if (isMounted.current) {
+            setShowCodecToast(false);
+          }
+        });
+      }
+    }, 3000);
   };
 
   useEffect(() => {
@@ -2378,13 +2428,23 @@ const AndroidVideoPlayer: React.FC = () => {
   // Handle audio track changes with proper logging
   useEffect(() => {
     if (selectedAudioTrack !== null && rnVideoAudioTracks.length > 0) {
-      const selectedTrack = rnVideoAudioTracks.find(track => track.id === selectedAudioTrack);
-      if (selectedTrack) {
-        if (DEBUG_MODE) {
-          logger.log(`[AndroidVideoPlayer] Audio track selected: ${selectedTrack.name} (${selectedTrack.language}) - ID: ${selectedAudioTrack}`);
+      if (selectedAudioTrack.type === SelectedTrackType.INDEX && selectedAudioTrack.value !== undefined) {
+        const selectedTrack = rnVideoAudioTracks.find(track => track.id === selectedAudioTrack.value);
+        if (selectedTrack) {
+          if (DEBUG_MODE) {
+            logger.log(`[AndroidVideoPlayer] Audio track selected: ${selectedTrack.name} (${selectedTrack.language}) - ID: ${selectedAudioTrack.value}`);
+          }
+        } else {
+          logger.warn(`[AndroidVideoPlayer] Selected audio track ${selectedAudioTrack.value} not found in available tracks`);
         }
-      } else {
-        logger.warn(`[AndroidVideoPlayer] Selected audio track ${selectedAudioTrack} not found in available tracks`);
+      } else if (selectedAudioTrack.type === SelectedTrackType.SYSTEM) {
+        if (DEBUG_MODE) {
+          logger.log(`[AndroidVideoPlayer] Using system audio selection`);
+        }
+      } else if (selectedAudioTrack.type === SelectedTrackType.DISABLED) {
+        if (DEBUG_MODE) {
+          logger.log(`[AndroidVideoPlayer] Audio disabled`);
+        }
       }
     }
   }, [selectedAudioTrack, rnVideoAudioTracks]);
@@ -2872,7 +2932,7 @@ const AndroidVideoPlayer: React.FC = () => {
                     onBuffer(buf);
                   }}
                   resizeMode={getVideoResizeMode(resizeMode)}
-                  selectedAudioTrack={selectedAudioTrack !== null ? { type: SelectedTrackType.INDEX, value: selectedAudioTrack } : undefined}
+                  selectedAudioTrack={selectedAudioTrack || undefined}
                   selectedTextTrack={useCustomSubtitles ? { type: SelectedTrackType.DISABLED } : (selectedTextTrack >= 0 ? { type: SelectedTrackType.INDEX, value: selectedTextTrack } : undefined)}
                   rate={1.0}
                   volume={volume}
@@ -2882,23 +2942,14 @@ const AndroidVideoPlayer: React.FC = () => {
                   playWhenInactive={false}
                   ignoreSilentSwitch="ignore"
                   mixWithOthers="inherit"
-                  progressUpdateInterval={1000}
+                  progressUpdateInterval={250}
                   // Remove artificial bit rate cap to allow high-bitrate streams (e.g., Blu-ray remux) to play
                   // maxBitRate intentionally omitted
                   disableFocus={true}
-                  // iOS AVPlayer startup tuning
-                  automaticallyWaitsToMinimizeStalling={true as any}
-                  preferredForwardBufferDuration={1 as any}
+                  // iOS AVPlayer optimization
                   allowsExternalPlayback={false as any}
                   preventsDisplaySleepDuringVideoPlayback={true as any}
-                  // ExoPlayer HLS optimization
-                  bufferConfig={{
-                    // Larger buffers for high-bitrate remuxes to reduce rebuffering/crashes
-                    minBufferMs: 60000,
-                    maxBufferMs: 180000,
-                    bufferForPlaybackMs: 2500,
-                    bufferForPlaybackAfterRebufferMs: 8000,
-                  } as any}
+                  // ExoPlayer HLS optimization - let the player use optimal defaults
                   // Use SurfaceView on Android to lower memory pressure with 4K/high-bitrate content
                   useTextureView={Platform.OS === 'android' ? false : (undefined as any)}
                 />
@@ -3523,6 +3574,48 @@ const AndroidVideoPlayer: React.FC = () => {
           {/* Resume overlay removed when AlwaysResume is enabled; overlay component omitted */}
         </View> 
       </Animated.View>
+
+      {/* Codec Unsupported Toast */}
+      {showCodecToast && (
+        <Animated.View
+          style={{
+            position: 'absolute',
+            top: 60 + insets.top,
+            left: 20 + insets.left,
+            right: 20 + insets.right,
+            opacity: codecToastOpacity,
+            transform: [{ translateY: codecToastTranslateY }],
+            zIndex: 2000,
+          }}
+        >
+          <View style={{
+            backgroundColor: 'rgba(255, 87, 34, 0.95)',
+            borderRadius: 12,
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            flexDirection: 'row',
+            alignItems: 'center',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            elevation: 10,
+            borderLeftWidth: 4,
+            borderLeftColor: '#FF5722',
+          }}>
+            <MaterialIcons name="warning" size={20} color="#FFFFFF" style={{ marginRight: 12 }} />
+            <Text style={{
+              color: '#FFFFFF',
+              fontSize: 14,
+              fontWeight: '600',
+              flex: 1,
+              lineHeight: 18,
+            }}>
+              {codecToastMessage}
+            </Text>
+          </View>
+        </Animated.View>
+      )}
 
       <AudioTrackModal
         showAudioModal={showAudioModal}

@@ -198,7 +198,7 @@ class SyncService {
       try {
         const u = await accountService.getCurrentUser();
         if (!u) return;
-        // Compare excluding preinstalled
+        // Compare excluding preinstalled addons
         const exclude = new Set(['com.linvo.cinemeta', 'org.stremio.opensubtitlesv3']);
         const localIds = new Set(
           (await stremioService.getInstalledAddonsAsync())
@@ -651,7 +651,12 @@ class SyncService {
 
     // Always include preinstalled regardless of server
     try { map.set('com.linvo.cinemeta', await stremioService.getManifest('https://v3-cinemeta.strem.io/manifest.json')); } catch {}
-    try { map.set('org.stremio.opensubtitlesv3', await stremioService.getManifest('https://opensubtitles-v3.strem.io/manifest.json')); } catch {}
+    
+    // Only include OpenSubtitles if user hasn't explicitly removed it
+    const hasUserRemovedOpenSubtitles = await stremioService.hasUserRemovedAddon('org.stremio.opensubtitlesv3');
+    if (!hasUserRemovedOpenSubtitles) {
+      try { map.set('org.stremio.opensubtitlesv3', await stremioService.getManifest('https://opensubtitles-v3.strem.io/manifest.json')); } catch {}
+    }
 
     (stremioService as any).installedAddons = map;
     let order = (addons as any[]).map(a => a.addon_id);
@@ -661,7 +666,11 @@ class SyncService {
       else if (idx > 0) { arr.splice(idx, 1); arr.unshift(id); }
     };
     ensureFront(order, 'com.linvo.cinemeta');
-    ensureFront(order, 'org.stremio.opensubtitlesv3');
+    
+    // Only ensure OpenSubtitles is in order if user hasn't removed it
+    if (!hasUserRemovedOpenSubtitles) {
+      ensureFront(order, 'org.stremio.opensubtitlesv3');
+    }
     // Prefer local order if it exists; otherwise use remote
     try {
       const userScope = `@user:${userId}:stremio-addon-order`;
@@ -861,9 +870,21 @@ class SyncService {
         .eq('user_id', userId);
       if (!rErr && remote) {
         const localIds = new Set(addons.map((a: any) => a.id));
-        const toDelete = (remote as any[])
+        const toDeletePromises = (remote as any[])
           .map(r => r.addon_id as string)
-          .filter(id => !localIds.has(id) && id !== 'com.linvo.cinemeta' && id !== 'org.stremio.opensubtitlesv3');
+          .map(async id => {
+            if (localIds.has(id)) return null; // Don't delete if still installed locally
+            if (id === 'com.linvo.cinemeta') return null; // Never delete Cinemeta
+            if (id === 'org.stremio.opensubtitlesv3') {
+              // Don't delete OpenSubtitles if user has explicitly removed it
+              const userRemoved = await stremioService.hasUserRemovedAddon(id);
+              return userRemoved ? null : id;
+            }
+            return id; // Delete other addons that are no longer installed locally
+          });
+        
+        const toDeleteResults = await Promise.all(toDeletePromises);
+        const toDelete = toDeleteResults.filter(id => id !== null);
         logger.log(`[Sync] push installed_addons deletions=${toDelete.length}`);
         if (toDelete.length > 0) {
           const del = await supabase
