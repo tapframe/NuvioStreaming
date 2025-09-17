@@ -1185,14 +1185,26 @@ const AndroidVideoPlayer: React.FC = () => {
           };
         });
         setRnVideoAudioTracks(formattedAudioTracks);
-        
-        // Use system auto-selection
+
+        // Auto-select audio track if none is selected (similar to iOS behavior)
         if (selectedAudioTrack?.type === SelectedTrackType.SYSTEM && formattedAudioTracks.length > 0) {
+          // Look for English track first
+          const englishTrack = formattedAudioTracks.find((track: {id: number, name: string, language?: string}) => {
+            const lang = (track.language || '').toLowerCase();
+            return lang === 'english' || lang === 'en' || lang === 'eng' ||
+                   (track.name && track.name.toLowerCase().includes('english'));
+          });
+
+          const selectedTrack = englishTrack || formattedAudioTracks[0];
+          setSelectedAudioTrack({ type: SelectedTrackType.INDEX, value: selectedTrack.id });
+
           if (DEBUG_MODE) {
-            logger.log(`[AndroidVideoPlayer] Using system auto-selection for ${formattedAudioTracks.length} audio tracks`);
-            logger.log(`[AndroidVideoPlayer] Available tracks:`, formattedAudioTracks.map((t: any) => `${t.name} (${t.language})`));
+            if (englishTrack) {
+              logger.log(`[AndroidVideoPlayer] Auto-selected English audio track: ${selectedTrack.name} (ID: ${selectedTrack.id})`);
+            } else {
+              logger.log(`[AndroidVideoPlayer] No English track found, auto-selected first audio track: ${selectedTrack.name} (ID: ${selectedTrack.id})`);
+            }
           }
-          // Keep using system selection
         }
         
         if (DEBUG_MODE) {
@@ -1771,7 +1783,7 @@ const AndroidVideoPlayer: React.FC = () => {
       logger.log(`[AndroidVideoPlayer] Selecting audio track:`, trackSelection);
       logger.log(`[AndroidVideoPlayer] Available tracks:`, rnVideoAudioTracks);
     }
-    
+
     // Validate track selection
     if (trackSelection.type === SelectedTrackType.INDEX) {
       const trackExists = rnVideoAudioTracks.some(track => track.id === trackSelection.value);
@@ -1779,34 +1791,34 @@ const AndroidVideoPlayer: React.FC = () => {
         logger.error(`[AndroidVideoPlayer] Audio track ${trackSelection.value} not found in available tracks`);
         return;
       }
-      
+
       // Check if the selected track might have codec compatibility issues
       const selectedTrack = rnVideoAudioTracks.find(track => track.id === trackSelection.value);
       if (selectedTrack) {
         const trackName = (selectedTrack.name || '').toLowerCase();
-        const hasHeavyCodec = trackName.includes('truehd') || trackName.includes('dts') || trackName.includes('atmos') || 
+        const hasHeavyCodec = trackName.includes('truehd') || trackName.includes('dts') || trackName.includes('atmos') ||
                              trackName.includes('eac3') || trackName.includes('dolby') || trackName.includes('hdma');
-        
+
         if (hasHeavyCodec) {
           // Show toast warning about potential codec issues
           showCodecUnsupportedToast(`Audio codec may not be supported on this device. Try selecting a different track if playback fails.`);
         }
       }
     }
-    
+
     // If changing tracks, briefly pause to allow smooth transition
     const wasPlaying = !paused;
     if (wasPlaying) {
       setPaused(true);
     }
-    
+
     // Set the new audio track
     setSelectedAudioTrack(trackSelection);
-    
+
     if (DEBUG_MODE) {
       logger.log(`[AndroidVideoPlayer] Audio track changed to:`, trackSelection);
     }
-    
+
     // Resume playback after a brief delay if it was playing
     if (wasPlaying) {
       setTimeout(() => {
@@ -1818,6 +1830,12 @@ const AndroidVideoPlayer: React.FC = () => {
         }
       }, 300);
     }
+  };
+
+  // Wrapper function to convert number to SelectedTrack for modal usage
+  const selectAudioTrackById = (trackId: number) => {
+    const trackSelection: SelectedTrack = { type: SelectedTrackType.INDEX, value: trackId };
+    selectAudioTrack(trackSelection);
   };
 
   const selectTextTrack = (trackId: number) => {
@@ -2982,7 +3000,7 @@ const AndroidVideoPlayer: React.FC = () => {
             zoomScale={zoomScale}
             currentResizeMode={resizeMode}
             vlcAudioTracks={rnVideoAudioTracks}
-            selectedAudioTrack={selectedAudioTrack}
+            selectedAudioTrack={selectedAudioTrack?.type === SelectedTrackType.INDEX && selectedAudioTrack.value !== undefined ? Number(selectedAudioTrack.value) : null}
             availableStreams={availableStreams}
             togglePlayback={togglePlayback}
             skip={skip}
@@ -3621,8 +3639,8 @@ const AndroidVideoPlayer: React.FC = () => {
         showAudioModal={showAudioModal}
         setShowAudioModal={setShowAudioModal}
         vlcAudioTracks={rnVideoAudioTracks}
-        selectedAudioTrack={selectedAudioTrack}
-        selectAudioTrack={selectAudioTrack}
+        selectedAudioTrack={selectedAudioTrack?.type === SelectedTrackType.INDEX && selectedAudioTrack.value !== undefined ? Number(selectedAudioTrack.value) : null}
+        selectAudioTrack={selectAudioTrackById}
       />
       <SubtitleModals
         showSubtitleModal={showSubtitleModal}

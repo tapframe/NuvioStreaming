@@ -9,14 +9,13 @@ import Animated, {
 } from 'react-native-reanimated';
 import { getTrackDisplayName, DEBUG_MODE } from '../utils/playerUtils';
 import { logger } from '../../../utils/logger';
-import { SelectedTrack, SelectedTrackType } from 'react-native-video';
 
 interface AudioTrackModalProps {
   showAudioModal: boolean;
   setShowAudioModal: (show: boolean) => void;
   vlcAudioTracks: Array<{id: number, name: string, language?: string}>;
-  selectedAudioTrack: SelectedTrack | null;
-  selectAudioTrack: (trackSelection: SelectedTrack) => void;
+  selectedAudioTrack: number | null;
+  selectAudioTrack: (trackId: number) => void;
 }
 
 const { width } = Dimensions.get('window');
@@ -38,15 +37,13 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
     if (showAudioModal && DEBUG_MODE) {
       logger.log(`[AudioTrackModal] Modal opened with selectedAudioTrack:`, selectedAudioTrack);
       logger.log(`[AudioTrackModal] Available tracks:`, vlcAudioTracks);
-      if (selectedAudioTrack?.type === 'index' && selectedAudioTrack.value !== undefined) {
-        const selectedTrack = vlcAudioTracks.find(track => track.id === selectedAudioTrack.value);
+      if (typeof selectedAudioTrack === 'number') {
+        const selectedTrack = vlcAudioTracks.find(track => track.id === selectedAudioTrack);
         if (selectedTrack) {
           logger.log(`[AudioTrackModal] Selected track found: ${selectedTrack.name} (${selectedTrack.language})`);
         } else {
-          logger.warn(`[AudioTrackModal] Selected track ${selectedAudioTrack.value} not found in available tracks`);
+          logger.warn(`[AudioTrackModal] Selected track ${selectedAudioTrack} not found in available tracks`);
         }
-      } else if (selectedAudioTrack?.type === 'system') {
-        logger.log(`[AudioTrackModal] Using system auto-selection`);
       }
     }
   }, [showAudioModal, selectedAudioTrack, vlcAudioTracks]);
@@ -152,16 +149,8 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
             <View style={{ gap: 8 }}>
               {vlcAudioTracks.map((track) => {
                 // Determine if track is selected
-                let isSelected = false;
-                if (selectedAudioTrack?.type === 'index' && selectedAudioTrack.value === track.id) {
-                  isSelected = true;
-                } else if (selectedAudioTrack?.type === 'system' && track.id === vlcAudioTracks[0]?.id) {
-                  // Show first track as selected when using system selection
-                  isSelected = true;
-                }
-                
-                // All tracks are now available for selection
-                
+                const isSelected = selectedAudioTrack === track.id;
+
                 return (
                   <TouchableOpacity
                     key={track.id}
@@ -176,7 +165,7 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
                       if (DEBUG_MODE) {
                         logger.log(`[AudioTrackModal] Selecting track: ${track.id} (${track.name})`);
                       }
-                      selectAudioTrack({ type: SelectedTrackType.INDEX, value: track.id });
+                      selectAudioTrack(track.id);
                       // Close modal after selection
                       setTimeout(() => {
                         setShowAudioModal(false);

@@ -3,7 +3,6 @@ import { View, Text, TouchableOpacity, Animated, StyleSheet, Platform } from 're
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Slider from '@react-native-community/slider';
-import { SelectedTrack, SelectedTrackType } from 'react-native-video';
 import { styles } from '../utils/playerStyles';
 import { getTrackDisplayName } from '../utils/playerUtils';
 import { useTheme } from '../../../contexts/ThemeContext';
@@ -25,7 +24,7 @@ interface PlayerControlsProps {
   zoomScale: number;
   currentResizeMode?: string;
   vlcAudioTracks: Array<{id: number, name: string, language?: string}>;
-  selectedAudioTrack: SelectedTrack | null;
+  selectedAudioTrack: number | null;
   availableStreams?: { [providerId: string]: { streams: any[]; addonName: string } };
   togglePlayback: () => void;
   skip: (seconds: number) => void;
@@ -180,7 +179,9 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 <Ionicons name="volume-high" size={20} color={vlcAudioTracks.length <= 1 ? 'grey' : 'white'} />
                 <Text style={[styles.bottomButtonText, vlcAudioTracks.length <= 1 && {color: 'grey'}]} numberOfLines={1}>
                   {(() => {
-                    const trackName = getTrackDisplayName(vlcAudioTracks.find(t => t.id === (selectedAudioTrack?.type === SelectedTrackType.INDEX ? selectedAudioTrack.value : null)) || {id: -1, name: 'Default'});
+                    const trackName = getTrackDisplayName(
+                      vlcAudioTracks.find(t => t.id === selectedAudioTrack) || { id: -1, name: 'Default' }
+                    );
                     // Truncate long audio track names to prevent UI cramping
                     const maxLength = 12; // Limit to 12 characters
                     return trackName.length > maxLength ? `${trackName.substring(0, maxLength)}...` : trackName;
