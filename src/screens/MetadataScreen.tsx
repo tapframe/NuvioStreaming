@@ -8,6 +8,7 @@ import {
   Dimensions,
   TouchableOpacity,
   InteractionManager,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -206,7 +207,7 @@ const MetadataScreen: React.FC = () => {
   useFocusEffect(
     useCallback(() => {
       setIsScreenFocused(true);
-      
+
       // Delay secondary data loading until interactions are complete
       const timer = setTimeout(() => {
         if (!interactionComplete.current) {
@@ -222,6 +223,21 @@ const MetadataScreen: React.FC = () => {
         clearTimeout(timer);
       };
     }, [])
+  );
+
+  // Handle back button press - close modal if open, otherwise navigate back
+  useFocusEffect(
+    useCallback(() => {
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (showCastModal) {
+          setShowCastModal(false);
+          return true; // Prevent default back behavior
+        }
+        return false; // Allow default back behavior (navigate back)
+      });
+
+      return () => backHandler.remove();
+    }, [showCastModal])
   );
 
   // Optimize secondary data loading
