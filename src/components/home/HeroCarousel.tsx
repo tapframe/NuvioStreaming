@@ -95,7 +95,14 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
             contentContainerStyle={{ paddingHorizontal: (width - CARD_WIDTH) / 2 }}
             renderItem={() => (
               <View style={{ width: CARD_WIDTH + 16 }}>
-                <View style={[styles.card, { backgroundColor: currentTheme.colors.elevation1 }] as StyleProp<ViewStyle>}>
+                <View style={[
+                  styles.card,
+                  {
+                    backgroundColor: currentTheme.colors.elevation1,
+                    borderWidth: 1,
+                    borderColor: 'rgba(255,255,255,0.18)',
+                  }
+                ] as StyleProp<ViewStyle>}>
                   <View style={styles.bannerContainer as ViewStyle}>
                     <View style={styles.skeletonBannerFull as ViewStyle} />
                     <LinearGradient
@@ -264,7 +271,14 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
       activeOpacity={0.9}
       onPress={onPressInfo}
     >
-      <View style={[styles.card, { backgroundColor: colors.elevation1 }] as StyleProp<ViewStyle>}>
+      <View style={[
+        styles.card,
+        {
+          backgroundColor: colors.elevation1,
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.18)',
+        }
+      ] as StyleProp<ViewStyle>}>
         <View style={styles.bannerContainer as ViewStyle}>
           <ExpoImage
             source={{ uri: item.banner || item.poster }}

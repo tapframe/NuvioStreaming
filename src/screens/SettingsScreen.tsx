@@ -719,32 +719,46 @@ const SettingsScreen: React.FC = () => {
               {renderCategoryContent(selectedCategory)}
               
               {selectedCategory === 'about' && (
-                <View style={styles.footer}>
-                  <Text style={[styles.footerText, { color: currentTheme.colors.mediumEmphasis }]}>
-                    Made with ❤️ by the Nuvio team
-                  </Text>
-                </View>
-              )}
-
-              {/* Discord Join Button - Show on all categories for tablet */}
-              <View style={styles.discordContainer}>
-                <TouchableOpacity
-                  style={[styles.discordButton, { backgroundColor: currentTheme.colors.elevation1 }]}
-                  onPress={() => Linking.openURL('https://discord.gg/6w8dr3TSDN')}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.discordButtonContent}>
-                    <Image
-                      source={{ uri: 'https://pngimg.com/uploads/discord/discord_PNG3.png' }}
-                      style={styles.discordLogo}
-                      resizeMode="contain"
-                    />
-                    <Text style={[styles.discordButtonText, { color: currentTheme.colors.highEmphasis }]}>
-                      Join Discord
+                <>
+                  <View style={styles.footer}>
+                    <Text style={[styles.footerText, { color: currentTheme.colors.mediumEmphasis }]}> 
+                      Made with ❤️ by Tapframe and Friends
                     </Text>
                   </View>
-                </TouchableOpacity>
-              </View>
+                  <View style={styles.discordContainer}>
+                    <View style={{ flexDirection: 'row', gap: 12 }}>
+                      <TouchableOpacity
+                        style={[styles.discordButton, { backgroundColor: currentTheme.colors.elevation1 }]}
+                        onPress={() => Linking.openURL('https://discord.gg/6w8dr3TSDN')}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.discordButtonContent}>
+                          <Image
+                            source={{ uri: 'https://pngimg.com/uploads/discord/discord_PNG3.png' }}
+                            style={styles.discordLogo}
+                            resizeMode="contain"
+                          />
+                          <Text style={[styles.discordButtonText, { color: currentTheme.colors.highEmphasis }]}> 
+                            Join Discord
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.discordButton, { backgroundColor: 'transparent', paddingVertical: 0, paddingHorizontal: 0 }]}
+                        onPress={() => Linking.openURL('https://ko-fi.com/tapframe')}
+                        activeOpacity={0.7}
+                      >
+                        <Image
+                          source={require('../../assets/support_me_on_kofi_red.png')}
+                          style={styles.kofiImage}
+                          resizeMode="contain"
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </>
+              )}
             </ScrollView>
           </View>
         </View>
@@ -785,28 +799,42 @@ const SettingsScreen: React.FC = () => {
 
             <View style={styles.footer}>
               <Text style={[styles.footerText, { color: currentTheme.colors.mediumEmphasis }]}>
-                Made with ❤️ by the Nuvio team
+                Made with ❤️ by Tapframe and friends
               </Text>
             </View>
 
-            {/* Discord Join Button */}
+            {/* Support & Community Buttons */}
             <View style={styles.discordContainer}>
-              <TouchableOpacity
-                style={[styles.discordButton, { backgroundColor: currentTheme.colors.elevation1 }]}
-                onPress={() => Linking.openURL('https://discord.gg/6w8dr3TSDN')}
-                activeOpacity={0.7}
-              >
-                <View style={styles.discordButtonContent}>
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <TouchableOpacity
+                  style={[styles.discordButton, { backgroundColor: currentTheme.colors.elevation1 }]}
+                  onPress={() => Linking.openURL('https://discord.gg/6w8dr3TSDN')}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.discordButtonContent}>
+                    <Image
+                      source={{ uri: 'https://pngimg.com/uploads/discord/discord_PNG3.png' }}
+                      style={styles.discordLogo}
+                      resizeMode="contain"
+                    />
+                    <Text style={[styles.discordButtonText, { color: currentTheme.colors.highEmphasis }]}> 
+                      Join Discord
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.discordButton, { backgroundColor: 'transparent', paddingVertical: 0, paddingHorizontal: 0 }]}
+                  onPress={() => Linking.openURL('https://ko-fi.com/tapframe')}
+                  activeOpacity={0.7}
+                >
                   <Image
-                    source={{ uri: 'https://pngimg.com/uploads/discord/discord_PNG3.png' }}
-                    style={styles.discordLogo}
+                    source={require('../../assets/support_me_on_kofi_red.png')}
+                    style={styles.kofiImage}
                     resizeMode="contain"
                   />
-                  <Text style={[styles.discordButtonText, { color: currentTheme.colors.highEmphasis }]}>
-                    Join Discord
-                  </Text>
-                </View>
-              </TouchableOpacity>
+                </TouchableOpacity>
+              </View>
             </View>
           </ScrollView>
         </View>
@@ -1045,7 +1073,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 10,
-    marginBottom: 20,
+    marginBottom: 8,
   },
   footerText: {
     fontSize: 14,
@@ -1053,7 +1081,7 @@ const styles = StyleSheet.create({
   },
   // New styles for Discord button
   discordContainer: {
-    marginTop: 20,
+    marginTop: 8,
     marginBottom: 20,
     alignItems: 'center',
   },
@@ -1078,6 +1106,10 @@ const styles = StyleSheet.create({
   discordButtonText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  kofiImage: {
+    height: 32,
+    width: 150,
   },
   loadingSpinner: {
     width: 16,

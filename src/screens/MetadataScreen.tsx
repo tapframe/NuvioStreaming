@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   InteractionManager,
   BackHandler,
+  Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -612,8 +613,10 @@ const MetadataScreen: React.FC = () => {
             showsVerticalScrollIndicator={false}
             onScroll={animations.scrollHandler}
             scrollEventThrottle={16}
-            bounces={false}
-            overScrollMode="never"
+            bounces={Platform.OS === 'ios'}
+            overScrollMode={Platform.OS === 'android' ? 'always' : 'always'}
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.scrollContent}
           >
             {/* Hero Section - Optimized */}

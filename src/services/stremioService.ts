@@ -1197,26 +1197,15 @@ class StremioService {
         const isDirectStreamingUrl = this.isDirectStreamingUrl(streamUrl);
         const isMagnetStream = streamUrl?.startsWith('magnet:');
 
-        // Memory optimization: Limit title length to prevent memory bloat
+        // Prefer full, untruncated text to preserve complete addon details
         let displayTitle = stream.title || stream.name || 'Unnamed Stream';
         if (stream.description && stream.description.includes('\n') && stream.description.length > (stream.title?.length || 0)) {
-          // If description exists, contains newlines (likely formatted metadata), 
-          // and is longer than the title, prefer it but truncate if too long
-          displayTitle = stream.description.length > 150 
-            ? stream.description.substring(0, 150) + '...' 
-            : stream.description;
+          // If description exists and is likely the formatted metadata, prefer it as-is
+          displayTitle = stream.description;
         }
-        
-        // Truncate display title if still too long
-        if (displayTitle.length > 100) {
-          displayTitle = displayTitle.substring(0, 100) + '...';
-        }
-        
-        // Use the original name field for the primary identifier if available
+
+        // Use full name for primary identifier if available
         let name = stream.name || stream.title || 'Unnamed Stream';
-        if (name.length > 80) {
-          name = name.substring(0, 80) + '...';
-        }
 
         // Extract size: Prefer behaviorHints.videoSize, fallback to top-level size
         const sizeInBytes = stream.behaviorHints?.videoSize || stream.size || undefined;
@@ -1241,10 +1230,8 @@ class StremioService {
           title: displayTitle,
           addonName: addon.name,
           addonId: addon.id,
-          // Memory optimization: Only include essential fields
-          description: stream.description && stream.description.length <= 100 
-            ? stream.description 
-            : undefined, // Skip long descriptions
+          // Include description as-is to preserve full details
+          description: stream.description,
           infoHash: stream.infoHash || undefined,
           fileIdx: stream.fileIdx,
           size: sizeInBytes,

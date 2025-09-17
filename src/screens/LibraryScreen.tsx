@@ -831,8 +831,33 @@ const LibraryScreen = () => {
     }
 
     if (filteredItems.length === 0) {
-      // Intentionally render nothing to match the minimal empty state in the design
-      return <View style={styles.listContainer} />;
+      const emptyTitle = filter === 'movies' ? 'No movies yet' : filter === 'series' ? 'No TV shows yet' : 'No content yet';
+      const emptySubtitle = 'Add some content to your library to see it here';
+      return (
+        <View style={styles.emptyContainer}>
+          <MaterialIcons 
+            name="video-library" 
+            size={64} 
+            color={currentTheme.colors.lightGray}
+          />
+          <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>
+            {emptyTitle}
+          </Text>
+          <Text style={[styles.emptySubtext, { color: currentTheme.colors.mediumGray }]}>
+            {emptySubtitle}
+          </Text>
+          <TouchableOpacity 
+            style={[styles.exploreButton, { 
+              backgroundColor: currentTheme.colors.primary,
+              shadowColor: currentTheme.colors.black
+            }]}
+            onPress={() => navigation.navigate('Search')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.exploreButtonText, { color: currentTheme.colors.white }]}>Find something to watch</Text>
+          </TouchableOpacity>
+        </View>
+      );
     }
 
     return (
