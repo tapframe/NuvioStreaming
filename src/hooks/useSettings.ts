@@ -126,6 +126,7 @@ const SETTINGS_STORAGE_KEY = 'app_settings';
 
 export const useSettings = () => {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [isLoaded, setIsLoaded] = useState<boolean>(false);
 
   useEffect(() => {
     loadSettings();
@@ -180,6 +181,10 @@ export const useSettings = () => {
       // Fallback to default settings on error
       setSettings(DEFAULT_SETTINGS);
     }
+    finally {
+      // Mark settings as loaded so UI can render with correct values without flicker
+      setIsLoaded(true);
+    }
   };
 
   const updateSetting = useCallback(async <K extends keyof AppSettings>(
@@ -217,6 +222,7 @@ export const useSettings = () => {
   return {
     settings,
     updateSetting,
+    isLoaded,
   };
 };
 

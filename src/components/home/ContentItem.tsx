@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Platform, Text } from 'react-native';
+import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Platform, Text, Animated } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -66,8 +66,9 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
   const [shouldLoadImageState, setShouldLoadImageState] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const { currentTheme } = useTheme();
-  const { settings } = useSettings();
+  const { settings, isLoaded } = useSettings();
   const posterRadius = typeof settings.posterBorderRadius === 'number' ? settings.posterBorderRadius : 12;
+  const fadeInOpacity = React.useRef(new Animated.Value(0)).current;
   // Memoize poster width calculation to avoid recalculating on every render
   const posterWidth = React.useMemo(() => {
     switch (settings.posterSize) {
@@ -157,9 +158,42 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
     return item.poster;
   }, [item.poster, retryCount, item.id]);
 
+  // Smoothly fade in content when settings are ready
+  useEffect(() => {
+    if (isLoaded) {
+      fadeInOpacity.setValue(0);
+      Animated.timing(fadeInOpacity, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [isLoaded, fadeInOpacity]);
+
+  // While settings load, render a placeholder with reserved space (poster aspect + title)
+  if (!isLoaded) {
+    const placeholderRadius = 12;
+    return (
+      <View style={[styles.itemContainer, { width: posterWidth }]}>
+        <View
+          style={[
+            styles.contentItem,
+            {
+              width: posterWidth,
+              borderRadius: placeholderRadius,
+              backgroundColor: currentTheme.colors.elevation1,
+            },
+          ]}
+        />
+        {/* Reserve space for title to keep section spacing stable */}
+        <View style={{ height: 18, marginTop: 4 }} />
+      </View>
+    );
+  }
+
   return (
     <>
-      <View style={[styles.itemContainer, { width: posterWidth }]}>
+      <Animated.View style={[styles.itemContainer, { width: posterWidth, opacity: fadeInOpacity }]}> 
         <TouchableOpacity
           style={[styles.contentItem, { width: posterWidth, borderRadius: posterRadius }]}
           activeOpacity={0.7}
@@ -175,9 +209,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
                 style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, borderRadius: posterRadius }]}
                 contentFit="cover"
                 cachePolicy={Platform.OS === 'android' ? 'disk' : 'memory-disk'}
-                transition={0} // Disable transition to reduce GPU work
-                placeholder={{ blurhash: PLACEHOLDER_BLURHASH } as any}
-                placeholderContentFit="cover"
+                transition={140}
                 allowDownscaling
                 priority="low" // Deprioritize decode for long lists
                 onLoad={() => {
@@ -227,7 +259,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
             {item.name}
           </Text>
         )}
-      </View>
+      </Animated.View>
 
       <DropUpMenu
         visible={menuVisible}

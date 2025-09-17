@@ -209,7 +209,7 @@ const LibraryScreen = () => {
   const { numColumns, itemWidth } = useMemo(() => getGridLayout(width), [width]);
   const [loading, setLoading] = useState(true);
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
-  const [filter, setFilter] = useState<'all' | 'movies' | 'series'>('all');
+  const [filter, setFilter] = useState<'trakt' | 'movies' | 'series'>('movies');
   const [showTraktContent, setShowTraktContent] = useState(false);
   const [selectedTraktFolder, setSelectedTraktFolder] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
@@ -295,7 +295,6 @@ const LibraryScreen = () => {
   }, []);
 
   const filteredItems = libraryItems.filter(item => {
-    if (filter === 'all') return true;
     if (filter === 'movies') return item.type === 'movie';
     if (filter === 'series') return item.type === 'series';
     return true;
@@ -776,7 +775,7 @@ const LibraryScreen = () => {
     );
   };
 
-  const renderFilter = (filterType: 'all' | 'movies' | 'series', label: string, iconName: keyof typeof MaterialIcons.glyphMap) => {
+  const renderFilter = (filterType: 'trakt' | 'movies' | 'series', label: string, iconName: keyof typeof MaterialIcons.glyphMap) => {
     const isActive = filter === filterType;
     
     return (
@@ -786,15 +785,33 @@ const LibraryScreen = () => {
           isActive && { backgroundColor: currentTheme.colors.primary },
           { shadowColor: currentTheme.colors.black }
         ]}
-        onPress={() => setFilter(filterType)}
+        onPress={() => {
+          if (filterType === 'trakt') {
+            if (!traktAuthenticated) {
+              navigation.navigate('TraktSettings');
+            } else {
+              setShowTraktContent(true);
+              setSelectedTraktFolder(null);
+              loadAllCollections();
+            }
+            return;
+          }
+          setFilter(filterType);
+        }}
         activeOpacity={0.7}
       >
-        <MaterialIcons
-          name={iconName}
-          size={22}
-          color={isActive ? currentTheme.colors.white : currentTheme.colors.mediumGray}
-          style={styles.filterIcon}
-        />
+        {filterType === 'trakt' ? (
+          <View style={[styles.filterIcon, { justifyContent: 'center', alignItems: 'center' }]}>
+            <TraktIcon width={18} height={18} style={{ opacity: isActive ? 1 : 0.6 }} />
+          </View>
+        ) : (
+          <MaterialIcons
+            name={iconName}
+            size={22}
+            color={isActive ? currentTheme.colors.white : currentTheme.colors.mediumGray}
+            style={styles.filterIcon}
+          />
+        )}
         <Text
           style={[
             styles.filterText,
@@ -813,60 +830,22 @@ const LibraryScreen = () => {
       return <SkeletonLoader />;
     }
 
-    // Combine regular library items with Trakt folder
-    const allItems = [];
-    
-    // Add Trakt folder if authenticated or as connection prompt
-    if (traktAuthenticated || !traktAuthenticated) {
-      allItems.push({ type: 'trakt-folder', id: 'trakt-folder' });
-    }
-    
-    // Add filtered library items
-    allItems.push(...filteredItems);
-
-    if (allItems.length === 0) {
-      return (
-            <View style={styles.emptyContainer}>
-              <MaterialIcons 
-                name="video-library" 
-                size={80} 
-                color={currentTheme.colors.mediumGray}
-                style={{ opacity: 0.7 }}
-              />
-              <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>Your library is empty</Text>
-              <Text style={[styles.emptySubtext, { color: currentTheme.colors.mediumGray }]}>
-                Add content to your library to keep track of what you're watching
-              </Text>
-              <TouchableOpacity 
-                style={[styles.exploreButton, { 
-                  backgroundColor: currentTheme.colors.primary,
-                  shadowColor: currentTheme.colors.black
-                }]}
-                onPress={() => navigation.navigate('MainTabs')}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.exploreButtonText, { color: currentTheme.colors.white }]}>Explore Content</Text>
-              </TouchableOpacity>
-            </View>
-      );
+    if (filteredItems.length === 0) {
+      // Intentionally render nothing to match the minimal empty state in the design
+      return <View style={styles.listContainer} />;
     }
 
     return (
-            <FlashList
-        data={allItems}
-        renderItem={({ item }) => {
-          if (item.type === 'trakt-folder') {
-            return renderTraktFolder();
-          }
-          return renderItem({ item: item as LibraryItem });
-        }}
-              keyExtractor={item => item.id}
-              numColumns={numColumns}
-              contentContainerStyle={styles.listContainer}
-              showsVerticalScrollIndicator={false}
-              onEndReachedThreshold={0.7}
-              onEndReached={() => {}}
-            />
+      <FlashList
+        data={filteredItems}
+        renderItem={({ item }) => renderItem({ item: item as LibraryItem })}
+        keyExtractor={item => item.id}
+        numColumns={numColumns}
+        contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
+        onEndReachedThreshold={0.7}
+        onEndReached={() => {}}
+      />
     );
   };
 
@@ -937,7 +916,7 @@ const LibraryScreen = () => {
               contentContainerStyle={styles.filtersContainer}
               style={styles.filtersScrollView}
             >
-              {renderFilter('all', 'All', 'apps')}
+              {renderFilter('trakt', 'Trakt', 'pan-tool')}
               {renderFilter('movies', 'Movies', 'movie')}
               {renderFilter('series', 'TV Shows', 'live-tv')}
             </ScrollView>
