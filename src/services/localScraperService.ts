@@ -33,6 +33,7 @@ export interface ScraperInfo {
   formats?: string[];
   supportedFormats?: string[];
   repositoryId?: string; // Which repository this scraper came from
+  supportsExternalPlayer?: boolean; // Whether this scraper supports external players
 }
 
 export interface RepositoryInfo {
@@ -600,14 +601,25 @@ class LocalScraperService {
 
     try {
       logger.log('[LocalScraperService] Fetching repository manifest from:', this.repositoryUrl);
-      
+
+      // Clear all cached scraper code for this repository to force hard refresh
+      const cachedScraperIds = Array.from(this.installedScrapers.keys());
+      for (const scraperId of cachedScraperIds) {
+        const scraper = this.installedScrapers.get(scraperId);
+        if (scraper && scraper.repositoryId === this.currentRepositoryId) {
+          this.scraperCode.delete(scraperId);
+          await AsyncStorage.removeItem(`scraper-code-${scraperId}`);
+          logger.log('[LocalScraperService] Cleared cached code for scraper:', scraper.name);
+        }
+      }
+
       // Fetch manifest with cache busting
-      const baseManifestUrl = this.repositoryUrl.endsWith('/') 
+      const baseManifestUrl = this.repositoryUrl.endsWith('/')
         ? `${this.repositoryUrl}manifest.json`
         : `${this.repositoryUrl}/manifest.json`;
-      const manifestUrl = `${baseManifestUrl}?t=${Date.now()}`;
-      
-      const response = await axios.get(manifestUrl, { 
+      const manifestUrl = `${baseManifestUrl}?t=${Date.now()}&v=${Math.random()}`;
+
+      const response = await axios.get(manifestUrl, {
          timeout: 10000,
          headers: {
            'Cache-Control': 'no-cache',
@@ -700,7 +712,17 @@ class LocalScraperService {
       
       logger.log('[LocalScraperService] Downloading scraper:', scraperInfo.name);
       
-      const response = await axios.get(scraperUrl, { timeout: 15000 });
+      // Add cache-busting parameters to force fresh download
+      const scraperUrlWithCacheBust = `${scraperUrl}?t=${Date.now()}&v=${Math.random()}`;
+
+      const response = await axios.get(scraperUrlWithCacheBust, {
+        timeout: 15000,
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
       const scraperCode = response.data;
       
       // Store scraper info and code
@@ -836,19 +858,19 @@ class LocalScraperService {
       logger.log('[LocalScraperService] Fetching available scrapers from manifest');
       
       // Fetch manifest with cache busting
-      const baseManifestUrl = this.repositoryUrl.endsWith('/') 
+      const baseManifestUrl = this.repositoryUrl.endsWith('/')
         ? `${this.repositoryUrl}manifest.json`
         : `${this.repositoryUrl}/manifest.json`;
-      const manifestUrl = `${baseManifestUrl}?t=${Date.now()}`;
-      
-      const response = await axios.get(manifestUrl, { 
-        timeout: 10000,
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      });
+      const manifestUrl = `${baseManifestUrl}?t=${Date.now()}&v=${Math.random()}`;
+
+      const response = await axios.get(manifestUrl, {
+         timeout: 10000,
+         headers: {
+           'Cache-Control': 'no-cache',
+           'Pragma': 'no-cache',
+           'Expires': '0'
+         }
+       });
       const manifest: ScraperManifest = response.data;
       
       // Store repository name from manifest
@@ -871,6 +893,7 @@ class LocalScraperService {
             // If manifest says enabled: true, use installed state or default to false
             enabled: scraperInfo.enabled ? (installedScraper?.enabled ?? false) : false
           };
+
 
           // Normalize formats fields (support both `formats` and `supportedFormats`)
           const anyScraper: any = scraperWithManifestData as any;

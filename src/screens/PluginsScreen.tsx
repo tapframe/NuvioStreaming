@@ -490,16 +490,18 @@ const createStyles = (colors: any) => StyleSheet.create({
   modalContent: {
     backgroundColor: colors.darkBackground,
     borderRadius: 16,
-    padding: 24,
+    padding: 20,
     margin: 20,
-    maxHeight: '80%',
+    maxHeight: '70%',
     width: screenWidth - 40,
+    borderWidth: 1,
+    borderColor: colors.elevation3,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
     color: colors.white,
-    marginBottom: 16,
+    marginBottom: 8,
   },
   modalText: {
     fontSize: 16,
@@ -521,6 +523,82 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.white,
     fontSize: 16,
     fontWeight: '500',
+  },
+  // Compact modal styles
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    gap: 6,
+  },
+  compactTextInput: {
+    backgroundColor: colors.darkBackground,
+    borderRadius: 8,
+    padding: 12,
+    color: colors.white,
+    fontSize: 15,
+    borderWidth: 1,
+    borderColor: colors.elevation3,
+    marginBottom: 12,
+  },
+  compactExamples: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  quickButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.elevation2,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: colors.elevation3,
+  },
+  quickButtonText: {
+    fontSize: 12,
+    color: colors.white,
+    fontWeight: '500',
+  },
+  formatHint: {
+    fontSize: 12,
+    color: colors.mediumGray,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    marginBottom: 16,
+    lineHeight: 16,
+  },
+  compactActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  compactButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 40,
+  },
+  cancelButton: {
+    backgroundColor: colors.elevation2,
+    borderWidth: 1,
+    borderColor: colors.elevation3,
+  },
+  cancelButtonText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  addButton: {
+    backgroundColor: colors.primary,
+  },
+  addButtonText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '600',
   },
   quickSetupContainer: {
     backgroundColor: colors.elevation2,
@@ -563,6 +641,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: colors.elevation3,
+    minHeight: 120,
   },
   scraperCardHeader: {
     flexDirection: 'row',
@@ -577,12 +656,14 @@ const createStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 8,
-    gap: 12,
+    gap: 8,
+    flexWrap: 'wrap',
   },
   scraperCardMetaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 2,
+    marginBottom: 4,
   },
   scraperCardMetaText: {
     fontSize: 12,
@@ -857,8 +938,27 @@ const PluginsScreen: React.FC = () => {
     const url = newRepositoryUrl.trim();
     if (!url.startsWith('https://raw.githubusercontent.com/') && !url.startsWith('http://')) {
       Alert.alert(
-        'Invalid URL Format', 
-        'Please use a valid GitHub raw URL format:\n\nhttps://raw.githubusercontent.com/username/repo/refs/heads/branch\n\nExample:\nhttps://raw.githubusercontent.com/tapframe/nuvio-providers/refs/heads/master'
+        'Invalid URL Format',
+        'Please use a valid GitHub raw URL format:\n\nhttps://raw.githubusercontent.com/username/repo/refs/heads/branch\n\nor include manifest.json:\nhttps://raw.githubusercontent.com/username/repo/refs/heads/branch/manifest.json\n\nExample:\nhttps://raw.githubusercontent.com/tapframe/nuvio-providers/refs/heads/master'
+      );
+      return;
+    }
+
+    // Check if URL already includes manifest.json
+    const isManifestUrl = url.includes('/manifest.json');
+
+    // Normalize URL - if it's a manifest URL, extract the base repository URL
+    let normalizedUrl = url;
+    if (isManifestUrl) {
+      normalizedUrl = url.replace('/manifest.json', '');
+      logger.log('[PluginsScreen] Detected manifest URL, extracting base repository URL:', normalizedUrl);
+    }
+
+    // Additional validation for normalized URL
+    if (!normalizedUrl.endsWith('/refs/heads/') && !normalizedUrl.includes('/refs/heads/')) {
+      Alert.alert(
+        'Invalid Repository Structure',
+        'The URL should point to a GitHub repository branch.\n\nExpected format:\nhttps://raw.githubusercontent.com/username/repo/refs/heads/branch'
       );
       return;
     }
@@ -867,7 +967,7 @@ const PluginsScreen: React.FC = () => {
       setIsLoading(true);
       const repoId = await localScraperService.addRepository({
         name: '', // Let the service fetch from manifest
-        url,
+        url: normalizedUrl, // Use normalized URL (without manifest.json)
         description: '',
         enabled: true
       });
@@ -952,6 +1052,8 @@ const PluginsScreen: React.FC = () => {
   const loadScrapers = async () => {
     try {
       const scrapers = await localScraperService.getAvailableScrapers();
+
+
       setInstalledScrapers(scrapers);
       // preload showbox settings if present
       const sb = scrapers.find(s => s.id === 'showboxog');
@@ -1036,14 +1138,20 @@ const PluginsScreen: React.FC = () => {
 
     try {
       setIsRefreshing(true);
+      logger.log('[PluginsScreen] Starting hard refresh of repository...');
+
+      // Force a complete hard refresh by clearing any cached data first
       await localScraperService.refreshRepository();
-      await loadScrapers(); // This will now load available scrapers from manifest
-      Alert.alert('Success', 'Repository refreshed successfully');
+
+      // Load fresh scrapers from the updated repository
+      await loadScrapers();
+
+      Alert.alert('Success', 'Repository refreshed successfully with latest files');
     } catch (error) {
-      logger.error('[ScraperSettings] Failed to refresh repository:', error);
+      logger.error('[PluginsScreen] Failed to refresh repository:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
       Alert.alert(
-        'Repository Error', 
+        'Repository Error',
         `Failed to refresh repository: ${errorMessage}\n\nPlease ensure your URL is correct and follows this format:\nhttps://raw.githubusercontent.com/username/repo/refs/heads/branch`
       );
     } finally {
@@ -1191,7 +1299,25 @@ const PluginsScreen: React.FC = () => {
       <ScrollView
         style={styles.scrollView}
         refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={loadScrapers} />
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={async () => {
+              try {
+                setIsRefreshing(true);
+                logger.log('[PluginsScreen] Pull-to-refresh: Starting hard refresh...');
+
+                // Force hard refresh of repository
+                await localScraperService.refreshRepository();
+                await loadScrapers();
+
+                logger.log('[PluginsScreen] Pull-to-refresh completed');
+              } catch (error) {
+                logger.error('[PluginsScreen] Pull-to-refresh failed:', error);
+              } finally {
+                setIsRefreshing(false);
+              }
+            }}
+          />
         }
       >
         {/* Quick Setup banner removed */}
@@ -1489,6 +1615,14 @@ const PluginsScreen: React.FC = () => {
                         </Text>
                       </View>
                     )}
+                    {scraper.supportsExternalPlayer === false && (
+                      <View style={styles.scraperCardMetaItem}>
+                        <Ionicons name="play-circle" size={12} color={colors.mediumGray} />
+                        <Text style={styles.scraperCardMetaText}>
+                          No external player
+                        </Text>
+                      </View>
+                    )}
                   </View>
 
                   {/* ShowBox Settings */}
@@ -1727,43 +1861,66 @@ const PluginsScreen: React.FC = () => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add New Repository</Text>
-            
-            <Text style={[styles.settingTitle, { marginBottom: 8 }]}>Repository URL</Text>
-            <TextInput
-              style={styles.textInput}
-              value={newRepositoryUrl}
-              onChangeText={handleUrlChange}
-              placeholder="https://raw.githubusercontent.com/username/repo/refs/heads/branch"
-              placeholderTextColor={colors.mediumGray}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-            />
-            
-            <View style={styles.buttonRow}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.modalHeader}>
+                <Ionicons name="add-circle" size={20} color={colors.primary} />
+                <Text style={styles.modalTitle}>Add Repository</Text>
+              </View>
+
+              <TextInput
+                style={styles.compactTextInput}
+                value={newRepositoryUrl}
+                onChangeText={handleUrlChange}
+                placeholder="Repository URL"
+                placeholderTextColor={colors.mediumGray}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                multiline={false}
+                numberOfLines={1}
+              />
+
+            {/* Quick Example */}
+            <View style={styles.compactExamples}>
               <TouchableOpacity
-                style={[styles.button, styles.secondaryButton, { flex: 1 }]}
+                style={styles.quickButton}
+                onPress={() => setNewRepositoryUrl('https://raw.githubusercontent.com/tapframe/nuvio-providers/refs/heads/main')}
+              >
+                <Ionicons name="star" size={14} color={colors.primary} />
+                <Text style={styles.quickButtonText}>Official</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Format Hint */}
+            <Text style={styles.formatHint}>
+              Format: https://raw.githubusercontent.com/username/repo/refs/heads/branch
+            </Text>
+
+            {/* Action Buttons */}
+            <View style={styles.compactActions}>
+              <TouchableOpacity
+                style={[styles.compactButton, styles.cancelButton]}
                 onPress={() => {
                   setShowAddRepositoryModal(false);
                   setNewRepositoryUrl('');
                 }}
               >
-                <Text style={styles.secondaryButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
-                style={[styles.button, styles.primaryButton, { flex: 1 }]}
+                style={[styles.compactButton, styles.addButton, (!newRepositoryUrl.trim() || isLoading) && styles.disabledButton]}
                 onPress={handleAddRepository}
-                disabled={isLoading}
+                disabled={!newRepositoryUrl.trim() || isLoading}
               >
                 {isLoading ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
+                  <ActivityIndicator size="small" color={colors.white} />
                 ) : (
-                  <Text style={styles.buttonText}>Add Repository</Text>
+                  <Text style={styles.addButtonText}>Add</Text>
                 )}
               </TouchableOpacity>
             </View>
+          </ScrollView>
           </View>
         </View>
       </Modal>
