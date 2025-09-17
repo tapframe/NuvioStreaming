@@ -51,9 +51,9 @@ const VideoPlayer: React.FC = () => {
   // Detect if stream is MKV format
   const isMkvFile = isMkvStream(uri, headers);
 
-  // Use AndroidVideoPlayer for Android devices
-  // Use KSPlayer for iOS devices
-  const shouldUseAndroidPlayer = Platform.OS === 'android';
+  // Use AndroidVideoPlayer for Android devices and non-MKV files on iOS
+  // Use KSPlayer only for MKV files on iOS
+  const shouldUseAndroidPlayer = Platform.OS === 'android' || (Platform.OS === 'ios' && !isMkvFile);
 
   safeDebugLog("Player selection logic", {
     platform: Platform.OS,
@@ -248,23 +248,6 @@ const VideoPlayer: React.FC = () => {
   const [brightness, setBrightness] = useState(1.0);
   const [showVolumeOverlay, setShowVolumeOverlay] = useState(false);
   const [showBrightnessOverlay, setShowBrightnessOverlay] = useState(false);
-  const [showKsVolumeWarning, setShowKsVolumeWarning] = useState(false);
-  const [hasShownKsWarning, setHasShownKsWarning] = useState(false);
-
-  // Load KSPlayer warning state from storage
-  useEffect(() => {
-    const loadWarningState = async () => {
-      try {
-        const warningShown = await AsyncStorage.getItem('ks_volume_warning_shown');
-        if (warningShown === 'true') {
-          setHasShownKsWarning(true);
-        }
-      } catch (error) {
-        // Ignore storage errors
-      }
-    };
-    loadWarningState();
-  }, []);
   const volumeOverlayOpacity = useRef(new Animated.Value(0)).current;
   const brightnessOverlayOpacity = useRef(new Animated.Value(0)).current;
   const volumeOverlayTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -426,20 +409,44 @@ const VideoPlayer: React.FC = () => {
   // Volume gesture handler (right side of screen)
   const onVolumeGestureEvent = async (event: PanGestureHandlerGestureEvent) => {
     const { translationY, state } = event.nativeEvent;
-
+    const screenHeight = screenDimensions.height;
+    const sensitivity = 0.002; // Reduced for finer control
+    
     if (state === State.ACTIVE) {
-      // Show KSPlayer volume warning only once per session
-      if (!showKsVolumeWarning && !hasShownKsWarning) {
-        setShowKsVolumeWarning(true);
-        setHasShownKsWarning(true);
-
-        // Save to storage that warning has been shown
-        AsyncStorage.setItem('ks_volume_warning_shown', 'true').catch(() => {});
-
-        // Hide warning after 4 seconds
-        setTimeout(() => {
-          setShowKsVolumeWarning(false);
-        }, 4000);
+      const deltaY = -translationY; // Invert for natural feel (up = increase)
+      const volumeChange = deltaY * sensitivity;
+      const newVolume = Math.max(0, Math.min(100, volume + volumeChange));
+      
+      if (Math.abs(newVolume - volume) > 0.5) { // Reduced threshold for smoother updates
+        setVolume(newVolume);
+        lastVolumeChange.current = Date.now();
+        
+        // Show overlay with smoother animation
+        if (!showVolumeOverlay) {
+          setShowVolumeOverlay(true);
+          Animated.spring(volumeOverlayOpacity, {
+            toValue: 1,
+            tension: 100,
+            friction: 8,
+            useNativeDriver: true,
+          }).start();
+        }
+        
+        // Clear existing timeout
+        if (volumeOverlayTimeout.current) {
+          clearTimeout(volumeOverlayTimeout.current);
+        }
+        
+        // Hide overlay after 1.5 seconds
+        volumeOverlayTimeout.current = setTimeout(() => {
+          Animated.timing(volumeOverlayOpacity, {
+            toValue: 0,
+            duration: 250,
+            useNativeDriver: true,
+          }).start(() => {
+            setShowVolumeOverlay(false);
+          });
+        }, 1500);
       }
     }
   };
@@ -3147,73 +3154,6 @@ const VideoPlayer: React.FC = () => {
             </Animated.View>
           )}
 
-          {/* KSPlayer Volume Warning Overlay */}
-          {showKsVolumeWarning && (
-            <View
-              style={{
-                position: 'absolute',
-                left: 0,
-                right: 0,
-                top: 0,
-                bottom: 0,
-                justifyContent: 'center',
-                alignItems: 'center',
-                zIndex: 1000,
-                backgroundColor: 'rgba(0, 0, 0, 0.3)',
-              }}
-            >
-              <View style={{
-                backgroundColor: 'rgba(0, 0, 0, 0.95)',
-                borderRadius: 16,
-                padding: 20,
-                alignItems: 'center',
-                width: Math.min(280, screenDimensions.width * 0.8),
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 8 },
-                shadowOpacity: 0.6,
-                shadowRadius: 12,
-                elevation: 15,
-                borderWidth: 1,
-                borderColor: 'rgba(255, 255, 255, 0.1)',
-              }}>
-                <MaterialIcons
-                  name="volume-off"
-                  size={28}
-                  color="#FF6B6B"
-                  style={{ marginBottom: 12 }}
-                />
-
-                <Text style={{
-                  color: '#FFFFFF',
-                  fontSize: 16,
-                  fontWeight: '700',
-                  textAlign: 'center',
-                  marginBottom: 8,
-                }}>
-                  Volume Control Not Available
-                </Text>
-
-                <Text style={{
-                  color: '#CCCCCC',
-                  fontSize: 13,
-                  textAlign: 'center',
-                  lineHeight: 18,
-                  marginBottom: 12,
-                }}>
-                  KSPlayer doesn't support volume gestures.{'\n'}Use your device volume buttons instead.
-                </Text>
-
-                <Text style={{
-                  color: '#888888',
-                  fontSize: 11,
-                  textAlign: 'center',
-                  fontStyle: 'italic',
-                }}>
-                  This message won't be shown again
-                </Text>
-              </View>
-            </View>
-          )}
 
           {/* Resume overlay removed when AlwaysResume is enabled; overlay component omitted */}
         </View>

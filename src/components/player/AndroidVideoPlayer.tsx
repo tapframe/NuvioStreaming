@@ -2968,7 +2968,7 @@ const AndroidVideoPlayer: React.FC = () => {
             duration={duration}
             zoomScale={zoomScale}
             currentResizeMode={resizeMode}
-            vlcAudioTracks={rnVideoAudioTracks}
+            ksAudioTracks={rnVideoAudioTracks}
             selectedAudioTrack={selectedAudioTrack?.type === SelectedTrackType.INDEX && selectedAudioTrack.value !== undefined ? Number(selectedAudioTrack.value) : null}
             availableStreams={availableStreams}
             togglePlayback={togglePlayback}
@@ -3607,7 +3607,7 @@ const AndroidVideoPlayer: React.FC = () => {
       <AudioTrackModal
         showAudioModal={showAudioModal}
         setShowAudioModal={setShowAudioModal}
-        vlcAudioTracks={rnVideoAudioTracks}
+        ksAudioTracks={rnVideoAudioTracks}
         selectedAudioTrack={selectedAudioTrack?.type === SelectedTrackType.INDEX && selectedAudioTrack.value !== undefined ? Number(selectedAudioTrack.value) : null}
         selectAudioTrack={selectAudioTrackById}
       />
@@ -3620,7 +3620,7 @@ const AndroidVideoPlayer: React.FC = () => {
         isLoadingSubtitles={isLoadingSubtitles}
         customSubtitles={customSubtitles}
         availableSubtitles={availableSubtitles}
-        vlcTextTracks={rnVideoTextTracks}
+        ksTextTracks={rnVideoTextTracks}
         selectedTextTrack={selectedTextTrack}
         useCustomSubtitles={useCustomSubtitles}
         subtitleSize={subtitleSize}
