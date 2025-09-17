@@ -23,7 +23,7 @@ interface PlayerControlsProps {
   duration: number;
   zoomScale: number;
   currentResizeMode?: string;
-  vlcAudioTracks: Array<{id: number, name: string, language?: string}>;
+  ksAudioTracks: Array<{id: number, name: string, language?: string}>;
   selectedAudioTrack: number | null;
   availableStreams?: { [providerId: string]: { streams: any[]; addonName: string } };
   togglePlayback: () => void;
@@ -58,7 +58,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   duration,
   zoomScale,
   currentResizeMode,
-  vlcAudioTracks,
+  ksAudioTracks,
   selectedAudioTrack,
   availableStreams,
   togglePlayback,
@@ -170,17 +170,17 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 </Text>
               </TouchableOpacity>
 
-              {/* Audio Button - Updated to use vlcAudioTracks */}
+              {/* Audio Button - Updated to use ksAudioTracks */}
               <TouchableOpacity
                 style={styles.bottomButton}
                 onPress={() => setShowAudioModal(true)}
-                disabled={vlcAudioTracks.length <= 1}
+                disabled={ksAudioTracks.length <= 1}
               >
-                <Ionicons name="volume-high" size={20} color={vlcAudioTracks.length <= 1 ? 'grey' : 'white'} />
-                <Text style={[styles.bottomButtonText, vlcAudioTracks.length <= 1 && {color: 'grey'}]} numberOfLines={1}>
+                <Ionicons name="volume-high" size={20} color={ksAudioTracks.length <= 1 ? 'grey' : 'white'} />
+                <Text style={[styles.bottomButtonText, ksAudioTracks.length <= 1 && {color: 'grey'}]} numberOfLines={1}>
                   {(() => {
                     const trackName = getTrackDisplayName(
-                      vlcAudioTracks.find(t => t.id === selectedAudioTrack) || { id: -1, name: 'Default' }
+                      ksAudioTracks.find(t => t.id === selectedAudioTrack) || { id: -1, name: 'Default' }
                     );
                     // Truncate long audio track names to prevent UI cramping
                     const maxLength = 12; // Limit to 12 characters

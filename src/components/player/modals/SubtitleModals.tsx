@@ -21,7 +21,7 @@ interface SubtitleModalsProps {
   isLoadingSubtitles: boolean;
   customSubtitles: SubtitleCue[];
   availableSubtitles: WyzieSubtitle[];
-  vlcTextTracks: Array<{id: number, name: string, language?: string}>;
+  ksTextTracks: Array<{id: number, name: string, language?: string}>;
   selectedTextTrack: number;
   useCustomSubtitles: boolean;
   subtitleSize: number;
@@ -68,7 +68,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   isLoadingSubtitles,
   customSubtitles,
   availableSubtitles,
-  vlcTextTracks,
+  ksTextTracks,
   selectedTextTrack,
   useCustomSubtitles,
   subtitleSize,
@@ -286,10 +286,10 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                 </Text>
                 
                 <View style={{ gap: 8 }}>
-                  {vlcTextTracks.map((track) => {
+                  {ksTextTracks.map((track) => {
                     const isSelected = selectedTextTrack === track.id && !useCustomSubtitles;
                     // Debug logging for subtitle selection
-                    if (__DEV__ && vlcTextTracks.length > 0) {
+                    if (__DEV__ && ksTextTracks.length > 0) {
                       console.log('[SubtitleModals] Track:', track.id, track.name, 'Selected:', selectedTextTrack, 'isSelected:', isSelected, 'useCustom:', useCustomSubtitles);
                     }
                     return (

@@ -46,7 +46,7 @@ import * as Brightness from 'expo-brightness';
 const VideoPlayer: React.FC = () => {
   const insets = useSafeAreaInsets();
   const route = useRoute<RouteProp<RootStackParamList, 'Player'>>();
-  const { uri, headers, forceVlc, streamProvider } = route.params as any;
+  const { uri, headers, streamProvider } = route.params as any;
 
   // Detect if stream is MKV format
   const isMkvFile = isMkvStream(uri, headers);
@@ -150,8 +150,8 @@ const VideoPlayer: React.FC = () => {
   const [isBackdropLoaded, setIsBackdropLoaded] = useState(false);
   const backdropImageOpacityAnim = useRef(new Animated.Value(0)).current;
   const [isBuffering, setIsBuffering] = useState(false);
-  const [vlcAudioTracks, setVlcAudioTracks] = useState<Array<{ id: number, name: string, language?: string }>>([]);
-  const [vlcTextTracks, setVlcTextTracks] = useState<Array<{ id: number, name: string, language?: string }>>([]);
+  const [ksAudioTracks, setKsAudioTracks] = useState<Array<{ id: number, name: string, language?: string }>>([]);
+  const [ksTextTracks, setKsTextTracks] = useState<Array<{ id: number, name: string, language?: string }>>([]);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
   // Removed progressAnim and progressBarRef - no longer needed with React Native Community Slider
   const [isDragging, setIsDragging] = useState(false);
@@ -193,10 +193,10 @@ const VideoPlayer: React.FC = () => {
   const [isLoadingSubtitleList, setIsLoadingSubtitleList] = useState<boolean>(false);
   const [showSourcesModal, setShowSourcesModal] = useState<boolean>(false);
   const [availableStreams, setAvailableStreams] = useState<{ [providerId: string]: { streams: any[]; addonName: string } }>(passedAvailableStreams || {});
-  // Decode URLs for VLC compatibility - VLC has issues with encoded URLs
-  const decodeUrlForVlc = (url: string): string => {
+  // Decode URLs for KSPlayer compatibility - KSPlayer handles encoded URLs better
+  const decodeUrlForKsPlayer = (url: string): string => {
     try {
-      // Always decode URLs for VLC as it has trouble with encoded characters
+      // KSPlayer handles encoded URLs well, but decode for consistency
       const decoded = decodeURIComponent(url);
       return decoded;
     } catch (e) {
@@ -205,7 +205,7 @@ const VideoPlayer: React.FC = () => {
     }
   };
 
-  const [currentStreamUrl, setCurrentStreamUrl] = useState<string>(decodeUrlForVlc(uri));
+  const [currentStreamUrl, setCurrentStreamUrl] = useState<string>(decodeUrlForKsPlayer(uri));
   const [isChangingSource, setIsChangingSource] = useState<boolean>(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string>('');
@@ -244,20 +244,20 @@ const VideoPlayer: React.FC = () => {
   const castDetailsScale = useRef(new Animated.Value(0.95)).current;
 
   // Volume and brightness controls
-  const [volume, setVolume] = useState(100); // VLC uses 0-100 range
+  const [volume, setVolume] = useState(100); // KSPlayer uses 0-100 range
   const [brightness, setBrightness] = useState(1.0);
   const [showVolumeOverlay, setShowVolumeOverlay] = useState(false);
   const [showBrightnessOverlay, setShowBrightnessOverlay] = useState(false);
-  const [showVlcVolumeWarning, setShowVlcVolumeWarning] = useState(false);
-  const [hasShownVlcWarning, setHasShownVlcWarning] = useState(false);
+  const [showKsVolumeWarning, setShowKsVolumeWarning] = useState(false);
+  const [hasShownKsWarning, setHasShownKsWarning] = useState(false);
 
-  // Load VLC warning state from storage
+  // Load KSPlayer warning state from storage
   useEffect(() => {
     const loadWarningState = async () => {
       try {
-        const warningShown = await AsyncStorage.getItem('vlc_volume_warning_shown');
+        const warningShown = await AsyncStorage.getItem('ks_volume_warning_shown');
         if (warningShown === 'true') {
-          setHasShownVlcWarning(true);
+          setHasShownKsWarning(true);
         }
       } catch (error) {
         // Ignore storage errors
@@ -428,17 +428,17 @@ const VideoPlayer: React.FC = () => {
     const { translationY, state } = event.nativeEvent;
 
     if (state === State.ACTIVE) {
-      // Show VLC volume warning only once per session
-      if (!showVlcVolumeWarning && !hasShownVlcWarning) {
-        setShowVlcVolumeWarning(true);
-        setHasShownVlcWarning(true);
+      // Show KSPlayer volume warning only once per session
+      if (!showKsVolumeWarning && !hasShownKsWarning) {
+        setShowKsVolumeWarning(true);
+        setHasShownKsWarning(true);
 
         // Save to storage that warning has been shown
-        AsyncStorage.setItem('vlc_volume_warning_shown', 'true').catch(() => {});
+        AsyncStorage.setItem('ks_volume_warning_shown', 'true').catch(() => {});
 
         // Hide warning after 4 seconds
         setTimeout(() => {
-          setShowVlcVolumeWarning(false);
+          setShowKsVolumeWarning(false);
         }, 4000);
       }
     }
@@ -552,10 +552,10 @@ const VideoPlayer: React.FC = () => {
       startOpeningAnimation();
 
       // Initialize current volume and brightness levels
-      // Volume starts at 100 (full volume) for VLC
+      // Volume starts at 100 (full volume) for KSPlayer
       setVolume(100);
       if (DEBUG_MODE) {
-        logger.log(`[VideoPlayer] Initial volume: 100 (VLC native)`);
+        logger.log(`[VideoPlayer] Initial volume: 100 (KSPlayer native)`);
       }
 
       try {
@@ -901,11 +901,11 @@ const VideoPlayer: React.FC = () => {
       setLastAudioTrackCheck(now);
       
       // Check if audio track is disabled (-1) and we have available tracks
-      if (selectedAudioTrack === -1 && vlcAudioTracks.length > 1) {
+      if (selectedAudioTrack === -1 && ksAudioTracks.length > 1) {
         logger.warn('[VideoPlayer] Detected disabled audio track, attempting fallback');
         
         // Find a fallback audio track (prefer stereo/standard formats)
-        const fallbackTrack = vlcAudioTracks.find((track, index) => {
+        const fallbackTrack = ksAudioTracks.find((track, index) => {
           const trackName = (track.name || '').toLowerCase();
           const trackLang = (track.language || '').toLowerCase();
           // Prefer stereo, AAC, or standard audio formats, avoid heavy codecs
@@ -919,7 +919,7 @@ const VideoPlayer: React.FC = () => {
         });
         
         if (fallbackTrack) {
-          const fallbackIndex = vlcAudioTracks.indexOf(fallbackTrack);
+          const fallbackIndex = ksAudioTracks.indexOf(fallbackTrack);
           logger.warn(`[VideoPlayer] Switching to fallback audio track: ${fallbackTrack.name || 'Unknown'} (index: ${fallbackIndex})`);
           
           // Increment fallback attempts counter
@@ -1073,7 +1073,7 @@ const VideoPlayer: React.FC = () => {
             language: trackLanguage,
           };
         });
-        setVlcAudioTracks(formattedAudioTracks);
+        setKsAudioTracks(formattedAudioTracks);
         
         // Auto-select English audio track if available, otherwise first track
         if (selectedAudioTrack === null && formattedAudioTracks.length > 0) {
@@ -1110,7 +1110,7 @@ const VideoPlayer: React.FC = () => {
           isImageSubtitle: track.isImageSubtitle || false
         }));
         
-        setVlcTextTracks(formattedTextTracks);
+        setKsTextTracks(formattedTextTracks);
 
         // Auto-select English subtitle track if available
         if (selectedTextTrack === -1 && !useCustomSubtitles && formattedTextTracks.length > 0) {
@@ -1351,11 +1351,11 @@ const VideoPlayer: React.FC = () => {
         (error?.title && /codec not supported/i.test(error.title));
       
       // Handle audio codec errors with automatic fallback
-      if (isAudioCodecError && vlcAudioTracks.length > 1) {
+      if (isAudioCodecError && ksAudioTracks.length > 1) {
         logger.warn('[VideoPlayer] Audio codec error detected, attempting audio track fallback');
         
         // Find a fallback audio track (prefer stereo/standard formats)
-        const fallbackTrack = vlcAudioTracks.find((track, index) => {
+        const fallbackTrack = ksAudioTracks.find((track, index) => {
           const trackName = (track.name || '').toLowerCase();
           const trackLang = (track.language || '').toLowerCase();
           // Prefer stereo, AAC, or standard audio formats, avoid heavy codecs
@@ -1369,7 +1369,7 @@ const VideoPlayer: React.FC = () => {
         });
         
         if (fallbackTrack) {
-          const fallbackIndex = vlcAudioTracks.indexOf(fallbackTrack);
+          const fallbackIndex = ksAudioTracks.indexOf(fallbackTrack);
           logger.warn(`[VideoPlayer] Switching to fallback audio track: ${fallbackTrack.name || 'Unknown'} (index: ${fallbackIndex})`);
           
           // Clear any existing error state
@@ -1478,18 +1478,18 @@ const VideoPlayer: React.FC = () => {
   const selectAudioTrack = (trackId: number) => {
     if (DEBUG_MODE) {
       logger.log(`[VideoPlayer] Selecting audio track: ${trackId}`);
-      logger.log(`[VideoPlayer] Available tracks:`, vlcAudioTracks);
+      logger.log(`[VideoPlayer] Available tracks:`, ksAudioTracks);
     }
     
     // Validate that the track exists
-    const trackExists = vlcAudioTracks.some(track => track.id === trackId);
+    const trackExists = ksAudioTracks.some(track => track.id === trackId);
     if (!trackExists) {
       logger.error(`[VideoPlayer] Audio track ${trackId} not found in available tracks`);
       return;
     }
     
     // Get the selected track info for logging
-    const selectedTrack = vlcAudioTracks.find(track => track.id === trackId);
+    const selectedTrack = ksAudioTracks.find(track => track.id === trackId);
     if (selectedTrack && DEBUG_MODE) {
       logger.log(`[VideoPlayer] Switching to track: ${selectedTrack.name} (${selectedTrack.language})`);
       
@@ -1541,12 +1541,12 @@ const VideoPlayer: React.FC = () => {
     }
   };
 
-  // Ensure native VLC text tracks are disabled when using custom (addon) subtitles
+  // Ensure native KSPlayer text tracks are disabled when using custom (addon) subtitles
   // and re-applied when switching back to built-in tracks. This prevents double-rendering.
   useEffect(() => {
     try {
       if (useCustomSubtitles) {
-        // -1 disables native subtitle rendering in VLC
+        // -1 disables native subtitle rendering in KSPlayer
         setSelectedTextTrack(-1);
       } else if (typeof selectedTextTrack === 'number' && selectedTextTrack >= 0) {
         // KSPlayer picks it up via prop
@@ -1692,7 +1692,7 @@ const VideoPlayer: React.FC = () => {
       const parsedCues = parseSRT(srtContent);
       logger.log(`[VideoPlayer] Parsed cues count=${parsedCues.length}`);
 
-      // For VLC on iOS: stop spinner early, then clear-apply and micro-seek nudge
+      // For KSPlayer on iOS: stop spinner early, then clear-apply and micro-seek nudge
       setIsLoadingSubtitles(false);
       logger.log('[VideoPlayer] isLoadingSubtitles -> false (early)');
 
@@ -1825,7 +1825,6 @@ const VideoPlayer: React.FC = () => {
               streamProvider: addonName,
               streamName: bestStream.name || bestStream.title,
               headers: bestStream.headers || undefined,
-              forceVlc: false,
               id,
               type: 'series',
               episodeId: nextEpisodeId,
@@ -2121,8 +2120,8 @@ const VideoPlayer: React.FC = () => {
 
   // Handle audio track changes with proper logging
   useEffect(() => {
-    if (selectedAudioTrack !== null && vlcAudioTracks.length > 0) {
-      const selectedTrack = vlcAudioTracks.find(track => track.id === selectedAudioTrack);
+    if (selectedAudioTrack !== null && ksAudioTracks.length > 0) {
+      const selectedTrack = ksAudioTracks.find(track => track.id === selectedAudioTrack);
       if (selectedTrack) {
         if (DEBUG_MODE) {
           logger.log(`[VideoPlayer] Audio track selected: ${selectedTrack.name} (${selectedTrack.language}) - ID: ${selectedAudioTrack}`);
@@ -2131,7 +2130,7 @@ const VideoPlayer: React.FC = () => {
         logger.warn(`[VideoPlayer] Selected audio track ${selectedAudioTrack} not found in available tracks`);
       }
     }
-  }, [selectedAudioTrack, vlcAudioTracks]);
+  }, [selectedAudioTrack, ksAudioTracks]);
 
   const increaseSubtitleSize = () => {
     const newSize = Math.min(subtitleSize + 2, 32);
@@ -2231,8 +2230,8 @@ const VideoPlayer: React.FC = () => {
       // Set pending seek state
       setPendingSeek({ position: savedPosition, shouldPlay: wasPlaying });
 
-      // Update the stream URL and details immediately (decode URL for VLC)
-      setCurrentStreamUrl(decodeUrlForVlc(newStream.url));
+      // Update the stream URL and details immediately (decode URL for KSPlayer)
+      setCurrentStreamUrl(decodeUrlForKsPlayer(newStream.url));
       setCurrentQuality(newQuality);
       setCurrentStreamProvider(newProvider);
       setCurrentStreamName(newStreamName);
@@ -2559,7 +2558,7 @@ const VideoPlayer: React.FC = () => {
             currentTime={currentTime}
             duration={duration}
             zoomScale={zoomScale}
-            vlcAudioTracks={vlcAudioTracks}
+            ksAudioTracks={ksAudioTracks}
             selectedAudioTrack={selectedAudioTrack}
             availableStreams={availableStreams}
             togglePlayback={togglePlayback}
@@ -3148,8 +3147,8 @@ const VideoPlayer: React.FC = () => {
             </Animated.View>
           )}
 
-          {/* VLC Volume Warning Overlay */}
-          {showVlcVolumeWarning && (
+          {/* KSPlayer Volume Warning Overlay */}
+          {showKsVolumeWarning && (
             <View
               style={{
                 position: 'absolute',
@@ -3201,7 +3200,7 @@ const VideoPlayer: React.FC = () => {
                   lineHeight: 18,
                   marginBottom: 12,
                 }}>
-                  VLC player doesn't support volume gestures.{'\n'}Use your device volume buttons instead.
+                  KSPlayer doesn't support volume gestures.{'\n'}Use your device volume buttons instead.
                 </Text>
 
                 <Text style={{
@@ -3223,7 +3222,7 @@ const VideoPlayer: React.FC = () => {
       <AudioTrackModal
         showAudioModal={showAudioModal}
         setShowAudioModal={setShowAudioModal}
-        vlcAudioTracks={vlcAudioTracks}
+        ksAudioTracks={ksAudioTracks}
         selectedAudioTrack={selectedAudioTrack}
         selectAudioTrack={selectAudioTrack}
       />
@@ -3236,7 +3235,7 @@ const VideoPlayer: React.FC = () => {
         isLoadingSubtitles={isLoadingSubtitles}
         customSubtitles={customSubtitles}
         availableSubtitles={availableSubtitles}
-        vlcTextTracks={vlcTextTracks}
+        ksTextTracks={ksTextTracks}
         selectedTextTrack={selectedTextTrack}
         useCustomSubtitles={useCustomSubtitles}
         subtitleSize={subtitleSize}

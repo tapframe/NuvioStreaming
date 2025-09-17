@@ -13,7 +13,7 @@ import { logger } from '../../../utils/logger';
 interface AudioTrackModalProps {
   showAudioModal: boolean;
   setShowAudioModal: (show: boolean) => void;
-  vlcAudioTracks: Array<{id: number, name: string, language?: string}>;
+  ksAudioTracks: Array<{id: number, name: string, language?: string}>;
   selectedAudioTrack: number | null;
   selectAudioTrack: (trackId: number) => void;
 }
@@ -24,7 +24,7 @@ const MENU_WIDTH = Math.min(width * 0.85, 400);
 export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
   showAudioModal,
   setShowAudioModal,
-  vlcAudioTracks,
+  ksAudioTracks,
   selectedAudioTrack,
   selectAudioTrack,
 }) => {
@@ -36,9 +36,9 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
   React.useEffect(() => {
     if (showAudioModal && DEBUG_MODE) {
       logger.log(`[AudioTrackModal] Modal opened with selectedAudioTrack:`, selectedAudioTrack);
-      logger.log(`[AudioTrackModal] Available tracks:`, vlcAudioTracks);
+      logger.log(`[AudioTrackModal] Available tracks:`, ksAudioTracks);
       if (typeof selectedAudioTrack === 'number') {
-        const selectedTrack = vlcAudioTracks.find(track => track.id === selectedAudioTrack);
+        const selectedTrack = ksAudioTracks.find(track => track.id === selectedAudioTrack);
         if (selectedTrack) {
           logger.log(`[AudioTrackModal] Selected track found: ${selectedTrack.name} (${selectedTrack.language})`);
         } else {
@@ -46,7 +46,7 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
         }
       }
     }
-  }, [showAudioModal, selectedAudioTrack, vlcAudioTracks]);
+  }, [showAudioModal, selectedAudioTrack, ksAudioTracks]);
 
   if (!showAudioModal) return null;
   
@@ -143,11 +143,11 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
               textTransform: 'uppercase',
               letterSpacing: 0.5,
             }}>
-              Available Tracks ({vlcAudioTracks.length})
+              Available Tracks ({ksAudioTracks.length})
             </Text>
             
             <View style={{ gap: 8 }}>
-              {vlcAudioTracks.map((track) => {
+              {ksAudioTracks.map((track) => {
                 // Determine if track is selected
                 const isSelected = selectedAudioTrack === track.id;
 
@@ -203,7 +203,7 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
               })}
             </View>
 
-            {vlcAudioTracks.length === 0 && (
+            {ksAudioTracks.length === 0 && (
               <View style={{
                 backgroundColor: 'rgba(255, 255, 255, 0.05)',
                 borderRadius: 16,
