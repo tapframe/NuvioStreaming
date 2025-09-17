@@ -75,9 +75,6 @@ const AndroidVideoPlayer: React.FC = () => {
     backdrop
   } = route.params;
 
-  // Check if the stream is from Xprime (by provider name or URL pattern)
-  const isXprimeStream = streamProvider === 'xprime' || streamProvider === 'Xprime' || 
-    (uri && /flutch.*\.workers\.dev|fsl\.fastcloud\.casa|xprime/i.test(uri));
 
   // Check if the stream is HLS (m3u8 playlist)
   const isHlsStream = (url: string) => {
@@ -99,37 +96,11 @@ const AndroidVideoPlayer: React.FC = () => {
     } as any;
   };
 
-  // Xprime-specific headers for better compatibility (from local-scrapers-repo)
-  const getXprimeHeaders = () => {
-    if (!isXprimeStream) return {};
-    const xprimeHeaders = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Accept-Encoding': 'identity',
-      'Origin': 'https://xprime.tv',
-      'Referer': 'https://xprime.tv/',
-      'Sec-Fetch-Dest': 'video',
-      'Sec-Fetch-Mode': 'no-cors',
-      'Sec-Fetch-Site': 'cross-site',
-      'DNT': '1'
-    } as any;
-    logger.log('[AndroidVideoPlayer] Applying Xprime headers for stream:', uri);
-    return xprimeHeaders;
-  };
 
   // Get appropriate headers based on stream type
   const getStreamHeaders = () => {
-    // For Xprime streams, be more flexible - only use HLS headers if it actually looks like HLS
-    if (isXprimeStream) {
-      if (isHlsStream(currentStreamUrl)) {
-        logger.log('[AndroidVideoPlayer] Xprime HLS stream detected, applying HLS headers');
-        return getXprimeHeaders();
-      } else {
-        logger.log('[AndroidVideoPlayer] Xprime MP4 stream detected, using default headers');
-        return Platform.OS === 'android' ? defaultAndroidHeaders() : defaultIosHeaders();
-      }
-    } else if (isHlsStream(currentStreamUrl)) {
+    // Use HLS headers for HLS streams, default headers for everything else
+    if (isHlsStream(currentStreamUrl)) {
       logger.log('[AndroidVideoPlayer] Detected HLS stream, applying HLS headers');
       return getHlsHeaders();
     }
@@ -1535,12 +1506,8 @@ const AndroidVideoPlayer: React.FC = () => {
         return;
       }
       
-      // Detect Xprime provider to enable a one-shot silent retry (warms upstream/cache)
-      const providerName = ((currentStreamProvider || streamProvider || '') as string).toLowerCase();
-      const isXprimeProvider = providerName.includes('xprime');
-
       // One-shot, silent retry without showing error UI
-      if (isXprimeProvider && retryAttemptRef.current < 1) {
+      if (retryAttemptRef.current < 1) {
         retryAttemptRef.current = 1;
         // Cache-bust to force a fresh fetch and warm upstream
         const addRetryParam = (url: string) => {
@@ -1548,7 +1515,7 @@ const AndroidVideoPlayer: React.FC = () => {
           return `${url}${sep}rn_retry_ts=${Date.now()}`;
         };
         const bustedUrl = addRetryParam(currentStreamUrl);
-        logger.warn('[AndroidVideoPlayer] Silent retry for Xprime with cache-busted URL');
+        logger.warn('[AndroidVideoPlayer] Silent retry with cache-busted URL');
         // Ensure no modal is visible
         if (errorTimeoutRef.current) {
           clearTimeout(errorTimeoutRef.current);

@@ -46,57 +46,23 @@ import * as Brightness from 'expo-brightness';
 const VideoPlayer: React.FC = () => {
   const insets = useSafeAreaInsets();
   const route = useRoute<RouteProp<RootStackParamList, 'Player'>>();
-  const { streamProvider, uri, headers, forceVlc } = route.params as any;
-  
-  // Check if the stream is from Xprime (by provider name or URL pattern)
-  const isXprimeStream = streamProvider === 'xprime' || streamProvider === 'Xprime' ||
-    (uri && /flutch.*\.workers\.dev|fsl\.fastcloud\.casa|xprime/i.test(uri));
-
-  safeDebugLog("Stream detection", {
-    uri,
-    streamProvider,
-    isXprimeStream,
-    platform: Platform.OS
-  });
-
-  // Xprime-specific headers for better compatibility (from local-scrapers-repo)
-  const getXprimeHeaders = () => {
-    if (!isXprimeStream) return {};
-    const xprimeHeaders = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Accept-Encoding': 'identity',
-      'Origin': 'https://xprime.tv',
-      'Referer': 'https://xprime.tv/',
-      'Sec-Fetch-Dest': 'video',
-      'Sec-Fetch-Mode': 'no-cors',
-      'Sec-Fetch-Site': 'cross-site',
-      'DNT': '1'
-    } as any;
-    logger.log('[VideoPlayer] Applying Xprime headers for stream:', uri);
-    return xprimeHeaders;
-  };
+  const { uri, headers, forceVlc, streamProvider } = route.params as any;
 
   // Detect if stream is MKV format
   const isMkvFile = isMkvStream(uri, headers);
 
   // Use AndroidVideoPlayer for:
   // - Android devices
-  // - Xprime streams (unless it's MKV on iOS - allow VLC for better compatibility)
   // - Non-MKV files on iOS (unless forceVlc is set)
   // Use VideoPlayer (VLC) for:
-  // - MKV files on iOS (unless forceVlc is set, even for Xprime)
+  // - MKV files on iOS (unless forceVlc is set)
   const shouldUseAndroidPlayer = Platform.OS === 'android' ||
-    (isXprimeStream && !(Platform.OS === 'ios' && isMkvFile)) ||
     (Platform.OS === 'ios' && !isMkvFile && !forceVlc);
 
   safeDebugLog("Player selection logic", {
     platform: Platform.OS,
-    isXprimeStream,
     isMkvFile,
     forceVlc,
-    xprimeException: isXprimeStream && Platform.OS === 'ios' && isMkvFile,
     shouldUseAndroidPlayer
   });
   if (shouldUseAndroidPlayer) {
@@ -1176,6 +1142,38 @@ const VideoPlayer: React.FC = () => {
       }
       if (data.textTracks && data.textTracks.length > 0) {
         setVlcTextTracks(data.textTracks);
+
+        // Auto-select English subtitle track if available
+        if (selectedTextTrack === -1 && !useCustomSubtitles && data.textTracks.length > 0) {
+          if (DEBUG_MODE) {
+            logger.log(`[VideoPlayer] Available subtitle tracks:`, data.textTracks.map((track: any) => ({
+              id: track.id,
+              index: track.index,
+              name: track.name,
+              language: track.language
+            })));
+          }
+
+          // Look for English track first
+          const englishTrack = data.textTracks.find((track: any) => {
+            const lang = (track.language || '').toLowerCase();
+            const name = (track.name || '').toLowerCase();
+            return lang === 'english' || lang === 'en' || lang === 'eng' ||
+                   name.includes('english') || name.includes('en');
+          });
+
+          if (englishTrack) {
+            // Try different ID fields that VLC might use
+            const trackId = englishTrack.id !== undefined ? englishTrack.id :
+                           englishTrack.index !== undefined ? englishTrack.index : 0;
+            setSelectedTextTrack(trackId);
+            if (DEBUG_MODE) {
+              logger.log(`[VideoPlayer] Auto-selected English subtitle track: ${englishTrack.name || 'Unknown'} (ID: ${trackId})`);
+            }
+          } else if (DEBUG_MODE) {
+            logger.log(`[VideoPlayer] No English subtitle track found, keeping subtitles disabled`);
+          }
+        }
       }
 
       setIsVideoLoaded(true);
@@ -2557,13 +2555,12 @@ const VideoPlayer: React.FC = () => {
                   ref={vlcRef}
                   style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
                   source={(() => {
-                     // Use Xprime headers if detected, otherwise use headers from route params
-                     const finalHeaders = getXprimeHeaders() || headers;
-                     const sourceWithHeaders = finalHeaders ? {
+                     // Use route headers for VLC streams
+                     const sourceWithHeaders = headers && Object.keys(headers).length > 0 ? {
                        uri: currentStreamUrl,
-                       headers: finalHeaders
+                       headers: headers
                      } : { uri: currentStreamUrl };
-                     
+
                      return sourceWithHeaders;
                    })()}
                   paused={paused}
@@ -2576,7 +2573,7 @@ const VideoPlayer: React.FC = () => {
                   onPaused={onPaused}
                   resizeMode={resizeMode as any}
                   audioTrack={selectedAudioTrack ?? undefined}
-                  textTrack={useCustomSubtitles ? -1 : (selectedTextTrack ?? undefined)}
+                  textTrack={useCustomSubtitles ? -1 : (selectedTextTrack >= 0 ? selectedTextTrack : -1)}
                   autoAspectRatio
                   volume={volume / 100}
                 />

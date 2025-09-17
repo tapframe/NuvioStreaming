@@ -288,6 +288,10 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                 <View style={{ gap: 8 }}>
                   {vlcTextTracks.map((track) => {
                     const isSelected = selectedTextTrack === track.id && !useCustomSubtitles;
+                    // Debug logging for subtitle selection
+                    if (__DEV__ && vlcTextTracks.length > 0) {
+                      console.log('[SubtitleModals] Track:', track.id, track.name, 'Selected:', selectedTextTrack, 'isSelected:', isSelected, 'useCustom:', useCustomSubtitles);
+                    }
                     return (
                       <TouchableOpacity
                         key={track.id}

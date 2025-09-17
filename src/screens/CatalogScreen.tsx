@@ -18,6 +18,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { Meta, stremioService } from '../services/stremioService';
 import { useTheme } from '../contexts/ThemeContext';
 import { Image } from 'expo-image';
+import { BlurView } from 'expo-blur';
 import { MaterialIcons } from '@expo/vector-icons';
 import { logger } from '../utils/logger';
 import { useCustomCatalogNames } from '../hooks/useCustomCatalogNames';
@@ -193,11 +194,24 @@ const createStyles = (colors: any) => StyleSheet.create({
     top: 10,
     right: 10,
     backgroundColor: 'rgba(0,0,0,0.7)',
-    borderRadius: 0,
+    borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 6,
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  badgeBlur: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  badgeContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   badgeText: {
     fontSize: 11,
@@ -584,15 +598,31 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
         />
 
         {type === 'movie' && nowPlayingMovies.has(item.id) && (
-          <View style={styles.badgeContainer}>
-            <MaterialIcons
-              name="theaters"
-              size={12}
-              color={colors.white}
-              style={{ marginRight: 4 }}
-            />
-            <Text style={styles.badgeText}>In Theaters</Text>
-          </View>
+          Platform.OS === 'ios' ? (
+            <View style={styles.badgeBlur}>
+              <BlurView intensity={40} tint={isDarkMode ? 'dark' : 'light'} style={{ borderRadius: 10 }}>
+                <View style={styles.badgeContent}>
+                  <MaterialIcons
+                    name="theaters"
+                    size={12}
+                    color={colors.white}
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text style={styles.badgeText}>In Theaters</Text>
+                </View>
+              </BlurView>
+            </View>
+          ) : (
+            <View style={styles.badgeContainer}>
+              <MaterialIcons
+                name="theaters"
+                size={12}
+                color={colors.white}
+                style={{ marginRight: 4 }}
+              />
+              <Text style={styles.badgeText}>In Theaters</Text>
+            </View>
+          )
         )}
       </TouchableOpacity>
     );
