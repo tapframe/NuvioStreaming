@@ -32,6 +32,7 @@ import {
 } from './utils/playerTypes';
 import { safeDebugLog, parseSRT, DEBUG_MODE, formatTime } from './utils/playerUtils';
 import { styles } from './utils/playerStyles';
+import { isMkvStream } from '../../utils/mkvDetection';
 import { SubtitleModals } from './modals/SubtitleModals';
 import { AudioTrackModal } from './modals/AudioTrackModal';
 // Removed ResumeOverlay usage when alwaysResume is enabled
@@ -48,8 +49,15 @@ const VideoPlayer: React.FC = () => {
   const { streamProvider, uri, headers, forceVlc } = route.params as any;
   
   // Check if the stream is from Xprime (by provider name or URL pattern)
-  const isXprimeStream = streamProvider === 'xprime' || streamProvider === 'Xprime' || 
+  const isXprimeStream = streamProvider === 'xprime' || streamProvider === 'Xprime' ||
     (uri && /flutch.*\.workers\.dev|fsl\.fastcloud\.casa|xprime/i.test(uri));
+
+  safeDebugLog("Stream detection", {
+    uri,
+    streamProvider,
+    isXprimeStream,
+    platform: Platform.OS
+  });
 
   // Xprime-specific headers for better compatibility (from local-scrapers-repo)
   const getXprimeHeaders = () => {
@@ -69,21 +77,28 @@ const VideoPlayer: React.FC = () => {
     logger.log('[VideoPlayer] Applying Xprime headers for stream:', uri);
     return xprimeHeaders;
   };
-  
-  // Check if the file format is MKV
-  const lowerUri = (uri || '').toLowerCase();
-  const contentType = (headers && (headers['Content-Type'] || headers['content-type'])) || '';
-  const isMkvByHeader = typeof contentType === 'string' && contentType.includes('matroska');
-  const isMkvByPath = lowerUri.includes('.mkv') || /[?&]ext=mkv\b/.test(lowerUri) || /format=mkv\b/.test(lowerUri) || /container=mkv\b/.test(lowerUri);
-  const isMkvFile = Boolean(isMkvByHeader || isMkvByPath);
-  
+
+  // Detect if stream is MKV format
+  const isMkvFile = isMkvStream(uri, headers);
+
   // Use AndroidVideoPlayer for:
   // - Android devices
-  // - Xprime streams on any platform
+  // - Xprime streams (unless it's MKV on iOS - allow VLC for better compatibility)
   // - Non-MKV files on iOS (unless forceVlc is set)
   // Use VideoPlayer (VLC) for:
-  // - MKV files on iOS (unless forceVlc is set)
-  const shouldUseAndroidPlayer = Platform.OS === 'android' || isXprimeStream || (Platform.OS === 'ios' && !isMkvFile && !forceVlc);
+  // - MKV files on iOS (unless forceVlc is set, even for Xprime)
+  const shouldUseAndroidPlayer = Platform.OS === 'android' ||
+    (isXprimeStream && !(Platform.OS === 'ios' && isMkvFile)) ||
+    (Platform.OS === 'ios' && !isMkvFile && !forceVlc);
+
+  safeDebugLog("Player selection logic", {
+    platform: Platform.OS,
+    isXprimeStream,
+    isMkvFile,
+    forceVlc,
+    xprimeException: isXprimeStream && Platform.OS === 'ios' && isMkvFile,
+    shouldUseAndroidPlayer
+  });
   if (shouldUseAndroidPlayer) {
     return <AndroidVideoPlayer />;
   }

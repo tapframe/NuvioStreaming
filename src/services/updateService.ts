@@ -8,12 +8,15 @@ export interface UpdateInfo {
   isEmbeddedLaunch?: boolean;
 }
 
+export type UpdateCheckCallback = (updateInfo: UpdateInfo) => void;
+
 export class UpdateService {
   private static instance: UpdateService;
   private updateCheckInterval: NodeJS.Timeout | null = null;
   // Removed automatic periodic checks - only check on app start and manual trigger
   private logs: string[] = [];
   private readonly MAX_LOGS = 100; // Keep last 100 logs
+  private updateCheckCallbacks: UpdateCheckCallback[] = [];
 
   private constructor() {}
 
@@ -28,23 +31,31 @@ export class UpdateService {
    * Add a log entry with timestamp - always log to console for adb logcat visibility
    */
   private addLog(message: string, level: 'INFO' | 'WARN' | 'ERROR' = 'INFO'): void {
-    // Logging disabled intentionally
-    return;
+    const timestamp = new Date().toISOString();
+    const logEntry = `[${timestamp}] [${level}] UpdateService: ${message}`;
+
+    // Keep logs for debugging (limited to prevent memory issues)
+    if (this.logs.length >= this.MAX_LOGS) {
+      this.logs.shift(); // Remove oldest log
+    }
+    this.logs.push(logEntry);
+
+    // Always log to console for visibility
+    console.log(logEntry);
   }
 
   /**
    * Get all logs
    */
   public getLogs(): string[] {
-    // Logging disabled - return empty list
-    return [];
+    return [...this.logs];
   }
 
   /**
    * Clear all logs
    */
   public clearLogs(): void {
-    // Logging disabled - no-op
+    this.addLog('Clearing all logs', 'INFO');
     this.logs = [];
   }
 
@@ -52,8 +63,40 @@ export class UpdateService {
    * Add a test log entry (useful for debugging)
    */
   public addTestLog(message: string): void {
-    // Logging disabled - no-op
-    return;
+    this.addLog(`TEST: ${message}`, 'INFO');
+  }
+
+  /**
+   * Register a callback to be notified when update checks complete
+   */
+  public onUpdateCheck(callback: UpdateCheckCallback): void {
+    this.updateCheckCallbacks.push(callback);
+    this.addLog(`Registered update check callback (${this.updateCheckCallbacks.length} total)`, 'INFO');
+  }
+
+  /**
+   * Unregister an update check callback
+   */
+  public offUpdateCheck(callback: UpdateCheckCallback): void {
+    const index = this.updateCheckCallbacks.indexOf(callback);
+    if (index > -1) {
+      this.updateCheckCallbacks.splice(index, 1);
+      this.addLog(`Unregistered update check callback (${this.updateCheckCallbacks.length} remaining)`, 'INFO');
+    }
+  }
+
+  /**
+   * Notify all registered callbacks about an update check result
+   */
+  private notifyUpdateCheckCallbacks(updateInfo: UpdateInfo): void {
+    this.addLog(`Notifying ${this.updateCheckCallbacks.length} callback(s) about update check result`, 'INFO');
+    this.updateCheckCallbacks.forEach(callback => {
+      try {
+        callback(updateInfo);
+      } catch (error) {
+        this.addLog(`Callback notification failed: ${error instanceof Error ? error.message : String(error)}`, 'ERROR');
+      }
+    });
   }
 
   /**
@@ -189,15 +232,13 @@ export class UpdateService {
     this.addLog(`Updates enabled: ${Updates.isEnabled}`, 'INFO');
     this.addLog(`Runtime version: ${Updates.runtimeVersion || 'unknown'}`, 'INFO');
     this.addLog(`Update URL: ${this.getUpdateUrl()}`, 'INFO');
-    
-    try {
-      // Only log initialization info, don't perform automatic update checks
-      this.addLog('UpdateService initialized - updates will be handled manually via popup', 'INFO');
 
+    try {
       // Check if we're running in a development environment
       if (__DEV__) {
         this.addLog('Running in development mode', 'WARN');
         this.addLog('UpdateService initialization completed (dev mode)', 'INFO');
+        return;
       }
 
       // Check if updates are enabled
@@ -207,7 +248,30 @@ export class UpdateService {
         return;
       }
 
-      this.addLog('Updates are enabled, manual update checks only', 'INFO');
+      this.addLog('Updates are enabled, performing initial update check...', 'INFO');
+
+      // Perform an initial update check on app startup
+      try {
+        const updateInfo = await this.checkForUpdates();
+        this.addLog(`Initial update check completed - Updates available: ${updateInfo.isAvailable}`, 'INFO');
+
+        if (updateInfo.isAvailable) {
+          this.addLog('Update available! The popup will be shown to the user.', 'INFO');
+        } else {
+          this.addLog('No updates available at startup', 'INFO');
+        }
+
+        // Notify registered callbacks about the update check result
+        this.notifyUpdateCheckCallbacks(updateInfo);
+      } catch (checkError) {
+        this.addLog(`Initial update check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`, 'ERROR');
+
+        // Notify callbacks about the failed check
+        this.notifyUpdateCheckCallbacks({ isAvailable: false });
+
+        // Don't fail initialization if update check fails
+      }
+
       this.addLog('UpdateService initialization completed successfully', 'INFO');
     } catch (error) {
       this.addLog(`Initialization failed: ${error instanceof Error ? error.message : String(error)}`, 'ERROR');

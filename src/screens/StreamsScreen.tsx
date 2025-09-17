@@ -46,6 +46,7 @@ import { VideoPlayerService } from '../services/videoPlayerService';
 import { useSettings } from '../hooks/useSettings';
 import QualityBadge from '../components/metadata/QualityBadge';
 import { logger } from '../utils/logger';
+import { isMkvStream } from '../utils/mkvDetection';
 
 const TMDB_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tmdb.new.logo.svg/512px-Tmdb.new.logo.svg.png?20200406190906';
 const HDR_ICON = 'https://uxwing.com/wp-content/themes/uxwing/download/video-photography-multimedia/hdr-icon.png';
@@ -846,12 +847,7 @@ export const StreamsScreen = () => {
     let forceVlc = !!options?.forceVlc;
     try {
       if (Platform.OS === 'ios' && !forceVlc) {
-        // Check if the actual stream is an MKV file
-        const lowerUri = (stream.url || '').toLowerCase();
-        const contentType = (stream.headers && ((stream.headers as any)['Content-Type'] || (stream.headers as any)['content-type'])) || '';
-        const isMkvByHeader = typeof contentType === 'string' && contentType.includes('matroska');
-        const isMkvByPath = lowerUri.includes('.mkv') || /[?&]ext=mkv\b/.test(lowerUri) || /format=mkv\b/.test(lowerUri) || /container=mkv\b/.test(lowerUri);
-        const isMkvFile = Boolean(isMkvByHeader || isMkvByPath);
+        const isMkvFile = isMkvStream(stream.url, stream.headers);
         
         // Special case: moviebox should always use AndroidVideoPlayer
         if (streamProvider === 'moviebox') {
