@@ -996,6 +996,50 @@ export class TMDBService {
   }
 
   /**
+   * Get now playing movies (currently in theaters)
+   * @param page Page number for pagination
+   * @param region ISO 3166-1 country code (e.g., 'US', 'GB')
+   */
+  async getNowPlaying(page: number = 1, region: string = 'US'): Promise<TMDBTrendingResult[]> {
+    try {
+      const response = await axios.get(`${BASE_URL}/movie/now_playing`, {
+        headers: await this.getHeaders(),
+        params: await this.getParams({
+          language: 'en-US',
+          page,
+          region, // Filter by region to get accurate theater availability
+        }),
+      });
+
+      // Get external IDs for each now playing movie
+      const results = response.data.results || [];
+      const resultsWithExternalIds = await Promise.all(
+        results.map(async (item: TMDBTrendingResult) => {
+          try {
+            const externalIdsResponse = await axios.get(
+              `${BASE_URL}/movie/${item.id}/external_ids`,
+              {
+                headers: await this.getHeaders(),
+                params: await this.getParams(),
+              }
+            );
+            return {
+              ...item,
+              external_ids: externalIdsResponse.data
+            };
+          } catch (error) {
+            return item;
+          }
+        })
+      );
+
+      return resultsWithExternalIds;
+    } catch (error) {
+      return [];
+    }
+  }
+
+  /**
    * Get the list of official movie genres from TMDB
    */
   async getMovieGenres(): Promise<{ id: number; name: string }[]> {

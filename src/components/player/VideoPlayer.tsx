@@ -1552,6 +1552,22 @@ const VideoPlayer: React.FC = () => {
     }
   };
 
+  // Ensure native VLC text tracks are disabled when using custom (addon) subtitles
+  // and re-applied when switching back to built-in tracks. This prevents double-rendering.
+  useEffect(() => {
+    try {
+      if (!vlcRef.current) return;
+      if (useCustomSubtitles) {
+        // -1 disables native subtitle rendering in VLC
+        vlcRef.current.setNativeProps && vlcRef.current.setNativeProps({ textTrack: -1 });
+      } else if (typeof selectedTextTrack === 'number' && selectedTextTrack >= 0) {
+        vlcRef.current.setNativeProps && vlcRef.current.setNativeProps({ textTrack: selectedTextTrack });
+      }
+    } catch (e) {
+      // no-op: defensive guard in case ref methods are unavailable momentarily
+    }
+  }, [useCustomSubtitles, selectedTextTrack]);
+
   const loadSubtitleSize = async () => {
     try {
       // Prefer scoped subtitle settings

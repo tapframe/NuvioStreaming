@@ -126,13 +126,6 @@ const TraktItem = React.memo(({ item, width, navigation, currentTheme }: { item:
               <ActivityIndicator color={currentTheme.colors.primary} />
             </View>
           )}
-
-          <View style={[styles.badgeContainer, { backgroundColor: 'rgba(45,55,72,0.9)' }]}>
-            <TraktIcon width={12} height={12} style={{ marginRight: 4 }} />
-            <Text style={[styles.badgeText, { color: currentTheme.colors.white }]}>
-              {item.type === 'movie' ? 'Movie' : 'Series'}
-            </Text>
-          </View>
         </View>
         <Text style={[styles.cardTitle, { color: currentTheme.colors.white }]}>
           {item.name}
@@ -374,17 +367,6 @@ const LibraryScreen = () => {
                   { width: `${item.progress * 100}%`, backgroundColor: currentTheme.colors.primary }
                 ]}
               />
-            </View>
-          )}
-          {item.type === 'series' && (
-            <View style={styles.badgeContainer}>
-              <MaterialIcons
-                name="live-tv"
-                size={14}
-                color={currentTheme.colors.white}
-                style={{ marginRight: 4 }}
-              />
-              <Text style={[styles.badgeText, { color: currentTheme.colors.white }]}>Series</Text>
             </View>
           )}
         </View>

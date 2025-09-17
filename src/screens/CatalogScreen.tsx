@@ -23,6 +23,7 @@ import { logger } from '../utils/logger';
 import { useCustomCatalogNames } from '../hooks/useCustomCatalogNames';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { catalogService, DataSource, StreamingContent } from '../services/catalogService';
+import { tmdbService } from '../services/tmdbService';
 
 type CatalogScreenProps = {
   route: RouteProp<RootStackParamList, 'Catalog'>;
@@ -145,10 +146,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.elevation3,
   },
   // removed bottom text container; keep spacing via item margin only
-  footer: {
-    padding: SPACING.lg,
-    alignItems: 'center',
-  },
   button: {
     marginTop: SPACING.md,
     paddingVertical: SPACING.md,
@@ -190,6 +187,22 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.white,
     fontSize: 16,
     marginTop: SPACING.lg,
+  },
+  badgeContainer: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 0,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.white,
   }
 });
 
@@ -197,10 +210,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   const { addonId, type, id, name: originalName, genreFilter } = route.params;
   const [items, setItems] = useState<Meta[]>([]);
   const [loading, setLoading] = useState(true);
-  const [paginating, setPaginating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dataSource, setDataSource] = useState<DataSource>(DataSource.STREMIO_ADDONS);
   const [actualCatalogName, setActualCatalogName] = useState<string | null>(null);
@@ -212,11 +222,11 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
     };
   });
   const [mobileColumnsPref, setMobileColumnsPref] = useState<'auto' | 2 | 3>('auto');
+  const [nowPlayingMovies, setNowPlayingMovies] = useState<Set<string>>(new Set());
   const { currentTheme } = useTheme();
   const colors = currentTheme.colors;
   const styles = createStyles(colors);
   const isDarkMode = true;
-  const isInitialRender = React.useRef(true);
 
   // Load mobile columns preference (phones only)
   useEffect(() => {
@@ -298,17 +308,36 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
       const preference = await catalogService.getDataSourcePreference();
       setDataSource(preference);
     };
-    
+
     getDataSourcePreference();
   }, []);
 
-  const loadItems = useCallback(async (pageNum: number, shouldRefresh: boolean = false) => {
+  // Load now playing movies for theater chip (only for movie catalogs)
+  useEffect(() => {
+    const loadNowPlayingMovies = async () => {
+      if (type === 'movie') {
+        try {
+          // Get first page of now playing movies (typically shows most recent/current)
+          const nowPlaying = await tmdbService.getNowPlaying(1, 'US');
+          const movieIds = new Set(nowPlaying.map(movie =>
+            movie.external_ids?.imdb_id || movie.id.toString()
+          ).filter(Boolean));
+          setNowPlayingMovies(movieIds);
+        } catch (error) {
+          logger.error('Failed to load now playing movies:', error);
+          // Set empty set on error to avoid repeated attempts
+          setNowPlayingMovies(new Set());
+        }
+      }
+    };
+
+    loadNowPlayingMovies();
+  }, [type]);
+
+  const loadItems = useCallback(async (shouldRefresh: boolean = false) => {
     try {
       if (shouldRefresh) {
         setRefreshing(true);
-        setHasMore(true); // Reset hasMore on refresh
-      } else if (pageNum > 1) {
-        setPaginating(true);
       } else {
         setLoading(true);
       }
@@ -399,21 +428,13 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
         
         // Create filters array for genre filtering if provided
         const filters = effectiveGenreFilter ? [{ title: 'genre', value: effectiveGenreFilter }] : [];
-        
+
         // Load items from the catalog
-        const newItems = await stremioService.getCatalog(addon, type, id, pageNum, filters);
-        
-        if (newItems.length === 0) {
-          setHasMore(false);
-        } else {
+        const catalogItems = await stremioService.getCatalog(addon, type, id, 1, filters);
+
+        if (catalogItems.length > 0) {
           foundItems = true;
-          setHasMore(true); // Ensure hasMore is true if we found items
-        }
-        
-        if (shouldRefresh || pageNum === 1) {
-          setItems(newItems);
-        } else {
-          setItems(prev => [...prev, ...newItems]);
+          setItems(catalogItems);
         }
       } else if (effectiveGenreFilter) {
         // Get all addons that have catalogs of the specified type
@@ -438,7 +459,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
                 // Debug logging for each catalog request
                 logger.log(`Requesting from ${manifest.name}, catalog ${catalog.id} with genre "${effectiveGenreFilter}"`);
                 
-                const catalogItems = await stremioService.getCatalog(manifest, type, catalog.id, pageNum, filters);
+                const catalogItems = await stremioService.getCatalog(manifest, type, catalog.id, 1, filters);
                 
                 if (catalogItems && catalogItems.length > 0) {
                   // Log first few items' genres to debug
@@ -489,23 +510,10 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
         const uniqueItems = allItems.filter((item, index, self) =>
           index === self.findIndex((t) => t.id === item.id)
         );
-        
-        if (uniqueItems.length === 0 && allItems.length === 0) {
-          setHasMore(false);
-        } else {
+
+        if (uniqueItems.length > 0) {
           foundItems = true;
-          setHasMore(true); // Ensure hasMore is true if we found items
-        }
-        
-        if (shouldRefresh || pageNum === 1) {
           setItems(uniqueItems);
-        } else {
-          // Add new items while avoiding duplicates
-          setItems(prev => {
-            const prevIds = new Set(prev.map(item => item.id));
-            const newItems = uniqueItems.filter(item => !prevIds.has(item.id));
-            return [...prev, ...newItems];
-          });
         }
       }
       
@@ -518,31 +526,18 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
     } finally {
       setLoading(false);
       setRefreshing(false);
-      setPaginating(false);
     }
   }, [addonId, type, id, genreFilter, dataSource]);
 
   useEffect(() => {
-    loadItems(1, true);
+    loadItems(true);
   }, [loadItems]);
 
   const handleRefresh = useCallback(() => {
-    setPage(1);
     setItems([]); // Clear items on refresh
-    loadItems(1, true);
+    loadItems(true);
   }, [loadItems]);
 
-  const handleLoadMore = useCallback(() => {
-    if (isInitialRender.current) {
-      isInitialRender.current = false;
-      return;
-    }
-    if (!loading && !paginating && hasMore && !refreshing) {
-      const nextPage = page + 1;
-      setPage(nextPage);
-      loadItems(nextPage);
-    }
-  }, [loading, paginating, hasMore, page, loadItems, refreshing]);
 
   const effectiveNumColumns = React.useMemo(() => {
     const isPhone = screenData.width < 600; // basic breakpoint; tablets generally above this
@@ -587,9 +582,21 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           transition={0}
           allowDownscaling
         />
+
+        {type === 'movie' && nowPlayingMovies.has(item.id) && (
+          <View style={styles.badgeContainer}>
+            <MaterialIcons
+              name="theaters"
+              size={12}
+              color={colors.white}
+              style={{ marginRight: 4 }}
+            />
+            <Text style={styles.badgeText}>In Theaters</Text>
+          </View>
+        )}
       </TouchableOpacity>
     );
-  }, [navigation, styles, effectiveNumColumns, effectiveItemWidth]);
+  }, [navigation, styles, effectiveNumColumns, effectiveItemWidth, type, nowPlayingMovies]);
 
   const renderEmptyState = () => (
     <View style={styles.centered}>
@@ -696,15 +703,6 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
               colors={[colors.primary]}
               tintColor={colors.primary}
             />
-          }
-          onEndReached={handleLoadMore}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={
-            paginating ? (
-              <View style={styles.footer}>
-                <ActivityIndicator size="small" color={colors.primary} />
-              </View>
-            ) : null
           }
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
