@@ -142,6 +142,8 @@ const VideoPlayer: React.FC = () => {
   const isSourceSeekableRef = useRef<boolean | null>(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const [isOpeningAnimationComplete, setIsOpeningAnimationComplete] = useState(false);
+  const [shouldHideOpeningOverlay, setShouldHideOpeningOverlay] = useState(false);
+  const DISABLE_OPENING_OVERLAY = false; // Enable opening overlay animation
   const openingFadeAnim = useRef(new Animated.Value(0)).current;
   const openingScaleAnim = useRef(new Animated.Value(0.8)).current;
   const backgroundFadeAnim = useRef(new Animated.Value(1)).current;
@@ -512,7 +514,7 @@ const VideoPlayer: React.FC = () => {
     }
   }, [effectiveDimensions, videoAspectRatio]);
 
-  // Force landscape orientation immediately when component mounts
+  // Force landscape orientation after opening animation completes
   useEffect(() => {
     const lockOrientation = async () => {
       try {
@@ -523,32 +525,39 @@ const VideoPlayer: React.FC = () => {
       }
     };
 
-    // Lock orientation immediately
-    lockOrientation();
+    // Lock orientation after opening animation completes to prevent glitches
+    if (isOpeningAnimationComplete) {
+      lockOrientation();
+    }
 
     return () => {
       // Do not unlock orientation here; we unlock explicitly on close to avoid mid-transition flips
     };
-  }, []);
+  }, [isOpeningAnimationComplete]);
 
   useEffect(() => {
     const subscription = Dimensions.addEventListener('change', ({ screen }) => {
       setScreenDimensions(screen);
-      // Re-apply immersive mode on layout changes (Android)
-      enableImmersiveMode();
+      // Re-apply immersive mode on layout changes (Android) - only after opening animation
+      if (isOpeningAnimationComplete) {
+        enableImmersiveMode();
+      }
     });
     const initializePlayer = async () => {
       StatusBar.setHidden(true, 'none');
-      enableImmersiveMode();
+      // Enable immersive mode after opening animation to prevent glitches
+      if (isOpeningAnimationComplete) {
+        enableImmersiveMode();
+      }
       startOpeningAnimation();
-      
+
       // Initialize current volume and brightness levels
       // Volume starts at 100 (full volume) for VLC
       setVolume(100);
       if (DEBUG_MODE) {
         logger.log(`[VideoPlayer] Initial volume: 100 (VLC native)`);
       }
-      
+
       try {
         const currentBrightness = await Brightness.getBrightnessAsync();
         setBrightness(currentBrightness);
@@ -566,20 +575,22 @@ const VideoPlayer: React.FC = () => {
       subscription?.remove();
       disableImmersiveMode();
     };
-  }, []);
+  }, [isOpeningAnimationComplete]);
 
   // Re-apply immersive mode when screen gains focus (Android)
   useFocusEffect(
     useCallback(() => {
-      enableImmersiveMode();
+      if (isOpeningAnimationComplete) {
+        enableImmersiveMode();
+      }
       return () => {};
-    }, [])
+    }, [isOpeningAnimationComplete])
   );
 
   // Re-apply immersive mode when app returns to foreground (Android)
   useEffect(() => {
     const onAppStateChange = (state: string) => {
-      if (state === 'active') {
+      if (state === 'active' && isOpeningAnimationComplete) {
         enableImmersiveMode();
       }
     };
@@ -587,7 +598,7 @@ const VideoPlayer: React.FC = () => {
     return () => {
       sub.remove();
     };
-  }, []);
+  }, [isOpeningAnimationComplete]);
 
   const startOpeningAnimation = () => {
     // Logo entrance animation - optimized for faster appearance
@@ -652,12 +663,13 @@ const VideoPlayer: React.FC = () => {
         useNativeDriver: true,
       }),
     ]).start(() => {
-      openingScaleAnim.setValue(1);
-      openingFadeAnim.setValue(1);
       setIsOpeningAnimationComplete(true);
+      // Delay hiding the overlay to allow background fade animation to complete
       setTimeout(() => {
-        backgroundFadeAnim.setValue(0);
-      }, 100);
+        setShouldHideOpeningOverlay(true);
+      }, 450); // Slightly longer than the background fade duration
+      // Enable immersive mode and lock orientation now that animation is complete
+      enableImmersiveMode();
     });
   };
 
@@ -778,31 +790,36 @@ const VideoPlayer: React.FC = () => {
   };
 
   const seekToTime = (rawSeconds: number) => {
-    // Clamp to just before the end to avoid triggering onEnd.
-    const timeInSeconds = Math.max(0, Math.min(rawSeconds, duration > 0 ? duration - END_EPSILON : rawSeconds));
-    if (ksPlayerRef.current && duration > 0 && !isSeeking.current) {
+    // For KSPlayer, we need to wait for the player to be ready
+    if (!ksPlayerRef.current || isSeeking.current) {
       if (DEBUG_MODE) {
-        if (__DEV__) logger.log(`[VideoPlayer] Seeking to ${timeInSeconds.toFixed(2)}s out of ${duration.toFixed(2)}s`);
+        logger.error(`[VideoPlayer] Seek failed: ksPlayerRef=${!!ksPlayerRef.current}, seeking=${isSeeking.current}`);
       }
-
-      isSeeking.current = true;
-
-      // KSPlayer uses direct time seeking
-      ksPlayerRef.current.seek(timeInSeconds);
-
-      setTimeout(() => {
-        if (isMounted.current) {
-          isSeeking.current = false;
-          if (DEBUG_MODE) {
-            logger.log(`[VideoPlayer] KSPlayer seek completed to ${timeInSeconds.toFixed(2)}s`);
-          }
-        }
-      }, 500);
-    } else {
-      if (DEBUG_MODE) {
-        logger.error(`[VideoPlayer] Seek failed: ksPlayerRef=${!!ksPlayerRef.current}, duration=${duration}, seeking=${isSeeking.current}`);
-      }
+      return;
     }
+
+    // Clamp to just before the end to avoid triggering onEnd when duration is known.
+    const timeInSeconds = duration > 0
+      ? Math.max(0, Math.min(rawSeconds, duration - END_EPSILON))
+      : Math.max(0, rawSeconds);
+    
+    if (DEBUG_MODE) {
+      if (__DEV__) logger.log(`[VideoPlayer] Seeking to ${timeInSeconds.toFixed(2)}s out of ${duration.toFixed(2)}s`);
+    }
+
+    isSeeking.current = true;
+
+    // KSPlayer uses direct time seeking
+    ksPlayerRef.current.seek(timeInSeconds);
+
+    setTimeout(() => {
+      if (isMounted.current) {
+        isSeeking.current = false;
+        if (DEBUG_MODE) {
+          logger.log(`[VideoPlayer] KSPlayer seek completed to ${timeInSeconds.toFixed(2)}s`);
+        }
+      }
+    }, 500);
   };
 
   // Slider callback functions for React Native Community Slider
@@ -856,6 +873,12 @@ const VideoPlayer: React.FC = () => {
 
     // KSPlayer returns times in seconds directly
     const currentTimeInSeconds = event.currentTime;
+    const durationInSeconds = event.duration;
+
+    // Update duration if it's available and different
+    if (durationInSeconds > 0 && durationInSeconds !== duration) {
+      setDuration(durationInSeconds);
+    }
 
     // Only update if there's a significant change to avoid unnecessary updates
     if (Math.abs(currentTimeInSeconds - currentTime) > 0.5) {
@@ -863,6 +886,13 @@ const VideoPlayer: React.FC = () => {
       // KSPlayer returns bufferTime in seconds
       const bufferedTime = event.bufferTime || currentTimeInSeconds;
       safeSetState(() => setBuffered(bufferedTime));
+    }
+
+    // Safety: if audio is advancing but onLoad didn't fire, dismiss opening overlay
+    if (!isOpeningAnimationComplete) {
+      setIsVideoLoaded(true);
+      setIsPlayerReady(true);
+      completeOpeningAnimation();
     }
     
     // Periodic check for disabled audio track (every 3 seconds, max 3 attempts)
@@ -929,6 +959,9 @@ const VideoPlayer: React.FC = () => {
       }
       // KSPlayer returns duration in seconds directly
       const videoDuration = data.duration;
+      if (DEBUG_MODE) {
+        logger.log(`[VideoPlayer] Setting duration to: ${videoDuration}`);
+      }
       if (videoDuration > 0) {
         setDuration(videoDuration);
 
@@ -959,16 +992,13 @@ const VideoPlayer: React.FC = () => {
           logger.log(`[VideoPlayer] Raw audio tracks data:`, data.audioTracks);
           data.audioTracks.forEach((track: any, idx: number) => {
             logger.log(`[VideoPlayer] Track ${idx} raw data:`, {
-              index: track.index,
-              title: track.title,
-              language: track.language,
-              type: track.type,
-              channels: track.channels,
-              bitrate: track.bitrate,
-              codec: track.codec,
-              sampleRate: track.sampleRate,
+              id: track.id,
               name: track.name,
-              label: track.label,
+              language: track.language,
+              languageCode: track.languageCode,
+              isEnabled: track.isEnabled,
+              bitRate: track.bitRate,
+              bitDepth: track.bitDepth,
               allKeys: Object.keys(track),
               fullTrackObject: track
             });
@@ -976,63 +1006,33 @@ const VideoPlayer: React.FC = () => {
         }
         
         const formattedAudioTracks = data.audioTracks.map((track: any, index: number) => {
-          const trackIndex = track.index !== undefined ? track.index : index;
+          const trackIndex = track.id !== undefined ? track.id : index;
           
           // Build comprehensive track name from available fields
           let trackName = '';
           const parts = [];
           
-          // Add language if available (try multiple possible fields)
-          let language = track.language || track.lang || track.languageCode;
-          
-          // If no language field, try to extract from track name (e.g., "[Russian]", "[English]")
-          if ((!language || language === 'Unknown' || language === 'und' || language === '') && track.name) {
-            const languageMatch = track.name.match(/\[([^\]]+)\]/);
-            if (languageMatch && languageMatch[1]) {
-              language = languageMatch[1].trim();
-            }
-          }
+          // Add language if available
+          let language = track.language || track.languageCode;
           
           if (language && language !== 'Unknown' && language !== 'und' && language !== '') {
             parts.push(language.toUpperCase());
           }
           
-          // Add codec information if available (try multiple possible fields)
-          const codec = track.type || track.codec || track.format;
-          if (codec && codec !== 'Unknown') {
-            parts.push(codec.toUpperCase());
-          }
-          
-          // Add channel information if available
-          const channels = track.channels || track.channelCount;
-          if (channels && channels > 0) {
-            if (channels === 1) {
-              parts.push('MONO');
-            } else if (channels === 2) {
-              parts.push('STEREO');
-            } else if (channels === 6) {
-              parts.push('5.1CH');
-            } else if (channels === 8) {
-              parts.push('7.1CH');
-            } else {
-              parts.push(`${channels}CH`);
-            }
-          }
-          
           // Add bitrate if available
-          const bitrate = track.bitrate || track.bitRate;
+          const bitrate = track.bitRate;
           if (bitrate && bitrate > 0) {
             parts.push(`${Math.round(bitrate / 1000)}kbps`);
           }
           
-          // Add sample rate if available
-          const sampleRate = track.sampleRate || track.sample_rate;
-          if (sampleRate && sampleRate > 0) {
-            parts.push(`${Math.round(sampleRate / 1000)}kHz`);
+          // Add bit depth if available
+          const bitDepth = track.bitDepth;
+          if (bitDepth && bitDepth > 0) {
+            parts.push(`${bitDepth}bit`);
           }
           
-          // Add title if available and not generic
-          let title = track.title || track.name || track.label;
+          // Add track name if available and not generic
+          let title = track.name;
           if (title && !title.match(/^(Audio|Track)\s*\d*$/i) && title !== 'Unknown') {
             // Clean up title by removing language brackets and trailing punctuation
             title = title.replace(/\s*\[[^\]]+\]\s*[-–—]*\s*$/, '').trim();
@@ -1046,44 +1046,29 @@ const VideoPlayer: React.FC = () => {
             trackName = parts.join(' • ');
           } else {
             // For simple track names like "Track 1", "Audio 1", etc., use them as-is
-            const simpleName = track.name || track.title || track.label;
+            const simpleName = track.name;
             if (simpleName && simpleName.match(/^(Track|Audio)\s*\d*$/i)) {
               trackName = simpleName;
             } else {
-              // Try to extract any meaningful info from the track object
-              const meaningfulFields: string[] = [];
-              Object.keys(track).forEach(key => {
-                const value = track[key];
-                if (value && typeof value === 'string' && value !== 'Unknown' && value !== 'und' && value.length > 1) {
-                  meaningfulFields.push(`${key}: ${value}`);
-                }
-              });
-              
-              if (meaningfulFields.length > 0) {
-                trackName = `Audio ${index + 1} (${meaningfulFields.slice(0, 2).join(', ')})`;
-              } else {
-                trackName = `Audio ${index + 1}`;
-              }
+              trackName = `Audio ${index + 1}`;
             }
           }
           
           const trackLanguage = language || 'Unknown';
           
           if (DEBUG_MODE) {
-            logger.log(`[VideoPlayer] Processed track ${index}:`, {
-              index: trackIndex,
+            logger.log(`[VideoPlayer] Processed KSPlayer track ${index}:`, {
+              id: trackIndex,
               name: trackName,
               language: trackLanguage,
               parts: parts,
-              meaningfulFields: Object.keys(track).filter(key => {
-                const value = track[key];
-                return value && typeof value === 'string' && value !== 'Unknown' && value !== 'und' && value.length > 1;
-              })
+              bitRate: bitrate,
+              bitDepth: bitDepth
             });
           }
           
           return {
-            id: trackIndex, // Use the actual track index from VLC
+            id: trackIndex, // Use the actual track ID from KSPlayer
             name: trackName,
             language: trackLanguage,
           };
@@ -1116,21 +1101,25 @@ const VideoPlayer: React.FC = () => {
         }
       }
       if (data.textTracks && data.textTracks.length > 0) {
-        setVlcTextTracks(data.textTracks);
+        // Process KSPlayer text tracks
+        const formattedTextTracks = data.textTracks.map((track: any, index: number) => ({
+          id: track.id !== undefined ? track.id : index,
+          name: track.name || `Subtitle ${index + 1}`,
+          language: track.language || track.languageCode || 'Unknown',
+          isEnabled: track.isEnabled || false,
+          isImageSubtitle: track.isImageSubtitle || false
+        }));
+        
+        setVlcTextTracks(formattedTextTracks);
 
         // Auto-select English subtitle track if available
-        if (selectedTextTrack === -1 && !useCustomSubtitles && data.textTracks.length > 0) {
+        if (selectedTextTrack === -1 && !useCustomSubtitles && formattedTextTracks.length > 0) {
           if (DEBUG_MODE) {
-            logger.log(`[VideoPlayer] Available subtitle tracks:`, data.textTracks.map((track: any) => ({
-              id: track.id,
-              index: track.index,
-              name: track.name,
-              language: track.language
-            })));
+            logger.log(`[VideoPlayer] Available KSPlayer subtitle tracks:`, formattedTextTracks);
           }
 
           // Look for English track first
-          const englishTrack = data.textTracks.find((track: any) => {
+          const englishTrack = formattedTextTracks.find((track: any) => {
             const lang = (track.language || '').toLowerCase();
             const name = (track.name || '').toLowerCase();
             return lang === 'english' || lang === 'en' || lang === 'eng' ||
@@ -1138,12 +1127,9 @@ const VideoPlayer: React.FC = () => {
           });
 
           if (englishTrack) {
-            // Try different ID fields that VLC might use
-            const trackId = englishTrack.id !== undefined ? englishTrack.id :
-                           englishTrack.index !== undefined ? englishTrack.index : 0;
-            setSelectedTextTrack(trackId);
+            setSelectedTextTrack(englishTrack.id);
             if (DEBUG_MODE) {
-              logger.log(`[VideoPlayer] Auto-selected English subtitle track: ${englishTrack.name || 'Unknown'} (ID: ${trackId})`);
+              logger.log(`[VideoPlayer] Auto-selected English subtitle track: ${englishTrack.name} (ID: ${englishTrack.id})`);
             }
           } else if (DEBUG_MODE) {
             logger.log(`[VideoPlayer] No English subtitle track found, keeping subtitles disabled`);
@@ -1170,12 +1156,12 @@ const VideoPlayer: React.FC = () => {
         logger.log(`[VideoPlayer] Seeking to initial position: ${initialPosition}s (duration: ${videoDuration}s)`);
         // Reduced timeout from 1000ms to 500ms
         setTimeout(() => {
-          if (vlcRef.current && videoDuration > 0 && isMounted.current) {
+          if (videoDuration > 0 && isMounted.current) {
             seekToTime(initialPosition);
             setIsInitialSeekComplete(true);
             logger.log(`[VideoPlayer] Initial seek completed to: ${initialPosition}s`);
           } else {
-            logger.error(`[VideoPlayer] Initial seek failed: vlcRef=${!!vlcRef.current}, duration=${videoDuration}, mounted=${isMounted.current}`);
+            logger.error(`[VideoPlayer] Initial seek failed: duration=${videoDuration}, mounted=${isMounted.current}`);
           }
         }, 500);
       }
@@ -1194,10 +1180,8 @@ const VideoPlayer: React.FC = () => {
   };
 
   const skip = (seconds: number) => {
-    if (vlcRef.current) {
-      const newTime = Math.max(0, Math.min(currentTime + seconds, duration - END_EPSILON));
-      seekToTime(newTime);
-    }
+    const newTime = Math.max(0, Math.min(currentTime + seconds, duration - END_EPSILON));
+    seekToTime(newTime);
   };
 
   const onAudioTracks = (data: { audioTracks: AudioTrack[] }) => {
@@ -1504,6 +1488,23 @@ const VideoPlayer: React.FC = () => {
       return;
     }
     
+    // Get the selected track info for logging
+    const selectedTrack = vlcAudioTracks.find(track => track.id === trackId);
+    if (selectedTrack && DEBUG_MODE) {
+      logger.log(`[VideoPlayer] Switching to track: ${selectedTrack.name} (${selectedTrack.language})`);
+      
+      // Check if this is a multi-channel track that might need downmixing
+      const trackName = selectedTrack.name.toLowerCase();
+      const isMultiChannel = trackName.includes('5.1') || trackName.includes('7.1') || 
+                            trackName.includes('truehd') || trackName.includes('dts') ||
+                            trackName.includes('dolby') || trackName.includes('atmos');
+      
+      if (isMultiChannel) {
+        logger.log(`[VideoPlayer] Multi-channel audio track detected: ${selectedTrack.name}`);
+        logger.log(`[VideoPlayer] KSPlayer will apply downmixing to ensure dialogue is audible`);
+      }
+    }
+    
     // If changing tracks, briefly pause to allow smooth transition
     const wasPlaying = !paused;
     if (wasPlaying) {
@@ -1544,12 +1545,11 @@ const VideoPlayer: React.FC = () => {
   // and re-applied when switching back to built-in tracks. This prevents double-rendering.
   useEffect(() => {
     try {
-      if (!vlcRef.current) return;
       if (useCustomSubtitles) {
         // -1 disables native subtitle rendering in VLC
-        vlcRef.current.setNativeProps && vlcRef.current.setNativeProps({ textTrack: -1 });
+        setSelectedTextTrack(-1);
       } else if (typeof selectedTextTrack === 'number' && selectedTextTrack >= 0) {
-        vlcRef.current.setNativeProps && vlcRef.current.setNativeProps({ textTrack: selectedTextTrack });
+        // KSPlayer picks it up via prop
       }
     } catch (e) {
       // no-op: defensive guard in case ref methods are unavailable momentarily
@@ -1731,9 +1731,7 @@ const VideoPlayer: React.FC = () => {
   };
 
   const togglePlayback = () => {
-    if (vlcRef.current) {
-      setPaused(!paused);
-    }
+    setPaused(!paused);
   };
 
   // Handle next episode button press
@@ -2153,11 +2151,11 @@ const VideoPlayer: React.FC = () => {
     if (pendingSeek && isPlayerReady && isVideoLoaded && duration > 0) {
       logger.log(`[VideoPlayer] Player ready after source change, seeking to position: ${pendingSeek.position}s out of ${duration}s total`);
 
-      if (pendingSeek.position > 0 && vlcRef.current) {
+      if (pendingSeek.position > 0) {
         const delayTime = Platform.OS === 'android' ? 1500 : 1000;
 
         setTimeout(() => {
-          if (vlcRef.current && duration > 0 && pendingSeek) {
+          if (duration > 0 && pendingSeek) {
             logger.log(`[VideoPlayer] Executing seek to ${pendingSeek.position}s`);
 
             seekToTime(pendingSeek.position);
@@ -2228,9 +2226,6 @@ const VideoPlayer: React.FC = () => {
       logger.log(`[VideoPlayer] Available fields - quality: ${newStream.quality}, title: ${newStream.title}, addonName: ${newStream.addonName}, name: ${newStream.name}, addon: ${newStream.addon}`);
 
       // Stop current playback
-      if (vlcRef.current) {
-        vlcRef.current.pause && vlcRef.current.pause();
-      }
       setPaused(true);
 
       // Set pending seek state
@@ -2297,17 +2292,18 @@ const VideoPlayer: React.FC = () => {
         top: 0,
         left: 0,
       }]}>
+      {!DISABLE_OPENING_OVERLAY && (
       <Animated.View
         style={[
           styles.openingOverlay,
           {
             opacity: backgroundFadeAnim,
-            zIndex: isOpeningAnimationComplete ? -1 : 3000,
+            zIndex: shouldHideOpeningOverlay ? -1 : 3000,
             width: screenDimensions.width,
             height: screenDimensions.height,
           }
         ]}
-        pointerEvents={isOpeningAnimationComplete ? 'none' : 'auto'}
+        pointerEvents={shouldHideOpeningOverlay ? 'none' : 'auto'}
       >
         {backdrop && (
           <Animated.Image
@@ -2388,6 +2384,7 @@ const VideoPlayer: React.FC = () => {
           )}
         </View>
       </Animated.View>
+      )}
 
       {/* Source Change Loading Overlay */}
       {isChangingSource && (
@@ -2410,12 +2407,12 @@ const VideoPlayer: React.FC = () => {
         </Animated.View>
       )}
 
-      <Animated.View 
+      <Animated.View
         style={[
           styles.videoPlayerContainer,
           {
-            opacity: openingFadeAnim,
-            transform: isOpeningAnimationComplete ? [] : [{ scale: openingScaleAnim }],
+            opacity: DISABLE_OPENING_OVERLAY ? 1 : openingFadeAnim,
+            transform: DISABLE_OPENING_OVERLAY ? [] : [{ scale: openingScaleAnim }],
             width: screenDimensions.width,
             height: screenDimensions.height,
           }
@@ -2535,7 +2532,7 @@ const VideoPlayer: React.FC = () => {
                   }}
                   paused={paused}
                   volume={volume / 100}
-                  audioTrack={selectedAudioTrack}
+                  audioTrack={selectedAudioTrack ?? undefined}
                   textTrack={useCustomSubtitles ? -1 : selectedTextTrack}
                   onProgress={handleProgress}
                   onLoad={onLoad}
@@ -2562,7 +2559,7 @@ const VideoPlayer: React.FC = () => {
             currentTime={currentTime}
             duration={duration}
             zoomScale={zoomScale}
-            vlcAudioTracks={[]} // TODO: Update with KSPlayer tracks
+            vlcAudioTracks={vlcAudioTracks}
             selectedAudioTrack={selectedAudioTrack}
             availableStreams={availableStreams}
             togglePlayback={togglePlayback}

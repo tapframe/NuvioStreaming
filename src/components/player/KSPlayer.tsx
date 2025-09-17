@@ -31,6 +31,7 @@ export interface KSPlayerRef {
   setVolume: (volume: number) => void;
   setAudioTrack: (trackId: number) => void;
   setTextTrack: (trackId: number) => void;
+  getTracks: () => Promise<{ audioTracks: any[]; textTracks: any[] }>;
 }
 
 export interface KSPlayerProps {
@@ -101,6 +102,13 @@ const KSPlayer = forwardRef<KSPlayerRef, KSPlayerProps>((props, ref) => {
         UIManager.dispatchViewManagerCommand(node, commandId, [trackId]);
       }
     },
+    getTracks: async () => {
+      if (nativeRef.current) {
+        const node = findNodeHandle(nativeRef.current);
+        return await KSPlayerModule.getTracks(node);
+      }
+      return { audioTracks: [], textTracks: [] };
+    },
   }));
 
   // No need for event listeners - events are handled through props
@@ -121,12 +129,12 @@ const KSPlayer = forwardRef<KSPlayerRef, KSPlayerProps>((props, ref) => {
       volume={props.volume}
       audioTrack={props.audioTrack}
       textTrack={props.textTrack}
-      onLoad={props.onLoad}
-      onProgress={props.onProgress}
-      onBuffering={props.onBuffering}
-      onEnd={props.onEnd}
-      onError={props.onError}
-      onBufferingProgress={props.onBufferingProgress}
+      onLoad={(e: any) => props.onLoad?.(e?.nativeEvent ?? e)}
+      onProgress={(e: any) => props.onProgress?.(e?.nativeEvent ?? e)}
+      onBuffering={(e: any) => props.onBuffering?.(e?.nativeEvent ?? e)}
+      onEnd={() => props.onEnd?.()}
+      onError={(e: any) => props.onError?.(e?.nativeEvent ?? e)}
+      onBufferingProgress={(e: any) => props.onBufferingProgress?.(e?.nativeEvent ?? e)}
       style={props.style}
     />
   );

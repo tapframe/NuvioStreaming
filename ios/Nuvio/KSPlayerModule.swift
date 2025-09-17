@@ -25,12 +25,13 @@ class KSPlayerModule: RCTEventEmitter {
         ]
     }
 
-    @objc func getTracks(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        // This method can be expanded to get track information
-        // For now, return empty tracks
-        resolve([
-            "audioTracks": [],
-            "textTracks": []
-        ])
+    @objc func getTracks(_ nodeTag: NSNumber, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        DispatchQueue.main.async {
+            if let viewManager = self.bridge.module(for: KSPlayerViewManager.self) as? KSPlayerViewManager {
+                viewManager.getTracks(nodeTag, resolve: resolve, reject: reject)
+            } else {
+                reject("NO_VIEW_MANAGER", "KSPlayerViewManager not found", nil)
+            }
+        }
     }
 }

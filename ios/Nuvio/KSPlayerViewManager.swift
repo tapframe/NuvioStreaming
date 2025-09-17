@@ -85,4 +85,15 @@ class KSPlayerViewManager: RCTViewManager {
             }
         }
     }
+    
+    @objc func getTracks(_ node: NSNumber, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        DispatchQueue.main.async {
+            if let view = self.bridge.uiManager.view(forReactTag: node) as? KSPlayerView {
+                let tracks = view.getAvailableTracks()
+                resolve(tracks)
+            } else {
+                reject("NO_VIEW", "KSPlayerView not found", nil)
+            }
+        }
+    }
 }

@@ -31,11 +31,12 @@ RCT_EXTERN_METHOD(setPaused:(nonnull NSNumber *)node paused:(BOOL)paused)
 RCT_EXTERN_METHOD(setVolume:(nonnull NSNumber *)node volume:(nonnull NSNumber *)volume)
 RCT_EXTERN_METHOD(setAudioTrack:(nonnull NSNumber *)node trackId:(nonnull NSNumber *)trackId)
 RCT_EXTERN_METHOD(setTextTrack:(nonnull NSNumber *)node trackId:(nonnull NSNumber *)trackId)
+RCT_EXTERN_METHOD(getTracks:(nonnull NSNumber *)node resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 
 @end
 
 @interface RCT_EXTERN_MODULE(KSPlayerModule, RCTEventEmitter)
 
-RCT_EXTERN_METHOD(getTracks:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(getTracks:(nonnull NSNumber *)nodeTag resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 
 @end
