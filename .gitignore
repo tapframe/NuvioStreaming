@@ -42,7 +42,7 @@ CHANGELOG.md
 .env.local
 android/
 HEATING_OPTIMIZATIONS.md
-ios
+
 android
 sliderreadme.md
 .cursor/mcp.json
@@ -53,3 +53,4 @@ hackintosh-emulator-fix.sh
 /ota-builds
 src/screens/xavio.md
 /nuvio-providers
+/KSPlayer

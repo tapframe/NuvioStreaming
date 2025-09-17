@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { View, TouchableOpacity, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, Image, StyleSheet, Modal, AppState } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { VLCPlayer } from 'react-native-vlc-media-player';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList, RootStackNavigationProp } from '../../navigation/AppNavigator';
 import { PinchGestureHandler, PanGestureHandler, TapGestureHandler, State, PinchGestureHandlerGestureEvent, PanGestureHandlerGestureEvent, TapGestureHandlerGestureEvent } from 'react-native-gesture-handler';
@@ -14,6 +13,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Slider from '@react-native-community/slider';
 import AndroidVideoPlayer from './AndroidVideoPlayer';
+import KSPlayer, { KSPlayerRef, KSPlayerSource } from './KSPlayer';
 import { useTraktAutosync } from '../../hooks/useTraktAutosync';
 import { useTraktAutosyncSettings } from '../../hooks/useTraktAutosyncSettings';
 import { useMetadata } from '../../hooks/useMetadata';
@@ -51,20 +51,16 @@ const VideoPlayer: React.FC = () => {
   // Detect if stream is MKV format
   const isMkvFile = isMkvStream(uri, headers);
 
-  // Use AndroidVideoPlayer for:
-  // - Android devices
-  // - Non-MKV files on iOS (unless forceVlc is set)
-  // Use VideoPlayer (VLC) for:
-  // - MKV files on iOS (unless forceVlc is set)
-  const shouldUseAndroidPlayer = Platform.OS === 'android' ||
-    (Platform.OS === 'ios' && !isMkvFile && !forceVlc);
+  // Use AndroidVideoPlayer for Android devices
+  // Use KSPlayer for iOS devices
+  const shouldUseAndroidPlayer = Platform.OS === 'android';
 
   safeDebugLog("Player selection logic", {
     platform: Platform.OS,
     isMkvFile,
-    forceVlc,
     shouldUseAndroidPlayer
   });
+
   if (shouldUseAndroidPlayer) {
     return <AndroidVideoPlayer />;
   }
@@ -132,7 +128,7 @@ const VideoPlayer: React.FC = () => {
   const [resizeMode, setResizeMode] = useState<ResizeModeType>('stretch');
   const [buffered, setBuffered] = useState(0);
   const [seekPosition, setSeekPosition] = useState<number | null>(null);
-  const vlcRef = useRef<any>(null);
+  const ksPlayerRef = useRef<KSPlayerRef>(null);
   const [showAudioModal, setShowAudioModal] = useState(false);
   const [showSubtitleModal, setShowSubtitleModal] = useState(false);
   const [initialPosition, setInitialPosition] = useState<number | null>(null);
@@ -784,51 +780,27 @@ const VideoPlayer: React.FC = () => {
   const seekToTime = (rawSeconds: number) => {
     // Clamp to just before the end to avoid triggering onEnd.
     const timeInSeconds = Math.max(0, Math.min(rawSeconds, duration > 0 ? duration - END_EPSILON : rawSeconds));
-    if (vlcRef.current && duration > 0 && !isSeeking.current) {
+    if (ksPlayerRef.current && duration > 0 && !isSeeking.current) {
       if (DEBUG_MODE) {
         if (__DEV__) logger.log(`[VideoPlayer] Seeking to ${timeInSeconds.toFixed(2)}s out of ${duration.toFixed(2)}s`);
       }
 
       isSeeking.current = true;
 
-      // For Android, use direct seeking on VLC player ref instead of seek prop
-      if (Platform.OS === 'android' && vlcRef.current.seek) {
-        // Calculate position as fraction
-        const position = timeInSeconds / duration;
-        vlcRef.current.seek(position);
-        // Clear seek state after Android seek
-        setTimeout(() => {
-          if (isMounted.current) {
-            isSeeking.current = false;
-            if (DEBUG_MODE) {
-              logger.log(`[VideoPlayer] Android seek completed to ${timeInSeconds.toFixed(2)}s`);
-            }
-          }
-        }, 500);
-      } else {
-        // iOS (and other platforms) – prefer direct seek on the ref to avoid re-mounts caused by the `seek` prop
-        const position = timeInSeconds / duration; // VLC expects a 0-1 fraction
-        if (vlcRef.current && typeof vlcRef.current.seek === 'function') {
-          vlcRef.current.seek(position);
-        } else {
-          // Fallback to legacy behaviour only if direct seek is unavailable
-          setSeekPosition(position);
-        }
+      // KSPlayer uses direct time seeking
+      ksPlayerRef.current.seek(timeInSeconds);
 
-        setTimeout(() => {
-          if (isMounted.current) {
-            // Reset temporary seek state
-            setSeekPosition(null);
-            isSeeking.current = false;
-            if (DEBUG_MODE) {
-              logger.log(`[VideoPlayer] iOS seek completed to ${timeInSeconds.toFixed(2)}s`);
-            }
+      setTimeout(() => {
+        if (isMounted.current) {
+          isSeeking.current = false;
+          if (DEBUG_MODE) {
+            logger.log(`[VideoPlayer] KSPlayer seek completed to ${timeInSeconds.toFixed(2)}s`);
           }
-        }, 500);
-      }
+        }
+      }, 500);
     } else {
       if (DEBUG_MODE) {
-        logger.error(`[VideoPlayer] Seek failed: vlcRef=${!!vlcRef.current}, duration=${duration}, seeking=${isSeeking.current}`);
+        logger.error(`[VideoPlayer] Seek failed: ksPlayerRef=${!!ksPlayerRef.current}, duration=${duration}, seeking=${isSeeking.current}`);
       }
     }
   };
@@ -882,13 +854,14 @@ const VideoPlayer: React.FC = () => {
   const handleProgress = (event: any) => {
     if (isDragging || isSeeking.current) return;
 
-    const currentTimeInSeconds = event.currentTime / 1000;
+    // KSPlayer returns times in seconds directly
+    const currentTimeInSeconds = event.currentTime;
 
     // Only update if there's a significant change to avoid unnecessary updates
     if (Math.abs(currentTimeInSeconds - currentTime) > 0.5) {
       safeSetState(() => setCurrentTime(currentTimeInSeconds));
-      // Removed progressAnim animation - no longer needed with React Native Community Slider
-      const bufferedTime = event.bufferTime / 1000 || currentTimeInSeconds;
+      // KSPlayer returns bufferTime in seconds
+      const bufferedTime = event.bufferTime || currentTimeInSeconds;
       safeSetState(() => setBuffered(bufferedTime));
     }
     
@@ -954,8 +927,9 @@ const VideoPlayer: React.FC = () => {
         logger.error('[VideoPlayer] onLoad called with null/undefined data');
         return;
       }
-      const videoDuration = data.duration / 1000;
-      if (data.duration > 0) {
+      // KSPlayer returns duration in seconds directly
+      const videoDuration = data.duration;
+      if (videoDuration > 0) {
         setDuration(videoDuration);
 
         // Store the actual duration for future reference and update existing progress
@@ -969,13 +943,14 @@ const VideoPlayer: React.FC = () => {
           }
         }
       }
-      // Set aspect ratio with null check for videoSize
-      if (data.videoSize && data.videoSize.width && data.videoSize.height) {
-        setVideoAspectRatio(data.videoSize.width / data.videoSize.height);
+
+      // Set aspect ratio from naturalSize (KSPlayer format)
+      if (data.naturalSize && data.naturalSize.width && data.naturalSize.height) {
+        setVideoAspectRatio(data.naturalSize.width / data.naturalSize.height);
       } else {
-        // Fallback to 16:9 aspect ratio if videoSize is not available
+        // Fallback to 16:9 aspect ratio if naturalSize is not available
         setVideoAspectRatio(16 / 9);
-        logger.warn('[VideoPlayer] videoSize not available, using default 16:9 aspect ratio');
+        logger.warn('[VideoPlayer] naturalSize not available, using default 16:9 aspect ratio');
       }
 
       if (data.audioTracks && data.audioTracks.length > 0) {
@@ -2551,31 +2526,22 @@ const VideoPlayer: React.FC = () => {
                 onLongPress={resetZoom}
                 delayLongPress={300}
               >
-                <VLCPlayer
-                  ref={vlcRef}
+                <KSPlayer
+                  ref={ksPlayerRef}
                   style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
-                  source={(() => {
-                     // Use route headers for VLC streams
-                     const sourceWithHeaders = headers && Object.keys(headers).length > 0 ? {
-                       uri: currentStreamUrl,
-                       headers: headers
-                     } : { uri: currentStreamUrl };
-
-                     return sourceWithHeaders;
-                   })()}
+                  source={{
+                    uri: currentStreamUrl,
+                    headers: headers && Object.keys(headers).length > 0 ? headers : undefined
+                  }}
                   paused={paused}
+                  volume={volume / 100}
+                  audioTrack={selectedAudioTrack}
+                  textTrack={useCustomSubtitles ? -1 : selectedTextTrack}
                   onProgress={handleProgress}
                   onLoad={onLoad}
                   onEnd={onEnd}
                   onError={handleError}
                   onBuffering={onBuffering}
-                  onPlaying={onPlaying}
-                  onPaused={onPaused}
-                  resizeMode={resizeMode as any}
-                  audioTrack={selectedAudioTrack ?? undefined}
-                  textTrack={useCustomSubtitles ? -1 : (selectedTextTrack >= 0 ? selectedTextTrack : -1)}
-                  autoAspectRatio
-                  volume={volume / 100}
                 />
               </TouchableOpacity>
             </View>
@@ -2596,7 +2562,7 @@ const VideoPlayer: React.FC = () => {
             currentTime={currentTime}
             duration={duration}
             zoomScale={zoomScale}
-            vlcAudioTracks={vlcAudioTracks}
+            vlcAudioTracks={[]} // TODO: Update with KSPlayer tracks
             selectedAudioTrack={selectedAudioTrack}
             availableStreams={availableStreams}
             togglePlayback={togglePlayback}

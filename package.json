@@ -83,7 +83,8 @@
     "@types/react-native": "^0.72.8",
     "babel-plugin-transform-remove-console": "^6.9.4",
     "react-native-svg-transformer": "^1.5.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "xcode": "^3.0.1"
   },
   "private": true
 }
