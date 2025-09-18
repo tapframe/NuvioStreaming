@@ -10,6 +10,7 @@ type AccountContextValue = {
   signIn: (email: string, password: string) => Promise<string | null>;
   signUp: (email: string, password: string) => Promise<string | null>;
   signOut: () => Promise<void>;
+  refreshCurrentUser: () => Promise<void>;
   updateProfile: (partial: { avatarUrl?: string; displayName?: string }) => Promise<string | null>;
 };
 
@@ -47,16 +48,21 @@ export const AccountProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     // Auth state listener
     const { data: subscription } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const fullUser = session?.user ? await accountService.getCurrentUser() : null;
-      setUser(fullUser);
-      if (fullUser) {
-        await syncService.migrateLocalScopeToUser();
-        await syncService.subscribeRealtime();
-        // Pull first to hydrate local state, then push to avoid wiping server with empty local
-        await syncService.fullPull();
-        await syncService.fullPush();
-      } else {
-        syncService.unsubscribeRealtime();
+      setLoading(true);
+      try {
+        const fullUser = session?.user ? await accountService.getCurrentUser() : null;
+        setUser(fullUser);
+        if (fullUser) {
+          await syncService.migrateLocalScopeToUser();
+          await syncService.subscribeRealtime();
+          // Pull first to hydrate local state, then push to avoid wiping server with empty local
+          await syncService.fullPull();
+          await syncService.fullPush();
+        } else {
+          syncService.unsubscribeRealtime();
+        }
+      } finally {
+        setLoading(false);
       }
     });
 
@@ -80,6 +86,15 @@ export const AccountProvider: React.FC<{ children: React.ReactNode }> = ({ child
     signOut: async () => {
       await accountService.signOut();
       setUser(null);
+    },
+    refreshCurrentUser: async () => {
+      setLoading(true);
+      try {
+        const u = await accountService.getCurrentUser();
+        setUser(u);
+      } finally {
+        setLoading(false);
+      }
     },
     updateProfile: async (partial) => {
       const err = await accountService.updateProfile(partial);

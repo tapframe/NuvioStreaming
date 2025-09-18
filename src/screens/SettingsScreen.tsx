@@ -231,7 +231,7 @@ const SettingsScreen: React.FC = () => {
   const { isAuthenticated, userProfile, refreshAuthStatus } = useTraktContext();
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
-  const { user, signOut, loading: accountLoading } = useAccount();
+  const { user, signOut, loading: accountLoading, refreshCurrentUser } = useAccount();
   
   // Tablet-specific state
   const [selectedCategory, setSelectedCategory] = useState('account');
@@ -248,10 +248,12 @@ const SettingsScreen: React.FC = () => {
         if (__DEV__) console.log('SettingsScreen focused, refreshing auth status. Current state:', { isAuthenticated, userProfile: userProfile?.username });
       }
       refreshAuthStatus();
+      // Also refresh account user in case we returned from auth flow
+      refreshCurrentUser();
     });
     
     return unsubscribe;
-  }, [navigation, isAuthenticated, userProfile, refreshAuthStatus]);
+  }, [navigation, isAuthenticated, userProfile, refreshAuthStatus, refreshCurrentUser]);
 
   // States for dynamic content
   const [addonCount, setAddonCount] = useState<number>(0);

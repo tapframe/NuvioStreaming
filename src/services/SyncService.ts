@@ -693,6 +693,8 @@ class SyncService {
     (stremioService as any).addonOrder = order;
     await (stremioService as any).saveInstalledAddons();
     await (stremioService as any).saveAddonOrder();
+    // Mark addons initialized for this user to prevent destructive merges on first push
+    try { await AsyncStorage.setItem(`@user:${userId}:addons_initialized`, 'true'); } catch {}
     // Push merged order to server to preserve across devices
     try {
       const rows = order.map((addonId: string, idx: number) => ({
@@ -848,9 +850,27 @@ class SyncService {
     const user = await accountService.getCurrentUser();
     if (!user) return;
     const userId = user.id;
-    const addons = await stremioService.getInstalledAddonsAsync();
+    let addons = await stremioService.getInstalledAddonsAsync();
     logger.log(`[Sync] push installed_addons count=${addons.length}`);
-    const order = (stremioService as any).addonOrder as string[];
+    let order = (stremioService as any).addonOrder as string[];
+
+    // Safety: if this is a first-time push and local addons are fewer than remote, pull before pushing
+    try {
+      const initialized = (await AsyncStorage.getItem(`@user:${userId}:addons_initialized`)) === 'true';
+      const { data: remoteBefore } = await supabase
+        .from('installed_addons')
+        .select('addon_id')
+        .eq('user_id', userId);
+      const remoteCount = (remoteBefore || []).length;
+      if (!initialized && remoteCount > addons.length) {
+        logger.log('[Sync] addons not initialized and local smaller than remote → pulling before push');
+        await this.pullAddonsSnapshot(userId);
+        // refresh local state after pull
+        addons = await stremioService.getInstalledAddonsAsync();
+        order = (stremioService as any).addonOrder as string[];
+      }
+    } catch {}
+
     const rows = addons.map((a: any) => ({
       user_id: userId,
       addon_id: a.id,
@@ -863,12 +883,17 @@ class SyncService {
       manifest_data: a,
     }));
     // Delete remote addons that no longer exist locally (excluding pre-installed to be safe)
+    // Guard: do not perform deletions on first-time merge when remote has more addons
     try {
       const { data: remote, error: rErr } = await supabase
         .from('installed_addons')
         .select('addon_id')
         .eq('user_id', userId);
       if (!rErr && remote) {
+        const initialized = (await AsyncStorage.getItem(`@user:${userId}:addons_initialized`)) === 'true';
+        if (!initialized && (remote as any[]).length > addons.length) {
+          logger.log('[Sync] skipping deletions during first-time addon merge');
+        } else {
         const localIds = new Set(addons.map((a: any) => a.id));
         const toDeletePromises = (remote as any[])
           .map(r => r.addon_id as string)
@@ -893,6 +918,7 @@ class SyncService {
             .eq('user_id', userId)
             .in('addon_id', toDelete);
           if (del.error && __DEV__) console.warn('[SyncService] delete addons error', del.error);
+        }
         }
       }
     } catch (e) {
