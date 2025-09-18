@@ -404,7 +404,6 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
-  - MobileVLCKit (3.5.1)
   - RCT-Folly (2024.10.14.00):
     - boost
     - DoubleConversion
@@ -1885,10 +1884,6 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
-  - react-native-vlc-media-player (1.0.38):
-    - MobileVLCKit (= 3.5.1)
-    - React
-    - TVVLCKit (= 3.5.1)
   - React-nativeconfig (0.76.9)
   - React-NativeModulesApple (0.76.9):
     - glog
@@ -2518,7 +2513,6 @@ DEPENDENCIES:
   - react-native-safe-area-context (from `../node_modules/react-native-safe-area-context`)
   - "react-native-slider (from `../node_modules/@react-native-community/slider`)"
   - react-native-video (from `../node_modules/react-native-video`)
-  - react-native-vlc-media-player (from `../node_modules/react-native-vlc-media-player`)
   - React-nativeconfig (from `../node_modules/react-native/ReactCommon`)
   - React-NativeModulesApple (from `../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)
   - React-perflogger (from `../node_modules/react-native/ReactCommon/reactperflogger`)
@@ -2560,7 +2554,6 @@ SPEC REPOS:
     - libavif
     - libdav1d
     - lottie-ios
-    - MobileVLCKit
     - ReachabilitySwift
     - SDWebImage
     - SDWebImageAVIFCoder
@@ -2736,8 +2729,6 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@react-native-community/slider"
   react-native-video:
     :path: "../node_modules/react-native-video"
-  react-native-vlc-media-player:
-    :path: "../node_modules/react-native-vlc-media-player"
   React-nativeconfig:
     :path: "../node_modules/react-native/ReactCommon"
   React-NativeModulesApple:
@@ -2872,7 +2863,6 @@ SPEC CHECKSUMS:
   libdav1d: 23581a4d8ec811ff171ed5e2e05cd27bad64c39f
   lottie-ios: a881093fab623c467d3bce374367755c272bdd59
   lottie-react-native: 4ba06e2e4985c53dda6595a880f780e7ff551df1
-  MobileVLCKit: 144d5f565512d1147d63b0fa1379231b3fd66535
   RCT-Folly: ea9d9256ba7f9322ef911169a9f696e5857b9e17
   RCTDeprecation: ebe712bb05077934b16c6bf25228bdec34b64f83
   RCTRequired: ca91e5dd26b64f577b528044c962baf171c6b716
@@ -2910,7 +2900,6 @@ SPEC CHECKSUMS:
   react-native-safe-area-context: cd916088cac5300c3266876218377518987b995e
   react-native-slider: d8c35cc0162af73c9448f4b18c34d09e841cc1ab
   react-native-video: bc6104529a6fde35127a1625b30d557412fdb70d
-  react-native-vlc-media-player: da3308dda896d4ff7abfacadb8f981752bf9b425
   React-nativeconfig: 8efdb1ef1e9158c77098a93085438f7e7b463678
   React-NativeModulesApple: cebca2e5320a3d66e123cade23bd90a167ffce5e
   React-perflogger: 72e653eb3aba9122f9e57cf012d22d2486f33358

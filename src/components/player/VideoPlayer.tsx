@@ -67,6 +67,9 @@ const VideoPlayer: React.FC = () => {
 
   const navigation = useNavigation<RootStackNavigationProp>();
 
+  // KSPlayer is active only on iOS when using MKV (shouldUseAndroidPlayer is false)
+  const isKsPlayerActive = Platform.OS === 'ios' && !shouldUseAndroidPlayer;
+
   const {
     title = 'Episode Name',
     season,
@@ -3178,6 +3181,7 @@ const VideoPlayer: React.FC = () => {
         ksTextTracks={ksTextTracks}
         selectedTextTrack={selectedTextTrack}
         useCustomSubtitles={useCustomSubtitles}
+        isKsPlayerActive={isKsPlayerActive}
         subtitleSize={subtitleSize}
         subtitleBackground={subtitleBackground}
         fetchAvailableSubtitles={fetchAvailableSubtitles}

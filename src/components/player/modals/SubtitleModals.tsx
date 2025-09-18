@@ -24,6 +24,8 @@ interface SubtitleModalsProps {
   ksTextTracks: Array<{id: number, name: string, language?: string}>;
   selectedTextTrack: number;
   useCustomSubtitles: boolean;
+  // When true, KSPlayer is active (iOS MKV path). Use to gate iOS-only limitations.
+  isKsPlayerActive?: boolean;
   subtitleSize: number;
   subtitleBackground: boolean;
   fetchAvailableSubtitles: () => void;
@@ -71,6 +73,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   ksTextTracks,
   selectedTextTrack,
   useCustomSubtitles,
+  isKsPlayerActive,
   subtitleSize,
   subtitleBackground,
   fetchAvailableSubtitles,
@@ -284,47 +287,82 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                 }}>
                   Built-in Subtitles
                 </Text>
+
+                {/* Notice about built-in subtitle limitations - only when KSPlayer active on iOS */}
+                {isIos && isKsPlayerActive && (
+                  <View style={{
+                    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                    borderRadius: 12,
+                    padding: sectionPad,
+                    marginBottom: 15,
+                    borderWidth: 1,
+                    borderColor: 'rgba(255, 193, 7, 0.3)',
+                  }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+                      <MaterialIcons name="info" size={18} color="#FFC107" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={{
+                          color: '#FFC107',
+                          fontSize: isCompact ? 12 : 13,
+                          fontWeight: '600',
+                          marginBottom: 4,
+                        }}>
+                          Built-in subtitles temporarily disabled
+                        </Text>
+                        <Text style={{
+                          color: 'rgba(255, 255, 255, 0.8)',
+                          fontSize: isCompact ? 11 : 12,
+                          lineHeight: isCompact ? 16 : 18,
+                        }}>
+                          Due to some React Native limitations with KSPlayer, built-in subtitle rendering is temporarily disabled. Please use external subtitles instead for the best experience.
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                )}
                 
-                <View style={{ gap: 8 }}>
-                  {ksTextTracks.map((track) => {
-                    const isSelected = selectedTextTrack === track.id && !useCustomSubtitles;
-                    // Debug logging for subtitle selection
-                    if (__DEV__ && ksTextTracks.length > 0) {
-                      console.log('[SubtitleModals] Track:', track.id, track.name, 'Selected:', selectedTextTrack, 'isSelected:', isSelected, 'useCustom:', useCustomSubtitles);
-                    }
-                    return (
-                      <TouchableOpacity
-                        key={track.id}
-                        style={{
-                          backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                          borderRadius: 16,
-                          padding: sectionPad,
-                          borderWidth: 1,
-                          borderColor: isSelected ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255, 255, 255, 0.1)',
-                        }}
-                        onPress={() => {
-                          selectTextTrack(track.id);
-                          setSelectedOnlineSubtitleId(null);
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Text style={{
-                            color: '#FFFFFF',
-                            fontSize: isCompact ? 14 : 15,
-                            fontWeight: '500',
-                            flex: 1,
-                          }}>
-                            {getTrackDisplayName(track)}
-                          </Text>
-                          {isSelected && (
-                            <MaterialIcons name="check" size={20} color="#3B82F6" />
-                          )}
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                {(!isIos || (isIos && !isKsPlayerActive)) && (
+                  <View style={{ gap: 8 }}>
+                    {ksTextTracks.map((track) => {
+                      const isSelected = selectedTextTrack === track.id && !useCustomSubtitles;
+                      // Debug logging for subtitle selection
+                      if (__DEV__ && ksTextTracks.length > 0) {
+                        console.log('[SubtitleModals] Track:', track.id, track.name, 'Selected:', selectedTextTrack, 'isSelected:', isSelected, 'useCustom:', useCustomSubtitles);
+                      }
+                      return (
+                        <TouchableOpacity
+                          key={track.id}
+                          style={{
+                            backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                            borderRadius: 16,
+                            padding: sectionPad,
+                            borderWidth: 1,
+                            borderColor: isSelected ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+                          }}
+                          onPress={() => {
+                            selectTextTrack(track.id);
+                            setSelectedOnlineSubtitleId(null);
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Text style={{
+                              color: '#FFFFFF',
+                              fontSize: isCompact ? 14 : 15,
+                              fontWeight: '500',
+                              flex: 1,
+                            }}>
+                              {getTrackDisplayName(track)}
+                            </Text>
+                            {isSelected && (
+                              <MaterialIcons name="check" size={20} color="#3B82F6" />
+                            )}
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
             )}
 

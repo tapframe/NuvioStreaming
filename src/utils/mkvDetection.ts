@@ -155,15 +155,5 @@ export const detectMkvComprehensive = async (
 export const isMkvStream = (streamUri: string, streamHeaders?: Record<string, string>): boolean => {
   const result = detectMkvStream(streamUri, streamHeaders);
 
-  // Debug logging in development
-  if (__DEV__ && streamUri) {
-    console.log('[MKV Detection]', {
-      uri: streamUri.substring(0, 100) + (streamUri.length > 100 ? '...' : ''),
-      isMkv: result.isMkv,
-      method: result.method,
-      confidence: result.confidence
-    });
-  }
-
   return result.isMkv;
 };
