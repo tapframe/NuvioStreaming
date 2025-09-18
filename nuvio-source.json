@@ -31,6 +31,14 @@
       ],
       "versions": [
         {
+          "version": "1.1.0",
+          "buildVersion": "13",
+          "date": "2025-09-18",
+          "localizedDescription": "# Version 1.1.0 – Update Notes\n\nThis update focuses on important bug fixes and a major internal player replacement for iOS.\n\n## Changes\n- **iOS Player Update**:  \n  - iOS now uses **KSPlayer** internally for MKV files (replacing VLCKit).  \n  - AVPlayer continues to be used for all other formats.  \n- Fixed an issue where posters disappeared on the Cast movie screen.  \n- Minor glitch fixes and improvements.  \n\n---\n\n## Note for iOS Users  \nThis is the **initial build with KSPlayer**. Please expect bugs and limitations:  \n- Embedded subtitle support is **not available** yet, as KSPlayer is a custom React Native module.  \n- Use **external/addon subtitles** for now until proper support is added.  \n\n---\n\n⚠️ **Important:** Both **iOS and Android users** are requested to update to this version to continue receiving future **OTA updates**.",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/1.1.0/Stable_1-1-0.ipa",
+          "size": 25700000
+        },
+        {
           "version": "1.0.0",
           "buildVersion": "12",
           "date": "2025-09-15",
