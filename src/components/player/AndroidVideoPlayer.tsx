@@ -37,6 +37,7 @@ import PlayerControls from './controls/PlayerControls';
 import CustomSubtitles from './subtitles/CustomSubtitles';
 import { SourcesModal } from './modals/SourcesModal';
 import { stremioService } from '../../services/stremioService';
+import { isMkvStream } from '../../utils/mkvDetection';
 import axios from 'axios';
 import * as Brightness from 'expo-brightness';
 
@@ -440,15 +441,14 @@ const AndroidVideoPlayer: React.FC = () => {
   // Volume gesture handler (right side of screen)
   const onVolumeGestureEvent = async (event: PanGestureHandlerGestureEvent) => {
     const { translationY, state } = event.nativeEvent;
-    const screenHeight = screenDimensions.height;
-    const sensitivity = 0.002; // Reduced for finer control
-    
+    const sensitivity = 0.002; // Lower sensitivity for gradual volume control on Android
+
     if (state === State.ACTIVE) {
       const deltaY = -translationY; // Invert for natural feel (up = increase)
       const volumeChange = deltaY * sensitivity;
       const newVolume = Math.max(0, Math.min(1, volume + volumeChange));
-      
-      if (Math.abs(newVolume - volume) > 0.005) { // Reduced threshold for smoother updates
+
+      if (Math.abs(newVolume - volume) > 0.01) { // Lower threshold for smoother Android volume control
         setVolume(newVolume);
         lastVolumeChange.current = Date.now();
         
@@ -489,15 +489,14 @@ const AndroidVideoPlayer: React.FC = () => {
   // Brightness gesture handler (left side of screen)
   const onBrightnessGestureEvent = async (event: PanGestureHandlerGestureEvent) => {
     const { translationY, state } = event.nativeEvent;
-    const screenHeight = screenDimensions.height;
-    const sensitivity = 0.002; // Reduced for finer control
-    
+    const sensitivity = 0.001; // Lower sensitivity for finer brightness control
+
     if (state === State.ACTIVE) {
       const deltaY = -translationY; // Invert for natural feel (up = increase)
       const brightnessChange = deltaY * sensitivity;
       const newBrightness = Math.max(0, Math.min(1, brightness + brightnessChange));
-      
-      if (Math.abs(newBrightness - brightness) > 0.005) { // Reduced threshold for smoother updates
+
+      if (Math.abs(newBrightness - brightness) > 0.001) { // Much lower threshold for more responsive updates
         setBrightness(newBrightness);
         lastBrightnessChange.current = Date.now();
         
@@ -2556,6 +2555,38 @@ const AndroidVideoPlayer: React.FC = () => {
       return;
     }
 
+    // On iOS: if the selected stream is MKV, switch to KSPlayer screen by replacing route
+    if (Platform.OS === 'ios') {
+      const targetIsMkv = isMkvStream(newStream.url, newStream.headers || {});
+      if (targetIsMkv) {
+        // Ensure current player stops immediately before switching screens
+        setPaused(true);
+        setShowSourcesModal(false);
+        // Small delay to guarantee audio halt before navigation switch
+        setTimeout(() => {
+          (navigation as any).replace('Player', {
+            uri: newStream.url,
+            title,
+            episodeTitle,
+            season,
+            episode,
+            quality: (newStream.title?.match(/(\d+)p/) || [])[1] || newStream.quality,
+            year,
+            streamProvider: newStream.addonName || newStream.name || newStream.addon || 'Unknown',
+            streamName: newStream.name || newStream.title || 'Unknown Stream',
+            headers: newStream.headers || undefined,
+            id,
+            type,
+            episodeId,
+            imdbId,
+            backdrop,
+            availableStreams,
+          });
+        }, 50);
+        return;
+      }
+    }
+
     setIsChangingSource(true);
     setShowSourcesModal(false);
     
@@ -2768,10 +2799,11 @@ const AndroidVideoPlayer: React.FC = () => {
         {/* Combined gesture handler for left side - brightness + tap */}
         <PanGestureHandler
           onGestureEvent={onBrightnessGestureEvent}
-          activeOffsetY={[-10, 10]}
-          failOffsetX={[-50, 50]}
-          shouldCancelWhenOutside={true}
+          activeOffsetY={[-5, 5]}
+          failOffsetX={[-20, 20]}
+          shouldCancelWhenOutside={false}
           simultaneousHandlers={[]}
+          maxPointers={1}
         >
           <TapGestureHandler
             onActivated={toggleControls}
@@ -2792,10 +2824,11 @@ const AndroidVideoPlayer: React.FC = () => {
         {/* Combined gesture handler for right side - volume + tap */}
         <PanGestureHandler
           onGestureEvent={onVolumeGestureEvent}
-          activeOffsetY={[-10, 10]}
-          failOffsetX={[-50, 50]}
-          shouldCancelWhenOutside={true}
+          activeOffsetY={[-5, 5]}
+          failOffsetX={[-20, 20]}
+          shouldCancelWhenOutside={false}
           simultaneousHandlers={[]}
+          maxPointers={1}
         >
           <TapGestureHandler
             onActivated={toggleControls}
