@@ -8,8 +8,8 @@ import {
   Dimensions,
   Platform,
   Alert,
+  FlatList,
 } from 'react-native';
-import { FlashList } from '@shopify/flash-list';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import Animated, {
@@ -352,6 +352,7 @@ const CastMoviesScreen: React.FC = () => {
       style={{
         width: posterWidth,
         marginBottom: 20,
+        marginRight: (index + 1) % numColumns === 0 ? 0 : 12,
       }}
     >
       <TouchableOpacity
@@ -704,7 +705,7 @@ const CastMoviesScreen: React.FC = () => {
           </Text>
         </View>
       ) : (
-        <FlashList
+        <FlatList
           data={displayedMovies}
           renderItem={renderMovieItem}
           keyExtractor={(item) => `${item.media_type}-${item.id}`}
@@ -722,6 +723,10 @@ const CastMoviesScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.8}
+          removeClippedSubviews={false}
+          initialNumToRender={30}
+          maxToRenderPerBatch={20}
+          windowSize={7}
           ListFooterComponent={
             displayLimit < filteredAndSortedMovies.length ? (
               <View style={{

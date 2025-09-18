@@ -162,6 +162,7 @@ const VideoPlayer: React.FC = () => {
   const seekDebounceTimer = useRef<NodeJS.Timeout | null>(null);
   const pendingSeekValue = useRef<number | null>(null);
   const lastSeekTime = useRef<number>(0);
+  const wasPlayingBeforeDragRef = useRef<boolean>(false);
   const [isVideoLoaded, setIsVideoLoaded] = useState(false);
   const [videoAspectRatio, setVideoAspectRatio] = useState<number | null>(null);
   const [is16by9Content, setIs16by9Content] = useState(false);
@@ -843,6 +844,8 @@ const VideoPlayer: React.FC = () => {
 
   const handleSlidingStart = () => {
     setIsDragging(true);
+    // Remember if we were playing before the user started dragging
+    wasPlayingBeforeDragRef.current = !paused;
     // Keep controls visible while dragging and cancel any hide timeout
     if (!showControls) setShowControls(true);
     if (controlsTimeout.current) {
@@ -856,6 +859,14 @@ const VideoPlayer: React.FC = () => {
     if (duration > 0) {
       const seekTime = Math.min(value, duration - END_EPSILON);
       seekToTime(seekTime);
+      // If the video was playing before the drag, ensure we remain in playing state after the seek
+      if (wasPlayingBeforeDragRef.current) {
+        setTimeout(() => {
+          if (isMounted.current) {
+            setPaused(false);
+          }
+        }, 350);
+      }
       pendingSeekValue.current = null;
     }
     // Restart auto-hide timer after interaction finishes
@@ -903,6 +914,14 @@ const VideoPlayer: React.FC = () => {
       setIsVideoLoaded(true);
       setIsPlayerReady(true);
       completeOpeningAnimation();
+    }
+    
+    // If time is advancing right after seek and we previously intended to play,
+    // ensure paused state is false to keep UI in sync
+    if (wasPlayingBeforeDragRef.current && paused && !isDragging) {
+      setPaused(false);
+      // Reset the intent once corrected
+      wasPlayingBeforeDragRef.current = false;
     }
     
     // Periodic check for disabled audio track (every 3 seconds, max 3 attempts)
