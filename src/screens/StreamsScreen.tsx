@@ -676,14 +676,19 @@ export const StreamsScreen = () => {
 
     return streams.filter(stream => {
       const streamTitle = stream.title || stream.name || '';
-      
+
       // Check if any excluded quality is found in the stream title
       const hasExcludedQuality = settings.excludedQualities.some(excludedQuality => {
-        // Create a case-insensitive regex pattern for the quality
-        const pattern = new RegExp(excludedQuality.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-        return pattern.test(streamTitle);
+        if (excludedQuality === 'Auto') {
+          // Special handling for Auto quality - check for Auto or Adaptive
+          return /\b(auto|adaptive)\b/i.test(streamTitle);
+        } else {
+          // Create a case-insensitive regex pattern for other qualities
+          const pattern = new RegExp(excludedQuality.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+          return pattern.test(streamTitle);
+        }
       });
-      
+
       // Return true to keep the stream (if it doesn't have excluded quality)
       return !hasExcludedQuality;
     });
@@ -1306,94 +1311,218 @@ export const StreamsScreen = () => {
 
     // Check if we should group all streams under one section
     if (settings.streamDisplayMode === 'grouped') {
-      // Separate streams by type: installed addons vs plugins
+      // Separate addon and plugin streams - only apply quality filtering/sorting to plugins
       const addonStreams: Stream[] = [];
       const pluginStreams: Stream[] = [];
-      const addonNames: string[] = [];
-      const pluginNames: string[] = [];
-      let addonOriginalCount = 0;
-      let pluginOriginalCount = 0;
+      const providerNames: string[] = [];
+      let totalOriginalCount = 0;
 
       filteredEntries.forEach(([addonId, { addonName, streams: providerStreams }]) => {
         const isInstalledAddon = installedAddons.some(addon => addon.id === addonId);
 
         // Count original streams before filtering
-        if (isInstalledAddon) {
-          addonOriginalCount += providerStreams.length;
-        } else {
-          pluginOriginalCount += providerStreams.length;
-        }
-
-        // Apply quality filtering only; keep original addon stream order
-        const filteredStreams = filterStreamsByQuality(providerStreams);
+        totalOriginalCount += providerStreams.length;
 
         if (isInstalledAddon) {
-          addonStreams.push(...filteredStreams);
-          if (!addonNames.includes(addonName)) {
-            addonNames.push(addonName);
+          // For ADDONS: Keep all streams in original order, NO filtering or sorting
+          addonStreams.push(...providerStreams);
+          if (!providerNames.includes(addonName)) {
+            providerNames.push(addonName);
           }
         } else {
-          pluginStreams.push(...filteredStreams);
-          if (!pluginNames.includes(addonName)) {
-            pluginNames.push(addonName);
+          // For PLUGINS: Apply quality filtering and sorting
+          const filteredStreams = filterStreamsByQuality(providerStreams);
+
+          if (filteredStreams.length > 0) {
+            pluginStreams.push(...filteredStreams);
+            if (!providerNames.includes(addonName)) {
+              providerNames.push(addonName);
+            }
           }
         }
       });
 
-      const sections = [];
-      if (addonStreams.length > 0) {
-        sections.push({
-          title: addonNames.join(', '),
-          addonId: 'grouped-addons',
-          data: addonStreams
-        });
-      } else if (addonOriginalCount > 0 && addonStreams.length === 0) {
-        // Show empty section with message for addons that had streams but all were filtered
-        sections.push({
-          title: addonNames.join(', '),
-          addonId: 'grouped-addons',
+      const totalStreamsCount = addonStreams.length + pluginStreams.length;
+      const isEmptyDueToQualityFilter = totalOriginalCount > 0 && totalStreamsCount === 0;
+
+      if (isEmptyDueToQualityFilter) {
+        return [{
+          title: providerNames.join(', '),
+          addonId: 'grouped-all',
           data: [{ isEmptyPlaceholder: true } as any],
           isEmptyDueToQualityFilter: true
-        });
+        }];
       }
 
-      if (pluginStreams.length > 0) {
-        sections.push({
-          title: localScraperService.getRepositoryName(),
-          addonId: 'grouped-plugins',
-          data: pluginStreams
+      // Combine streams: Addons first (unsorted), then sorted plugins
+      let combinedStreams = [...addonStreams];
+
+      // Apply quality sorting to PLUGIN streams when enabled
+      if (settings.streamSortMode === 'quality-then-scraper' && pluginStreams.length > 0) {
+        const sortedPluginStreams = [...pluginStreams].sort((a, b) => {
+          const titleA = (a.name || a.title || '').toLowerCase();
+          const titleB = (b.name || b.title || '').toLowerCase();
+
+          // Check for "Auto" quality - always prioritize it
+          const isAutoA = /\b(auto|adaptive)\b/i.test(titleA);
+          const isAutoB = /\b(auto|adaptive)\b/i.test(titleB);
+
+          if (isAutoA && !isAutoB) return -1; // Auto comes first
+          if (!isAutoA && isAutoB) return 1;  // Auto comes first
+
+          // If both are Auto or both are not Auto, continue with normal sorting
+          // Helper function to extract quality as number
+          const getQualityNumeric = (title: string | undefined): number => {
+            if (!title) return 0;
+
+            // Check for 4K first (treat as 2160p)
+            if (/\b4k\b/i.test(title)) {
+              return 2160;
+            }
+
+            const matchWithP = title.match(/(\d+)p/i);
+            if (matchWithP) return parseInt(matchWithP[1], 10);
+
+            const qualityPatterns = [
+              /\b(240|360|480|720|1080|1440|2160|4320|8000)\b/i
+            ];
+
+            for (const pattern of qualityPatterns) {
+              const match = title.match(pattern);
+              if (match) {
+                const quality = parseInt(match[1], 10);
+                if (quality >= 240 && quality <= 8000) return quality;
+              }
+            }
+            return 0;
+          };
+
+          const qualityA = getQualityNumeric(a.name || a.title);
+          const qualityB = getQualityNumeric(b.name || b.title);
+
+          // Sort by quality (highest first)
+          if (qualityA !== qualityB) {
+            return qualityB - qualityA;
+          }
+
+          // If quality is the same, sort by provider name, then stream name
+          const providerA = a.addonId || a.addonName || '';
+          const providerB = b.addonId || b.addonName || '';
+
+          if (providerA !== providerB) {
+            return providerA.localeCompare(providerB);
+          }
+
+          const nameA = (a.name || a.title || '').toLowerCase();
+          const nameB = (b.name || b.title || '').toLowerCase();
+          return nameA.localeCompare(nameB);
         });
-      } else if (pluginOriginalCount > 0 && pluginStreams.length === 0) {
-        // Show empty section with message for plugins that had streams but all were filtered
-        sections.push({
-          title: localScraperService.getRepositoryName(),
-          addonId: 'grouped-plugins',
-          data: [{ isEmptyPlaceholder: true } as any],
-          isEmptyDueToQualityFilter: true
-        });
+
+        // Add sorted plugin streams to the combined streams
+        combinedStreams.push(...sortedPluginStreams);
+      } else {
+        // If quality sorting is disabled, just add plugin streams as-is
+        combinedStreams.push(...pluginStreams);
       }
 
-      return sections;
+      return [{
+        title: providerNames.join(', '),
+        addonId: 'grouped-all',
+        data: combinedStreams,
+        isEmptyDueToQualityFilter: false
+      }];
     } else {
       // Use separate sections for each provider (current behavior)
       return filteredEntries.map(([addonId, { addonName, streams: providerStreams }]) => {
+        const isInstalledAddon = installedAddons.some(addon => addon.id === addonId);
+
         // Count original streams before filtering
         const originalCount = providerStreams.length;
 
-        // Apply quality filtering only; keep original addon stream order
-        const filteredStreams = filterStreamsByQuality(providerStreams);
+        let filteredStreams = providerStreams;
+        let isEmptyDueToQualityFilter = false;
 
-        const isEmptyDueToQualityFilter = originalCount > 0 && filteredStreams.length === 0;
+        // Only apply quality filtering to plugins, NOT addons
+        if (!isInstalledAddon) {
+          filteredStreams = filterStreamsByQuality(providerStreams);
+          isEmptyDueToQualityFilter = originalCount > 0 && filteredStreams.length === 0;
+        }
+
+        if (isEmptyDueToQualityFilter) {
+          return {
+            title: addonName,
+            addonId,
+            data: [{ isEmptyPlaceholder: true } as any],
+            isEmptyDueToQualityFilter
+          };
+        }
+
+        let processedStreams = filteredStreams;
+
+        // Apply quality sorting for plugins when enabled, but NOT for addons
+        if (!isInstalledAddon && settings.streamSortMode === 'quality-then-scraper') {
+          processedStreams = [...filteredStreams].sort((a, b) => {
+            const titleA = (a.name || a.title || '').toLowerCase();
+            const titleB = (b.name || b.title || '').toLowerCase();
+
+            // Check for "Auto" quality - always prioritize it
+            const isAutoA = /\b(auto|adaptive)\b/i.test(titleA);
+            const isAutoB = /\b(auto|adaptive)\b/i.test(titleB);
+
+            if (isAutoA && !isAutoB) return -1; // Auto comes first
+            if (!isAutoA && isAutoB) return 1;  // Auto comes first
+
+            // If both are Auto or both are not Auto, continue with normal sorting
+            // Helper function to extract quality as number
+            const getQualityNumeric = (title: string | undefined): number => {
+              if (!title) return 0;
+
+              // Check for 4K first (treat as 2160p)
+              if (/\b4k\b/i.test(title)) {
+                return 2160;
+              }
+
+              const matchWithP = title.match(/(\d+)p/i);
+              if (matchWithP) return parseInt(matchWithP[1], 10);
+
+              const qualityPatterns = [
+                /\b(240|360|480|720|1080|1440|2160|4320|8000)\b/i
+              ];
+
+              for (const pattern of qualityPatterns) {
+                const match = title.match(pattern);
+                if (match) {
+                  const quality = parseInt(match[1], 10);
+                  if (quality >= 240 && quality <= 8000) return quality;
+                }
+              }
+              return 0;
+            };
+
+            const qualityA = getQualityNumeric(a.name || a.title);
+            const qualityB = getQualityNumeric(b.name || b.title);
+
+            // Sort by quality (highest first)
+            if (qualityA !== qualityB) {
+              return qualityB - qualityA;
+            }
+
+            // If quality is the same, sort by name/title
+            const nameA = (a.name || a.title || '').toLowerCase();
+            const nameB = (b.name || b.title || '').toLowerCase();
+            return nameA.localeCompare(nameB);
+          });
+        }
 
         return {
           title: addonName,
           addonId,
-          data: isEmptyDueToQualityFilter ? [{ isEmptyPlaceholder: true } as any] : filteredStreams,
-          isEmptyDueToQualityFilter
+          data: processedStreams,
+          isEmptyDueToQualityFilter: false
         };
       });
     }
-  }, [selectedProvider, type, episodeStreams, groupedStreams, settings.streamDisplayMode, filterStreamsByQuality, addonResponseOrder]);
+  }, [selectedProvider, type, episodeStreams, groupedStreams, settings.streamDisplayMode, filterStreamsByQuality, addonResponseOrder, settings.streamSortMode]);
 
   const episodeImage = useMemo(() => {
     if (episodeThumbnail) {
