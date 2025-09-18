@@ -91,9 +91,9 @@ echo "🔨 Starting build process..."
 rm -rf $outputFolder
 mkdir -p $outputFolder
 
-# Run expo export with the specified output folder
-echo "📦 Exporting Expo bundle..."
-if ! npx expo export --output-dir $outputFolder; then
+# Run expo export with the specified output folder (excluding web)
+echo "📦 Exporting Expo bundle (Android & iOS only)..."
+if ! npx expo export --output-dir $outputFolder --platform android --platform ios; then
   echo "❌ Error: Expo export failed"
   exit 1
 fi

@@ -468,7 +468,11 @@ const MainTabs = () => {
     if (isHomeLoading) {
       return null;
     }
-    
+
+    // Get current route name to determine if we should keep navigation fixed
+    const currentRoute = props.state.routes[props.state.index]?.name;
+    const shouldKeepFixed = currentRoute === 'Search' || currentRoute === 'Library';
+
     if (isTablet) {
       // Top floating, text-only pill nav for tablets
       return (
@@ -481,7 +485,7 @@ const MainTabs = () => {
           alignItems: 'center',
           backgroundColor: 'transparent',
           zIndex: 100,
-        }, {
+        }, shouldKeepFixed ? {} : {
           transform: [{ translateY }],
           opacity: fade,
         }]}>
