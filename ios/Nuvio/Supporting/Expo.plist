@@ -9,7 +9,7 @@
     <key>EXUpdatesLaunchWaitMs</key>
     <integer>30000</integer>
     <key>EXUpdatesRuntimeVersion</key>
-    <string>1.0.0</string>
+    <string>1.1.0</string>
     <key>EXUpdatesURL</key>
     <string>https://grim-reyna-tapframe-69970143.koyeb.app/api/manifest</string>
   </dict>
