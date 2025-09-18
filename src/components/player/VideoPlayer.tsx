@@ -51,13 +51,15 @@ const VideoPlayer: React.FC = () => {
   // Detect if stream is MKV format
   const isMkvFile = isMkvStream(uri, headers);
 
-  // Use AndroidVideoPlayer for Android devices and non-MKV files on iOS
-  // Use KSPlayer only for MKV files on iOS
-  const shouldUseAndroidPlayer = Platform.OS === 'android' || (Platform.OS === 'ios' && !isMkvFile);
+  // Honor forceVlc from navigation params for iOS, or fallback to MKV detection
+  const forceVlc = ((route.params as any)?.forceVlc === true);
+  // Use AndroidVideoPlayer for Android devices. On iOS, use KSPlayer when MKV or forced.
+  const shouldUseAndroidPlayer = Platform.OS === 'android' || (Platform.OS === 'ios' && !(isMkvFile || forceVlc));
 
   safeDebugLog("Player selection logic", {
     platform: Platform.OS,
     isMkvFile,
+    forceVlc,
     shouldUseAndroidPlayer
   });
 

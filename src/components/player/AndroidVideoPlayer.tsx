@@ -2586,6 +2586,8 @@ const AndroidVideoPlayer: React.FC = () => {
             imdbId,
             backdrop,
             availableStreams,
+            // Ensure KSPlayer is chosen even if URL/headers do not reveal MKV
+            forceVlc: true,
           });
         }, 50);
         return;
