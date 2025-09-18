@@ -264,6 +264,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const [brightness, setBrightness] = useState(1.0);
   const [showVolumeOverlay, setShowVolumeOverlay] = useState(false);
   const [showBrightnessOverlay, setShowBrightnessOverlay] = useState(false);
+  const [subtitleSettingsLoaded, setSubtitleSettingsLoaded] = useState(false);
   const volumeOverlayOpacity = useRef(new Animated.Value(0)).current;
   const brightnessOverlayOpacity = useRef(new Animated.Value(0)).current;
   const volumeOverlayTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -2455,12 +2456,15 @@ const AndroidVideoPlayer: React.FC = () => {
           if (typeof saved.subtitleLineHeightMultiplier === 'number') setSubtitleLineHeightMultiplier(saved.subtitleLineHeightMultiplier);
           if (typeof saved.subtitleOffsetSec === 'number') setSubtitleOffsetSec(saved.subtitleOffsetSec);
         }
-      } catch {}
+      } catch {} finally {
+        try { setSubtitleSettingsLoaded(true); } catch {}
+      }
     })();
   }, []);
 
   // Persist global subtitle settings on change
   useEffect(() => {
+    if (!subtitleSettingsLoaded) return;
     storageService.saveSubtitleSettings({
       subtitleSize,
       subtitleBackground,
@@ -2490,6 +2494,7 @@ const AndroidVideoPlayer: React.FC = () => {
     subtitleLetterSpacing,
     subtitleLineHeightMultiplier,
     subtitleOffsetSec,
+    subtitleSettingsLoaded,
   ]);
 
   const increaseSubtitleSize = () => {
