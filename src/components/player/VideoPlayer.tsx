@@ -43,16 +43,17 @@ import axios from 'axios';
 import { stremioService } from '../../services/stremioService';
 import * as Brightness from 'expo-brightness';
 
-const VideoPlayer: React.FC = () => {
-  const insets = useSafeAreaInsets();
+// VideoPlayerRouter component handles platform selection without conditional hook calls
+const VideoPlayerRouter: React.FC = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'Player'>>();
-  const { uri, headers, streamProvider } = route.params as any;
+  const { uri, headers } = route.params as any;
 
   // Detect if stream is MKV format
   const isMkvFile = isMkvStream(uri, headers);
 
   // Honor forceVlc from navigation params for iOS, or fallback to MKV detection
   const forceVlc = ((route.params as any)?.forceVlc === true);
+
   // Use AndroidVideoPlayer for Android devices. On iOS, use KSPlayer when MKV or forced.
   const shouldUseAndroidPlayer = Platform.OS === 'android' || (Platform.OS === 'ios' && !(isMkvFile || forceVlc));
 
@@ -67,10 +68,22 @@ const VideoPlayer: React.FC = () => {
     return <AndroidVideoPlayer />;
   }
 
+  return <VideoPlayerCore />;
+};
+
+const VideoPlayer: React.FC = () => {
+  return <VideoPlayerRouter />;
+};
+
+const VideoPlayerCore: React.FC = () => {
+  const insets = useSafeAreaInsets();
+  const route = useRoute<RouteProp<RootStackParamList, 'Player'>>();
+  const { uri, headers, streamProvider } = route.params as any;
+
   const navigation = useNavigation<RootStackNavigationProp>();
 
-  // KSPlayer is active only on iOS when using MKV (shouldUseAndroidPlayer is false)
-  const isKsPlayerActive = Platform.OS === 'ios' && !shouldUseAndroidPlayer;
+  // KSPlayer is active only on iOS for MKV streams
+  const isKsPlayerActive = Platform.OS === 'ios';
 
   const {
     title = 'Episode Name',
