@@ -276,6 +276,9 @@ const AndroidVideoPlayer: React.FC = () => {
   const loadStartAtRef = useRef<number | null>(null);
   const firstFrameAtRef = useRef<number | null>(null);
 
+  // iOS playback state tracking for system interruptions
+  const wasPlayingBeforeIOSInterruptionRef = useRef<boolean>(false);
+
   // Pause overlay state
   const [showPauseOverlay, setShowPauseOverlay] = useState(false);
   const pauseOverlayTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -615,13 +618,34 @@ const AndroidVideoPlayer: React.FC = () => {
     const onAppStateChange = (state: string) => {
       if (state === 'active') {
         enableImmersiveMode();
+        // On iOS, if we were playing before system interruption and the app becomes active again,
+        // ensure playback resumes (handles status bar pull-down case)
+        if (Platform.OS === 'ios' && wasPlayingBeforeIOSInterruptionRef.current && isPlayerReady) {
+          logger.log('[AndroidVideoPlayer] iOS app active - resuming playback after system interruption');
+          // Small delay to allow system UI to settle
+          setTimeout(() => {
+            if (isMounted.current && wasPlayingBeforeIOSInterruptionRef.current) {
+              setPaused(false); // Resume playback
+              wasPlayingBeforeIOSInterruptionRef.current = false; // Reset flag
+            }
+          }, 300); // Slightly longer delay for iOS
+        }
+      } else if (state === 'background' || state === 'inactive') {
+        // On iOS, when app goes inactive (like status bar pull), track if we were playing
+        if (Platform.OS === 'ios') {
+          wasPlayingBeforeIOSInterruptionRef.current = !paused;
+          if (!paused) {
+            logger.log('[AndroidVideoPlayer] iOS app inactive - tracking playing state for resume');
+            setPaused(true);
+          }
+        }
       }
     };
     const sub = AppState.addEventListener('change', onAppStateChange);
     return () => {
       sub.remove();
     };
-  }, []);
+  }, [paused, isPlayerReady]);
 
   const startOpeningAnimation = () => {
     // Logo entrance animation - optimized for faster appearance

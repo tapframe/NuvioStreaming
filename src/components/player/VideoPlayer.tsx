@@ -226,6 +226,11 @@ const VideoPlayer: React.FC = () => {
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null);
   const [isSyncingBeforeClose, setIsSyncingBeforeClose] = useState(false);
 
+  // Silent startup-timeout retry state
+  const startupRetryCountRef = useRef(0);
+  const startupRetryTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const MAX_STARTUP_RETRIES = 3;
+
   // Pause overlay state
   const [showPauseOverlay, setShowPauseOverlay] = useState(false);
   const pauseOverlayTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -979,6 +984,12 @@ const VideoPlayer: React.FC = () => {
       if (DEBUG_MODE) {
         logger.log('[VideoPlayer] Video loaded:', data);
       }
+      // Clear any pending startup silent retry timers and counters on success
+      if (startupRetryTimerRef.current) {
+        clearTimeout(startupRetryTimerRef.current);
+        startupRetryTimerRef.current = null;
+      }
+      startupRetryCountRef.current = 0;
       if (!isMounted.current) {
         logger.warn('[VideoPlayer] Component unmounted, skipping onLoad');
         return;
@@ -1374,6 +1385,48 @@ const VideoPlayer: React.FC = () => {
     try {
       logger.error('[VideoPlayer] Playback Error:', error);
       
+      // Detect KSPlayer startup timeout and silently retry without UI
+      const errText = typeof error === 'string'
+        ? error
+        : (error?.message || error?.error?.message || error?.title || '');
+      const isStartupTimeout = /timeout/i.test(errText) && /stream.*ready/i.test(errText);
+      if (isStartupTimeout && !isVideoLoaded) {
+        // Suppress any error modal and retry silently
+        if (errorTimeoutRef.current) {
+          clearTimeout(errorTimeoutRef.current);
+          errorTimeoutRef.current = null;
+        }
+        setShowErrorModal(false);
+
+        const attempt = startupRetryCountRef.current;
+        if (attempt < MAX_STARTUP_RETRIES) {
+          const backoffMs = [4000, 8000, 12000][attempt] ?? 8000;
+          startupRetryCountRef.current = attempt + 1;
+          logger.warn(`[VideoPlayer] Startup timeout; retrying (${attempt + 1}/${MAX_STARTUP_RETRIES}) in ${backoffMs}ms`);
+
+          if (startupRetryTimerRef.current) {
+            clearTimeout(startupRetryTimerRef.current);
+          }
+          startupRetryTimerRef.current = setTimeout(() => {
+            if (!ksPlayerRef.current) return;
+            try {
+              // Reload the same source silently using native bridge
+              ksPlayerRef.current.setSource({
+                uri: currentStreamUrl,
+                headers: headers && Object.keys(headers).length > 0 ? headers : undefined
+              });
+              // Ensure playback resumes if not paused
+              ksPlayerRef.current.setPaused(paused);
+              logger.log('[VideoPlayer] Retried source load via KSPlayer.setSource');
+            } catch (e) {
+              logger.error('[VideoPlayer] Error during silent retry setSource:', e);
+            }
+          }, backoffMs);
+          return; // Exit handler; do not show UI
+        }
+        logger.error('[VideoPlayer] Max startup retries reached; proceeding to normal error handling');
+      }
+
       // Check for audio codec errors (TrueHD, DTS, Dolby, etc.)
       const isAudioCodecError = 
         (error?.message && /(trhd|truehd|true\s?hd|dts|dolby|atmos|e-ac3|ac3)/i.test(error.message)) ||
@@ -2062,6 +2115,10 @@ const VideoPlayer: React.FC = () => {
       }
       if (brightnessOverlayTimeout.current) {
         clearTimeout(brightnessOverlayTimeout.current);
+      }
+      if (startupRetryTimerRef.current) {
+        clearTimeout(startupRetryTimerRef.current);
+        startupRetryTimerRef.current = null;
       }
     };
   }, []);
