@@ -1314,7 +1314,6 @@ export const StreamsScreen = () => {
       // Separate addon and plugin streams - only apply quality filtering/sorting to plugins
       const addonStreams: Stream[] = [];
       const pluginStreams: Stream[] = [];
-      const providerNames: string[] = [];
       let totalOriginalCount = 0;
 
       filteredEntries.forEach(([addonId, { addonName, streams: providerStreams }]) => {
@@ -1326,18 +1325,12 @@ export const StreamsScreen = () => {
         if (isInstalledAddon) {
           // For ADDONS: Keep all streams in original order, NO filtering or sorting
           addonStreams.push(...providerStreams);
-          if (!providerNames.includes(addonName)) {
-            providerNames.push(addonName);
-          }
         } else {
           // For PLUGINS: Apply quality filtering and sorting
           const filteredStreams = filterStreamsByQuality(providerStreams);
 
           if (filteredStreams.length > 0) {
             pluginStreams.push(...filteredStreams);
-            if (!providerNames.includes(addonName)) {
-              providerNames.push(addonName);
-            }
           }
         }
       });
@@ -1347,7 +1340,7 @@ export const StreamsScreen = () => {
 
       if (isEmptyDueToQualityFilter) {
         return [{
-          title: providerNames.join(', '),
+          title: 'Available Streams',
           addonId: 'grouped-all',
           data: [{ isEmptyPlaceholder: true } as any],
           isEmptyDueToQualityFilter: true
@@ -1426,7 +1419,7 @@ export const StreamsScreen = () => {
       }
 
       return [{
-        title: providerNames.join(', '),
+        title: 'Available Streams',
         addonId: 'grouped-all',
         data: combinedStreams,
         isEmptyDueToQualityFilter: false
