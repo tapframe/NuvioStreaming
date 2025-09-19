@@ -799,9 +799,9 @@ const VideoPlayer: React.FC = () => {
     if (isMounted.current) {
       setPaused(true);
 
-      // Send a forced pause update to Trakt immediately when user pauses
+      // IMMEDIATE: Send immediate pause update to Trakt when user pauses
       if (duration > 0) {
-        traktAutosync.handleProgressUpdate(currentTime, duration, true);
+        traktAutosync.handleProgressUpdate(currentTime, duration, true); // force=true triggers immediate sync
       }
     }
   };
@@ -1331,12 +1331,12 @@ const VideoPlayer: React.FC = () => {
     const backgroundSync = async () => {
       try {
         logger.log('[VideoPlayer] Starting background Trakt sync');
-        // Force one last progress update (scrobble/pause) with the exact time
+        // IMMEDIATE: Force immediate progress update (scrobble/pause) with the exact time
         await traktAutosync.handleProgressUpdate(actualCurrentTime, duration, true);
-        
-        // Sync progress to Trakt
-        await traktAutosync.handlePlaybackEnd(actualCurrentTime, duration, 'unmount');
-        
+
+        // IMMEDIATE: Use user_close reason to trigger immediate scrobble stop
+        await traktAutosync.handlePlaybackEnd(actualCurrentTime, duration, 'user_close');
+
         logger.log('[VideoPlayer] Background Trakt sync completed successfully');
       } catch (error) {
         logger.error('[VideoPlayer] Error in background Trakt sync:', error);
@@ -1543,12 +1543,11 @@ const VideoPlayer: React.FC = () => {
     setCurrentTime(finalTime);
 
     try {
-      // Force one last progress update (scrobble/pause) with the exact final time
+      // REGULAR: Use regular sync for natural video end (not immediate since it's not user-triggered)
       logger.log('[VideoPlayer] Video ended naturally, sending final progress update with 100%');
-      await traktAutosync.handleProgressUpdate(finalTime, duration, true);
+      await traktAutosync.handleProgressUpdate(finalTime, duration, false); // force=false for regular sync
 
-      // IMMEDIATE SYNC: Remove delay for instant sync
-      // Now send the stop call immediately
+      // REGULAR: Use 'ended' reason for natural video end (uses regular queued method)
       logger.log('[VideoPlayer] Sending final stop call after natural end');
       await traktAutosync.handlePlaybackEnd(finalTime, duration, 'ended');
 

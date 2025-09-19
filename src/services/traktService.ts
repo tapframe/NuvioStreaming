@@ -1492,7 +1492,7 @@ export class TraktService {
 
       const watchingKey = this.getWatchingKey(contentData);
       const now = Date.now();
-      
+
       // IMMEDIATE SYNC: Reduce debouncing for instant sync, only prevent truly duplicate calls (< 1 second)
       const lastStopTime = this.lastStopCalls.get(watchingKey);
       if (lastStopTime && (now - lastStopTime) < 1000) {
@@ -1509,19 +1509,19 @@ export class TraktService {
 
       if (result) {
         this.currentlyWatching.delete(watchingKey);
-        
+
         // Mark as scrobbled if >= 80% to prevent future duplicates and restarts
         if (progress >= this.completionThreshold) {
           this.scrobbledItems.add(watchingKey);
           this.scrobbledTimestamps.set(watchingKey, Date.now());
           logger.log(`[TraktService] Marked as scrobbled to prevent restarts: ${watchingKey}`);
         }
-        
+
         // The stop endpoint automatically handles the 80%+ completion logic
         // and will mark as scrobbled if >= 80%, or pause if < 80%
         const action = progress >= this.completionThreshold ? 'scrobbled' : 'paused';
         logger.log(`[TraktService] Stopped watching ${contentData.type}: ${contentData.title} (${progress.toFixed(1)}% - ${action})`);
-        
+
         return true;
       } else {
         // If failed, remove from lastStopCalls so we can try again
@@ -1535,8 +1535,90 @@ export class TraktService {
         logger.warn('[TraktService] Rate limited, will retry later');
         return true;
       }
-      
+
       logger.error('[TraktService] Failed to stop scrobbling:', error);
+      return false;
+    }
+  }
+
+  /**
+   * IMMEDIATE SCROBBLE METHODS - Bypass rate limiting queue for critical user actions
+   */
+
+  /**
+   * Immediate scrobble pause - bypasses queue for instant user feedback
+   */
+  public async scrobblePauseImmediate(contentData: TraktContentData, progress: number): Promise<boolean> {
+    try {
+      if (!await this.isAuthenticated()) {
+        return false;
+      }
+
+      const watchingKey = this.getWatchingKey(contentData);
+
+      // MINIMAL DEDUPLICATION: Only prevent calls within 100ms for immediate actions
+      const lastSync = this.lastSyncTimes.get(watchingKey) || 0;
+      if ((Date.now() - lastSync) < 100) {
+        return true; // Skip this sync, but return success
+      }
+
+      this.lastSyncTimes.set(watchingKey, Date.now());
+
+      // BYPASS QUEUE: Call API directly for immediate response
+      const result = await this.pauseWatching(contentData, progress);
+
+      if (result) {
+        logger.log(`[TraktService] IMMEDIATE: Updated progress ${progress.toFixed(1)}% for ${contentData.type}: ${contentData.title}`);
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      logger.error('[TraktService] Failed to pause scrobbling immediately:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Immediate scrobble stop - bypasses queue for instant user feedback
+   */
+  public async scrobbleStopImmediate(contentData: TraktContentData, progress: number): Promise<boolean> {
+    try {
+      if (!await this.isAuthenticated()) {
+        return false;
+      }
+
+      const watchingKey = this.getWatchingKey(contentData);
+
+      // MINIMAL DEDUPLICATION: Only prevent calls within 200ms for immediate actions
+      const lastStopTime = this.lastStopCalls.get(watchingKey);
+      if (lastStopTime && (Date.now() - lastStopTime) < 200) {
+        return true;
+      }
+
+      this.lastStopCalls.set(watchingKey, Date.now());
+
+      // BYPASS QUEUE: Call API directly for immediate response
+      const result = await this.stopWatching(contentData, progress);
+
+      if (result) {
+        this.currentlyWatching.delete(watchingKey);
+
+        // Mark as scrobbled if >= 80% to prevent future duplicates and restarts
+        if (progress >= this.completionThreshold) {
+          this.scrobbledItems.add(watchingKey);
+          this.scrobbledTimestamps.set(watchingKey, Date.now());
+        }
+
+        const action = progress >= this.completionThreshold ? 'scrobbled' : 'paused';
+        logger.log(`[TraktService] IMMEDIATE: Stopped watching ${contentData.type}: ${contentData.title} (${progress.toFixed(1)}% - ${action})`);
+
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      logger.error('[TraktService] Failed to stop scrobbling immediately:', error);
       return false;
     }
   }

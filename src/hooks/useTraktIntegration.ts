@@ -199,12 +199,12 @@ export function useTraktIntegration() {
 
   // Update progress while watching (scrobble pause)
   const updateProgress = useCallback(async (
-    contentData: TraktContentData, 
-    progress: number, 
+    contentData: TraktContentData,
+    progress: number,
     force: boolean = false
   ): Promise<boolean> => {
     if (!isAuthenticated) return false;
-    
+
     try {
       return await traktService.scrobblePause(contentData, progress, force);
     } catch (error) {
@@ -213,14 +213,43 @@ export function useTraktIntegration() {
     }
   }, [isAuthenticated]);
 
+  // IMMEDIATE SCROBBLE METHODS - Bypass queue for instant user feedback
+
+  // Immediate update progress while watching (scrobble pause)
+  const updateProgressImmediate = useCallback(async (
+    contentData: TraktContentData,
+    progress: number
+  ): Promise<boolean> => {
+    if (!isAuthenticated) return false;
+
+    try {
+      return await traktService.scrobblePauseImmediate(contentData, progress);
+    } catch (error) {
+      logger.error('[useTraktIntegration] Error updating progress immediately:', error);
+      return false;
+    }
+  }, [isAuthenticated]);
+
   // Stop watching content (scrobble stop)
   const stopWatching = useCallback(async (contentData: TraktContentData, progress: number): Promise<boolean> => {
     if (!isAuthenticated) return false;
-    
+
     try {
       return await traktService.scrobbleStop(contentData, progress);
     } catch (error) {
       logger.error('[useTraktIntegration] Error stopping watch:', error);
+      return false;
+    }
+  }, [isAuthenticated]);
+
+  // Immediate stop watching content (scrobble stop)
+  const stopWatchingImmediate = useCallback(async (contentData: TraktContentData, progress: number): Promise<boolean> => {
+    if (!isAuthenticated) return false;
+
+    try {
+      return await traktService.scrobbleStopImmediate(contentData, progress);
+    } catch (error) {
+      logger.error('[useTraktIntegration] Error stopping watch immediately:', error);
       return false;
     }
   }, [isAuthenticated]);
@@ -494,7 +523,9 @@ export function useTraktIntegration() {
     refreshAuthStatus,
     startWatching,
     updateProgress,
+    updateProgressImmediate,
     stopWatching,
+    stopWatchingImmediate,
     syncProgress, // legacy
     getTraktPlaybackProgress,
     syncAllProgress,

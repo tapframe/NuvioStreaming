@@ -21,11 +21,13 @@ interface TraktAutosyncOptions {
 }
 
 export function useTraktAutosync(options: TraktAutosyncOptions) {
-  const { 
-    isAuthenticated, 
-    startWatching, 
+  const {
+    isAuthenticated,
+    startWatching,
     updateProgress,
-    stopWatching
+    updateProgressImmediate,
+    stopWatching,
+    stopWatchingImmediate
   } = useTraktIntegration();
   
   const { settings: autosyncSettings } = useTraktAutosyncSettings();
@@ -148,8 +150,8 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
 
   // Sync progress during playback
   const handleProgressUpdate = useCallback(async (
-    currentTime: number, 
-    duration: number, 
+    currentTime: number,
+    duration: number,
     force: boolean = false
   ) => {
     if (!isAuthenticated || !autosyncSettings.enabled || duration <= 0) {
@@ -164,45 +166,72 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
     try {
       const progressPercent = (currentTime / duration) * 100;
       const now = Date.now();
-      
-      // IMMEDIATE SYNC: Remove all debouncing and frequency checks for instant sync
-      const progressDiff = Math.abs(progressPercent - lastSyncProgress.current);
-      
-      // Only skip if not forced and progress difference is minimal (< 1%)
-      if (!force && progressDiff < 1) {
-        return;
-      }
 
-      const contentData = buildContentData();
-      const success = await updateProgress(contentData, progressPercent, force);
-      
-      if (success) {
-        lastSyncTime.current = now;
-        lastSyncProgress.current = progressPercent;
-        
-        // Update local storage sync status
-        await storageService.updateTraktSyncStatus(
-          options.id,
-          options.type,
-          true,
-          progressPercent,
-          options.episodeId,
-          currentTime
-        );
-        
-        // Progress sync logging removed
+      // IMMEDIATE SYNC: Use immediate method for user-triggered actions (force=true)
+      // Use regular queued method for background periodic syncs
+      let success: boolean;
+
+      if (force) {
+        // IMMEDIATE: User action (pause/unpause) - bypass queue
+        const contentData = buildContentData();
+        success = await updateProgressImmediate(contentData, progressPercent);
+
+        if (success) {
+          lastSyncTime.current = now;
+          lastSyncProgress.current = progressPercent;
+
+          // Update local storage sync status
+          await storageService.updateTraktSyncStatus(
+            options.id,
+            options.type,
+            true,
+            progressPercent,
+            options.episodeId,
+            currentTime
+          );
+
+          logger.log(`[TraktAutosync] IMMEDIATE: Progress updated to ${progressPercent.toFixed(1)}%`);
+        }
+      } else {
+        // BACKGROUND: Periodic sync - use queued method
+        const progressDiff = Math.abs(progressPercent - lastSyncProgress.current);
+
+        // Only skip if not forced and progress difference is minimal (< 1%)
+        if (progressDiff < 1) {
+          return;
+        }
+
+        const contentData = buildContentData();
+        success = await updateProgress(contentData, progressPercent, force);
+
+        if (success) {
+          lastSyncTime.current = now;
+          lastSyncProgress.current = progressPercent;
+
+          // Update local storage sync status
+          await storageService.updateTraktSyncStatus(
+            options.id,
+            options.type,
+            true,
+            progressPercent,
+            options.episodeId,
+            currentTime
+          );
+
+          // Progress sync logging removed
+        }
       }
     } catch (error) {
       logger.error('[TraktAutosync] Error syncing progress:', error);
     }
-  }, [isAuthenticated, autosyncSettings.enabled, updateProgress, buildContentData, options]);
+  }, [isAuthenticated, autosyncSettings.enabled, updateProgress, updateProgressImmediate, buildContentData, options]);
 
   // Handle playback end/pause
-  const handlePlaybackEnd = useCallback(async (currentTime: number, duration: number, reason: 'ended' | 'unmount' = 'ended') => {
+  const handlePlaybackEnd = useCallback(async (currentTime: number, duration: number, reason: 'ended' | 'unmount' | 'user_close' = 'ended') => {
     const now = Date.now();
-    
+
     // Removed excessive logging for handlePlaybackEnd calls
-    
+
     if (!isAuthenticated || !autosyncSettings.enabled) {
       // logger.log(`[TraktAutosync] Skipping handlePlaybackEnd: authenticated=${isAuthenticated}, enabled=${autosyncSettings.enabled}`);
       return;
@@ -220,7 +249,7 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
     if (hasStopped.current) {
       const currentProgressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
       const progressImprovement = currentProgressPercent - lastSyncProgress.current;
-      
+
       if (progressImprovement > 5) {
         logger.log(`[TraktAutosync] Session already stopped, but progress improved significantly by ${progressImprovement.toFixed(1)}% (${lastSyncProgress.current.toFixed(1)}% → ${currentProgressPercent.toFixed(1)}%), allowing update`);
         // Reset stopped flag to allow this significant update
@@ -232,10 +261,14 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
       }
     }
 
+    // IMMEDIATE SYNC: Use immediate method for user-initiated actions (user_close)
+    let useImmediate = reason === 'user_close';
+
     // IMMEDIATE SYNC: Remove debouncing for instant sync when closing
-    // Only prevent truly duplicate calls (within 1 second)
-    if (!isSignificantUpdate && now - lastStopCall.current < 1000) {
-      logger.log(`[TraktAutosync] Ignoring duplicate stop call within 1 second (reason: ${reason})`);
+    // Only prevent truly duplicate calls (within 1 second for regular, 200ms for immediate)
+    const debounceThreshold = useImmediate ? 200 : 1000;
+    if (!isSignificantUpdate && now - lastStopCall.current < debounceThreshold) {
+      logger.log(`[TraktAutosync] Ignoring duplicate stop call within ${debounceThreshold}ms (reason: ${reason})`);
       return;
     }
 
@@ -248,25 +281,25 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
     try {
       let progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
       // Initial progress calculation logging removed
-      
+
       // For unmount calls, always use the highest available progress
       // Check current progress, last synced progress, and local storage progress
       if (reason === 'unmount') {
         let maxProgress = progressPercent;
-        
+
         // Check last synced progress
         if (lastSyncProgress.current > maxProgress) {
           maxProgress = lastSyncProgress.current;
         }
-        
+
         // Also check local storage for the highest recorded progress
         try {
           const savedProgress = await storageService.getWatchProgress(
-            options.id, 
-            options.type, 
+            options.id,
+            options.type,
             options.episodeId
           );
-          
+
           if (savedProgress && savedProgress.duration > 0) {
             const savedProgressPercent = (savedProgress.currentTime / savedProgress.duration) * 100;
             if (savedProgressPercent > maxProgress) {
@@ -276,7 +309,7 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
         } catch (error) {
           logger.error('[TraktAutosync] Error checking saved progress:', error);
         }
-        
+
         if (maxProgress !== progressPercent) {
           // Highest progress logging removed
           progressPercent = maxProgress;
@@ -293,29 +326,31 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
           hasStartedWatching.current = true;
         }
       }
-      
+
       // Only stop if we have meaningful progress (>= 0.5%) or it's a natural video end
       // Lower threshold for unmount calls to catch more edge cases
       if (reason === 'unmount' && progressPercent < 0.5) {
         // Early unmount stop logging removed
         return;
       }
-      
+
       // For natural end events, always set progress to at least 90%
       if (reason === 'ended' && progressPercent < 90) {
         logger.log(`[TraktAutosync] Natural end detected but progress is low (${progressPercent.toFixed(1)}%), boosting to 90%`);
         progressPercent = 90;
       }
-      
+
       // Mark stop attempt and update timestamp
       lastStopCall.current = now;
       hasStopped.current = true;
-      
+
       const contentData = buildContentData();
-      
-      // Use stopWatching for proper scrobble stop
-      const success = await stopWatching(contentData, progressPercent);
-      
+
+      // IMMEDIATE: Use immediate method for user-initiated closes, regular method for natural ends
+      const success = useImmediate
+        ? await stopWatchingImmediate(contentData, progressPercent)
+        : await stopWatching(contentData, progressPercent);
+
       if (success) {
         // Update local storage sync status
         await storageService.updateTraktSyncStatus(
@@ -326,20 +361,20 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
           options.episodeId,
           currentTime
         );
-        
+
         // Mark session as complete if high progress (scrobbled)
         if (progressPercent >= 80) {
           isSessionComplete.current = true;
           logger.log(`[TraktAutosync] Session marked as complete (scrobbled) at ${progressPercent.toFixed(1)}%`);
         }
-        
-        logger.log(`[TraktAutosync] Successfully stopped watching: ${contentData.title} (${progressPercent.toFixed(1)}% - ${reason})`);
+
+        logger.log(`[TraktAutosync] ${useImmediate ? 'IMMEDIATE: ' : ''}Successfully stopped watching: ${contentData.title} (${progressPercent.toFixed(1)}% - ${reason})`);
       } else {
         // If stop failed, reset the stop flag so we can try again later
         hasStopped.current = false;
         logger.warn(`[TraktAutosync] Failed to stop watching, reset stop flag for retry`);
       }
-      
+
       // Reset state only for natural end or very high progress unmounts
       if (reason === 'ended' || progressPercent >= 80) {
         hasStartedWatching.current = false;
@@ -347,13 +382,13 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
         lastSyncProgress.current = 0;
         logger.log(`[TraktAutosync] Reset session state for ${reason} at ${progressPercent.toFixed(1)}%`);
       }
-      
+
     } catch (error) {
       logger.error('[TraktAutosync] Error ending watch:', error);
       // Reset stop flag on error so we can try again
       hasStopped.current = false;
     }
-  }, [isAuthenticated, autosyncSettings.enabled, stopWatching, startWatching, buildContentData, options]);
+  }, [isAuthenticated, autosyncSettings.enabled, stopWatching, stopWatchingImmediate, startWatching, buildContentData, options]);
 
   // Reset state (useful when switching content)
   const resetState = useCallback(() => {

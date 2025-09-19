@@ -1364,12 +1364,12 @@ const AndroidVideoPlayer: React.FC = () => {
     const backgroundSync = async () => {
       try {
         logger.log('[AndroidVideoPlayer] Starting background Trakt sync');
-        // Force one last progress update (scrobble/pause) with the exact time
+        // IMMEDIATE: Force immediate progress update (scrobble/pause) with the exact time
         await traktAutosync.handleProgressUpdate(actualCurrentTime, duration, true);
-        
-        // Sync progress to Trakt
-        await traktAutosync.handlePlaybackEnd(actualCurrentTime, duration, 'unmount');
-        
+
+        // IMMEDIATE: Use user_close reason to trigger immediate scrobble stop
+        await traktAutosync.handlePlaybackEnd(actualCurrentTime, duration, 'user_close');
+
         logger.log('[AndroidVideoPlayer] Background Trakt sync completed successfully');
       } catch (error) {
         logger.error('[AndroidVideoPlayer] Error in background Trakt sync:', error);
@@ -1756,15 +1756,14 @@ const AndroidVideoPlayer: React.FC = () => {
     setCurrentTime(finalTime);
 
     try {
-      // Force one last progress update (scrobble/pause) with the exact final time
+      // REGULAR: Use regular sync for natural video end (not immediate since it's not user-triggered)
       logger.log('[AndroidVideoPlayer] Video ended naturally, sending final progress update with 100%');
-      await traktAutosync.handleProgressUpdate(finalTime, duration, true);
-      
-      // IMMEDIATE SYNC: Remove delay for instant sync
-      // Now send the stop call immediately
+      await traktAutosync.handleProgressUpdate(finalTime, duration, false); // force=false for regular sync
+
+      // REGULAR: Use 'ended' reason for natural video end (uses regular queued method)
       logger.log('[AndroidVideoPlayer] Sending final stop call after natural end');
       await traktAutosync.handlePlaybackEnd(finalTime, duration, 'ended');
-      
+
       logger.log('[AndroidVideoPlayer] Completed video end sync to Trakt');
     } catch (error) {
       logger.error('[AndroidVideoPlayer] Error syncing to Trakt on video end:', error);
@@ -2048,10 +2047,10 @@ const AndroidVideoPlayer: React.FC = () => {
     if (videoRef.current) {
       const newPausedState = !paused;
       setPaused(newPausedState);
-      
-      // Send a forced pause update to Trakt immediately when user pauses
-      if (newPausedState && duration > 0) {
-        traktAutosync.handleProgressUpdate(currentTime, duration, true);
+
+      // IMMEDIATE: Send immediate progress update to Trakt for both pause and unpause
+      if (duration > 0) {
+        traktAutosync.handleProgressUpdate(currentTime, duration, true); // force=true triggers immediate sync
       }
     }
   };
