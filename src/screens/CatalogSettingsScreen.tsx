@@ -377,7 +377,11 @@ const CatalogSettingsScreen = () => {
         settingsObj[key] = setting.enabled;
       });
       await AsyncStorage.setItem(CATALOG_SETTINGS_KEY, JSON.stringify(settingsObj));
-      refreshCatalogs(); // Trigger catalog refresh after saving settings
+      
+      // Small delay to ensure AsyncStorage has fully persisted before triggering refresh
+      setTimeout(() => {
+        refreshCatalogs(); // Trigger catalog refresh after saving settings
+      }, 100);
     } catch (error) {
       logger.error('Failed to save catalog enabled settings:', error);
     }

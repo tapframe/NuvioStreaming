@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useRef } from 'react';
 import { InteractionManager } from 'react-native';
 import accountService, { AuthUser } from '../services/AccountService';
 import supabase from '../services/supabaseClient';
@@ -19,6 +19,7 @@ const AccountContext = createContext<AccountContextValue | undefined>(undefined)
 export const AccountProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     // Initial session (load full profile)
@@ -69,6 +70,10 @@ export const AccountProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return () => {
       subscription.subscription.unsubscribe();
       task.cancel();
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
     };
   }, []);
 
@@ -88,11 +93,27 @@ export const AccountProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setUser(null);
     },
     refreshCurrentUser: async () => {
+      // Don't set loading if already loading to avoid conflicts
+      if (loading) return;
+      
       setLoading(true);
+      
+      // Set a timeout to prevent loading from getting stuck
+      loadingTimeoutRef.current = setTimeout(() => {
+        console.warn('Account loading timeout, forcing loading to false');
+        setLoading(false);
+      }, 10000); // 10 second timeout
+      
       try {
         const u = await accountService.getCurrentUser();
         setUser(u);
+      } catch (error) {
+        console.error('Failed to refresh current user:', error);
       } finally {
+        if (loadingTimeoutRef.current) {
+          clearTimeout(loadingTimeoutRef.current);
+          loadingTimeoutRef.current = null;
+        }
         setLoading(false);
       }
     },

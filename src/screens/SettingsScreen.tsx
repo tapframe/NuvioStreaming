@@ -261,12 +261,14 @@ const SettingsScreen: React.FC = () => {
         if (__DEV__) console.log('SettingsScreen focused, refreshing auth status. Current state:', { isAuthenticated, userProfile: userProfile?.username });
       }
       refreshAuthStatus();
-      // Also refresh account user in case we returned from auth flow
-      refreshCurrentUser();
+      // Only refresh account user if we don't have a user or if we're not already loading
+      if (!user && !accountLoading) {
+        refreshCurrentUser();
+      }
     });
     
     return unsubscribe;
-  }, [navigation, isAuthenticated, userProfile, refreshAuthStatus, refreshCurrentUser]);
+  }, [navigation, isAuthenticated, userProfile, refreshAuthStatus, refreshCurrentUser, user, accountLoading]);
 
   // States for dynamic content
   const [addonCount, setAddonCount] = useState<number>(0);

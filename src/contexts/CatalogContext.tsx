@@ -27,7 +27,6 @@ export const CatalogProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const refreshCatalogs = useCallback(() => {
     setLastUpdate(Date.now());
-    logger.info('Refreshing catalogs, timestamp:', Date.now());
   }, []);
 
   // Listen for addon changes to update catalog data
