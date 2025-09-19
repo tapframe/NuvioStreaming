@@ -1,22 +1,20 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  Modal,
   Dimensions,
-  Platform,
+  BackHandler,
+  Animated,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
-import AndroidUpdatePopup from './AndroidUpdatePopup';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
-interface UpdatePopupProps {
+interface AndroidUpdatePopupProps {
   visible: boolean;
   updateInfo: {
     isAvailable: boolean;
@@ -32,7 +30,7 @@ interface UpdatePopupProps {
   isInstalling?: boolean;
 }
 
-const UpdatePopup: React.FC<UpdatePopupProps> = ({
+const AndroidUpdatePopup: React.FC<AndroidUpdatePopupProps> = ({
   visible,
   updateInfo,
   onUpdateNow,
@@ -42,6 +40,10 @@ const UpdatePopup: React.FC<UpdatePopupProps> = ({
 }) => {
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
+  const backHandlerRef = useRef<any>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.8)).current;
 
   const getReleaseNotes = () => {
     const manifest: any = updateInfo?.manifest || {};
@@ -54,46 +56,93 @@ const UpdatePopup: React.FC<UpdatePopupProps> = ({
     );
   };
 
-  const handleUpdateNow = () => {
-    if (Platform.OS === 'ios') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  // Handle Android back button
+  useEffect(() => {
+    if (visible) {
+      backHandlerRef.current = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (!isInstalling) {
+          onDismiss();
+          return true;
+        }
+        return false;
+      });
     }
-    onUpdateNow();
-  };
 
-  const handleUpdateLater = () => {
-    if (Platform.OS === 'ios') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-    onUpdateLater();
-  };
+    return () => {
+      if (backHandlerRef.current) {
+        backHandlerRef.current.remove();
+        backHandlerRef.current = null;
+      }
+    };
+  }, [visible, isInstalling, onDismiss]);
 
-  const handleDismiss = () => {
-    if (Platform.OS === 'ios') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  // Animation effects
+  useEffect(() => {
+    if (visible) {
+      // Animate in
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 100,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // Safety timeout
+      timeoutRef.current = setTimeout(() => {
+        console.warn('AndroidUpdatePopup: Timeout reached, auto-dismissing');
+        onDismiss();
+      }, 30000);
+    } else {
+      // Animate out
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.8,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
     }
-    onDismiss();
-  };
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, [visible, fadeAnim, scaleAnim, onDismiss]);
 
   if (!visible || !updateInfo.isAvailable) {
     return null;
   }
 
-  // Completely disable popup on Android
-  if (Platform.OS === 'android') {
-    return null;
-  }
-
-  // iOS implementation with full features
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      statusBarTranslucent={true}
-      presentationStyle="overFullScreen"
-    >
-      <View style={styles.overlay}>
+    <View style={styles.overlay}>
+      <Animated.View 
+        style={[
+          styles.overlayContent,
+          {
+            opacity: fadeAnim,
+            transform: [{ scale: scaleAnim }],
+          }
+        ]}
+      >
+        <TouchableOpacity 
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={onDismiss}
+        />
         <View style={[
           styles.popup,
           {
@@ -177,7 +226,7 @@ const UpdatePopup: React.FC<UpdatePopupProps> = ({
                 { backgroundColor: currentTheme.colors.primary },
                 isInstalling && styles.disabledButton
               ]}
-              onPress={handleUpdateNow}
+              onPress={onUpdateNow}
               disabled={isInstalling}
               activeOpacity={0.8}
             >
@@ -204,7 +253,7 @@ const UpdatePopup: React.FC<UpdatePopupProps> = ({
                     borderColor: currentTheme.colors.elevation3 || '#444444',
                   }
                 ]}
-                onPress={handleUpdateLater}
+                onPress={onUpdateLater}
                 disabled={isInstalling}
                 activeOpacity={0.7}
               >
@@ -225,7 +274,7 @@ const UpdatePopup: React.FC<UpdatePopupProps> = ({
                     borderColor: currentTheme.colors.elevation3 || '#444444',
                   }
                 ]}
-                onPress={handleDismiss}
+                onPress={onDismiss}
                 disabled={isInstalling}
                 activeOpacity={0.7}
               >
@@ -239,32 +288,44 @@ const UpdatePopup: React.FC<UpdatePopupProps> = ({
             </View>
           </View>
         </View>
-      </View>
-    </Modal>
+      </Animated.View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 9999,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
   },
+  overlayContent: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+  },
   popup: {
     width: Math.min(width - 40, 400),
     borderRadius: 20,
     borderWidth: 1,
-    backgroundColor: '#1a1a1a', // Solid background - not transparent
-    ...(Platform.OS === 'ios' ? {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 10 },
-      shadowOpacity: 0.5,
-      shadowRadius: 20,
-    } : {
-      elevation: 15,
-    }),
+    backgroundColor: '#1a1a1a',
+    elevation: 15,
     overflow: 'hidden',
   },
   header: {
@@ -341,14 +402,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   primaryButton: {
-    ...(Platform.OS === 'ios' ? {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.2,
-      shadowRadius: 8,
-    } : {
-      elevation: 4,
-    }),
+    elevation: 4,
   },
   secondaryButton: {
     borderWidth: 1,
@@ -372,16 +426,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
   },
-  footer: {
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-    alignItems: 'center',
-  },
-  footerText: {
-    fontSize: 12,
-    textAlign: 'center',
-    opacity: 0.7,
-  },
 });
 
-export default UpdatePopup;
+export default AndroidUpdatePopup;

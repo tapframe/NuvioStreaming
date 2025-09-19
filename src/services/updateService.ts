@@ -250,27 +250,31 @@ export class UpdateService {
 
       this.addLog('Updates are enabled, performing initial update check...', 'INFO');
 
-      // Perform an initial update check on app startup
-      try {
-        const updateInfo = await this.checkForUpdates();
-        this.addLog(`Initial update check completed - Updates available: ${updateInfo.isAvailable}`, 'INFO');
+      // Perform an initial update check on app startup (non-blocking)
+      // Use setTimeout to defer the check and prevent blocking the main thread
+      setTimeout(async () => {
+        try {
+          this.addLog('Starting deferred update check...', 'INFO');
+          const updateInfo = await this.checkForUpdates();
+          this.addLog(`Initial update check completed - Updates available: ${updateInfo.isAvailable}`, 'INFO');
 
-        if (updateInfo.isAvailable) {
-          this.addLog('Update available! The popup will be shown to the user.', 'INFO');
-        } else {
-          this.addLog('No updates available at startup', 'INFO');
+          if (updateInfo.isAvailable) {
+            this.addLog('Update available! The popup will be shown to the user.', 'INFO');
+          } else {
+            this.addLog('No updates available at startup', 'INFO');
+          }
+
+          // Notify registered callbacks about the update check result
+          this.notifyUpdateCheckCallbacks(updateInfo);
+        } catch (checkError) {
+          this.addLog(`Initial update check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`, 'ERROR');
+
+          // Notify callbacks about the failed check
+          this.notifyUpdateCheckCallbacks({ isAvailable: false });
+
+          // Don't fail initialization if update check fails
         }
-
-        // Notify registered callbacks about the update check result
-        this.notifyUpdateCheckCallbacks(updateInfo);
-      } catch (checkError) {
-        this.addLog(`Initial update check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`, 'ERROR');
-
-        // Notify callbacks about the failed check
-        this.notifyUpdateCheckCallbacks({ isAvailable: false });
-
-        // Don't fail initialization if update check fails
-      }
+      }, 1000); // Defer by 1 second to let the app fully initialize
 
       this.addLog('UpdateService initialization completed successfully', 'INFO');
     } catch (error) {

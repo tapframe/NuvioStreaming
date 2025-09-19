@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
+import { toast, ToastPosition } from '@backpackapp-io/react-native-toast';
 import UpdateService, { UpdateInfo } from '../services/updateService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -16,12 +17,14 @@ interface UseUpdatePopupReturn {
 const UPDATE_POPUP_STORAGE_KEY = '@update_popup_dismissed';
 const UPDATE_LATER_STORAGE_KEY = '@update_later_timestamp';
 const UPDATE_LAST_CHECK_TS_KEY = '@update_last_check_ts';
+const UPDATE_BADGE_KEY = '@update_badge_pending';
 
 export const useUpdatePopup = (): UseUpdatePopupReturn => {
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo>({ isAvailable: false });
   const [isInstalling, setIsInstalling] = useState(false);
   const [hasCheckedOnStartup, setHasCheckedOnStartup] = useState(false);
+  const [isAppReady, setIsAppReady] = useState(false);
 
   const checkForUpdates = useCallback(async (forceCheck = false) => {
     try {
@@ -49,13 +52,29 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
       setUpdateInfo(info);
 
       if (info.isAvailable) {
-        setShowUpdatePopup(true);
+        // Android: use badge instead of popup to avoid freezes
+        if (Platform.OS === 'android') {
+          try {
+            await AsyncStorage.setItem(UPDATE_BADGE_KEY, 'true');
+          } catch {}
+          // Show actionable toast instead of popup
+          try {
+            toast('Update available — go to Settings → App Updates', {
+              duration: 3000,
+              position: ToastPosition.TOP,
+            });
+          } catch {}
+          setShowUpdatePopup(false);
+        } else {
+          // iOS: show popup as usual
+          setShowUpdatePopup(true);
+        }
       }
     } catch (error) {
       if (__DEV__) console.error('Error checking for updates:', error);
       // Don't show popup on error, just log it
     }
-  }, [updateInfo.manifest?.id]);
+  }, [updateInfo.manifest?.id, isAppReady]);
 
   const handleUpdateNow = useCallback(async () => {
     try {
@@ -65,27 +84,9 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
       const success = await UpdateService.downloadAndInstallUpdate();
       
       if (success) {
-        Alert.alert(
-          'Update Installed',
-          'The update has been installed successfully. Please restart the app to apply the changes.',
-          [
-            {
-              text: 'Restart Later',
-              style: 'cancel',
-            },
-            {
-              text: 'Restart Now',
-              onPress: () => {
-                // On React Native, we can't programmatically restart the app
-                // The user will need to manually restart
-                Alert.alert(
-                  'Restart Required',
-                  'Please close and reopen the app to complete the update.'
-                );
-              },
-            },
-          ]
-        );
+        // Update installed successfully - no restart alert needed
+        // The app will automatically reload with the new version
+        console.log('Update installed successfully');
       } else {
         Alert.alert(
           'Update Failed',
@@ -140,7 +141,21 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
       setHasCheckedOnStartup(true);
 
       if (updateInfo.isAvailable) {
-        setShowUpdatePopup(true);
+        if (Platform.OS === 'android') {
+          // Set badge and show a toast
+          (async () => {
+            try { await AsyncStorage.setItem(UPDATE_BADGE_KEY, 'true'); } catch {}
+          })();
+          try {
+            toast('Update available — go to Settings → App Updates', {
+              duration: 3000,
+              position: ToastPosition.TOP,
+            });
+          } catch {}
+          setShowUpdatePopup(false);
+        } else {
+          setShowUpdatePopup(true);
+        }
       }
     };
 
@@ -152,6 +167,35 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
       UpdateService.offUpdateCheck(handleStartupUpdateCheck);
     };
   }, []);
+
+  // Mark app as ready after a delay (Android safety)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsAppReady(true);
+    }, Platform.OS === 'android' ? 3000 : 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Show popup when app becomes ready on Android (if update is available)
+  useEffect(() => {
+    if (Platform.OS === 'android' && isAppReady && updateInfo.isAvailable && !showUpdatePopup) {
+      // Check if user hasn't dismissed this version
+      (async () => {
+        try {
+          const dismissedVersion = await AsyncStorage.getItem(UPDATE_POPUP_STORAGE_KEY);
+          const currentVersion = updateInfo.manifest?.id;
+          
+          if (dismissedVersion !== currentVersion) {
+            setShowUpdatePopup(true);
+          }
+        } catch (error) {
+          // If we can't check, show the popup anyway
+          setShowUpdatePopup(true);
+        }
+      })();
+    }
+  }, [isAppReady, updateInfo.isAvailable, updateInfo.manifest?.id, showUpdatePopup]);
 
   // Auto-check for updates when hook is first used (fallback if startup check fails)
   useEffect(() => {

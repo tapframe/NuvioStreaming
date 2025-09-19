@@ -11,6 +11,7 @@ import {
   Platform,
   Dimensions
 } from 'react-native';
+import { toast, ToastPosition } from '@backpackapp-io/react-native-toast';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -18,6 +19,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import UpdateService from '../services/updateService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -103,6 +105,22 @@ const UpdateScreen: React.FC = () => {
       setIsChecking(false);
     }
   };
+
+  // Auto-check on mount and keep section visible
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      // ensure badge clears when entering this screen
+      (async () => {
+        try { await AsyncStorage.removeItem('@update_badge_pending'); } catch {}
+      })();
+    }
+    checkForUpdates();
+    if (Platform.OS === 'android') {
+      try {
+        toast('Checking for updates…', { duration: 1200, position: ToastPosition.TOP });
+      } catch {}
+    }
+  }, []);
 
   const installUpdate = async () => {
     try {

@@ -3,6 +3,7 @@ import { NavigationContainer, DefaultTheme as NavigationDefaultTheme, DarkTheme 
 import { createNativeStackNavigator, NativeStackNavigationOptions, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createBottomTabNavigator, BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useColorScheme, Platform, Animated, StatusBar, TouchableOpacity, View, Text, AppState, Easing, Dimensions } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PaperProvider, MD3DarkTheme, MD3LightTheme, adaptNavigationTheme } from 'react-native-paper';
 import type { MD3Theme } from 'react-native-paper';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
@@ -440,6 +441,38 @@ const WrappedScreen: React.FC<{Screen: React.ComponentType<any>}> = ({ Screen })
 // Tab Navigator
 const MainTabs = () => {
   const { currentTheme } = useTheme();
+  const [hasUpdateBadge, setHasUpdateBadge] = React.useState(false);
+  React.useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    let mounted = true;
+    const load = async () => {
+      try {
+        const flag = await AsyncStorage.getItem('@update_badge_pending');
+        if (mounted) setHasUpdateBadge(flag === 'true');
+      } catch {}
+    };
+    load();
+    // Fast poll initially for quick badge appearance, then slow down
+    const fast = setInterval(load, 800);
+    const slowTimer = setTimeout(() => {
+      clearInterval(fast);
+      const slow = setInterval(load, 10000);
+      // store slow interval id on closure for cleanup
+      (load as any)._slow = slow;
+    }, 6000);
+    const onAppStateChange = (state: string) => {
+      if (state === 'active') load();
+    };
+    const sub = AppState.addEventListener('change', onAppStateChange);
+    return () => {
+      mounted = false;
+      clearInterval(fast);
+      // @ts-ignore
+      if ((load as any)._slow) clearInterval((load as any)._slow);
+      clearTimeout(slowTimer);
+      sub.remove();
+    };
+  }, []);
   const { isHomeLoading } = useLoading();
   const isTablet = useMemo(() => {
     const { width, height } = Dimensions.get('window');

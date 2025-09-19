@@ -226,6 +226,19 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, c
 
 const SettingsScreen: React.FC = () => {
   const { settings, updateSetting } = useSettings();
+  const [hasUpdateBadge, setHasUpdateBadge] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    let mounted = true;
+    (async () => {
+      try {
+        const flag = await AsyncStorage.getItem('@update_badge_pending');
+        if (mounted) setHasUpdateBadge(flag === 'true');
+      } catch {}
+    })();
+    return () => { mounted = false; };
+  }, []);
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { lastUpdate } = useCatalogContext();
   const { isAuthenticated, userProfile, refreshAuthStatus } = useTraktContext();
@@ -681,7 +694,14 @@ const SettingsScreen: React.FC = () => {
               description="Check for updates and manage app version"
               icon="system-update"
               renderControl={ChevronRight}
-              onPress={() => navigation.navigate('Update')}
+              badge={Platform.OS === 'android' && hasUpdateBadge ? 1 : undefined}
+              onPress={async () => {
+                if (Platform.OS === 'android') {
+                  try { await AsyncStorage.removeItem('@update_badge_pending'); } catch {}
+                  setHasUpdateBadge(false);
+                }
+                navigation.navigate('Update');
+              }}
               isLast={true}
               isTablet={isTablet}
             />

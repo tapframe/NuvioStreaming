@@ -9,7 +9,8 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
-  I18nManager
+  I18nManager,
+  Platform
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -155,14 +156,16 @@ const ThemedApp = () => {
           {shouldShowApp && <AppNavigator initialRouteName={initialRouteName} />}
           
           {/* Update Popup */}
-          <UpdatePopup
-            visible={showUpdatePopup}
-            updateInfo={updateInfo}
-            onUpdateNow={handleUpdateNow}
-            onUpdateLater={handleUpdateLater}
-            onDismiss={handleDismiss}
-            isInstalling={isInstalling}
-          />
+          {Platform.OS === 'ios' && (
+            <UpdatePopup
+              visible={showUpdatePopup}
+              updateInfo={updateInfo}
+              onUpdateNow={handleUpdateNow}
+              onUpdateLater={handleUpdateLater}
+              onDismiss={handleDismiss}
+              isInstalling={isInstalling}
+            />
+          )}
         </View>
       </NavigationContainer>
     </PaperProvider>
