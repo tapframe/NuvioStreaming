@@ -449,7 +449,7 @@ const NotificationSettingsScreen = () => {
                   <Text style={[styles.resetButtonText, { color: currentTheme.colors.primary }]}>
                     {countdown !== null 
                       ? `Notification in ${countdown}s...` 
-                      : 'Test Notification (1min)'}
+                      : 'Test Notification (5 sec)'}
                   </Text>
                 </TouchableOpacity>
 
