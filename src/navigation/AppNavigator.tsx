@@ -23,7 +23,7 @@ import HomeScreen from '../screens/HomeScreen';
 import LibraryScreen from '../screens/LibraryScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import MetadataScreen from '../screens/MetadataScreen';
-import VideoPlayer from '../components/player/VideoPlayer';
+import KSPlayer from '../components/player/KSPlayer';
 import CatalogScreen from '../screens/CatalogScreen';
 import AddonsScreen from '../screens/AddonsScreen';
 import SearchScreen from '../screens/SearchScreen';
@@ -74,7 +74,7 @@ export type RootStackParamList = {
     episodeThumbnail?: string;
     fromPlayer?: boolean;
   };
-  VideoPlayer: { 
+  KSPlayer: { 
     id: string; 
     type: string; 
     stream: Stream;
@@ -990,7 +990,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen 
               name="Player" 
-              component={VideoPlayer as any} 
+              component={KSPlayer as any} 
               options={{ 
                 animation: Platform.OS === 'android' ? 'none' : 'default',
                 animationDuration: Platform.OS === 'android' ? 0 : 0,
