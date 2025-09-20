@@ -483,7 +483,7 @@ class SyncService {
           }
         }
       })(),
-      this.pullAddonsSnapshot(userId),
+      this.smartPullAddons(userId), // Use smart pull instead of destructive pull
       this.pullLibrary(userId),
     ]);
     logger.log('[Sync] fullPull done');
@@ -951,6 +951,100 @@ class SyncService {
   }
 
   // Excluded: pushLocalScrapers (local scrapers are device-local only)
+
+  private async smartPullAddons(userId: string): Promise<void> {
+    logger.log('[Sync] smartPullAddons: intelligent addon synchronization');
+    try {
+      // Check if this device has been initialized for this user
+      const deviceInitialized = (await AsyncStorage.getItem(`@user:${userId}:addons_initialized`)) === 'true';
+      
+      // Get current local addons
+      const localAddons = await stremioService.getInstalledAddonsAsync();
+      const localAddonIds = new Set(localAddons.map(a => a.id));
+      
+      // Get remote addons
+      const { data: remoteAddons } = await supabase
+        .from('installed_addons')
+        .select('*')
+        .eq('user_id', userId)
+        .order('position', { ascending: true });
+      
+      if (!remoteAddons || remoteAddons.length === 0) {
+        logger.log('[Sync] smartPullAddons: no remote addons found');
+        return;
+      }
+      
+      const remoteAddonIds = new Set(remoteAddons.map(a => a.addon_id));
+      
+      // Determine sync strategy based on context
+      const hasOnlyPreInstalled = localAddons.length <= 2 && 
+        localAddons.every(a => ['com.linvo.cinemeta', 'org.stremio.opensubtitlesv3'].includes(a.id));
+      
+      if (!deviceInitialized && hasOnlyPreInstalled && remoteAddons.length > 2) {
+        // First-time sync with only pre-installed addons - safe to pull
+        logger.log('[Sync] smartPullAddons: first-time sync with only pre-installed → pulling');
+        await this.pullAddonsSnapshot(userId);
+      } else if (!deviceInitialized && localAddons.length > 2) {
+        // First-time sync but user has custom addons - merge instead
+        logger.log('[Sync] smartPullAddons: first-time sync with custom addons → merging');
+        await this.mergeAddonsFromServer(userId);
+      } else if (deviceInitialized) {
+        // Device already initialized - only merge missing addons
+        logger.log('[Sync] smartPullAddons: device initialized → merging missing addons only');
+        await this.mergeMissingAddonsOnly(userId, localAddonIds, remoteAddons);
+      } else {
+        // Default case - merge
+        logger.log('[Sync] smartPullAddons: default case → merging');
+        await this.mergeAddonsFromServer(userId);
+      }
+      
+      // Mark device as initialized after successful sync
+      if (!deviceInitialized) {
+        await AsyncStorage.setItem(`@user:${userId}:addons_initialized`, 'true');
+        logger.log('[Sync] smartPullAddons: marked device as initialized');
+      }
+      
+    } catch (e) {
+      logger.error('[Sync] smartPullAddons failed:', e);
+    }
+  }
+
+  private async mergeMissingAddonsOnly(userId: string, localAddonIds: Set<string>, remoteAddons: any[]): Promise<void> {
+    logger.log('[Sync] mergeMissingAddonsOnly: adding only missing addons');
+    try {
+      const addonsToInstall: any[] = [];
+      
+      for (const remoteAddon of remoteAddons) {
+        if (!localAddonIds.has(remoteAddon.addon_id)) {
+          try {
+            let manifest = remoteAddon.manifest_data;
+            if (!manifest && remoteAddon.original_url) {
+              manifest = await stremioService.getManifest(remoteAddon.original_url);
+            }
+            if (manifest) {
+              addonsToInstall.push(manifest);
+            }
+          } catch (e) {
+            logger.warn('[Sync] Failed to fetch manifest for missing addon:', remoteAddon.addon_id);
+          }
+        }
+      }
+      
+      // Install missing addons locally
+      for (const manifest of addonsToInstall) {
+        try {
+          await stremioService.installAddon(manifest.originalUrl || manifest.url);
+          logger.log('[Sync] Installed missing addon:', manifest.id);
+        } catch (e) {
+          logger.warn('[Sync] Failed to install missing addon:', manifest.id);
+        }
+      }
+      
+      logger.log(`[Sync] mergeMissingAddonsOnly completed: ${addonsToInstall.length} addons installed`);
+    } catch (e) {
+      logger.error('[Sync] mergeMissingAddonsOnly failed:', e);
+    }
+  }
 
   private async mergeAddonsFromServer(userId: string): Promise<void> {
     logger.log('[Sync] mergeAddonsFromServer: merging server addons with local addons');
