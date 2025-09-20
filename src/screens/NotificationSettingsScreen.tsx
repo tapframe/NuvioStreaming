@@ -116,7 +116,7 @@ const NotificationSettingsScreen = () => {
   const resetAllNotifications = async () => {
     Alert.alert(
       'Reset Notifications',
-      'This will cancel all scheduled notifications. Are you sure?',
+      'This will cancel all scheduled notifications, but will not remove anything from your saved library. Are you sure?',
       [
         {
           text: 'Cancel',
@@ -127,7 +127,11 @@ const NotificationSettingsScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await notificationService.cancelAllNotifications();
+              // Cancel all notifications for all series, but do not remove from saved
+              const scheduledNotifications = notificationService.getScheduledNotifications?.() || [];
+              for (const notification of scheduledNotifications) {
+                await notificationService.cancelNotification(notification.id);
+              }
               Alert.alert('Success', 'All notifications have been reset');
             } catch (error) {
               logger.error('Error resetting notifications:', error);
@@ -164,9 +168,24 @@ const NotificationSettingsScreen = () => {
 
   const handleTestNotification = async () => {
     try {
-      // Cancel previous test notification if exists
-      if (testNotificationId) {
-        await notificationService.cancelNotification(testNotificationId);
+      // Remove all previous test notifications before scheduling a new one
+      const scheduled = notificationService.getScheduledNotifications?.() || [];
+      const testNotifications = scheduled.filter(n => n.id.startsWith('test-notification-'));
+      if (testNotifications.length > 0 && typeof notificationService.cancelNotification === 'function') {
+        for (const n of testNotifications) {
+          await notificationService.cancelNotification(n.id);
+        }
+      }
+
+
+      // Temporarily override timeBeforeAiring to 0 for the test notification
+      let originalTimeBeforeAiring: number | undefined = undefined;
+      if (typeof notificationService.getSettings === 'function') {
+        const currentSettings = await notificationService.getSettings();
+        originalTimeBeforeAiring = currentSettings.timeBeforeAiring;
+        if (typeof notificationService.updateSettings === 'function') {
+          await notificationService.updateSettings({ timeBeforeAiring: 0 });
+        }
       }
 
       const testNotification = {
@@ -176,15 +195,24 @@ const NotificationSettingsScreen = () => {
         episodeTitle: 'Test Episode',
         season: 1,
         episode: 1,
-        releaseDate: new Date(Date.now() + 60000).toISOString(), // 1 minute from now
+        releaseDate: new Date(Date.now() + 5000).toISOString(), // 5 seconds from now
         notified: false
       };
-      
+
       const notificationId = await notificationService.scheduleEpisodeNotification(testNotification);
+
+      // Restore original timeBeforeAiring
+      if (
+        typeof notificationService.updateSettings === 'function' &&
+        originalTimeBeforeAiring !== undefined
+      ) {
+        await notificationService.updateSettings({ timeBeforeAiring: originalTimeBeforeAiring });
+      }
+
       if (notificationId) {
         setTestNotificationId(notificationId);
-        setCountdown(60); // Start 60 second countdown
-        Alert.alert('Success', 'Test notification scheduled for 1 minute from now');
+        setCountdown(0); // No countdown for instant notification
+        Alert.alert('Success', 'Test notification scheduled to fire instantly');
       } else {
         Alert.alert('Error', 'Failed to schedule test notification. Make sure notifications are enabled.');
       }
@@ -425,7 +453,7 @@ const NotificationSettingsScreen = () => {
                   <Text style={[styles.resetButtonText, { color: currentTheme.colors.primary }]}>
                     {countdown !== null 
                       ? `Notification in ${countdown}s...` 
-                      : 'Test Notification (1min)'}
+                      : 'Test Notification (5 sec)'}
                   </Text>
                 </TouchableOpacity>
 
@@ -442,10 +470,6 @@ const NotificationSettingsScreen = () => {
                     </Text>
                   </View>
                 )}
-                
-                <Text style={[styles.resetDescription, { color: currentTheme.colors.lightGray }]}>
-                  This will cancel all scheduled notifications. You'll need to re-enable them manually.
-                </Text>
               </View>
             </>
           )}
