@@ -116,7 +116,7 @@ const NotificationSettingsScreen = () => {
   const resetAllNotifications = async () => {
     Alert.alert(
       'Reset Notifications',
-      'This will cancel all scheduled notifications. Are you sure?',
+      'This will cancel all scheduled notifications, but will not remove anything from your saved library. Are you sure?',
       [
         {
           text: 'Cancel',
@@ -127,7 +127,11 @@ const NotificationSettingsScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await notificationService.cancelAllNotifications();
+              // Cancel all notifications for all series, but do not remove from saved
+              const scheduledNotifications = notificationService.getScheduledNotifications?.() || [];
+              for (const notification of scheduledNotifications) {
+                await notificationService.cancelNotification(notification.id);
+              }
               Alert.alert('Success', 'All notifications have been reset');
             } catch (error) {
               logger.error('Error resetting notifications:', error);
@@ -466,10 +470,6 @@ const NotificationSettingsScreen = () => {
                     </Text>
                   </View>
                 )}
-                
-                <Text style={[styles.resetDescription, { color: currentTheme.colors.lightGray }]}>
-                  This will cancel all scheduled notifications. You'll need to re-enable them manually.
-                </Text>
               </View>
             </>
           )}
