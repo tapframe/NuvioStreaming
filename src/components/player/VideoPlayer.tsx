@@ -212,19 +212,38 @@ const VideoPlayerCore: React.FC = () => {
   const [isLoadingSubtitleList, setIsLoadingSubtitleList] = useState<boolean>(false);
   const [showSourcesModal, setShowSourcesModal] = useState<boolean>(false);
   const [availableStreams, setAvailableStreams] = useState<{ [providerId: string]: { streams: any[]; addonName: string } }>(passedAvailableStreams || {});
-  // Decode URLs for KSPlayer compatibility - KSPlayer handles encoded URLs better
-  const decodeUrlForKsPlayer = (url: string): string => {
+  // Smart URL processing for KSPlayer compatibility
+  const processUrlForKsPlayer = (url: string): string => {
     try {
-      // KSPlayer handles encoded URLs well, but decode for consistency
-      const decoded = decodeURIComponent(url);
-      return decoded;
+      // Validate URL first
+      const urlObj = new URL(url);
+      
+      // Only decode if the URL appears to be double-encoded
+      // Check if URL contains encoded characters that shouldn't be there
+      const hasDoubleEncoding = url.includes('%25') || 
+                                (url.includes('%2F') && url.includes('//')) ||
+                                (url.includes('%3A') && url.includes('://'));
+      
+      if (hasDoubleEncoding) {
+        logger.log('[VideoPlayer] Detected double-encoded URL, decoding once');
+        return decodeURIComponent(url);
+      }
+      
+      // For URLs with special characters in query params, ensure proper encoding
+      if (urlObj.search) {
+        const searchParams = new URLSearchParams(urlObj.search);
+        urlObj.search = searchParams.toString();
+        return urlObj.toString();
+      }
+      
+      return url;
     } catch (e) {
-      logger.warn('[VideoPlayer] URL decoding failed, using original:', e);
+      logger.warn('[VideoPlayer] URL processing failed, using original:', e);
       return url;
     }
   };
 
-  const [currentStreamUrl, setCurrentStreamUrl] = useState<string>(decodeUrlForKsPlayer(uri));
+  const [currentStreamUrl, setCurrentStreamUrl] = useState<string>(processUrlForKsPlayer(uri));
   const [isChangingSource, setIsChangingSource] = useState<boolean>(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string>('');
@@ -2365,8 +2384,8 @@ const VideoPlayerCore: React.FC = () => {
       // Set pending seek state
       setPendingSeek({ position: savedPosition, shouldPlay: wasPlaying });
 
-      // Update the stream URL and details immediately (decode URL for KSPlayer)
-      setCurrentStreamUrl(decodeUrlForKsPlayer(newStream.url));
+      // Update the stream URL and details immediately (process URL for KSPlayer)
+      setCurrentStreamUrl(processUrlForKsPlayer(newStream.url));
       setCurrentQuality(newQuality);
       setCurrentStreamProvider(newProvider);
       setCurrentStreamName(newStreamName);

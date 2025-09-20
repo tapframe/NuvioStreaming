@@ -109,6 +109,14 @@ class KSPlayerView: UIView {
 
         guard let uri = source["uri"] as? String else {
             print("KSPlayerView: No URI provided")
+            sendEvent("onError", ["error": "No URI provided in source"])
+            return
+        }
+
+        // Validate URL before proceeding
+        guard let url = URL(string: uri), url.scheme != nil else {
+            print("KSPlayerView: Invalid URL format: \(uri)")
+            sendEvent("onError", ["error": "Invalid URL format: \(uri)"])
             return
         }
 
@@ -135,11 +143,24 @@ class KSPlayerView: UIView {
         }
         #endif
 
-        // Create KSPlayerResource
-        let url = URL(string: uri)!
+        // Create KSPlayerResource with validated URL
         let resource = KSPlayerResource(url: url, options: createOptions(with: headers), name: "Video")
 
         print("KSPlayerView: Setting source: \(uri)")
+        print("KSPlayerView: URL scheme: \(url.scheme ?? "unknown"), host: \(url.host ?? "unknown")")
+        
+        // Add timeout for source loading
+        loadTimeoutWorkItem?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self = self else { return }
+            let dur = self.playerView.playerLayer?.player.duration ?? 0
+            if dur <= 0 {
+                self.sendEvent("onError", ["error": "Stream timeout: unable to open input after 8 seconds"])
+            }
+        }
+        loadTimeoutWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8, execute: work)
+        
         playerView.set(resource: resource)
         
         // Set up delegate after setting the resource
@@ -153,18 +174,6 @@ class KSPlayerView: UIView {
         }
 
         setVolume(currentVolume)
-
-        // Start a safety timeout to surface errors if never ready
-        loadTimeoutWorkItem?.cancel()
-        let work = DispatchWorkItem { [weak self] in
-            guard let self = self else { return }
-            let dur = self.playerView.playerLayer?.player.duration ?? 0
-            if dur <= 0 {
-                self.sendEvent("onError", ["error": "Playback timeout: stream did not become ready."])
-            }
-        }
-        loadTimeoutWorkItem = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 8, execute: work)
     }
 
     private func createOptions(with headers: [String: String]) -> KSOptions {
@@ -192,9 +201,23 @@ class KSPlayerView: UIView {
         options.hardwareDecode = KSOptions.hardwareDecode
         #endif
         if !headers.isEmpty {
-            options.appendHeader(headers)
-            if let referer = headers["Referer"] ?? headers["referer"] {
-                options.referer = referer
+            // Clean and validate headers before adding
+            var cleanHeaders: [String: String] = [:]
+            for (key, value) in headers {
+                // Remove any null or empty values
+                if !value.isEmpty && value != "null" {
+                    cleanHeaders[key] = value
+                }
+            }
+            
+            if !cleanHeaders.isEmpty {
+                options.appendHeader(cleanHeaders)
+                print("KSPlayerView: Added headers: \(cleanHeaders.keys.joined(separator: ", "))")
+                
+                if let referer = cleanHeaders["Referer"] ?? cleanHeaders["referer"] {
+                    options.referer = referer
+                    print("KSPlayerView: Set referer: \(referer)")
+                }
             }
         }
         return options
@@ -447,7 +470,22 @@ extension KSPlayerView: KSPlayerLayerDelegate {
 
     func player(layer: KSPlayerLayer, finish error: Error?) {
         if let error = error {
-            sendEvent("onError", ["error": error.localizedDescription])
+            let errorMessage = error.localizedDescription
+            print("KSPlayerView: Player finished with error: \(errorMessage)")
+            
+            // Provide more specific error messages for common issues
+            var detailedError = errorMessage
+            if errorMessage.contains("avformat can't open input") {
+                detailedError = "Unable to open video stream. This could be due to:\n• Invalid or malformed URL\n• Network connectivity issues\n• Server blocking the request\n• Unsupported video format\n• Missing required headers"
+            } else if errorMessage.contains("timeout") {
+                detailedError = "Stream connection timed out. The server may be slow or unreachable."
+            } else if errorMessage.contains("404") || errorMessage.contains("Not Found") {
+                detailedError = "Video stream not found. The URL may be expired or incorrect."
+            } else if errorMessage.contains("403") || errorMessage.contains("Forbidden") {
+                detailedError = "Access denied. The server may be blocking requests or require authentication."
+            }
+            
+            sendEvent("onError", ["error": detailedError])
         }
     }
 
