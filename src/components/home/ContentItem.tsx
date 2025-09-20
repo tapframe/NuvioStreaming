@@ -59,6 +59,17 @@ const POSTER_WIDTH = posterLayout.posterWidth;
 const PLACEHOLDER_BLURHASH = 'LEHV6nWB2yk8pyo0adR*.7kCMdnj';
 
 const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, deferMs = 0 }: ContentItemProps) => {
+  // Track inLibrary status locally to force re-render
+  const [inLibrary, setInLibrary] = useState(!!item.inLibrary);
+
+  useEffect(() => {
+    // Subscribe to library updates and update local state if this item's status changes
+    const unsubscribe = catalogService.subscribeToLibraryUpdates((items) => {
+      const found = items.find((libItem) => libItem.id === item.id && libItem.type === item.type);
+      setInLibrary(!!found);
+    });
+    return () => unsubscribe();
+  }, [item.id, item.type]);
   const [menuVisible, setMenuVisible] = useState(false);
   const [isWatched, setIsWatched] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -95,7 +106,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
   const handleOptionSelect = useCallback((option: string) => {
     switch (option) {
       case 'library':
-        if (item.inLibrary) {
+        if (inLibrary) {
           catalogService.removeFromLibrary(item.type, item.id);
         } else {
           catalogService.addToLibrary(item);
@@ -109,7 +120,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
       case 'share':
         break;
     }
-  }, [item]);
+  }, [item, inLibrary]);
 
   const handleMenuClose = useCallback(() => {
     setMenuVisible(false);
@@ -238,7 +249,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
               </View>
             )}
             {imageError && (
-              <View style={[styles.loadingOverlay, { backgroundColor: currentTheme.colors.elevation1 }]}>
+              <View style={[styles.loadingOverlay, { backgroundColor: currentTheme.colors.elevation1 }]}> 
                 <MaterialIcons name="broken-image" size={24} color={currentTheme.colors.textMuted} />
               </View>
             )}
@@ -247,7 +258,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
                 <MaterialIcons name="check-circle" size={22} color={currentTheme.colors.success} />
               </View>
             )}
-            {item.inLibrary && (
+            {inLibrary && (
               <View style={styles.libraryBadge}>
                 <MaterialIcons name="bookmark" size={16} color={currentTheme.colors.white} />
               </View>
@@ -266,6 +277,8 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
         onClose={handleMenuClose}
         item={item}
         onOptionSelect={handleOptionSelect}
+        isSaved={inLibrary}
+        isWatched={isWatched}
       />
     </>
   );
