@@ -854,18 +854,33 @@ class SyncService {
     logger.log(`[Sync] push installed_addons count=${addons.length}`);
     let order = (stremioService as any).addonOrder as string[];
 
-    // Safety: if this is a first-time push and local addons are fewer than remote, pull before pushing
+    // Safety: Check if this device has ever synced addons for this user
+    // Only pull if this is truly a first-time sync AND remote has significantly more addons
     try {
-      const initialized = (await AsyncStorage.getItem(`@user:${userId}:addons_initialized`)) === 'true';
+      const deviceInitialized = (await AsyncStorage.getItem(`@user:${userId}:addons_initialized`)) === 'true';
       const { data: remoteBefore } = await supabase
         .from('installed_addons')
         .select('addon_id')
         .eq('user_id', userId);
       const remoteCount = (remoteBefore || []).length;
-      if (!initialized && remoteCount > addons.length) {
-        logger.log('[Sync] addons not initialized and local smaller than remote → pulling before push');
+      
+      // Only pull if:
+      // 1. This device hasn't initialized addons for this user
+      // 2. Remote has significantly more addons (not just pre-installed ones)
+      // 3. Local has only pre-installed addons (2 or fewer)
+      const hasOnlyPreInstalled = addons.length <= 2 && 
+        addons.every(a => ['com.linvo.cinemeta', 'org.stremio.opensubtitlesv3'].includes(a.id));
+      
+      if (!deviceInitialized && remoteCount > 2 && hasOnlyPreInstalled) {
+        logger.log('[Sync] Device first-time sync with only pre-installed addons → pulling before push');
         await this.pullAddonsSnapshot(userId);
         // refresh local state after pull
+        addons = await stremioService.getInstalledAddonsAsync();
+        order = (stremioService as any).addonOrder as string[];
+      } else if (!deviceInitialized && remoteCount > addons.length) {
+        logger.log('[Sync] Device first-time sync but local has custom addons → merging instead of pulling');
+        // Don't pull - merge the addons instead
+        await this.mergeAddonsFromServer(userId);
         addons = await stremioService.getInstalledAddonsAsync();
         order = (stremioService as any).addonOrder as string[];
       }
@@ -883,42 +898,49 @@ class SyncService {
       manifest_data: a,
     }));
     // Delete remote addons that no longer exist locally (excluding pre-installed to be safe)
-    // Guard: do not perform deletions on first-time merge when remote has more addons
+    // Enhanced safety: only delete if device has been initialized and user explicitly removed addons
     try {
       const { data: remote, error: rErr } = await supabase
         .from('installed_addons')
         .select('addon_id')
         .eq('user_id', userId);
       if (!rErr && remote) {
-        const initialized = (await AsyncStorage.getItem(`@user:${userId}:addons_initialized`)) === 'true';
-        if (!initialized && (remote as any[]).length > addons.length) {
-          logger.log('[Sync] skipping deletions during first-time addon merge');
-        } else {
-        const localIds = new Set(addons.map((a: any) => a.id));
-        const toDeletePromises = (remote as any[])
-          .map(r => r.addon_id as string)
-          .map(async id => {
-            if (localIds.has(id)) return null; // Don't delete if still installed locally
-            if (id === 'com.linvo.cinemeta') return null; // Never delete Cinemeta
-            if (id === 'org.stremio.opensubtitlesv3') {
-              // Don't delete OpenSubtitles if user has explicitly removed it
-              const userRemoved = await stremioService.hasUserRemovedAddon(id);
-              return userRemoved ? null : id;
-            }
-            return id; // Delete other addons that are no longer installed locally
-          });
+        const deviceInitialized = (await AsyncStorage.getItem(`@user:${userId}:addons_initialized`)) === 'true';
         
-        const toDeleteResults = await Promise.all(toDeletePromises);
-        const toDelete = toDeleteResults.filter(id => id !== null);
-        logger.log(`[Sync] push installed_addons deletions=${toDelete.length}`);
-        if (toDelete.length > 0) {
-          const del = await supabase
-            .from('installed_addons')
-            .delete()
-            .eq('user_id', userId)
-            .in('addon_id', toDelete);
-          if (del.error && __DEV__) console.warn('[SyncService] delete addons error', del.error);
-        }
+        // Only perform deletions if:
+        // 1. Device has been initialized (not first-time sync)
+        // 2. Local addons are not just pre-installed ones
+        const hasOnlyPreInstalled = addons.length <= 2 && 
+          addons.every(a => ['com.linvo.cinemeta', 'org.stremio.opensubtitlesv3'].includes(a.id));
+        
+        if (!deviceInitialized || hasOnlyPreInstalled) {
+          logger.log('[Sync] skipping deletions during first-time sync or when only pre-installed addons present');
+        } else {
+          const localIds = new Set(addons.map((a: any) => a.id));
+          const toDeletePromises = (remote as any[])
+            .map(r => r.addon_id as string)
+            .map(async id => {
+              if (localIds.has(id)) return null; // Don't delete if still installed locally
+              if (id === 'com.linvo.cinemeta') return null; // Never delete Cinemeta
+              if (id === 'org.stremio.opensubtitlesv3') {
+                // Don't delete OpenSubtitles if user has explicitly removed it
+                const userRemoved = await stremioService.hasUserRemovedAddon(id);
+                return userRemoved ? null : id;
+              }
+              return id; // Delete other addons that are no longer installed locally
+            });
+          
+          const toDeleteResults = await Promise.all(toDeletePromises);
+          const toDelete = toDeleteResults.filter(id => id !== null);
+          logger.log(`[Sync] push installed_addons deletions=${toDelete.length}`);
+          if (toDelete.length > 0) {
+            const del = await supabase
+              .from('installed_addons')
+              .delete()
+              .eq('user_id', userId)
+              .in('addon_id', toDelete);
+            if (del.error && __DEV__) console.warn('[SyncService] delete addons error', del.error);
+          }
         }
       }
     } catch (e) {
@@ -929,6 +951,55 @@ class SyncService {
   }
 
   // Excluded: pushLocalScrapers (local scrapers are device-local only)
+
+  private async mergeAddonsFromServer(userId: string): Promise<void> {
+    logger.log('[Sync] mergeAddonsFromServer: merging server addons with local addons');
+    try {
+      const { data: remoteAddons } = await supabase
+        .from('installed_addons')
+        .select('*')
+        .eq('user_id', userId)
+        .order('position', { ascending: true });
+
+      if (!remoteAddons || remoteAddons.length === 0) return;
+
+      // Get current local addons
+      const localAddons = await stremioService.getInstalledAddonsAsync();
+      const localAddonIds = new Set(localAddons.map(a => a.id));
+
+      // Merge remote addons that aren't already local
+      const addonsToInstall: any[] = [];
+      for (const remoteAddon of remoteAddons as any[]) {
+        if (!localAddonIds.has(remoteAddon.addon_id)) {
+          try {
+            let manifest = remoteAddon.manifest_data;
+            if (!manifest && remoteAddon.original_url) {
+              manifest = await stremioService.getManifest(remoteAddon.original_url);
+            }
+            if (manifest) {
+              addonsToInstall.push(manifest);
+            }
+          } catch (e) {
+            logger.warn('[Sync] Failed to fetch manifest for remote addon:', remoteAddon.addon_id);
+          }
+        }
+      }
+
+      // Install missing addons locally
+      for (const manifest of addonsToInstall) {
+        try {
+          await stremioService.installAddon(manifest.originalUrl || manifest.url);
+          logger.log('[Sync] Merged addon from server:', manifest.id);
+        } catch (e) {
+          logger.warn('[Sync] Failed to install merged addon:', manifest.id);
+        }
+      }
+
+      logger.log(`[Sync] mergeAddonsFromServer completed: ${addonsToInstall.length} addons merged`);
+    } catch (e) {
+      logger.error('[Sync] mergeAddonsFromServer failed:', e);
+    }
+  }
 }
 
 export const syncService = SyncService.getInstance();
