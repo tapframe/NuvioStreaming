@@ -28,6 +28,11 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
 
   const checkForUpdates = useCallback(async (forceCheck = false) => {
     try {
+      // Skip update checks on Android to prevent OTA checks
+      if (Platform.OS === 'android') {
+        return;
+      }
+
       // Check if user has dismissed the popup for this version
       const dismissedVersion = await AsyncStorage.getItem(UPDATE_POPUP_STORAGE_KEY);
       const currentVersion = updateInfo.manifest?.id;
@@ -52,23 +57,8 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
       setUpdateInfo(info);
 
       if (info.isAvailable) {
-        // Android: use badge instead of popup to avoid freezes
-        if (Platform.OS === 'android') {
-          try {
-            await AsyncStorage.setItem(UPDATE_BADGE_KEY, 'true');
-          } catch {}
-          // Show actionable toast instead of popup
-          try {
-            toast('Update available — go to Settings → App Updates', {
-              duration: 3000,
-              position: ToastPosition.TOP,
-            });
-          } catch {}
-          setShowUpdatePopup(false);
-        } else {
-          // iOS: show popup as usual
-          setShowUpdatePopup(true);
-        }
+        // Show popup (Android checks are handled earlier in the function)
+        setShowUpdatePopup(true);
       }
     } catch (error) {
       if (__DEV__) console.error('Error checking for updates:', error);
@@ -135,6 +125,11 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
 
   // Handle startup update check results
   useEffect(() => {
+    // Skip startup update check registration on Android
+    if (Platform.OS === 'android') {
+      return;
+    }
+
     const handleStartupUpdateCheck = (updateInfo: UpdateInfo) => {
       console.log('UpdatePopup: Received startup update check result', updateInfo);
       setUpdateInfo(updateInfo);
@@ -201,6 +196,11 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
   useEffect(() => {
     if (hasCheckedOnStartup) {
       return; // Already checked on startup
+    }
+
+    // Skip auto-check on Android to prevent OTA checks
+    if (Platform.OS === 'android') {
+      return;
     }
 
     // Add a small delay to ensure the app is fully loaded

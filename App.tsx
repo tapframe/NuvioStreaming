@@ -92,8 +92,10 @@ const ThemedApp = () => {
         const onboardingCompleted = await AsyncStorage.getItem('hasCompletedOnboarding');
         setHasCompletedOnboarding(onboardingCompleted === 'true');
         
-        // Initialize update service
-        await UpdateService.initialize();
+        // Initialize update service (skip on Android to prevent update checks)
+        if (Platform.OS !== 'android') {
+          await UpdateService.initialize();
+        }
         
         // Initialize memory monitoring service to prevent OutOfMemoryError
         memoryMonitorService; // Just accessing it starts the monitoring
