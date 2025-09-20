@@ -31,6 +31,7 @@
         <data android:scheme="stremioexpo"/>
         <data android:scheme="com.nuvio.app"/>
         <data android:scheme="exp+nuvio"/>
+        <data android:scheme="nuvio"/>
       </intent-filter>
     </activity>
   </application>

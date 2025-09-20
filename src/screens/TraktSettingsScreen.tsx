@@ -37,7 +37,7 @@ const discovery = {
 
 // For use with deep linking
 const redirectUri = makeRedirectUri({
-  scheme: 'stremioexpo',
+  scheme: 'nuvio',
   path: 'auth/trakt',
 });
 
