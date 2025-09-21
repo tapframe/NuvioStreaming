@@ -23,7 +23,8 @@ import HomeScreen from '../screens/HomeScreen';
 import LibraryScreen from '../screens/LibraryScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import MetadataScreen from '../screens/MetadataScreen';
-import KSPlayer from '../components/player/KSPlayer';
+import KSPlayerCore from '../components/player/KSPlayerCore';
+import AndroidVideoPlayer from '../components/player/AndroidVideoPlayer';
 import CatalogScreen from '../screens/CatalogScreen';
 import AddonsScreen from '../screens/AddonsScreen';
 import SearchScreen from '../screens/SearchScreen';
@@ -74,14 +75,7 @@ export type RootStackParamList = {
     episodeThumbnail?: string;
     fromPlayer?: boolean;
   };
-  KSPlayer: { 
-    id: string; 
-    type: string; 
-    stream: Stream;
-    episodeId?: string;
-    backdrop?: string;
-  };
-  Player: { 
+  PlayerIOS: { 
     uri: string; 
     title?: string; 
     season?: number; 
@@ -99,6 +93,27 @@ export type RootStackParamList = {
     imdbId?: string;
     availableStreams?: { [providerId: string]: { streams: any[]; addonName: string } };
     backdrop?: string;
+    videoType?: string;
+  };
+  PlayerAndroid: { 
+    uri: string; 
+    title?: string; 
+    season?: number; 
+    episode?: number; 
+    episodeTitle?: string; 
+    quality?: string; 
+    year?: number; 
+    streamProvider?: string;
+    streamName?: string;
+    headers?: { [key: string]: string };
+    forceVlc?: boolean;
+    id?: string;
+    type?: string;
+    episodeId?: string;
+    imdbId?: string;
+    availableStreams?: { [providerId: string]: { streams: any[]; addonName: string } };
+    backdrop?: string;
+    videoType?: string;
   };
   Catalog: { id: string; type: string; addonId?: string; name?: string; genreFilter?: string };
   Credits: { mediaId: string; mediaType: string };
@@ -989,13 +1004,13 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               }}
             />
             <Stack.Screen 
-              name="Player" 
-              component={KSPlayer as any} 
+              name="PlayerIOS" 
+              component={KSPlayerCore as any} 
               options={{ 
-                animation: Platform.OS === 'android' ? 'none' : 'default',
-                animationDuration: Platform.OS === 'android' ? 0 : 0,
+                animation: 'default',
+                animationDuration: 0,
                 // Force fullscreen presentation on iPad
-                presentation: Platform.OS === 'ios' ? 'fullScreenModal' : 'card',
+                presentation: 'fullScreenModal',
                 // Disable gestures during video playback
                 gestureEnabled: false,
                 // Ensure proper orientation handling
@@ -1004,10 +1019,26 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                   backgroundColor: '#000000', // Pure black for video player
                 },
                 // iPad-specific fullscreen options
-                ...(Platform.OS === 'ios' && {
-                  statusBarHidden: true,
-                  statusBarAnimation: 'none',
-                }),
+                statusBarHidden: true,
+                statusBarAnimation: 'none',
+                // Freeze when blurred to release resources safely
+                freezeOnBlur: true,
+              }}
+            />
+            <Stack.Screen 
+              name="PlayerAndroid" 
+              component={AndroidVideoPlayer as any} 
+              options={{ 
+                animation: 'none',
+                animationDuration: 0,
+                presentation: 'card',
+                // Disable gestures during video playback
+                gestureEnabled: false,
+                // Ensure proper orientation handling
+                orientation: 'landscape',
+                contentStyle: {
+                  backgroundColor: '#000000', // Pure black for video player
+                },
                 // Freeze when blurred to release resources safely
                 freezeOnBlur: true,
               }}

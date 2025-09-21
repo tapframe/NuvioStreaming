@@ -900,7 +900,10 @@ export const StreamsScreen = () => {
       }
     } catch {}
 
-    navigation.navigate('Player', {
+    // Simple platform check - iOS uses KSPlayerCore, Android uses AndroidVideoPlayer
+    const playerRoute = Platform.OS === 'ios' ? 'PlayerIOS' : 'PlayerAndroid';
+    
+    navigation.navigate(playerRoute as any, {
       uri: stream.url,
       title: metadata?.name || '',
       episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
