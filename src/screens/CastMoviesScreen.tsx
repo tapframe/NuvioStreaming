@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   Dimensions,
   Platform,
-  Alert,
   FlatList,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -35,6 +34,7 @@ import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StackActions } from '@react-navigation/native';
+import CustomAlert from '../components/CustomAlert';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -71,6 +71,10 @@ const CastMoviesScreen: React.FC = () => {
   const scrollY = useSharedValue(0);
   const [displayLimit, setDisplayLimit] = useState(30); // Start with fewer items for performance
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertActions, setAlertActions] = useState<any[]>([]);
 
   useEffect(() => {
     if (castMember) {
@@ -253,7 +257,7 @@ const CastMoviesScreen: React.FC = () => {
         if (__DEV__) console.warn('Stremio ID is null/undefined for movie:', movie.title);
         throw new Error('Could not find Stremio ID');
       }
-    } catch (error: any) {
+  } catch (error: any) {
       if (__DEV__) {
         console.error('=== Error in handleMoviePress ===');
         console.error('Movie:', movie.title);
@@ -261,12 +265,10 @@ const CastMoviesScreen: React.FC = () => {
         console.error('Error message:', error.message);
         console.error('Error stack:', error.stack);
       }
-      
-      Alert.alert(
-        'Error',
-        `Unable to load "${movie.title}". Please try again later.`,
-        [{ text: 'OK' }]
-      );
+      setAlertTitle('Error');
+      setAlertMessage(`Unable to load "${movie.title}". Please try again later.`);
+      setAlertActions([{ label: 'OK', onPress: () => {} }]);
+      setAlertVisible(true);
     }
   };
 
@@ -810,8 +812,18 @@ const CastMoviesScreen: React.FC = () => {
           }
         />
       )}
+
+      {/* Inject CustomAlert component to display errors */}
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        actions={alertActions}
+        onClose={() => setAlertVisible(false)}
+      />
     </View>
   );
 };
 
 export default CastMoviesScreen;
+

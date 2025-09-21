@@ -11,7 +11,6 @@ import {
   ImageBackground,
   ScrollView,
   StatusBar,
-  Alert,
   Dimensions,
   Linking,
   Clipboard,
@@ -47,6 +46,7 @@ import { useSettings } from '../hooks/useSettings';
 import QualityBadge from '../components/metadata/QualityBadge';
 import { logger } from '../utils/logger';
 import { isMkvStream } from '../utils/mkvDetection';
+import CustomAlert from '../components/CustomAlert';
 
 const TMDB_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tmdb.new.logo.svg/512px-Tmdb.new.logo.svg.png?20200406190906';
 const HDR_ICON = 'https://uxwing.com/wp-content/themes/uxwing/download/video-photography-multimedia/hdr-icon.png';
@@ -176,7 +176,7 @@ const AnimatedView = memo(({
 });
 
 // Extracted Components
-const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, theme, showLogos, scraperLogo }: { 
+const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, theme, showLogos, scraperLogo, showAlert }: { 
   stream: Stream; 
   onPress: () => void; 
   index: number;
@@ -185,6 +185,7 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
   theme: any;
   showLogos?: boolean;
   scraperLogo?: string | null;
+  showAlert: (title: string, message: string) => void;
 }) => {
   
   // Handle long press to copy stream URL to clipboard
@@ -192,18 +193,10 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
     if (stream.url) {
       try {
         await Clipboard.setString(stream.url);
-        Alert.alert(
-          'Copied!',
-          'Stream URL has been copied to clipboard.',
-          [{ text: 'OK' }]
-        );
+        showAlert('Copied!', 'Stream URL has been copied to clipboard.');
       } catch (error) {
         // Fallback: show URL in alert if clipboard fails
-        Alert.alert(
-          'Stream URL',
-          stream.url,
-          [{ text: 'OK' }]
-        );
+        showAlert('Stream URL', stream.url);
       }
     }
   }, [stream.url]);
@@ -413,6 +406,23 @@ export const StreamsScreen = () => {
   const loadStartTimeRef = useRef(0);
   const hasDoneInitialLoadRef = useRef(false);
   
+  // CustomAlert state
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertActions, setAlertActions] = useState<Array<{ label: string; onPress: () => void; style?: object }>>([]);
+
+  const openAlert = (
+    title: string,
+    message: string,
+    actions?: Array<{ label: string; onPress: () => void; style?: object }>
+  ) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertActions(actions && actions.length > 0 ? actions : [{ label: 'OK', onPress: () => {} }]);
+    setAlertVisible(true);
+  };
+
   
 
   // Track when we started fetching streams so we can show an extended loading state
@@ -939,7 +949,7 @@ export const StreamsScreen = () => {
         // Block magnet links - not supported yet
         if (stream.url.startsWith('magnet:')) {
           try {
-            Alert.alert('Not supported', 'Torrent streaming is not supported yet.');
+            openAlert('Not supported', 'Torrent streaming is not supported yet.');
           } catch (_e) {}
           return;
         }
@@ -1847,6 +1857,7 @@ export const StreamsScreen = () => {
                             theme={currentTheme}
                             showLogos={settings.showScraperLogos}
                             scraperLogo={(item.addonId && scraperLogos[item.addonId]) || (item as any).addon ? scraperLogoCache.get((item.addonId || (item as any).addon) as string) || null : null}
+                            showAlert={(t, m) => openAlert(t, m)}
                           />
                         </View>
                       )}
@@ -1885,6 +1896,13 @@ export const StreamsScreen = () => {
           </View>
         )}
       </View>
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        actions={alertActions}
+        onClose={() => setAlertVisible(false)}
+      />
     </View>
   );
 };

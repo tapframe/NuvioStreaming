@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, StatusBar, Platform, Animated, Easing, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar, Platform, Animated, Easing, TextInput, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import { useAccount } from '../contexts/AccountContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import CustomAlert from '../components/CustomAlert';
 
 const AccountManageScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -34,6 +35,10 @@ const AccountManageScreen: React.FC = () => {
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || '');
   const [saving, setSaving] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertActions, setAlertActions] = useState<any[]>([]);
 
   useEffect(() => {
     // Reset image error state when URL changes
@@ -45,31 +50,32 @@ const AccountManageScreen: React.FC = () => {
     setSaving(true);
     const err = await updateProfile({ displayName: displayName.trim() || undefined, avatarUrl: avatarUrl.trim() || undefined });
     if (err) {
-      Alert.alert('Error', err);
+      setAlertTitle('Error');
+      setAlertMessage(err);
+      setAlertActions([{ label: 'OK', onPress: () => {} }]);
+      setAlertVisible(true);
     }
     setSaving(false);
   };
 
   const handleSignOut = () => {
-    Alert.alert(
-      'Sign out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign out',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await signOut();
-              // Navigate back to root after sign out
-              // @ts-ignore
-              navigation.goBack();
-            } catch (_) {}
-          },
+    setAlertTitle('Sign out');
+    setAlertMessage('Are you sure you want to sign out?');
+    setAlertActions([
+      { label: 'Cancel', onPress: () => {} },
+      {
+        label: 'Sign out',
+        onPress: async () => {
+          try {
+            await signOut();
+            // @ts-ignore
+            navigation.goBack();
+          } catch (_) {}
         },
-      ]
-    );
+        style: { opacity: 1 },
+      },
+    ]);
+    setAlertVisible(true);
   };
 
   return (
@@ -207,6 +213,13 @@ const AccountManageScreen: React.FC = () => {
           <Text style={styles.signOutText}>Sign out</Text>
         </TouchableOpacity>
       </Animated.View>
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        actions={alertActions}
+        onClose={() => setAlertVisible(false)}
+      />
     </View>
   );
 };

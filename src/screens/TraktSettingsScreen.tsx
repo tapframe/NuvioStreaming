@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   Image,
   SafeAreaView,
   ScrollView,
@@ -25,6 +24,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useTraktIntegration } from '../hooks/useTraktIntegration';
 import { useTraktAutosyncSettings } from '../hooks/useTraktAutosyncSettings';
 import { colors } from '../styles';
+import CustomAlert from '../components/CustomAlert';
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
@@ -68,6 +68,33 @@ const TraktSettingsScreen: React.FC = () => {
 
   const [showSyncFrequencyModal, setShowSyncFrequencyModal] = useState(false);
   const [showThresholdModal, setShowThresholdModal] = useState(false);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertActions, setAlertActions] = useState<Array<{ label: string; onPress: () => void; style?: object }>>([
+    { label: 'OK', onPress: () => setAlertVisible(false) },
+  ]);
+
+  const openAlert = (
+    title: string,
+    message: string,
+    actions?: Array<{ label: string; onPress?: () => void; style?: object }>
+  ) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    if (actions && actions.length > 0) {
+      setAlertActions(
+        actions.map(a => ({
+          label: a.label,
+          style: a.style,
+          onPress: () => { a.onPress?.(); },
+        }))
+      );
+    } else {
+      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+    }
+    setAlertVisible(true);
+  };
 
   const checkAuthStatus = useCallback(async () => {
     setIsLoading(true);
@@ -120,32 +147,32 @@ const TraktSettingsScreen: React.FC = () => {
               logger.log('[TraktSettingsScreen] Token exchange successful');
               checkAuthStatus().then(() => {
                 // Show success message
-                Alert.alert(
+                openAlert(
                   'Successfully Connected',
                   'Your Trakt account has been connected successfully.',
                   [
                     { 
-                      text: 'OK', 
-                      onPress: () => navigation.goBack() 
+                      label: 'OK', 
+                      onPress: () => navigation.goBack(),
                     }
                   ]
                 );
               });
             } else {
               logger.error('[TraktSettingsScreen] Token exchange failed');
-              Alert.alert('Authentication Error', 'Failed to complete authentication with Trakt.');
+              openAlert('Authentication Error', 'Failed to complete authentication with Trakt.');
             }
           })
           .catch(error => {
             logger.error('[TraktSettingsScreen] Token exchange error:', error);
-            Alert.alert('Authentication Error', 'An error occurred during authentication.');
+            openAlert('Authentication Error', 'An error occurred during authentication.');
           })
           .finally(() => {
             setIsExchangingCode(false);
           });
       } else if (response.type === 'error') {
         logger.error('[TraktSettingsScreen] Authentication error:', response.error);
-        Alert.alert('Authentication Error', response.error?.message || 'An error occurred during authentication.');
+        openAlert('Authentication Error', response.error?.message || 'An error occurred during authentication.');
         setIsExchangingCode(false);
       } else {
         logger.log('[TraktSettingsScreen] Auth response type:', response.type);
@@ -159,14 +186,13 @@ const TraktSettingsScreen: React.FC = () => {
   };
 
   const handleSignOut = async () => {
-    Alert.alert(
+    openAlert(
       'Sign Out',
       'Are you sure you want to sign out of your Trakt account?',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { label: 'Cancel', onPress: () => {} },
         { 
-          text: 'Sign Out', 
-          style: 'destructive',
+          label: 'Sign Out', 
           onPress: async () => {
             setIsLoading(true);
             try {
@@ -175,7 +201,7 @@ const TraktSettingsScreen: React.FC = () => {
               setUserProfile(null);
             } catch (error) {
               logger.error('[TraktSettingsScreen] Error signing out:', error);
-              Alert.alert('Error', 'Failed to sign out of Trakt.');
+              openAlert('Error', 'Failed to sign out of Trakt.');
             } finally {
               setIsLoading(false);
             }
@@ -398,10 +424,9 @@ const TraktSettingsScreen: React.FC = () => {
                 disabled={isSyncing}
                 onPress={async () => {
                   const success = await performManualSync();
-                  Alert.alert(
+                  openAlert(
                     'Sync Complete',
-                    success ? 'Successfully synced your watch progress with Trakt.' : 'Sync failed. Please try again.',
-                    [{ text: 'OK' }]
+                    success ? 'Successfully synced your watch progress with Trakt.' : 'Sync failed. Please try again.'
                   );
                 }}
               >
