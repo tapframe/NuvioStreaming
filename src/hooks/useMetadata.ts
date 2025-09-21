@@ -868,6 +868,10 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
            }
            
            let hasStreamResource = false;
+           let supportsIdPrefix = false;
+           
+           // Extract ID prefix from the ID
+           const idPrefix = id.split(':')[0];
            
            for (const resource of addon.resources) {
              // Check if the current element is a ResourceObject
@@ -877,6 +881,14 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
                    Array.isArray(typedResource.types) && 
                    typedResource.types.includes(type)) {
                  hasStreamResource = true;
+                 
+                 // Check if this addon supports the ID prefix
+                 if (Array.isArray(typedResource.idPrefixes)) {
+                   supportsIdPrefix = typedResource.idPrefixes.includes(idPrefix);
+                 } else {
+                   // If no idPrefixes specified, assume it supports all prefixes
+                   supportsIdPrefix = true;
+                 }
                  break;
                }
              } 
@@ -884,12 +896,19 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
              else if (typeof resource === 'string' && resource === 'stream' && addon.types) {
                if (Array.isArray(addon.types) && addon.types.includes(type)) {
                  hasStreamResource = true;
+                 // For simple string resources, check addon-level idPrefixes
+                 if (addon.idPrefixes && Array.isArray(addon.idPrefixes)) {
+                   supportsIdPrefix = addon.idPrefixes.includes(idPrefix);
+                 } else {
+                   // If no idPrefixes specified, assume it supports all prefixes
+                   supportsIdPrefix = true;
+                 }
                  break;
                }
              }
            }
            
-           return hasStreamResource;
+           return hasStreamResource && supportsIdPrefix;
          });
          
          // Initialize scraper statuses for tracking

@@ -29,7 +29,11 @@ import { colors } from '../styles';
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
 // Trakt configuration
-const TRAKT_CLIENT_ID = 'd7271f7dd57d8aeff63e99408610091a6b1ceac3b3a541d1031a48f429b7942c';
+const TRAKT_CLIENT_ID = process.env.EXPO_PUBLIC_TRAKT_CLIENT_ID as string;
+
+if (!TRAKT_CLIENT_ID) {
+  throw new Error('Missing EXPO_PUBLIC_TRAKT_CLIENT_ID environment variable');
+}
 const discovery = {
   authorizationEndpoint: 'https://trakt.tv/oauth/authorize',
   tokenEndpoint: 'https://api.trakt.tv/oauth/token',

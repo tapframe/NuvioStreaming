@@ -926,47 +926,72 @@ class StremioService {
           // Map Stremio types to local scraper types
           const scraperType = type === 'series' ? 'tv' : type;
           
-          // Parse the Stremio ID to extract IMDb ID and season/episode info
+          // Parse the Stremio ID to extract ID and season/episode info
           let tmdbId: string | null = null;
           let season: number | undefined = undefined;
           let episode: number | undefined = undefined;
           
           try {
             const idParts = id.split(':');
-            let baseImdbId: string;
+            let baseId: string;
+            let idType: 'imdb' | 'kitsu' | 'tmdb' = 'imdb';
             
             // Handle different episode ID formats
             if (idParts[0] === 'series') {
-              // Format: series:imdbId:season:episode
-              baseImdbId = idParts[1];
+              // Format: series:imdbId:season:episode or series:kitsu:7442:season:episode
+              baseId = idParts[1];
               if (scraperType === 'tv' && idParts.length >= 4) {
                 season = parseInt(idParts[2], 10);
                 episode = parseInt(idParts[3], 10);
               }
+              // Check if it's a kitsu ID
+              if (idParts[1] === 'kitsu') {
+                idType = 'kitsu';
+                baseId = idParts[2]; // kitsu:7442:season:episode -> baseId = 7442
+                if (scraperType === 'tv' && idParts.length >= 5) {
+                  season = parseInt(idParts[3], 10);
+                  episode = parseInt(idParts[4], 10);
+                }
+              }
             } else if (idParts[0].startsWith('tt')) {
               // Format: imdbId:season:episode (direct IMDb ID)
-              baseImdbId = idParts[0];
+              baseId = idParts[0];
+              idType = 'imdb';
               if (scraperType === 'tv' && idParts.length >= 3) {
                 season = parseInt(idParts[1], 10);
                 episode = parseInt(idParts[2], 10);
               }
+            } else if (idParts[0] === 'kitsu') {
+              // Format: kitsu:7442:season:episode (direct Kitsu ID)
+              baseId = idParts[1];
+              idType = 'kitsu';
+              if (scraperType === 'tv' && idParts.length >= 4) {
+                season = parseInt(idParts[2], 10);
+                episode = parseInt(idParts[3], 10);
+              }
             } else {
               // Fallback: assume first part is the ID
-              baseImdbId = idParts[0];
+              baseId = idParts[0];
               if (scraperType === 'tv' && idParts.length >= 3) {
                 season = parseInt(idParts[1], 10);
                 episode = parseInt(idParts[2], 10);
               }
             }
             
-            // Convert IMDb ID to TMDB ID using TMDBService
-             const tmdbService = TMDBService.getInstance();
-            const tmdbIdNumber = await tmdbService.findTMDBIdByIMDB(baseImdbId);
-            
-            if (tmdbIdNumber) {
-              tmdbId = tmdbIdNumber.toString();
+            // Only try to convert to TMDB ID for IMDb IDs (local scrapers need TMDB)
+            if (idType === 'imdb') {
+              const tmdbService = TMDBService.getInstance();
+              const tmdbIdNumber = await tmdbService.findTMDBIdByIMDB(baseId);
+              
+              if (tmdbIdNumber) {
+                tmdbId = tmdbIdNumber.toString();
+              } else {
+                return; // Skip local scrapers if we can't convert the ID
+              }
             } else {
-              return; // Skip local scrapers if we can't convert the ID
+              // For kitsu IDs, skip local scrapers as they don't support kitsu
+              logger.log('🔧 [getStreams] Skipping local scrapers for kitsu ID:', baseId);
+              return;
             }
           } catch (error) {
             return; // Skip local scrapers if ID parsing fails
@@ -1008,6 +1033,11 @@ class StremioService {
         logger.log(`📋 [getStreams] Checking addon ${addon.id} resources:`, JSON.stringify(addon.resources));
         
         let hasStreamResource = false;
+        let supportsIdPrefix = false;
+        
+        // Extract ID prefix from the ID
+        const idPrefix = id.split(':')[0];
+        logger.log(`🔍 [getStreams] Checking if addon supports ID prefix: ${idPrefix}`);
         
         // Iterate through the resources array, checking each element
         for (const resource of addon.resources) {
@@ -1018,6 +1048,16 @@ class StremioService {
                 Array.isArray(typedResource.types) && 
                 typedResource.types.includes(type)) {
               hasStreamResource = true;
+              
+              // Check if this addon supports the ID prefix
+              if (Array.isArray(typedResource.idPrefixes)) {
+                supportsIdPrefix = typedResource.idPrefixes.includes(idPrefix);
+                logger.log(`🔍 [getStreams] Addon ${addon.id} supports prefixes: ${typedResource.idPrefixes.join(', ')}`);
+              } else {
+                // If no idPrefixes specified, assume it supports all prefixes
+                supportsIdPrefix = true;
+                logger.log(`🔍 [getStreams] Addon ${addon.id} has no prefix restrictions, assuming support`);
+              }
               break; // Found the stream resource object, no need to check further
             }
           } 
@@ -1025,18 +1065,31 @@ class StremioService {
           else if (typeof resource === 'string' && resource === 'stream' && addon.types) {
             if (Array.isArray(addon.types) && addon.types.includes(type)) {
               hasStreamResource = true;
+              // For simple string resources, check addon-level idPrefixes
+              if (addon.idPrefixes && Array.isArray(addon.idPrefixes)) {
+                supportsIdPrefix = addon.idPrefixes.includes(idPrefix);
+                logger.log(`🔍 [getStreams] Addon ${addon.id} supports prefixes: ${addon.idPrefixes.join(', ')}`);
+              } else {
+                // If no idPrefixes specified, assume it supports all prefixes
+                supportsIdPrefix = true;
+                logger.log(`🔍 [getStreams] Addon ${addon.id} has no prefix restrictions, assuming support`);
+              }
               break; // Found the simple stream resource string and type support
             }
           }
         }
         
+        const canHandleRequest = hasStreamResource && supportsIdPrefix;
+        
         if (!hasStreamResource) {
           logger.log(`❌ [getStreams] Addon ${addon.id} does not support streaming ${type}`);
+        } else if (!supportsIdPrefix) {
+          logger.log(`❌ [getStreams] Addon ${addon.id} supports ${type} but not ID prefix ${idPrefix}`);
         } else {
-          logger.log(`✅ [getStreams] Addon ${addon.id} supports streaming ${type}`);
+          logger.log(`✅ [getStreams] Addon ${addon.id} supports streaming ${type} with prefix ${idPrefix}`);
         }
         
-        return hasStreamResource;
+        return canHandleRequest;
       });
     
     logger.log('📊 [getStreams] Stream capable addons:', streamAddons.map(a => a.id));
