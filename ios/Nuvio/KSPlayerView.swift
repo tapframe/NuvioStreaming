@@ -16,7 +16,6 @@ class KSPlayerView: UIView {
     private var isPaused = false
     private var currentVolume: Float = 1.0
     weak var viewManager: KSPlayerViewManager?
-    private var loadTimeoutWorkItem: DispatchWorkItem?
     
     // Event blocks for Fabric
     @objc var onLoad: RCTDirectEventBlock?
@@ -148,18 +147,6 @@ class KSPlayerView: UIView {
 
         print("KSPlayerView: Setting source: \(uri)")
         print("KSPlayerView: URL scheme: \(url.scheme ?? "unknown"), host: \(url.host ?? "unknown")")
-        
-        // Add timeout for source loading
-        loadTimeoutWorkItem?.cancel()
-        let work = DispatchWorkItem { [weak self] in
-            guard let self = self else { return }
-            let dur = self.playerView.playerLayer?.player.duration ?? 0
-            if dur <= 0 {
-                self.sendEvent("onError", ["error": "Stream timeout: unable to open input after 8 seconds"])
-            }
-        }
-        loadTimeoutWorkItem = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 8, execute: work)
         
         playerView.set(resource: resource)
         
@@ -427,8 +414,6 @@ extension KSPlayerView: KSPlayerLayerDelegate {
     func player(layer: KSPlayerLayer, state: KSPlayerState) {
         switch state {
         case .readyToPlay:
-            // Cancel timeout when ready
-            loadTimeoutWorkItem?.cancel()
             // Send onLoad event to React Native with track information
             let p = layer.player
             let tracks = getAvailableTracks()

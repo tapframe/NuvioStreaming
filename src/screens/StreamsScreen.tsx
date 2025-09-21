@@ -874,41 +874,9 @@ export const StreamsScreen = () => {
     const streamName = stream.name || stream.title || 'Unnamed Stream';
     const streamProvider = stream.addonId || stream.addonName || stream.name;
     
-    // Determine if we should force VLC on iOS based on actual stream format and provider capability
-    let forceVlc = !!options?.forceVlc;
-    try {
-      if (Platform.OS === 'ios' && !forceVlc) {
-        const isMkvFile = isMkvStream(stream.url, stream.headers);
-        
-        // Special case: moviebox should always use AndroidVideoPlayer
-        if (streamProvider === 'moviebox') {
-          forceVlc = false;
-          logger.log(`[StreamsScreen] Provider ${streamProvider} -> always using AndroidVideoPlayer`);
-        } else {
-          // Also check if the provider declares MKV format support
-          let providerSupportsMkv = false;
-          try {
-            const availableScrapers = await localScraperService.getAvailableScrapers();
-            const provider = availableScrapers.find(scraper => scraper.id === streamProvider);
-            if (provider && provider.formats) {
-              providerSupportsMkv = provider.formats.includes('mkv');
-              logger.log(`[StreamsScreen] Provider ${streamProvider} formats:`, provider.formats, 'supports MKV:', providerSupportsMkv);
-            }
-          } catch (providerError) {
-            logger.warn('[StreamsScreen] Failed to check provider formats:', providerError);
-          }
-          
-          if (isMkvFile || providerSupportsMkv) {
-            forceVlc = true;
-            logger.log(`[StreamsScreen] Stream is MKV format (detected: ${isMkvFile}, provider supports: ${providerSupportsMkv}) -> forcing VLC`);
-          } else {
-            logger.log(`[StreamsScreen] Stream is NOT MKV format (detected: ${isMkvFile}, provider supports: ${providerSupportsMkv}) -> using AndroidVideoPlayer`);
-          }
-        }
-      }
-    } catch (e) {
-      logger.warn('[StreamsScreen] Stream format detection failed:', e);
-    }
+    // iOS now always uses KSPlayer, no need for player selection logic
+    // Keep forceVlc for backward compatibility but it's ignored by player selection
+    const forceVlc = !!options?.forceVlc;
 
 
     // Show a quick full-screen black overlay to mask rotation flicker
@@ -944,7 +912,7 @@ export const StreamsScreen = () => {
       streamName: streamName,
       // Always prefer stream.headers; player will use these for requests
       headers: options?.headers || stream.headers || undefined,
-      // Force VLC for providers that declare MKV format support on iOS
+      // iOS now always uses KSPlayer, forceVlc kept for backward compatibility
       forceVlc,
       id,
       type,
@@ -974,15 +942,15 @@ export const StreamsScreen = () => {
           if (Platform.OS === 'ios' && settings.preferredPlayer === 'internal') {
             // Check if the actual stream is an MKV file
             const lowerUri = (stream.url || '').toLowerCase();
+            // iOS now always uses KSPlayer, no need for format-specific logic
+            // Keep this for logging purposes only
             const contentType = (stream.headers && ((stream.headers as any)['Content-Type'] || (stream.headers as any)['content-type'])) || '';
             const isMkvByHeader = typeof contentType === 'string' && contentType.includes('matroska');
             const isMkvByPath = lowerUri.includes('.mkv') || /[?&]ext=mkv\b/.test(lowerUri) || /format=mkv\b/.test(lowerUri) || /container=mkv\b/.test(lowerUri);
             const isMkvFile = Boolean(isMkvByHeader || isMkvByPath);
-            
+
             if (isMkvFile) {
-              logger.log(`[StreamsScreen] Stream is MKV format -> forcing VLC on iOS (internal preferred)`);
-              navigateToPlayer(stream, { forceVlc: true });
-              return;
+              logger.log(`[StreamsScreen] Stream is MKV format - will play in KSPlayer on iOS`);
             }
           }
         } catch (err) {
@@ -1005,8 +973,8 @@ export const StreamsScreen = () => {
                   ...(stream.headers || {}),
                   'Content-Type': 'video/x-matroska',
                 } as Record<string, string>;
-                logger.log('[StreamsScreen] HEAD detected MKV via Content-Type quickly, forcing in-app VLC on iOS (internal preferred)');
-                navigateToPlayer(stream, { forceVlc: true, headers: mergedHeaders });
+                logger.log('[StreamsScreen] HEAD detected MKV via Content-Type - will play in KSPlayer on iOS');
+                navigateToPlayer(stream, { headers: mergedHeaders });
                 return;
               }
             } catch (e) {

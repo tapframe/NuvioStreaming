@@ -32,7 +32,7 @@ import {
 } from './utils/playerTypes';
 import { safeDebugLog, parseSRT, DEBUG_MODE, formatTime } from './utils/playerUtils';
 import { styles } from './utils/playerStyles';
-import { isMkvStream } from '../../utils/mkvDetection';
+import { shouldUseKSPlayer } from '../../utils/playerSelection';
 import { SubtitleModals } from './modals/SubtitleModals';
 import { AudioTrackModal } from './modals/AudioTrackModal';
 // Removed ResumeOverlay usage when alwaysResume is enabled
@@ -43,32 +43,32 @@ import axios from 'axios';
 import { stremioService } from '../../services/stremioService';
 import * as Brightness from 'expo-brightness';
 
-// KSPlayerRouter component handles platform selection without conditional hook calls
+// KSPlayerRouter component handles platform selection
 const KSPlayerRouter: React.FC = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'Player'>>();
-  const { uri, headers } = route.params as any;
+  const { uri, headers, forceVlc } = route.params as any;
 
-  // Detect if stream is MKV format
-  const isMkvFile = isMkvStream(uri, headers);
-
-  // Honor forceVlc from navigation params for iOS, or fallback to MKV detection
-  const forceVlc = ((route.params as any)?.forceVlc === true);
-
-  // Use AndroidVideoPlayer for Android devices. On iOS, use KSPlayer when MKV or forced.
-  const shouldUseAndroidPlayer = Platform.OS === 'android' || (Platform.OS === 'ios' && !(isMkvFile || forceVlc));
+  // Use centralized player selection logic
+  const shouldUseKSPlayerComponent = shouldUseKSPlayer({
+    uri,
+    headers,
+    forceVlc
+  });
 
   safeDebugLog("Player selection logic", {
     platform: Platform.OS,
-    isMkvFile,
+    uri,
     forceVlc,
-    shouldUseAndroidPlayer
+    shouldUseKSPlayer: shouldUseKSPlayerComponent
   });
 
-  if (shouldUseAndroidPlayer) {
-    return <AndroidVideoPlayer />;
+  // iOS: Always use KSPlayer (handles all formats with AVPlayer → FFmpeg fallback)
+  // Android: Always use AndroidVideoPlayer (react-native-video/ExoPlayer)
+  if (shouldUseKSPlayerComponent) {
+    return <KSPlayerCore />;
   }
 
-  return <KSPlayerCore />;
+  return <AndroidVideoPlayer />;
 };
 
 const KSPlayer: React.FC = () => {
@@ -2318,36 +2318,8 @@ const KSPlayerCore: React.FC = () => {
       return;
     }
 
-    // On iOS: if the selected stream is NOT MKV, switch to AndroidVideoPlayer screen by replacing route
-    if (Platform.OS === 'ios') {
-      const targetIsMkv = isMkvStream(newStream.url, newStream.headers || {});
-      if (!targetIsMkv) {
-        // Ensure KSPlayer stops immediately before switching screens
-        setPaused(true);
-        setShowSourcesModal(false);
-        setTimeout(() => {
-          navigation.replace('Player', {
-            uri: newStream.url,
-            title,
-            episodeTitle,
-            season,
-            episode,
-            quality: (newStream.title?.match(/(\d+)p/) || [])[1] || newStream.quality,
-            year,
-            streamProvider: newStream.addonName || newStream.name || newStream.addon || 'Unknown',
-            streamName: newStream.name || newStream.title || 'Unknown Stream',
-            headers: newStream.headers || undefined,
-            id,
-            type,
-            episodeId,
-            imdbId,
-            backdrop,
-            availableStreams,
-          } as any);
-        }, 50);
-        return;
-      }
-    }
+    // On iOS: All streams use KSPlayer, no need to switch players
+    // Stream switching is handled internally by KSPlayerCore
 
     setIsChangingSource(true);
     setShowSourcesModal(false);

@@ -37,7 +37,7 @@ import PlayerControls from './controls/PlayerControls';
 import CustomSubtitles from './subtitles/CustomSubtitles';
 import { SourcesModal } from './modals/SourcesModal';
 import { stremioService } from '../../services/stremioService';
-import { isMkvStream } from '../../utils/mkvDetection';
+import { shouldUseKSPlayer } from '../../utils/playerSelection';
 import axios from 'axios';
 import * as Brightness from 'expo-brightness';
 
@@ -2332,39 +2332,8 @@ const AndroidVideoPlayer: React.FC = () => {
       return;
     }
 
-    // On iOS: if the selected stream is MKV, switch to KSPlayer screen by replacing route
-    if (Platform.OS === 'ios') {
-      const targetIsMkv = isMkvStream(newStream.url, newStream.headers || {});
-      if (targetIsMkv) {
-        // Ensure current player stops immediately before switching screens
-        setPaused(true);
-        setShowSourcesModal(false);
-        // Small delay to guarantee audio halt before navigation switch
-        setTimeout(() => {
-          (navigation as any).replace('Player', {
-            uri: newStream.url,
-            title,
-            episodeTitle,
-            season,
-            episode,
-            quality: (newStream.title?.match(/(\d+)p/) || [])[1] || newStream.quality,
-            year,
-            streamProvider: newStream.addonName || newStream.name || newStream.addon || 'Unknown',
-            streamName: newStream.name || newStream.title || 'Unknown Stream',
-            headers: newStream.headers || undefined,
-            id,
-            type,
-            episodeId,
-            imdbId,
-            backdrop,
-            availableStreams,
-            // Ensure KSPlayer is chosen even if URL/headers do not reveal MKV
-            forceVlc: true,
-          });
-        }, 50);
-        return;
-      }
-    }
+    // Note: iOS now always uses KSPlayer, so this AndroidVideoPlayer should never be used on iOS
+    // This logic is kept for safety in case routing changes
 
     setIsChangingSource(true);
     setShowSourcesModal(false);
