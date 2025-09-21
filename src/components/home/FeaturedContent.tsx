@@ -437,7 +437,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
           easing: Easing.out(Easing.cubic)
         });
       } else {
-        // Initial load - start from 0
+        // Initial load - start from 0 but don't animate if we're just mounting
         posterOpacity.value = 0;
         posterScale.value = 1.1;
         overlayOpacity.value = 0;
@@ -449,8 +449,10 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
 
     prevContentIdRef.current = contentId;
 
-    // Set poster URL for immediate display
-    if (posterUrl) setBannerUrl(posterUrl);
+    // Set poster URL for immediate display - only if it's different to prevent flash
+    if (posterUrl && posterUrl !== bannerUrl) {
+      setBannerUrl(posterUrl);
+    }
 
     // Load images with enhanced animations
     const loadImages = async () => {
@@ -486,6 +488,13 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
             duration: 500,
             easing: Easing.out(Easing.cubic)
           }));
+        } else {
+          // If preload fails, still show the image but without animation
+          posterOpacity.value = 1;
+          posterScale.value = 1;
+          overlayOpacity.value = 0.15;
+          contentOpacity.value = 1;
+          buttonsOpacity.value = 1;
         }
       }
 

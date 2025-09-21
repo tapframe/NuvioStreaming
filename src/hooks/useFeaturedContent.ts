@@ -412,14 +412,17 @@ export function useFeaturedContent() {
         const parsed = JSON.parse(json);
         if (cancelled) return;
         if (parsed?.featuredContent) {
-          persistentStore.featuredContent = parsed.featuredContent;
-          persistentStore.allFeaturedContent = Array.isArray(parsed.allFeaturedContent) ? parsed.allFeaturedContent : [];
-          persistentStore.lastFetchTime = typeof parsed.ts === 'number' ? parsed.ts : Date.now();
-          persistentStore.isFirstLoad = false;
-          setFeaturedContent(parsed.featuredContent);
-          setAllFeaturedContent(persistentStore.allFeaturedContent);
-          setLoading(false);
-          logger.info('[useFeaturedContent] hydrate:storage', { allCount: persistentStore.allFeaturedContent.length });
+          // Only hydrate if we don't already have content to prevent flash
+          if (!persistentStore.featuredContent) {
+            persistentStore.featuredContent = parsed.featuredContent;
+            persistentStore.allFeaturedContent = Array.isArray(parsed.allFeaturedContent) ? parsed.allFeaturedContent : [];
+            persistentStore.lastFetchTime = typeof parsed.ts === 'number' ? parsed.ts : Date.now();
+            persistentStore.isFirstLoad = false;
+            setFeaturedContent(parsed.featuredContent);
+            setAllFeaturedContent(persistentStore.allFeaturedContent);
+            setLoading(false);
+            logger.info('[useFeaturedContent] hydrate:storage', { allCount: persistentStore.allFeaturedContent.length });
+          }
         }
       } catch {}
     })();
@@ -445,8 +448,8 @@ export function useFeaturedContent() {
       tmdbLanguagePreference: settings.tmdbLanguagePreference
     };
     
-    // Force refresh if settings changed during app restart
-    if (settingsChanged) {
+    // Force refresh if settings changed during app restart, but only if we have content
+    if (settingsChanged && persistentStore.featuredContent) {
       logger.info('[useFeaturedContent] settings:changed', { source: settings.featuredContentSource, selectedCount: settings.selectedHeroCatalogs?.length || 0 });
       loadFeaturedContent(true);
     }
@@ -482,11 +485,13 @@ export function useFeaturedContent() {
         persistentStore.lastSettings.logoSourcePreference = nextLogoPref;
         persistentStore.lastSettings.tmdbLanguagePreference = nextTmdbLang;
 
-        // Clear current data to reflect change instantly in UI
-        setAllFeaturedContent([]);
-        setFeaturedContent(null);
-        persistentStore.allFeaturedContent = [];
-        persistentStore.featuredContent = null;
+        // Only clear current data if it's a significant change (source or catalogs)
+        if (sourceChanged || (nextSource === 'catalogs' && catalogsChanged)) {
+          setAllFeaturedContent([]);
+          setFeaturedContent(null);
+          persistentStore.allFeaturedContent = [];
+          persistentStore.featuredContent = null;
+        }
 
         // Force a fresh load
         loadFeaturedContent(true);

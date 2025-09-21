@@ -139,7 +139,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
     const animatedOpacity = useSharedValue(1);
     
     useEffect(() => {
-      // Start with opacity 0 and animate to 1
+      // Start with opacity 0 and animate to 1, but only if it's a new item
       animatedOpacity.value = 0;
       animatedOpacity.value = withTiming(1, { duration: 400 });
     }, [item.id]);
