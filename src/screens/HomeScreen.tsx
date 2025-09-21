@@ -15,7 +15,8 @@ import {
   Image,
   Modal,
   Pressable,
-  Alert
+  Alert,
+  InteractionManager
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -146,8 +147,10 @@ const HomeScreen = () => {
         stremioService.getInstalledAddonsAsync()
       ]);
       
-      // Set hasAddons state based on whether we have any addons
-      setHasAddons(addons.length > 0);
+      // Set hasAddons state based on whether we have any addons - ensure on main thread
+      InteractionManager.runAfterInteractions(() => {
+        setHasAddons(addons.length > 0);
+      });
       
       const catalogSettings = catalogSettingsJson ? JSON.parse(catalogSettingsJson) : {};
       
@@ -245,23 +248,28 @@ const HomeScreen = () => {
                       items
                     };
                     
-                    // Update the catalog at its specific position
-                    setCatalogs(prevCatalogs => {
-                      const newCatalogs = [...prevCatalogs];
-                      newCatalogs[currentIndex] = catalogContent;
-                      return newCatalogs;
+                    // Update the catalog at its specific position - ensure on main thread
+                    InteractionManager.runAfterInteractions(() => {
+                      setCatalogs(prevCatalogs => {
+                        const newCatalogs = [...prevCatalogs];
+                        newCatalogs[currentIndex] = catalogContent;
+                        return newCatalogs;
+                      });
                     });
                   }
                 } catch (error) {
                   if (__DEV__) console.error(`[HomeScreen] Failed to load ${catalog.name} from ${addon.name}:`, error);
                 } finally {
-                  setLoadedCatalogCount(prev => {
-                    const next = prev + 1;
-                    // Exit loading screen as soon as first catalog finishes
-                    if (prev === 0) {
-                      setCatalogsLoading(false);
-                    }
-                    return next;
+                  // Update loading count - ensure on main thread
+                  InteractionManager.runAfterInteractions(() => {
+                    setLoadedCatalogCount(prev => {
+                      const next = prev + 1;
+                      // Exit loading screen as soon as first catalog finishes
+                      if (prev === 0) {
+                        setCatalogsLoading(false);
+                      }
+                      return next;
+                    });
                   });
                 }
               };
@@ -275,14 +283,18 @@ const HomeScreen = () => {
       
       totalCatalogsRef.current = catalogIndex;
       
-      // Initialize catalogs array with proper length
-      setCatalogs(new Array(catalogIndex).fill(null));
+      // Initialize catalogs array with proper length - ensure on main thread
+      InteractionManager.runAfterInteractions(() => {
+        setCatalogs(new Array(catalogIndex).fill(null));
+      });
       
       // Start processing the catalog queue
       processCatalogQueue();
     } catch (error) {
       if (__DEV__) console.error('[HomeScreen] Error in progressive catalog loading:', error);
-      setCatalogsLoading(false);
+      InteractionManager.runAfterInteractions(() => {
+        setCatalogsLoading(false);
+      });
     }
   }, []);
 
