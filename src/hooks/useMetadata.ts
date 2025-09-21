@@ -871,7 +871,17 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
            let supportsIdPrefix = false;
            
            // Extract ID prefix from the ID
-           const idPrefix = id.split(':')[0];
+           let idPrefix = id.split(':')[0];
+           
+           // For IMDb IDs (tt...), extract just the 'tt' prefix
+           if (idPrefix.startsWith('tt')) {
+             idPrefix = 'tt';
+           }
+           // For Kitsu IDs, keep the full prefix
+           else if (idPrefix === 'kitsu') {
+             idPrefix = 'kitsu';
+           }
+           // For other prefixes, keep as is
            
            for (const resource of addon.resources) {
              // Check if the current element is a ResourceObject

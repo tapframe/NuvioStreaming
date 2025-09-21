@@ -930,11 +930,11 @@ class StremioService {
           let tmdbId: string | null = null;
           let season: number | undefined = undefined;
           let episode: number | undefined = undefined;
+          let idType: 'imdb' | 'kitsu' | 'tmdb' = 'imdb';
           
           try {
             const idParts = id.split(':');
             let baseId: string;
-            let idType: 'imdb' | 'kitsu' | 'tmdb' = 'imdb';
             
             // Handle different episode ID formats
             if (idParts[0] === 'series') {
@@ -991,24 +991,26 @@ class StremioService {
             } else {
               // For kitsu IDs, skip local scrapers as they don't support kitsu
               logger.log('🔧 [getStreams] Skipping local scrapers for kitsu ID:', baseId);
-              return;
+              // Don't return here - continue to Stremio addon processing
             }
           } catch (error) {
             return; // Skip local scrapers if ID parsing fails
           }
           
-          // Execute local scrapers asynchronously with TMDB ID
-          localScraperService.getStreams(scraperType, tmdbId, season, episode, (streams, scraperId, scraperName, error) => {
-            if (error) {
-              if (callback) {
-                callback(null, scraperId, scraperName, error);
+          // Execute local scrapers asynchronously with TMDB ID (only for IMDb IDs)
+          if (idType === 'imdb' && tmdbId) {
+            localScraperService.getStreams(scraperType, tmdbId, season, episode, (streams, scraperId, scraperName, error) => {
+              if (error) {
+                if (callback) {
+                  callback(null, scraperId, scraperName, error);
+                }
+              } else if (streams && streams.length > 0) {
+                if (callback) {
+                  callback(streams, scraperId, scraperName, null);
+                }
               }
-            } else if (streams && streams.length > 0) {
-              if (callback) {
-                callback(streams, scraperId, scraperName, null);
-              }
-            }
-          });
+            });
+          }
         }
       }
     } catch (error) {
@@ -1036,8 +1038,19 @@ class StremioService {
         let supportsIdPrefix = false;
         
         // Extract ID prefix from the ID
-        const idPrefix = id.split(':')[0];
-        logger.log(`🔍 [getStreams] Checking if addon supports ID prefix: ${idPrefix}`);
+        let idPrefix = id.split(':')[0];
+        
+        // For IMDb IDs (tt...), extract just the 'tt' prefix
+        if (idPrefix.startsWith('tt')) {
+          idPrefix = 'tt';
+        }
+        // For Kitsu IDs, keep the full prefix
+        else if (idPrefix === 'kitsu') {
+          idPrefix = 'kitsu';
+        }
+        // For other prefixes, keep as is
+        
+        logger.log(`🔍 [getStreams] Checking if addon supports ID prefix: ${idPrefix} (from ${id.split(':')[0]})`);
         
         // Iterate through the resources array, checking each element
         for (const resource of addon.resources) {
