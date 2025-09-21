@@ -31,6 +31,14 @@
       ],
       "versions": [
         {
+          "version": "1.1.1",
+          "buildVersion": "14",
+          "date": "2025-09-20",
+          "localizedDescription": "# Version 1.1.1 – Update Notes\n\nThis update includes community contributions, bug fixes, and playback improvements.\n\n## Merged PR from @CrissZollo\n- Fixed test notification (now instant).\n- Updated test notification text.\n- Ensured scheduled notifications do not cancel on test.\n- Added and removed scheduled notifications by saving to library.\n- Fixed **mark/unmark as watched** (long press).\n- Fixed **adding/removing from library** (long press).\n\n## Improvements & Fixes\n- Fixed **Addon Sync across devices**.\n- Improved **iOS video playback** for MKV files.\n- Improved **error handling** in Android ExoPlayer.\n- Various minor bug fixes.\n\n---\n\n⚠️ **Note for Android users:**\n- This update **does not yet add HEVC/unsupported codec support** on devices without hardware decoding support.\n- A fix is in progress — until then, please use an **external player** for unsupported formats.\n\n## Changelog & Download\n[View on GitHub](https://github.com/tapframe/NuvioStreaming/releases/tag/1.1.1)\n\n🌐 **[Official Website](https://tapframe.github.io/NuvioStreaming/)**",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/1.1.1/Stable_1-1-1.ipa",
+          "size": 25700000
+        },
+        {
           "version": "1.1.0",
           "buildVersion": "13",
           "date": "2025-09-18",
