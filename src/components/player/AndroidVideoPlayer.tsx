@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { View, TouchableOpacity, TouchableWithoutFeedback, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, Image, StyleSheet, Modal, AppState } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Video, { VideoRef, SelectedTrack, SelectedTrackType, BufferingStrategyType } from 'react-native-video';
+import Video, { VideoRef, SelectedTrack, SelectedTrackType, BufferingStrategyType, ViewType } from 'react-native-video';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { PinchGestureHandler, PanGestureHandler, TapGestureHandler, State, PinchGestureHandlerGestureEvent, PanGestureHandlerGestureEvent, TapGestureHandlerGestureEvent } from 'react-native-gesture-handler';
@@ -1135,27 +1135,6 @@ const AndroidVideoPlayer: React.FC = () => {
           };
         });
         setRnVideoAudioTracks(formattedAudioTracks);
-
-        // Auto-select audio track if none is selected (similar to iOS behavior)
-        if (selectedAudioTrack?.type === SelectedTrackType.SYSTEM && formattedAudioTracks.length > 0) {
-          // Look for English track first
-          const englishTrack = formattedAudioTracks.find((track: {id: number, name: string, language?: string}) => {
-            const lang = (track.language || '').toLowerCase();
-            return lang === 'english' || lang === 'en' || lang === 'eng' ||
-                   (track.name && track.name.toLowerCase().includes('english'));
-          });
-
-          const selectedTrack = englishTrack || formattedAudioTracks[0];
-          setSelectedAudioTrack({ type: SelectedTrackType.INDEX, value: selectedTrack.id });
-
-          if (DEBUG_MODE) {
-            if (englishTrack) {
-              logger.log(`[AndroidVideoPlayer] Auto-selected English audio track: ${selectedTrack.name} (ID: ${selectedTrack.id})`);
-            } else {
-              logger.log(`[AndroidVideoPlayer] No English track found, auto-selected first audio track: ${selectedTrack.name} (ID: ${selectedTrack.id})`);
-            }
-          }
-        }
         
         if (DEBUG_MODE) {
           logger.log(`[AndroidVideoPlayer] Formatted audio tracks:`, formattedAudioTracks);
@@ -2770,8 +2749,8 @@ const AndroidVideoPlayer: React.FC = () => {
                   allowsExternalPlayback={false as any}
                   preventsDisplaySleepDuringVideoPlayback={true as any}
                   // ExoPlayer HLS optimization - let the player use optimal defaults
-                  // Use SurfaceView on Android to lower memory pressure with 4K/high-bitrate content
-                  useTextureView={Platform.OS === 'android' ? false : (undefined as any)}
+                  // Use textureView on Android: allows 3D mapping but DRM not supported
+                  viewType={Platform.OS === 'android' ? ViewType.TEXTURE : undefined}
                 />
               </TouchableOpacity>
             </View>
