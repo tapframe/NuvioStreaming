@@ -80,29 +80,38 @@ const detectMkvViaHead = async (url: string, headers?: Record<string, string>) =
 };
 
 // Animated Components
-const AnimatedImage = memo(({ 
-  source, 
-  style, 
-  contentFit, 
-  onLoad 
-}: { 
-  source: { uri: string } | undefined; 
-  style: any; 
-  contentFit: any; 
+const AnimatedImage = memo(({
+  source,
+  style,
+  contentFit,
+  onLoad
+}: {
+  source: { uri: string } | undefined;
+  style: any;
+  contentFit: any;
   onLoad?: () => void;
 }) => {
   const opacity = useSharedValue(0);
-  
+
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
   }));
-  
+
   useEffect(() => {
     if (source?.uri) {
       opacity.value = withTiming(1, { duration: 300 });
+    } else {
+      opacity.value = 0;
     }
   }, [source?.uri]);
-  
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      opacity.value = 0;
+    };
+  }, []);
+
   return (
     <Animated.View style={[style, animatedStyle]}>
       <Image
@@ -115,30 +124,38 @@ const AnimatedImage = memo(({
   );
 });
 
-const AnimatedText = memo(({ 
-  children, 
-  style, 
+const AnimatedText = memo(({
+  children,
+  style,
   delay = 0,
   numberOfLines
-}: { 
-  children: React.ReactNode; 
-  style: any; 
+}: {
+  children: React.ReactNode;
+  style: any;
   delay?: number;
   numberOfLines?: number;
 }) => {
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(20);
-  
+
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
     transform: [{ translateY: translateY.value }],
   }));
-  
+
   useEffect(() => {
     opacity.value = withDelay(delay, withTiming(1, { duration: 250 }));
     translateY.value = withDelay(delay, withTiming(0, { duration: 250 }));
+  }, [delay]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      opacity.value = 0;
+      translateY.value = 20;
+    };
   }, []);
-  
+
   return (
     <Animated.Text style={[style, animatedStyle]} numberOfLines={numberOfLines}>
       {children}
@@ -146,28 +163,36 @@ const AnimatedText = memo(({
   );
 });
 
-const AnimatedView = memo(({ 
-  children, 
-  style, 
-  delay = 0 
-}: { 
-  children: React.ReactNode; 
-  style?: any; 
+const AnimatedView = memo(({
+  children,
+  style,
+  delay = 0
+}: {
+  children: React.ReactNode;
+  style?: any;
   delay?: number;
 }) => {
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(20);
-  
+
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
     transform: [{ translateY: translateY.value }],
   }));
-  
+
   useEffect(() => {
     opacity.value = withDelay(delay, withTiming(1, { duration: 250 }));
     translateY.value = withDelay(delay, withTiming(0, { duration: 250 }));
+  }, [delay]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      opacity.value = 0;
+      translateY.value = 20;
+    };
   }, []);
-  
+
   return (
     <Animated.View style={[style, animatedStyle]}>
       {children}
@@ -381,6 +406,7 @@ const ProviderFilter = memo(({
         initialNumToRender={5}
         maxToRenderPerBatch={3}
         windowSize={3}
+        removeClippedSubviews={true}
         getItemLayout={(data, index) => ({
           length: 100, // Approximate width of each item
           offset: 100 * index,
@@ -1608,6 +1634,9 @@ export const StreamsScreen = () => {
   useEffect(() => {
     return () => {
       isMounted.current = false;
+      // Clear scraper logo cache to free memory
+      scraperLogoCache.clear();
+      scraperLogoCachePromise = null;
     };
   }, []);
 
@@ -1867,6 +1896,11 @@ export const StreamsScreen = () => {
                       windowSize={3}
                       removeClippedSubviews={true}
                       showsVerticalScrollIndicator={false}
+                      getItemLayout={(data, index) => ({
+                        length: 78, // Approximate height of StreamCard (68 minHeight + 10 marginBottom)
+                        offset: 78 * index,
+                        index,
+                      })}
                     />
                   ) : (
                     // Empty section placeholder

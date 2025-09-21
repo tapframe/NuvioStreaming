@@ -10,6 +10,7 @@ import {
   RefreshControl,
   Dimensions,
   Platform,
+  InteractionManager
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { RouteProp } from '@react-navigation/native';
@@ -226,6 +227,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
   const [dataSource, setDataSource] = useState<DataSource>(DataSource.STREMIO_ADDONS);
   const [actualCatalogName, setActualCatalogName] = useState<string | null>(null);
   const [screenData, setScreenData] = useState(() => {
@@ -403,24 +405,30 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
               index === self.findIndex((t) => t.id === item.id)
             );
             
-            setItems(uniqueItems);
-            setHasMore(false); // TMDB already returns a full set
-            setLoading(false);
-            setRefreshing(false);
+            InteractionManager.runAfterInteractions(() => {
+              setItems(uniqueItems);
+              setHasMore(false); // TMDB already returns a full set
+              setLoading(false);
+              setRefreshing(false);
+            });
             return;
           } else {
-            setError("No content found for the selected filters");
-            setItems([]);
-            setLoading(false);
-            setRefreshing(false);
+            InteractionManager.runAfterInteractions(() => {
+              setError("No content found for the selected filters");
+              setItems([]);
+              setLoading(false);
+              setRefreshing(false);
+            });
             return;
           }
         } catch (error) {
           logger.error('Failed to get TMDB catalog:', error);
-          setError('Failed to load content from TMDB');
-          setItems([]);
-          setLoading(false);
-          setRefreshing(false);
+          InteractionManager.runAfterInteractions(() => {
+            setError('Failed to load content from TMDB');
+            setItems([]);
+            setLoading(false);
+            setRefreshing(false);
+          });
           return;
         }
       }
@@ -448,7 +456,9 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
 
         if (catalogItems.length > 0) {
           foundItems = true;
-          setItems(catalogItems);
+          InteractionManager.runAfterInteractions(() => {
+            setItems(catalogItems);
+          });
         }
       } else if (effectiveGenreFilter) {
         // Get all addons that have catalogs of the specified type
@@ -527,19 +537,27 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
 
         if (uniqueItems.length > 0) {
           foundItems = true;
-          setItems(uniqueItems);
+          InteractionManager.runAfterInteractions(() => {
+            setItems(uniqueItems);
+          });
         }
       }
       
       if (!foundItems) {
-        setError("No content found for the selected filters");
+        InteractionManager.runAfterInteractions(() => {
+          setError("No content found for the selected filters");
+        });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load catalog items');
+      InteractionManager.runAfterInteractions(() => {
+        setError(err instanceof Error ? err.message : 'Failed to load catalog items');
+      });
       logger.error('Failed to load catalog:', err);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      InteractionManager.runAfterInteractions(() => {
+        setLoading(false);
+        setRefreshing(false);
+      });
     }
   }, [addonId, type, id, genreFilter, dataSource]);
 
@@ -651,7 +669,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
       </Text>
       <TouchableOpacity
         style={styles.button}
-        onPress={() => loadItems(1)}
+        onPress={() => loadItems(true)}
       >
         <Text style={styles.buttonText}>Retry</Text>
       </TouchableOpacity>
@@ -736,7 +754,6 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           }
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
-          estimatedItemSize={effectiveItemWidth * 1.5 + SPACING.lg}
         />
       ) : renderEmptyState()}
     </SafeAreaView>
