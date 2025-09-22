@@ -8,7 +8,6 @@ import {
   Switch,
   SafeAreaView,
   Image,
-  Alert,
   StatusBar,
   Platform,
   ActivityIndicator,
@@ -21,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TMDBService } from '../services/tmdbService';
 import { logger } from '../utils/logger';
 import { useTheme } from '../contexts/ThemeContext';
+import CustomAlert from '../components/CustomAlert';
 
 // TMDB API key - since the default key might be private in the service, we'll use our own
 const TMDB_API_KEY = '439c478a771f35c05022f9feabcca01c';
@@ -358,7 +358,36 @@ const LogoSourceSettings = () => {
   const { currentTheme } = useTheme();
   const colors = currentTheme.colors;
   const styles = createStyles(colors);
-  
+
+  // CustomAlert state
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertActions, setAlertActions] = useState<Array<{ label: string; onPress: () => void; style?: object }>>([
+    { label: 'OK', onPress: () => setAlertVisible(false) },
+  ]);
+
+  const openAlert = (
+    title: string,
+    message: string,
+    actions?: Array<{ label: string; onPress?: () => void; style?: object }>
+  ) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    if (actions && actions.length > 0) {
+      setAlertActions(
+        actions.map(a => ({
+          label: a.label,
+          style: a.style,
+          onPress: () => { a.onPress?.(); },
+        }))
+      );
+    } else {
+      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+    }
+    setAlertVisible(true);
+  };
+
   // Get current preference
   const [logoSource, setLogoSource] = useState<'metahub' | 'tmdb'>(
     settings.logoSourcePreference || 'metahub'
@@ -560,10 +589,9 @@ const LogoSourceSettings = () => {
       }
       
       // Show confirmation alert
-      Alert.alert(
+      openAlert(
         'Settings Updated',
-        `Logo and background source preference set to ${source === 'metahub' ? 'Metahub' : 'TMDB'}. Changes will apply when you navigate to content.`,
-        [{ text: 'OK' }]
+        `Logo and background source preference set to ${source === 'metahub' ? 'Metahub' : 'TMDB'}. Changes will apply when you navigate to content.`
       );
     };
     
@@ -599,19 +627,17 @@ const LogoSourceSettings = () => {
         await AsyncStorage.removeItem('_last_logos_');
         
         // Show confirmation toast or feedback
-        Alert.alert(
+        openAlert(
           'TMDB Language Updated',
-          `TMDB logo language preference set to ${languageCode.toUpperCase()}. Changes will apply when you navigate to content.`,
-          [{ text: 'OK' }]
+          `TMDB logo language preference set to ${languageCode.toUpperCase()}. Changes will apply when you navigate to content.`
         );
       } catch (e) {
         logger.error(`[LogoSourceSettings] Error in saveLanguagePreference:`, e);
         
         // Show error notification
-        Alert.alert(
+        openAlert(
           'Error Saving Preference',
-          'There was a problem saving your language preference. Please try again.',
-          [{ text: 'OK' }]
+          'There was a problem saving your language preference. Please try again.'
         );
       }
     };
@@ -692,7 +718,6 @@ const LogoSourceSettings = () => {
     return (
       <SafeAreaView style={[styles.container]}>
         <StatusBar barStyle="light-content" />
-        
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity 
@@ -703,14 +728,11 @@ const LogoSourceSettings = () => {
             <MaterialIcons name="arrow-back" size={24} color={colors.white} />
             <Text style={styles.backText}>Settings</Text>
           </TouchableOpacity>
-          
           <View style={styles.headerActions}>
             {/* Empty for now, but ready for future actions */}
           </View>
         </View>
-        
         <Text style={styles.headerTitle}>Logo Source</Text>
-        
         <ScrollView 
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
@@ -866,6 +888,13 @@ const LogoSourceSettings = () => {
             </Text>
           </View>
         </ScrollView>
+        <CustomAlert
+          visible={alertVisible}
+          title={alertTitle}
+          message={alertMessage}
+          onClose={() => setAlertVisible(false)}
+          actions={alertActions}
+        />
       </SafeAreaView>
     );
   };

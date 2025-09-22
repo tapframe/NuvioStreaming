@@ -7,7 +7,6 @@ import {
   ScrollView,
   SafeAreaView,
   StatusBar,
-  Alert,
   Platform,
   Dimensions
 } from 'react-native';
@@ -19,6 +18,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import UpdateService from '../services/updateService';
+import CustomAlert from '../components/CustomAlert';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
@@ -65,7 +65,36 @@ const UpdateScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
-  
+
+  // CustomAlert state
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertActions, setAlertActions] = useState<Array<{ label: string; onPress: () => void; style?: object }>>([
+    { label: 'OK', onPress: () => setAlertVisible(false) },
+  ]);
+
+  const openAlert = (
+    title: string,
+    message: string,
+    actions?: Array<{ label: string; onPress?: () => void; style?: object }>
+  ) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    if (actions && actions.length > 0) {
+      setAlertActions(
+        actions.map(a => ({
+          label: a.label,
+          style: a.style,
+          onPress: () => { a.onPress?.(); },
+        }))
+      );
+    } else {
+      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+    }
+    setAlertVisible(true);
+  };
+
   const [updateInfo, setUpdateInfo] = useState<any>(null);
   const [currentInfo, setCurrentInfo] = useState<any>(null);
   const [isChecking, setIsChecking] = useState(false);
@@ -100,7 +129,7 @@ const UpdateScreen: React.FC = () => {
       if (__DEV__) console.error('Error checking for updates:', error);
       setUpdateStatus('error');
       setLastOperation(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      Alert.alert('Error', 'Failed to check for updates');
+  openAlert('Error', 'Failed to check for updates');
     } finally {
       setIsChecking(false);
     }
@@ -149,17 +178,17 @@ const UpdateScreen: React.FC = () => {
       if (success) {
         setUpdateStatus('success');
         setLastOperation('Update installed successfully');
-        Alert.alert('Success', 'Update will be applied on next app restart');
+  openAlert('Success', 'Update will be applied on next app restart');
       } else {
         setUpdateStatus('error');
         setLastOperation('No update available to install');
-        Alert.alert('No Update', 'No update available to install');
+  openAlert('No Update', 'No update available to install');
       }
     } catch (error) {
       if (__DEV__) console.error('Error installing update:', error);
       setUpdateStatus('error');
       setLastOperation(`Installation error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      Alert.alert('Error', 'Failed to install update');
+  openAlert('Error', 'Failed to install update');
     } finally {
       setIsInstalling(false);
     }
@@ -569,6 +598,13 @@ const UpdateScreen: React.FC = () => {
             )}
           </ScrollView>
         </View>
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        onClose={() => setAlertVisible(false)}
+        actions={alertActions}
+      />
     </SafeAreaView>
   );
 };

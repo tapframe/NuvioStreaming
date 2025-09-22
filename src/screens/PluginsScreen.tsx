@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   Switch,
   TextInput,
   ScrollView,
@@ -16,6 +15,7 @@ import {
   Dimensions,
   Animated,
 } from 'react-native';
+import CustomAlert from '../components/CustomAlert';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -826,6 +826,23 @@ const PluginsScreen: React.FC = () => {
   const colors = currentTheme.colors;
   const styles = createStyles(colors);
   
+  // CustomAlert state
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertActions, setAlertActions] = useState<Array<{ label: string; onPress: () => void; style?: object }>>([]);
+
+  const openAlert = (
+    title: string,
+    message: string,
+    actions?: Array<{ label: string; onPress: () => void; style?: object }>
+  ) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertActions(actions && actions.length > 0 ? actions : [{ label: 'OK', onPress: () => {} }]);
+    setAlertVisible(true);
+  };
+
   // Core state
   const [repositoryUrl, setRepositoryUrl] = useState(settings.scraperRepositoryUrl);
   const [installedScrapers, setInstalledScrapers] = useState<ScraperInfo[]>([]);
@@ -915,10 +932,10 @@ const PluginsScreen: React.FC = () => {
       );
       await Promise.all(promises);
       await loadScrapers();
-      Alert.alert('Success', `${enabled ? 'Enabled' : 'Disabled'} ${filteredScrapers.length} scrapers`);
+      openAlert('Success', `${enabled ? 'Enabled' : 'Disabled'} ${filteredScrapers.length} scrapers`);
     } catch (error) {
       logger.error('[ScraperSettings] Failed to bulk toggle:', error);
-      Alert.alert('Error', 'Failed to update scrapers');
+      openAlert('Error', 'Failed to update scrapers');
     } finally {
       setIsRefreshing(false);
     }
@@ -930,14 +947,14 @@ const PluginsScreen: React.FC = () => {
 
   const handleAddRepository = async () => {
     if (!newRepositoryUrl.trim()) {
-      Alert.alert('Error', 'Please enter a valid repository URL');
+      openAlert('Error', 'Please enter a valid repository URL');
       return;
     }
 
     // Validate URL format
     const url = newRepositoryUrl.trim();
     if (!url.startsWith('https://raw.githubusercontent.com/') && !url.startsWith('http://')) {
-      Alert.alert(
+      openAlert(
         'Invalid URL Format',
         'Please use a valid GitHub raw URL format:\n\nhttps://raw.githubusercontent.com/username/repo/refs/heads/branch\n\nor include manifest.json:\nhttps://raw.githubusercontent.com/username/repo/refs/heads/branch/manifest.json\n\nExample:\nhttps://raw.githubusercontent.com/tapframe/nuvio-providers/refs/heads/master'
       );
@@ -956,7 +973,7 @@ const PluginsScreen: React.FC = () => {
 
     // Additional validation for normalized URL
     if (!normalizedUrl.endsWith('/refs/heads/') && !normalizedUrl.includes('/refs/heads/')) {
-      Alert.alert(
+      openAlert(
         'Invalid Repository Structure',
         'The URL should point to a GitHub repository branch.\n\nExpected format:\nhttps://raw.githubusercontent.com/username/repo/refs/heads/branch'
       );
@@ -981,10 +998,10 @@ const PluginsScreen: React.FC = () => {
       
       setNewRepositoryUrl('');
       setShowAddRepositoryModal(false);
-      Alert.alert('Success', 'Repository added and refreshed successfully');
+      openAlert('Success', 'Repository added and refreshed successfully');
     } catch (error) {
       logger.error('[PluginsScreen] Failed to add repository:', error);
-      Alert.alert('Error', 'Failed to add repository');
+      openAlert('Error', 'Failed to add repository');
     } finally {
       setIsLoading(false);
     }
@@ -996,10 +1013,10 @@ const PluginsScreen: React.FC = () => {
       await localScraperService.setCurrentRepository(repoId);
       await loadRepositories();
       await loadScrapers();
-      Alert.alert('Success', 'Repository switched successfully');
+      openAlert('Success', 'Repository switched successfully');
     } catch (error) {
       logger.error('[ScraperSettings] Failed to switch repository:', error);
-      Alert.alert('Error', 'Failed to switch repository');
+      openAlert('Error', 'Failed to switch repository');
     } finally {
       setSwitchingRepository(null);
     }
@@ -1017,14 +1034,13 @@ const PluginsScreen: React.FC = () => {
       ? `Are you sure you want to remove "${repo.name}"? This is your only repository, so you'll have no scrapers available until you add a new repository.`
       : `Are you sure you want to remove "${repo.name}"? This will also remove all scrapers from this repository.`;
 
-    Alert.alert(
+    openAlert(
       alertTitle,
       alertMessage,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { label: 'Cancel', onPress: () => {} },
         {
-          text: 'Remove',
-          style: 'destructive',
+          label: 'Remove',
           onPress: async () => {
             try {
               await localScraperService.removeRepository(repoId);
@@ -1033,10 +1049,10 @@ const PluginsScreen: React.FC = () => {
               const successMessage = isLastRepository 
                 ? 'Repository removed successfully. You can add a new repository using the "Add Repository" button.'
                 : 'Repository removed successfully';
-              Alert.alert('Success', successMessage);
+              openAlert('Success', successMessage);
             } catch (error) {
               logger.error('[ScraperSettings] Failed to remove repository:', error);
-              Alert.alert('Error', error instanceof Error ? error.message : 'Failed to remove repository');
+              openAlert('Error', error instanceof Error ? error.message : 'Failed to remove repository');
             }
           },
         },
@@ -1102,14 +1118,14 @@ const PluginsScreen: React.FC = () => {
 
   const handleSaveRepository = async () => {
     if (!repositoryUrl.trim()) {
-      Alert.alert('Error', 'Please enter a valid repository URL');
+      openAlert('Error', 'Please enter a valid repository URL');
       return;
     }
 
     // Validate URL format
     const url = repositoryUrl.trim();
     if (!url.startsWith('https://raw.githubusercontent.com/') && !url.startsWith('http://')) {
-      Alert.alert(
+      openAlert(
         'Invalid URL Format', 
         'Please use a valid GitHub raw URL format:\n\nhttps://raw.githubusercontent.com/username/repo/refs/heads/branch\n\nExample:\nhttps://raw.githubusercontent.com/tapframe/nuvio-providers/refs/heads/master'
       );
@@ -1121,10 +1137,10 @@ const PluginsScreen: React.FC = () => {
       await localScraperService.setRepositoryUrl(url);
       await updateSetting('scraperRepositoryUrl', url);
       setHasRepository(true);
-      Alert.alert('Success', 'Repository URL saved successfully');
+      openAlert('Success', 'Repository URL saved successfully');
     } catch (error) {
       logger.error('[ScraperSettings] Failed to save repository:', error);
-      Alert.alert('Error', 'Failed to save repository URL');
+      openAlert('Error', 'Failed to save repository URL');
     } finally {
       setIsLoading(false);
     }
@@ -1132,7 +1148,7 @@ const PluginsScreen: React.FC = () => {
 
   const handleRefreshRepository = async () => {
     if (!repositoryUrl.trim()) {
-      Alert.alert('Error', 'Please set a repository URL first');
+      openAlert('Error', 'Please set a repository URL first');
       return;
     }
 
@@ -1146,11 +1162,11 @@ const PluginsScreen: React.FC = () => {
       // Load fresh scrapers from the updated repository
       await loadScrapers();
 
-      Alert.alert('Success', 'Repository refreshed successfully with latest files');
+      openAlert('Success', 'Repository refreshed successfully with latest files');
     } catch (error) {
       logger.error('[PluginsScreen] Failed to refresh repository:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
-      Alert.alert(
+      openAlert(
         'Repository Error',
         `Failed to refresh repository: ${errorMessage}\n\nPlease ensure your URL is correct and follows this format:\nhttps://raw.githubusercontent.com/username/repo/refs/heads/branch`
       );
@@ -1178,28 +1194,27 @@ const PluginsScreen: React.FC = () => {
       await loadScrapers();
     } catch (error) {
       logger.error('[ScraperSettings] Failed to toggle scraper:', error);
-      Alert.alert('Error', 'Failed to update scraper status');
+      openAlert('Error', 'Failed to update scraper status');
       setIsRefreshing(false);
     }
   };
 
   const handleClearScrapers = () => {
-    Alert.alert(
+    openAlert(
       'Clear All Scrapers',
       'Are you sure you want to remove all installed scrapers? This action cannot be undone.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { label: 'Cancel', onPress: () => {} },
         {
-          text: 'Clear',
-          style: 'destructive',
+          label: 'Clear',
           onPress: async () => {
             try {
               await localScraperService.clearScrapers();
               await loadScrapers();
-              Alert.alert('Success', 'All scrapers have been removed');
+              openAlert('Success', 'All scrapers have been removed');
             } catch (error) {
               logger.error('[ScraperSettings] Failed to clear scrapers:', error);
-              Alert.alert('Error', 'Failed to clear scrapers');
+              openAlert('Error', 'Failed to clear scrapers');
             }
           },
         },
@@ -1208,14 +1223,13 @@ const PluginsScreen: React.FC = () => {
   };
 
   const handleClearCache = () => {
-    Alert.alert(
+    openAlert(
       'Clear Repository Cache',
       'This will remove the saved repository URL and clear all cached scraper data. You will need to re-enter your repository URL.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { label: 'Cancel', onPress: () => {} },
         {
-          text: 'Clear Cache',
-          style: 'destructive',
+          label: 'Clear Cache',
           onPress: async () => {
             try {
               await localScraperService.clearScrapers();
@@ -1224,10 +1238,10 @@ const PluginsScreen: React.FC = () => {
               setRepositoryUrl('');
               setHasRepository(false);
               await loadScrapers();
-              Alert.alert('Success', 'Repository cache cleared successfully');
+              openAlert('Success', 'Repository cache cleared successfully');
             } catch (error) {
               logger.error('[ScraperSettings] Failed to clear cache:', error);
-              Alert.alert('Error', 'Failed to clear repository cache');
+              openAlert('Error', 'Failed to clear repository cache');
             }
           },
         },
@@ -1445,10 +1459,10 @@ const PluginsScreen: React.FC = () => {
                   const tapframeInfo = localScraperService.getTapframeRepositoryInfo();
                   const repoId = await localScraperService.addRepository(tapframeInfo);
                   await loadRepositories();
-                  Alert.alert('Success', 'Official repository added successfully!');
+                  openAlert('Success', 'Official repository added successfully!');
                 } catch (error) {
                   logger.error('[PluginsScreen] Failed to add tapframe repository:', error);
-                  Alert.alert('Error', 'Failed to add official repository');
+                  openAlert('Error', 'Failed to add official repository');
                 } finally {
                   setIsLoading(false);
                 }
@@ -1662,7 +1676,7 @@ const PluginsScreen: React.FC = () => {
                                style={[styles.button, styles.primaryButton]}
                                onPress={async () => {
                                  await localScraperService.setScraperSettings('showboxog', { cookie: showboxCookie, region: showboxRegion });
-                                 Alert.alert('Saved', 'ShowBox settings updated');
+                                   openAlert('Saved', 'ShowBox settings updated');
                                }}
                              >
                                <Text style={styles.buttonText}>Save</Text>
@@ -1924,6 +1938,13 @@ const PluginsScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        actions={alertActions}
+        onClose={() => setAlertVisible(false)}
+      />
     </SafeAreaView>
   );
 };

@@ -14,7 +14,6 @@ import {
   TextInput,
   Pressable,
   Button,
-  Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
@@ -25,6 +24,7 @@ import { useCatalogContext } from '../contexts/CatalogContext';
 import { logger } from '../utils/logger';
 import { clearCustomNameCache } from '../utils/catalogNameUtils';
 import { BlurView } from 'expo-blur';
+import CustomAlert from '../components/CustomAlert';
 
 interface CatalogSetting {
   addonId: string;
@@ -264,6 +264,10 @@ const CatalogSettingsScreen = () => {
   const [isRenameModalVisible, setIsRenameModalVisible] = useState(false);
   const [catalogToRename, setCatalogToRename] = useState<CatalogSetting | null>(null);
   const [currentRenameValue, setCurrentRenameValue] = useState('');
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertActions, setAlertActions] = useState<any[]>([]);
 
   // Load saved settings and available catalogs
   const loadSettings = useCallback(async () => {
@@ -465,7 +469,10 @@ const CatalogSettingsScreen = () => {
 
     } catch (error) {
       logger.error('Failed to save custom catalog name:', error);
-      Alert.alert('Error', 'Could not save the custom name.'); // Inform user
+      setAlertTitle('Error');
+      setAlertMessage('Could not save the custom name.');
+      setAlertActions([{ label: 'OK', onPress: () => {} }]);
+      setAlertVisible(true);
     } finally {
       setIsRenameModalVisible(false);
       setCatalogToRename(null);
@@ -688,6 +695,13 @@ const CatalogSettingsScreen = () => {
         )}
       </Modal>
 
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        actions={alertActions}
+        onClose={() => setAlertVisible(false)}
+      />
     </SafeAreaView>
   );
 };

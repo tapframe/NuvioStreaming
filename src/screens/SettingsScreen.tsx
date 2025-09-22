@@ -8,7 +8,6 @@ import {
   ScrollView,
   SafeAreaView,
   StatusBar,
-  Alert,
   Platform,
   Dimensions,
   Image,
@@ -31,6 +30,7 @@ import { useAccount } from '../contexts/AccountContext';
 import { catalogService } from '../services/catalogService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
+import CustomAlert from '../components/CustomAlert';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -227,6 +227,22 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, c
 const SettingsScreen: React.FC = () => {
   const { settings, updateSetting } = useSettings();
   const [hasUpdateBadge, setHasUpdateBadge] = useState(false);
+  // CustomAlert state
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertActions, setAlertActions] = useState<Array<{ label: string; onPress: () => void; style?: object }>>([]);
+
+  const openAlert = (
+    title: string,
+    message: string,
+    actions?: Array<{ label: string; onPress: () => void; style?: object }>
+  ) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertActions(actions && actions.length > 0 ? actions : [{ label: 'OK', onPress: () => {} }]);
+    setAlertVisible(true);
+  };
 
   useEffect(() => {
     if (Platform.OS !== 'android') return;
@@ -333,14 +349,13 @@ const SettingsScreen: React.FC = () => {
   }, [navigation, loadData]);
 
   const handleResetSettings = useCallback(() => {
-    Alert.alert(
+    openAlert(
       'Reset Settings',
       'Are you sure you want to reset all settings to default values?',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { label: 'Cancel', onPress: () => {} },
         {
-          text: 'Reset',
-          style: 'destructive',
+          label: 'Reset',
           onPress: () => {
             (Object.keys(DEFAULT_SETTINGS) as Array<keyof typeof DEFAULT_SETTINGS>).forEach(key => {
               updateSetting(key, DEFAULT_SETTINGS[key]);
@@ -352,20 +367,19 @@ const SettingsScreen: React.FC = () => {
   }, [updateSetting]);
 
   const handleClearMDBListCache = () => {
-    Alert.alert(
-      "Clear MDBList Cache",
-      "Are you sure you want to clear all cached MDBList data? This cannot be undone.",
+    openAlert(
+      'Clear MDBList Cache',
+      'Are you sure you want to clear all cached MDBList data? This cannot be undone.',
       [
-        { text: "Cancel", style: "cancel" },
+        { label: 'Cancel', onPress: () => {} },
         {
-          text: "Clear",
-          style: "destructive",
+          label: 'Clear',
           onPress: async () => {
             try {
               await AsyncStorage.removeItem('mdblist_cache');
-              Alert.alert("Success", "MDBList cache has been cleared.");
+              openAlert('Success', 'MDBList cache has been cleared.');
             } catch (error) {
-              Alert.alert("Error", "Could not clear MDBList cache.");
+              openAlert('Error', 'Could not clear MDBList cache.');
               if (__DEV__) console.error('Error clearing MDBList cache:', error);
             }
           }
@@ -637,9 +651,9 @@ const SettingsScreen: React.FC = () => {
               onPress={async () => {
                 try {
                   await AsyncStorage.removeItem('hasCompletedOnboarding');
-                  Alert.alert('Success', 'Onboarding has been reset. Restart the app to see the onboarding flow.');
+                  openAlert('Success', 'Onboarding has been reset. Restart the app to see the onboarding flow.');
                 } catch (error) {
-                  Alert.alert('Error', 'Failed to reset onboarding.');
+                  openAlert('Error', 'Failed to reset onboarding.');
                 }
               }}
               renderControl={ChevronRight}
@@ -649,20 +663,19 @@ const SettingsScreen: React.FC = () => {
               title="Clear All Data"
               icon="delete-forever"
               onPress={() => {
-                Alert.alert(
+                openAlert(
                   'Clear All Data',
                   'This will reset all settings and clear all cached data. Are you sure?',
                   [
-                    { text: 'Cancel', style: 'cancel' },
+                    { label: 'Cancel', onPress: () => {} },
                     {
-                      text: 'Clear',
-                      style: 'destructive',
+                      label: 'Clear',
                       onPress: async () => {
                         try {
                           await AsyncStorage.clear();
-                          Alert.alert('Success', 'All data cleared. Please restart the app.');
+                          openAlert('Success', 'All data cleared. Please restart the app.');
                         } catch (error) {
-                          Alert.alert('Error', 'Failed to clear data.');
+                          openAlert('Error', 'Failed to clear data.');
                         }
                       }
                     }
@@ -786,6 +799,13 @@ const SettingsScreen: React.FC = () => {
             </ScrollView>
           </View>
         </View>
+        <CustomAlert
+          visible={alertVisible}
+          title={alertTitle}
+          message={alertMessage}
+          actions={alertActions}
+          onClose={() => setAlertVisible(false)}
+        />
       </View>
     );
   }
@@ -863,6 +883,13 @@ const SettingsScreen: React.FC = () => {
           </ScrollView>
         </View>
       </View>
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        actions={alertActions}
+        onClose={() => setAlertVisible(false)}
+      />
     </View>
   );
 };

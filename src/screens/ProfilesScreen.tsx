@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  Alert,
   StatusBar,
   Platform,
   SafeAreaView,
@@ -17,6 +16,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTraktContext } from '../contexts/TraktContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import CustomAlert from '../components/CustomAlert';
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 const PROFILE_STORAGE_KEY = 'user_profiles';
@@ -39,6 +39,23 @@ const ProfilesScreen: React.FC = () => {
   const [newProfileName, setNewProfileName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
+  // CustomAlert state
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertActions, setAlertActions] = useState<Array<{ label: string; onPress: () => void; style?: object }>>([]);
+
+  const openAlert = (
+    title: string,
+    message: string,
+    actions?: Array<{ label: string; onPress: () => void; style?: object }>
+  ) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertActions(actions && actions.length > 0 ? actions : [{ label: 'OK', onPress: () => {} }]);
+    setAlertVisible(true);
+  };
+
   // Load profiles from AsyncStorage
   const loadProfiles = useCallback(async () => {
     try {
@@ -59,7 +76,7 @@ const ProfilesScreen: React.FC = () => {
       }
     } catch (error) {
       if (__DEV__) console.error('Error loading profiles:', error);
-      Alert.alert('Error', 'Failed to load profiles');
+      openAlert('Error', 'Failed to load profiles');
     } finally {
       setIsLoading(false);
     }
@@ -85,7 +102,7 @@ const ProfilesScreen: React.FC = () => {
       await AsyncStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(updatedProfiles));
     } catch (error) {
       if (__DEV__) console.error('Error saving profiles:', error);
-      Alert.alert('Error', 'Failed to save profiles');
+      openAlert('Error', 'Failed to save profiles');
     }
   }, []);
 
@@ -101,7 +118,7 @@ const ProfilesScreen: React.FC = () => {
 
   const handleAddProfile = useCallback(() => {
     if (!newProfileName.trim()) {
-      Alert.alert('Error', 'Please enter a profile name');
+      openAlert('Error', 'Please enter a profile name');
       return;
     }
 
@@ -133,24 +150,23 @@ const ProfilesScreen: React.FC = () => {
     // Prevent deleting the active profile
     const isActiveProfile = profiles.find(p => p.id === id)?.isActive;
     if (isActiveProfile) {
-      Alert.alert('Error', 'Cannot delete the active profile. Switch to another profile first.');
+      openAlert('Error', 'Cannot delete the active profile. Switch to another profile first.');
       return;
     }
 
     // Prevent deleting the last profile
     if (profiles.length <= 1) {
-      Alert.alert('Error', 'Cannot delete the only profile');
+      openAlert('Error', 'Cannot delete the only profile');
       return;
     }
 
-    Alert.alert(
+    openAlert(
       'Delete Profile',
       'Are you sure you want to delete this profile? This action cannot be undone.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { label: 'Cancel', onPress: () => {} },
         { 
-          text: 'Delete', 
-          style: 'destructive',
+          label: 'Delete', 
           onPress: () => {
             const updatedProfiles = profiles.filter(profile => profile.id !== id);
             setProfiles(updatedProfiles);
@@ -313,6 +329,14 @@ const ProfilesScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        actions={alertActions}
+        onClose={() => setAlertVisible(false)}
+      />
     </SafeAreaView>
   );
 };

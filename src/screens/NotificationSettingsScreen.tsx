@@ -6,11 +6,11 @@ import {
   ScrollView,
   Switch,
   TouchableOpacity,
-  Alert,
   SafeAreaView,
   StatusBar,
   Platform,
 } from 'react-native';
+import CustomAlert from '../components/CustomAlert';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { notificationService, NotificationSettings } from '../services/notificationService';
@@ -36,6 +36,11 @@ const NotificationSettingsScreen = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [notificationStats, setNotificationStats] = useState({ total: 0, upcoming: 0, thisWeek: 0 });
 
+  // Custom alert state
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertActions, setAlertActions] = useState<any[]>([]);
   // Load settings and stats on mount
   useEffect(() => {
     const loadSettings = async () => {
@@ -104,7 +109,10 @@ const NotificationSettingsScreen = () => {
       setSettings(updatedSettings);
     } catch (error) {
       logger.error('Error updating notification settings:', error);
-      Alert.alert('Error', 'Failed to update notification settings');
+  setAlertTitle('Error');
+  setAlertMessage('Failed to update notification settings');
+  setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+  setAlertVisible(true);
     }
   };
 
@@ -114,33 +122,34 @@ const NotificationSettingsScreen = () => {
   };
 
   const resetAllNotifications = async () => {
-    Alert.alert(
-      'Reset Notifications',
-      'This will cancel all scheduled notifications, but will not remove anything from your saved library. Are you sure?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Reset',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // Cancel all notifications for all series, but do not remove from saved
-              const scheduledNotifications = notificationService.getScheduledNotifications?.() || [];
-              for (const notification of scheduledNotifications) {
-                await notificationService.cancelNotification(notification.id);
-              }
-              Alert.alert('Success', 'All notifications have been reset');
-            } catch (error) {
-              logger.error('Error resetting notifications:', error);
-              Alert.alert('Error', 'Failed to reset notifications');
+    setAlertTitle('Reset Notifications');
+    setAlertMessage('This will cancel all scheduled notifications, but will not remove anything from your saved library. Are you sure?');
+    setAlertActions([
+      { label: 'Cancel', onPress: () => setAlertVisible(false), style: { color: currentTheme.colors.mediumGray } },
+      {
+        label: 'Reset',
+        onPress: async () => {
+          try {
+            const scheduledNotifications = notificationService.getScheduledNotifications?.() || [];
+            for (const notification of scheduledNotifications) {
+              await notificationService.cancelNotification(notification.id);
             }
-          },
+            setAlertTitle('Success');
+            setAlertMessage('All notifications have been reset');
+            setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+            setAlertVisible(true);
+          } catch (error) {
+            logger.error('Error resetting notifications:', error);
+            setAlertTitle('Error');
+            setAlertMessage('Failed to reset notifications');
+            setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+            setAlertVisible(true);
+          }
         },
-      ]
-    );
+        style: { color: currentTheme.colors.error }
+      },
+    ]);
+    setAlertVisible(true);
   };
 
   const handleSyncNotifications = async () => {
@@ -154,13 +163,16 @@ const NotificationSettingsScreen = () => {
       const stats = notificationService.getNotificationStats();
       setNotificationStats(stats);
       
-      Alert.alert(
-        'Sync Complete', 
-        `Successfully synced notifications for your library and Trakt items.\n\nScheduled: ${stats.upcoming} upcoming episodes\nThis week: ${stats.thisWeek} episodes`
-      );
+      setAlertTitle('Sync Complete');
+      setAlertMessage(`Successfully synced notifications for your library and Trakt items.\n\nScheduled: ${stats.upcoming} upcoming episodes\nThis week: ${stats.thisWeek} episodes`);
+      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+      setAlertVisible(true);
     } catch (error) {
       logger.error('Error syncing notifications:', error);
-      Alert.alert('Error', 'Failed to sync notifications. Please try again.');
+  setAlertTitle('Error');
+  setAlertMessage('Failed to sync notifications. Please try again.');
+  setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+  setAlertVisible(true);
     } finally {
       setIsSyncing(false);
     }
@@ -212,13 +224,22 @@ const NotificationSettingsScreen = () => {
       if (notificationId) {
         setTestNotificationId(notificationId);
         setCountdown(0); // No countdown for instant notification
-        Alert.alert('Success', 'Test notification scheduled to fire instantly');
+  setAlertTitle('Success');
+  setAlertMessage('Test notification scheduled to fire instantly');
+  setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+  setAlertVisible(true);
       } else {
-        Alert.alert('Error', 'Failed to schedule test notification. Make sure notifications are enabled.');
+  setAlertTitle('Error');
+  setAlertMessage('Failed to schedule test notification. Make sure notifications are enabled.');
+  setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+  setAlertVisible(true);
       }
     } catch (error) {
       logger.error('Error scheduling test notification:', error);
-      Alert.alert('Error', 'Failed to schedule test notification');
+  setAlertTitle('Error');
+  setAlertMessage('Failed to schedule test notification');
+  setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+  setAlertVisible(true);
     }
   };
 
@@ -475,7 +496,14 @@ const NotificationSettingsScreen = () => {
           )}
         </Animated.View>
       </ScrollView>
-    </SafeAreaView>
+    <CustomAlert
+      visible={alertVisible}
+      title={alertTitle}
+      message={alertMessage}
+      onClose={() => setAlertVisible(false)}
+      actions={alertActions}
+    />
+  </SafeAreaView>
   );
 };
 

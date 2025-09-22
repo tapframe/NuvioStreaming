@@ -7,16 +7,16 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Dimensions,
-  Alert,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useNavigation, StackActions } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
-import { StreamingContent } from '../../types/metadata';
+import { StreamingContent } from '../../services/catalogService';
 import { useTheme } from '../../contexts/ThemeContext';
 import { TMDBService } from '../../services/tmdbService';
 import { catalogService } from '../../services/catalogService';
+import CustomAlert from '../../components/CustomAlert';
 
 const { width } = Dimensions.get('window');
 
@@ -59,6 +59,11 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
   const { currentTheme } = useTheme();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
 
+  const [alertVisible, setAlertVisible] = React.useState(false);
+  const [alertTitle, setAlertTitle] = React.useState('');
+  const [alertMessage, setAlertMessage] = React.useState('');
+  const [alertActions, setAlertActions] = React.useState<any[]>([]);
+
   const handleItemPress = async (item: StreamingContent) => {
     try {
       // Extract TMDB ID from the tmdb:123456 format
@@ -80,11 +85,10 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
       }
     } catch (error) {
       if (__DEV__) console.error('Error navigating to recommendation:', error);
-      Alert.alert(
-        'Error',
-        'Unable to load this content. Please try again later.',
-        [{ text: 'OK' }]
-      );
+      setAlertTitle('Error');
+      setAlertMessage('Unable to load this content. Please try again later.');
+      setAlertActions([{ label: 'OK', onPress: () => {} }]);
+      setAlertVisible(true);
     }
   };
 
@@ -128,6 +132,13 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.listContentContainer}
       />
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        actions={alertActions}
+        onClose={() => setAlertVisible(false)}
+      />
     </View>
   );
 };
@@ -169,4 +180,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-}); 
+});

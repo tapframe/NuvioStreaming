@@ -11,9 +11,9 @@ import {
   Platform,
   useColorScheme,
   ActivityIndicator,
-  Alert,
   Animated
 } from 'react-native';
+import CustomAlert from '../components/CustomAlert';
 import { useSettings, settingsEmitter } from '../hooks/useSettings';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -35,6 +35,11 @@ const HeroCatalogsScreen: React.FC = () => {
   const systemColorScheme = useColorScheme();
   const isDarkMode = systemColorScheme === 'dark' || settings.enableDarkMode;
   const navigation = useNavigation();
+  // Custom alert state
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertActions, setAlertActions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [catalogs, setCatalogs] = useState<CatalogItem[]>([]);
   const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>(settings.selectedHeroCatalogs || []);
@@ -120,7 +125,10 @@ const HeroCatalogsScreen: React.FC = () => {
         setCatalogs(catalogItems);
       } catch (error) {
         if (__DEV__) console.error('Failed to load catalogs:', error);
-        Alert.alert('Error', 'Failed to load catalogs');
+        setAlertTitle('Error');
+        setAlertMessage('Failed to load catalogs');
+        setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+        setAlertVisible(true);
       } finally {
         setLoading(false);
       }
@@ -276,7 +284,14 @@ const HeroCatalogsScreen: React.FC = () => {
           </ScrollView>
         </>
       )}
-    </SafeAreaView>
+    <CustomAlert
+      visible={alertVisible}
+      title={alertTitle}
+      message={alertMessage}
+      onClose={() => setAlertVisible(false)}
+      actions={alertActions}
+    />
+  </SafeAreaView>
   );
 };
 
