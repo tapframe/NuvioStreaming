@@ -1449,30 +1449,6 @@ const PluginsScreen: React.FC = () => {
             </View>
           )}
 
-          {/* Add Official Repository Button */}
-          {!localScraperService.hasTapframeRepository() && (
-            <TouchableOpacity
-              style={[styles.defaultRepoButton]}
-              onPress={async () => {
-                try {
-                  setIsLoading(true);
-                  const tapframeInfo = localScraperService.getTapframeRepositoryInfo();
-                  const repoId = await localScraperService.addRepository(tapframeInfo);
-                  await loadRepositories();
-                  openAlert('Success', 'Official repository added successfully!');
-                } catch (error) {
-                  logger.error('[PluginsScreen] Failed to add tapframe repository:', error);
-                  openAlert('Error', 'Failed to add official repository');
-                } finally {
-                  setIsLoading(false);
-                }
-              }}
-              disabled={!settings.enableLocalScrapers || isLoading}
-            >
-              <Ionicons name="add-circle" size={16} color={colors.primary} />
-              <Text style={styles.defaultRepoButtonText}>Add Official Repository</Text>
-            </TouchableOpacity>
-          )}
 
           {/* Add Repository Button */}
           <TouchableOpacity
@@ -1894,16 +1870,6 @@ const PluginsScreen: React.FC = () => {
                 numberOfLines={1}
               />
 
-            {/* Quick Example */}
-            <View style={styles.compactExamples}>
-              <TouchableOpacity
-                style={styles.quickButton}
-                onPress={() => setNewRepositoryUrl('https://raw.githubusercontent.com/tapframe/nuvio-providers/refs/heads/main')}
-              >
-                <Ionicons name="star" size={14} color={colors.primary} />
-                <Text style={styles.quickButtonText}>Official</Text>
-              </TouchableOpacity>
-            </View>
 
             {/* Format Hint */}
             <Text style={styles.formatHint}>

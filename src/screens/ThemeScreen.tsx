@@ -12,6 +12,7 @@ import {
   StatusBar,
   FlatList,
   SafeAreaView,
+  BackHandler,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -25,6 +26,8 @@ import { useSettings } from '../hooks/useSettings';
 import CustomAlert from '../components/CustomAlert';
 
 const { width } = Dimensions.get('window');
+
+const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
 // Theme categories for organization
 const THEME_CATEGORIES = [
@@ -316,9 +319,9 @@ const ThemeColorEditor: React.FC<ThemeColorEditorProps & {
 };
 
 const ThemeScreen: React.FC = () => {
-  const { 
-    currentTheme, 
-    availableThemes, 
+  const {
+    currentTheme,
+    availableThemes,
     setCurrentTheme,
     addCustomTheme,
     updateCustomTheme,
@@ -327,6 +330,11 @@ const ThemeScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
   const { settings, updateSetting } = useSettings();
+
+  // Calculate proper header top padding (only needed on Android since iOS uses SafeAreaView)
+  const headerTopPadding = Platform.OS === 'android'
+    ? ANDROID_STATUSBAR_HEIGHT + 8
+    : 8;
   
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingTheme, setEditingTheme] = useState<Theme | null>(null);
@@ -443,6 +451,18 @@ const ThemeScreen: React.FC = () => {
     setEditingTheme(null);
   }, []);
 
+  // Handle system back button when in edit mode
+  useEffect(() => {
+    if (isEditMode) {
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+        handleCancelEdit();
+        return true; // Prevent default behavior
+      });
+
+      return () => backHandler.remove();
+    }
+  }, [isEditMode, handleCancelEdit]);
+
   // Pass alert state to ThemeColorEditor
   const ThemeColorEditorWithAlert = (props: any) => {
     const handleSave = (themeName: string, themeColors: any, onSave: any) => {
@@ -514,7 +534,7 @@ const ThemeScreen: React.FC = () => {
     ]}>
       <StatusBar barStyle="light-content" />
       
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: headerTopPadding }]}>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => navigation.goBack()}
@@ -624,7 +644,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 0 + 8 : 8,
   },
   backButton: {
     flexDirection: 'row',
@@ -792,7 +811,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 8 : 16,
+    paddingBottom: 8,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
