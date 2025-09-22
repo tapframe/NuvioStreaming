@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": true,
       "icon": "./assets/ios/AppIcon.appiconset/Icon-App-60x60@3x.png",
-      "buildNumber": "15",
+      "buildNumber": "16",
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
@@ -48,7 +48,7 @@
         "WAKE_LOCK"
       ],
       "package": "com.nuvio.app",
-      "versionCode": 15,
+      "versionCode": 16,
       "architectures": [
         "arm64-v8a",
         "armeabi-v7a",

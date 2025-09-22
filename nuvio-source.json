@@ -31,6 +31,14 @@
       ],
       "versions": [
         {
+          "version": "1.2.0",
+          "buildVersion": "16",
+          "date": "2025-09-22",
+          "localizedDescription": "# Version 1.2.0 – Update Notes\n\nThis release brings **VLCLib** for Android users for better codec support.\n iOS now uses **KSPlayer** as the exclusive player.\n\n⚠️ **Note for Android users:**\n- This is the **initial release with VLCLib**, so you may encounter some bugs.\n- The **APK size will be significantly larger** due to VLC integration.\n- Please report any issues on the GitHub **Issues** page.\n- Until some bugs are resolved, you can continue using an **external player** for unsupported formats.\n\n## Merged PRs & Community Contributions\n- **Custom Confirmation Popup** by @CrissZollo:\n  - Introduces a new, custom-made confirmation popup with a modern design.\n  - Matches the app’s theme and the user-selected theming.\n  - Replaces all **Alert.alert** instances with the new custom popup.\n  - Fixes [Issue #83](https://github.com/tapframe/NuvioStreaming/issues/83).\n\n---\n\n## Changelog & Download\n[View on GitHub](https://github.com/tapframe/NuvioStreaming/releases/tag/1.2.0)\n\n🌐 **[Official Website](https://tapframe.github.io/NuvioStreaming/)**",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/1.2.0/Stable_1-2-0.ipa",
+          "size": 25700000
+        },
+        {
           "version": "1.1.1",
           "buildVersion": "14",
           "date": "2025-09-20",
