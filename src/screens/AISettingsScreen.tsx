@@ -8,12 +8,12 @@ import {
   StatusBar,
   TextInput,
   TouchableOpacity,
-  Alert,
   Linking,
   Platform,
   Dimensions,
   Switch,
 } from 'react-native';
+import CustomAlert from '../components/CustomAlert';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -26,6 +26,34 @@ const { width } = Dimensions.get('window');
 const isTablet = width >= 768;
 
 const AISettingsScreen: React.FC = () => {
+  // CustomAlert state (must be inside the component)
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertActions, setAlertActions] = useState<Array<{ label: string; onPress: () => void; style?: object }>>([
+    { label: 'OK', onPress: () => setAlertVisible(false) },
+  ]);
+
+  const openAlert = (
+    title: string,
+    message: string,
+    actions?: Array<{ label: string; onPress?: () => void; style?: object }>
+  ) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    if (actions && actions.length > 0) {
+      setAlertActions(
+        actions.map(a => ({
+          label: a.label,
+          style: a.style,
+          onPress: () => { a.onPress?.(); },
+        }))
+      );
+    } else {
+      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+    }
+    setAlertVisible(true);
+  };
   const navigation = useNavigation();
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
@@ -64,12 +92,12 @@ const AISettingsScreen: React.FC = () => {
 
   const handleSaveApiKey = async () => {
     if (!apiKey.trim()) {
-      Alert.alert('Error', 'Please enter a valid API key');
+      openAlert('Error', 'Please enter a valid API key');
       return;
     }
 
     if (!apiKey.startsWith('sk-or-')) {
-      Alert.alert('Error', 'OpenRouter API keys should start with "sk-or-"');
+      openAlert('Error', 'OpenRouter API keys should start with "sk-or-"');
       return;
     }
 
@@ -77,9 +105,9 @@ const AISettingsScreen: React.FC = () => {
     try {
       await AsyncStorage.setItem('openrouter_api_key', apiKey.trim());
       setIsKeySet(true);
-      Alert.alert('Success', 'OpenRouter API key saved successfully!');
+      openAlert('Success', 'OpenRouter API key saved successfully!');
     } catch (error) {
-      Alert.alert('Error', 'Failed to save API key');
+      openAlert('Error', 'Failed to save API key');
       if (__DEV__) console.error('Error saving OpenRouter API key:', error);
     } finally {
       setLoading(false);
@@ -87,22 +115,21 @@ const AISettingsScreen: React.FC = () => {
   };
 
   const handleRemoveApiKey = () => {
-    Alert.alert(
+    openAlert(
       'Remove API Key',
       'Are you sure you want to remove your OpenRouter API key? This will disable AI chat features.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { label: 'Cancel', onPress: () => {} },
         {
-          text: 'Remove',
-          style: 'destructive',
+          label: 'Remove',
           onPress: async () => {
             try {
               await AsyncStorage.removeItem('openrouter_api_key');
               setApiKey('');
               setIsKeySet(false);
-              Alert.alert('Success', 'API key removed successfully');
+              openAlert('Success', 'API key removed successfully');
             } catch (error) {
-              Alert.alert('Error', 'Failed to remove API key');
+              openAlert('Error', 'Failed to remove API key');
             }
           }
         }
@@ -115,7 +142,7 @@ const AISettingsScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}> 
       <StatusBar barStyle="light-content" />
       
       {/* Header */}
@@ -344,6 +371,13 @@ const AISettingsScreen: React.FC = () => {
           <SvgXml xml={OPENROUTER_SVG.replace(/CURRENTCOLOR/g, currentTheme.colors.mediumEmphasis)} width={180} height={60} />
         </View>
       </ScrollView>
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        onClose={() => setAlertVisible(false)}
+        actions={alertActions}
+      />
     </SafeAreaView>
   );
 };

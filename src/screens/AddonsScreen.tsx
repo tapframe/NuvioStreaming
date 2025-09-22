@@ -7,7 +7,6 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   SafeAreaView,
   StatusBar,
   Modal,
@@ -30,6 +29,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { logger } from '../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlurView as ExpoBlurView } from 'expo-blur';
+import CustomAlert from '../components/CustomAlert';
 // Removed community blur and expo-constants for Android overlay
 import axios from 'axios';
 import { useTheme } from '../contexts/ThemeContext';
@@ -597,6 +597,11 @@ const AddonsScreen = () => {
   const [installing, setInstalling] = useState(false);
   const [catalogCount, setCatalogCount] = useState(0);
   // Add state for reorder mode
+  // Custom alert state
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertActions, setAlertActions] = useState<any[]>([]);
   const [reorderMode, setReorderMode] = useState(false);
   // Use ThemeContext
   const { currentTheme } = useTheme();
@@ -662,8 +667,11 @@ const AddonsScreen = () => {
         setCatalogCount(totalCatalogs);
       }
     } catch (error) {
-      logger.error('Failed to load addons:', error);
-      Alert.alert('Error', 'Failed to load addons');
+  logger.error('Failed to load addons:', error);
+  setAlertTitle('Error');
+  setAlertMessage('Failed to load addons');
+  setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+  setAlertVisible(true);
     } finally {
       setLoading(false);
     }
@@ -683,10 +691,9 @@ const AddonsScreen = () => {
 
       setCommunityAddons(validAddons);
     } catch (error) {
-      logger.error('Failed to load community addons:', error);
-      setCommunityError('Failed to load community addons. Please try again later.');
-      // Set empty array on error since Cinemeta is pre-installed
-      setCommunityAddons([]);
+  logger.error('Failed to load community addons:', error);
+  setCommunityError('Failed to load community addons. Please try again later.');
+  setCommunityAddons([]);
     } finally {
       setCommunityLoading(false);
     }
@@ -695,7 +702,10 @@ const AddonsScreen = () => {
   const handleAddAddon = async (url?: string) => {
     const urlToInstall = url || addonUrl;
     if (!urlToInstall) {
-      Alert.alert('Error', 'Please enter an addon URL or select a community addon');
+      setAlertTitle('Error');
+      setAlertMessage('Please enter an addon URL or select a community addon');
+      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+      setAlertVisible(true);
       return;
     }
 
@@ -706,8 +716,11 @@ const AddonsScreen = () => {
       setAddonUrl(urlToInstall);
       setShowConfirmModal(true);
     } catch (error) {
-      logger.error('Failed to fetch addon details:', error);
-      Alert.alert('Error', `Failed to fetch addon details from ${urlToInstall}`);
+  logger.error('Failed to fetch addon details:', error);
+  setAlertTitle('Error');
+  setAlertMessage(`Failed to fetch addon details from ${urlToInstall}`);
+  setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+  setAlertVisible(true);
     } finally {
       setInstalling(false);
     }
@@ -723,10 +736,16 @@ const AddonsScreen = () => {
       setShowConfirmModal(false);
       setAddonDetails(null);
       loadAddons();
-      Alert.alert('Success', 'Addon installed successfully');
+  setAlertTitle('Success');
+  setAlertMessage('Addon installed successfully');
+  setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+  setAlertVisible(true);
     } catch (error) {
-      logger.error('Failed to install addon:', error);
-      Alert.alert('Error', 'Failed to install addon');
+  logger.error('Failed to install addon:', error);
+  setAlertTitle('Error');
+  setAlertMessage('Failed to install addon');
+  setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+  setAlertVisible(true);
     } finally {
       setInstalling(false);
     }
@@ -754,31 +773,26 @@ const AddonsScreen = () => {
   const handleRemoveAddon = (addon: ExtendedManifest) => {
     // Check if this is a pre-installed addon
     if (stremioService.isPreInstalledAddon(addon.id)) {
-      Alert.alert(
-        'Cannot Remove Addon',
-        `${addon.name} is a pre-installed addon and cannot be removed.`,
-        [{ text: 'OK', style: 'default' }]
-      );
+      setAlertTitle('Cannot Remove Addon');
+      setAlertMessage(`${addon.name} is a pre-installed addon and cannot be removed.`);
+      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+      setAlertVisible(true);
       return;
     }
-    
-    Alert.alert(
-      'Uninstall Addon',
-      `Are you sure you want to uninstall ${addon.name}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Uninstall',
-          style: 'destructive',
-          onPress: () => {
-            stremioService.removeAddon(addon.id);
-            
-            // Remove from addons list
-            setAddons(prev => prev.filter(a => a.id !== addon.id));
-          },
+    setAlertTitle('Uninstall Addon');
+    setAlertMessage(`Are you sure you want to uninstall ${addon.name}?`);
+    setAlertActions([
+      { label: 'Cancel', onPress: () => setAlertVisible(false), style: { color: colors.mediumGray } },
+      {
+        label: 'Uninstall',
+        onPress: () => {
+          stremioService.removeAddon(addon.id);
+          setAddons(prev => prev.filter(a => a.id !== addon.id));
         },
-      ]
-    );
+        style: { color: colors.error }
+      },
+    ]);
+    setAlertVisible(true);
   };
 
   // Add function to handle configuration
@@ -876,11 +890,10 @@ const AddonsScreen = () => {
     // If we couldn't determine a config URL, show an error
     if (!configUrl) {
       logger.error(`Failed to determine config URL for addon: ${addon.name}, ID: ${addon.id}`);
-      Alert.alert(
-        'Configuration Unavailable', 
-        'Could not determine configuration URL for this addon.',
-        [{ text: 'OK' }]
-      );
+      setAlertTitle('Configuration Unavailable');
+      setAlertMessage('Could not determine configuration URL for this addon.');
+      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+      setAlertVisible(true);
       return;
     }
     
@@ -893,15 +906,17 @@ const AddonsScreen = () => {
         Linking.openURL(configUrl);
       } else {
         logger.error(`URL cannot be opened: ${configUrl}`);
-        Alert.alert(
-          'Cannot Open Configuration',
-          `The configuration URL (${configUrl}) cannot be opened. The addon may not have a configuration page.`,
-          [{ text: 'OK' }]
-        );
+        setAlertTitle('Cannot Open Configuration');
+        setAlertMessage(`The configuration URL (${configUrl}) cannot be opened. The addon may not have a configuration page.`);
+        setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+        setAlertVisible(true);
       }
     }).catch(err => {
       logger.error(`Error checking if URL can be opened: ${configUrl}`, err);
-      Alert.alert('Error', 'Could not open configuration page.');
+  setAlertTitle('Error');
+  setAlertMessage('Could not open configuration page.');
+  setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+  setAlertVisible(true);
     });
   };
 
@@ -1482,7 +1497,15 @@ const AddonsScreen = () => {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    {/* Custom Alert Modal */}
+    <CustomAlert
+      visible={alertVisible}
+      title={alertTitle}
+      message={alertMessage}
+      onClose={() => setAlertVisible(false)}
+      actions={alertActions}
+    />
+  </SafeAreaView>
   );
 };
 

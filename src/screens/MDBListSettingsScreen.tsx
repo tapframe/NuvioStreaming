@@ -8,7 +8,6 @@ import {
   SafeAreaView,
   StatusBar,
   Platform,
-  Alert,
   ActivityIndicator,
   Linking,
   ScrollView,
@@ -16,6 +15,7 @@ import {
   Clipboard,
   Switch,
 } from 'react-native';
+import CustomAlert from '../components/CustomAlert';
 import { useNavigation } from '@react-navigation/native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -361,6 +361,11 @@ const MDBListSettingsScreen = () => {
   const colors = currentTheme.colors;
   const styles = createStyles(colors);
   
+  // Custom alert state
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertActions, setAlertActions] = useState<any[]>([]);
   const [apiKey, setApiKey] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isKeySet, setIsKeySet] = useState(false);
@@ -492,34 +497,32 @@ const MDBListSettingsScreen = () => {
 
   const clearApiKey = async () => {
     logger.log('[MDBListSettingsScreen] Clear API key requested');
-    Alert.alert(
-      'Clear API Key',
-      'Are you sure you want to remove the saved API key?',
-      [
-        { 
-          text: 'Cancel', 
-          style: 'cancel',
-          onPress: () => logger.log('[MDBListSettingsScreen] Clear API key cancelled')
-        },
-        {
-          text: 'Clear',
-          style: 'destructive',
-          onPress: async () => {
-            logger.log('[MDBListSettingsScreen] Proceeding with API key clear');
-            try {
-              await AsyncStorage.removeItem(MDBLIST_API_KEY_STORAGE_KEY);
-              setApiKey('');
-              setIsKeySet(false);
-              setTestResult(null);
-              logger.log('[MDBListSettingsScreen] API key cleared successfully');
-            } catch (error) {
-              logger.error('[MDBListSettingsScreen] Failed to clear API key:', error);
-              Alert.alert('Error', 'Failed to clear API key');
-            }
+    setAlertTitle('Clear API Key');
+    setAlertMessage('Are you sure you want to remove the saved API key?');
+    setAlertActions([
+      { label: 'Cancel', onPress: () => setAlertVisible(false), style: { color: colors.mediumGray } },
+      {
+        label: 'Clear',
+        onPress: async () => {
+          logger.log('[MDBListSettingsScreen] Proceeding with API key clear');
+          try {
+            await AsyncStorage.removeItem(MDBLIST_API_KEY_STORAGE_KEY);
+            setApiKey('');
+            setIsKeySet(false);
+            setTestResult(null);
+            logger.log('[MDBListSettingsScreen] API key cleared successfully');
+          } catch (error) {
+            logger.error('[MDBListSettingsScreen] Failed to clear API key:', error);
+            setAlertTitle('Error');
+            setAlertMessage('Failed to clear API key');
+            setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+            setAlertVisible(true);
           }
-        }
-      ]
-    );
+        },
+        style: { color: colors.error }
+      },
+    ]);
+    setAlertVisible(true);
   };
 
   const pasteFromClipboard = async () => {
@@ -823,7 +826,14 @@ const MDBListSettingsScreen = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    <CustomAlert
+      visible={alertVisible}
+      title={alertTitle}
+      message={alertMessage}
+      onClose={() => setAlertVisible(false)}
+      actions={alertActions}
+    />
+  </SafeAreaView>
   );
 };
 

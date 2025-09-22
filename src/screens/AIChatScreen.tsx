@@ -11,9 +11,10 @@ import {
   Platform,
   Dimensions,
   ActivityIndicator,
-  Alert,
   Keyboard,
 } from 'react-native';
+import CustomAlert from '../components/CustomAlert';
+// Removed duplicate AIChatScreen definition and alert state at the top. The correct component is defined after SuggestionChip.
 import { useRoute, useNavigation, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
@@ -297,6 +298,34 @@ const SuggestionChip: React.FC<SuggestionChipProps> = React.memo(({ text, onPres
 }, (prev, next) => prev.text === next.text && prev.onPress === next.onPress);
 
 const AIChatScreen: React.FC = () => {
+  // CustomAlert state
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertActions, setAlertActions] = useState<Array<{ label: string; onPress: () => void; style?: object }>>([
+    { label: 'OK', onPress: () => setAlertVisible(false) },
+  ]);
+
+  const openAlert = (
+    title: string,
+    message: string,
+    actions?: Array<{ label: string; onPress?: () => void; style?: object }>
+  ) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    if (actions && actions.length > 0) {
+      setAlertActions(
+        actions.map(a => ({
+          label: a.label,
+          style: a.style,
+          onPress: () => { a.onPress?.(); setAlertVisible(false); },
+        }))
+      );
+    } else {
+      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+    }
+    setAlertVisible(true);
+  };
   const route = useRoute<AIChatScreenRouteProp>();
   const navigation = useNavigation();
   const { currentTheme } = useTheme();
@@ -438,9 +467,17 @@ const AIChatScreen: React.FC = () => {
       }
     } catch (error) {
       if (__DEV__) console.error('Error loading context:', error);
-      Alert.alert('Error', 'Failed to load content details for AI chat');
+  openAlert('Error', 'Failed to load content details for AI chat');
     } finally {
       setIsLoadingContext(false);
+          {/* CustomAlert at root */}
+          <CustomAlert
+            visible={alertVisible}
+            title={alertTitle}
+            message={alertMessage}
+            onClose={() => setAlertVisible(false)}
+            actions={alertActions}
+          />
     }
   };
 
@@ -786,6 +823,13 @@ const AIChatScreen: React.FC = () => {
         </SafeAreaView>
       </KeyboardAvoidingView>
     </SafeAreaView>
+    <CustomAlert
+      visible={alertVisible}
+      title={alertTitle}
+      message={alertMessage}
+      onClose={() => setAlertVisible(false)}
+      actions={alertActions}
+    />
     </Animated.View>
   );
 };

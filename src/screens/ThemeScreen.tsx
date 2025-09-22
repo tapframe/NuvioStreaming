@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Switch,
   ScrollView,
-  Alert,
   Platform,
   TextInput,
   Dimensions,
@@ -23,6 +22,7 @@ import { colors } from '../styles/colors';
 import { useTheme, Theme, DEFAULT_THEMES } from '../contexts/ThemeContext';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useSettings } from '../hooks/useSettings';
+import CustomAlert from '../components/CustomAlert';
 
 const { width } = Dimensions.get('window');
 
@@ -153,10 +153,20 @@ interface ThemeColorEditorProps {
   onCancel: () => void;
 }
 
-const ThemeColorEditor: React.FC<ThemeColorEditorProps> = ({
+// Accept alert state setters as props
+const ThemeColorEditor: React.FC<ThemeColorEditorProps & {
+  setAlertTitle: (s: string) => void;
+  setAlertMessage: (s: string) => void;
+  setAlertActions: (a: any[]) => void;
+  setAlertVisible: (v: boolean) => void;
+}> = ({
   initialColors,
   onSave,
-  onCancel
+  onCancel,
+  setAlertTitle,
+  setAlertMessage,
+  setAlertActions,
+  setAlertVisible
 }) => {
   const [themeName, setThemeName] = useState('Custom Theme');
   const [selectedColorKey, setSelectedColorKey] = useState<ColorKey>('primary');
@@ -175,7 +185,10 @@ const ThemeColorEditor: React.FC<ThemeColorEditorProps> = ({
 
   const handleSave = () => {
     if (!themeName.trim()) {
-      Alert.alert('Invalid Name', 'Please enter a valid theme name');
+      setAlertTitle('Invalid Name');
+      setAlertMessage('Please enter a valid theme name');
+      setAlertActions([{ label: 'OK', onPress: () => {} }]);
+      setAlertVisible(true);
       return;
     }
     onSave({ 
@@ -318,7 +331,11 @@ const ThemeScreen: React.FC = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingTheme, setEditingTheme] = useState<Theme | null>(null);
   const [activeFilter, setActiveFilter] = useState('all');
-  
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertActions, setAlertActions] = useState<any[]>([]);
+
   // Force consistent status bar settings
   useEffect(() => {
     const applyStatusBarConfig = () => {
@@ -373,19 +390,18 @@ const ThemeScreen: React.FC = () => {
   }, []);
 
   const handleDeleteTheme = useCallback((theme: Theme) => {
-    Alert.alert(
-      'Delete Theme',
-      `Are you sure you want to delete "${theme.name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deleteCustomTheme(theme.id)
-        }
-      ]
-    );
-  }, [deleteCustomTheme]);
+    setAlertTitle('Delete Theme');
+    setAlertMessage(`Are you sure you want to delete "${theme.name}"?`);
+    setAlertActions([
+      { label: 'Cancel', style: { color: '#888' }, onPress: () => {} },
+      {
+        label: 'Delete',
+        style: { color: currentTheme.colors.error },
+        onPress: () => deleteCustomTheme(theme.id),
+      },
+    ]);
+    setAlertVisible(true);
+  }, [deleteCustomTheme, currentTheme.colors.error]);
 
   const handleCreateTheme = useCallback(() => {
     setEditingTheme(null);
@@ -427,6 +443,33 @@ const ThemeScreen: React.FC = () => {
     setEditingTheme(null);
   }, []);
 
+  // Pass alert state to ThemeColorEditor
+  const ThemeColorEditorWithAlert = (props: any) => {
+    const handleSave = (themeName: string, themeColors: any, onSave: any) => {
+      if (!themeName.trim()) {
+        setAlertTitle('Invalid Name');
+        setAlertMessage('Please enter a valid theme name');
+        setAlertActions([{ label: 'OK', onPress: () => {} }]);
+        setAlertVisible(true);
+        return false;
+      }
+      onSave();
+      return true;
+    };
+    return (
+      <>
+        <ThemeColorEditor {...props} handleSave={handleSave} />
+        <CustomAlert
+          visible={alertVisible}
+          title={alertTitle}
+          message={alertMessage}
+          actions={alertActions}
+          onClose={() => setAlertVisible(false)}
+        />
+      </>
+    );
+  };
+
   if (isEditMode) {
     const initialColors = editingTheme ? {
       primary: editingTheme.colors.primary,
@@ -441,15 +484,24 @@ const ThemeScreen: React.FC = () => {
     return (
       <SafeAreaView style={[
         styles.container, 
-        { 
-          backgroundColor: currentTheme.colors.darkBackground,
-        }
+        { backgroundColor: currentTheme.colors.darkBackground }
       ]}>
         <StatusBar barStyle="light-content" />
         <ThemeColorEditor
           initialColors={initialColors}
           onSave={handleSaveTheme}
           onCancel={handleCancelEdit}
+          setAlertTitle={setAlertTitle}
+          setAlertMessage={setAlertMessage}
+          setAlertActions={setAlertActions}
+          setAlertVisible={setAlertVisible}
+        />
+        <CustomAlert
+          visible={alertVisible}
+          title={alertTitle}
+          message={alertMessage}
+          actions={alertActions}
+          onClose={() => setAlertVisible(false)}
         />
       </SafeAreaView>
     );
@@ -458,9 +510,7 @@ const ThemeScreen: React.FC = () => {
   return (
     <SafeAreaView style={[
       styles.container, 
-      { 
-        backgroundColor: currentTheme.colors.darkBackground,
-      }
+      { backgroundColor: currentTheme.colors.darkBackground }
     ]}>
       <StatusBar barStyle="light-content" />
       
@@ -553,6 +603,14 @@ const ThemeScreen: React.FC = () => {
           />
         </View>
       </ScrollView>
+
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        actions={alertActions}
+        onClose={() => setAlertVisible(false)}
+      />
     </SafeAreaView>
   );
 };
@@ -949,4 +1007,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ThemeScreen; 
+export default ThemeScreen;

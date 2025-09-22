@@ -7,7 +7,6 @@ import {
   Dimensions,
   AppState,
   AppStateStatus,
-  Alert,
   ActivityIndicator
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
@@ -24,6 +23,7 @@ import { logger } from '../../utils/logger';
 import * as Haptics from 'expo-haptics';
 import { TraktService } from '../../services/traktService';
 import { stremioService } from '../../services/stremioService';
+import CustomAlert from '../../components/CustomAlert';
 
 // Define interface for continue watching items
 interface ContinueWatchingItem extends StreamingContent {
@@ -95,6 +95,12 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const longPressTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Alert state for CustomAlert
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertActions, setAlertActions] = useState<any[]>([]);
 
   // Use a ref to track if a background refresh is in progress to avoid state updates
   const isRefreshingRef = useRef(false);
@@ -516,80 +522,51 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       // Ignore haptic errors
     }
 
-    // Show confirmation alert
-    Alert.alert(
-      "Remove from Continue Watching",
-      `Remove "${item.name}" from your continue watching list?`,
-      [
-        {
-          text: "Cancel",
-          style: "cancel"
-        },
-        { 
-          text: "Remove", 
-          style: "destructive",
-          onPress: async () => {
-            setDeletingItemId(item.id);
-            try {
-              // Trigger haptic feedback for confirmation
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-              // Remove all watch progress for this content (all episodes if series)
-              await storageService.removeAllWatchProgressForContent(item.id, item.type, { addBaseTombstone: true });
-
-              // Also remove from Trakt playback queue if authenticated
-              const traktService = TraktService.getInstance();
-              const isAuthed = await traktService.isAuthenticated();
-              logger.log(`🔍 [ContinueWatching] Trakt authentication status: ${isAuthed}`);
-
-              if (isAuthed) {
-                logger.log(`🗑️ [ContinueWatching] Removing Trakt history for ${item.id}`);
-                let traktResult = false;
-
-                if (item.type === 'movie') {
-                  logger.log(`🎬 [ContinueWatching] Removing movie from Trakt history: ${item.name}`);
-                  traktResult = await traktService.removeMovieFromHistory(item.id);
-                } else if (item.type === 'series' && item.season !== undefined && item.episode !== undefined) {
-                  logger.log(`📺 [ContinueWatching] Removing specific episode from Trakt history: ${item.name} S${item.season}E${item.episode}`);
-                  traktResult = await traktService.removeEpisodeFromHistory(item.id, item.season, item.episode);
-                } else {
-                  logger.log(`📺 [ContinueWatching] Removing entire show from Trakt history: ${item.name} (no specific episode info)`);
-                  traktResult = await traktService.removeShowFromHistory(item.id);
-                }
-
-                logger.log(`✅ [ContinueWatching] Trakt removal result: ${traktResult}`);
+    setAlertTitle('Remove from Continue Watching');
+    setAlertMessage(`Remove "${item.name}" from your continue watching list?`);
+    setAlertActions([
+      {
+        label: 'Cancel',
+        style: { color: '#888' },
+        onPress: () => {},
+      },
+      {
+        label: 'Remove',
+        style: { color: currentTheme.colors.error },
+        onPress: async () => {
+          setDeletingItemId(item.id);
+          try {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            await storageService.removeAllWatchProgressForContent(item.id, item.type, { addBaseTombstone: true });
+            const traktService = TraktService.getInstance();
+            const isAuthed = await traktService.isAuthenticated();
+            if (isAuthed) {
+              let traktResult = false;
+              if (item.type === 'movie') {
+                traktResult = await traktService.removeMovieFromHistory(item.id);
+              } else if (item.type === 'series' && item.season !== undefined && item.episode !== undefined) {
+                traktResult = await traktService.removeEpisodeFromHistory(item.id, item.season, item.episode);
               } else {
-                logger.log(`ℹ️ [ContinueWatching] Skipping Trakt removal - not authenticated`);
+                traktResult = await traktService.removeShowFromHistory(item.id);
               }
-
-              // Track this item as recently removed to prevent immediate re-addition
-              const itemKey = `${item.type}:${item.id}`;
-              recentlyRemovedRef.current.add(itemKey);
-
-              // Persist the removed state for long-term tracking
-              await storageService.addContinueWatchingRemoved(item.id, item.type);
-
-              // Clear from recently removed after the ignore duration
-              setTimeout(() => {
-                recentlyRemovedRef.current.delete(itemKey);
-              }, REMOVAL_IGNORE_DURATION);
-
-              // Update the list by filtering out the deleted item
-              setContinueWatchingItems(prev => {
-                const newList = prev.filter(i => i.id !== item.id);
-                return newList;
-              });
-
-            } catch (error) {
-              // Continue even if removal fails
-            } finally {
-              setDeletingItemId(null);
             }
+            const itemKey = `${item.type}:${item.id}`;
+            recentlyRemovedRef.current.add(itemKey);
+            await storageService.addContinueWatchingRemoved(item.id, item.type);
+            setTimeout(() => {
+              recentlyRemovedRef.current.delete(itemKey);
+            }, REMOVAL_IGNORE_DURATION);
+            setContinueWatchingItems(prev => prev.filter(i => i.id !== item.id));
+          } catch (error) {
+            // Continue even if removal fails
+          } finally {
+            setDeletingItemId(null);
           }
-        }
-      ]
-    );
-  }, []);
+        },
+      },
+    ]);
+    setAlertVisible(true);
+  }, [currentTheme.colors.error]);
 
   // Memoized render function for continue watching items
   const renderContinueWatchingItem = useCallback(({ item }: { item: ContinueWatchingItem }) => (
@@ -729,6 +706,14 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         onEndReachedThreshold={0.7}
         onEndReached={() => {}}
         removeClippedSubviews={true}
+      />
+
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        actions={alertActions}
+        onClose={() => setAlertVisible(false)}
       />
     </Animated.View>
   );

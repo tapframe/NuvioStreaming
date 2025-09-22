@@ -8,7 +8,6 @@ import {
   SafeAreaView,
   StatusBar,
   Platform,
-  Alert,
   ActivityIndicator,
   Linking,
   ScrollView,
@@ -27,6 +26,7 @@ import { useSettings } from '../hooks/useSettings';
 import { logger } from '../utils/logger';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import CustomAlert from '../components/CustomAlert';
 
 const TMDB_API_KEY_STORAGE_KEY = 'tmdb_api_key';
 const USE_CUSTOM_TMDB_API_KEY = 'use_custom_tmdb_api_key';
@@ -39,9 +39,36 @@ const TMDBSettingsScreen = () => {
   const [useCustomKey, setUseCustomKey] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [isInputFocused, setIsInputFocused] = useState(false);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertActions, setAlertActions] = useState<Array<{ label: string; onPress: () => void; style?: object }>>([
+    { label: 'OK', onPress: () => setAlertVisible(false) },
+  ]);
   const apiKeyInputRef = useRef<TextInput>(null);
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
+
+  const openAlert = (
+    title: string,
+    message: string,
+    actions?: Array<{ label: string; onPress?: () => void; style?: object }>
+  ) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    if (actions && actions.length > 0) {
+      setAlertActions(
+        actions.map(a => ({
+          label: a.label,
+          style: a.style,
+          onPress: () => { a.onPress?.(); },
+        }))
+      );
+    } else {
+      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+    }
+    setAlertVisible(true);
+  };
 
   useEffect(() => {
     logger.log('[TMDBSettingsScreen] Component mounted');
@@ -135,18 +162,16 @@ const TMDBSettingsScreen = () => {
 
   const clearApiKey = async () => {
     logger.log('[TMDBSettingsScreen] Clear API key requested');
-    Alert.alert(
+    openAlert(
       'Clear API Key',
       'Are you sure you want to remove your custom API key and revert to the default?',
       [
-        { 
-          text: 'Cancel', 
-          style: 'cancel',
-          onPress: () => logger.log('[TMDBSettingsScreen] Clear API key cancelled')
+        {
+          label: 'Cancel',
+          onPress: () => logger.log('[TMDBSettingsScreen] Clear API key cancelled'),
         },
         {
-          text: 'Clear',
-          style: 'destructive',
+          label: 'Clear',
           onPress: async () => {
             logger.log('[TMDBSettingsScreen] Proceeding with API key clear');
             try {
@@ -159,10 +184,10 @@ const TMDBSettingsScreen = () => {
               logger.log('[TMDBSettingsScreen] API key cleared successfully');
             } catch (error) {
               logger.error('[TMDBSettingsScreen] Failed to clear API key:', error);
-              Alert.alert('Error', 'Failed to clear API key');
+              openAlert('Error', 'Failed to clear API key');
             }
-          }
-        }
+          },
+        },
       ]
     );
   };
@@ -240,7 +265,7 @@ const TMDBSettingsScreen = () => {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
+    <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}> 
       <StatusBar barStyle="light-content" />
       <View style={[styles.headerContainer, { paddingTop: topSpacing }]}>
         <View style={styles.header}>
@@ -404,6 +429,13 @@ const TMDBSettingsScreen = () => {
           </View>
         )}
       </ScrollView>
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        onClose={() => setAlertVisible(false)}
+        actions={alertActions}
+      />
     </View>
   );
 };
