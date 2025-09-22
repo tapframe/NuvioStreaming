@@ -874,9 +874,26 @@ export const StreamsScreen = () => {
     const streamName = stream.name || stream.title || 'Unnamed Stream';
     const streamProvider = stream.addonId || stream.addonName || stream.name;
     
-    // iOS now always uses KSPlayer, no need for player selection logic
-    // Keep forceVlc for backward compatibility but it's ignored by player selection
-    const forceVlc = !!options?.forceVlc;
+    // Decide if we should force VLC on Android based on scraper format or URL/content-type
+    let forceVlc = !!options?.forceVlc;
+    try {
+      const providerId = stream.addonId || (stream as any).addon || '';
+      // If provider declares MKV support in manifest, prefer VLC
+      if (Platform.OS === 'android' && providerId) {
+        const supportsMkv = await localScraperService.supportsFormat(providerId, 'mkv');
+        if (supportsMkv) forceVlc = true;
+      }
+      // URL/content-type heuristic
+      if (!forceVlc) {
+        const lowerUrl = (stream.url || '').toLowerCase();
+        const isMkvByPath = lowerUrl.includes('.mkv') || /[?&]ext=mkv\b/i.test(lowerUrl) || /format=mkv\b/i.test(lowerUrl) || /container=mkv\b/i.test(lowerUrl);
+        const contentType = (stream.headers && ((stream.headers as any)['Content-Type'] || (stream.headers as any)['content-type'])) || '';
+        const isMkvByHeader = typeof contentType === 'string' && /matroska|x-matroska/i.test(contentType);
+        if (Platform.OS === 'android' && (isMkvByPath || isMkvByHeader)) {
+          forceVlc = true;
+        }
+      }
+    } catch {}
 
 
     // Show a quick full-screen black overlay to mask rotation flicker
@@ -915,7 +932,7 @@ export const StreamsScreen = () => {
       streamName: streamName,
       // Always prefer stream.headers; player will use these for requests
       headers: options?.headers || stream.headers || undefined,
-      // iOS now always uses KSPlayer, forceVlc kept for backward compatibility
+      // Android will use this to choose VLC path; iOS ignores
       forceVlc,
       id,
       type,

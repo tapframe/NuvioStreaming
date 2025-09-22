@@ -79,6 +79,13 @@
         {
           "username": "nayifleo"
         }
+      ],
+      [
+        "expo-libvlc-player",
+        {
+          "localNetworkPermission": "Allow $(PRODUCT_NAME) to access your local network",
+          "supportsBackgroundPlayback": true
+        }
       ]
     ],
     "updates": {

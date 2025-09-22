@@ -56,7 +56,7 @@
       <string>_http._tcp</string>
     </array>
     <key>NSLocalNetworkUsageDescription</key>
-    <string>App uses the local network to discover and connect to devices.</string>
+    <string>Allow $(PRODUCT_NAME) to access your local network</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>This app does not require microphone access.</string>
     <key>RCTRootViewBackgroundColor</key>

@@ -40,6 +40,7 @@ import { stremioService } from '../../services/stremioService';
 import { shouldUseKSPlayer } from '../../utils/playerSelection';
 import axios from 'axios';
 import * as Brightness from 'expo-brightness';
+import { LibVlcPlayerView } from 'expo-libvlc-player';
 
 // Map VLC resize modes to react-native-video resize modes
 const getVideoResizeMode = (resizeMode: ResizeModeType) => {
@@ -75,6 +76,16 @@ const AndroidVideoPlayer: React.FC = () => {
     availableStreams: passedAvailableStreams,
     backdrop
   } = route.params;
+
+  // Opt-in flag to use VLC backend
+  const forceVlc = useMemo(() => {
+    const rp: any = route.params || {};
+    const v = rp.forceVlc !== undefined ? rp.forceVlc : rp.forceVLC;
+    return typeof v === 'string' ? v.toLowerCase() === 'true' : Boolean(v);
+  }, [route.params]);
+  // TEMP toggle disabled; rely on route param forceVlc
+  const TEMP_FORCE_VLC = false;
+  const useVLC = Platform.OS === 'android' && (TEMP_FORCE_VLC || forceVlc);
 
 
   // Check if the stream is HLS (m3u8 playlist)
@@ -249,6 +260,22 @@ const AndroidVideoPlayer: React.FC = () => {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string>('');
   const errorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // VLC refs/state
+  const vlcRef = useRef<any>(null);
+  const [vlcActive, setVlcActive] = useState(true);
+
+  // Compute VLC aspect ratio mapping from current resize mode
+  const vlcAspectRatio = useMemo(() => {
+    if (!useVLC) return undefined;
+    // Contain/original behavior -> let VLC choose best fit
+    if (resizeMode === 'contain' || resizeMode === 'none') return undefined;
+    // For cover/fill, force the view's aspect ratio to fill the container
+    if ((resizeMode === 'cover' || resizeMode === 'fill') && screenDimensions.width > 0 && screenDimensions.height > 0) {
+      return `${Math.round(screenDimensions.width)}:${Math.round(screenDimensions.height)}`;
+    }
+    return undefined;
+  }, [useVLC, resizeMode, screenDimensions.width, screenDimensions.height]);
 
 
   // Volume and brightness controls
@@ -601,6 +628,12 @@ const AndroidVideoPlayer: React.FC = () => {
   useFocusEffect(
     useCallback(() => {
       enableImmersiveMode();
+      // Workaround for VLC surface detach: briefly remount VLC view on focus
+      if (useVLC) {
+        setVlcActive(false);
+        const t = setTimeout(() => setVlcActive(true), 60);
+        return () => clearTimeout(t);
+      }
       return () => {};
     }, [])
   );
@@ -610,6 +643,11 @@ const AndroidVideoPlayer: React.FC = () => {
     const onAppStateChange = (state: string) => {
       if (state === 'active') {
         enableImmersiveMode();
+        if (useVLC) {
+          // Briefly remount VLC view when app returns to foreground
+          setVlcActive(false);
+          setTimeout(() => setVlcActive(true), 60);
+        }
         // On iOS, if we were playing before system interruption and the app becomes active again,
         // ensure playback resumes (handles status bar pull-down case)
         if (Platform.OS === 'ios' && wasPlayingBeforeIOSInterruptionRef.current && isPlayerReady) {
@@ -816,6 +854,15 @@ const AndroidVideoPlayer: React.FC = () => {
   const seekToTime = (rawSeconds: number) => {
     // Clamp to just before the end of the media.
     const timeInSeconds = Math.max(0, Math.min(rawSeconds, duration > 0 ? duration - END_EPSILON : rawSeconds));
+    if (useVLC && duration > 0) {
+      try {
+        const fraction = Math.min(Math.max(timeInSeconds / duration, 0), 0.999);
+        if (vlcRef.current && typeof vlcRef.current.seek === 'function') {
+          vlcRef.current.seek(fraction);
+          return;
+        }
+      } catch {}
+    }
     if (videoRef.current && duration > 0 && !isSeeking.current) {
       if (DEBUG_MODE) {
         if (__DEV__) logger.log(`[AndroidVideoPlayer] Seeking to ${timeInSeconds.toFixed(2)}s out of ${duration.toFixed(2)}s`);
@@ -1844,14 +1891,22 @@ const AndroidVideoPlayer: React.FC = () => {
   };
     
   const togglePlayback = () => {
-    if (videoRef.current) {
-      const newPausedState = !paused;
+    const newPausedState = !paused;
+    if (useVLC && vlcRef.current) {
+      try {
+        if (newPausedState) {
+          if (typeof vlcRef.current.pause === 'function') vlcRef.current.pause();
+        } else {
+          if (typeof vlcRef.current.play === 'function') vlcRef.current.play();
+        }
+      } catch {}
       setPaused(newPausedState);
+    } else if (videoRef.current) {
+      setPaused(newPausedState);
+    }
 
-      // IMMEDIATE: Send immediate progress update to Trakt for both pause and unpause
-      if (duration > 0) {
-        traktAutosync.handleProgressUpdate(currentTime, duration, true); // force=true triggers immediate sync
-      }
+    if (duration > 0) {
+      traktAutosync.handleProgressUpdate(currentTime, duration, true);
     }
   };
 
@@ -2651,7 +2706,47 @@ const AndroidVideoPlayer: React.FC = () => {
                 onLongPress={resetZoom}
                 delayLongPress={300}
               >
-                <Video
+                {useVLC ? (
+                  <LibVlcPlayerView
+                    ref={vlcRef}
+                    style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
+                    // Remount control
+                    key={vlcActive ? 'vlc-on' : 'vlc-off'}
+                    source={currentStreamUrl}
+                    aspectRatio={vlcAspectRatio}
+                    // When using contain/original, use scale 0 to let VLC manage
+                    scale={resizeMode === 'contain' || resizeMode === 'none' ? 0 : 0}
+                    volume={Math.round(Math.max(0, Math.min(1, volume)) * 100)}
+                    mute={false}
+                    repeat={false}
+                    rate={1}
+                    autoplay={!paused}
+                    // Restore approximate time after remount
+                    time={Math.max(0, Math.floor(currentTime * 1000))}
+                    onFirstPlay={(info: any) => {
+                      try {
+                        const lenSec = (info?.length ?? 0) / 1000;
+                        const width = info?.width || 0;
+                        const height = info?.height || 0;
+                        onLoad({ duration: lenSec, naturalSize: width && height ? { width, height } : undefined });
+                      } catch (e) {
+                        logger.warn('[AndroidVideoPlayer][VLC] onFirstPlay parse error', e);
+                      }
+                    }}
+                    onPositionChanged={(ev: any) => {
+                      const pos = typeof ev?.position === 'number' ? ev.position : 0;
+                      if (duration > 0) {
+                        const current = pos * duration;
+                        handleProgress({ currentTime: current, playableDuration: current });
+                      }
+                    }}
+                    onPlaying={() => setPaused(false)}
+                    onPaused={() => setPaused(true)}
+                    onEndReached={onEnd}
+                    onEncounteredError={(e: any) => handleError(e)}
+                  />
+                ) : (
+                  <Video
                   ref={videoRef}
                   style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
                   source={{ 
@@ -2721,6 +2816,7 @@ const AndroidVideoPlayer: React.FC = () => {
                   // Use textureView on Android: allows 3D mapping but DRM not supported
                   viewType={Platform.OS === 'android' ? ViewType.TEXTURE : undefined}
                 />
+                )}
               </TouchableOpacity>
             </View>
           </PinchGestureHandler>
