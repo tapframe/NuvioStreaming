@@ -28,10 +28,9 @@
         <action android:name="android.intent.action.VIEW"/>
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
-        <data android:scheme="stremioexpo"/>
+        <data android:scheme="nuvio"/>
         <data android:scheme="com.nuvio.app"/>
         <data android:scheme="exp+nuvio"/>
-        <data android:scheme="nuvio"/>
       </intent-filter>
     </activity>
   </application>
