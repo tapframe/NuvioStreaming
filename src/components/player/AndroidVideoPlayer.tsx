@@ -40,7 +40,7 @@ import { stremioService } from '../../services/stremioService';
 import { shouldUseKSPlayer } from '../../utils/playerSelection';
 import axios from 'axios';
 import * as Brightness from 'expo-brightness';
-import { LibVlcPlayerView } from 'expo-libvlc-player';
+// Do not statically import Android-only native modules; resolve at runtime on Android
 
 // Map VLC resize modes to react-native-video resize modes
 const getVideoResizeMode = (resizeMode: ResizeModeType) => {
@@ -96,6 +96,18 @@ const AndroidVideoPlayer: React.FC = () => {
     console.log(`🎬 [AndroidVideoPlayer] Using ${playerType} - ${reason}`);
     logger.log(`[AndroidVideoPlayer] Player selection: ${playerType} (${reason})`);
   }, [useVLC, forceVlc]);
+
+  // Resolve VLC view dynamically to avoid iOS loading the Android native module
+  const LibVlcPlayerViewComponent: any = useMemo(() => {
+    if (Platform.OS !== 'android') return null;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const mod = require('expo-libvlc-player');
+      return mod?.LibVlcPlayerView || null;
+    } catch {
+      return null;
+    }
+  }, []);
 
 
   // Check if the stream is HLS (m3u8 playlist)
@@ -2877,7 +2889,8 @@ const AndroidVideoPlayer: React.FC = () => {
               >
                 {useVLC && !forceVlcRemount ? (
                   <>
-                    <LibVlcPlayerView
+                    {LibVlcPlayerViewComponent ? (
+                    <LibVlcPlayerViewComponent
                     ref={vlcRef}
                     style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
                     // Force remount when surfaces are recreated
@@ -2984,7 +2997,7 @@ const AndroidVideoPlayer: React.FC = () => {
                         logger.warn('[AndroidVideoPlayer][VLC] onESAdded parse error', e);
                       }
                     }}
-                  />
+                  />) : null}
                   </>
                 ) : (
                   <Video
