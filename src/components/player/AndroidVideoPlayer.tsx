@@ -87,6 +87,16 @@ const AndroidVideoPlayer: React.FC = () => {
   const TEMP_FORCE_VLC = false;
   const useVLC = Platform.OS === 'android' && (TEMP_FORCE_VLC || forceVlc);
 
+  // Log player selection
+  useEffect(() => {
+    const playerType = useVLC ? 'VLC (expo-libvlc-player)' : 'React Native Video';
+    const reason = useVLC
+      ? (TEMP_FORCE_VLC ? 'TEMP_FORCE_VLC=true' : `forceVlc=${forceVlc} from route params`)
+      : 'default react-native-video';
+    console.log(`🎬 [AndroidVideoPlayer] Using ${playerType} - ${reason}`);
+    logger.log(`[AndroidVideoPlayer] Player selection: ${playerType} (${reason})`);
+  }, [useVLC, forceVlc]);
+
 
   // Check if the stream is HLS (m3u8 playlist)
   const isHlsStream = (url: string) => {
@@ -265,17 +275,41 @@ const AndroidVideoPlayer: React.FC = () => {
   const vlcRef = useRef<any>(null);
   const [vlcActive, setVlcActive] = useState(true);
 
-  // Compute VLC aspect ratio mapping from current resize mode
+  // Compute aspect ratio string for VLC (e.g., "16:9") based on current screen and resizeMode
+  const toVlcRatio = useCallback((w: number, h: number): string => {
+    const a = Math.max(1, Math.round(w));
+    const b = Math.max(1, Math.round(h));
+    const gcd = (x: number, y: number): number => (y === 0 ? x : gcd(y, x % y));
+    const g = gcd(a, b);
+    return `${Math.floor(a / g)}:${Math.floor(b / g)}`;
+  }, []);
+
   const vlcAspectRatio = useMemo(() => {
-    if (!useVLC) return undefined;
-    // Contain/original behavior -> let VLC choose best fit
-    if (resizeMode === 'contain' || resizeMode === 'none') return undefined;
-    // For cover/fill, force the view's aspect ratio to fill the container
-    if ((resizeMode === 'cover' || resizeMode === 'fill') && screenDimensions.width > 0 && screenDimensions.height > 0) {
-      return `${Math.round(screenDimensions.width)}:${Math.round(screenDimensions.height)}`;
+    if (!useVLC) return undefined as string | undefined;
+    // For VLC, we handle aspect ratio through custom zoom for cover mode
+    // Only force aspect for fill mode (stretch to fit)
+    if (resizeMode === 'fill') {
+      const sw = screenDimensions.width || 0;
+      const sh = screenDimensions.height || 0;
+      if (sw > 0 && sh > 0) {
+        return toVlcRatio(sw, sh);
+      }
     }
+    // For cover/contain/none: let VLC preserve natural aspect, we handle zoom separately
     return undefined;
-  }, [useVLC, resizeMode, screenDimensions.width, screenDimensions.height]);
+  }, [useVLC, resizeMode, screenDimensions.width, screenDimensions.height, toVlcRatio]);
+
+  // VLC options for better playback
+  const vlcOptions = useMemo(() => {
+    if (!useVLC) return [] as string[];
+    // Basic options for network streaming
+    return [
+      '--network-caching=2000',
+      '--clock-jitter=0',
+      '--http-reconnect',
+      '--sout-mux-caching=2000'
+    ];
+  }, [useVLC]);
 
 
   // Volume and brightness controls
@@ -581,11 +615,22 @@ const AndroidVideoPlayer: React.FC = () => {
         screenDimensions.height
       );
       setCustomVideoStyles(styles);
+
+      // Recalculate zoom for cover mode when video aspect ratio changes
+      if (resizeMode === 'cover') {
+        const screenAspect = screenDimensions.width / screenDimensions.height;
+        const zoomFactor = Math.max(screenAspect / videoAspectRatio, videoAspectRatio / screenAspect);
+        setZoomScale(zoomFactor);
+        if (DEBUG_MODE) {
+          logger.log(`[AndroidVideoPlayer] Cover zoom updated: ${zoomFactor.toFixed(2)}x (video AR: ${videoAspectRatio.toFixed(2)})`);
+        }
+      }
+
       if (DEBUG_MODE) {
         if (__DEV__) logger.log(`[AndroidVideoPlayer] Screen dimensions changed, recalculated styles:`, styles);
       }
     }
-  }, [screenDimensions, videoAspectRatio]);
+  }, [screenDimensions, videoAspectRatio, resizeMode]);
 
   useEffect(() => {
     const subscription = Dimensions.addEventListener('change', ({ screen }) => {
@@ -1245,15 +1290,47 @@ const AndroidVideoPlayer: React.FC = () => {
   };
 
   const cycleAspectRatio = () => {
-    // Cycle through allowed resize modes per platform
-    const resizeModes: ResizeModeType[] = Platform.OS === 'ios'
-      ? ['cover', 'fill']
-      : ['contain', 'cover', 'fill', 'none'];
+    // Cycle through allowed resize modes per platform, but exclude 'contain' for VLC
+    let resizeModes: ResizeModeType[];
+    if (Platform.OS === 'ios') {
+      resizeModes = ['cover', 'fill'];
+    } else if (useVLC) {
+      // VLC doesn't handle contain well, so exclude it
+      resizeModes = ['cover', 'fill', 'none'];
+    } else {
+      resizeModes = ['contain', 'cover', 'fill', 'none'];
+    }
+
     const currentIndex = resizeModes.indexOf(resizeMode);
     const nextIndex = (currentIndex + 1) % resizeModes.length;
-    setResizeMode(resizeModes[nextIndex]);
+    const newResizeMode = resizeModes[nextIndex];
+    setResizeMode(newResizeMode);
+
+    // Set zoom for cover mode to crop/fill screen
+    if (newResizeMode === 'cover') {
+      if (videoAspectRatio && screenDimensions.width && screenDimensions.height) {
+        const screenAspect = screenDimensions.width / screenDimensions.height;
+        const videoAspect = videoAspectRatio;
+        // Calculate zoom needed to fill screen (cover mode crops to fill)
+        const zoomFactor = Math.max(screenAspect / videoAspect, videoAspect / screenAspect);
+        setZoomScale(zoomFactor);
+        if (DEBUG_MODE) {
+          logger.log(`[AndroidVideoPlayer] Cover mode zoom: ${zoomFactor.toFixed(2)}x (screen: ${screenAspect.toFixed(2)}, video: ${videoAspect.toFixed(2)})`);
+        }
+      } else {
+        // Fallback if video aspect not available yet - will be set when video loads
+        setZoomScale(1.2); // Conservative zoom that works for most content
+        if (DEBUG_MODE) {
+          logger.log(`[AndroidVideoPlayer] Cover mode zoom fallback: 1.2x (video AR not available yet)`);
+        }
+      }
+    } else if (newResizeMode === 'contain' || newResizeMode === 'none') {
+      // Reset zoom for other modes
+      setZoomScale(1);
+    }
+
     if (DEBUG_MODE) {
-      logger.log(`[AndroidVideoPlayer] Resize mode changed to: ${resizeModes[nextIndex]}`);
+      logger.log(`[AndroidVideoPlayer] Resize mode changed to: ${newResizeMode}`);
     }
   };
 
@@ -2707,15 +2784,16 @@ const AndroidVideoPlayer: React.FC = () => {
                 delayLongPress={300}
               >
                 {useVLC ? (
-                  <LibVlcPlayerView
+                  <>
+                    {console.log('🎬 [AndroidVideoPlayer] Rendering VLC player component')}
+                    <LibVlcPlayerView
                     ref={vlcRef}
                     style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
                     // Remount control
                     key={vlcActive ? 'vlc-on' : 'vlc-off'}
                     source={currentStreamUrl}
                     aspectRatio={vlcAspectRatio}
-                    // When using contain/original, use scale 0 to let VLC manage
-                    scale={resizeMode === 'contain' || resizeMode === 'none' ? 0 : 0}
+                    options={vlcOptions}
                     volume={Math.round(Math.max(0, Math.min(1, volume)) * 100)}
                     mute={false}
                     repeat={false}
@@ -2725,6 +2803,8 @@ const AndroidVideoPlayer: React.FC = () => {
                     time={Math.max(0, Math.floor(currentTime * 1000))}
                     onFirstPlay={(info: any) => {
                       try {
+                        console.log('🎬 [VLC] Video loaded successfully');
+                        logger.log('[AndroidVideoPlayer][VLC] Video loaded successfully');
                         const lenSec = (info?.length ?? 0) / 1000;
                         const width = info?.width || 0;
                         const height = info?.height || 0;
@@ -2743,11 +2823,18 @@ const AndroidVideoPlayer: React.FC = () => {
                     onPlaying={() => setPaused(false)}
                     onPaused={() => setPaused(true)}
                     onEndReached={onEnd}
-                    onEncounteredError={(e: any) => handleError(e)}
+                    onEncounteredError={(e: any) => {
+                      console.log('🎬 [VLC] Encountered error:', e);
+                      logger.error('[AndroidVideoPlayer][VLC] Encountered error:', e);
+                      handleError(e);
+                    }}
                   />
+                  </>
                 ) : (
-                  <Video
-                  ref={videoRef}
+                  <>
+                    {console.log('🎬 [AndroidVideoPlayer] Rendering React Native Video component')}
+                    <Video
+                      ref={videoRef}
                   style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
                   source={{ 
                     uri: currentStreamUrl, 
@@ -2755,23 +2842,25 @@ const AndroidVideoPlayer: React.FC = () => {
                     type: isHlsStream(currentStreamUrl) ? 'm3u8' : (currentVideoType as any)
                   }}
                   paused={paused}
-                  onLoadStart={() => {
-                    loadStartAtRef.current = Date.now();
-                    logger.log('[AndroidVideoPlayer] onLoadStart');
-                    
-                    // Log stream information for debugging
-                    const streamInfo = {
-                      url: currentStreamUrl,
-                      isHls: isHlsStream(currentStreamUrl),
-                      videoType: currentVideoType,
-                      headers: headers || getStreamHeaders(),
-                      provider: currentStreamProvider || streamProvider
-                    };
-                    logger.log('[AndroidVideoPlayer] Stream info:', streamInfo);
-                  }}
+                    onLoadStart={() => {
+                      console.log('🎬 [RN Video] Load started');
+                      loadStartAtRef.current = Date.now();
+                      logger.log('[AndroidVideoPlayer][RN Video] onLoadStart');
+
+                      // Log stream information for debugging
+                      const streamInfo = {
+                        url: currentStreamUrl,
+                        isHls: isHlsStream(currentStreamUrl),
+                        videoType: currentVideoType,
+                        headers: headers || getStreamHeaders(),
+                        provider: currentStreamProvider || streamProvider
+                      };
+                      logger.log('[AndroidVideoPlayer][RN Video] Stream info:', streamInfo);
+                    }}
                   onProgress={handleProgress}
                   onLoad={(e) => {
-                    logger.log('[AndroidVideoPlayer] onLoad fired', { duration: e?.duration });
+                    console.log('🎬 [RN Video] Video loaded successfully');
+                    logger.log('[AndroidVideoPlayer][RN Video] onLoad fired', { duration: e?.duration });
                     onLoad(e);
                   }}
                   onReadyForDisplay={() => {
@@ -2787,7 +2876,8 @@ const AndroidVideoPlayer: React.FC = () => {
                   onSeek={onSeek}
                   onEnd={onEnd}
                   onError={(err) => {
-                    logger.error('[AndroidVideoPlayer] onError', err);
+                    console.log('🎬 [RN Video] Encountered error:', err);
+                    logger.error('[AndroidVideoPlayer][RN Video] onError', err);
                     handleError(err);
                   }}
                   onBuffer={(buf) => {
@@ -2816,6 +2906,7 @@ const AndroidVideoPlayer: React.FC = () => {
                   // Use textureView on Android: allows 3D mapping but DRM not supported
                   viewType={Platform.OS === 'android' ? ViewType.TEXTURE : undefined}
                 />
+                  </>
                 )}
               </TouchableOpacity>
             </View>
