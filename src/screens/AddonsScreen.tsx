@@ -700,13 +700,18 @@ const AddonsScreen = () => {
   };
 
   const handleAddAddon = async (url?: string) => {
-    const urlToInstall = url || addonUrl;
+    let urlToInstall = url || addonUrl;
     if (!urlToInstall) {
       setAlertTitle('Error');
       setAlertMessage('Please enter an addon URL or select a community addon');
       setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
       setAlertVisible(true);
       return;
+    }
+
+    // Replace stremio:// with https:// if present
+    if (urlToInstall.startsWith('stremio://')) {
+      urlToInstall = urlToInstall.replace(/^stremio:\/\//, 'https://');
     }
 
     try {
@@ -716,11 +721,11 @@ const AddonsScreen = () => {
       setAddonUrl(urlToInstall);
       setShowConfirmModal(true);
     } catch (error) {
-  logger.error('Failed to fetch addon details:', error);
-  setAlertTitle('Error');
-  setAlertMessage(`Failed to fetch addon details from ${urlToInstall}`);
-  setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
-  setAlertVisible(true);
+      logger.error('Failed to fetch addon details:', error);
+      setAlertTitle('Error');
+      setAlertMessage(`Failed to fetch addon details from ${urlToInstall}`);
+      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+      setAlertVisible(true);
     } finally {
       setInstalling(false);
     }
