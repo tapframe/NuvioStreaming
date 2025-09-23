@@ -886,6 +886,10 @@ class SyncService {
       }
     } catch {}
 
+    const removedListJson = (await AsyncStorage.getItem('user_removed_addons')) || '[]';
+    let removedList: string[] = [];
+    try { removedList = JSON.parse(removedListJson); } catch { removedList = []; }
+
     const rows = addons.map((a: any) => ({
       user_id: userId,
       addon_id: a.id,
@@ -922,11 +926,8 @@ class SyncService {
             .map(async id => {
               if (localIds.has(id)) return null; // Don't delete if still installed locally
               if (id === 'com.linvo.cinemeta') return null; // Never delete Cinemeta
-              if (id === 'org.stremio.opensubtitlesv3') {
-                // Don't delete OpenSubtitles if user has explicitly removed it
-                const userRemoved = await stremioService.hasUserRemovedAddon(id);
-                return userRemoved ? null : id;
-              }
+              // If user explicitly removed this addon locally, prefer local removal and delete remotely
+              if (removedList.includes(id)) return id;
               return id; // Delete other addons that are no longer installed locally
             });
           

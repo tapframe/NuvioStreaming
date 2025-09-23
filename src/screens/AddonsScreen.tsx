@@ -785,9 +785,11 @@ const AddonsScreen = () => {
       { label: 'Cancel', onPress: () => setAlertVisible(false), style: { color: colors.mediumGray } },
       {
         label: 'Uninstall',
-        onPress: () => {
-          stremioService.removeAddon(addon.id);
+        onPress: async () => {
+          await stremioService.removeAddon(addon.id);
           setAddons(prev => prev.filter(a => a.id !== addon.id));
+          // Ensure we re-read from storage/order to avoid reappearing on next load
+          await loadAddons();
         },
         style: { color: colors.error }
       },

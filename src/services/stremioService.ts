@@ -440,12 +440,9 @@ class StremioService {
     if (manifest && manifest.id) {
       this.installedAddons.set(manifest.id, manifest);
       
-      // If this is OpenSubtitles being reinstalled, remove it from the user removed list
-      if (manifest.id === 'org.stremio.opensubtitlesv3') {
-        await this.unmarkAddonAsRemovedByUser(manifest.id);
-        // Also clean up any storage references
-        await this.cleanupRemovedAddonFromStorage(manifest.id);
-      }
+      // If addon was previously removed by user, unmark it on reinstall and clean up
+      await this.unmarkAddonAsRemovedByUser(manifest.id);
+      await this.cleanupRemovedAddonFromStorage(manifest.id);
       
       // Add to order if not already present (new addons go to the end)
       if (!this.addonOrder.includes(manifest.id)) {
@@ -462,7 +459,7 @@ class StremioService {
     }
   }
 
-  removeAddon(id: string): void {
+  async removeAddon(id: string): Promise<void> {
     // Prevent removal of Cinemeta as it's a pre-installed addon
     if (id === 'com.linvo.cinemeta') {
       return;
@@ -472,16 +469,15 @@ class StremioService {
       this.installedAddons.delete(id);
       // Remove from order
       this.addonOrder = this.addonOrder.filter(addonId => addonId !== id);
-      
-      // Track if user explicitly removed OpenSubtitles
-      if (id === 'org.stremio.opensubtitlesv3') {
-        this.markAddonAsRemovedByUser(id);
-        // Also remove from any stored addon order to prevent it from being added back
-        this.cleanupRemovedAddonFromStorage(id);
-      }
-      
-      this.saveInstalledAddons();
-      this.saveAddonOrder();
+
+      // Track user explicit removal for any addon (tombstone)
+      await this.markAddonAsRemovedByUser(id);
+      // Proactively clean up any persisted orders/legacy keys for this addon
+      await this.cleanupRemovedAddonFromStorage(id);
+
+      // Persist removals before app possibly exits
+      await this.saveInstalledAddons();
+      await this.saveAddonOrder();
       try { (require('./SyncService').syncService as any).pushAddons?.(); } catch {}
       // Emit an event that an addon was removed
       addonEmitter.emit(ADDON_EVENTS.ADDON_REMOVED, id);
