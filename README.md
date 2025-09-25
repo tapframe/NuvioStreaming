@@ -22,15 +22,6 @@
 
 ---
 
-## Features
-
-- **Content Discovery:** Personalized recommendations, advanced search, rich metadata
-- **Media Playback:** Dual player support, quality selection, subtitle integration
-- **Platform Sync:** Trakt.tv synchronization, Stremio addon compatibility
-- **Modern UI:** Material Design, dynamic theming, cross-platform native experience
-
----
-
 ## Screenshots
 
 | Home | Details |
@@ -92,4 +83,4 @@ This project is licensed under the GNU General Public License v3.0.
 
 ## Disclaimer
 
-This application functions as a media player with addon/plugin support. It does not contain any built-in content sources or host media content. Content access is only available through user-installed plugins and addons. Any legal concerns should be directed to the specific websites providing the content.
+This application functions as a media player with addon/plugin support. It does not contain any built-in content or host media content. Content access is only available through user-installed plugins and addons. Any legal concerns should be directed to the specific websites providing the content.
