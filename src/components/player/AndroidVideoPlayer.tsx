@@ -1833,6 +1833,38 @@ const AndroidVideoPlayer: React.FC = () => {
       }
     }
   };
+
+  // Keep screen awake during active playback (Android)
+  const keepAwakeModuleRef = useRef<any>(null);
+  useEffect(() => {
+    try {
+      // Use require to avoid TS dynamic import constraints
+      // If the module is unavailable, catch and ignore
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const mod = require('expo-keep-awake');
+      keepAwakeModuleRef.current = mod;
+    } catch (_e) {
+      keepAwakeModuleRef.current = null;
+    }
+  }, []);
+
+  // Toggle keep-awake based on playback state
+  useEffect(() => {
+    const mod = keepAwakeModuleRef.current;
+    if (!mod) return;
+    const activate = mod.activateKeepAwakeAsync || mod.activateKeepAwake;
+    const deactivate = mod.deactivateKeepAwakeAsync || mod.deactivateKeepAwake;
+    try {
+      if (!paused && isPlayerReady && duration > 0) {
+        activate && activate();
+      } else {
+        deactivate && deactivate();
+      }
+    } catch (_e) {}
+    return () => {
+      try { deactivate && deactivate(); } catch (_e) {}
+    };
+  }, [paused, isPlayerReady, duration]);
   
   const handleErrorExit = () => {
     try {
