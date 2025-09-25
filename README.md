@@ -33,9 +33,9 @@
 
 ## Screenshots
 
-| Home | Details | Player |
-|:----:|:-------:|:------:|
-| ![Home](screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.08.32-portrait.png) | ![Details](screesnhots/WhatsApp%20Image%202025-09-02%20at%2000.24.31-portrait.png) | ![Player](screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.13.36-landscape.png) |
+| Home | Details |
+|:----:|:-------:|
+| ![Home](screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.08.32-portrait.png) | ![Details](screesnhots/WhatsApp%20Image%202025-09-02%20at%2000.24.31-portrait.png) |
 
 ---
 
