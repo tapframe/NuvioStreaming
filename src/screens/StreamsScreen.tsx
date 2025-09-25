@@ -224,7 +224,7 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
         showAlert('Stream URL', stream.url);
       }
     }
-  }, [stream.url]);
+  }, [stream.url, showAlert]);
   const styles = React.useMemo(() => createStyles(theme.colors), [theme.colors]);
   
   const streamInfo = useMemo(() => {

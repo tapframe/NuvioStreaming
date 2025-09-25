@@ -227,10 +227,49 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         contentGroups[contentKey].episodes.push({ key, episodeId, progress, progressPercent });
       }
 
+      // Fetch Trakt watched movies once and reuse
+      const traktMoviesSetPromise = (async () => {
+        try {
+          const traktService = TraktService.getInstance();
+          const isAuthed = await traktService.isAuthenticated();
+          if (!isAuthed) return new Set<string>();
+          if (typeof (traktService as any).getWatchedMovies === 'function') {
+            const watched = await (traktService as any).getWatchedMovies();
+            if (Array.isArray(watched)) {
+              const ids = watched
+                .map((w: any) => w?.movie?.ids?.imdb)
+                .filter(Boolean)
+                .map((imdb: string) => (imdb.startsWith('tt') ? imdb : `tt${imdb}`));
+              return new Set<string>(ids);
+            }
+          }
+          return new Set<string>();
+        } catch {
+          return new Set<string>();
+        }
+      })();
+
       // Process each content group concurrently, merging results as they arrive
       const groupPromises = Object.values(contentGroups).map(async (group) => {
         try {
           if (!isSupportedId(group.id)) return;
+          // Skip movies that are already watched on Trakt
+          if (group.type === 'movie') {
+            const watchedSet = await traktMoviesSetPromise;
+            if (watchedSet.has(group.id)) {
+              // Optional: sync local store to watched to prevent reappearance
+              try {
+                await storageService.setWatchProgress(group.id, 'movie', {
+                  currentTime: 1,
+                  duration: 1,
+                  lastUpdated: Date.now(),
+                  traktSynced: true,
+                  traktProgress: 100,
+                } as any);
+              } catch (_e) {}
+              return;
+            }
+          }
           const cachedData = await getCachedMetadata(group.type, group.id);
           if (!cachedData?.basicContent) return;
           const { metadata, basicContent } = cachedData;
