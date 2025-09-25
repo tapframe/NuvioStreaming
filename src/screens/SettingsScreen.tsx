@@ -630,7 +630,7 @@ const SettingsScreen: React.FC = () => {
             />
             <SettingItem
               title="Version"
-              description="1.2.0"
+              description="1.2.1"
               icon="info-outline"
               isLast={true}
               isTablet={isTablet}
