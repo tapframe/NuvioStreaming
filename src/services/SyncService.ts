@@ -622,6 +622,13 @@ class SyncService {
 
     for (const a of addons as any[]) {
       try {
+        // Skip server addon if user explicitly removed it locally (tombstone)
+        try {
+          const removed = await stremioService.hasUserRemovedAddon(a.addon_id);
+          if (removed && a.addon_id !== 'com.linvo.cinemeta') {
+            continue;
+          }
+        } catch {}
         let manifest = a.manifest_data;
         if (!manifest) {
           const urlToUse = a.original_url || a.url;
@@ -1017,6 +1024,13 @@ class SyncService {
       
       for (const remoteAddon of remoteAddons) {
         if (!localAddonIds.has(remoteAddon.addon_id)) {
+          // Honor local tombstone: skip addons user explicitly removed
+          try {
+            const removed = await stremioService.hasUserRemovedAddon(remoteAddon.addon_id);
+            if (removed && remoteAddon.addon_id !== 'com.linvo.cinemeta') {
+              continue;
+            }
+          } catch {}
           try {
             let manifest = remoteAddon.manifest_data;
             if (!manifest && remoteAddon.original_url) {
@@ -1066,6 +1080,13 @@ class SyncService {
       const addonsToInstall: any[] = [];
       for (const remoteAddon of remoteAddons as any[]) {
         if (!localAddonIds.has(remoteAddon.addon_id)) {
+          // Honor local tombstone: skip addons user explicitly removed
+          try {
+            const removed = await stremioService.hasUserRemovedAddon(remoteAddon.addon_id);
+            if (removed && remoteAddon.addon_id !== 'com.linvo.cinemeta') {
+              continue;
+            }
+          } catch {}
           try {
             let manifest = remoteAddon.manifest_data;
             if (!manifest && remoteAddon.original_url) {
