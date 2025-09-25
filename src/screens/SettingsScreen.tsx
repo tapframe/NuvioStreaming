@@ -264,7 +264,14 @@ const SettingsScreen: React.FC = () => {
   
   // Tablet-specific state
   const [selectedCategory, setSelectedCategory] = useState('account');
-  
+
+  // States for dynamic content
+  const [addonCount, setAddonCount] = useState<number>(0);
+  const [catalogCount, setCatalogCount] = useState<number>(0);
+  const [mdblistKeySet, setMdblistKeySet] = useState<boolean>(false);
+  const [openRouterKeySet, setOpenRouterKeySet] = useState<boolean>(false);
+  const [initialLoadComplete, setInitialLoadComplete] = useState<boolean>(false);
+
   // Add a useEffect to check authentication status on focus
   useEffect(() => {
     // This will reload the Trakt auth status whenever the settings screen is focused
@@ -277,26 +284,22 @@ const SettingsScreen: React.FC = () => {
         if (__DEV__) console.log('SettingsScreen focused, refreshing auth status. Current state:', { isAuthenticated, userProfile: userProfile?.username });
       }
       refreshAuthStatus();
-      // Only refresh account user if we don't have a user or if we're not already loading
-      if (!user && !accountLoading) {
+      // Don't refresh account user on every focus - the context handles auth state changes
+      // Only refresh if we have no user at all and aren't loading (rare edge case)
+      if (!user && !accountLoading && !initialLoadComplete) {
         refreshCurrentUser();
       }
     });
     
     return unsubscribe;
-  }, [navigation, isAuthenticated, userProfile, refreshAuthStatus, refreshCurrentUser, user, accountLoading]);
-
-  // States for dynamic content
-  const [addonCount, setAddonCount] = useState<number>(0);
-  const [catalogCount, setCatalogCount] = useState<number>(0);
-  const [mdblistKeySet, setMdblistKeySet] = useState<boolean>(false);
-  const [openRouterKeySet, setOpenRouterKeySet] = useState<boolean>(false);
+  }, [navigation, isAuthenticated, userProfile, refreshAuthStatus, refreshCurrentUser, user, accountLoading, initialLoadComplete]);
 
   const loadData = useCallback(async () => {
     try {
       // Load addon count and get their catalogs
       const addons = await stremioService.getInstalledAddonsAsync();
       setAddonCount(addons.length);
+      setInitialLoadComplete(true);
       
       // Count total available catalogs
       let totalCatalogs = 0;

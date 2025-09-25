@@ -94,27 +94,35 @@ export const AccountProvider: React.FC<{ children: React.ReactNode }> = ({ child
     },
     refreshCurrentUser: async () => {
       // Don't set loading if already loading to avoid conflicts
-      if (loading) return;
-      
+      if (loading) {
+        if (__DEV__) console.log('[AccountContext] Already loading, skipping refresh');
+        return;
+      }
+
+      if (__DEV__) console.log('[AccountContext] Starting refreshCurrentUser');
       setLoading(true);
-      
+
       // Set a timeout to prevent loading from getting stuck
       loadingTimeoutRef.current = setTimeout(() => {
-        console.warn('Account loading timeout, forcing loading to false');
+        console.warn('[AccountContext] Account loading timeout, forcing loading to false');
         setLoading(false);
-      }, 10000); // 10 second timeout
-      
+      }, 5000); // Reduced to 5 seconds for faster fallback
+
       try {
         const u = await accountService.getCurrentUser();
+        if (__DEV__) console.log('[AccountContext] refreshCurrentUser completed:', u ? 'user found' : 'no user');
         setUser(u);
       } catch (error) {
-        console.error('Failed to refresh current user:', error);
+        console.error('[AccountContext] Failed to refresh current user:', error);
+        // Still set user to null on error to ensure we don't get stuck
+        setUser(null);
       } finally {
         if (loadingTimeoutRef.current) {
           clearTimeout(loadingTimeoutRef.current);
           loadingTimeoutRef.current = null;
         }
         setLoading(false);
+        if (__DEV__) console.log('[AccountContext] refreshCurrentUser finished');
       }
     },
     updateProfile: async (partial) => {
