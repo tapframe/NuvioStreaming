@@ -1,11 +1,11 @@
-# Nuvio Media Player
+# Nuvio Media Hub
 
 <p align="center">
   <img src="assets/titlelogo.png" alt="Nuvio Logo" width="300"/>
 </p>
 
 <p align="center">
-  A modern media player built with React Native and Expo, featuring comprehensive addon integration and content synchronization.
+  A modern media hub built with React Native and Expo, featuring comprehensive addon integration and content synchronization.
 </p>
 
 ---
@@ -83,4 +83,4 @@ This project is licensed under the GNU General Public License v3.0.
 
 ## Disclaimer
 
-This application functions as a media player with addon/plugin support. It does not contain any built-in content or host media content. Content access is only available through user-installed plugins and addons. Any legal concerns should be directed to the specific websites providing the content.
+This application functions as a media hub with addon/plugin support. It does not contain any built-in content or host media content. Content access is only available through user-installed plugins and addons. Any legal concerns should be directed to the specific websites providing the content.
