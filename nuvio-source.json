@@ -31,6 +31,14 @@
       ],
       "versions": [
         {
+          "version": "1.2.1",
+          "buildVersion": "16",
+          "date": "2025-01-27",
+          "localizedDescription": "# Version 1.2.1 – Update Notes\n\nThis release focuses on **stability improvements** and internal fixes.\n\n## Improvements & Fixes\n- Multiple **minor internal bug fixes**\n- Updated dependencies for improved stability and compatibility\n- Plugin is no longer **hardcoded** into the app\n  - ⚠️ New users should use the respective **plugin repository link** to set up properly\n\n⚠️ **Important:**\n- All users are strongly **recommended to update** to this version for stability improvements and to continue receiving **future OTA updates**.\n\n## Merged PRs\n- **Adding addons with `stremio://` URL** by @CrissZollo\n  - Fixed an issue with `stremio://` URLs being incorrectly converted to `https://` URLs\n  - Ensures correct handling of addon URLs\n  - Fixes [Issue #25](https://github.com/tapframe/NuvioStreaming/issues/25)\n\n---\n\n## Changelog & Download\n[View on GitHub](https://github.com/tapframe/NuvioStreaming/releases/tag/1.2.1)\n\n🌐 **[Official Website](https://tapframe.github.io/NuvioStreaming/)**",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/1.2.1/Stable_1-2-1.ipa",
+          "size": 25700000
+        },
+        {
           "version": "1.2.0",
           "buildVersion": "15",
           "date": "2025-09-22",
