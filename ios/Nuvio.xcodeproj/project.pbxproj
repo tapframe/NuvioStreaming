@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 46;
+	objectVersion = 54;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -13,6 +13,10 @@
 		2F6C4443E26F4184A8EA68F1 /* noop-file.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C4B16751559433B951A993C /* noop-file.swift */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		96905EF65AED1B983A6B3ABC /* libPods-Nuvio.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 58EEBF8E8E6FB1BC6CAF49B5 /* libPods-Nuvio.a */; };
+		9FBA88F42E86ECD700892850 /* KSPlayerViewManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FBA88F32E86ECD700892850 /* KSPlayerViewManager.swift */; };
+		9FBA88F52E86ECD700892850 /* KSPlayerModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FBA88F12E86ECD700892850 /* KSPlayerModule.swift */; };
+		9FBA88F62E86ECD700892850 /* KSPlayerManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FBA88F02E86ECD700892850 /* KSPlayerManager.m */; };
+		9FBA88F72E86ECD700892850 /* KSPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FBA88F22E86ECD700892850 /* KSPlayerView.swift */; };
 		B18059E884C0ABDD17F3DC3D /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC715A2D49A985799AEE119 /* ExpoModulesProvider.swift */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		E660DA8F5C7B39AACB568229 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 8F20890D58E6A611113A359A /* PrivacyInfo.xcprivacy */; };
@@ -30,7 +34,12 @@
 		58EEBF8E8E6FB1BC6CAF49B5 /* libPods-Nuvio.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Nuvio.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		6C2E3173556A471DD304B334 /* Pods-Nuvio.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Nuvio.debug.xcconfig"; path = "Target Support Files/Pods-Nuvio/Pods-Nuvio.debug.xcconfig"; sourceTree = "<group>"; };
 		7A4D352CD337FB3A3BF06240 /* Pods-Nuvio.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Nuvio.release.xcconfig"; path = "Target Support Files/Pods-Nuvio/Pods-Nuvio.release.xcconfig"; sourceTree = "<group>"; };
-		8F20890D58E6A611113A359A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = Nuvio/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		8F20890D58E6A611113A359A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = Nuvio/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		9F9D45D12E85C42200C88FAD /* NuvioRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = NuvioRelease.entitlements; path = Nuvio/NuvioRelease.entitlements; sourceTree = "<group>"; };
+		9FBA88F02E86ECD700892850 /* KSPlayerManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KSPlayerManager.m; sourceTree = "<group>"; };
+		9FBA88F12E86ECD700892850 /* KSPlayerModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KSPlayerModule.swift; sourceTree = "<group>"; };
+		9FBA88F22E86ECD700892850 /* KSPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KSPlayerView.swift; sourceTree = "<group>"; };
+		9FBA88F32E86ECD700892850 /* KSPlayerViewManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KSPlayerViewManager.swift; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = Nuvio/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
@@ -52,6 +61,7 @@
 		13B07FAE1A68108700A75B9A /* Nuvio */ = {
 			isa = PBXGroup;
 			children = (
+				9F9D45D12E85C42200C88FAD /* NuvioRelease.entitlements */,
 				BB2F792B24A3F905000567C9 /* Supporting */,
 				13B07FAF1A68108700A75B9A /* AppDelegate.h */,
 				13B07FB01A68108700A75B9A /* AppDelegate.mm */,
@@ -85,6 +95,10 @@
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
+				9FBA88F02E86ECD700892850 /* KSPlayerManager.m */,
+				9FBA88F12E86ECD700892850 /* KSPlayerModule.swift */,
+				9FBA88F22E86ECD700892850 /* KSPlayerView.swift */,
+				9FBA88F32E86ECD700892850 /* KSPlayerViewManager.swift */,
 				13B07FAE1A68108700A75B9A /* Nuvio */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
@@ -373,6 +387,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				13B07FBC1A68108700A75B9A /* AppDelegate.mm in Sources */,
+				9FBA88F42E86ECD700892850 /* KSPlayerViewManager.swift in Sources */,
+				9FBA88F52E86ECD700892850 /* KSPlayerModule.swift in Sources */,
+				9FBA88F62E86ECD700892850 /* KSPlayerManager.m in Sources */,
+				9FBA88F72E86ECD700892850 /* KSPlayerView.swift in Sources */,
 				13B07FC11A68108700A75B9A /* main.m in Sources */,
 				B18059E884C0ABDD17F3DC3D /* ExpoModulesProvider.swift in Sources */,
 				2F6C4443E26F4184A8EA68F1 /* noop-file.swift in Sources */,
@@ -400,7 +418,10 @@
 				);
 				INFOPLIST_FILE = Nuvio/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
@@ -409,7 +430,7 @@
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
 				PRODUCT_BUNDLE_IDENTIFIER = com.nuvio.app;
-				PRODUCT_NAME = "Nuvio";
+				PRODUCT_NAME = Nuvio;
 				SWIFT_OBJC_BRIDGING_HEADER = "Nuvio/Nuvio-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -424,14 +445,17 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = Nuvio/Nuvio.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Nuvio/NuvioRelease.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = NLXTHANK2N;
 				INFOPLIST_FILE = Nuvio/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
@@ -440,7 +464,7 @@
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
 				PRODUCT_BUNDLE_IDENTIFIER = com.nuvio.app;
-				PRODUCT_NAME = "Nuvio";
+				PRODUCT_NAME = Nuvio;
 				SWIFT_OBJC_BRIDGING_HEADER = "Nuvio/Nuvio-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -496,14 +520,14 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
-				LD_RUNPATH_SEARCH_PATHS = "/usr/lib/swift $(inherited)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					/usr/lib/swift,
+					"$(inherited)",
+				);
 				LIBRARY_SEARCH_PATHS = "$(SDKROOT)/usr/lib/swift\"$(inherited)\"";
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
+				OTHER_LDFLAGS = "$(inherited)  ";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
@@ -552,13 +576,13 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
-				LD_RUNPATH_SEARCH_PATHS = "/usr/lib/swift $(inherited)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					/usr/lib/swift,
+					"$(inherited)",
+				);
 				LIBRARY_SEARCH_PATHS = "$(SDKROOT)/usr/lib/swift\"$(inherited)\"";
 				MTL_ENABLE_DEBUG_INFO = NO;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
+				OTHER_LDFLAGS = "$(inherited)  ";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				USE_HERMES = true;
