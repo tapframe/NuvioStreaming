@@ -62,24 +62,22 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   const episodeScrollViewRef = useRef<FlashListRef<Episode>>(null);
   const horizontalEpisodeScrollViewRef = useRef<FlatList<Episode>>(null);
 
-  // Load saved view mode preference when component mounts or show changes
+  // Load saved global view mode preference when component mounts
   useEffect(() => {
     const loadViewModePreference = async () => {
-      if (metadata?.id) {
-        try {
-          const savedMode = await AsyncStorage.getItem(`season_view_mode_${metadata.id}`);
-          if (savedMode === 'text' || savedMode === 'posters') {
-            setSeasonViewMode(savedMode);
-            if (__DEV__) console.log('[SeriesContent] Loaded saved view mode:', savedMode, 'for show:', metadata.id);
-          }
-        } catch (error) {
-          if (__DEV__) console.log('[SeriesContent] Error loading view mode preference:', error);
+      try {
+        const savedMode = await AsyncStorage.getItem('global_season_view_mode');
+        if (savedMode === 'text' || savedMode === 'posters') {
+          setSeasonViewMode(savedMode);
+          if (__DEV__) console.log('[SeriesContent] Loaded global view mode:', savedMode);
         }
+      } catch (error) {
+        if (__DEV__) console.log('[SeriesContent] Error loading global view mode preference:', error);
       }
     };
     
     loadViewModePreference();
-  }, [metadata?.id]);
+  }, []);
 
   // Initialize view mode visibility based on current view mode
   useEffect(() => {
@@ -97,11 +95,9 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   // Update view mode without animations
   const updateViewMode = (newMode: 'posters' | 'text') => {
     setSeasonViewMode(newMode);
-    if (metadata?.id) {
-      AsyncStorage.setItem(`season_view_mode_${metadata.id}`, newMode).catch(error => {
-        if (__DEV__) console.log('[SeriesContent] Error saving view mode preference:', error);
-      });
-    }
+    AsyncStorage.setItem('global_season_view_mode', newMode).catch(error => {
+      if (__DEV__) console.log('[SeriesContent] Error saving global view mode preference:', error);
+    });
   };
   
   // Add refs for the scroll views

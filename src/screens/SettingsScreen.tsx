@@ -33,6 +33,7 @@ import * as Sentry from '@sentry/react-native';
 import CustomAlert from '../components/CustomAlert';
 import ProfileIcon from '../components/icons/ProfileIcon';
 import PluginIcon from '../components/icons/PluginIcon';
+import TraktIcon from '../components/icons/TraktIcon';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -462,7 +463,7 @@ const SettingsScreen: React.FC = () => {
             <SettingItem
               title="Trakt"
               description={isAuthenticated ? `@${userProfile?.username || 'User'}` : "Sign in to sync"}
-              icon="person"
+              customIcon={<TraktIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('TraktSettings')}
               isLast={true}
