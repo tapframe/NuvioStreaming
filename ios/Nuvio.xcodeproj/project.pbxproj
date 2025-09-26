@@ -72,6 +72,10 @@
 				4C4B16751559433B951A993C /* noop-file.swift */,
 				05FDEBFD08F44643A98FC770 /* Nuvio-Bridging-Header.h */,
 				8F20890D58E6A611113A359A /* PrivacyInfo.xcprivacy */,
+				9FBA88F02E86ECD700892850 /* KSPlayerManager.m */,
+				9FBA88F12E86ECD700892850 /* KSPlayerModule.swift */,
+				9FBA88F22E86ECD700892850 /* KSPlayerView.swift */,
+				9FBA88F32E86ECD700892850 /* KSPlayerViewManager.swift */,
 			);
 			name = Nuvio;
 			sourceTree = "<group>";
@@ -95,10 +99,6 @@
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
-				9FBA88F02E86ECD700892850 /* KSPlayerManager.m */,
-				9FBA88F12E86ECD700892850 /* KSPlayerModule.swift */,
-				9FBA88F22E86ECD700892850 /* KSPlayerView.swift */,
-				9FBA88F32E86ECD700892850 /* KSPlayerViewManager.swift */,
 				13B07FAE1A68108700A75B9A /* Nuvio */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,

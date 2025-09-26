@@ -466,6 +466,11 @@ export const StreamsScreen = () => {
     if (__DEV__) console.log('[StreamsScreen] Received thumbnail from params:', episodeThumbnail);
   }, [episodeThumbnail]);
 
+  // Reset movie logo error when movie changes
+  useEffect(() => {
+    setMovieLogoError(false);
+  }, [id]);
+
   // Pause trailer when StreamsScreen is opened
   useEffect(() => {
     // Pause trailer when component mounts
@@ -532,6 +537,9 @@ export const StreamsScreen = () => {
 
   // Add state for no sources error
   const [showNoSourcesError, setShowNoSourcesError] = useState(false);
+  
+  // State for movie logo loading error
+  const [movieLogoError, setMovieLogoError] = useState(false);
   
   // Scraper logos map to avoid per-card async fetches
   const [scraperLogos, setScraperLogos] = useState<Record<string, string>>({});
@@ -1662,11 +1670,12 @@ export const StreamsScreen = () => {
       {type === 'movie' && metadata && (
         <View style={[styles.movieTitleContainer]}>
           <View style={styles.movieTitleContent}>
-            {metadata.logo ? (
-              <AnimatedImage
+            {metadata.logo && !movieLogoError ? (
+              <Image
                 source={{ uri: metadata.logo }}
                 style={styles.movieLogo}
                 contentFit="contain"
+                onError={() => setMovieLogoError(true)}
               />
             ) : (
               <AnimatedText style={styles.movieTitle} numberOfLines={2}>
@@ -2320,13 +2329,13 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   movieTitleContent: {
     width: '100%',
-    height: '100%',
+    height: 80, // Fixed height for consistent layout
     alignItems: 'center',
     justifyContent: 'center',
   },
   movieLogo: {
     width: '100%',
-    height: '100%',
+    height: 80, // Fixed height to match content container
     maxWidth: width * 0.85,
   },
   movieTitle: {
