@@ -74,14 +74,6 @@ const onboardingData: OnboardingSlide[] = [
     icon: 'library-books',
     gradient: ['#43e97b', '#38f9d7'],
   },
-  {
-    id: '5',
-    title: 'Plugins',
-    subtitle: 'Stream Sources Only',
-    description: 'Plugins add streaming sources to Nuvio.',
-    icon: 'widgets',
-    gradient: ['#ff9a9e', '#fad0c4'],
-  },
 ];
 
 const OnboardingScreen = () => {

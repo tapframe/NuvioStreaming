@@ -49,20 +49,32 @@ export const AccountProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     // Auth state listener
     const { data: subscription } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      // Do not block UI on auth transitions
       setLoading(true);
       try {
         const fullUser = session?.user ? await accountService.getCurrentUser() : null;
         setUser(fullUser);
+        // Immediately clear loading so UI can transition to MainTabs/Auth
+        setLoading(false);
         if (fullUser) {
-          await syncService.migrateLocalScopeToUser();
-          await syncService.subscribeRealtime();
-          // Pull first to hydrate local state, then push to avoid wiping server with empty local
-          await syncService.fullPull();
-          await syncService.fullPush();
+          // Run sync in background without blocking UI
+          setTimeout(async () => {
+            try {
+              await syncService.migrateLocalScopeToUser();
+              await new Promise(r => setTimeout(r, 0));
+              await syncService.subscribeRealtime();
+              await new Promise(r => setTimeout(r, 0));
+              await syncService.fullPull();
+              await new Promise(r => setTimeout(r, 0));
+              await syncService.fullPush();
+            } catch (error) {
+              console.warn('[AccountContext] Background sync failed:', error);
+            }
+          }, 0);
         } else {
           syncService.unsubscribeRealtime();
         }
-      } finally {
+      } catch (e) {
         setLoading(false);
       }
     });

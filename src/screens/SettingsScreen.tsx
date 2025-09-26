@@ -31,6 +31,8 @@ import { catalogService } from '../services/catalogService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
 import CustomAlert from '../components/CustomAlert';
+import ProfileIcon from '../components/icons/ProfileIcon';
+import PluginIcon from '../components/icons/PluginIcon';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -91,7 +93,8 @@ const SettingsCard: React.FC<SettingsCardProps> = ({ children, title, isTablet =
 interface SettingItemProps {
   title: string;
   description?: string;
-  icon: keyof typeof MaterialIcons.glyphMap;
+  icon?: keyof typeof MaterialIcons.glyphMap;
+  customIcon?: React.ReactNode;
   renderControl?: () => React.ReactNode;
   isLast?: boolean;
   onPress?: () => void;
@@ -103,6 +106,7 @@ const SettingItem: React.FC<SettingItemProps> = ({
   title,
   description,
   icon,
+  customIcon,
   renderControl,
   isLast = false,
   onPress,
@@ -124,14 +128,22 @@ const SettingItem: React.FC<SettingItemProps> = ({
     >
       <View style={[
         styles.settingIconContainer,
-        { backgroundColor: currentTheme.colors.elevation2 },
+        { 
+          backgroundColor: currentTheme.colors.darkGray,
+          borderWidth: 1,
+          borderColor: currentTheme.colors.primary + '20'
+        },
         isTablet && styles.tabletSettingIconContainer
       ]}>
-        <MaterialIcons 
-          name={icon} 
-          size={isTablet ? 24 : 20} 
-          color={currentTheme.colors.primary} 
-        />
+        {customIcon ? (
+          customIcon
+        ) : (
+          <MaterialIcons 
+            name={icon!} 
+            size={isTablet ? 24 : 20} 
+            color={currentTheme.colors.primary} 
+          />
+        )}
       </View>
       <View style={styles.settingContent}>
         <View style={styles.settingTextContainer}>
@@ -426,7 +438,7 @@ const SettingsScreen: React.FC = () => {
                 <SettingItem
                   title={user.displayName || user.email || user.id}
                   description="Manage account"
-                  icon="account-circle"
+                  customIcon={<ProfileIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
                   onPress={() => navigation.navigate('AccountManage')}
                   isTablet={isTablet}
                 />
@@ -473,7 +485,7 @@ const SettingsScreen: React.FC = () => {
             <SettingItem
               title="Plugins"
               description="Manage plugins and repositories"
-              icon="code"
+              customIcon={<PluginIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('ScraperSettings')}
               isTablet={isTablet}

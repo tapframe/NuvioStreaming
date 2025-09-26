@@ -35,6 +35,7 @@ import * as Sentry from '@sentry/react-native';
 import UpdateService from './src/services/updateService';
 import { memoryMonitorService } from './src/services/memoryMonitorService';
 import { aiService } from './src/services/aiService';
+import { AccountProvider, useAccount } from './src/contexts/AccountContext';
 
 Sentry.init({
   dsn: 'https://1a58bf436454d346e5852b7bfd3c95e8@o4509536317276160.ingest.de.sentry.io/4509536317734992',
@@ -143,21 +144,18 @@ const ThemedApp = () => {
   const shouldShowApp = isAppReady && hasCompletedOnboarding !== null;
   const initialRouteName = hasCompletedOnboarding ? 'MainTabs' : 'Onboarding';
   
-  return (
-    <PaperProvider theme={customDarkTheme}>
+  const NavigationWithRef = () => {
+    const { navigationRef } = useAccount() as any;
+    return (
       <NavigationContainer 
+        ref={navigationRef as any}
         theme={customNavigationTheme}
-        // Disable automatic linking which can cause layout issues
         linking={undefined}
       >
         <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
-          <StatusBar
-            style="light"
-          />
+          <StatusBar style="light" />
           {!isAppReady && <SplashScreen onFinish={handleSplashComplete} />}
           {shouldShowApp && <AppNavigator initialRouteName={initialRouteName} />}
-          
-          {/* Update Popup */}
           {Platform.OS === 'ios' && (
             <UpdatePopup
               visible={showUpdatePopup}
@@ -170,7 +168,15 @@ const ThemedApp = () => {
           )}
         </View>
       </NavigationContainer>
-    </PaperProvider>
+    );
+  };
+
+  return (
+    <AccountProvider>
+      <PaperProvider theme={customDarkTheme}>
+        <NavigationWithRef />
+      </PaperProvider>
+    </AccountProvider>
   );
 }
 

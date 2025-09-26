@@ -44,7 +44,7 @@ import ThemeScreen from '../screens/ThemeScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import AuthScreen from '../screens/AuthScreen';
 import AccountManageScreen from '../screens/AccountManageScreen';
-import { AccountProvider, useAccount } from '../contexts/AccountContext';
+import { useAccount } from '../contexts/AccountContext';
 import { LoadingProvider, useLoading } from '../contexts/LoadingContext';
 import PluginsScreen from '../screens/PluginsScreen';
 import CastMoviesScreen from '../screens/CastMoviesScreen';
@@ -1336,11 +1336,9 @@ const AppNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootStack
       host: "https://us.i.posthog.com",
     }}
   >
-    <AccountProvider>
-      <LoadingProvider>
-        <InnerNavigator initialRouteName={initialRouteName} />
-      </LoadingProvider>
-    </AccountProvider>
+    <LoadingProvider>
+      <InnerNavigator initialRouteName={initialRouteName} />
+    </LoadingProvider>
   </PostHogProvider>
 );
 
