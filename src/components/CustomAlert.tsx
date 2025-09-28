@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import {
   Modal,
   View,
@@ -44,7 +44,7 @@ export const CustomAlert = ({
   const themeColors = currentTheme.colors;
 
   useEffect(() => {
-    const animDuration = 120;
+    const animDuration = Platform.OS === 'android' ? 200 : 120;
     if (visible) {
       opacity.value = withTiming(1, { duration: animDuration });
       scale.value = withTiming(1, { duration: animDuration });
@@ -67,14 +67,69 @@ export const CustomAlert = ({
   const textColor = isDarkMode ? themeColors.white : themeColors.black || '#000000';
   const borderColor = isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
 
+  // Safe action handler to prevent crashes
+  const handleActionPress = useCallback((action: { label: string; onPress: () => void; style?: object }) => {
+    try {
+      action.onPress();
+      onClose();
+    } catch (error) {
+      console.warn('[CustomAlert] Error in action handler:', error);
+      // Still close the alert even if action fails
+      onClose();
+    }
+  }, [onClose]);
+
+  // Don't render anything if not visible
+  if (!visible) {
+    return null;
+  }
+
+  // Use different rendering approach for Android to avoid Modal issues
+  if (Platform.OS === 'android') {
+    return (
+      <Modal
+        visible={visible}
+        transparent
+        animationType="fade"
+        onRequestClose={onClose}
+        statusBarTranslucent={false}
+        hardwareAccelerated={true}
+      >
+        <View style={[styles.overlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+          <Pressable style={styles.overlayPressable} onPress={onClose} />
+          <View style={styles.centered}>
+            <View style={[styles.alertContainer, { backgroundColor, borderColor }]}> 
+              <Text style={[styles.title, { color: textColor }]}>{title}</Text>
+              <Text style={[styles.message, { color: textColor }]}>{message}</Text>
+              <View style={styles.actionsRow}>
+                {actions.map((action, idx) => (
+                  <TouchableOpacity
+                    key={action.label}
+                    style={[styles.actionButton, idx === actions.length - 1 && styles.lastActionButton, action.style]}
+                    onPress={() => handleActionPress(action)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.actionText, { color: themeColors.primary }]}>{action.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  // iOS version with animations
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="none"
+      animationType="fade"
       onRequestClose={onClose}
+      presentationStyle="overFullScreen"
     >
-      <Animated.View style={[styles.overlay, { backgroundColor: themeColors.transparentDark }, overlayStyle]}>
+      <Animated.View style={[styles.overlay, { backgroundColor: themeColors.transparentDark || 'rgba(0,0,0,0.5)' }, overlayStyle]}>
         <Pressable style={styles.overlayPressable} onPress={onClose} />
         <View style={styles.centered}>
           <Animated.View style={[styles.alertContainer, alertStyle, { backgroundColor, borderColor }]}> 
@@ -85,10 +140,8 @@ export const CustomAlert = ({
                 <TouchableOpacity
                   key={action.label}
                   style={[styles.actionButton, idx === actions.length - 1 && styles.lastActionButton, action.style]}
-                  onPress={() => {
-                    action.onPress();
-                    onClose();
-                  }}
+                  onPress={() => handleActionPress(action)}
+                  activeOpacity={0.7}
                 >
                   <Text style={[styles.actionText, { color: themeColors.primary }]}>{action.label}</Text>
                 </TouchableOpacity>

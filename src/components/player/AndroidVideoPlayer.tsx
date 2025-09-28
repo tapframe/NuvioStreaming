@@ -93,7 +93,6 @@ const AndroidVideoPlayer: React.FC = () => {
     const reason = useVLC
       ? (TEMP_FORCE_VLC ? 'TEMP_FORCE_VLC=true' : `forceVlc=${forceVlc} from route params`)
       : 'default react-native-video';
-    console.log(`🎬 [AndroidVideoPlayer] Using ${playerType} - ${reason}`);
     logger.log(`[AndroidVideoPlayer] Player selection: ${playerType} (${reason})`);
   }, [useVLC, forceVlc]);
 
@@ -237,6 +236,9 @@ const AndroidVideoPlayer: React.FC = () => {
   // Debounce resize operations to prevent rapid successive clicks
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Debounce gesture operations to prevent rapid-fire events
+  const gestureDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
   // Memoize VLC tracks prop to prevent unnecessary re-renders
   const vlcTracks = useMemo(() => ({
     audio: vlcSelectedAudioTrack,
@@ -244,19 +246,72 @@ const AndroidVideoPlayer: React.FC = () => {
     subtitle: vlcSelectedSubtitleTrack
   }), [vlcSelectedAudioTrack, vlcSelectedSubtitleTrack]);
 
-  // Format VLC tracks to match RN Video format - optimized version
+  // Format VLC tracks to match RN Video format - raw version
   const formatVlcTracks = useCallback((vlcTracks: Array<{id: number, name: string}>) => {
     if (!Array.isArray(vlcTracks)) return [];
-    return vlcTracks.map(track => ({
-      id: track.id,
-      name: track.name || `Track ${track.id + 1}`,
-      language: undefined // VLC doesn't provide language info in this format
-    }));
+    return vlcTracks.map(track => {
+      // Just extract basic language info if available, but keep the full name
+      let language = undefined;
+      let displayName = track.name || `Track ${track.id + 1}`;
+      
+      // Log the raw track data for debugging
+      if (DEBUG_MODE) {
+        logger.log(`[VLC] Raw track data:`, { id: track.id, name: track.name });
+      }
+      
+      // Only extract language from brackets if present, but keep full name
+      const languageMatch = track.name?.match(/\[([^\]]+)\]/);
+      if (languageMatch && languageMatch[1]) {
+        language = languageMatch[1].trim();
+      }
+      
+      return {
+        id: track.id,
+        name: displayName, // Show exactly what VLC provides
+        language: language
+      };
+    });
   }, []);
 
-  // Optimized VLC track processing function
+  // Process URL for VLC compatibility
+  const processUrlForVLC = useCallback((url: string): string => {
+    if (!url || typeof url !== 'string') {
+      logger.warn('[AndroidVideoPlayer][VLC] Invalid URL provided:', url);
+      return url || '';
+    }
+
+    try {
+      // Check if URL is already properly formatted
+      const urlObj = new URL(url);
+      
+      // Handle special characters in the pathname that might cause issues
+      const pathname = urlObj.pathname;
+      const search = urlObj.search;
+      const hash = urlObj.hash;
+      
+      // Decode and re-encode the pathname to handle double-encoding
+      const decodedPathname = decodeURIComponent(pathname);
+      const encodedPathname = encodeURI(decodedPathname);
+      
+      // Reconstruct the URL
+      const processedUrl = `${urlObj.protocol}//${urlObj.host}${encodedPathname}${search}${hash}`;
+      
+      logger.log(`[AndroidVideoPlayer][VLC] URL processed: ${url} -> ${processedUrl}`);
+      return processedUrl;
+    } catch (error) {
+      logger.warn(`[AndroidVideoPlayer][VLC] URL processing failed, using original: ${error}`);
+      return url;
+    }
+  }, []);
+
+  // Optimized VLC track processing function with reduced JSON operations
   const processVlcTracks = useCallback((tracks: any, source: string) => {
     if (!tracks) return;
+
+    // Log raw VLC tracks data for debugging
+    if (DEBUG_MODE) {
+      logger.log(`[VLC] ${source} - Raw tracks data:`, tracks);
+    }
 
     // Clear any pending updates
     if (trackUpdateTimeoutRef.current) {
@@ -268,29 +323,39 @@ const AndroidVideoPlayer: React.FC = () => {
       const { audio = [], subtitle = [] } = tracks;
       let hasUpdates = false;
 
-      // Process audio tracks
+      // Process audio tracks with optimized comparison
       if (Array.isArray(audio) && audio.length > 0) {
         const formattedAudio = formatVlcTracks(audio);
-        if (formattedAudio.length !== vlcAudioTracks.length ||
-            JSON.stringify(formattedAudio) !== JSON.stringify(vlcAudioTracks)) {
+        // Use length and first/last item comparison instead of full JSON.stringify
+        const audioChanged = formattedAudio.length !== vlcAudioTracks.length ||
+          (formattedAudio.length > 0 && vlcAudioTracks.length > 0 && 
+           (formattedAudio[0]?.id !== vlcAudioTracks[0]?.id || 
+            formattedAudio[formattedAudio.length - 1]?.id !== vlcAudioTracks[vlcAudioTracks.length - 1]?.id));
+        
+        if (audioChanged) {
           setVlcAudioTracks(formattedAudio);
           hasUpdates = true;
           // Only log in debug mode or when tracks actually change
           if (DEBUG_MODE) {
-            console.log(`🎬 [VLC] ${source} - Audio tracks updated:`, formattedAudio.length);
+            logger.log(`[VLC] ${source} - Audio tracks updated:`, formattedAudio.length);
           }
         }
       }
 
-      // Process subtitle tracks
+      // Process subtitle tracks with optimized comparison
       if (Array.isArray(subtitle) && subtitle.length > 0) {
         const formattedSubs = formatVlcTracks(subtitle);
-        if (formattedSubs.length !== vlcSubtitleTracks.length ||
-            JSON.stringify(formattedSubs) !== JSON.stringify(vlcSubtitleTracks)) {
+        // Use length and first/last item comparison instead of full JSON.stringify
+        const subsChanged = formattedSubs.length !== vlcSubtitleTracks.length ||
+          (formattedSubs.length > 0 && vlcSubtitleTracks.length > 0 && 
+           (formattedSubs[0]?.id !== vlcSubtitleTracks[0]?.id || 
+            formattedSubs[formattedSubs.length - 1]?.id !== vlcSubtitleTracks[vlcSubtitleTracks.length - 1]?.id));
+        
+        if (subsChanged) {
           setVlcSubtitleTracks(formattedSubs);
           hasUpdates = true;
           if (DEBUG_MODE) {
-            console.log(`🎬 [VLC] ${source} - Subtitle tracks updated:`, formattedSubs.length);
+            logger.log(`[VLC] ${source} - Subtitle tracks updated:`, formattedSubs.length);
           }
         }
       }
@@ -338,9 +403,15 @@ const AndroidVideoPlayer: React.FC = () => {
     return () => {
       if (trackUpdateTimeoutRef.current) {
         clearTimeout(trackUpdateTimeoutRef.current);
+        trackUpdateTimeoutRef.current = null;
       }
       if (resizeTimeoutRef.current) {
         clearTimeout(resizeTimeoutRef.current);
+        resizeTimeoutRef.current = null;
+      }
+      if (gestureDebounceRef.current) {
+        clearTimeout(gestureDebounceRef.current);
+        gestureDebounceRef.current = null;
       }
     };
   }, []);
@@ -355,13 +426,11 @@ const AndroidVideoPlayer: React.FC = () => {
   // VLC track selection handlers
   const selectVlcAudioTrack = useCallback((trackId: number | null) => {
     setVlcSelectedAudioTrack(trackId ?? undefined);
-    console.log('🎬 [VLC] Audio track selected:', trackId);
     logger.log('[AndroidVideoPlayer][VLC] Audio track selected:', trackId);
   }, []);
 
   const selectVlcSubtitleTrack = useCallback((trackId: number | null) => {
     setVlcSelectedSubtitleTrack(trackId ?? undefined);
-    console.log('🎬 [VLC] Subtitle track selected:', trackId);
     logger.log('[AndroidVideoPlayer][VLC] Subtitle track selected:', trackId);
   }, []);
 
@@ -446,6 +515,11 @@ const AndroidVideoPlayer: React.FC = () => {
   const [availableStreams, setAvailableStreams] = useState<{ [providerId: string]: { streams: any[]; addonName: string } }>(passedAvailableStreams || {});
   const [currentStreamUrl, setCurrentStreamUrl] = useState<string>(uri);
   const [currentVideoType, setCurrentVideoType] = useState<string | undefined>(videoType);
+  
+  // Memoized processed URL for VLC to prevent infinite loops
+  const processedStreamUrl = useMemo(() => {
+    return useVLC ? processUrlForVLC(currentStreamUrl) : currentStreamUrl;
+  }, [currentStreamUrl, useVLC, processUrlForVLC]);
   // Track a single silent retry per source to avoid loops
   const retryAttemptRef = useRef<number>(0);
   const [isChangingSource, setIsChangingSource] = useState<boolean>(false);
@@ -459,6 +533,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string>('');
   const errorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const vlcFallbackAttemptedRef = useRef(false);
 
   // VLC refs/state
   const vlcRef = useRef<any>(null);
@@ -676,105 +751,121 @@ const AndroidVideoPlayer: React.FC = () => {
     }
   };
 
-  // Volume gesture handler (right side of screen)
+  // Volume gesture handler (right side of screen) - optimized with debouncing
   const onVolumeGestureEvent = async (event: PanGestureHandlerGestureEvent) => {
     const { translationY, state } = event.nativeEvent;
     const sensitivity = 0.002; // Lower sensitivity for gradual volume control on Android
 
     if (state === State.ACTIVE) {
-      const deltaY = -translationY; // Invert for natural feel (up = increase)
-      const volumeChange = deltaY * sensitivity;
-      const newVolume = Math.max(0, Math.min(1, volume + volumeChange));
-
-      if (Math.abs(newVolume - volume) > 0.01) { // Lower threshold for smoother Android volume control
-        setVolume(newVolume);
-        lastVolumeChange.current = Date.now();
-        
-        if (DEBUG_MODE) {
-          logger.log(`[AndroidVideoPlayer] Volume set to: ${newVolume}`);
-        }
-        
-        // Show overlay with smoother animation
-        if (!showVolumeOverlay) {
-          setShowVolumeOverlay(true);
-          Animated.spring(volumeOverlayOpacity, {
-            toValue: 1,
-            tension: 100,
-            friction: 8,
-            useNativeDriver: true,
-          }).start();
-        }
-        
-        // Clear existing timeout
-        if (volumeOverlayTimeout.current) {
-          clearTimeout(volumeOverlayTimeout.current);
-        }
-        
-        // Hide overlay after 1.5 seconds (reduced from 2 seconds)
-        volumeOverlayTimeout.current = setTimeout(() => {
-          Animated.timing(volumeOverlayOpacity, {
-            toValue: 0,
-            duration: 250,
-            useNativeDriver: true,
-          }).start(() => {
-            setShowVolumeOverlay(false);
-          });
-        }, 1500);
+      // Debounce rapid gesture events
+      if (gestureDebounceRef.current) {
+        clearTimeout(gestureDebounceRef.current);
       }
+      
+      gestureDebounceRef.current = setTimeout(() => {
+        const deltaY = -translationY; // Invert for natural feel (up = increase)
+        const volumeChange = deltaY * sensitivity;
+        const newVolume = Math.max(0, Math.min(1, volume + volumeChange));
+
+        if (Math.abs(newVolume - volume) > 0.01) { // Lower threshold for smoother Android volume control
+          setVolume(newVolume);
+          lastVolumeChange.current = Date.now();
+          
+          if (DEBUG_MODE) {
+            logger.log(`[AndroidVideoPlayer] Volume set to: ${newVolume}`);
+          }
+          
+          // Show overlay with smoother animation
+          if (!showVolumeOverlay) {
+            setShowVolumeOverlay(true);
+            Animated.spring(volumeOverlayOpacity, {
+              toValue: 1,
+              tension: 100,
+              friction: 8,
+              useNativeDriver: true,
+            }).start();
+          }
+          
+          // Clear existing timeout
+          if (volumeOverlayTimeout.current) {
+            clearTimeout(volumeOverlayTimeout.current);
+          }
+          
+          // Hide overlay after 1.5 seconds (reduced from 2 seconds)
+          volumeOverlayTimeout.current = setTimeout(() => {
+            Animated.timing(volumeOverlayOpacity, {
+              toValue: 0,
+              duration: 250,
+              useNativeDriver: true,
+            }).start(() => {
+              setShowVolumeOverlay(false);
+            });
+          }, 1500);
+        }
+      }, 16); // ~60fps debouncing
     }
   };
 
-  // Brightness gesture handler (left side of screen)
+  // Brightness gesture handler (left side of screen) - optimized with debouncing
   const onBrightnessGestureEvent = async (event: PanGestureHandlerGestureEvent) => {
     const { translationY, state } = event.nativeEvent;
     const sensitivity = 0.001; // Lower sensitivity for finer brightness control
 
     if (state === State.ACTIVE) {
-      const deltaY = -translationY; // Invert for natural feel (up = increase)
-      const brightnessChange = deltaY * sensitivity;
-      const newBrightness = Math.max(0, Math.min(1, brightness + brightnessChange));
-
-      if (Math.abs(newBrightness - brightness) > 0.001) { // Much lower threshold for more responsive updates
-        setBrightness(newBrightness);
-        lastBrightnessChange.current = Date.now();
-        
-        // Set device brightness using Expo Brightness
-        try {
-          await Brightness.setBrightnessAsync(newBrightness);
-          if (DEBUG_MODE) {
-            logger.log(`[AndroidVideoPlayer] Device brightness set to: ${newBrightness}`);
-          }
-        } catch (error) {
-          logger.warn('[AndroidVideoPlayer] Error setting device brightness:', error);
-        }
-        
-        // Show overlay with smoother animation
-        if (!showBrightnessOverlay) {
-          setShowBrightnessOverlay(true);
-          Animated.spring(brightnessOverlayOpacity, {
-            toValue: 1,
-            tension: 100,
-            friction: 8,
-            useNativeDriver: true,
-          }).start();
-        }
-        
-        // Clear existing timeout
-        if (brightnessOverlayTimeout.current) {
-          clearTimeout(brightnessOverlayTimeout.current);
-        }
-        
-        // Hide overlay after 1.5 seconds (reduced from 2 seconds)
-        brightnessOverlayTimeout.current = setTimeout(() => {
-          Animated.timing(brightnessOverlayOpacity, {
-            toValue: 0,
-            duration: 250,
-            useNativeDriver: true,
-          }).start(() => {
-            setShowBrightnessOverlay(false);
-          });
-        }, 1500);
+      // Debounce rapid gesture events
+      if (gestureDebounceRef.current) {
+        clearTimeout(gestureDebounceRef.current);
       }
+      
+      gestureDebounceRef.current = setTimeout(() => {
+        const deltaY = -translationY; // Invert for natural feel (up = increase)
+        const brightnessChange = deltaY * sensitivity;
+        const newBrightness = Math.max(0, Math.min(1, brightness + brightnessChange));
+
+        if (Math.abs(newBrightness - brightness) > 0.001) { // Much lower threshold for more responsive updates
+          setBrightness(newBrightness);
+          lastBrightnessChange.current = Date.now();
+          
+          // Set device brightness using Expo Brightness
+          try {
+            Brightness.setBrightnessAsync(newBrightness).catch((error) => {
+              logger.warn('[AndroidVideoPlayer] Error setting device brightness:', error);
+            });
+            if (DEBUG_MODE) {
+              logger.log(`[AndroidVideoPlayer] Device brightness set to: ${newBrightness}`);
+            }
+          } catch (error) {
+            logger.warn('[AndroidVideoPlayer] Error setting device brightness:', error);
+          }
+          
+          // Show overlay with smoother animation
+          if (!showBrightnessOverlay) {
+            setShowBrightnessOverlay(true);
+            Animated.spring(brightnessOverlayOpacity, {
+              toValue: 1,
+              tension: 100,
+              friction: 8,
+              useNativeDriver: true,
+            }).start();
+          }
+          
+          // Clear existing timeout
+          if (brightnessOverlayTimeout.current) {
+            clearTimeout(brightnessOverlayTimeout.current);
+          }
+          
+          // Hide overlay after 1.5 seconds (reduced from 2 seconds)
+          brightnessOverlayTimeout.current = setTimeout(() => {
+            Animated.timing(brightnessOverlayOpacity, {
+              toValue: 0,
+              duration: 250,
+              useNativeDriver: true,
+            }).start(() => {
+              setShowBrightnessOverlay(false);
+            });
+          }, 1500);
+        }
+      }, 16); // ~60fps debouncing
     }
   };
 
@@ -840,7 +931,7 @@ const AndroidVideoPlayer: React.FC = () => {
       enableImmersiveMode();
       // Workaround for VLC surface detach: force complete remount VLC view on focus
       if (useVLC) {
-        console.log('🎬 [VLC] Forcing complete remount due to focus gain');
+        logger.log('[VLC] Forcing complete remount due to focus gain');
         setVlcRestoreTime(currentTime); // Save current time for restoration
         setForceVlcRemount(true);
         // Re-enable after a brief moment
@@ -860,7 +951,7 @@ const AndroidVideoPlayer: React.FC = () => {
         enableImmersiveMode();
         if (useVLC) {
           // Force complete remount VLC view when app returns to foreground
-          console.log('🎬 [VLC] Forcing complete remount due to app foreground');
+          logger.log('[VLC] Forcing complete remount due to app foreground');
           setVlcRestoreTime(currentTime); // Save current time for restoration
           setForceVlcRemount(true);
           // Re-enable after a brief moment
@@ -1047,8 +1138,8 @@ const AndroidVideoPlayer: React.FC = () => {
         clearInterval(progressSaveInterval);
       }
       
-      // Sync interval for progress updates
-      const syncInterval = 5000; // 5 seconds for responsive progress tracking
+      // Sync interval for progress updates - increased from 5s to 10s to reduce overhead
+      const syncInterval = 10000; // 10 seconds for better performance
       
       const interval = setInterval(() => {
         saveWatchProgress();
@@ -1218,8 +1309,8 @@ const AndroidVideoPlayer: React.FC = () => {
     
     const currentTimeInSeconds = data.currentTime;
     
-    // Update time more frequently for subtitle synchronization (0.1s threshold)
-    if (Math.abs(currentTimeInSeconds - currentTime) > 0.1) {
+    // Update time less frequently for better performance (increased threshold from 0.1s to 0.5s)
+    if (Math.abs(currentTimeInSeconds - currentTime) > 0.5) {
       safeSetState(() => setCurrentTime(currentTimeInSeconds));
       // Removed progressAnim animation - no longer needed with React Native Community Slider
       const bufferedTime = data.playableDuration || currentTimeInSeconds;
@@ -1409,15 +1500,100 @@ const AndroidVideoPlayer: React.FC = () => {
         }
       }
 
-      // Handle text tracks
-      if (data.textTracks && data.textTracks.length > 0) {
-        const formattedTextTracks = data.textTracks.map((track: any, index: number) => ({
-          id: track.index || index,
-          name: track.title || track.language || `Subtitle ${index + 1}`,
-          language: track.language,
-        }));
-        setRnVideoTextTracks(formattedTextTracks);
-      }
+        // Handle text tracks
+        if (data.textTracks && data.textTracks.length > 0) {
+          if (DEBUG_MODE) {
+            logger.log(`[AndroidVideoPlayer] Raw text tracks data:`, data.textTracks);
+            data.textTracks.forEach((track: any, idx: number) => {
+              logger.log(`[AndroidVideoPlayer] Text Track ${idx} raw data:`, {
+                index: track.index,
+                title: track.title,
+                language: track.language,
+                type: track.type,
+                name: track.name,
+                label: track.label,
+                allKeys: Object.keys(track),
+                fullTrackObject: track
+              });
+            });
+          }
+          
+          const formattedTextTracks = data.textTracks.map((track: any, index: number) => {
+            const trackIndex = track.index !== undefined ? track.index : index;
+            
+            // Build comprehensive track name from available fields
+            let trackName = '';
+            const parts = [];
+            
+            // Add language if available (try multiple possible fields)
+            let language = track.language || track.lang || track.languageCode;
+            
+            // If no language field, try to extract from track name (e.g., "[Russian]", "[English]")
+            if ((!language || language === 'Unknown' || language === 'und' || language === '') && track.title) {
+              const languageMatch = track.title.match(/\[([^\]]+)\]/);
+              if (languageMatch && languageMatch[1]) {
+                language = languageMatch[1].trim();
+              }
+            }
+            
+            if (language && language !== 'Unknown' && language !== 'und' && language !== '') {
+              parts.push(language.toUpperCase());
+            }
+            
+            // Add codec information if available (try multiple possible fields)
+            const codec = track.codec || track.format;
+            if (codec && codec !== 'Unknown' && codec !== 'und') {
+              parts.push(codec.toUpperCase());
+            }
+            
+            // Add title if available and not generic
+            let title = track.title || track.name || track.label;
+            if (title && !title.match(/^(Subtitle|Track)\s*\d*$/i) && title !== 'Unknown') {
+              // Clean up title by removing language brackets and trailing punctuation
+              title = title.replace(/\s*\[[^\]]+\]\s*[-–—]*\s*$/, '').trim();
+              if (title && title !== 'Unknown') {
+                parts.push(title);
+              }
+            }
+            
+            // Combine parts or fallback to generic name
+            if (parts.length > 0) {
+              trackName = parts.join(' • ');
+            } else {
+              // For simple track names like "Track 1", "Subtitle 1", etc., use them as-is
+              const simpleName = track.title || track.name || track.label;
+              if (simpleName && simpleName.match(/^(Track|Subtitle)\s*\d*$/i)) {
+                trackName = simpleName;
+              } else {
+                // Try to extract any meaningful info from the track object
+                const meaningfulFields: string[] = [];
+                Object.keys(track).forEach(key => {
+                  const value = track[key];
+                  if (value && typeof value === 'string' && value !== 'Unknown' && value !== 'und' && value.length > 1) {
+                    meaningfulFields.push(`${key}: ${value}`);
+                  }
+                });
+                
+                if (meaningfulFields.length > 0) {
+                  trackName = meaningfulFields.join(' • ');
+                } else {
+                  trackName = `Subtitle ${index + 1}`;
+                }
+              }
+            }
+            
+            return {
+              id: trackIndex, // Use the actual track index from react-native-video
+              name: trackName,
+              language: language,
+            };
+          });
+          setRnVideoTextTracks(formattedTextTracks);
+          
+          if (DEBUG_MODE) {
+            logger.log(`[AndroidVideoPlayer] Formatted text tracks:`, formattedTextTracks);
+          }
+        }
 
       setIsVideoLoaded(true);
       setIsPlayerReady(true);
@@ -1529,7 +1705,7 @@ const AndroidVideoPlayer: React.FC = () => {
           NativeModules.StatusBarManager.setHidden(true);
         }
       } catch (error) {
-        if (__DEV__) console.log('Immersive mode error:', error);
+        logger.warn('[AndroidVideoPlayer] Immersive mode error:', error);
       }
     }
   };
@@ -1664,6 +1840,37 @@ const AndroidVideoPlayer: React.FC = () => {
         return;
       }
       
+      // Check for codec errors that should trigger VLC fallback
+      const errorString = JSON.stringify(error || {});
+      const isCodecError = errorString.includes('MediaCodecVideoRenderer error') ||
+                         errorString.includes('MediaCodecAudioRenderer error') ||
+                         errorString.includes('NO_EXCEEDS_CAPABILITIES') ||
+                         errorString.includes('NO_UNSUPPORTED_TYPE') ||
+                         errorString.includes('Decoder failed') ||
+                         errorString.includes('video/hevc') ||
+                         errorString.includes('audio/eac3') ||
+                         errorString.includes('ERROR_CODE_DECODING_FAILED') ||
+                         errorString.includes('ERROR_CODE_DECODER_INIT_FAILED');
+      
+      // If it's a codec error and we're not already using VLC, silently switch to VLC
+      if (isCodecError && !useVLC && LibVlcPlayerViewComponent && !vlcFallbackAttemptedRef.current) {
+        vlcFallbackAttemptedRef.current = true;
+        logger.warn('[AndroidVideoPlayer] Codec error detected, silently switching to VLC');
+        // Clear any existing timeout
+        if (errorTimeoutRef.current) {
+          clearTimeout(errorTimeoutRef.current);
+          errorTimeoutRef.current = null;
+        }
+        safeSetState(() => setShowErrorModal(false));
+        
+        // Switch to VLC silently
+        setTimeout(() => {
+          if (!isMounted.current) return;
+          // Force VLC by updating the route params
+          navigation.setParams({ forceVlc: true } as any);
+        }, 100);
+        return; // Do not proceed to show error UI
+      }
       
       // One-shot, silent retry without showing error UI
       if (retryAttemptRef.current < 1) {
@@ -1713,7 +1920,8 @@ const AndroidVideoPlayer: React.FC = () => {
             // Force HLS type and add cache-busting
             setCurrentVideoType('m3u8');
             const sep = currentStreamUrl.includes('?') ? '&' : '?';
-            setCurrentStreamUrl(`${currentStreamUrl}${sep}hls_retry=${Date.now()}`);
+            const retryUrl = `${currentStreamUrl}${sep}hls_retry=${Date.now()}`;
+            setCurrentStreamUrl(retryUrl);
             setPaused(false);
           }, 120);
           return;
@@ -1732,7 +1940,8 @@ const AndroidVideoPlayer: React.FC = () => {
             setCurrentVideoType(nextType);
             // Force re-mount of source by tweaking URL param
             const sep = currentStreamUrl.includes('?') ? '&' : '?';
-            setCurrentStreamUrl(`${currentStreamUrl}${sep}rn_type_retry=${Date.now()}`);
+            const retryUrl = `${currentStreamUrl}${sep}rn_type_retry=${Date.now()}`;
+            setCurrentStreamUrl(retryUrl);
             setPaused(false);
           }, 120);
           return;
@@ -1760,7 +1969,8 @@ const AndroidVideoPlayer: React.FC = () => {
           setCurrentVideoType('mp4');
           // Force re-mount of source by tweaking URL param
           const sep = currentStreamUrl.includes('?') ? '&' : '?';
-          setCurrentStreamUrl(`${currentStreamUrl}${sep}manifest_fix_retry=${Date.now()}`);
+          const retryUrl = `${currentStreamUrl}${sep}manifest_fix_retry=${Date.now()}`;
+          setCurrentStreamUrl(retryUrl);
           setPaused(false);
         }, 120);
         return;
@@ -1879,7 +2089,7 @@ const AndroidVideoPlayer: React.FC = () => {
       } catch (error) {
         logger.warn('[AndroidVideoPlayer] Failed to maintain keep-awake:', error);
       }
-    }, 5000); // Re-activate every 5 seconds to ensure it stays active
+    }, 10000); // Reduced frequency from 5s to 10s to reduce overhead
 
     return () => {
       clearInterval(keepAliveInterval);
@@ -2568,17 +2778,38 @@ const AndroidVideoPlayer: React.FC = () => {
     isMounted.current = true;
     return () => {
       isMounted.current = false;
+      // Clear all timers and intervals
       if (seekDebounceTimer.current) {
         clearTimeout(seekDebounceTimer.current);
+        seekDebounceTimer.current = null;
       }
       if (errorTimeoutRef.current) {
         clearTimeout(errorTimeoutRef.current);
+        errorTimeoutRef.current = null;
       }
       if (volumeOverlayTimeout.current) {
         clearTimeout(volumeOverlayTimeout.current);
+        volumeOverlayTimeout.current = null;
       }
       if (brightnessOverlayTimeout.current) {
         clearTimeout(brightnessOverlayTimeout.current);
+        brightnessOverlayTimeout.current = null;
+      }
+      if (controlsTimeout.current) {
+        clearTimeout(controlsTimeout.current);
+        controlsTimeout.current = null;
+      }
+      if (pauseOverlayTimerRef.current) {
+        clearTimeout(pauseOverlayTimerRef.current);
+        pauseOverlayTimerRef.current = null;
+      }
+      if (gestureDebounceRef.current) {
+        clearTimeout(gestureDebounceRef.current);
+        gestureDebounceRef.current = null;
+      }
+      if (progressSaveInterval) {
+        clearInterval(progressSaveInterval);
+        setProgressSaveInterval(null);
       }
     };
   }, []);
@@ -3084,7 +3315,7 @@ const AndroidVideoPlayer: React.FC = () => {
                     style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
                     // Force remount when surfaces are recreated
                     key={vlcKey}
-                    source={currentStreamUrl}
+                    source={processedStreamUrl}
                     aspectRatio={vlcAspectRatio}
                     options={vlcOptions}
                     tracks={vlcTracks}
@@ -3096,7 +3327,7 @@ const AndroidVideoPlayer: React.FC = () => {
                     onFirstPlay={(info: any) => {
                       try {
                         if (DEBUG_MODE) {
-                          console.log('🎬 [VLC] Video loaded, extracting tracks...');
+                          logger.log('[VLC] Video loaded, extracting tracks...');
                         }
                         logger.log('[AndroidVideoPlayer][VLC] Video loaded successfully');
 
@@ -3113,21 +3344,21 @@ const AndroidVideoPlayer: React.FC = () => {
                         // Restore playback position after remount (workaround for surface detach)
                         if (vlcRestoreTime !== undefined && vlcRestoreTime > 0) {
                           if (DEBUG_MODE) {
-                            console.log('🎬 [VLC] Restoring playback position:', vlcRestoreTime);
+                            logger.log('[VLC] Restoring playback position:', vlcRestoreTime);
                           }
                           setTimeout(() => {
                             if (vlcRef.current && typeof vlcRef.current.seek === 'function') {
                               const seekPosition = Math.min(vlcRestoreTime / lenSec, 0.999); // Convert to fraction
                               vlcRef.current.seek(seekPosition);
                               if (DEBUG_MODE) {
-                                console.log('🎬 [VLC] Seeked to restore position');
+                                logger.log('[VLC] Seeked to restore position');
                               }
                             }
                           }, 500); // Small delay to ensure player is ready
                           setVlcRestoreTime(undefined); // Clear restore time
                         }
                       } catch (e) {
-                        console.error('🎬 [VLC] onFirstPlay error:', e);
+                        logger.error('[VLC] onFirstPlay error:', e);
                         logger.warn('[AndroidVideoPlayer][VLC] onFirstPlay parse error', e);
                       }
                     }}
@@ -3142,17 +3373,16 @@ const AndroidVideoPlayer: React.FC = () => {
                     onPaused={() => setPaused(true)}
                     onEndReached={onEnd}
                     onEncounteredError={(e: any) => {
-                      console.log('🎬 [VLC] Encountered error:', e);
                       logger.error('[AndroidVideoPlayer][VLC] Encountered error:', e);
                       handleError(e);
                     }}
                     onBackground={() => {
-                      console.log('🎬 [VLC] App went to background');
+                      logger.log('[VLC] App went to background');
                     }}
                     onESAdded={(tracks: any) => {
                       try {
                         if (DEBUG_MODE) {
-                          console.log('🎬 [VLC] ES Added - processing tracks...');
+                          logger.log('[VLC] ES Added - processing tracks...');
                         }
 
                         // Process VLC tracks using optimized function
@@ -3160,7 +3390,7 @@ const AndroidVideoPlayer: React.FC = () => {
                           processVlcTracks(tracks, 'onESAdded');
                         }
                       } catch (e) {
-                        console.error('🎬 [VLC] onESAdded error:', e);
+                        logger.error('[VLC] onESAdded error:', e);
                         logger.warn('[AndroidVideoPlayer][VLC] onESAdded parse error', e);
                       }
                     }}
@@ -3177,9 +3407,8 @@ const AndroidVideoPlayer: React.FC = () => {
                   }}
                   paused={paused}
                     onLoadStart={() => {
-                      console.log('🎬 [RN Video] Load started');
-                      loadStartAtRef.current = Date.now();
                       logger.log('[AndroidVideoPlayer][RN Video] onLoadStart');
+                      loadStartAtRef.current = Date.now();
 
                       // Log stream information for debugging
                       const streamInfo = {
@@ -3193,7 +3422,7 @@ const AndroidVideoPlayer: React.FC = () => {
                     }}
                   onProgress={handleProgress}
                   onLoad={(e) => {
-                    console.log('🎬 [RN Video] Video loaded successfully');
+                    logger.log('[AndroidVideoPlayer][RN Video] Video loaded successfully');
                     logger.log('[AndroidVideoPlayer][RN Video] onLoad fired', { duration: e?.duration });
                     onLoad(e);
                   }}
@@ -3210,8 +3439,7 @@ const AndroidVideoPlayer: React.FC = () => {
                   onSeek={onSeek}
                   onEnd={onEnd}
                   onError={(err) => {
-                    console.log('🎬 [RN Video] Encountered error:', err);
-                    logger.error('[AndroidVideoPlayer][RN Video] onError', err);
+                    logger.error('[AndroidVideoPlayer][RN Video] Encountered error:', err);
                     handleError(err);
                   }}
                   onBuffer={(buf) => {
@@ -3229,7 +3457,7 @@ const AndroidVideoPlayer: React.FC = () => {
                   playWhenInactive={false}
                   ignoreSilentSwitch="ignore"
                   mixWithOthers="inherit"
-                  progressUpdateInterval={250}
+                  progressUpdateInterval={500}
                   // Remove artificial bit rate cap to allow high-bitrate streams (e.g., Blu-ray remux) to play
                   // maxBitRate intentionally omitted
                   disableFocus={true}

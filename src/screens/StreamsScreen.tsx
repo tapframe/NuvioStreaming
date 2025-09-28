@@ -47,6 +47,7 @@ import QualityBadge from '../components/metadata/QualityBadge';
 import { logger } from '../utils/logger';
 import { isMkvStream } from '../utils/mkvDetection';
 import CustomAlert from '../components/CustomAlert';
+import { toast, ToastPosition } from '@backpackapp-io/react-native-toast';
 
 const TMDB_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tmdb.new.logo.svg/512px-Tmdb.new.logo.svg.png?20200406190906';
 const HDR_ICON = 'https://uxwing.com/wp-content/themes/uxwing/download/video-photography-multimedia/hdr-icon.png';
@@ -218,10 +219,31 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
     if (stream.url) {
       try {
         await Clipboard.setString(stream.url);
-        showAlert('Copied!', 'Stream URL has been copied to clipboard.');
+        
+        // Use toast for Android, custom alert for iOS
+        if (Platform.OS === 'android') {
+          toast('Stream URL copied to clipboard!', {
+            duration: 2000,
+            position: ToastPosition.BOTTOM,
+          });
+        } else {
+          // iOS uses custom alert
+          setTimeout(() => {
+            showAlert('Copied!', 'Stream URL has been copied to clipboard.');
+          }, 50);
+        }
       } catch (error) {
         // Fallback: show URL in alert if clipboard fails
-        showAlert('Stream URL', stream.url);
+        if (Platform.OS === 'android') {
+          toast(`Stream URL: ${stream.url}`, {
+            duration: 3000,
+            position: ToastPosition.BOTTOM,
+          });
+        } else {
+          setTimeout(() => {
+            showAlert('Stream URL', stream.url);
+          }, 50);
+        }
       }
     }
   }, [stream.url, showAlert]);
@@ -438,16 +460,25 @@ export const StreamsScreen = () => {
   const [alertMessage, setAlertMessage] = useState('');
   const [alertActions, setAlertActions] = useState<Array<{ label: string; onPress: () => void; style?: object }>>([]);
 
-  const openAlert = (
+  const openAlert = useCallback((
     title: string,
     message: string,
     actions?: Array<{ label: string; onPress: () => void; style?: object }>
   ) => {
-    setAlertTitle(title);
-    setAlertMessage(message);
-    setAlertActions(actions && actions.length > 0 ? actions : [{ label: 'OK', onPress: () => {} }]);
-    setAlertVisible(true);
-  };
+    // Add safety check to prevent crashes on Android
+    if (!isMounted.current) {
+      return;
+    }
+    
+    try {
+      setAlertTitle(title);
+      setAlertMessage(message);
+      setAlertActions(actions && actions.length > 0 ? actions : [{ label: 'OK', onPress: () => {} }]);
+      setAlertVisible(true);
+    } catch (error) {
+      console.warn('[StreamsScreen] Error showing alert:', error);
+    }
+  }, []);
 
   
 
@@ -1927,13 +1958,15 @@ export const StreamsScreen = () => {
           </View>
         )}
       </View>
-      <CustomAlert
-        visible={alertVisible}
-        title={alertTitle}
-        message={alertMessage}
-        actions={alertActions}
-        onClose={() => setAlertVisible(false)}
-      />
+      {Platform.OS === 'ios' && (
+        <CustomAlert
+          visible={alertVisible}
+          title={alertTitle}
+          message={alertMessage}
+          actions={alertActions}
+          onClose={() => setAlertVisible(false)}
+        />
+      )}
     </View>
   );
 };

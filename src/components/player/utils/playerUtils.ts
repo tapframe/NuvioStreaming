@@ -101,7 +101,13 @@ export const getTrackDisplayName = (track: { name?: string, id: number, language
     return track.name;
   }
 
-  // If we have a language field, use that for better display
+  // If the track name contains detailed information (like codec, bitrate, etc.), use it as-is
+  if (track.name && (track.name.includes('DDP') || track.name.includes('DTS') || track.name.includes('AAC') || 
+                     track.name.includes('Kbps') || track.name.includes('Atmos') || track.name.includes('~'))) {
+    return track.name;
+  }
+
+  // If we have a language field, use that for better display (only for simple track names)
   if (track.language && track.language !== 'Unknown') {
     const formattedLanguage = formatLanguage(track.language);
     if (formattedLanguage !== 'Unknown' && !formattedLanguage.includes('Unknown')) {
