@@ -117,7 +117,15 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
           <Text style={[styles.metaText, { color: currentTheme.colors.text }]}>{metadata.year}</Text>
         )}
         {metadata.runtime && (
-          <Text style={[styles.metaText, { color: currentTheme.colors.text }]}>{metadata.runtime}</Text>
+          <Text style={[styles.metaText, { color: currentTheme.colors.text }]}>
+            {(() => {
+              const r = parseInt(metadata.runtime, 10);
+              if (isNaN(r) || r < 60) return metadata.runtime;
+              const h = Math.floor(r / 60);
+              const m = r % 60;
+              return `${h}H ${m < 10 ? '0' : ''}${m}MIN`;
+            })()}
+          </Text>
         )}
         {metadata.certification && (
           <Text style={[styles.metaText, { color: currentTheme.colors.text }]}>{metadata.certification}</Text>
