@@ -56,49 +56,32 @@ const POSTER_WIDTH = posterLayout.posterWidth;
 const CatalogSection = ({ catalog }: CatalogSectionProps) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
-  // Simplified visibility tracking to reduce state updates and re-renders
-  const [visibleIndexSet, setVisibleIndexSet] = useState<Set<number>>(new Set([0, 1, 2, 3, 4, 5, 6, 7]));
-  const viewabilityConfig = useMemo(() => ({
-    itemVisiblePercentThreshold: 15,
-    minimumViewTime: 100,
-  }), []);
+  // Simplified visibility tracking - just load all images immediately for better performance
+  const [hasLoaded, setHasLoaded] = useState(false);
   
-  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<{ index?: number | null }> }) => {
-    const next = new Set<number>();
-    viewableItems.forEach(v => { if (typeof v.index === 'number') next.add(v.index); });
-    // Only pre-warm immediate neighbors to reduce overhead
-    const neighbors: number[] = [];
-    next.forEach(i => {
-      neighbors.push(i - 1, i + 1);
-    });
-    neighbors.forEach(i => { if (i >= 0) next.add(i); });
-    setVisibleIndexSet(next);
-  });
-
-  const [minVisible, maxVisible] = useMemo(() => {
-    if (visibleIndexSet.size === 0) return [0, 7];
-    let min = Number.POSITIVE_INFINITY;
-    let max = 0;
-    visibleIndexSet.forEach(i => { if (i < min) min = i; if (i > max) max = i; });
-    return [min, max];
-  }, [visibleIndexSet]);
+  // Load all images after a short delay to prevent blocking initial render
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setHasLoaded(true);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleContentPress = useCallback((id: string, type: string) => {
     navigation.navigate('Metadata', { id, type, addonId: catalog.addon });
   }, [navigation, catalog.addon]);
 
   const renderContentItem = useCallback(({ item, index }: { item: StreamingContent, index: number }) => {
-    // Simplify visibility logic to reduce re-renders
-    const isVisible = visibleIndexSet.has(index) || index < 8;
+    // Load images immediately for better scrolling performance
     return (
       <ContentItem 
         item={item} 
         onPress={handleContentPress}
-        shouldLoadImage={isVisible}
-        deferMs={0}
+        shouldLoadImage={hasLoaded}
+        deferMs={index * 10} // Small stagger to prevent blocking
       />
     );
-  }, [handleContentPress, visibleIndexSet]);
+  }, [handleContentPress, hasLoaded]);
 
   // Memoize the ItemSeparatorComponent to prevent re-creation
   const ItemSeparator = useCallback(() => <View style={{ width: 8 }} />, []);
@@ -139,8 +122,6 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
         onEndReachedThreshold={0.7}
         onEndReached={() => {}}
         scrollEventThrottle={64}
-        viewabilityConfig={viewabilityConfig as any}
-        onViewableItemsChanged={onViewableItemsChanged.current as any}
         removeClippedSubviews={true}
       />
     </Animated.View>

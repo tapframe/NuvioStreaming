@@ -74,7 +74,6 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
   const [isWatched, setIsWatched] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const [shouldLoadImageState, setShouldLoadImageState] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const { currentTheme } = useTheme();
   const { settings, isLoaded } = useSettings();
@@ -126,22 +125,6 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
     setMenuVisible(false);
   }, []);
 
-  // Lazy load images - only load when asked by parent (viewability) or after small defer
-  useEffect(() => {
-    if (shouldLoadImageProp !== undefined) {
-      if (shouldLoadImageProp) {
-        const t = setTimeout(() => setShouldLoadImageState(true), deferMs);
-        return () => clearTimeout(t);
-      } else {
-        setShouldLoadImageState(false);
-      }
-      return;
-    }
-    const timer = setTimeout(() => {
-      setShouldLoadImageState(true);
-    }, 80);
-    return () => clearTimeout(timer);
-  }, [shouldLoadImageProp, deferMs]);
 
   // Memoize optimized poster URL to prevent recalculating
   const optimizedPosterUrl = React.useMemo(() => {
@@ -213,16 +196,16 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
           delayLongPress={300}
         >
           <View ref={itemRef} style={[styles.contentItemContainer, { borderRadius: posterRadius }] }>
-            {/* Only load image when shouldLoadImage is true (lazy loading) */}
-            {(shouldLoadImageProp ?? shouldLoadImageState) && item.poster ? (
+            {/* Always load image for horizontal scrolling to prevent blank posters */}
+            {item.poster ? (
               <ExpoImage
                 source={{ uri: optimizedPosterUrl }}
                 style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, borderRadius: posterRadius }]}
                 contentFit="cover"
                 cachePolicy={Platform.OS === 'android' ? 'disk' : 'memory-disk'}
-                transition={140}
+                transition={100} // Faster transition for scrolling
                 allowDownscaling
-                priority="low" // Deprioritize decode for long lists
+                priority="normal" // Normal priority for horizontal scrolling
                 onLoad={() => {
                   setImageLoaded(true);
                   setImageError(false);
@@ -241,7 +224,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
                 recyclingKey={item.id} // Add recycling key for better performance
               />
             ) : (
-              // Show placeholder until lazy load triggers
+              // Show placeholder for items without posters
               <View style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, justifyContent: 'center', alignItems: 'center', borderRadius: posterRadius }] }>
                 <Text style={{ color: currentTheme.colors.textMuted, fontSize: 10, textAlign: 'center' }}>
                   {item.name.substring(0, 20)}...
@@ -349,9 +332,8 @@ const styles = StyleSheet.create({
 });
 
 export default React.memo(ContentItem, (prev, next) => {
-  // Re-render when identity changes or when visibility-driven loading flips
+  // Re-render when identity changes or poster changes
   if (prev.item.id !== next.item.id) return false;
   if (prev.item.poster !== next.item.poster) return false;
-  if ((prev.shouldLoadImage ?? false) !== (next.shouldLoadImage ?? false)) return false;
   return true;
 });

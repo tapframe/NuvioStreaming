@@ -588,6 +588,20 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
     return (availableWidth - totalSpacing) / effectiveNumColumns;
   }, [effectiveNumColumns, screenData.width, screenData.itemWidth]);
 
+  // Helper function to optimize poster URLs
+  const optimizePosterUrl = useCallback((poster: string | undefined) => {
+    if (!poster || poster.includes('placeholder')) {
+      return 'https://via.placeholder.com/300x450/333333/666666?text=No+Image';
+    }
+    
+    // For TMDB images, use smaller sizes for better performance
+    if (poster.includes('image.tmdb.org')) {
+      return poster.replace(/\/w\d+\//, '/w300/');
+    }
+    
+    return poster;
+  }, []);
+
   const renderItem = useCallback(({ item, index }: { item: Meta; index: number }) => {
     // Calculate if this is the last item in a row
     const isLastInRow = (index + 1) % effectiveNumColumns === 0;
@@ -607,12 +621,14 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
         activeOpacity={0.7}
       >
         <Image
-          source={{ uri: item.poster || 'https://via.placeholder.com/300x450/333333/666666?text=No+Image' }}
+          source={{ uri: optimizePosterUrl(item.poster) }}
           style={styles.poster}
           contentFit="cover"
-          cachePolicy="disk"
-          transition={0}
+          cachePolicy={Platform.OS === 'android' ? 'memory-disk' : 'memory-disk'}
+          transition={100}
           allowDownscaling
+          priority="normal"
+          recyclingKey={`${item.id}-${item.type}`}
         />
 
         {type === 'movie' && nowPlayingMovies.has(item.id) && (
@@ -644,7 +660,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
         )}
       </TouchableOpacity>
     );
-  }, [navigation, styles, effectiveNumColumns, effectiveItemWidth, type, nowPlayingMovies]);
+  }, [navigation, styles, effectiveNumColumns, effectiveItemWidth, type, nowPlayingMovies, colors.white, optimizePosterUrl]);
 
   const renderEmptyState = () => (
     <View style={styles.centered}>
@@ -754,6 +770,11 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           }
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={effectiveNumColumns * 3}
+          windowSize={10}
+          initialNumToRender={effectiveNumColumns * 4}
+          getItemType={() => 'item'}
         />
       ) : renderEmptyState()}
     </SafeAreaView>

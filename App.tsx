@@ -144,37 +144,29 @@ const ThemedApp = () => {
   const shouldShowApp = isAppReady && hasCompletedOnboarding !== null;
   const initialRouteName = hasCompletedOnboarding ? 'MainTabs' : 'Onboarding';
   
-  const NavigationWithRef = () => {
-    const { navigationRef } = useAccount() as any;
-    return (
-      <NavigationContainer 
-        ref={navigationRef as any}
-        theme={customNavigationTheme}
-        linking={undefined}
-      >
-        <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
-          <StatusBar style="light" />
-          {!isAppReady && <SplashScreen onFinish={handleSplashComplete} />}
-          {shouldShowApp && <AppNavigator initialRouteName={initialRouteName} />}
-          {Platform.OS === 'ios' && (
-            <UpdatePopup
-              visible={showUpdatePopup}
-              updateInfo={updateInfo}
-              onUpdateNow={handleUpdateNow}
-              onUpdateLater={handleUpdateLater}
-              onDismiss={handleDismiss}
-              isInstalling={isInstalling}
-            />
-          )}
-        </View>
-      </NavigationContainer>
-    );
-  };
-
   return (
     <AccountProvider>
       <PaperProvider theme={customDarkTheme}>
-        <NavigationWithRef />
+        <NavigationContainer 
+          theme={customNavigationTheme}
+          linking={undefined}
+        >
+          <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
+            <StatusBar style="light" />
+            {!isAppReady && <SplashScreen onFinish={handleSplashComplete} />}
+            {shouldShowApp && <AppNavigator initialRouteName={initialRouteName} />}
+            {Platform.OS === 'ios' && (
+              <UpdatePopup
+                visible={showUpdatePopup}
+                updateInfo={updateInfo}
+                onUpdateNow={handleUpdateNow}
+                onUpdateLater={handleUpdateLater}
+                onDismiss={handleDismiss}
+                isInstalling={isInstalling}
+              />
+            )}
+          </View>
+        </NavigationContainer>
       </PaperProvider>
     </AccountProvider>
   );
