@@ -1834,8 +1834,10 @@ const AndroidVideoPlayer: React.FC = () => {
     }
   };
 
-  // Keep screen awake during active playback (Android)
+  // Enhanced screen lock prevention - keep screen awake as soon as player mounts
   const keepAwakeModuleRef = useRef<any>(null);
+  const keepAwakeActiveRef = useRef<boolean>(false);
+  
   useEffect(() => {
     try {
       // Use require to avoid TS dynamic import constraints
@@ -1848,23 +1850,75 @@ const AndroidVideoPlayer: React.FC = () => {
     }
   }, []);
 
-  // Toggle keep-awake based on playback state
+  // Activate keep-awake immediately when player mounts and keep it active
   useEffect(() => {
     const mod = keepAwakeModuleRef.current;
     if (!mod) return;
+    
     const activate = mod.activateKeepAwakeAsync || mod.activateKeepAwake;
     const deactivate = mod.deactivateKeepAwakeAsync || mod.deactivateKeepAwake;
+    
+    // Activate immediately when component mounts
     try {
-      if (!paused && isPlayerReady && duration > 0) {
-        activate && activate();
-      } else {
-        deactivate && deactivate();
+      if (activate && !keepAwakeActiveRef.current) {
+        activate();
+        keepAwakeActiveRef.current = true;
+        logger.log('[AndroidVideoPlayer] Screen lock prevention activated on mount');
       }
-    } catch (_e) {}
+    } catch (error) {
+      logger.warn('[AndroidVideoPlayer] Failed to activate keep-awake:', error);
+    }
+
+    // Keep it active throughout the entire player session
+    const keepAliveInterval = setInterval(() => {
+      try {
+        if (activate && !keepAwakeActiveRef.current) {
+          activate();
+          keepAwakeActiveRef.current = true;
+        }
+      } catch (error) {
+        logger.warn('[AndroidVideoPlayer] Failed to maintain keep-awake:', error);
+      }
+    }, 5000); // Re-activate every 5 seconds to ensure it stays active
+
     return () => {
-      try { deactivate && deactivate(); } catch (_e) {}
+      clearInterval(keepAliveInterval);
+      try {
+        if (deactivate && keepAwakeActiveRef.current) {
+          deactivate();
+          keepAwakeActiveRef.current = false;
+          logger.log('[AndroidVideoPlayer] Screen lock prevention deactivated on unmount');
+        }
+      } catch (error) {
+        logger.warn('[AndroidVideoPlayer] Failed to deactivate keep-awake:', error);
+      }
     };
-  }, [paused, isPlayerReady, duration]);
+  }, []); // Empty dependency array - only run on mount/unmount
+
+  // Additional keep-awake activation on app state changes
+  useEffect(() => {
+    const mod = keepAwakeModuleRef.current;
+    if (!mod) return;
+    
+    const activate = mod.activateKeepAwakeAsync || mod.activateKeepAwake;
+    
+    const handleAppStateChange = (nextAppState: string) => {
+      if (nextAppState === 'active') {
+        try {
+          if (activate && !keepAwakeActiveRef.current) {
+            activate();
+            keepAwakeActiveRef.current = true;
+            logger.log('[AndroidVideoPlayer] Screen lock prevention re-activated on app foreground');
+          }
+        } catch (error) {
+          logger.warn('[AndroidVideoPlayer] Failed to re-activate keep-awake on app foreground:', error);
+        }
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
+  }, []);
   
   const handleErrorExit = () => {
     try {

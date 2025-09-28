@@ -503,7 +503,7 @@ const HomeScreen = () => {
       await new Promise(resolve => setTimeout(resolve, 100));
       }
       
-      navigation.navigate('Player', {
+      navigation.navigate(Platform.OS === 'ios' ? 'PlayerIOS' : 'PlayerAndroid', {
         uri: stream.url,
         title: featuredContent.name,
         year: featuredContent.year,
@@ -516,7 +516,7 @@ const HomeScreen = () => {
       logger.error('[HomeScreen] Error in handlePlayStream:', error);
       
       // Fallback: navigate anyway
-      navigation.navigate('Player', {
+      navigation.navigate(Platform.OS === 'ios' ? 'PlayerIOS' : 'PlayerAndroid', {
         uri: stream.url,
         title: featuredContent.name,
         year: featuredContent.year,
