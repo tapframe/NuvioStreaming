@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { toast } from '@backpackapp-io/react-native-toast';
+import { DeviceEventEmitter } from 'react-native';
 import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Platform, Text, Animated } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -74,8 +76,13 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
 
     // Load watched state from AsyncStorage when item changes
   useEffect(() => {
-    AsyncStorage.getItem(`watched_${item.id}`).then(val => setIsWatched(val === 'true'));
-  }, [item.id]);
+    const updateWatched = () => {
+      AsyncStorage.getItem(`watched:${item.type}:${item.id}`).then(val => setIsWatched(val === 'true'));
+    };
+    updateWatched();
+    const sub = DeviceEventEmitter.addListener('watchedStatusChanged', updateWatched);
+    return () => sub.remove();
+  }, [item.id, item.type]);
 
   const [menuVisible, setMenuVisible] = useState(false);
   const [isWatched, setIsWatched] = useState(false);
@@ -114,14 +121,21 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
       case 'library':
         if (inLibrary) {
           catalogService.removeFromLibrary(item.type, item.id);
+          toast('Removed from Library', { duration: 1200 });
         } else {
           catalogService.addToLibrary(item);
+          toast('Added to Library', { duration: 1200 });
         }
         break;
       case 'watched': {
         setIsWatched(prevWatched => {
           const newWatched = !prevWatched;
-          AsyncStorage.setItem(`watched_${item.id}`, newWatched ? 'true' : 'false');
+          AsyncStorage.setItem(`watched:${item.type}:${item.id}`, newWatched ? 'true' : 'false');
+          toast(newWatched ? 'Marked as Watched' : 'Marked as Unwatched', { duration: 1200 });
+          // Fire a custom event so other screens can update
+          setTimeout(() => {
+            DeviceEventEmitter.emit('watchedStatusChanged');
+          }, 100);
           return newWatched;
         });
         setMenuVisible(false);
