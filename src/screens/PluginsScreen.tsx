@@ -33,7 +33,7 @@ const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.darkBackground,
   },
   header: {
     flexDirection: 'row',
@@ -63,7 +63,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   headerTitle: {
     fontSize: 34,
     fontWeight: 'bold',
-    color: colors.white,
+    color: colors.text,
     paddingHorizontal: 16,
     marginBottom: 24,
   },
@@ -71,7 +71,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     flex: 1,
   },
   section: {
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.elevation1,
     marginBottom: 16,
     borderRadius: 12,
     padding: 16,
@@ -852,6 +852,7 @@ const PluginsScreen: React.FC = () => {
   const [showboxUiToken, setShowboxUiToken] = useState<string>('');
   const [showboxSavedToken, setShowboxSavedToken] = useState<string>('');
   const [showboxScraperId, setShowboxScraperId] = useState<string | null>(null);
+  const [showboxTokenVisible, setShowboxTokenVisible] = useState<boolean>(false);
   
   // Multiple repositories state
   const [repositories, setRepositories] = useState<RepositoryInfo[]>([]);
@@ -1084,10 +1085,12 @@ const PluginsScreen: React.FC = () => {
         const s = await localScraperService.getScraperSettings(sb.id);
         setShowboxUiToken(s.uiToken || '');
         setShowboxSavedToken(s.uiToken || '');
+        setShowboxTokenVisible(false);
       } else {
         setShowboxScraperId(null);
         setShowboxUiToken('');
         setShowboxSavedToken('');
+        setShowboxTokenVisible(false);
       }
     } catch (error) {
       logger.error('[ScraperSettings] Failed to load scrapers:', error);
@@ -1630,17 +1633,25 @@ const PluginsScreen: React.FC = () => {
                        {showboxScraperId && scraper.id === showboxScraperId && settings.enableLocalScrapers && (
                     <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.elevation3 }}>
                            <Text style={[styles.settingTitle, { marginBottom: 8 }]}>ShowBox UI Token</Text>
-                           <TextInput
-                             style={[styles.textInput, { marginBottom: 12 }]}
-                             value={showboxUiToken}
-                             onChangeText={setShowboxUiToken}
-                             placeholder="Paste your ShowBox UI token"
-                             placeholderTextColor={colors.mediumGray}
-                             autoCapitalize="none"
-                             autoCorrect={false}
-                             multiline={true}
-                             numberOfLines={3}
-                           />
+                           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                             <TextInput
+                               style={[styles.textInput, { flex: 1, marginBottom: 0 }]}
+                               value={showboxUiToken}
+                               onChangeText={setShowboxUiToken}
+                               placeholder="Paste your ShowBox UI token"
+                               placeholderTextColor={colors.mediumGray}
+                               autoCapitalize="none"
+                               autoCorrect={false}
+                               secureTextEntry={showboxSavedToken.length > 0 && !showboxTokenVisible}
+                               multiline={false}
+                               numberOfLines={1}
+                             />
+                             {showboxSavedToken.length > 0 && (
+                               <TouchableOpacity onPress={() => setShowboxTokenVisible(v => !v)} accessibilityRole="button" accessibilityLabel={showboxTokenVisible ? 'Hide token' : 'Show token'} style={{ marginLeft: 10 }}>
+                                 <Ionicons name={showboxTokenVisible ? 'eye-off' : 'eye'} size={18} color={colors.primary} />
+                               </TouchableOpacity>
+                             )}
+                           </View>
                             <View style={styles.buttonRow}>
                               {showboxUiToken !== showboxSavedToken && (
                                 <TouchableOpacity

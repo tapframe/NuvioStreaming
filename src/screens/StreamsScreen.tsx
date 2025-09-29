@@ -221,6 +221,8 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
   parentPosterUrl?: string | null;
   providerName?: string;
 }) => {
+  const { useSettings } = require('../hooks/useSettings');
+  const { settings } = useSettings();
   const { startDownload } = useDownloads();
   
   // Handle long press to copy stream URL to clipboard
@@ -398,17 +400,19 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
             color={theme.colors.white} 
           />
         </View>
-        <TouchableOpacity
-          style={[styles.streamAction, { marginLeft: 8, backgroundColor: theme.colors.elevation2 }]}
-          onPress={handleDownload}
-          activeOpacity={0.7}
-        >
-          <MaterialIcons 
-            name="download"
-            size={20}
-            color={theme.colors.highEmphasis}
-          />
-        </TouchableOpacity>
+        {settings?.enableDownloads !== false && (
+          <TouchableOpacity
+            style={[styles.streamAction, { marginLeft: 8, backgroundColor: theme.colors.elevation2 }]}
+            onPress={handleDownload}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons 
+              name="download"
+              size={20}
+              color={theme.colors.highEmphasis}
+            />
+          </TouchableOpacity>
+        )}
       </TouchableOpacity>
   );
 });

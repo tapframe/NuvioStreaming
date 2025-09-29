@@ -458,6 +458,9 @@ const WrappedScreen: React.FC<{Screen: React.ComponentType<any>}> = ({ Screen })
 // Tab Navigator
 const MainTabs = () => {
   const { currentTheme } = useTheme();
+  const { settings } = require('../hooks/useSettings');
+  const { useSettings: useSettingsHook } = require('../hooks/useSettings');
+  const { settings: appSettings } = useSettingsHook();
   const [hasUpdateBadge, setHasUpdateBadge] = React.useState(false);
   React.useEffect(() => {
     if (Platform.OS !== 'android') return;
@@ -829,16 +832,18 @@ const MainTabs = () => {
             ),
           }}
         />
-        <Tab.Screen
-          name="Downloads"
-          component={DownloadsScreen}
-          options={{
-            tabBarLabel: 'Downloads',
-            tabBarIcon: ({ color, size, focused }) => (
-              <MaterialCommunityIcons name={focused ? 'download' : 'download-outline'} size={size} color={color} />
-            ),
-          }}
-        />
+        {appSettings?.enableDownloads !== false && (
+          <Tab.Screen
+            name="Downloads"
+            component={DownloadsScreen}
+            options={{
+              tabBarLabel: 'Downloads',
+              tabBarIcon: ({ color, size, focused }) => (
+                <MaterialCommunityIcons name={focused ? 'download' : 'download-outline'} size={size} color={color} />
+              ),
+            }}
+          />
+        )}
         <Tab.Screen
           name="Settings"
           component={SettingsScreen}

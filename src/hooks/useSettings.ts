@@ -57,6 +57,8 @@ export interface AppSettings {
   excludedQualities: string[]; // Array of quality strings to exclude (e.g., ['2160p', '4K', '1080p', '720p'])
   // Playback behavior
   alwaysResume: boolean; // If true, resume automatically without prompt when progress < 85%
+  // Downloads
+  enableDownloads: boolean; // Show Downloads tab and enable saving streams
   // Theme settings
   themeId: string;
   customThemes: CustomThemeDef[];
@@ -105,6 +107,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   excludedQualities: [], // No qualities excluded by default
   // Playback behavior defaults
   alwaysResume: true,
+  // Downloads
+  enableDownloads: false,
   // Theme defaults
   themeId: 'default',
   customThemes: [],

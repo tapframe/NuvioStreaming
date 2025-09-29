@@ -278,6 +278,8 @@ const SettingsScreen: React.FC = () => {
   
   // Tablet-specific state
   const [selectedCategory, setSelectedCategory] = useState('account');
+  const [downloadsDevUnlocked, setDownloadsDevUnlocked] = useState(false);
+  const [versionTapCount, setVersionTapCount] = useState(0);
 
   // States for dynamic content
   const [addonCount, setAddonCount] = useState<number>(0);
@@ -613,6 +615,22 @@ const SettingsScreen: React.FC = () => {
               )}
               isTablet={isTablet}
             />
+            {downloadsDevUnlocked && (
+              <SettingItem
+                title="Enable Downloads"
+                description="Show Downloads tab and enable saving streams"
+                icon="download"
+                renderControl={() => (
+                  <Switch
+                    value={settings?.enableDownloads ?? true}
+                    onValueChange={(value) => updateSetting('enableDownloads', value)}
+                    trackColor={{ false: 'rgba(255,255,255,0.2)', true: currentTheme.colors.primary }}
+                    thumbColor={settings?.enableDownloads ? '#fff' : '#f4f3f4'}
+                  />
+                )}
+                isTablet={isTablet}
+              />
+            )}
             <SettingItem
               title="Notifications"
               description="Episode reminders"
@@ -646,6 +664,16 @@ const SettingsScreen: React.FC = () => {
               title="Version"
               description={getDisplayedAppVersion()}
               icon="info-outline"
+              onPress={() => {
+                if (downloadsDevUnlocked) return;
+                const next = versionTapCount + 1;
+                setVersionTapCount(next);
+                if (next >= 5) {
+                  setDownloadsDevUnlocked(true);
+                  setVersionTapCount(0);
+                  openAlert('Developer option unlocked', 'Downloads toggle is now visible in Playback settings.');
+                }
+              }}
               isLast={true}
               isTablet={isTablet}
             />
