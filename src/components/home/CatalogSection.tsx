@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, Dimensions } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
@@ -56,32 +56,19 @@ const POSTER_WIDTH = posterLayout.posterWidth;
 const CatalogSection = ({ catalog }: CatalogSectionProps) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
-  // Simplified visibility tracking - just load all images immediately for better performance
-  const [hasLoaded, setHasLoaded] = useState(false);
-  
-  // Load all images after a short delay to prevent blocking initial render
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
-      setHasLoaded(true);
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []);
 
   const handleContentPress = useCallback((id: string, type: string) => {
     navigation.navigate('Metadata', { id, type, addonId: catalog.addon });
   }, [navigation, catalog.addon]);
 
-  const renderContentItem = useCallback(({ item, index }: { item: StreamingContent, index: number }) => {
-    // Load images immediately for better scrolling performance
+  const renderContentItem = useCallback(({ item }: { item: StreamingContent, index: number }) => {
     return (
       <ContentItem 
         item={item} 
         onPress={handleContentPress}
-        shouldLoadImage={hasLoaded}
-        deferMs={index * 10} // Small stagger to prevent blocking
       />
     );
-  }, [handleContentPress, hasLoaded]);
+  }, [handleContentPress]);
 
   // Memoize the ItemSeparatorComponent to prevent re-creation
   const ItemSeparator = useCallback(() => <View style={{ width: 8 }} />, []);

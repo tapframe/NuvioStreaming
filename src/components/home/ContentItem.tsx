@@ -152,15 +152,10 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
     return item.poster;
   }, [item.poster, retryCount, item.id]);
 
-  // Smoothly fade in content when settings are ready
+  // Avoid strong fade animations that can appear as flicker on mount/scroll
   useEffect(() => {
     if (isLoaded) {
-      fadeInOpacity.setValue(0);
-      Animated.timing(fadeInOpacity, {
-        toValue: 1,
-        duration: 180,
-        useNativeDriver: true,
-      }).start();
+      fadeInOpacity.setValue(1);
     }
   }, [isLoaded, fadeInOpacity]);
 
@@ -196,14 +191,14 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
           delayLongPress={300}
         >
           <View ref={itemRef} style={[styles.contentItemContainer, { borderRadius: posterRadius }] }>
-            {/* Always load image for horizontal scrolling to prevent blank posters */}
+            {/* Image with lightweight placeholder to reduce flicker */}
             {item.poster ? (
               <ExpoImage
                 source={{ uri: optimizedPosterUrl }}
                 style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, borderRadius: posterRadius }]}
                 contentFit="cover"
                 cachePolicy={Platform.OS === 'android' ? 'disk' : 'memory-disk'}
-                transition={100} // Faster transition for scrolling
+                transition={0}
                 allowDownscaling
                 priority="normal" // Normal priority for horizontal scrolling
                 onLoad={() => {
@@ -222,6 +217,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
                   setImageLoaded(false);
                 }}
                 recyclingKey={item.id} // Add recycling key for better performance
+                placeholder={PLACEHOLDER_BLURHASH}
               />
             ) : (
               // Show placeholder for items without posters
