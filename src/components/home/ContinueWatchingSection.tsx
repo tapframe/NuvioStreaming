@@ -227,25 +227,47 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         contentGroups[contentKey].episodes.push({ key, episodeId, progress, progressPercent });
       }
 
-      // Fetch Trakt watched movies once and reuse
-      const traktMoviesSetPromise = (async () => {
+      // Fetch Trakt watched movies and shows once and reuse
+      const traktDataPromise = (async () => {
         try {
           const traktService = TraktService.getInstance();
           const isAuthed = await traktService.isAuthenticated();
-          if (!isAuthed) return new Set<string>();
-          if (typeof (traktService as any).getWatchedMovies === 'function') {
-            const watched = await (traktService as any).getWatchedMovies();
-            if (Array.isArray(watched)) {
-              const ids = watched
-                .map((w: any) => w?.movie?.ids?.imdb)
-                .filter(Boolean)
-                .map((imdb: string) => (imdb.startsWith('tt') ? imdb : `tt${imdb}`));
-              return new Set<string>(ids);
-            }
-          }
-          return new Set<string>();
+          if (!isAuthed) return { watchedMovies: new Set<string>(), watchedShows: new Set<string>() };
+          
+          const [watchedMovies, watchedShows] = await Promise.all([
+            // Get watched movies
+            (async () => {
+              if (typeof (traktService as any).getWatchedMovies === 'function') {
+                const watched = await (traktService as any).getWatchedMovies();
+                if (Array.isArray(watched)) {
+                  const ids = watched
+                    .map((w: any) => w?.movie?.ids?.imdb)
+                    .filter(Boolean)
+                    .map((imdb: string) => (imdb.startsWith('tt') ? imdb : `tt${imdb}`));
+                  return new Set<string>(ids);
+                }
+              }
+              return new Set<string>();
+            })(),
+            // Get watched shows
+            (async () => {
+              if (typeof (traktService as any).getWatchedShows === 'function') {
+                const watched = await (traktService as any).getWatchedShows();
+                if (Array.isArray(watched)) {
+                  const ids = watched
+                    .map((w: any) => w?.show?.ids?.imdb)
+                    .filter(Boolean)
+                    .map((imdb: string) => (imdb.startsWith('tt') ? imdb : `tt${imdb}`));
+                  return new Set<string>(ids);
+                }
+              }
+              return new Set<string>();
+            })()
+          ]);
+          
+          return { watchedMovies, watchedShows };
         } catch {
-          return new Set<string>();
+          return { watchedMovies: new Set<string>(), watchedShows: new Set<string>() };
         }
       })();
 
@@ -253,10 +275,13 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       const groupPromises = Object.values(contentGroups).map(async (group) => {
         try {
           if (!isSupportedId(group.id)) return;
+          
+          // Get Trakt data for filtering
+          const { watchedMovies, watchedShows } = await traktDataPromise;
+          
           // Skip movies that are already watched on Trakt
           if (group.type === 'movie') {
-            const watchedSet = await traktMoviesSetPromise;
-            if (watchedSet.has(group.id)) {
+            if (watchedMovies.has(group.id)) {
               // Optional: sync local store to watched to prevent reappearance
               try {
                 await storageService.setWatchProgress(group.id, 'movie', {
@@ -267,6 +292,14 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                   traktProgress: 100,
                 } as any);
               } catch (_e) {}
+              return;
+            }
+          }
+          
+          // Skip shows that are marked as watched on Trakt (entire show)
+          if (group.type === 'series') {
+            if (watchedShows.has(group.id)) {
+              logger.log(`🚫 [TraktFilter] Skipping show marked as watched on Trakt: ${group.id}`);
               return;
             }
           }
@@ -389,6 +422,13 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
               const showKey = `series:${showId}`;
               if (recentlyRemovedRef.current.has(showKey)) {
                 logger.log(`🚫 [TraktSync] Skipping recently removed show: ${showKey}`);
+                return;
+              }
+              
+              // Check if this show is marked as watched on Trakt (entire show)
+              const { watchedShows } = await traktDataPromise;
+              if (watchedShows.has(showId)) {
+                logger.log(`🚫 [TraktSync] Skipping show marked as watched on Trakt: ${showId}`);
                 return;
               }
               
