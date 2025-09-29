@@ -849,8 +849,9 @@ const PluginsScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasRepository, setHasRepository] = useState(false);
-  const [showboxCookie, setShowboxCookie] = useState<string>('');
-  const [showboxRegion, setShowboxRegion] = useState<string>('');
+  const [showboxUiToken, setShowboxUiToken] = useState<string>('');
+  const [showboxSavedToken, setShowboxSavedToken] = useState<string>('');
+  const [showboxScraperId, setShowboxScraperId] = useState<string | null>(null);
   
   // Multiple repositories state
   const [repositories, setRepositories] = useState<RepositoryInfo[]>([]);
@@ -1071,12 +1072,22 @@ const PluginsScreen: React.FC = () => {
 
 
       setInstalledScrapers(scrapers);
-      // preload showbox settings if present
-      const sb = scrapers.find(s => s.id === 'showboxog');
+      // Detect ShowBox scraper dynamically and preload settings
+      const sb = scrapers.find(s => {
+        const id = (s.id || '').toLowerCase();
+        const name = (s.name || '').toLowerCase();
+        const filename = (s.filename || '').toLowerCase();
+        return id.includes('showbox') || name.includes('showbox') || filename.includes('showbox');
+      });
       if (sb) {
-        const s = await localScraperService.getScraperSettings('showboxog');
-        setShowboxCookie(s.cookie || '');
-        setShowboxRegion(s.region || '');
+        setShowboxScraperId(sb.id);
+        const s = await localScraperService.getScraperSettings(sb.id);
+        setShowboxUiToken(s.uiToken || '');
+        setShowboxSavedToken(s.uiToken || '');
+      } else {
+        setShowboxScraperId(null);
+        setShowboxUiToken('');
+        setShowboxSavedToken('');
       }
     } catch (error) {
       logger.error('[ScraperSettings] Failed to load scrapers:', error);
@@ -1615,59 +1626,49 @@ const PluginsScreen: React.FC = () => {
                     )}
                   </View>
 
-                  {/* ShowBox Settings */}
-                       {scraper.id === 'showboxog' && settings.enableLocalScrapers && (
+                  {/* ShowBox Settings - only visible when ShowBox scraper is available */}
+                       {showboxScraperId && scraper.id === showboxScraperId && settings.enableLocalScrapers && (
                     <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.elevation3 }}>
-                           <Text style={[styles.settingTitle, { marginBottom: 8 }]}>ShowBox Cookie</Text>
+                           <Text style={[styles.settingTitle, { marginBottom: 8 }]}>ShowBox UI Token</Text>
                            <TextInput
                              style={[styles.textInput, { marginBottom: 12 }]}
-                             value={showboxCookie}
-                             onChangeText={setShowboxCookie}
-                             placeholder="Paste FebBox ui cookie value"
+                             value={showboxUiToken}
+                             onChangeText={setShowboxUiToken}
+                             placeholder="Paste your ShowBox UI token"
                              placeholderTextColor={colors.mediumGray}
                              autoCapitalize="none"
                              autoCorrect={false}
                              multiline={true}
                              numberOfLines={3}
                            />
-                           <Text style={[styles.settingTitle, { marginBottom: 8 }]}>Region</Text>
-                           <View style={[styles.qualityChipsContainer, { marginBottom: 16 }]}>
-                             {regionOptions.map(opt => {
-                               const selected = showboxRegion === opt.value;
-                               return (
-                                 <TouchableOpacity
-                                   key={opt.value}
-                                   style={[styles.qualityChip, selected && styles.qualityChipSelected]}
-                                   onPress={() => setShowboxRegion(opt.value)}
-                                 >
-                                   <Text style={[styles.qualityChipText, selected && styles.qualityChipTextSelected]}>
-                                     {opt.label}
-                                   </Text>
-                                 </TouchableOpacity>
-                               );
-                             })}
-                           </View>
-                           <View style={styles.buttonRow}>
-                             <TouchableOpacity
-                               style={[styles.button, styles.primaryButton]}
-                               onPress={async () => {
-                                 await localScraperService.setScraperSettings('showboxog', { cookie: showboxCookie, region: showboxRegion });
-                                   openAlert('Saved', 'ShowBox settings updated');
-                               }}
-                             >
-                               <Text style={styles.buttonText}>Save</Text>
-                             </TouchableOpacity>
-                             <TouchableOpacity
-                               style={[styles.button, styles.secondaryButton]}
-                               onPress={async () => {
-                                 setShowboxCookie('');
-                                 setShowboxRegion('');
-                                 await localScraperService.setScraperSettings('showboxog', {});
-                               }}
-                             >
-                               <Text style={styles.secondaryButtonText}>Clear</Text>
-                             </TouchableOpacity>
-                           </View>
+                            <View style={styles.buttonRow}>
+                              {showboxUiToken !== showboxSavedToken && (
+                                <TouchableOpacity
+                                  style={[styles.button, styles.primaryButton]}
+                                  onPress={async () => {
+                                    if (showboxScraperId) {
+                                      await localScraperService.setScraperSettings(showboxScraperId, { uiToken: showboxUiToken });
+                                    }
+                                    setShowboxSavedToken(showboxUiToken);
+                                    openAlert('Saved', 'ShowBox settings updated');
+                                  }}
+                                >
+                                  <Text style={styles.buttonText}>Save</Text>
+                                </TouchableOpacity>
+                              )}
+                              <TouchableOpacity
+                                style={[styles.button, styles.secondaryButton]}
+                                onPress={async () => {
+                                  setShowboxUiToken('');
+                                  setShowboxSavedToken('');
+                                  if (showboxScraperId) {
+                                    await localScraperService.setScraperSettings(showboxScraperId, {});
+                                  }
+                                }}
+                              >
+                                <Text style={styles.secondaryButtonText}>Clear</Text>
+                              </TouchableOpacity>
+                            </View>
                          </View>
                        )}
                      </View>

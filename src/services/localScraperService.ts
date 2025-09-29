@@ -1117,13 +1117,19 @@ class LocalScraperService {
         try {
           // Create function from code
           const func = new Function('sandbox', 'params', 'PRIMARY_KEY', 'TMDB_API_KEY', `
-            const { console, setTimeout, clearTimeout, Promise, JSON, Date, Math, parseInt, parseFloat, encodeURIComponent, decodeURIComponent, require, axios, fetch, module, exports, global, URL_VALIDATION_ENABLED } = sandbox;
+            const { console, setTimeout, clearTimeout, Promise, JSON, Date, Math, parseInt, parseFloat, encodeURIComponent, decodeURIComponent, require, axios, fetch, module, exports, global, URL_VALIDATION_ENABLED, SCRAPER_SETTINGS, SCRAPER_ID } = sandbox;
             
             // Inject MovieBox constants into global scope
             global.PRIMARY_KEY = PRIMARY_KEY;
             global.TMDB_API_KEY = TMDB_API_KEY;
             window.PRIMARY_KEY = PRIMARY_KEY;
             window.TMDB_API_KEY = TMDB_API_KEY;
+            
+            // Expose per-scraper context to plugin globals
+            global.SCRAPER_SETTINGS = SCRAPER_SETTINGS;
+            global.SCRAPER_ID = SCRAPER_ID;
+            window.SCRAPER_SETTINGS = SCRAPER_SETTINGS;
+            window.SCRAPER_ID = SCRAPER_ID;
             
             ${code}
             
