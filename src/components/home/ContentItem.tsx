@@ -6,6 +6,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useSettings } from '../../hooks/useSettings';
 import { catalogService, StreamingContent } from '../../services/catalogService';
 import { DropUpMenu } from './DropUpMenu';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface ContentItemProps {
   item: StreamingContent;
@@ -70,6 +71,12 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
     });
     return () => unsubscribe();
   }, [item.id, item.type]);
+
+    // Load watched state from AsyncStorage when item changes
+  useEffect(() => {
+    AsyncStorage.getItem(`watched_${item.id}`).then(val => setIsWatched(val === 'true'));
+  }, [item.id]);
+
   const [menuVisible, setMenuVisible] = useState(false);
   const [isWatched, setIsWatched] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -111,9 +118,15 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
           catalogService.addToLibrary(item);
         }
         break;
-      case 'watched':
-        setIsWatched(prev => !prev);
+      case 'watched': {
+        setIsWatched(prevWatched => {
+          const newWatched = !prevWatched;
+          AsyncStorage.setItem(`watched_${item.id}`, newWatched ? 'true' : 'false');
+          return newWatched;
+        });
+        setMenuVisible(false);
         break;
+      }
       case 'playlist':
         break;
       case 'share':
