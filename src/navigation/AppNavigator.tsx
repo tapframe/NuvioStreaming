@@ -22,6 +22,7 @@ import { PostHogProvider } from 'posthog-react-native';
 import HomeScreen from '../screens/HomeScreen';
 import LibraryScreen from '../screens/LibraryScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import DownloadsScreen from '../screens/DownloadsScreen';
 import MetadataScreen from '../screens/MetadataScreen';
 import KSPlayerCore from '../components/player/KSPlayerCore';
 import AndroidVideoPlayer from '../components/player/AndroidVideoPlayer';
@@ -161,6 +162,7 @@ export type MainTabParamList = {
   Home: undefined;
   Library: undefined;
   Search: undefined;
+  Downloads: undefined;
   Settings: undefined;
 };
 
@@ -348,7 +350,7 @@ type IconNameType = 'home' | 'home-outline' | 'compass' | 'compass-outline' |
                    'play-box-multiple' | 'play-box-multiple-outline' | 
                    'puzzle' | 'puzzle-outline' | 
                    'cog' | 'cog-outline' | 'feature-search' | 'feature-search-outline' |
-                   'magnify' | 'heart' | 'heart-outline';
+                   'magnify' | 'heart' | 'heart-outline' | 'download' | 'download-outline';
 
 // Add TabIcon component
 const TabIcon = React.memo(({ focused, color, iconName }: { 
@@ -697,6 +699,9 @@ const MainTabs = () => {
                 case 'Search':
                   iconName = 'magnify';
                   break;
+                case 'Downloads':
+                  iconName = 'download';
+                  break;
                 case 'Settings':
                   iconName = 'cog';
                   break;
@@ -821,6 +826,16 @@ const MainTabs = () => {
             tabBarLabel: 'Search',
             tabBarIcon: ({ color, size }) => (
               <MaterialCommunityIcons name={'magnify'} size={size} color={color} />
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Downloads"
+          component={DownloadsScreen}
+          options={{
+            tabBarLabel: 'Downloads',
+            tabBarIcon: ({ color, size, focused }) => (
+              <MaterialCommunityIcons name={focused ? 'download' : 'download-outline'} size={size} color={color} />
             ),
           }}
         />

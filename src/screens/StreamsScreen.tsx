@@ -48,6 +48,7 @@ import { logger } from '../utils/logger';
 import { isMkvStream } from '../utils/mkvDetection';
 import CustomAlert from '../components/CustomAlert';
 import { toast, ToastPosition } from '@backpackapp-io/react-native-toast';
+import { useDownloads } from '../contexts/DownloadsContext';
 
 const TMDB_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tmdb.new.logo.svg/512px-Tmdb.new.logo.svg.png?20200406190906';
 const HDR_ICON = 'https://uxwing.com/wp-content/themes/uxwing/download/video-photography-multimedia/hdr-icon.png';
@@ -202,7 +203,7 @@ const AnimatedView = memo(({
 });
 
 // Extracted Components
-const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, theme, showLogos, scraperLogo, showAlert }: { 
+const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, theme, showLogos, scraperLogo, showAlert, parentTitle, parentType, parentSeason, parentEpisode, parentEpisodeTitle, parentPosterUrl, providerName }: { 
   stream: Stream; 
   onPress: () => void; 
   index: number;
@@ -212,7 +213,15 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
   showLogos?: boolean;
   scraperLogo?: string | null;
   showAlert: (title: string, message: string) => void;
+  parentTitle?: string;
+  parentType?: 'movie' | 'series';
+  parentSeason?: number;
+  parentEpisode?: number;
+  parentEpisodeTitle?: string;
+  parentPosterUrl?: string | null;
+  providerName?: string;
 }) => {
+  const { startDownload } = useDownloads();
   
   // Handle long press to copy stream URL to clipboard
   const handleLongPress = useCallback(async () => {
@@ -284,6 +293,36 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
   
   // Logo is provided by parent to avoid per-card async work
   
+  const handleDownload = useCallback(async () => {
+    try {
+      const url = stream.url;
+      if (!url) return;
+      const parent: any = stream as any;
+      const inferredTitle = parentTitle || stream.name || stream.title || parent.metaName || 'Content';
+      const inferredType: 'movie' | 'series' = parentType || (parent.kind === 'series' || parent.type === 'series' ? 'series' : 'movie');
+      const season = typeof parentSeason === 'number' ? parentSeason : (parent.season || parent.season_number);
+      const episode = typeof parentEpisode === 'number' ? parentEpisode : (parent.episode || parent.episode_number);
+      const episodeTitle = parentEpisodeTitle || parent.episodeTitle || parent.episode_name;
+      const provider = providerName || parent.addonName || parent.addonId || (stream.addonName as any) || (stream.addonId as any) || 'Provider';
+      const idForContent = parent.imdbId || parent.tmdbId || parent.addonId || inferredTitle;
+
+      await startDownload({
+        id: String(idForContent),
+        type: inferredType,
+        title: String(inferredTitle),
+        providerName: String(provider),
+        season: inferredType === 'series' ? (season ? Number(season) : undefined) : undefined,
+        episode: inferredType === 'series' ? (episode ? Number(episode) : undefined) : undefined,
+        episodeTitle: inferredType === 'series' ? (episodeTitle ? String(episodeTitle) : undefined) : undefined,
+        quality: streamInfo.quality || undefined,
+        posterUrl: parentPosterUrl || parent.poster || parent.backdrop || null,
+        url,
+        headers: (stream.headers as any) || undefined,
+      });
+      toast('Download started', { duration: 1500, position: ToastPosition.BOTTOM });
+    } catch {}
+  }, [startDownload, stream.url, stream.headers, streamInfo.quality, showAlert, stream.name, stream.title]);
+
   const isDebrid = streamInfo.isDebrid;
   return (
     <TouchableOpacity 
@@ -358,6 +397,17 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
             color={theme.colors.white} 
           />
         </View>
+        <TouchableOpacity
+          style={[styles.streamAction, { marginLeft: 8, backgroundColor: theme.colors.elevation2 }]}
+          onPress={handleDownload}
+          activeOpacity={0.7}
+        >
+          <MaterialIcons 
+            name="download"
+            size={20}
+            color={theme.colors.highEmphasis}
+          />
+        </TouchableOpacity>
       </TouchableOpacity>
   );
 });
@@ -1915,6 +1965,13 @@ export const StreamsScreen = () => {
                             showLogos={settings.showScraperLogos}
                             scraperLogo={(item.addonId && scraperLogos[item.addonId]) || (item as any).addon ? scraperLogoCache.get((item.addonId || (item as any).addon) as string) || null : null}
                             showAlert={(t, m) => openAlert(t, m)}
+                            parentTitle={metadata?.name}
+                            parentType={type as 'movie' | 'series'}
+                            parentSeason={type === 'series' ? currentEpisode?.season_number : undefined}
+                            parentEpisode={type === 'series' ? currentEpisode?.episode_number : undefined}
+                            parentEpisodeTitle={type === 'series' ? currentEpisode?.name : undefined}
+                            parentPosterUrl={episodeImage || metadata?.poster || undefined}
+                            providerName={streams && Object.keys(streams).find(pid => (streams as any)[pid]?.streams?.includes?.(item))}
                           />
                         </View>
                       )}

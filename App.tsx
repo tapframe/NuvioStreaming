@@ -27,6 +27,7 @@ import { GenreProvider } from './src/contexts/GenreContext';
 import { TraktProvider } from './src/contexts/TraktContext';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import { TrailerProvider } from './src/contexts/TrailerContext';
+import { DownloadsProvider } from './src/contexts/DownloadsContext';
 import SplashScreen from './src/components/SplashScreen';
 import UpdatePopup from './src/components/UpdatePopup';
 import MajorUpdateOverlay from './src/components/MajorUpdateOverlay';
@@ -156,29 +157,31 @@ const ThemedApp = () => {
           theme={customNavigationTheme}
           linking={undefined}
         >
-          <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
-            <StatusBar style="light" />
-            {!isAppReady && <SplashScreen onFinish={handleSplashComplete} />}
-            {shouldShowApp && <AppNavigator initialRouteName={initialRouteName} />}
-            {Platform.OS === 'ios' && (
-              <UpdatePopup
-                visible={showUpdatePopup}
-                updateInfo={updateInfo}
-                onUpdateNow={handleUpdateNow}
-                onUpdateLater={handleUpdateLater}
-                onDismiss={handleDismiss}
-                isInstalling={isInstalling}
+          <DownloadsProvider>
+            <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
+              <StatusBar style="light" />
+              {!isAppReady && <SplashScreen onFinish={handleSplashComplete} />}
+              {shouldShowApp && <AppNavigator initialRouteName={initialRouteName} />}
+              {Platform.OS === 'ios' && (
+                <UpdatePopup
+                  visible={showUpdatePopup}
+                  updateInfo={updateInfo}
+                  onUpdateNow={handleUpdateNow}
+                  onUpdateLater={handleUpdateLater}
+                  onDismiss={handleDismiss}
+                  isInstalling={isInstalling}
+                />
+              )}
+              <MajorUpdateOverlay
+                visible={githubUpdate.visible}
+                latestTag={githubUpdate.latestTag}
+                releaseNotes={githubUpdate.releaseNotes}
+                releaseUrl={githubUpdate.releaseUrl}
+                onDismiss={githubUpdate.onDismiss}
+                onLater={githubUpdate.onLater}
               />
-            )}
-            <MajorUpdateOverlay
-              visible={githubUpdate.visible}
-              latestTag={githubUpdate.latestTag}
-              releaseNotes={githubUpdate.releaseNotes}
-              releaseUrl={githubUpdate.releaseUrl}
-              onDismiss={githubUpdate.onDismiss}
-              onLater={githubUpdate.onLater}
-            />
-          </View>
+            </View>
+          </DownloadsProvider>
         </NavigationContainer>
       </PaperProvider>
     </AccountProvider>
