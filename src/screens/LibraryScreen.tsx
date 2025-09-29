@@ -995,29 +995,12 @@ const LibraryScreen = () => {
           onClose={() => setMenuVisible(false)}
           item={selectedItem}
           isWatched={!!selectedItem.watched}
+          isSaved={true} // Since this is from library, it's always saved
           onOptionSelect={async (option) => {
             if (!selectedItem) return;
-            if (option === 'share') {
-              let url = '';
-              if (selectedItem.imdbId) {
-                url = `https://www.imdb.com/title/${selectedItem.imdbId}/`;
-              } else if (selectedItem.traktId) {
-                url = `https://trakt.tv/${selectedItem.type === 'movie' ? 'movies' : 'shows'}/${selectedItem.traktId}`;
-              } else {
-                url = selectedItem.poster || '';
-              }
+            switch (option) {
+              case 'library': {
               try {
-                await Share.share({
-                  message: `${selectedItem.name}\n${url}`,
-                  url,
-                  title: selectedItem.name,
-                });
-              } catch (error) {
-                toast('Failed to share', { duration: 1200 });
-              }
-            } else if (option === 'library') {
-              try {
-                // Always remove from library in LibraryScreen
                 await catalogService.removeFromLibrary(selectedItem.type, selectedItem.id);
                 toast('Removed from Library', { duration: 1200 });
                 setLibraryItems(prev => prev.filter(item => !(item.id === selectedItem.id && item.type === selectedItem.type)));
@@ -1025,7 +1008,9 @@ const LibraryScreen = () => {
               } catch (error) {
                 toast('Failed to update Library', { duration: 1200 });
               }
-            } else if (option === 'watched') {
+              break;
+              }
+              case 'watched': {
               try {
                 // Use AsyncStorage to store watched status by key
                 const key = `watched:${selectedItem.type}:${selectedItem.id}`;
@@ -1034,16 +1019,28 @@ const LibraryScreen = () => {
                 toast(newWatched ? 'Marked as Watched' : 'Marked as Unwatched', { duration: 1200 });
                 // Instantly update local state
                 setLibraryItems(prev => prev.map(item =>
-                  item.id === selectedItem.id && item.type === selectedItem.type
-                    ? { ...item, watched: newWatched }
-                    : item
+                item.id === selectedItem.id && item.type === selectedItem.type
+                  ? { ...item, watched: newWatched }
+                  : item
                 ));
               } catch (error) {
                 toast('Failed to update watched status', { duration: 1200 });
               }
+              break;
+              }
+              case 'share': {
+              let url = '';
+              if (selectedItem.id) {
+                url = `https://www.imdb.com/title/${selectedItem.id}/`;
+              }
+              const message = `${selectedItem.name}\n${url}`;
+              Share.share({ message, url, title: selectedItem.name });
+              break;
+              }
+              default:
+              break;
             }
           }}
-          isSaved={!!selectedItem.inLibrary}
         />
       )}
     </View>

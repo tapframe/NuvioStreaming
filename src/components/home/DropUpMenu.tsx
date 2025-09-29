@@ -95,7 +95,7 @@ export const DropUpMenu = ({ visible, onClose, item, onOptionSelect, isSaved: is
   let menuOptions = [
     {
       icon: 'bookmark',
-      label: 'Remove from Library',
+      label: isSaved ? 'Remove from Library' : 'Add to Library',
       action: 'library'
     },
     {
@@ -115,9 +115,9 @@ export const DropUpMenu = ({ visible, onClose, item, onOptionSelect, isSaved: is
     }
   ];
 
-  // If used in LibraryScreen, only show 'Remove from Library'
+  // If used in LibraryScreen, only show 'Remove from Library' if item is in library
   if (isSavedProp === true) {
-    menuOptions = menuOptions.filter(opt => opt.action !== 'library' || opt.label === 'Remove from Library');
+    menuOptions = menuOptions.filter(opt => opt.action !== 'library' || isSaved);
   }
 
   const backgroundColor = isDarkMode ? '#1A1A1A' : '#FFFFFF';

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from '@backpackapp-io/react-native-toast';
 import { DeviceEventEmitter } from 'react-native';
-import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Platform, Text, Animated } from 'react-native';
+import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Platform, Text, Animated, Share } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -143,8 +143,15 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
       }
       case 'playlist':
         break;
-      case 'share':
+      case 'share': {
+        let url = '';
+        if (item.id) {
+          url = `https://www.imdb.com/title/${item.id}/`;
+        }
+        const message = `${item.name}\n${url}`;
+        Share.share({ message, url, title: item.name });
         break;
+      }
     }
   }, [item, inLibrary]);
 
