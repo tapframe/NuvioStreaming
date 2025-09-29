@@ -8,7 +8,8 @@ import {
   SafeAreaView,
   StatusBar,
   Platform,
-  Dimensions
+  Dimensions,
+  Linking
 } from 'react-native';
 import { toast, ToastPosition } from '@backpackapp-io/react-native-toast';
 import { useNavigation } from '@react-navigation/native';
@@ -20,6 +21,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import UpdateService from '../services/updateService';
 import CustomAlert from '../components/CustomAlert';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useGithubMajorUpdate } from '../hooks/useGithubMajorUpdate';
+import { getDisplayedAppVersion } from '../utils/version';
+import { isAnyUpgrade } from '../services/githubReleaseService';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -65,6 +69,7 @@ const UpdateScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
+  const github = useGithubMajorUpdate();
 
   // CustomAlert state
   const [alertVisible, setAlertVisible] = useState(false);
@@ -144,6 +149,8 @@ const UpdateScreen: React.FC = () => {
       })();
     }
     checkForUpdates();
+    // Also refresh GitHub section on mount (works in dev and prod)
+    try { github.refresh(); } catch {}
     if (Platform.OS === 'android') {
       try {
         toast('Checking for updates…', { duration: 1200, position: ToastPosition.TOP });
@@ -516,6 +523,58 @@ const UpdateScreen: React.FC = () => {
 
               {/* Developer Logs removed */}
             </SettingsCard>
+
+            {/* GitHub Release (compact) – only show when update is available */}
+            {github.latestTag && isAnyUpgrade(getDisplayedAppVersion(), github.latestTag) ? (
+              <SettingsCard title="GITHUB RELEASE" isTablet={isTablet}>
+                <View style={styles.infoSection}>
+                  <View style={styles.infoItem}>
+                    <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
+                      <MaterialIcons name="new-releases" size={14} color={currentTheme.colors.primary} />
+                    </View>
+                    <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Current:</Text>
+                    <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>
+                      {getDisplayedAppVersion()}
+                    </Text>
+                  </View>
+
+                  <View style={styles.infoItem}>
+                    <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
+                      <MaterialIcons name="tag" size={14} color={currentTheme.colors.primary} />
+                    </View>
+                    <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Latest:</Text>
+                    <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>
+                      {github.latestTag}
+                    </Text>
+                  </View>
+
+                  {github.releaseNotes ? (
+                    <View style={{ marginTop: 4 }}>
+                      <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Notes:</Text>
+                      <Text
+                        numberOfLines={3}
+                        style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}
+                      >
+                        {github.releaseNotes}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  <View style={[styles.actionSection, { marginTop: 8 }]}> 
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <TouchableOpacity
+                        style={[styles.modernButton, { backgroundColor: currentTheme.colors.primary, flex: 1 }]}
+                        onPress={() => github.releaseUrl ? Linking.openURL(github.releaseUrl as string) : null}
+                        activeOpacity={0.8}
+                      >
+                        <MaterialIcons name="open-in-new" size={18} color="white" />
+                        <Text style={styles.modernButtonText}>View Release</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              </SettingsCard>
+            ) : null}
 
             {false && (
               <SettingsCard title="UPDATE LOGS" isTablet={isTablet}>

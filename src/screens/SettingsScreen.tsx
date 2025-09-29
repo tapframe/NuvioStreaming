@@ -30,6 +30,7 @@ import { useAccount } from '../contexts/AccountContext';
 import { catalogService } from '../services/catalogService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
+import { getDisplayedAppVersion } from '../utils/version';
 import CustomAlert from '../components/CustomAlert';
 import ProfileIcon from '../components/icons/ProfileIcon';
 import PluginIcon from '../components/icons/PluginIcon';
@@ -643,7 +644,7 @@ const SettingsScreen: React.FC = () => {
             />
             <SettingItem
               title="Version"
-              description="1.2.1"
+              description={getDisplayedAppVersion()}
               icon="info-outline"
               isLast={true}
               isTablet={isTablet}

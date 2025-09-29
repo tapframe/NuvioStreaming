@@ -29,6 +29,8 @@ import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import { TrailerProvider } from './src/contexts/TrailerContext';
 import SplashScreen from './src/components/SplashScreen';
 import UpdatePopup from './src/components/UpdatePopup';
+import MajorUpdateOverlay from './src/components/MajorUpdateOverlay';
+import { useGithubMajorUpdate } from './src/hooks/useGithubMajorUpdate';
 import { useUpdatePopup } from './src/hooks/useUpdatePopup';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Sentry from '@sentry/react-native';
@@ -84,6 +86,9 @@ const ThemedApp = () => {
     handleUpdateLater,
     handleDismiss,
   } = useUpdatePopup();
+
+  // GitHub major/minor release overlay
+  const githubUpdate = useGithubMajorUpdate();
   
   // Check onboarding status and initialize services
   useEffect(() => {
@@ -165,6 +170,14 @@ const ThemedApp = () => {
                 isInstalling={isInstalling}
               />
             )}
+            <MajorUpdateOverlay
+              visible={githubUpdate.visible}
+              latestTag={githubUpdate.latestTag}
+              releaseNotes={githubUpdate.releaseNotes}
+              releaseUrl={githubUpdate.releaseUrl}
+              onDismiss={githubUpdate.onDismiss}
+              onLater={githubUpdate.onLater}
+            />
           </View>
         </NavigationContainer>
       </PaperProvider>
