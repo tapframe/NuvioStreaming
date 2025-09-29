@@ -100,11 +100,8 @@ const DownloadItemComponent: React.FC<{
   const getStatusText = () => {
     switch (item.status) {
       case 'downloading':
-        {
-          const mbps = item.speedBps ? `${(item.speedBps / (1024 * 1024)).toFixed(2)} MB/s` : undefined;
-          const eta = item.etaSeconds ? `${Math.ceil(item.etaSeconds / 60)}m` : undefined;
-          return mbps ? `Downloading • ${mbps}${eta ? ` • ${eta}` : ''}` : 'Downloading';
-        }
+        const eta = item.etaSeconds ? `${Math.ceil(item.etaSeconds / 60)}m` : undefined;
+        return eta ? `Downloading • ${eta}` : 'Downloading';
       case 'completed':
         return 'Completed';
       case 'paused':
@@ -121,12 +118,15 @@ const DownloadItemComponent: React.FC<{
   const getActionIcon = () => {
     switch (item.status) {
       case 'downloading':
-        return 'pause';
+        // return 'pause'; // Resume support commented out
+        return null;
       case 'paused':
       case 'error':
-        return 'play';
+        // return 'play'; // Resume support commented out
+        return null;
       case 'queued':
-        return 'play';
+        // return 'play'; // Resume support commented out
+        return null;
       default:
         return null;
     }
@@ -134,15 +134,15 @@ const DownloadItemComponent: React.FC<{
 
   const handleActionPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
+
     switch (item.status) {
       case 'downloading':
-        onAction(item, 'pause');
+        // onAction(item, 'pause'); // Resume support commented out
         break;
       case 'paused':
       case 'error':
       case 'queued':
-        onAction(item, 'resume');
+        // onAction(item, 'resume'); // Resume support commented out
         break;
     }
   };
@@ -172,15 +172,20 @@ const DownloadItemComponent: React.FC<{
         {/* Progress section */}
         <View style={styles.progressSection}>
           {/* Provider + quality row */}
-          <View style={styles.progressInfo}>
-            <Text style={[styles.statusText, { color: currentTheme.colors.mediumEmphasis }]}>
+          <View style={styles.providerRow}>
+            <Text style={[styles.providerText, { color: currentTheme.colors.mediumEmphasis }]}>
               {(item.providerName || 'Provider') + (item.quality ? `  ${item.quality}` : '')}
             </Text>
           </View>
-          <View style={styles.progressInfo}>
+          {/* Status row */}
+          <View style={styles.statusRow}>
             <Text style={[styles.statusText, { color: getStatusColor() }]}>
               {getStatusText()}
             </Text>
+          </View>
+
+          {/* Size row */}
+          <View style={styles.sizeRow}>
             <Text style={[styles.progressText, { color: currentTheme.colors.mediumEmphasis }]}>
               {formatBytes(item.downloadedBytes)} / {item.totalBytes ? formatBytes(item.totalBytes) : '—'}
             </Text>
@@ -257,10 +262,10 @@ const DownloadsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const { top: safeAreaTop } = useSafeAreaInsets();
-  const { downloads, pauseDownload, resumeDownload, cancelDownload } = useDownloads();
+  const { downloads, /*pauseDownload, resumeDownload,*/ cancelDownload } = useDownloads();
 
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedFilter, setSelectedFilter] = useState<'all' | 'downloading' | 'completed' | 'paused'>('all');
+  const [selectedFilter, setSelectedFilter] = useState<'all' | 'downloading' | 'completed'>('all');
 
   // Animation values
   const headerOpacity = useSharedValue(1);
@@ -274,8 +279,8 @@ const DownloadsScreen: React.FC = () => {
           return item.status === 'downloading' || item.status === 'queued';
         case 'completed':
           return item.status === 'completed';
-        case 'paused':
-          return item.status === 'paused' || item.status === 'error';
+        // case 'paused':
+        //   return item.status === 'paused' || item.status === 'error'; // Resume support commented out
         default:
           return true;
       }
@@ -285,15 +290,15 @@ const DownloadsScreen: React.FC = () => {
   // Statistics
   const stats = useMemo(() => {
     const total = downloads.length;
-    const downloading = downloads.filter(item => 
+    const downloading = downloads.filter(item =>
       item.status === 'downloading' || item.status === 'queued'
     ).length;
     const completed = downloads.filter(item => item.status === 'completed').length;
-    const paused = downloads.filter(item => 
-      item.status === 'paused' || item.status === 'error'
-    ).length;
-    
-    return { total, downloading, completed, paused };
+    // const paused = downloads.filter(item =>
+    //   item.status === 'paused' || item.status === 'error'
+    // ).length; // Resume support commented out
+
+    return { total, downloading, completed /*, paused*/ };
   }, [downloads]);
 
   // Handlers
@@ -345,12 +350,12 @@ const DownloadsScreen: React.FC = () => {
   }, [navigation]);
 
   const handleDownloadAction = useCallback((item: DownloadItem, action: 'pause' | 'resume' | 'cancel' | 'retry') => {
-    if (action === 'pause') pauseDownload(item.id);
-    if (action === 'resume') resumeDownload(item.id);
+    // if (action === 'pause') pauseDownload(item.id);
+    // if (action === 'resume') resumeDownload(item.id);
     if (action === 'cancel') cancelDownload(item.id);
-  }, [pauseDownload, resumeDownload, cancelDownload]);
+  }, [/*pauseDownload, resumeDownload,*/ cancelDownload]);
 
-  const handleFilterPress = useCallback((filter: typeof selectedFilter) => {
+  const handleFilterPress = useCallback((filter: 'all' | 'downloading' | 'completed') => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedFilter(filter);
   }, []);
@@ -442,7 +447,7 @@ const DownloadsScreen: React.FC = () => {
             {renderFilterButton('all', 'All', stats.total)}
             {renderFilterButton('downloading', 'Active', stats.downloading)}
             {renderFilterButton('completed', 'Done', stats.completed)}
-            {renderFilterButton('paused', 'Paused', stats.paused)}
+            {/* {renderFilterButton('paused', 'Paused', stats.paused)} */} {/* Resume support commented out */}
           </View>
         )}
       </Animated.View>
@@ -583,15 +588,30 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   progressSection: {
-    gap: 8,
+    gap: 4,
+  },
+  providerRow: {
+    marginBottom: 2,
+  },
+  providerText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  statusRow: {
+    marginBottom: 2,
+  },
+  sizeRow: {
+    marginBottom: 6,
   },
   progressInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   statusText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   progressText: {

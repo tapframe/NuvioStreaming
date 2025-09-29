@@ -320,6 +320,45 @@ class NotificationService {
     }
   };
 
+  // Immediate notifications for download progress (background only)
+  public async notifyDownloadProgress(title: string, progress: number, downloadedBytes?: number, totalBytes?: number): Promise<void> {
+    try {
+      if (!this.settings.enabled) return;
+      if (AppState.currentState === 'active') return;
+      const downloadedMb = Math.floor((downloadedBytes || 0) / (1024 * 1024));
+      const totalMb = totalBytes ? Math.floor(totalBytes / (1024 * 1024)) : undefined;
+      const body = `${progress}%` + (totalMb !== undefined ? ` • ${downloadedMb}MB / ${totalMb}MB` : '');
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: `Downloading ${title}`,
+          body,
+          data: { kind: 'download-progress' },
+        },
+        trigger: null,
+      });
+    } catch (error) {
+      logger.error('[NotificationService] notifyDownloadProgress error:', error);
+    }
+  }
+
+  // Immediate notification for download completion (background only)
+  public async notifyDownloadComplete(title: string): Promise<void> {
+    try {
+      if (!this.settings.enabled) return;
+      if (AppState.currentState === 'active') return;
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Download complete',
+          body: title,
+          data: { kind: 'download-complete' },
+        },
+        trigger: null,
+      });
+    } catch (error) {
+      logger.error('[NotificationService] notifyDownloadComplete error:', error);
+    }
+  }
+
   // Sync notifications for all library items using memory-efficient batching
   private async syncNotificationsForLibrary(libraryItems: any[]): Promise<void> {
     try {

@@ -303,7 +303,8 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
       const season = typeof parentSeason === 'number' ? parentSeason : (parent.season || parent.season_number);
       const episode = typeof parentEpisode === 'number' ? parentEpisode : (parent.episode || parent.episode_number);
       const episodeTitle = parentEpisodeTitle || parent.episodeTitle || parent.episode_name;
-      const provider = providerName || parent.addonName || parent.addonId || (stream.addonName as any) || (stream.addonId as any) || 'Provider';
+      // Prefer the stream's display name (often includes provider + resolution)
+      const provider = (stream.name as any) || (stream.title as any) || providerName || parent.addonName || parent.addonId || (stream.addonName as any) || (stream.addonId as any) || 'Provider';
       const idForContent = parent.imdbId || parent.tmdbId || parent.addonId || inferredTitle;
 
       await startDownload({

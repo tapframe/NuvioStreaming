@@ -1,6 +1,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { notificationService } from '../services/notificationService';
 
 export type DownloadStatus = 'downloading' | 'completed' | 'paused' | 'error' | 'queued';
 
@@ -46,8 +48,8 @@ type StartDownloadInput = {
 type DownloadsContextValue = {
   downloads: DownloadItem[];
   startDownload: (input: StartDownloadInput) => Promise<void>;
-  pauseDownload: (id: string) => Promise<void>;
-  resumeDownload: (id: string) => Promise<void>;
+  // pauseDownload: (id: string) => Promise<void>;
+  // resumeDownload: (id: string) => Promise<void>;
   cancelDownload: (id: string) => Promise<void>;
   removeDownload: (id: string) => Promise<void>;
 };
@@ -115,6 +117,38 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
       } catch {}
     })();
+  }, []);
+
+  // Notifications are configured globally by notificationService
+
+  // Track app state to know foreground/background
+  const appStateRef = useRef<string>('active');
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => {
+      appStateRef.current = s;
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Cache last notified progress to reduce spam
+  const lastNotifyRef = useRef<Map<string, number>>(new Map());
+
+  const maybeNotifyProgress = useCallback(async (d: DownloadItem) => {
+    try {
+      if (appStateRef.current === 'active') return;
+      if (d.status !== 'downloading') return;
+      const prev = lastNotifyRef.current.get(d.id) ?? -1;
+      if (d.progress <= prev || d.progress - prev < 2) return; // notify every 2%
+      lastNotifyRef.current.set(d.id, d.progress);
+      await notificationService.notifyDownloadProgress(d.title, d.progress, d.downloadedBytes, d.totalBytes);
+    } catch {}
+  }, []);
+
+  const notifyCompleted = useCallback(async (d: DownloadItem) => {
+    try {
+      if (appStateRef.current === 'active') return;
+      await notificationService.notifyDownloadComplete(d.title);
+    } catch {}
   }, []);
 
   useEffect(() => {
@@ -197,6 +231,11 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         speedBps,
         updatedAt: now,
       }));
+      // Fire background progress notification (throttled)
+      const current = downloads.find(x => x.id === compoundId);
+      if (current) {
+        maybeNotifyProgress({ ...current, downloadedBytes: totalBytesWritten, totalBytes: totalBytesExpectedToWrite || current.totalBytes, progress: totalBytesExpectedToWrite ? Math.floor((totalBytesWritten / totalBytesExpectedToWrite) * 100) : current.progress });
+      }
     };
 
     // Create resumable
@@ -213,6 +252,8 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const result = await resumable.downloadAsync();
       if (!result) throw new Error('Download failed');
       updateDownload(compoundId, (d) => ({ ...d, status: 'completed', progress: 100, updatedAt: Date.now(), fileUri: result.uri }));
+      const done = downloads.find(x => x.id === compoundId);
+      if (done) notifyCompleted({ ...done, status: 'completed', progress: 100, fileUri: result.uri } as DownloadItem);
       resumablesRef.current.delete(compoundId);
       lastBytesRef.current.delete(compoundId);
     } catch (e) {
@@ -227,64 +268,64 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, [downloads, updateDownload]);
 
-  const pauseDownload = useCallback(async (id: string) => {
-    const resumable = resumablesRef.current.get(id);
-    if (resumable) {
-      try {
-        await resumable.pauseAsync();
-      } catch {}
-    }
-    updateDownload(id, (d) => ({ ...d, status: 'paused', updatedAt: Date.now() }));
-  }, [updateDownload]);
+  // const pauseDownload = useCallback(async (id: string) => {
+  //   const resumable = resumablesRef.current.get(id);
+  //   if (resumable) {
+  //     try {
+  //       await resumable.pauseAsync();
+  //     } catch {}
+  //   }
+  //   updateDownload(id, (d) => ({ ...d, status: 'paused', updatedAt: Date.now() }));
+  // }, [updateDownload]);
 
-  const resumeDownload = useCallback(async (id: string) => {
-    const item = downloads.find(d => d.id === id);
-    if (!item) return;
-    const progressCallback: FileSystem.DownloadProgressCallback = (data) => {
-      const { totalBytesWritten, totalBytesExpectedToWrite } = data;
-      const now = Date.now();
-      const last = lastBytesRef.current.get(id);
-      let speedBps = 0;
-      if (last) {
-        const deltaBytes = totalBytesWritten - last.bytes;
-        const deltaTime = Math.max(1, now - last.time) / 1000;
-        speedBps = deltaBytes / deltaTime;
-      }
-      lastBytesRef.current.set(id, { bytes: totalBytesWritten, time: now });
+  // const resumeDownload = useCallback(async (id: string) => {
+  //   const item = downloads.find(d => d.id === id);
+  //   if (!item) return;
+  //   const progressCallback: FileSystem.DownloadProgressCallback = (data) => {
+  //     const { totalBytesWritten, totalBytesExpectedToWrite } = data;
+  //     const now = Date.now();
+  //     const last = lastBytesRef.current.get(id);
+  //     let speedBps = 0;
+  //     if (last) {
+  //       const deltaBytes = totalBytesWritten - last.bytes;
+  //       const deltaTime = Math.max(1, now - last.time) / 1000;
+  //       speedBps = deltaBytes / deltaTime;
+  //     }
+  //     lastBytesRef.current.set(id, { bytes: totalBytesWritten, time: now });
 
-      updateDownload(id, (d) => ({
-        ...d,
-        downloadedBytes: totalBytesWritten,
-        totalBytes: totalBytesExpectedToWrite || d.totalBytes,
-        progress: totalBytesExpectedToWrite ? Math.floor((totalBytesWritten / totalBytesExpectedToWrite) * 100) : d.progress,
-        speedBps,
-        status: 'downloading',
-        updatedAt: now,
-      }));
-    };
+  //     updateDownload(id, (d) => ({
+  //       ...d,
+  //       downloadedBytes: totalBytesWritten,
+  //       totalBytes: totalBytesExpectedToWrite || d.totalBytes,
+  //       progress: totalBytesExpectedToWrite ? Math.floor((totalBytesWritten / totalBytesExpectedToWrite) * 100) : d.progress,
+  //       speedBps,
+  //       status: 'downloading',
+  //       updatedAt: now,
+  //     }));
+  //   };
 
-    let resumable = resumablesRef.current.get(id);
-    if (!resumable) {
-      resumable = FileSystem.createDownloadResumable(
-        item.sourceUrl,
-        item.fileUri || `${FileSystem.documentDirectory}downloads/${sanitizeFilename(item.title)}.mp4`,
-        { headers: item.headers || {} },
-        progressCallback
-      );
-      resumablesRef.current.set(id, resumable);
-    }
-    try {
-      const result = await resumable.resumeAsync();
-      if (!result) throw new Error('Resume failed');
-      updateDownload(id, (d) => ({ ...d, status: 'completed', progress: 100, updatedAt: Date.now(), fileUri: result.uri }));
-      resumablesRef.current.delete(id);
-      lastBytesRef.current.delete(id);
-    } catch (e) {
-      updateDownload(id, (d) => ({ ...d, status: 'error', updatedAt: Date.now() }));
-      resumablesRef.current.delete(id);
-      lastBytesRef.current.delete(id);
-    }
-  }, [downloads, updateDownload]);
+  //   let resumable = resumablesRef.current.get(id);
+  //   if (!resumable) {
+  //     resumable = FileSystem.createDownloadResumable(
+  //       item.sourceUrl,
+  //       item.fileUri || `${FileSystem.documentDirectory}downloads/${sanitizeFilename(item.title)}.mp4`,
+  //       { headers: item.headers || {} },
+  //       progressCallback
+  //     );
+  //     resumablesRef.current.set(id, resumable);
+  //   }
+  //   try {
+  //     const result = await resumable.resumeAsync();
+  //     if (!result) throw new Error('Resume failed');
+  //     updateDownload(id, (d) => ({ ...d, status: 'completed', progress: 100, updatedAt: Date.now(), fileUri: result.uri }));
+  //     resumablesRef.current.delete(id);
+  //     lastBytesRef.current.delete(id);
+  //   } catch (e) {
+  //     updateDownload(id, (d) => ({ ...d, status: 'error', updatedAt: Date.now() }));
+  //     resumablesRef.current.delete(id);
+  //     lastBytesRef.current.delete(id);
+  //   }
+  // }, [downloads, updateDownload]);
 
   const cancelDownload = useCallback(async (id: string) => {
     const resumable = resumablesRef.current.get(id);
@@ -315,11 +356,11 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const value = useMemo<DownloadsContextValue>(() => ({
     downloads,
     startDownload,
-    pauseDownload,
-    resumeDownload,
+    // pauseDownload,
+    // resumeDownload,
     cancelDownload,
     removeDownload,
-  }), [downloads, startDownload, pauseDownload, resumeDownload, cancelDownload, removeDownload]);
+  }), [downloads, startDownload, /*pauseDownload, resumeDownload,*/ cancelDownload, removeDownload]);
 
   return (
     <DownloadsContext.Provider value={value}>
