@@ -31,6 +31,14 @@
       ],
       "versions": [
         {
+          "version": "1.2.2",
+          "buildVersion": "17",
+          "date": "2025-09-30",
+          "localizedDescription": "# Version 1.2.2 – Update Notes\n\n### New Features\n- Added **FFmpeg Extension to ExoPlayer**  \n  - ExoPlayer now supports **DTS** and **EAC3** audio formats.  \n  - For a full list of supported formats, visit the [official documentation](https://developer.android.com/media/media3/exoplayer/supported-formats#ffmpeg-library).  \n\n### Notes\n- Video decoders that lack hardware support (e.g., **DV**, **HDR10+**) will still not work.  \n  - Your device must have hardware decoding support for those formats.  \n- If a decoder fails, playback will **gracefully fallback to VLCLib Player**.  \n\n### Improvements\n- Improved **addon compatibility**, including support for addons such as **USATV**  \n- General **stability improvements** across the app",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/1.2.2/Stable_1-2-2.ipa",
+          "size": 25700000
+        },
+        {
           "version": "1.2.1",
           "buildVersion": "16",
           "date": "2025-01-27",
