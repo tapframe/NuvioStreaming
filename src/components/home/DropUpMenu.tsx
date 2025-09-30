@@ -92,9 +92,9 @@ export const DropUpMenu = ({ visible, onClose, item, onOptionSelect, isSaved: is
   // Robustly determine if the item is in the library (saved)
   const isSaved = typeof isSavedProp === 'boolean' ? isSavedProp : !!item.inLibrary;
   const isWatched = !!isWatchedProp;
-  const menuOptions = [
+  let menuOptions = [
     {
-      icon: isSaved ? 'bookmark' : 'bookmark-border',
+      icon: 'bookmark',
       label: isSaved ? 'Remove from Library' : 'Add to Library',
       action: 'library'
     },
@@ -103,17 +103,24 @@ export const DropUpMenu = ({ visible, onClose, item, onOptionSelect, isSaved: is
       label: isWatched ? 'Mark as Unwatched' : 'Mark as Watched',
       action: 'watched'
     },
+    /*
     {
       icon: 'playlist-add',
       label: 'Add to Playlist',
       action: 'playlist'
     },
+    */
     {
       icon: 'share',
       label: 'Share',
       action: 'share'
     }
   ];
+
+  // If used in LibraryScreen, only show 'Remove from Library' if item is in library
+  if (isSavedProp === true) {
+    menuOptions = menuOptions.filter(opt => opt.action !== 'library' || isSaved);
+  }
 
   const backgroundColor = isDarkMode ? '#1A1A1A' : '#FFFFFF';
 

@@ -1,4 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { DeviceEventEmitter } from 'react-native';
+import { Share } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { toast } from '@backpackapp-io/react-native-toast';
+import DropUpMenu from '../components/home/DropUpMenu';
 import {
   View,
   Text,
@@ -40,6 +45,7 @@ interface LibraryItem extends StreamingContent {
   imdbId?: string;
   traktId: number;
   images?: TraktImages;
+  watched?: boolean;
 }
 
 interface TraktDisplayItem {
@@ -205,6 +211,9 @@ const LibraryScreen = () => {
   const [filter, setFilter] = useState<'trakt' | 'movies' | 'series'>('movies');
   const [showTraktContent, setShowTraktContent] = useState(false);
   const [selectedTraktFolder, setSelectedTraktFolder] = useState<string | null>(null);
+  // DropUpMenu state
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<LibraryItem | null>(null);
   const insets = useSafeAreaInsets();
   const { currentTheme } = useTheme();
   
@@ -267,7 +276,22 @@ const LibraryScreen = () => {
       setLoading(true);
       try {
         const items = await catalogService.getLibraryItems();
-        setLibraryItems(items as LibraryItem[]);
+        // Load watched status for each item from AsyncStorage
+        const updatedItems = await Promise.all(items.map(async (item) => {
+          // Map StreamingContent to LibraryItem shape
+          const libraryItem: LibraryItem = {
+            ...item,
+            gradient: Array.isArray((item as any).gradient) ? (item as any).gradient : ['#222', '#444'],
+            traktId: typeof (item as any).traktId === 'number' ? (item as any).traktId : 0,
+          };
+          const key = `watched:${item.type}:${item.id}`;
+          const watched = await AsyncStorage.getItem(key);
+          return {
+            ...libraryItem,
+            watched: watched === 'true'
+          };
+        }));
+        setLibraryItems(updatedItems);
       } catch (error) {
         logger.error('Failed to load library:', error);
       } finally {
@@ -278,14 +302,37 @@ const LibraryScreen = () => {
     loadLibrary();
 
     // Subscribe to library updates
-    const unsubscribe = catalogService.subscribeToLibraryUpdates((items) => {
-      setLibraryItems(items as LibraryItem[]);
+    const unsubscribe = catalogService.subscribeToLibraryUpdates(async (items) => {
+      // Sync watched status on update
+      const updatedItems = await Promise.all(items.map(async (item) => {
+        // Map StreamingContent to LibraryItem shape
+        const libraryItem: LibraryItem = {
+          ...item,
+          gradient: Array.isArray((item as any).gradient) ? (item as any).gradient : ['#222', '#444'],
+          traktId: typeof (item as any).traktId === 'number' ? (item as any).traktId : 0,
+        };
+        const key = `watched:${item.type}:${item.id}`;
+        const watched = await AsyncStorage.getItem(key);
+        return {
+          ...libraryItem,
+          watched: watched === 'true'
+        };
+      }));
+      setLibraryItems(updatedItems);
     });
+
+    // Listen for watched status changes
+    const watchedSub = DeviceEventEmitter.addListener('watchedStatusChanged', loadLibrary);
+
+    // Refresh when screen regains focus
+    const focusSub = navigation.addListener('focus', loadLibrary);
 
     return () => {
       unsubscribe();
+      watchedSub.remove();
+      focusSub();
     };
-  }, []);
+  }, [navigation]);
 
   const filteredItems = libraryItems.filter(item => {
     if (filter === 'movies') return item.type === 'movie';
@@ -348,17 +395,25 @@ const LibraryScreen = () => {
     <TouchableOpacity
       style={[styles.itemContainer, { width: itemWidth }]}
       onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type })}
+      onLongPress={() => {
+        setSelectedItem(item);
+        setMenuVisible(true);
+      }}
       activeOpacity={0.7}
     >
       <View>
-        <View style={[styles.posterContainer, { shadowColor: currentTheme.colors.black }]}>
+        <View style={[styles.posterContainer, { shadowColor: currentTheme.colors.black }]}> 
           <Image
             source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
             style={styles.poster}
             contentFit="cover"
             transition={300}
           />
-
+          {item.watched && (
+            <View style={styles.watchedIndicator}>
+              <MaterialIcons name="check-circle" size={22} color={currentTheme.colors.success || '#4CAF50'} />
+            </View>
+          )}
           {item.progress !== undefined && item.progress < 1 && (
             <View style={styles.progressBarContainer}>
               <View
@@ -370,7 +425,7 @@ const LibraryScreen = () => {
             </View>
           )}
         </View>
-        <Text style={[styles.cardTitle, { color: currentTheme.colors.white }]}>
+        <Text style={[styles.cardTitle, { color: currentTheme.colors.white }]}> 
           {item.name}
         </Text>
       </View>
@@ -932,6 +987,62 @@ const LibraryScreen = () => {
           {showTraktContent ? renderTraktContent() : renderContent()}
         </View>
       </View>
+
+      {/* DropUpMenu integration */}
+      {selectedItem && (
+        <DropUpMenu
+          visible={menuVisible}
+          onClose={() => setMenuVisible(false)}
+          item={selectedItem}
+          isWatched={!!selectedItem.watched}
+          isSaved={true} // Since this is from library, it's always saved
+          onOptionSelect={async (option) => {
+            if (!selectedItem) return;
+            switch (option) {
+              case 'library': {
+              try {
+                await catalogService.removeFromLibrary(selectedItem.type, selectedItem.id);
+                toast('Removed from Library', { duration: 1200 });
+                setLibraryItems(prev => prev.filter(item => !(item.id === selectedItem.id && item.type === selectedItem.type)));
+                setMenuVisible(false);
+              } catch (error) {
+                toast('Failed to update Library', { duration: 1200 });
+              }
+              break;
+              }
+              case 'watched': {
+              try {
+                // Use AsyncStorage to store watched status by key
+                const key = `watched:${selectedItem.type}:${selectedItem.id}`;
+                const newWatched = !selectedItem.watched;
+                await AsyncStorage.setItem(key, newWatched ? 'true' : 'false');
+                toast(newWatched ? 'Marked as Watched' : 'Marked as Unwatched', { duration: 1200 });
+                // Instantly update local state
+                setLibraryItems(prev => prev.map(item =>
+                item.id === selectedItem.id && item.type === selectedItem.type
+                  ? { ...item, watched: newWatched }
+                  : item
+                ));
+              } catch (error) {
+                toast('Failed to update watched status', { duration: 1200 });
+              }
+              break;
+              }
+              case 'share': {
+              let url = '';
+              if (selectedItem.id) {
+                url = `https://www.imdb.com/title/${selectedItem.id}/`;
+              }
+              const message = `${selectedItem.name}\n${url}`;
+              Share.share({ message, url, title: selectedItem.name });
+              break;
+              }
+              default:
+              break;
+            }
+          }}
+        />
+      )}
     </View>
   );
 };
@@ -946,6 +1057,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 1,
+  },
+  watchedIndicator: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    borderRadius: 12,
+    padding: 2,
+    zIndex: 2,
   },
   contentContainer: {
     flex: 1,

@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Platform, Text, Animated } from 'react-native';
+import { toast } from '@backpackapp-io/react-native-toast';
+import { DeviceEventEmitter } from 'react-native';
+import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Platform, Text, Animated, Share } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useSettings } from '../../hooks/useSettings';
 import { catalogService, StreamingContent } from '../../services/catalogService';
 import { DropUpMenu } from './DropUpMenu';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface ContentItemProps {
   item: StreamingContent;
@@ -70,6 +73,17 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
     });
     return () => unsubscribe();
   }, [item.id, item.type]);
+
+    // Load watched state from AsyncStorage when item changes
+  useEffect(() => {
+    const updateWatched = () => {
+      AsyncStorage.getItem(`watched:${item.type}:${item.id}`).then(val => setIsWatched(val === 'true'));
+    };
+    updateWatched();
+    const sub = DeviceEventEmitter.addListener('watchedStatusChanged', updateWatched);
+    return () => sub.remove();
+  }, [item.id, item.type]);
+
   const [menuVisible, setMenuVisible] = useState(false);
   const [isWatched, setIsWatched] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -107,17 +121,37 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
       case 'library':
         if (inLibrary) {
           catalogService.removeFromLibrary(item.type, item.id);
+          toast('Removed from Library', { duration: 1200 });
         } else {
           catalogService.addToLibrary(item);
+          toast('Added to Library', { duration: 1200 });
         }
         break;
-      case 'watched':
-        setIsWatched(prev => !prev);
+      case 'watched': {
+        setIsWatched(prevWatched => {
+          const newWatched = !prevWatched;
+          AsyncStorage.setItem(`watched:${item.type}:${item.id}`, newWatched ? 'true' : 'false');
+          toast(newWatched ? 'Marked as Watched' : 'Marked as Unwatched', { duration: 1200 });
+          // Fire a custom event so other screens can update
+          setTimeout(() => {
+            DeviceEventEmitter.emit('watchedStatusChanged');
+          }, 100);
+          return newWatched;
+        });
+        setMenuVisible(false);
         break;
+      }
       case 'playlist':
         break;
-      case 'share':
+      case 'share': {
+        let url = '';
+        if (item.id) {
+          url = `https://www.imdb.com/title/${item.id}/`;
+        }
+        const message = `${item.name}\n${url}`;
+        Share.share({ message, url, title: item.name });
         break;
+      }
     }
   }, [item, inLibrary]);
 

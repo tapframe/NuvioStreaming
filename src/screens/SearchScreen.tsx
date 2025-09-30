@@ -24,6 +24,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { catalogService, StreamingContent } from '../services/catalogService';
 import { Image } from 'expo-image';
 import debounce from 'lodash/debounce';
+import { DropUpMenu } from '../components/home/DropUpMenu';
+import { DeviceEventEmitter, Share } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, { 
   FadeIn, 
@@ -207,7 +209,26 @@ const SearchScreen = () => {
   const inputRef = useRef<TextInput>(null);
   const insets = useSafeAreaInsets();
   const { currentTheme } = useTheme();
-  
+  // DropUpMenu state
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<StreamingContent | null>(null);
+  const [isSaved, setIsSaved] = useState(false);
+  const [isWatched, setIsWatched] = useState(false);
+  const [refreshFlag, setRefreshFlag] = React.useState(false);
+
+  // Update isSaved and isWatched when selectedItem changes
+  useEffect(() => {
+    if (!selectedItem) return;
+    (async () => {
+      // Check if item is in library
+      const items = await catalogService.getLibraryItems();
+      const found = items.find((libItem: any) => libItem.id === selectedItem.id && libItem.type === selectedItem.type);
+      setIsSaved(!!found);
+      // Check watched status
+      const val = await AsyncStorage.getItem(`watched:${selectedItem.type}:${selectedItem.id}`);
+      setIsWatched(val === 'true');
+    })();
+  }, [selectedItem]);
   // Animation values
   const searchBarWidth = useSharedValue(width - 32);
   const searchBarOpacity = useSharedValue(1);
@@ -441,35 +462,85 @@ const SearchScreen = () => {
     );
   };
 
-  const renderHorizontalItem = ({ item, index }: { item: StreamingContent, index: number }) => {
+  const SearchResultItem = ({ item, index, navigation, setSelectedItem, setMenuVisible, currentTheme, refreshFlag }: {
+    item: StreamingContent;
+    index: number;
+    navigation: any;
+    setSelectedItem: (item: StreamingContent) => void;
+    setMenuVisible: (visible: boolean) => void;
+    currentTheme: any;
+    refreshFlag: boolean;
+  }) => {
+    const [inLibrary, setInLibrary] = React.useState(!!item.inLibrary);
+    const [watched, setWatched] = React.useState(false);
+    // Re-check status when refreshFlag changes
+    React.useEffect(() => {
+      AsyncStorage.getItem(`watched:${item.type}:${item.id}`).then(val => setWatched(val === 'true'));
+      const items = catalogService.getLibraryItems();
+      const found = items.find((libItem: any) => libItem.id === item.id && libItem.type === item.type);
+      setInLibrary(!!found);
+    }, [refreshFlag, item.id, item.type]);
+    React.useEffect(() => {
+      const updateWatched = () => {
+        AsyncStorage.getItem(`watched:${item.type}:${item.id}`).then(val => setWatched(val === 'true'));
+      };
+      updateWatched();
+      const sub = DeviceEventEmitter.addListener('watchedStatusChanged', updateWatched);
+      return () => sub.remove();
+    }, [item.id, item.type]);
+    React.useEffect(() => {
+      const unsubscribe = catalogService.subscribeToLibraryUpdates((items) => {
+        const found = items.find((libItem) => libItem.id === item.id && libItem.type === item.type);
+        setInLibrary(!!found);
+      });
+      return () => unsubscribe();
+    }, [item.id, item.type]);
     return (
       <AnimatedTouchable
         style={styles.horizontalItem}
         onPress={() => {
           navigation.navigate('Metadata', { id: item.id, type: item.type });
         }}
+        onLongPress={() => {
+          setSelectedItem(item);
+          setMenuVisible(true);
+          // Do NOT toggle refreshFlag here
+        }}
+        delayLongPress={300}
         entering={FadeIn.duration(300).delay(index * 50)}
         activeOpacity={0.7}
       >
         <View style={[styles.horizontalItemPosterContainer, { 
           backgroundColor: currentTheme.colors.darkBackground,
           borderColor: 'rgba(255,255,255,0.05)'
-        }]}>
+        }]}> 
           <Image
             source={{ uri: item.poster || PLACEHOLDER_POSTER }}
             style={styles.horizontalItemPoster}
             contentFit="cover"
             transition={300}
           />
+          {/* Bookmark and watched icons top right, bookmark to the left of watched */}
+          {inLibrary && (
+            <View style={[styles.libraryBadge, { position: 'absolute', top: 8, right: 36, backgroundColor: 'transparent', zIndex: 2 }] }>
+              <MaterialIcons name="bookmark" size={16} color={currentTheme.colors.white} />
+            </View>
+          )}
+          {watched && (
+            <View style={[styles.watchedIndicator, { position: 'absolute', top: 8, right: 8, backgroundColor: 'transparent', zIndex: 2 }] }>
+              <MaterialIcons name="check-circle" size={20} color={currentTheme.colors.success || '#4CAF50'} />
+            </View>
+          )}
+          {/* 'series'/'movie' text in original place */}
           <View style={styles.itemTypeContainer}>
-            <Text style={[styles.itemTypeText, { color: currentTheme.colors.white }]}>
+            <Text style={[styles.itemTypeText, { color: currentTheme.colors.white }]}> 
               {item.type === 'movie' ? 'MOVIE' : 'SERIES'}
             </Text>
           </View>
           {item.imdbRating && (
             <View style={styles.ratingContainer}>
               <MaterialIcons name="star" size={12} color="#FFC107" />
-              <Text style={[styles.ratingText, { color: currentTheme.colors.white }]}>
+              <Text style={[styles.ratingText, { color: currentTheme.colors.white }]}> 
                 {item.imdbRating}
               </Text>
             </View>
@@ -482,7 +553,7 @@ const SearchScreen = () => {
           {item.name}
         </Text>
         {item.year && (
-          <Text style={[styles.yearText, { color: currentTheme.colors.mediumGray }]}>
+          <Text style={[styles.yearText, { color: currentTheme.colors.mediumGray }]}> 
             {item.year}
           </Text>
         )}
@@ -506,6 +577,17 @@ const SearchScreen = () => {
   const topSpacing = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top;
   const headerHeight = headerBaseHeight + topSpacing + 60;
 
+  useEffect(() => {
+    const watchedSub = DeviceEventEmitter.addListener('watchedStatusChanged', () => setRefreshFlag(f => !f));
+    const librarySub = catalogService.subscribeToLibraryUpdates(() => setRefreshFlag(f => !f));
+    const focusSub = navigation.addListener('focus', () => setRefreshFlag(f => !f));
+    return () => {
+      watchedSub.remove();
+      librarySub();
+      focusSub();
+    };
+  }, []);
+
   return (
     <Animated.View 
       style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}
@@ -520,13 +602,11 @@ const SearchScreen = () => {
         backgroundColor="transparent"
         translucent
       />
-      
       {/* Fixed position header background to prevent shifts */}
       <View style={[styles.headerBackground, { 
         height: headerHeight,
         backgroundColor: currentTheme.colors.darkBackground 
       }]} />
-      
       <View style={{ flex: 1 }}>
         {/* Header Section with proper top spacing */}
         <View style={[styles.header, { height: headerHeight, paddingTop: topSpacing }]}>
@@ -580,7 +660,6 @@ const SearchScreen = () => {
             </View>
           </View>
         </View>
-
         {/* Content Container */}
         <View style={[styles.contentContainer, { backgroundColor: currentTheme.colors.darkBackground }]}>
           {searching ? (
@@ -600,10 +679,10 @@ const SearchScreen = () => {
                 size={64} 
                 color={currentTheme.colors.lightGray}
               />
-              <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>
+              <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}> 
                 Keep typing...
               </Text>
-              <Text style={[styles.emptySubtext, { color: currentTheme.colors.lightGray }]}>
+              <Text style={[styles.emptySubtext, { color: currentTheme.colors.lightGray }]}> 
                 Type at least 2 characters to search
               </Text>
             </Animated.View>
@@ -617,10 +696,10 @@ const SearchScreen = () => {
                 size={64} 
                 color={currentTheme.colors.lightGray}
               />
-              <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>
+              <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}> 
                 No results found
               </Text>
-              <Text style={[styles.emptySubtext, { color: currentTheme.colors.lightGray }]}>
+              <Text style={[styles.emptySubtext, { color: currentTheme.colors.lightGray }]}> 
                 Try different keywords or check your spelling
               </Text>
             </Animated.View>
@@ -634,48 +713,110 @@ const SearchScreen = () => {
               showsVerticalScrollIndicator={false}
             >
               {!query.trim() && renderRecentSearches()}
-
               {movieResults.length > 0 && (
                 <Animated.View 
                   style={styles.carouselContainer}
                   entering={FadeIn.duration(300)}
                 >
-                  <Text style={[styles.carouselTitle, { color: currentTheme.colors.white }]}>
+                  <Text style={[styles.carouselTitle, { color: currentTheme.colors.white }]}> 
                     Movies ({movieResults.length})
                   </Text>
                   <FlatList
                     data={movieResults}
-                    renderItem={renderHorizontalItem}
+                    renderItem={({ item, index }) => (
+                      <SearchResultItem
+                        item={item}
+                        index={index}
+                        navigation={navigation}
+                        setSelectedItem={setSelectedItem}
+                        setMenuVisible={setMenuVisible}
+                        currentTheme={currentTheme}
+                        refreshFlag={refreshFlag}
+                      />
+                    )}
                     keyExtractor={item => `movie-${item.id}`}
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.horizontalListContent}
+                    extraData={refreshFlag}
                   />
                 </Animated.View>
               )}
-
               {seriesResults.length > 0 && (
                 <Animated.View 
                   style={styles.carouselContainer}
                   entering={FadeIn.duration(300).delay(50)}
                 >
-                  <Text style={[styles.carouselTitle, { color: currentTheme.colors.white }]}>
+                  <Text style={[styles.carouselTitle, { color: currentTheme.colors.white }]}> 
                     TV Shows ({seriesResults.length})
                   </Text>
                   <FlatList
                     data={seriesResults}
-                    renderItem={renderHorizontalItem}
+                    renderItem={({ item, index }) => (
+                      <SearchResultItem
+                        item={item}
+                        index={index}
+                        navigation={navigation}
+                        setSelectedItem={setSelectedItem}
+                        setMenuVisible={setMenuVisible}
+                        currentTheme={currentTheme}
+                        refreshFlag={refreshFlag}
+                      />
+                    )}
                     keyExtractor={item => `series-${item.id}`}
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.horizontalListContent}
+                    extraData={refreshFlag}
                   />
                 </Animated.View>
               )}
-              
             </Animated.ScrollView>
           )}
         </View>
+        {/* DropUpMenu integration for search results */}
+        {selectedItem && (
+          <DropUpMenu
+            visible={menuVisible}
+            onClose={() => setMenuVisible(false)}
+            item={selectedItem}
+            isSaved={isSaved}
+            isWatched={isWatched}
+            onOptionSelect={async (option: string) => {
+              if (!selectedItem) return;
+              switch (option) {
+                case 'share': {
+                  let url = '';
+                  if (selectedItem.id) {
+                    url = `https://www.imdb.com/title/${selectedItem.id}/`;
+                  }
+                  const message = `${selectedItem.name}\n${url}`;
+                  Share.share({ message, url, title: selectedItem.name });
+                  break;
+                }
+                case 'library': {
+                  if (isSaved) {
+                    await catalogService.removeFromLibrary(selectedItem.type, selectedItem.id);
+                    setIsSaved(false);
+                  } else {
+                    await catalogService.addToLibrary(selectedItem);
+                    setIsSaved(true);
+                  }
+                  break;
+                }
+                case 'watched': {
+                  const key = `watched:${selectedItem.type}:${selectedItem.id}`;
+                  const newWatched = !isWatched;
+                  await AsyncStorage.setItem(key, newWatched ? 'true' : 'false');
+                  setIsWatched(newWatched);
+                  break;
+                }
+                default:
+                  break;
+              }
+            }}
+          />
+        )}
       </View>
     </Animated.View>
   );
@@ -953,6 +1094,24 @@ const styles = StyleSheet.create({
   simpleAnimationText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  watchedIndicator: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    borderRadius: 12,
+    padding: 2,
+    zIndex: 2,
+    backgroundColor: 'transparent',
+  },
+  libraryBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 36,
+    borderRadius: 8,
+    padding: 4,
+    zIndex: 2,
+    backgroundColor: 'transparent',
   },
 });
 

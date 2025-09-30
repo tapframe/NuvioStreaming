@@ -1337,4 +1337,17 @@ const styles = StyleSheet.create<any>({
   },
 });
 
-export default React.memo(HomeScreen);
+import { DeviceEventEmitter } from 'react-native';
+
+const HomeScreenWithFocusSync = (props: any) => {
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      DeviceEventEmitter.emit('watchedStatusChanged');
+    });
+    return () => unsubscribe();
+  }, [navigation]);
+  return <HomeScreen {...props} />;
+};
+
+export default React.memo(HomeScreenWithFocusSync);
