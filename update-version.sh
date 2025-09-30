@@ -59,9 +59,10 @@ APP_JSON="./app.json"
 VERSION_TS="./src/utils/version.ts"
 INFO_PLIST="./ios/Nuvio/Info.plist"
 ANDROID_BUILD_GRADLE="./android/app/build.gradle"
+ANDROID_STRINGS_XML="./android/app/src/main/res/values/strings.xml"
 
 # Check if files exist
-for file in "$APP_JSON" "$VERSION_TS" "$INFO_PLIST" "$ANDROID_BUILD_GRADLE"; do
+for file in "$APP_JSON" "$VERSION_TS" "$INFO_PLIST" "$ANDROID_BUILD_GRADLE" "$ANDROID_STRINGS_XML"; do
     if [ ! -f "$file" ]; then
         print_error "File not found: $file"
         exit 1
@@ -91,6 +92,7 @@ cp "$APP_JSON" "${APP_JSON}.backup"
 cp "$VERSION_TS" "${VERSION_TS}.backup"
 cp "$INFO_PLIST" "${INFO_PLIST}.backup"
 cp "$ANDROID_BUILD_GRADLE" "${ANDROID_BUILD_GRADLE}.backup"
+cp "$ANDROID_STRINGS_XML" "${ANDROID_STRINGS_XML}.backup"
 
 # Function to restore backups on error
 restore_backups() {
@@ -99,6 +101,7 @@ restore_backups() {
     mv "${VERSION_TS}.backup" "$VERSION_TS"
     mv "${INFO_PLIST}.backup" "$INFO_PLIST"
     mv "${ANDROID_BUILD_GRADLE}.backup" "$ANDROID_BUILD_GRADLE"
+    mv "${ANDROID_STRINGS_XML}.backup" "$ANDROID_STRINGS_XML"
 }
 
 # Set trap to restore backups on error
@@ -118,8 +121,8 @@ print_success "Updated app.json"
 
 # Update src/utils/version.ts
 print_status "Updating src/utils/version.ts..."
-# Replace the APP_VERSION constant value
-sed -E -i '' "s/export const APP_VERSION = '\\S*';/export const APP_VERSION = '$NEW_VERSION';/g" "$VERSION_TS"
+# Replace the APP_VERSION constant value (portable BSD sed regex)
+sed -E -i '' "s/export const APP_VERSION = '[^']*';/export const APP_VERSION = '$NEW_VERSION';/g" "$VERSION_TS"
 print_success "Updated src/utils/version.ts"
 
 # Update Info.plist
@@ -137,6 +140,12 @@ sed -i '' "s/versionCode [0-9]*/versionCode $NEW_BUILD_NUMBER/g" "$ANDROID_BUILD
 # Update versionName
 sed -i '' "s/versionName \"[^\"]*\"/versionName \"$NEW_VERSION\"/g" "$ANDROID_BUILD_GRADLE"
 print_success "Updated Android build.gradle"
+
+# Update Android strings.xml (expo_runtime_version)
+print_status "Updating Android strings.xml..."
+# Update <string name="expo_runtime_version"> value
+sed -i '' "s|<string name=\"expo_runtime_version\">[^<]*</string>|<string name=\"expo_runtime_version\">$NEW_VERSION</string>|g" "$ANDROID_STRINGS_XML"
+print_success "Updated Android strings.xml"
 
 # Verify updates
 print_status "Verifying updates..."
@@ -178,16 +187,24 @@ else
     exit 1
 fi
 
+# Check Android strings.xml
+if grep -q "<string name=\"expo_runtime_version\">$NEW_VERSION</string>" "$ANDROID_STRINGS_XML"; then
+    print_success "Android strings.xml updated correctly"
+else
+    print_error "Android strings.xml update verification failed"
+    exit 1
+fi
+
 # Clean up backups
 print_status "Cleaning up backups..."
-rm "${APP_JSON}.backup" "${VERSION_TS}.backup" "${INFO_PLIST}.backup" "${ANDROID_BUILD_GRADLE}.backup"
+rm "${APP_JSON}.backup" "${VERSION_TS}.backup" "${INFO_PLIST}.backup" "${ANDROID_BUILD_GRADLE}.backup" "${ANDROID_STRINGS_XML}.backup"
 
 print_success "Version update completed successfully!"
 print_status "Summary:"
 echo "  Version: $NEW_VERSION"
 echo "  Runtime Version: $NEW_VERSION"
 echo "  Build Number: $NEW_BUILD_NUMBER"
-echo "  Files updated: app.json, src/utils/version.ts, Info.plist, Android build.gradle"
+echo "  Files updated: app.json, src/utils/version.ts, Info.plist, Android build.gradle, Android strings.xml"
 echo ""
 print_status "Next steps:"
 echo "  1. Test the app to ensure everything works correctly"
