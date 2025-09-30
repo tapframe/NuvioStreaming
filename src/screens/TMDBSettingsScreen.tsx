@@ -27,6 +27,7 @@ import { logger } from '../utils/logger';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import CustomAlert from '../components/CustomAlert';
+// (duplicate import removed)
 
 const TMDB_API_KEY_STORAGE_KEY = 'tmdb_api_key';
 const USE_CUSTOM_TMDB_API_KEY = 'use_custom_tmdb_api_key';
@@ -48,6 +49,7 @@ const TMDBSettingsScreen = () => {
   const apiKeyInputRef = useRef<TextInput>(null);
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
+  const { settings, updateSetting } = useSettings();
 
   const openAlert = (
     title: string,
@@ -288,6 +290,19 @@ const TMDBSettingsScreen = () => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        <View style={[styles.switchCard, { backgroundColor: currentTheme.colors.elevation2 }]}> 
+          <View style={styles.switchTextContainer}>
+            <Text style={[styles.switchTitle, { color: currentTheme.colors.text }]}>Enrich Metadata with TMDb</Text>
+            <Text style={[styles.switchDescription, { color: currentTheme.colors.mediumEmphasis }]}>When enabled, the app augments addon metadata with TMDb for cast, certification, logos/posters, and episode fallback. Disable to strictly use addon metadata only.</Text>
+          </View>
+          <Switch
+            value={settings.enrichMetadataWithTMDB}
+            onValueChange={(v) => updateSetting('enrichMetadataWithTMDB', v)}
+            trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
+            thumbColor={Platform.OS === 'android' ? (settings.enrichMetadataWithTMDB ? currentTheme.colors.white : currentTheme.colors.white) : ''}
+            ios_backgroundColor={'rgba(255,255,255,0.1)'}
+          />
+        </View>
         <View style={[styles.switchCard, { backgroundColor: currentTheme.colors.elevation2 }]}>
           <View style={styles.switchTextContainer}>
             <Text style={[styles.switchTitle, { color: currentTheme.colors.text }]}>Use Custom TMDb API Key</Text>

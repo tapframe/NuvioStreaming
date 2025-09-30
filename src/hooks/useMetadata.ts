@@ -12,6 +12,7 @@ import { usePersistentSeasons } from './usePersistentSeasons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stream } from '../types/metadata';
 import { storageService } from '../services/storageService';
+import { useSettings } from './useSettings';
 
 // Constants for timeouts and retries
 const API_TIMEOUT = 10000; // 10 seconds
@@ -109,6 +110,7 @@ interface UseMetadataReturn {
 }
 
 export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadataReturn => {
+  const { settings } = useSettings();
   const [metadata, setMetadata] = useState<StreamingContent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -300,6 +302,11 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     if (__DEV__) logger.log('[loadCast] Starting cast fetch for:', id);
     setLoadingCast(true);
     try {
+      if (!settings.enrichMetadataWithTMDB) {
+        if (__DEV__) logger.log('[loadCast] TMDB enrichment disabled by settings');
+        setLoadingCast(false);
+        return;
+      }
       // Check cache first
       const cachedCast = cacheService.getCast(id, type);
       if (cachedCast) {
@@ -394,6 +401,22 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       // Handle TMDB-specific IDs
       let actualId = id;
       if (id.startsWith('tmdb:')) {
+        // If enrichment disabled, resolve to an addon-friendly ID (IMDb) before calling addons
+        if (!settings.enrichMetadataWithTMDB) {
+          const tmdbRaw = id.split(':')[1];
+          try {
+            if (__DEV__) logger.log('[loadMetadata] enrichment=OFF; resolving TMDB→Stremio ID', { type, tmdbId: tmdbRaw });
+            const stremioId = await catalogService.getStremioId(type === 'series' ? 'tv' : 'movie', tmdbRaw);
+            if (stremioId) {
+              actualId = stremioId;
+              if (__DEV__) logger.log('[loadMetadata] resolved TMDB→Stremio ID', { actualId });
+            } else {
+              if (__DEV__) logger.warn('[loadMetadata] failed to resolve TMDB→Stremio ID; addon fetch may fail', { type, tmdbId: tmdbRaw });
+            }
+          } catch (e) {
+            if (__DEV__) logger.error('[loadMetadata] error resolving TMDB→Stremio ID', e);
+          }
+        } else {
         const tmdbId = id.split(':')[1];
         // For TMDB IDs, we need to handle metadata differently
         if (type === 'movie') {
@@ -539,9 +562,11 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             logger.error('Failed to fetch TV show details from TMDB:', error);
           }
         }
+        }
       }
 
       // Load all data in parallel
+      if (__DEV__) logger.log('[loadMetadata] fetching addon metadata', { type, actualId, addonId });
       const [content, castData] = await Promise.allSettled([
         // Load content with timeout and retry
         withRetry(async () => {
@@ -553,6 +578,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
           if (actualId.startsWith('tt')) {
             setImdbId(actualId);
           }
+          if (__DEV__) logger.log('[loadMetadata] addon metadata fetched', { hasResult: Boolean(result) });
           return result;
         }),
         // Start loading cast immediately in parallel
@@ -560,6 +586,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       ]);
 
       if (content.status === 'fulfilled' && content.value) {
+        if (__DEV__) logger.log('[loadMetadata] addon metadata:success', { id: content.value?.id, type: content.value?.type, name: content.value?.name });
         setMetadata(content.value);
         // Check if item is in library
         const isInLib = catalogService.getLibraryItems().some(item => item.id === id);
@@ -571,6 +598,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         // Update cache
         cacheService.setMetadata(id, type, content.value);
       } else {
+        if (__DEV__) logger.warn('[loadMetadata] addon metadata:not found or failed', { status: content.status, reason: (content as any)?.reason?.message });
         throw new Error('Content not found');
       }
     } catch (error) {
@@ -636,29 +664,33 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         
         if (__DEV__) logger.log(`📺 Processed addon episodes into ${Object.keys(groupedAddonEpisodes).length} seasons`);
         
-        // Fetch season posters from TMDB
-        try {
-          const tmdbIdToUse = tmdbId || (id.startsWith('tt') ? await tmdbService.findTMDBIdByIMDB(id) : null);
-          if (tmdbIdToUse) {
-            if (!tmdbId) setTmdbId(tmdbIdToUse);
-            const showDetails = await tmdbService.getTVShowDetails(tmdbIdToUse);
-            if (showDetails?.seasons) {
-              Object.keys(groupedAddonEpisodes).forEach(seasonStr => {
-                const seasonNum = parseInt(seasonStr, 10);
-                const seasonInfo = showDetails.seasons.find(s => s.season_number === seasonNum);
-                const seasonPosterPath = seasonInfo?.poster_path;
-                if (seasonPosterPath) {
-                  groupedAddonEpisodes[seasonNum] = groupedAddonEpisodes[seasonNum].map(ep => ({
-                    ...ep,
-                    season_poster_path: seasonPosterPath,
-                  }));
-                }
-              });
-              if (__DEV__) logger.log('🖼️ Successfully fetched and attached TMDB season posters to addon episodes.');
+        // Fetch season posters from TMDB only if enrichment is enabled; otherwise skip quietly
+        if (settings.enrichMetadataWithTMDB) {
+          try {
+            const tmdbIdToUse = tmdbId || (id.startsWith('tt') ? await tmdbService.findTMDBIdByIMDB(id) : null);
+            if (tmdbIdToUse) {
+              if (!tmdbId) setTmdbId(tmdbIdToUse);
+              const showDetails = await tmdbService.getTVShowDetails(tmdbIdToUse);
+              if (showDetails?.seasons) {
+                Object.keys(groupedAddonEpisodes).forEach(seasonStr => {
+                  const seasonNum = parseInt(seasonStr, 10);
+                  const seasonInfo = showDetails.seasons.find(s => s.season_number === seasonNum);
+                  const seasonPosterPath = seasonInfo?.poster_path;
+                  if (seasonPosterPath) {
+                    groupedAddonEpisodes[seasonNum] = groupedAddonEpisodes[seasonNum].map(ep => ({
+                      ...ep,
+                      season_poster_path: seasonPosterPath,
+                    }));
+                  }
+                });
+                if (__DEV__) logger.log('🖼️ Successfully fetched and attached TMDB season posters to addon episodes.');
+              }
             }
+          } catch (error) {
+            logger.error('Failed to fetch TMDB season posters for addon episodes:', error);
           }
-        } catch (error) {
-          logger.error('Failed to fetch TMDB season posters for addon episodes:', error);
+        } else {
+          if (__DEV__) logger.log('[loadSeriesData] TMDB enrichment disabled; skipping season poster fetch');
         }
         
         setGroupedEpisodes(groupedAddonEpisodes);
@@ -680,6 +712,10 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         }
         
         // Try to get TMDB ID for additional metadata (cast, etc.) but don't override episodes
+        if (!settings.enrichMetadataWithTMDB) {
+          if (__DEV__) logger.log('[loadSeriesData] TMDB enrichment disabled; skipping TMDB episode fallback (preserving current episodes)');
+          return;
+        }
         const tmdbIdResult = await tmdbService.findTMDBIdByIMDB(id);
         if (tmdbIdResult) {
           setTmdbId(tmdbIdResult);
@@ -1078,11 +1114,11 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         if (metadata?.imdb_id) {
           // Replace the series ID in episodeId with the IMDb ID
           const [, season, episode] = episodeId.split(':');
-          stremioEpisodeId = `series:${metadata.imdb_id}:${season}:${episode}`;
+          stremioEpisodeId = `${metadata.imdb_id}:${season}:${episode}`;
           if (__DEV__) console.log('✅ [loadEpisodeStreams] Using IMDb ID from metadata for Stremio episode:', stremioEpisodeId);
         } else if (imdbId) {
           const [, season, episode] = episodeId.split(':');
-          stremioEpisodeId = `series:${imdbId}:${season}:${episode}`;
+          stremioEpisodeId = `${imdbId}:${season}:${episode}`;
           if (__DEV__) console.log('✅ [loadEpisodeStreams] Using stored IMDb ID for Stremio episode:', stremioEpisodeId);
         } else {
           // Convert TMDB ID to IMDb ID for Stremio addons
@@ -1091,7 +1127,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             
             if (externalIds?.imdb_id) {
               const [, season, episode] = episodeId.split(':');
-              stremioEpisodeId = `series:${externalIds.imdb_id}:${season}:${episode}`;
+              stremioEpisodeId = `${externalIds.imdb_id}:${season}:${episode}`;
               if (__DEV__) console.log('✅ [loadEpisodeStreams] Converted TMDB to IMDb ID for Stremio episode:', stremioEpisodeId);
             } else {
               if (__DEV__) console.log('⚠️ [loadEpisodeStreams] No IMDb ID found for TMDB ID, using original episode ID:', stremioEpisodeId);
@@ -1105,6 +1141,12 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         if (__DEV__) console.log('📝 [loadEpisodeStreams] Converting IMDB ID to TMDB ID...');
         tmdbId = await withTimeout(tmdbService.findTMDBIdByIMDB(id), API_TIMEOUT);
         if (__DEV__) console.log('✅ [loadEpisodeStreams] Converted to TMDB ID:', tmdbId);
+        // Normalize episode id to 'tt:season:episode' format for addons that expect tt prefix
+        const parts = episodeId.split(':');
+        if (parts.length === 3 && parts[0] === 'series') {
+          stremioEpisodeId = `${id}:${parts[1]}:${parts[2]}`;
+          if (__DEV__) console.log('🔧 [loadEpisodeStreams] Normalized episode ID for addons:', stremioEpisodeId);
+        }
       } else {
         tmdbId = id;
         if (__DEV__) console.log('ℹ️ [loadEpisodeStreams] Using ID as both TMDB and Stremio ID:', tmdbId);
@@ -1212,6 +1254,10 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
   }, [metadata?.videos, type]);
 
   const loadRecommendations = useCallback(async () => {
+    if (!settings.enrichMetadataWithTMDB) {
+      if (__DEV__) console.log('[useMetadata] enrichment disabled; skip recommendations');
+      return;
+    }
     if (!tmdbId) return;
 
     setLoadingRecommendations(true);
@@ -1240,6 +1286,10 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
   // Fetch TMDB ID if needed and then recommendations
   useEffect(() => {
     const fetchTmdbIdAndRecommendations = async () => {
+      if (!settings.enrichMetadataWithTMDB) {
+        if (__DEV__) console.log('[useMetadata] enrichment disabled; skip TMDB id extraction and certification (extract path)');
+        return;
+      }
       if (metadata && !tmdbId) {
         try {
           const tmdbService = TMDBService.getInstance();
@@ -1268,23 +1318,29 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     };
 
     fetchTmdbIdAndRecommendations();
-  }, [metadata, id]);
+  }, [metadata, id, settings.enrichMetadataWithTMDB]);
 
   useEffect(() => {
     if (tmdbId) {
-      if (__DEV__) console.log('[useMetadata] tmdbId available; loading recommendations and enabling certification checks', { tmdbId });
-      loadRecommendations();
+      if (settings.enrichMetadataWithTMDB) {
+        if (__DEV__) console.log('[useMetadata] tmdbId available; loading recommendations and enabling certification checks', { tmdbId });
+        loadRecommendations();
+      }
       // Reset recommendations when tmdbId changes
       return () => {
         setRecommendations([]);
         setLoadingRecommendations(true);
       };
     }
-  }, [tmdbId, loadRecommendations]);
+  }, [tmdbId, loadRecommendations, settings.enrichMetadataWithTMDB]);
 
   // Ensure certification is attached whenever a TMDB id is known and metadata lacks it
   useEffect(() => {
     const maybeAttachCertification = async () => {
+      if (!settings.enrichMetadataWithTMDB) {
+        if (__DEV__) console.log('[useMetadata] enrichment disabled; skip certification (attach path)');
+        return;
+      }
       try {
         if (!metadata) {
           if (__DEV__) console.warn('[useMetadata] skip certification attach: metadata not ready');
@@ -1311,7 +1367,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       }
     };
     maybeAttachCertification();
-  }, [tmdbId, metadata, type]);
+  }, [tmdbId, metadata, type, settings.enrichMetadataWithTMDB]);
 
   // Reset tmdbId when id changes
   useEffect(() => {

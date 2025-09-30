@@ -76,6 +76,8 @@ export interface AppSettings {
   trailerMuted: boolean; // Default to muted for better user experience
   // AI
   aiChatEnabled: boolean; // Enable/disable Ask AI and AI features
+  // Metadata enrichment
+  enrichMetadataWithTMDB: boolean; // Use TMDB to enrich metadata (cast, certification, posters, fallbacks)
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -124,6 +126,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   trailerMuted: true, // Default to muted for better user experience
   // AI
   aiChatEnabled: false,
+  // Metadata enrichment
+  enrichMetadataWithTMDB: true,
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';
