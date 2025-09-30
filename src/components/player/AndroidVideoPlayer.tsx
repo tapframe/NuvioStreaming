@@ -36,6 +36,7 @@ import { AudioTrackModal } from './modals/AudioTrackModal';
 import PlayerControls from './controls/PlayerControls';
 import CustomSubtitles from './subtitles/CustomSubtitles';
 import { SourcesModal } from './modals/SourcesModal';
+import VlcVideoPlayer, { VlcPlayerRef } from './VlcVideoPlayer';
 import { stremioService } from '../../services/stremioService';
 import { shouldUseKSPlayer } from '../../utils/playerSelection';
 import axios from 'axios';
@@ -96,17 +97,6 @@ const AndroidVideoPlayer: React.FC = () => {
     logger.log(`[AndroidVideoPlayer] Player selection: ${playerType} (${reason})`);
   }, [useVLC, forceVlc]);
 
-  // Resolve VLC view dynamically to avoid iOS loading the Android native module
-  const LibVlcPlayerViewComponent: any = useMemo(() => {
-    if (Platform.OS !== 'android') return null;
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const mod = require('expo-libvlc-player');
-      return mod?.LibVlcPlayerView || null;
-    } catch {
-      return null;
-    }
-  }, []);
 
 
   // Check if the stream is HLS (m3u8 playlist)
@@ -222,14 +212,6 @@ const AndroidVideoPlayer: React.FC = () => {
   const [rnVideoAudioTracks, setRnVideoAudioTracks] = useState<Array<{id: number, name: string, language?: string}>>([]);
   const [rnVideoTextTracks, setRnVideoTextTracks] = useState<Array<{id: number, name: string, language?: string}>>([]);
 
-  // VLC tracks state
-  const [vlcAudioTracks, setVlcAudioTracks] = useState<Array<{id: number, name: string, language?: string}>>([]);
-  const [vlcSubtitleTracks, setVlcSubtitleTracks] = useState<Array<{id: number, name: string, language?: string}>>([]);
-  const [vlcSelectedAudioTrack, setVlcSelectedAudioTrack] = useState<number | undefined>(undefined);
-  const [vlcSelectedSubtitleTrack, setVlcSelectedSubtitleTrack] = useState<number | undefined>(undefined);
-  const [vlcRestoreTime, setVlcRestoreTime] = useState<number | undefined>(undefined); // Time to restore after remount
-  const [forceVlcRemount, setForceVlcRemount] = useState(false); // Force complete unmount/remount
-
   // Debounce track updates to prevent excessive processing
   const trackUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -239,39 +221,7 @@ const AndroidVideoPlayer: React.FC = () => {
   // Debounce gesture operations to prevent rapid-fire events
   const gestureDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Memoize VLC tracks prop to prevent unnecessary re-renders
-  const vlcTracks = useMemo(() => ({
-    audio: vlcSelectedAudioTrack,
-    video: 0, // Use first video track
-    subtitle: vlcSelectedSubtitleTrack
-  }), [vlcSelectedAudioTrack, vlcSelectedSubtitleTrack]);
 
-  // Format VLC tracks to match RN Video format - raw version
-  const formatVlcTracks = useCallback((vlcTracks: Array<{id: number, name: string}>) => {
-    if (!Array.isArray(vlcTracks)) return [];
-    return vlcTracks.map(track => {
-      // Just extract basic language info if available, but keep the full name
-      let language = undefined;
-      let displayName = track.name || `Track ${track.id + 1}`;
-      
-      // Log the raw track data for debugging
-      if (DEBUG_MODE) {
-        logger.log(`[VLC] Raw track data:`, { id: track.id, name: track.name });
-      }
-      
-      // Only extract language from brackets if present, but keep full name
-      const languageMatch = track.name?.match(/\[([^\]]+)\]/);
-      if (languageMatch && languageMatch[1]) {
-        language = languageMatch[1].trim();
-      }
-      
-      return {
-        id: track.id,
-        name: displayName, // Show exactly what VLC provides
-        language: language
-      };
-    });
-  }, []);
 
   // Process URL for VLC compatibility
   const processUrlForVLC = useCallback((url: string): string => {
@@ -304,79 +254,36 @@ const AndroidVideoPlayer: React.FC = () => {
     }
   }, []);
 
-  // Optimized VLC track processing function with reduced JSON operations
-  const processVlcTracks = useCallback((tracks: any, source: string) => {
-    if (!tracks) return;
 
-    // Log raw VLC tracks data for debugging
-    if (DEBUG_MODE) {
-      logger.log(`[VLC] ${source} - Raw tracks data:`, tracks);
+  // VLC track state - will be managed by VlcVideoPlayer component
+  const [vlcAudioTracks, setVlcAudioTracks] = useState<Array<{id: number, name: string, language?: string}>>([]);
+  const [vlcSubtitleTracks, setVlcSubtitleTracks] = useState<Array<{id: number, name: string, language?: string}>>([]);
+  const [vlcSelectedAudioTrack, setVlcSelectedAudioTrack] = useState<number | undefined>(undefined);
+  const [vlcSelectedSubtitleTrack, setVlcSelectedSubtitleTrack] = useState<number | undefined>(undefined);
+  const [vlcRestoreTime, setVlcRestoreTime] = useState<number | undefined>(undefined); // Time to restore after remount
+  const [forceVlcRemount, setForceVlcRemount] = useState(false); // Force complete unmount/remount
+
+  // VLC player ref for imperative methods
+  const vlcPlayerRef = useRef<VlcPlayerRef>(null);
+
+  // Track if VLC has loaded and needs initial play command
+  const vlcLoadedRef = useRef<boolean>(false);
+
+  // Handle VLC pause/play state changes
+  useEffect(() => {
+    if (useVLC && vlcLoadedRef.current && vlcPlayerRef.current) {
+      if (paused) {
+        vlcPlayerRef.current.pause();
+      } else {
+        vlcPlayerRef.current.play();
+      }
     }
-
-    // Clear any pending updates
-    if (trackUpdateTimeoutRef.current) {
-      clearTimeout(trackUpdateTimeoutRef.current);
-    }
-
-    // Debounce track updates to prevent excessive processing
-    trackUpdateTimeoutRef.current = setTimeout(() => {
-      const { audio = [], subtitle = [] } = tracks;
-      let hasUpdates = false;
-
-      // Process audio tracks with optimized comparison
-      if (Array.isArray(audio) && audio.length > 0) {
-        const formattedAudio = formatVlcTracks(audio);
-        // Use length and first/last item comparison instead of full JSON.stringify
-        const audioChanged = formattedAudio.length !== vlcAudioTracks.length ||
-          (formattedAudio.length > 0 && vlcAudioTracks.length > 0 && 
-           (formattedAudio[0]?.id !== vlcAudioTracks[0]?.id || 
-            formattedAudio[formattedAudio.length - 1]?.id !== vlcAudioTracks[vlcAudioTracks.length - 1]?.id));
-        
-        if (audioChanged) {
-          setVlcAudioTracks(formattedAudio);
-          hasUpdates = true;
-          // Only log in debug mode or when tracks actually change
-          if (DEBUG_MODE) {
-            logger.log(`[VLC] ${source} - Audio tracks updated:`, formattedAudio.length);
-          }
-        }
-      }
-
-      // Process subtitle tracks with optimized comparison
-      if (Array.isArray(subtitle) && subtitle.length > 0) {
-        const formattedSubs = formatVlcTracks(subtitle);
-        // Use length and first/last item comparison instead of full JSON.stringify
-        const subsChanged = formattedSubs.length !== vlcSubtitleTracks.length ||
-          (formattedSubs.length > 0 && vlcSubtitleTracks.length > 0 && 
-           (formattedSubs[0]?.id !== vlcSubtitleTracks[0]?.id || 
-            formattedSubs[formattedSubs.length - 1]?.id !== vlcSubtitleTracks[vlcSubtitleTracks.length - 1]?.id));
-        
-        if (subsChanged) {
-          setVlcSubtitleTracks(formattedSubs);
-          hasUpdates = true;
-          if (DEBUG_MODE) {
-            logger.log(`[VLC] ${source} - Subtitle tracks updated:`, formattedSubs.length);
-          }
-        }
-      }
-
-      // Log summary only if tracks were actually updated
-      if (hasUpdates && DEBUG_MODE) {
-        logger.log(`[AndroidVideoPlayer][VLC] ${source} - Track processing complete. Audio: ${vlcAudioTracks.length}, Subs: ${vlcSubtitleTracks.length}`);
-      }
-
-      trackUpdateTimeoutRef.current = null;
-    }, 100); // 100ms debounce
-  }, [formatVlcTracks, vlcAudioTracks, vlcSubtitleTracks]);
-
-  // Use VLC tracks directly (they only update when tracks change)
-  const vlcAudioTracksForModal = vlcAudioTracks;
-  const vlcSubtitleTracksForModal = vlcSubtitleTracks;
+  }, [useVLC, paused]);
 
   // Memoized computed props for child components
   const ksAudioTracks = useMemo(() =>
-    useVLC ? vlcAudioTracksForModal : rnVideoAudioTracks,
-    [useVLC, vlcAudioTracksForModal, rnVideoAudioTracks]
+    useVLC ? vlcAudioTracks : rnVideoAudioTracks,
+    [useVLC, vlcAudioTracks, rnVideoAudioTracks]
   );
 
   const computedSelectedAudioTrack = useMemo(() =>
@@ -389,8 +296,8 @@ const AndroidVideoPlayer: React.FC = () => {
   );
 
   const ksTextTracks = useMemo(() =>
-    useVLC ? vlcSubtitleTracksForModal : rnVideoTextTracks,
-    [useVLC, vlcSubtitleTracksForModal, rnVideoTextTracks]
+    useVLC ? vlcSubtitleTracks : rnVideoTextTracks,
+    [useVLC, vlcSubtitleTracks, rnVideoTextTracks]
   );
 
   const computedSelectedTextTrack = useMemo(() =>
@@ -535,46 +442,77 @@ const AndroidVideoPlayer: React.FC = () => {
   const errorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const vlcFallbackAttemptedRef = useRef(false);
 
-  // VLC refs/state
-  const vlcRef = useRef<any>(null);
-  const [vlcActive, setVlcActive] = useState(true); // Start as active
+  // VLC key for forcing remounts
   const [vlcKey, setVlcKey] = useState('vlc-initial'); // Force remount key
 
-  // Compute aspect ratio string for VLC (e.g., "16:9") based on current screen and resizeMode
-  const toVlcRatio = useCallback((w: number, h: number): string => {
-    const a = Math.max(1, Math.round(w));
-    const b = Math.max(1, Math.round(h));
-    const gcd = (x: number, y: number): number => (y === 0 ? x : gcd(y, x % y));
-    const g = gcd(a, b);
-    return `${Math.floor(a / g)}:${Math.floor(b / g)}`;
-  }, []);
+  // Handler for VLC track updates
+  const handleVlcTracksUpdate = useCallback((tracks: { audio: any[], subtitle: any[] }) => {
+    if (!tracks) return;
 
-  const vlcAspectRatio = useMemo(() => {
-    if (!useVLC) return undefined as string | undefined;
-    // For VLC, we handle aspect ratio through custom zoom for cover mode
-    // Only force aspect for fill mode (stretch to fit)
-    if (resizeMode === 'fill') {
-      const sw = screenDimensions.width || 0;
-      const sh = screenDimensions.height || 0;
-      if (sw > 0 && sh > 0) {
-        return toVlcRatio(sw, sh);
-      }
+    // Clear any pending updates
+    if (trackUpdateTimeoutRef.current) {
+      clearTimeout(trackUpdateTimeoutRef.current);
     }
-    // For cover/contain/none: let VLC preserve natural aspect, we handle zoom separately
-    return undefined;
-  }, [useVLC, resizeMode, screenDimensions.width, screenDimensions.height, toVlcRatio]);
 
-  // VLC options for better playback
-  const vlcOptions = useMemo(() => {
-    if (!useVLC) return [] as string[];
-    // Basic options for network streaming
-    return [
-      '--network-caching=2000',
-      '--clock-jitter=0',
-      '--http-reconnect',
-      '--sout-mux-caching=2000'
-    ];
-  }, [useVLC]);
+    // Debounce track updates to prevent excessive processing
+    trackUpdateTimeoutRef.current = setTimeout(() => {
+      const { audio = [], subtitle = [] } = tracks;
+      let hasUpdates = false;
+
+      // Process audio tracks
+      if (Array.isArray(audio) && audio.length > 0) {
+        const formattedAudio = audio.map(track => ({
+          id: track.id,
+          name: track.name || `Track ${track.id + 1}`,
+          language: track.language
+        }));
+
+        // Simple comparison - check if tracks changed
+        const audioChanged = formattedAudio.length !== vlcAudioTracks.length ||
+          formattedAudio.some((track, index) => {
+            const existing = vlcAudioTracks[index];
+            return !existing || track.id !== existing.id || track.name !== existing.name;
+          });
+
+        if (audioChanged) {
+          setVlcAudioTracks(formattedAudio);
+          hasUpdates = true;
+          if (DEBUG_MODE) {
+            logger.log(`[VLC] Audio tracks updated:`, formattedAudio.length);
+          }
+        }
+      }
+
+      // Process subtitle tracks
+      if (Array.isArray(subtitle) && subtitle.length > 0) {
+        const formattedSubs = subtitle.map(track => ({
+          id: track.id,
+          name: track.name || `Track ${track.id + 1}`,
+          language: track.language
+        }));
+
+        const subsChanged = formattedSubs.length !== vlcSubtitleTracks.length ||
+          formattedSubs.some((track, index) => {
+            const existing = vlcSubtitleTracks[index];
+            return !existing || track.id !== existing.id || track.name !== existing.name;
+          });
+
+        if (subsChanged) {
+          setVlcSubtitleTracks(formattedSubs);
+          hasUpdates = true;
+          if (DEBUG_MODE) {
+            logger.log(`[VLC] Subtitle tracks updated:`, formattedSubs.length);
+          }
+        }
+      }
+
+      if (hasUpdates && DEBUG_MODE) {
+        logger.log(`[AndroidVideoPlayer][VLC] Track processing complete. Audio: ${vlcAudioTracks.length}, Subs: ${vlcSubtitleTracks.length}`);
+      }
+
+      trackUpdateTimeoutRef.current = null;
+    }, 100); // 100ms debounce
+  }, [vlcAudioTracks, vlcSubtitleTracks]);
 
 
   // Volume and brightness controls
@@ -934,6 +872,7 @@ const AndroidVideoPlayer: React.FC = () => {
         logger.log('[VLC] Forcing complete remount due to focus gain');
         setVlcRestoreTime(currentTime); // Save current time for restoration
         setForceVlcRemount(true);
+        vlcLoadedRef.current = false; // Reset loaded state
         // Re-enable after a brief moment
         setTimeout(() => {
           setForceVlcRemount(false);
@@ -954,6 +893,7 @@ const AndroidVideoPlayer: React.FC = () => {
           logger.log('[VLC] Forcing complete remount due to app foreground');
           setVlcRestoreTime(currentTime); // Save current time for restoration
           setForceVlcRemount(true);
+          vlcLoadedRef.current = false; // Reset loaded state
           // Re-enable after a brief moment
           setTimeout(() => {
             setForceVlcRemount(false);
@@ -1166,42 +1106,49 @@ const AndroidVideoPlayer: React.FC = () => {
   const seekToTime = (rawSeconds: number) => {
     // Clamp to just before the end of the media.
     const timeInSeconds = Math.max(0, Math.min(rawSeconds, duration > 0 ? duration - END_EPSILON : rawSeconds));
-    if (useVLC && duration > 0) {
-      try {
-        const fraction = Math.min(Math.max(timeInSeconds / duration, 0), 0.999);
-        if (vlcRef.current && typeof vlcRef.current.seek === 'function') {
-          vlcRef.current.seek(fraction);
-          return;
+
+    if (useVLC) {
+      // Use VLC imperative method
+      if (vlcPlayerRef.current && duration > 0) {
+        if (DEBUG_MODE) {
+          if (__DEV__) logger.log(`[AndroidVideoPlayer][VLC] Seeking to ${timeInSeconds.toFixed(2)}s out of ${duration.toFixed(2)}s`);
         }
-      } catch {}
-    }
-    if (videoRef.current && duration > 0 && !isSeeking.current) {
-      if (DEBUG_MODE) {
-        if (__DEV__) logger.log(`[AndroidVideoPlayer] Seeking to ${timeInSeconds.toFixed(2)}s out of ${duration.toFixed(2)}s`);
-      }
-      
-      isSeeking.current = true;
-      setSeekTime(timeInSeconds);
-      if (Platform.OS === 'ios') {
-        iosWasPausedDuringSeekRef.current = paused;
-        if (!paused) setPaused(true);
-      }
-      
-      // Clear seek state handled in onSeek; keep a fallback timeout
-      setTimeout(() => {
-        if (isMounted.current && isSeeking.current) {
-          setSeekTime(null);
-          isSeeking.current = false;
-          if (DEBUG_MODE) logger.log('[AndroidVideoPlayer] Seek fallback timeout cleared seeking state');
-          if (Platform.OS === 'ios' && iosWasPausedDuringSeekRef.current === false) {
-            setPaused(false);
-            iosWasPausedDuringSeekRef.current = null;
-          }
+        vlcPlayerRef.current.seek(timeInSeconds);
+      } else {
+        if (DEBUG_MODE) {
+          logger.error(`[AndroidVideoPlayer][VLC] Seek failed: vlcRef=${!!vlcPlayerRef.current}, duration=${duration}`);
         }
-      }, 1200);
+      }
     } else {
-      if (DEBUG_MODE) {
-        logger.error(`[AndroidVideoPlayer] Seek failed: videoRef=${!!videoRef.current}, duration=${duration}, seeking=${isSeeking.current}`);
+      // Use react-native-video method
+      if (videoRef.current && duration > 0 && !isSeeking.current) {
+        if (DEBUG_MODE) {
+          if (__DEV__) logger.log(`[AndroidVideoPlayer] Seeking to ${timeInSeconds.toFixed(2)}s out of ${duration.toFixed(2)}s`);
+        }
+
+        isSeeking.current = true;
+        setSeekTime(timeInSeconds);
+        if (Platform.OS === 'ios') {
+          iosWasPausedDuringSeekRef.current = paused;
+          if (!paused) setPaused(true);
+        }
+
+        // Clear seek state handled in onSeek; keep a fallback timeout
+        setTimeout(() => {
+          if (isMounted.current && isSeeking.current) {
+            setSeekTime(null);
+            isSeeking.current = false;
+            if (DEBUG_MODE) logger.log('[AndroidVideoPlayer] Seek fallback timeout cleared seeking state');
+            if (Platform.OS === 'ios' && iosWasPausedDuringSeekRef.current === false) {
+              setPaused(false);
+              iosWasPausedDuringSeekRef.current = null;
+            }
+          }
+        }, 1200);
+      } else {
+        if (DEBUG_MODE) {
+          logger.error(`[AndroidVideoPlayer] Seek failed: videoRef=${!!videoRef.current}, duration=${duration}, seeking=${isSeeking.current}`);
+        }
       }
     }
   };
@@ -1853,7 +1800,7 @@ const AndroidVideoPlayer: React.FC = () => {
                          errorString.includes('ERROR_CODE_DECODER_INIT_FAILED');
       
       // If it's a codec error and we're not already using VLC, silently switch to VLC
-      if (isCodecError && !useVLC && LibVlcPlayerViewComponent && !vlcFallbackAttemptedRef.current) {
+      if (isCodecError && !useVLC && !vlcFallbackAttemptedRef.current) {
         vlcFallbackAttemptedRef.current = true;
         logger.warn('[AndroidVideoPlayer] Codec error detected, silently switching to VLC');
         // Clear any existing timeout
@@ -2472,23 +2419,12 @@ const AndroidVideoPlayer: React.FC = () => {
     
   const togglePlayback = useCallback(() => {
     const newPausedState = !paused;
-    if (useVLC && vlcRef.current) {
-      try {
-        if (newPausedState) {
-          if (typeof vlcRef.current.pause === 'function') vlcRef.current.pause();
-        } else {
-          if (typeof vlcRef.current.play === 'function') vlcRef.current.play();
-        }
-      } catch {}
-      setPaused(newPausedState);
-    } else if (videoRef.current) {
-      setPaused(newPausedState);
-    }
+    setPaused(newPausedState);
 
     if (duration > 0) {
       traktAutosync.handleProgressUpdate(currentTime, duration, true);
     }
-  }, [paused, useVLC, currentTime, duration, traktAutosync]);
+  }, [paused, currentTime, duration, traktAutosync]);
 
   // Handle next episode button press
   const handlePlayNextEpisode = useCallback(async () => {
@@ -3036,6 +2972,7 @@ const AndroidVideoPlayer: React.FC = () => {
       setDuration(0);
       setIsPlayerReady(false);
       setIsVideoLoaded(false);
+      vlcLoadedRef.current = false;
       
     } catch (error) {
       logger.error('[AndroidVideoPlayer] Error changing source:', error);
@@ -3308,94 +3245,41 @@ const AndroidVideoPlayer: React.FC = () => {
                 delayLongPress={300}
               >
                 {useVLC && !forceVlcRemount ? (
-                  <>
-                    {LibVlcPlayerViewComponent ? (
-                    <LibVlcPlayerViewComponent
-                    ref={vlcRef}
-                    style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
-                    // Force remount when surfaces are recreated
-                    key={vlcKey}
+                  <VlcVideoPlayer
+                    ref={vlcPlayerRef}
                     source={processedStreamUrl}
-                    aspectRatio={vlcAspectRatio}
-                    options={vlcOptions}
-                    tracks={vlcTracks}
-                    volume={Math.round(Math.max(0, Math.min(1, volume)) * 100)}
-                    mute={false}
-                    repeat={false}
-                    rate={1}
-                    autoplay={!paused}
-                    onFirstPlay={(info: any) => {
-                      try {
-                        if (DEBUG_MODE) {
-                          logger.log('[VLC] Video loaded, extracting tracks...');
-                        }
-                        logger.log('[AndroidVideoPlayer][VLC] Video loaded successfully');
-
-                        // Process VLC tracks using optimized function
-                        if (info?.tracks) {
-                          processVlcTracks(info.tracks, 'onFirstPlay');
-                        }
-
-                        const lenSec = (info?.length ?? 0) / 1000;
-                        const width = info?.width || 0;
-                        const height = info?.height || 0;
-                        onLoad({ duration: lenSec, naturalSize: width && height ? { width, height } : undefined });
-
-                        // Restore playback position after remount (workaround for surface detach)
-                        if (vlcRestoreTime !== undefined && vlcRestoreTime > 0) {
-                          if (DEBUG_MODE) {
-                            logger.log('[VLC] Restoring playback position:', vlcRestoreTime);
+                    volume={volume}
+                    zoomScale={zoomScale}
+                    resizeMode={resizeMode}
+                    onLoad={(data) => {
+                      vlcLoadedRef.current = true;
+                      onLoad(data);
+                      // Start playback if not paused
+                      if (!paused && vlcPlayerRef.current) {
+                        setTimeout(() => {
+                          if (vlcPlayerRef.current) {
+                            vlcPlayerRef.current.play();
                           }
-                          setTimeout(() => {
-                            if (vlcRef.current && typeof vlcRef.current.seek === 'function') {
-                              const seekPosition = Math.min(vlcRestoreTime / lenSec, 0.999); // Convert to fraction
-                              vlcRef.current.seek(seekPosition);
-                              if (DEBUG_MODE) {
-                                logger.log('[VLC] Seeked to restore position');
-                              }
-                            }
-                          }, 500); // Small delay to ensure player is ready
-                          setVlcRestoreTime(undefined); // Clear restore time
-                        }
-                      } catch (e) {
-                        logger.error('[VLC] onFirstPlay error:', e);
-                        logger.warn('[AndroidVideoPlayer][VLC] onFirstPlay parse error', e);
+                        }, 100);
                       }
                     }}
-                    onPositionChanged={(ev: any) => {
-                      const pos = typeof ev?.position === 'number' ? ev.position : 0;
+                    onProgress={(data) => {
+                      const pos = typeof data?.position === 'number' ? data.position : 0;
                       if (duration > 0) {
                         const current = pos * duration;
                         handleProgress({ currentTime: current, playableDuration: current });
                       }
                     }}
-                    onPlaying={() => setPaused(false)}
-                    onPaused={() => setPaused(true)}
-                    onEndReached={onEnd}
-                    onEncounteredError={(e: any) => {
-                      logger.error('[AndroidVideoPlayer][VLC] Encountered error:', e);
-                      handleError(e);
-                    }}
-                    onBackground={() => {
-                      logger.log('[VLC] App went to background');
-                    }}
-                    onESAdded={(tracks: any) => {
-                      try {
-                        if (DEBUG_MODE) {
-                          logger.log('[VLC] ES Added - processing tracks...');
-                        }
-
-                        // Process VLC tracks using optimized function
-                        if (tracks) {
-                          processVlcTracks(tracks, 'onESAdded');
-                        }
-                      } catch (e) {
-                        logger.error('[VLC] onESAdded error:', e);
-                        logger.warn('[AndroidVideoPlayer][VLC] onESAdded parse error', e);
-                      }
-                    }}
-                  />) : null}
-                  </>
+                    onSeek={onSeek}
+                    onEnd={onEnd}
+                    onError={handleError}
+                    onTracksUpdate={handleVlcTracksUpdate}
+                    selectedAudioTrack={vlcSelectedAudioTrack}
+                    selectedSubtitleTrack={vlcSelectedSubtitleTrack}
+                    restoreTime={vlcRestoreTime}
+                    forceRemount={forceVlcRemount}
+                    key={vlcKey}
+                  />
                 ) : (
                   <Video
                       ref={videoRef}
@@ -4096,7 +3980,7 @@ const AndroidVideoPlayer: React.FC = () => {
         <AudioTrackModal
         showAudioModal={showAudioModal}
         setShowAudioModal={setShowAudioModal}
-        ksAudioTracks={useVLC ? vlcAudioTracksForModal : rnVideoAudioTracks}
+        ksAudioTracks={useVLC ? vlcAudioTracks : rnVideoAudioTracks}
         selectedAudioTrack={useVLC ? (vlcSelectedAudioTrack ?? null) : (selectedAudioTrack?.type === SelectedTrackType.INDEX && selectedAudioTrack.value !== undefined ? Number(selectedAudioTrack.value) : null)}
         selectAudioTrack={selectAudioTrackById}
       />
