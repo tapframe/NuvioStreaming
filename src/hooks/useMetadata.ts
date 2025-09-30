@@ -110,7 +110,7 @@ interface UseMetadataReturn {
 }
 
 export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadataReturn => {
-  const { settings } = useSettings();
+  const { settings, isLoaded: settingsLoaded } = useSettings();
   const [metadata, setMetadata] = useState<StreamingContent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -421,7 +421,10 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         // For TMDB IDs, we need to handle metadata differently
         if (type === 'movie') {
           if (__DEV__) logger.log('Fetching movie details from TMDB for:', tmdbId);
-          const movieDetails = await tmdbService.getMovieDetails(tmdbId);
+          const movieDetails = await tmdbService.getMovieDetails(
+            tmdbId,
+            settings.useTmdbLocalizedMetadata ? `${settings.tmdbLanguagePreference || 'en'}-US` : 'en-US'
+          );
           if (movieDetails) {
             const imdbId = movieDetails.imdb_id || movieDetails.external_ids?.imdb_id;
             if (imdbId) {
@@ -485,7 +488,10 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
           // Handle TV shows with TMDB IDs
           if (__DEV__) logger.log('Fetching TV show details from TMDB for:', tmdbId);
           try {
-            const showDetails = await tmdbService.getTVShowDetails(parseInt(tmdbId));
+            const showDetails = await tmdbService.getTVShowDetails(
+              parseInt(tmdbId),
+              settings.useTmdbLocalizedMetadata ? `${settings.tmdbLanguagePreference || 'en'}-US` : 'en-US'
+            );
             if (showDetails) {
               // Get external IDs to check for IMDb ID
               const externalIds = await tmdbService.getShowExternalIds(parseInt(tmdbId));
@@ -587,16 +593,52 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
       if (content.status === 'fulfilled' && content.value) {
         if (__DEV__) logger.log('[loadMetadata] addon metadata:success', { id: content.value?.id, type: content.value?.type, name: content.value?.name });
-        setMetadata(content.value);
-        // Check if item is in library
+
+        // Start with addon metadata
+        let finalMetadata = content.value as StreamingContent;
+
+        // If localization is enabled, merge TMDB localized text (name/overview) before first render
+        try {
+          if (settings.enrichMetadataWithTMDB && settings.useTmdbLocalizedMetadata) {
+            const tmdbSvc = TMDBService.getInstance();
+            // Ensure we have a TMDB ID
+            let finalTmdbId: number | null = tmdbId;
+            if (!finalTmdbId) {
+              finalTmdbId = await tmdbSvc.extractTMDBIdFromStremioId(actualId);
+              if (finalTmdbId) setTmdbId(finalTmdbId);
+            }
+            if (finalTmdbId) {
+              const lang = settings.tmdbLanguagePreference || 'en';
+              if (type === 'movie') {
+                const localized = await tmdbSvc.getMovieDetails(String(finalTmdbId), lang);
+                if (localized) {
+                  finalMetadata = {
+                    ...finalMetadata,
+                    name: localized.title || finalMetadata.name,
+                    description: localized.overview || finalMetadata.description,
+                  };
+                }
+              } else {
+                const localized = await tmdbSvc.getTVShowDetails(Number(finalTmdbId), lang);
+                if (localized) {
+                  finalMetadata = {
+                    ...finalMetadata,
+                    name: localized.name || finalMetadata.name,
+                    description: localized.overview || finalMetadata.description,
+                  };
+                }
+              }
+            }
+          }
+        } catch (e) {
+          if (__DEV__) console.log('[useMetadata] failed to merge localized TMDB text', e);
+        }
+
+        // Commit final metadata once and cache it
+        setMetadata(finalMetadata);
+        cacheService.setMetadata(id, type, finalMetadata);
         const isInLib = catalogService.getLibraryItems().some(item => item.id === id);
         setInLibrary(isInLib);
-        cacheService.setMetadata(id, type, content.value);
-
-        // Set the final metadata state without fetching logo (this will be handled by MetadataScreen)
-        setMetadata(content.value);
-        // Update cache
-        cacheService.setMetadata(id, type, content.value);
       } else {
         if (__DEV__) logger.warn('[loadMetadata] addon metadata:not found or failed', { status: content.status, reason: (content as any)?.reason?.message });
         throw new Error('Content not found');
@@ -693,6 +735,40 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
           if (__DEV__) logger.log('[loadSeriesData] TMDB enrichment disabled; skipping season poster fetch');
         }
         
+        // If localized TMDB text is enabled, merge episode names/overviews per language
+        if (settings.enrichMetadataWithTMDB && settings.useTmdbLocalizedMetadata) {
+          try {
+            const tmdbIdToUse = tmdbId || (id.startsWith('tt') ? await tmdbService.findTMDBIdByIMDB(id) : null);
+            if (tmdbIdToUse) {
+              const lang = `${settings.tmdbLanguagePreference || 'en'}-US`;
+              const seasons = Object.keys(groupedAddonEpisodes).map(Number);
+              for (const seasonNum of seasons) {
+                const seasonEps = groupedAddonEpisodes[seasonNum];
+                // Parallel fetch a reasonable batch (limit concurrency implicitly by season)
+                const localized = await Promise.all(
+                  seasonEps.map(async ep => {
+                    try {
+                      const data = await tmdbService.getEpisodeDetails(Number(tmdbIdToUse), seasonNum, ep.episode_number, lang);
+                      if (data) {
+                        return {
+                          ...ep,
+                          name: data.name || ep.name,
+                          overview: data.overview || ep.overview,
+                        };
+                      }
+                    } catch {}
+                    return ep;
+                  })
+                );
+                groupedAddonEpisodes[seasonNum] = localized;
+              }
+              if (__DEV__) logger.log('[useMetadata] merged localized episode names/overviews from TMDB');
+            }
+          } catch (e) {
+            if (__DEV__) console.log('[useMetadata] failed to merge localized episode text', e);
+          }
+        }
+
         setGroupedEpisodes(groupedAddonEpisodes);
         
         // Determine initial season only once per series
@@ -1242,8 +1318,17 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
   }, [error, loadAttempts]);
 
   useEffect(() => {
+    if (!settingsLoaded) return;
     loadMetadata();
-  }, [id, type]);
+  }, [id, type, settingsLoaded]);
+
+  // Re-fetch when localization settings change to guarantee selected language at open
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    if (settings.enrichMetadataWithTMDB && settings.useTmdbLocalizedMetadata) {
+      loadMetadata();
+    }
+  }, [settingsLoaded, settings.enrichMetadataWithTMDB, settings.useTmdbLocalizedMetadata, settings.tmdbLanguagePreference]);
 
   // Re-run series data loading when metadata updates with videos
   useEffect(() => {

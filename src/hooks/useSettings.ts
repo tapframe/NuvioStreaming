@@ -78,6 +78,7 @@ export interface AppSettings {
   aiChatEnabled: boolean; // Enable/disable Ask AI and AI features
   // Metadata enrichment
   enrichMetadataWithTMDB: boolean; // Use TMDB to enrich metadata (cast, certification, posters, fallbacks)
+  useTmdbLocalizedMetadata: boolean; // Use TMDB localized metadata (titles, overviews) per tmdbLanguagePreference
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -128,6 +129,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   aiChatEnabled: false,
   // Metadata enrichment
   enrichMetadataWithTMDB: true,
+  useTmdbLocalizedMetadata: false,
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';

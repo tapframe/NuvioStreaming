@@ -25,6 +25,9 @@ import CustomAlert from '../components/CustomAlert';
 // TMDB API key - since the default key might be private in the service, we'll use our own
 const TMDB_API_KEY = '439c478a771f35c05022f9feabcca01c';
 
+// Extra TMDB logo languages to always offer (only Arabic per request)
+const COMMON_TMDB_LANGUAGES: string[] = ['ar'];
+
 // Define example shows with their IMDB IDs and TMDB IDs
 const EXAMPLE_SHOWS = [
   { 
@@ -407,6 +410,9 @@ const LogoSourceSettings = () => {
   const [tmdbBanner, setTmdbBanner] = useState<string | null>(null);
   const [metahubBanner, setMetahubBanner] = useState<string | null>(null);
   const [loadingLogos, setLoadingLogos] = useState(true);
+  // Track which language the preview is actually using and if it is a fallback
+  const [previewLanguage, setPreviewLanguage] = useState<string>('');
+  const [isPreviewFallback, setIsPreviewFallback] = useState<boolean>(false);
   
   // State for TMDB language selection
   // Store unique language codes as strings
@@ -471,6 +477,7 @@ const LogoSourceSettings = () => {
               initialLogoPath = preferredLogo.file_path;
               initialLanguage = preferredTmdbLanguage;
               logger.log(`[LogoSourceSettings] Found initial ${preferredTmdbLanguage} TMDB logo for ${show.name}`);
+              setIsPreviewFallback(false);
             } else {
               // Fallback to English logo
               const englishLogo = imagesData.logos.find((logo: { iso_639_1: string; file_path: string }) => logo.iso_639_1 === 'en');
@@ -479,22 +486,27 @@ const LogoSourceSettings = () => {
                 initialLogoPath = englishLogo.file_path;
                 initialLanguage = 'en';
                 logger.log(`[LogoSourceSettings] Found initial English TMDB logo for ${show.name}`);
+                setIsPreviewFallback(true);
               } else if (imagesData.logos[0]) {
                 // Fallback to the first available logo
                 initialLogoPath = imagesData.logos[0].file_path;
                 initialLanguage = imagesData.logos[0].iso_639_1;
                 logger.log(`[LogoSourceSettings] No English logo, using first available (${initialLanguage}) TMDB logo for ${show.name}`);
+                setIsPreviewFallback(true);
               }
             }
             
             if (initialLogoPath) {
               setTmdbLogo(`https://image.tmdb.org/t/p/original${initialLogoPath}`);
+              setPreviewLanguage(initialLanguage || '');
             } else {
                logger.warn(`[LogoSourceSettings] No valid initial TMDB logo found for ${show.name}`);
             }
           } else {
             logger.warn(`[LogoSourceSettings] No TMDB logos found in response for ${show.name}`);
             setUniqueTmdbLanguages([]); // Ensure it's empty if no logos
+            setPreviewLanguage('');
+            setIsPreviewFallback(false);
           }
           
           // Get TMDB banner (backdrop)
@@ -603,8 +615,24 @@ const LogoSourceSettings = () => {
         if (selectedLogoData) {
           setTmdbLogo(`https://image.tmdb.org/t/p/original${selectedLogoData.file_path}`);
           logger.log(`[LogoSourceSettings] Switched TMDB logo preview to language: ${languageCode}`);
+          setPreviewLanguage(languageCode);
+          setIsPreviewFallback(false);
         } else {
           logger.warn(`[LogoSourceSettings] Could not find logo data for selected language: ${languageCode}`);
+          // Fallback to English, then first available if English is not present
+          const englishData = tmdbLogosData.find(logo => logo.iso_639_1 === 'en');
+          if (englishData) {
+            setTmdbLogo(`https://image.tmdb.org/t/p/original${englishData.file_path}`);
+            setPreviewLanguage('en');
+            setIsPreviewFallback(true);
+          } else if (tmdbLogosData[0]) {
+            setTmdbLogo(`https://image.tmdb.org/t/p/original${tmdbLogosData[0].file_path}`);
+            setPreviewLanguage(tmdbLogosData[0].iso_639_1 || '');
+            setIsPreviewFallback(true);
+          } else {
+            setPreviewLanguage('');
+            setIsPreviewFallback(false);
+          }
         }
       }
       
@@ -833,15 +861,18 @@ const LogoSourceSettings = () => {
               <View style={styles.exampleContainer}>
                 <Text style={styles.exampleLabel}>Example:</Text>
                 {renderLogoExample(tmdbLogo, tmdbBanner, loadingLogos)}
+                <Text style={styles.logoSourceLabel}>
+                  {`Preview language: ${(previewLanguage || '').toUpperCase() || 'N/A'}${isPreviewFallback ? ' (fallback)' : ''}`}
+                </Text>
                 <Text style={styles.logoSourceLabel}>{selectedShow.name} logo from TMDB</Text>
               </View>
               
               {/* TMDB Language Selector */}
-              {uniqueTmdbLanguages.length > 1 && (
+              {true && (
                 <View style={styles.languageSelectorContainer}>
                   <Text style={styles.languageSelectorTitle}>Logo Language</Text>
                   <Text style={styles.languageSelectorDescription}>
-                    Select your preferred language for TMDB logos.
+                    Select your preferred language for TMDB logos (includes common languages like Arabic even if not shown in this preview).
                   </Text>
                   <ScrollView 
                     horizontal 
@@ -850,8 +881,8 @@ const LogoSourceSettings = () => {
                     scrollEventThrottle={32}
                     decelerationRate="normal"
                   >
-                    {/* Iterate over unique language codes */}
-                    {uniqueTmdbLanguages.map((langCode) => (
+                    {/* Merge unique languages from TMDB with a common list to ensure wider options */}
+                    {Array.from(new Set<string>([...uniqueTmdbLanguages, ...COMMON_TMDB_LANGUAGES])).map((langCode) => (
                       <TouchableOpacity
                         key={langCode} // Use the unique code as key
                         style={[

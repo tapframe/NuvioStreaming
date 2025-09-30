@@ -17,6 +17,7 @@ import {
   Image,
   KeyboardAvoidingView,
   TouchableWithoutFeedback,
+  Modal,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
@@ -50,6 +51,8 @@ const TMDBSettingsScreen = () => {
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
   const { settings, updateSetting } = useSettings();
+  const [languagePickerVisible, setLanguagePickerVisible] = useState(false);
+  const [languageSearch, setLanguageSearch] = useState('');
 
   const openAlert = (
     title: string,
@@ -284,165 +287,311 @@ const TMDBSettingsScreen = () => {
         </Text>
       </View>
 
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.switchCard, { backgroundColor: currentTheme.colors.elevation2 }]}> 
-          <View style={styles.switchTextContainer}>
-            <Text style={[styles.switchTitle, { color: currentTheme.colors.text }]}>Enrich Metadata with TMDb</Text>
-            <Text style={[styles.switchDescription, { color: currentTheme.colors.mediumEmphasis }]}>When enabled, the app augments addon metadata with TMDb for cast, certification, logos/posters, and episode fallback. Disable to strictly use addon metadata only.</Text>
+        {/* Metadata Enrichment Section */}
+        <View style={[styles.sectionCard, { backgroundColor: currentTheme.colors.elevation2 }]}>
+          <View style={styles.sectionHeader}>
+            <MaterialIcons name="movie" size={20} color={currentTheme.colors.primary} />
+            <Text style={[styles.sectionTitle, { color: currentTheme.colors.text }]}>Metadata Enrichment</Text>
           </View>
-          <Switch
-            value={settings.enrichMetadataWithTMDB}
-            onValueChange={(v) => updateSetting('enrichMetadataWithTMDB', v)}
-            trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
-            thumbColor={Platform.OS === 'android' ? (settings.enrichMetadataWithTMDB ? currentTheme.colors.white : currentTheme.colors.white) : ''}
-            ios_backgroundColor={'rgba(255,255,255,0.1)'}
-          />
-        </View>
-        <View style={[styles.switchCard, { backgroundColor: currentTheme.colors.elevation2 }]}>
-          <View style={styles.switchTextContainer}>
-            <Text style={[styles.switchTitle, { color: currentTheme.colors.text }]}>Use Custom TMDb API Key</Text>
-            <Text style={[styles.switchDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-              Enable to use your own TMDb API key instead of the built-in one.
-              Using your own API key may provide better performance and higher rate limits.
-            </Text>
-          </View>
-          <Switch
-            value={useCustomKey}
-            onValueChange={toggleUseCustomKey}
-            trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
-            thumbColor={Platform.OS === 'android' ? (useCustomKey ? currentTheme.colors.white : currentTheme.colors.white) : ''}
-            ios_backgroundColor={'rgba(255,255,255,0.1)'}
-          />
-        </View>
+          <Text style={[styles.sectionDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+            Enhance your content metadata with TMDb data for better details and information.
+          </Text>
 
-        {useCustomKey && (
-          <>
-            <View style={[styles.statusCard, { backgroundColor: currentTheme.colors.elevation2 }]}>
-              <MaterialIcons 
-                name={isKeySet ? "check-circle" : "error-outline"} 
-                size={28}
-                color={isKeySet ? currentTheme.colors.success : currentTheme.colors.warning} 
-                style={styles.statusIconContainer}
-              />
-              <View style={styles.statusTextContainer}>
-                <Text style={[styles.statusTitle, { color: currentTheme.colors.text }]}>
-                  {isKeySet ? "API Key Active" : "API Key Required"}
-                </Text>
-                <Text style={[styles.statusDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-                  {isKeySet 
-                    ? "Your custom TMDb API key is set and active."
-                    : "Add your TMDb API key below."}
-                </Text>
-              </View>
-            </View>
-
-            <View style={[styles.card, { backgroundColor: currentTheme.colors.elevation2 }]}>
-              <Text style={[styles.cardTitle, { color: currentTheme.colors.text }]}>API Key</Text>
-              <View style={styles.inputContainer}>
-                <TextInput
-                  ref={apiKeyInputRef}
-                  style={[
-                    styles.input, 
-                    { 
-                      backgroundColor: currentTheme.colors.elevation1,
-                      color: currentTheme.colors.text,
-                      borderColor: isInputFocused ? currentTheme.colors.primary : 'transparent'
-                    }
-                  ]}
-                  value={apiKey}
-                  onChangeText={(text) => {
-                    setApiKey(text);
-                    if (testResult) setTestResult(null);
-                  }}
-                  placeholder="Paste your TMDb API key (v3)"
-                  placeholderTextColor={currentTheme.colors.mediumEmphasis}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  spellCheck={false}
-                  onFocus={() => setIsInputFocused(true)}
-                  onBlur={() => setIsInputFocused(false)}
-                />
-                <TouchableOpacity 
-                  style={styles.pasteButton}
-                  onPress={pasteFromClipboard}
-                >
-                  <MaterialIcons name="content-paste" size={20} color={currentTheme.colors.primary} />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.buttonRow}>
-                <TouchableOpacity 
-                  style={[styles.button, { backgroundColor: currentTheme.colors.primary }]}
-                  onPress={saveApiKey}
-                >
-                  <Text style={[styles.buttonText, { color: currentTheme.colors.white }]}>Save API Key</Text>
-                </TouchableOpacity>
-                
-                {isKeySet && (
-                  <TouchableOpacity 
-                    style={[styles.button, styles.clearButton, { borderColor: currentTheme.colors.error }]}
-                    onPress={clearApiKey}
-                  >
-                    <Text style={[styles.buttonText, { color: currentTheme.colors.error }]}>Clear</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              {testResult && (
-                <View style={[
-                  styles.resultMessage,
-                  { backgroundColor: testResult.success ? currentTheme.colors.success + '1A' : currentTheme.colors.error + '1A' }
-                ]}>
-                  <MaterialIcons 
-                    name={testResult.success ? "check-circle" : "error"} 
-                    size={18} 
-                    color={testResult.success ? currentTheme.colors.success : currentTheme.colors.error}
-                    style={styles.resultIcon}
-                  />
-                  <Text style={[
-                    styles.resultText,
-                    { color: testResult.success ? currentTheme.colors.success : currentTheme.colors.error }
-                  ]}>
-                    {testResult.message}
-                  </Text>
-                </View>
-              )}
-
-              <TouchableOpacity 
-                style={styles.helpLink}
-                onPress={openTMDBWebsite}
-              >
-                <MaterialIcons name="help" size={16} color={currentTheme.colors.primary} style={styles.helpIcon} />
-                <Text style={[styles.helpText, { color: currentTheme.colors.primary }]}>
-                  How to get a TMDb API key?
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={[styles.infoCard, { backgroundColor: currentTheme.colors.elevation1 }]}>
-              <MaterialIcons name="info-outline" size={22} color={currentTheme.colors.primary} style={styles.infoIcon} />
-              <Text style={[styles.infoText, { color: currentTheme.colors.mediumEmphasis }]}>
-                To get your own TMDb API key (v3), you need to create a TMDb account and request an API key from their website.
-                Using your own API key gives you dedicated quota and may improve app performance.
+          <View style={styles.settingRow}>
+            <View style={styles.settingTextContainer}>
+              <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Enable Enrichment</Text>
+              <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                Augments addon metadata with TMDb for cast, certification, logos/posters, and episode fallback.
               </Text>
             </View>
-          </>
-        )}
-
-        {!useCustomKey && (
-          <View style={[styles.infoCard, { backgroundColor: currentTheme.colors.elevation1 }]}>
-            <MaterialIcons name="info-outline" size={22} color={currentTheme.colors.primary} style={styles.infoIcon} />
-            <Text style={[styles.infoText, { color: currentTheme.colors.mediumEmphasis }]}>
-              Currently using the built-in TMDb API key. This key is shared among all users.
-              For better performance and reliability, consider using your own API key.
-            </Text>
+            <Switch
+              value={settings.enrichMetadataWithTMDB}
+              onValueChange={(v) => updateSetting('enrichMetadataWithTMDB', v)}
+              trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
+              thumbColor={Platform.OS === 'android' ? (settings.enrichMetadataWithTMDB ? currentTheme.colors.white : currentTheme.colors.white) : ''}
+              ios_backgroundColor={'rgba(255,255,255,0.1)'}
+            />
           </View>
-        )}
+
+          {settings.enrichMetadataWithTMDB && (
+            <>
+              <View style={styles.divider} />
+
+              <View style={styles.settingRow}>
+                <View style={styles.settingTextContainer}>
+                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Localized Text</Text>
+                  <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                    Fetch titles and descriptions in your preferred language from TMDb.
+                  </Text>
+                </View>
+                <Switch
+                  value={settings.useTmdbLocalizedMetadata}
+                  onValueChange={(v) => updateSetting('useTmdbLocalizedMetadata', v)}
+                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
+                  thumbColor={Platform.OS === 'android' ? (settings.useTmdbLocalizedMetadata ? currentTheme.colors.white : currentTheme.colors.white) : ''}
+                  ios_backgroundColor={'rgba(255,255,255,0.1)'}
+                />
+              </View>
+
+              {settings.useTmdbLocalizedMetadata && (
+                <>
+                  <View style={styles.divider} />
+
+                  <View style={styles.settingRow}>
+                    <View style={styles.settingTextContainer}>
+                      <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Language</Text>
+                      <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                        Current: {(settings.tmdbLanguagePreference || 'en').toUpperCase()}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => setLanguagePickerVisible(true)}
+                      style={[styles.languageButton, { backgroundColor: currentTheme.colors.primary }]}
+                    >
+                      <Text style={[styles.languageButtonText, { color: currentTheme.colors.white }]}>Change</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+            </>
+          )}
+        </View>
+
+        {/* API Configuration Section */}
+        <View style={[styles.sectionCard, { backgroundColor: currentTheme.colors.elevation2 }]}>
+          <View style={styles.sectionHeader}>
+            <MaterialIcons name="api" size={20} color={currentTheme.colors.primary} />
+            <Text style={[styles.sectionTitle, { color: currentTheme.colors.text }]}>API Configuration</Text>
+          </View>
+          <Text style={[styles.sectionDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+            Configure your TMDb API access for enhanced functionality.
+          </Text>
+
+          <View style={styles.settingRow}>
+            <View style={styles.settingTextContainer}>
+              <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Custom API Key</Text>
+              <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                Use your own TMDb API key for better performance and dedicated rate limits.
+              </Text>
+            </View>
+            <Switch
+              value={useCustomKey}
+              onValueChange={toggleUseCustomKey}
+              trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
+              thumbColor={Platform.OS === 'android' ? (useCustomKey ? currentTheme.colors.white : currentTheme.colors.white) : ''}
+              ios_backgroundColor={'rgba(255,255,255,0.1)'}
+            />
+          </View>
+
+          {useCustomKey && (
+            <>
+              <View style={styles.divider} />
+
+              {/* API Key Status */}
+              <View style={styles.statusRow}>
+                <MaterialIcons
+                  name={isKeySet ? "check-circle" : "error-outline"}
+                  size={20}
+                  color={isKeySet ? currentTheme.colors.success : currentTheme.colors.warning}
+                />
+                <Text style={[styles.statusText, {
+                  color: isKeySet ? currentTheme.colors.success : currentTheme.colors.warning
+                }]}>
+                  {isKeySet ? "Custom API key active" : "API key required"}
+                </Text>
+              </View>
+
+              {/* API Key Input */}
+              <View style={styles.apiKeyContainer}>
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    ref={apiKeyInputRef}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: currentTheme.colors.elevation1,
+                        color: currentTheme.colors.text,
+                        borderColor: isInputFocused ? currentTheme.colors.primary : 'transparent'
+                      }
+                    ]}
+                    value={apiKey}
+                    onChangeText={(text) => {
+                      setApiKey(text);
+                      if (testResult) setTestResult(null);
+                    }}
+                    placeholder="Paste your TMDb API key (v3)"
+                    placeholderTextColor={currentTheme.colors.mediumEmphasis}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    spellCheck={false}
+                    onFocus={() => setIsInputFocused(true)}
+                    onBlur={() => setIsInputFocused(false)}
+                  />
+                  <TouchableOpacity
+                    style={styles.pasteButton}
+                    onPress={pasteFromClipboard}
+                  >
+                    <MaterialIcons name="content-paste" size={20} color={currentTheme.colors.primary} />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.buttonRow}>
+                  <TouchableOpacity
+                    style={[styles.button, { backgroundColor: currentTheme.colors.primary }]}
+                    onPress={saveApiKey}
+                  >
+                    <Text style={[styles.buttonText, { color: currentTheme.colors.white }]}>Save</Text>
+                  </TouchableOpacity>
+
+                  {isKeySet && (
+                    <TouchableOpacity
+                      style={[styles.button, styles.clearButton, { borderColor: currentTheme.colors.error }]}
+                      onPress={clearApiKey}
+                    >
+                      <Text style={[styles.buttonText, { color: currentTheme.colors.error }]}>Clear</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {testResult && (
+                  <View style={[
+                    styles.resultMessage,
+                    { backgroundColor: testResult.success ? currentTheme.colors.success + '1A' : currentTheme.colors.error + '1A' }
+                  ]}>
+                    <MaterialIcons
+                      name={testResult.success ? "check-circle" : "error"}
+                      size={16}
+                      color={testResult.success ? currentTheme.colors.success : currentTheme.colors.error}
+                      style={styles.resultIcon}
+                    />
+                    <Text style={[
+                      styles.resultText,
+                      { color: testResult.success ? currentTheme.colors.success : currentTheme.colors.error }
+                    ]}>
+                      {testResult.message}
+                    </Text>
+                  </View>
+                )}
+
+                <TouchableOpacity
+                  style={styles.helpLink}
+                  onPress={openTMDBWebsite}
+                >
+                  <MaterialIcons name="help" size={16} color={currentTheme.colors.primary} style={styles.helpIcon} />
+                  <Text style={[styles.helpText, { color: currentTheme.colors.primary }]}>
+                    How to get a TMDb API key?
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+
+          {!useCustomKey && (
+            <View style={styles.infoContainer}>
+              <MaterialIcons name="info-outline" size={18} color={currentTheme.colors.primary} />
+              <Text style={[styles.infoText, { color: currentTheme.colors.mediumEmphasis }]}>
+                Currently using built-in API key. Consider using your own key for better performance.
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Language Picker Modal */}
+        <Modal
+          visible={languagePickerVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setLanguagePickerVisible(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+            <View style={{ backgroundColor: currentTheme.colors.darkBackground, borderTopLeftRadius: 16, borderTopRightRadius: 16, width: '100%', maxHeight: '80%', padding: 16 }}>
+              <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: currentTheme.colors.elevation3, alignSelf: 'center', marginBottom: 10 }} />
+              <Text style={{ color: currentTheme.colors.text, fontSize: 18, fontWeight: '800', marginBottom: 12 }}>Select Language</Text>
+              <View style={{ flexDirection: 'row', marginBottom: 12 }}>
+                <View style={{ flex: 1, borderRadius: 10, backgroundColor: currentTheme.colors.elevation1, paddingHorizontal: 12, paddingVertical: Platform.OS === 'ios' ? 10 : 0 }}>
+                  <TextInput
+                    placeholder="Search language (e.g. Arabic)"
+                    placeholderTextColor={currentTheme.colors.mediumEmphasis}
+                    style={{ color: currentTheme.colors.text, paddingVertical: Platform.OS === 'ios' ? 0 : 8 }}
+                    value={languageSearch}
+                    onChangeText={setLanguageSearch}
+                  />
+                </View>
+                <TouchableOpacity onPress={() => setLanguageSearch('')} style={{ marginLeft: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, backgroundColor: currentTheme.colors.elevation1 }}>
+                  <Text style={{ color: currentTheme.colors.text }}>Clear</Text>
+                </TouchableOpacity>
+              </View>
+              {/* Most used quick chips */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }} contentContainerStyle={{ paddingVertical: 2 }}>
+                {['en','ar','es','fr','de','tr'].map(code => (
+                  <TouchableOpacity key={code} onPress={() => { updateSetting('tmdbLanguagePreference', code); setLanguagePickerVisible(false); }} style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: settings.tmdbLanguagePreference === code ? currentTheme.colors.primary : currentTheme.colors.elevation1, borderRadius: 999, marginRight: 8 }}>
+                    <Text style={{ color: settings.tmdbLanguagePreference === code ? currentTheme.colors.white : currentTheme.colors.text }}>{code.toUpperCase()}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <ScrollView style={{ maxHeight: '70%' }}>
+                {[
+                  { code: 'en', label: 'English' },
+                  { code: 'ar', label: 'Arabic' },
+                  { code: 'es', label: 'Spanish' },
+                  { code: 'fr', label: 'French' },
+                  { code: 'de', label: 'German' },
+                  { code: 'it', label: 'Italian' },
+                  { code: 'pt', label: 'Portuguese' },
+                  { code: 'ru', label: 'Russian' },
+                  { code: 'tr', label: 'Turkish' },
+                  { code: 'ja', label: 'Japanese' },
+                  { code: 'ko', label: 'Korean' },
+                  { code: 'zh', label: 'Chinese' },
+                  { code: 'hi', label: 'Hindi' },
+                  { code: 'he', label: 'Hebrew' },
+                  { code: 'id', label: 'Indonesian' },
+                  { code: 'nl', label: 'Dutch' },
+                  { code: 'sv', label: 'Swedish' },
+                  { code: 'no', label: 'Norwegian' },
+                  { code: 'da', label: 'Danish' },
+                  { code: 'fi', label: 'Finnish' },
+                  { code: 'pl', label: 'Polish' },
+                  { code: 'cs', label: 'Czech' },
+                  { code: 'ro', label: 'Romanian' },
+                  { code: 'uk', label: 'Ukrainian' },
+                  { code: 'vi', label: 'Vietnamese' },
+                  { code: 'th', label: 'Thai' },
+                ]
+                .filter(({ label, code }) =>
+                  (languageSearch || '').length === 0 ||
+                  label.toLowerCase().includes(languageSearch.toLowerCase()) || code.toLowerCase().includes(languageSearch.toLowerCase())
+                )
+                .map(({ code, label }) => (
+                  <TouchableOpacity
+                    key={code}
+                    onPress={() => { updateSetting('tmdbLanguagePreference', code); setLanguagePickerVisible(false); }}
+                    style={{ paddingVertical: 12, paddingHorizontal: 6, borderRadius: 10, backgroundColor: settings.tmdbLanguagePreference === code ? currentTheme.colors.elevation1 : 'transparent', marginBottom: 4 }}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ color: currentTheme.colors.text, fontSize: 16 }}>
+                        {label} ({code.toUpperCase()})
+                      </Text>
+                      {settings.tmdbLanguagePreference === code && (
+                        <MaterialIcons name="check-circle" size={20} color={currentTheme.colors.primary} />
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <TouchableOpacity onPress={() => setLanguagePickerVisible(false)} style={{ marginTop: 12, paddingVertical: 12, alignItems: 'center', borderRadius: 10, backgroundColor: currentTheme.colors.primary }}>
+                <Text style={{ color: currentTheme.colors.white, fontWeight: '700' }}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
       <CustomAlert
         visible={alertVisible}
@@ -502,72 +651,85 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 40,
   },
-  switchCard: {
+  sectionCard: {
     borderRadius: 16,
-    marginBottom: 16,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    marginBottom: 20,
+    padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
-  switchTextContainer: {
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginLeft: 8,
+  },
+  sectionDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  settingTextContainer: {
     flex: 1,
     marginRight: 16,
   },
-  switchTitle: {
+  settingTitle: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
   },
-  switchDescription: {
+  settingDescription: {
     fontSize: 14,
     lineHeight: 20,
     opacity: 0.8,
   },
-  statusCard: {
-    flexDirection: 'row',
-    borderRadius: 16,
-    marginBottom: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  languageButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
   },
-  statusIconContainer: {
-    marginRight: 12,
-  },
-  statusTextContainer: {
-    flex: 1,
-  },
-  statusTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  statusDescription: {
+  languageButtonText: {
     fontSize: 14,
-    opacity: 0.8,
-  },
-  card: {
-    borderRadius: 16,
-    marginBottom: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  cardTitle: {
-    fontSize: 16,
     fontWeight: '600',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginVertical: 16,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 16,
+  },
+  statusText: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 8,
+  },
+  apiKeyContainer: {
+    marginTop: 16,
+  },
+  infoContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 8,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -640,27 +802,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  infoCard: {
-    borderRadius: 16,
-    marginBottom: 16,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  infoIcon: {
-    marginRight: 12,
-    marginTop: 2,
-  },
   infoText: {
     fontSize: 14,
     flex: 1,
     lineHeight: 20,
     opacity: 0.8,
+    marginLeft: 8,
   },
 });
 
