@@ -506,91 +506,211 @@ const TMDBSettingsScreen = () => {
         <Modal
           visible={languagePickerVisible}
           transparent
-          animationType="fade"
+          animationType="slide"
           onRequestClose={() => setLanguagePickerVisible(false)}
         >
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-            <View style={{ backgroundColor: currentTheme.colors.darkBackground, borderTopLeftRadius: 16, borderTopRightRadius: 16, width: '100%', maxHeight: '80%', padding: 16 }}>
-              <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: currentTheme.colors.elevation3, alignSelf: 'center', marginBottom: 10 }} />
-              <Text style={{ color: currentTheme.colors.text, fontSize: 18, fontWeight: '800', marginBottom: 12 }}>Select Language</Text>
-              <View style={{ flexDirection: 'row', marginBottom: 12 }}>
-                <View style={{ flex: 1, borderRadius: 10, backgroundColor: currentTheme.colors.elevation1, paddingHorizontal: 12, paddingVertical: Platform.OS === 'ios' ? 10 : 0 }}>
-                  <TextInput
-                    placeholder="Search language (e.g. Arabic)"
-                    placeholderTextColor={currentTheme.colors.mediumEmphasis}
-                    style={{ color: currentTheme.colors.text, paddingVertical: Platform.OS === 'ios' ? 0 : 8 }}
-                    value={languageSearch}
-                    onChangeText={setLanguageSearch}
-                  />
-                </View>
-                <TouchableOpacity onPress={() => setLanguageSearch('')} style={{ marginLeft: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, backgroundColor: currentTheme.colors.elevation1 }}>
-                  <Text style={{ color: currentTheme.colors.text }}>Clear</Text>
-                </TouchableOpacity>
-              </View>
-              {/* Most used quick chips */}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }} contentContainerStyle={{ paddingVertical: 2 }}>
-                {['en','ar','es','fr','de','tr'].map(code => (
-                  <TouchableOpacity key={code} onPress={() => { updateSetting('tmdbLanguagePreference', code); setLanguagePickerVisible(false); }} style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: settings.tmdbLanguagePreference === code ? currentTheme.colors.primary : currentTheme.colors.elevation1, borderRadius: 999, marginRight: 8 }}>
-                    <Text style={{ color: settings.tmdbLanguagePreference === code ? currentTheme.colors.white : currentTheme.colors.text }}>{code.toUpperCase()}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-              <ScrollView style={{ maxHeight: '70%' }}>
-                {[
-                  { code: 'en', label: 'English' },
-                  { code: 'ar', label: 'Arabic' },
-                  { code: 'es', label: 'Spanish' },
-                  { code: 'fr', label: 'French' },
-                  { code: 'de', label: 'German' },
-                  { code: 'it', label: 'Italian' },
-                  { code: 'pt', label: 'Portuguese' },
-                  { code: 'ru', label: 'Russian' },
-                  { code: 'tr', label: 'Turkish' },
-                  { code: 'ja', label: 'Japanese' },
-                  { code: 'ko', label: 'Korean' },
-                  { code: 'zh', label: 'Chinese' },
-                  { code: 'hi', label: 'Hindi' },
-                  { code: 'he', label: 'Hebrew' },
-                  { code: 'id', label: 'Indonesian' },
-                  { code: 'nl', label: 'Dutch' },
-                  { code: 'sv', label: 'Swedish' },
-                  { code: 'no', label: 'Norwegian' },
-                  { code: 'da', label: 'Danish' },
-                  { code: 'fi', label: 'Finnish' },
-                  { code: 'pl', label: 'Polish' },
-                  { code: 'cs', label: 'Czech' },
-                  { code: 'ro', label: 'Romanian' },
-                  { code: 'uk', label: 'Ukrainian' },
-                  { code: 'vi', label: 'Vietnamese' },
-                  { code: 'th', label: 'Thai' },
-                ]
-                .filter(({ label, code }) =>
-                  (languageSearch || '').length === 0 ||
-                  label.toLowerCase().includes(languageSearch.toLowerCase()) || code.toLowerCase().includes(languageSearch.toLowerCase())
-                )
-                .map(({ code, label }) => (
-                  <TouchableOpacity
-                    key={code}
-                    onPress={() => { updateSetting('tmdbLanguagePreference', code); setLanguagePickerVisible(false); }}
-                    style={{ paddingVertical: 12, paddingHorizontal: 6, borderRadius: 10, backgroundColor: settings.tmdbLanguagePreference === code ? currentTheme.colors.elevation1 : 'transparent', marginBottom: 4 }}
-                    activeOpacity={0.8}
-                  >
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={{ color: currentTheme.colors.text, fontSize: 16 }}>
-                        {label} ({code.toUpperCase()})
-                      </Text>
-                      {settings.tmdbLanguagePreference === code && (
-                        <MaterialIcons name="check-circle" size={20} color={currentTheme.colors.primary} />
+          <TouchableWithoutFeedback onPress={() => setLanguagePickerVisible(false)}>
+            <View style={styles.modalOverlay}>
+              <TouchableWithoutFeedback>
+                <View style={[styles.modalContent, { backgroundColor: currentTheme.colors.darkBackground }]}>
+                  {/* Header */}
+                  <View style={styles.modalHeader}>
+                    <View style={[styles.dragHandle, { backgroundColor: currentTheme.colors.elevation3 }]} />
+                    <Text style={[styles.modalTitle, { color: currentTheme.colors.text }]}>Choose Language</Text>
+                    <Text style={[styles.modalSubtitle, { color: currentTheme.colors.mediumEmphasis }]}>Select your preferred language for TMDb content</Text>
+                  </View>
+
+                  {/* Search Section */}
+                  <View style={styles.searchSection}>
+                    <View style={[styles.searchContainer, { backgroundColor: currentTheme.colors.elevation1 }]}>
+                      <MaterialIcons name="search" size={20} color={currentTheme.colors.mediumEmphasis} style={styles.searchIcon} />
+                      <TextInput
+                        placeholder="Search languages..."
+                        placeholderTextColor={currentTheme.colors.mediumEmphasis}
+                        style={[styles.searchInput, { color: currentTheme.colors.text }]}
+                        value={languageSearch}
+                        onChangeText={setLanguageSearch}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                      {languageSearch.length > 0 && (
+                        <TouchableOpacity onPress={() => setLanguageSearch('')} style={styles.searchClearButton}>
+                          <MaterialIcons name="close" size={20} color={currentTheme.colors.mediumEmphasis} />
+                        </TouchableOpacity>
                       )}
                     </View>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-              <TouchableOpacity onPress={() => setLanguagePickerVisible(false)} style={{ marginTop: 12, paddingVertical: 12, alignItems: 'center', borderRadius: 10, backgroundColor: currentTheme.colors.primary }}>
-                <Text style={{ color: currentTheme.colors.white, fontWeight: '700' }}>Done</Text>
-              </TouchableOpacity>
+                  </View>
+
+                  {/* Popular Languages */}
+                  {languageSearch.length === 0 && (
+                    <View style={styles.popularSection}>
+                      <Text style={[styles.sectionTitle, { color: currentTheme.colors.mediumEmphasis }]}>Popular</Text>
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.popularChips}
+                      >
+                        {[
+                          { code: 'en', label: 'EN' },
+                          { code: 'ar', label: 'AR' },
+                          { code: 'es', label: 'ES' },
+                          { code: 'fr', label: 'FR' },
+                          { code: 'de', label: 'DE' },
+                          { code: 'tr', label: 'TR' },
+                        ].map(({ code, label }) => (
+                          <TouchableOpacity
+                            key={code}
+                            onPress={() => { updateSetting('tmdbLanguagePreference', code); setLanguagePickerVisible(false); }}
+                            style={[
+                              styles.popularChip,
+                              settings.tmdbLanguagePreference === code && styles.selectedChip,
+                              {
+                                backgroundColor: settings.tmdbLanguagePreference === code ? currentTheme.colors.primary : currentTheme.colors.elevation1,
+                                borderColor: settings.tmdbLanguagePreference === code ? currentTheme.colors.primary : 'rgba(255,255,255,0.1)',
+                              }
+                            ]}
+                          >
+                            <Text style={[
+                              styles.popularChipText,
+                              settings.tmdbLanguagePreference === code && styles.selectedChipText,
+                              { color: settings.tmdbLanguagePreference === code ? currentTheme.colors.white : currentTheme.colors.text }
+                            ]}>
+                              {label}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+
+                  {/* All Languages */}
+                  <View style={styles.languagesSection}>
+                    <Text style={[
+                      styles.sectionTitle,
+                      languageSearch.length > 0 && styles.searchResultsTitle,
+                      { color: languageSearch.length > 0 ? currentTheme.colors.text : currentTheme.colors.mediumEmphasis }
+                    ]}>
+                      {languageSearch.length > 0 ? 'Search Results' : 'All Languages'}
+                    </Text>
+
+                    <ScrollView style={styles.languageList} showsVerticalScrollIndicator={false}>
+                      {(() => {
+                        const languages = [
+                          { code: 'en', label: 'English', native: 'English' },
+                          { code: 'ar', label: 'العربية', native: 'Arabic' },
+                          { code: 'es', label: 'Español', native: 'Spanish' },
+                          { code: 'fr', label: 'Français', native: 'French' },
+                          { code: 'de', label: 'Deutsch', native: 'German' },
+                          { code: 'it', label: 'Italiano', native: 'Italian' },
+                          { code: 'pt', label: 'Português', native: 'Portuguese' },
+                          { code: 'ru', label: 'Русский', native: 'Russian' },
+                          { code: 'tr', label: 'Türkçe', native: 'Turkish' },
+                          { code: 'ja', label: '日本語', native: 'Japanese' },
+                          { code: 'ko', label: '한국어', native: 'Korean' },
+                          { code: 'zh', label: '中文', native: 'Chinese' },
+                          { code: 'hi', label: 'हिन्दी', native: 'Hindi' },
+                          { code: 'he', label: 'עברית', native: 'Hebrew' },
+                          { code: 'id', label: 'Bahasa Indonesia', native: 'Indonesian' },
+                          { code: 'nl', label: 'Nederlands', native: 'Dutch' },
+                          { code: 'sv', label: 'Svenska', native: 'Swedish' },
+                          { code: 'no', label: 'Norsk', native: 'Norwegian' },
+                          { code: 'da', label: 'Dansk', native: 'Danish' },
+                          { code: 'fi', label: 'Suomi', native: 'Finnish' },
+                          { code: 'pl', label: 'Polski', native: 'Polish' },
+                          { code: 'cs', label: 'Čeština', native: 'Czech' },
+                          { code: 'ro', label: 'Română', native: 'Romanian' },
+                          { code: 'uk', label: 'Українська', native: 'Ukrainian' },
+                          { code: 'vi', label: 'Tiếng Việt', native: 'Vietnamese' },
+                          { code: 'th', label: 'ไทย', native: 'Thai' },
+                        ];
+
+                        const filteredLanguages = languages.filter(({ label, code, native }) =>
+                          (languageSearch || '').length === 0 ||
+                          label.toLowerCase().includes(languageSearch.toLowerCase()) ||
+                          native.toLowerCase().includes(languageSearch.toLowerCase()) ||
+                          code.toLowerCase().includes(languageSearch.toLowerCase())
+                        );
+
+                        return (
+                          <>
+                            {filteredLanguages.map(({ code, label, native }) => (
+                        <TouchableOpacity
+                          key={code}
+                          onPress={() => { updateSetting('tmdbLanguagePreference', code); setLanguagePickerVisible(false); }}
+                          style={[
+                            styles.languageItem,
+                            settings.tmdbLanguagePreference === code && styles.selectedLanguageItem
+                          ]}
+                          activeOpacity={0.7}
+                        >
+                          <View style={styles.languageContent}>
+                            <View style={styles.languageInfo}>
+                              <Text style={[
+                                styles.languageName,
+                                settings.tmdbLanguagePreference === code && styles.selectedLanguageName,
+                                {
+                                  color: settings.tmdbLanguagePreference === code ? currentTheme.colors.primary : currentTheme.colors.text,
+                                }
+                              ]}>
+                                {native}
+                              </Text>
+                              <Text style={[
+                                styles.languageCode,
+                                settings.tmdbLanguagePreference === code && styles.selectedLanguageCode,
+                                {
+                                  color: settings.tmdbLanguagePreference === code ? currentTheme.colors.primary : currentTheme.colors.mediumEmphasis,
+                                }
+                              ]}>
+                                {label} • {code.toUpperCase()}
+                              </Text>
+                            </View>
+                            {settings.tmdbLanguagePreference === code && (
+                              <View style={styles.checkmarkContainer}>
+                                <MaterialIcons name="check-circle" size={24} color={currentTheme.colors.primary} />
+                              </View>
+                            )}
+                          </View>
+                              </TouchableOpacity>
+                            ))}
+                            {languageSearch.length > 0 && filteredLanguages.length === 0 && (
+                              <View style={styles.noResultsContainer}>
+                                <MaterialIcons name="search-off" size={48} color={currentTheme.colors.mediumEmphasis} />
+                                <Text style={[styles.noResultsText, { color: currentTheme.colors.mediumEmphasis }]}>
+                                  No languages found for "{languageSearch}"
+                                </Text>
+                                <TouchableOpacity
+                                  onPress={() => setLanguageSearch('')}
+                                  style={[styles.clearSearchButton, { backgroundColor: currentTheme.colors.elevation1 }]}
+                                >
+                                  <Text style={[styles.clearSearchButtonText, { color: currentTheme.colors.primary }]}>Clear search</Text>
+                                </TouchableOpacity>
+                              </View>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </ScrollView>
+                  </View>
+
+                  {/* Footer Actions */}
+                  <View style={styles.modalFooter}>
+                    <TouchableOpacity
+                      onPress={() => setLanguagePickerVisible(false)}
+                      style={styles.cancelButton}
+                    >
+                      <Text style={[styles.cancelButtonText, { color: currentTheme.colors.text }]}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setLanguagePickerVisible(false)}
+                      style={[styles.doneButton, { backgroundColor: currentTheme.colors.primary }]}
+                    >
+                      <Text style={[styles.doneButtonText, { color: currentTheme.colors.white }]}>Done</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </TouchableWithoutFeedback>
             </View>
-          </View>
+          </TouchableWithoutFeedback>
         </Modal>
       </ScrollView>
       <CustomAlert
@@ -762,14 +882,6 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
   },
-  clearButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    marginRight: 0,
-    marginLeft: 8,
-    flex: 0,
-    paddingHorizontal: 16,
-  },
   buttonText: {
     fontWeight: '600',
     fontSize: 15,
@@ -808,6 +920,198 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     opacity: 0.8,
     marginLeft: 8,
+  },
+  clearButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    marginRight: 0,
+    marginLeft: 8,
+    flex: 0,
+    paddingHorizontal: 16,
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '85%',
+    minHeight: '70%', // Increased minimum height
+    flex: 1,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    paddingTop: 12,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  dragHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    marginBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  searchSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  searchIcon: {
+    marginRight: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    paddingVertical: 0,
+  },
+  searchClearButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  popularSection: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
+  searchResultsTitle: {
+    color: '#FFFFFF',
+  },
+  popularChips: {
+    paddingVertical: 2,
+  },
+  popularChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  selectedChip: {
+    // Border color handled by inline styles
+  },
+  popularChipText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  selectedChipText: {
+    color: '#FFFFFF',
+  },
+  languagesSection: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  languageList: {
+    flex: 1,
+  },
+  languageItem: {
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 4,
+    minHeight: 60,
+  },
+  selectedLanguageItem: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  languageContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  languageInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  languageName: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  selectedLanguageName: {
+    fontWeight: '600',
+  },
+  languageCode: {
+    fontSize: 12,
+  },
+  selectedLanguageCode: {
+  },
+  checkmarkContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noResultsContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  noResultsText: {
+    fontSize: 16,
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  clearSearchButton: {
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  clearSearchButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+    gap: 12,
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  doneButton: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderRadius: 12,
+  },
+  doneButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
   },
 });
 
