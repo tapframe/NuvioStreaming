@@ -97,6 +97,14 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
     overflow: 'hidden',
   }));
 
+function formatRuntime(runtime: string): string {
+  const r = parseInt(runtime, 10);
+  if (isNaN(r) || r < 60) return runtime;
+  const h = Math.floor(r / 60);
+  const m = r % 60;
+  return `${h}H ${m}MIN`;
+}
+
   return (
     <>
       {/* Metadata Source Selector removed */}
@@ -118,13 +126,7 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
         )}
         {metadata.runtime && (
           <Text style={[styles.metaText, { color: currentTheme.colors.text }]}>
-            {(() => {
-              const r = parseInt(metadata.runtime, 10);
-              if (isNaN(r) || r < 60) return metadata.runtime;
-              const h = Math.floor(r / 60);
-              const m = r % 60;
-              return `${h}H ${m < 10 ? '0' : ''}${m}MIN`;
-            })()}
+            {formatRuntime(metadata.runtime)}
           </Text>
         )}
         {metadata.certification && (
