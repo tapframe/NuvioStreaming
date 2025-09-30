@@ -108,7 +108,7 @@ const MetadataScreen: React.FC = () => {
   } = useMetadata({ id, type, addonId });
 
   // Optimized hooks with memoization and conditional loading
-  const watchProgressData = useWatchProgress(id, type as 'movie' | 'series', episodeId, episodes);
+  const watchProgressData = useWatchProgress(id, Object.keys(groupedEpisodes).length > 0 ? 'series' : type as 'movie' | 'series', episodeId, episodes);
   const assetData = useMetadataAssets(metadata, id, type, imdbId, settings, setMetadata);
   const animations = useMetadataAnimations(safeAreaTop, watchProgressData.watchProgress);
   
@@ -277,9 +277,9 @@ const MetadataScreen: React.FC = () => {
           item.type === 'movie' && 
           item.movie?.ids.imdb === id.replace('tt', '')
         );
-      } else if (type === 'series') {
-        relevantProgress = allProgress.filter(item => 
-          item.type === 'episode' && 
+      } else if (Object.keys(groupedEpisodes).length > 0) {
+        relevantProgress = allProgress.filter(item =>
+          item.type === 'episode' &&
           item.show?.ids.imdb === id.replace('tt', '')
         );
       }
@@ -290,7 +290,7 @@ const MetadataScreen: React.FC = () => {
       if (__DEV__) console.log(`[MetadataScreen] Found ${relevantProgress.length} Trakt progress items for ${type}`);
       
       // Find most recent progress if multiple episodes
-      if (type === 'series' && relevantProgress.length > 1) {
+      if (Object.keys(groupedEpisodes).length > 0 && relevantProgress.length > 1) {
         const mostRecent = relevantProgress.sort((a, b) => 
           new Date(b.paused_at).getTime() - new Date(a.paused_at).getTime()
         )[0];
@@ -411,7 +411,7 @@ const MetadataScreen: React.FC = () => {
       return ep.stremioId || `${id}:${ep.season_number}:${ep.episode_number}`;
     };
 
-    if (type === 'series') {
+    if (Object.keys(groupedEpisodes).length > 0) {
       // Determine if current episode is finished
       let progressPercent = 0;
       if (watchProgress && watchProgress.duration > 0) {
@@ -581,7 +581,7 @@ const MetadataScreen: React.FC = () => {
 
   // Show loading screen if metadata is not yet available
   if (loading || !isContentReady) {
-    return <MetadataLoadingScreen type={type as 'movie' | 'series'} />;
+    return <MetadataLoadingScreen type={Object.keys(groupedEpisodes).length > 0 ? 'series' : type as 'movie' | 'series'} />;
   }
 
   return (
@@ -634,7 +634,7 @@ const MetadataScreen: React.FC = () => {
               watchProgressOpacity={animations.watchProgressOpacity}
               watchProgressWidth={animations.watchProgressWidth}
               watchProgress={watchProgressData.watchProgress}
-              type={type as 'movie' | 'series'}
+              type={Object.keys(groupedEpisodes).length > 0 ? 'series' : type as 'movie' | 'series'}
               getEpisodeDetails={watchProgressData.getEpisodeDetails}
               handleShowStreams={handleShowStreams}
               handleToggleLibrary={handleToggleLibrary}
@@ -655,11 +655,11 @@ const MetadataScreen: React.FC = () => {
               <MetadataDetails 
                 metadata={metadata}
                 imdbId={imdbId}
-                type={type as 'movie' | 'series'}
+                type={Object.keys(groupedEpisodes).length > 0 ? 'series' : type as 'movie' | 'series'}
                 contentId={id}
                 loadingMetadata={false}
                 renderRatings={() => imdbId && shouldLoadSecondaryData ? (
-                  <MemoizedRatingsSection imdbId={imdbId} type={type === 'series' ? 'show' : 'movie'} />
+                  <MemoizedRatingsSection imdbId={imdbId} type={Object.keys(groupedEpisodes).length > 0 ? 'show' : 'movie'} />
                 ) : null}
               />
 
@@ -681,7 +681,7 @@ const MetadataScreen: React.FC = () => {
               )}
 
               {/* Series/Movie Content with episode skeleton when loading */}
-              {type === 'series' ? (
+              {Object.keys(groupedEpisodes).length > 0 ? (
                 <MemoizedSeriesContent
                   episodes={Object.values(groupedEpisodes).flat()}
                   selectedSeason={selectedSeason}
@@ -799,16 +799,6 @@ const styles = StyleSheet.create({
   },
 });
 
-// Performance Optimizations Applied:
-// 1. Memoized components (Cast, Series, Movie, Ratings, Modal)
-// 2. Lazy loading of secondary data (cast, recommendations, ratings)
-// 3. Focus-based rendering and interaction management
-// 4. Debounced Trakt progress fetching with reduced logging
-// 5. Optimized callback functions with screen focus checks
-// 6. Conditional haptics feedback based on screen focus
-// 7. Memory management and cleanup on unmount
-// 8. Performance monitoring in development mode
-// 9. Reduced re-renders through better state management
-// 10. RequestAnimationFrame for navigation optimization
+
 
 export default MetadataScreen;

@@ -870,19 +870,6 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
            let hasStreamResource = false;
            let supportsIdPrefix = false;
            
-           // Extract ID prefix from the ID
-           let idPrefix = id.split(':')[0];
-           
-           // For IMDb IDs (tt...), extract just the 'tt' prefix
-           if (idPrefix.startsWith('tt')) {
-             idPrefix = 'tt';
-           }
-           // For Kitsu IDs, keep the full prefix
-           else if (idPrefix === 'kitsu') {
-             idPrefix = 'kitsu';
-           }
-           // For other prefixes, keep as is
-           
            for (const resource of addon.resources) {
              // Check if the current element is a ResourceObject
              if (typeof resource === 'object' && resource !== null && 'name' in resource) {
@@ -892,13 +879,13 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
                    typedResource.types.includes(type)) {
                  hasStreamResource = true;
                  
-                 // Check if this addon supports the ID prefix
-                 if (Array.isArray(typedResource.idPrefixes)) {
-                   supportsIdPrefix = typedResource.idPrefixes.includes(idPrefix);
-                 } else {
-                   // If no idPrefixes specified, assume it supports all prefixes
-                   supportsIdPrefix = true;
-                 }
+                // Check if this addon supports the ID prefix generically: any prefix must match start of id
+                if (Array.isArray(typedResource.idPrefixes) && typedResource.idPrefixes.length > 0) {
+                  supportsIdPrefix = typedResource.idPrefixes.some((p: string) => id.startsWith(p));
+                } else {
+                  // If no idPrefixes specified, assume it supports all prefixes
+                  supportsIdPrefix = true;
+                }
                  break;
                }
              } 
@@ -906,9 +893,9 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
              else if (typeof resource === 'string' && resource === 'stream' && addon.types) {
                if (Array.isArray(addon.types) && addon.types.includes(type)) {
                  hasStreamResource = true;
-                 // For simple string resources, check addon-level idPrefixes
-                 if (addon.idPrefixes && Array.isArray(addon.idPrefixes)) {
-                   supportsIdPrefix = addon.idPrefixes.includes(idPrefix);
+                 // For simple string resources, check addon-level idPrefixes generically
+                 if (addon.idPrefixes && Array.isArray(addon.idPrefixes) && addon.idPrefixes.length > 0) {
+                   supportsIdPrefix = addon.idPrefixes.some((p: string) => id.startsWith(p));
                  } else {
                    // If no idPrefixes specified, assume it supports all prefixes
                    supportsIdPrefix = true;
@@ -920,6 +907,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
            
            return hasStreamResource && supportsIdPrefix;
          });
+         if (__DEV__) console.log('[useMetadata.loadStreams] Eligible stream addons:', streamAddons.map(a => a.id));
          
          // Initialize scraper statuses for tracking
          const initialStatuses: ScraperStatus[] = [];
@@ -1217,7 +1205,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
   // Re-run series data loading when metadata updates with videos
   useEffect(() => {
-    if (metadata && type === 'series' && metadata.videos && metadata.videos.length > 0) {
+    if (metadata && metadata.videos && metadata.videos.length > 0) {
       logger.log(`🎬 Metadata updated with ${metadata.videos.length} episodes, reloading series data`);
       loadSeriesData().catch((error) => { if (__DEV__) console.error(error); });
     }

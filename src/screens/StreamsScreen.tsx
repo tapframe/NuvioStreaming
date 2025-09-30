@@ -666,7 +666,8 @@ export const StreamsScreen = () => {
     // Skip processing if component is unmounting
     if (!isMounted.current) return;
     
-    const currentStreamsData = type === 'series' ? episodeStreams : groupedStreams;
+    const currentStreamsData = (type === 'series' || (type === 'other' && selectedEpisode)) ? episodeStreams : groupedStreams;
+    if (__DEV__) console.log('[StreamsScreen] streams state changed', { providerKeys: Object.keys(currentStreamsData || {}), type });
     
     // Update available providers immediately when streams change
     const providersWithStreams = Object.entries(currentStreamsData)
@@ -680,6 +681,7 @@ export const StreamsScreen = () => {
       // Only update if we have new providers, don't remove existing ones during loading
       setAvailableProviders(prevProviders => {
         const newProviders = new Set([...prevProviders, ...providersWithStreamsSet]);
+        if (__DEV__) console.log('[StreamsScreen] availableProviders ->', Array.from(newProviders));
         return newProviders;
       });
     }
@@ -701,6 +703,7 @@ export const StreamsScreen = () => {
           changed = true;
         }
       });
+      if (changed && __DEV__) console.log('[StreamsScreen] loadingProviders ->', nextLoading);
       return changed ? nextLoading : prevLoading;
     });
     
@@ -717,7 +720,7 @@ export const StreamsScreen = () => {
     }
     
     // Check if provider exists in current streams data
-    const currentStreamsData = type === 'series' ? episodeStreams : groupedStreams;
+    const currentStreamsData = (type === 'series' || (type === 'other' && selectedEpisode)) ? episodeStreams : groupedStreams;
     const hasStreamsForProvider = currentStreamsData[selectedProvider] && 
                                  currentStreamsData[selectedProvider].streams && 
                                  currentStreamsData[selectedProvider].streams.length > 0;
@@ -733,14 +736,19 @@ export const StreamsScreen = () => {
   // Update useEffect to check for sources
   useEffect(() => {
     const checkProviders = async () => {
+      if (__DEV__) console.log('[StreamsScreen] checkProviders() start', { id, type, episodeId, fromPlayer });
+      logger.log(`[StreamsScreen] checkProviders() start id=${id} type=${type} episodeId=${episodeId || 'none'} fromPlayer=${!!fromPlayer}`);
       // Check for Stremio addons
       const hasStremioProviders = await stremioService.hasStreamProviders();
+      if (__DEV__) console.log('[StreamsScreen] hasStremioProviders:', hasStremioProviders);
       
       // Check for local scrapers (only if enabled in settings)
       const hasLocalScrapers = settings.enableLocalScrapers && await localScraperService.hasScrapers();
+      if (__DEV__) console.log('[StreamsScreen] hasLocalScrapers:', hasLocalScrapers, 'enableLocalScrapers:', settings.enableLocalScrapers);
       
       // We have providers if we have either Stremio addons OR enabled local scrapers
       const hasProviders = hasStremioProviders || hasLocalScrapers;
+      logger.log(`[StreamsScreen] provider check: hasProviders=${hasProviders}`);
 
       if (!isMounted.current) return;
 
@@ -748,22 +756,43 @@ export const StreamsScreen = () => {
       setHasStremioStreamProviders(hasStremioProviders);
 
       if (!hasProviders) {
+        logger.log('[StreamsScreen] No providers detected; scheduling no-sources UI');
         const timer = setTimeout(() => {
           if (isMounted.current) setShowNoSourcesError(true);
         }, 500);
         return () => clearTimeout(timer);
       } else {
-          if (type === 'series' && episodeId) {
+          if ((type === 'series' || type === 'other') && episodeId) {
             logger.log(`🎬 Loading episode streams for: ${episodeId}`);
             setLoadingProviders({
               'stremio': true
             });
             setSelectedEpisode(episodeId);
             setStreamsLoadStart(Date.now());
+            if (__DEV__) console.log('[StreamsScreen] calling loadEpisodeStreams', episodeId);
             loadEpisodeStreams(episodeId);
           } else if (type === 'movie') {
             logger.log(`🎬 Loading movie streams for: ${id}`);
             setStreamsLoadStart(Date.now());
+            if (__DEV__) console.log('[StreamsScreen] calling loadStreams (movie)', id);
+            loadStreams();
+          } else if ((type === 'series' || type === 'other') && !episodeId) {
+            // Series with no episodes (e.g., TV/live channels) – fetch streams directly
+            logger.log(`🎬 Loading series streams (no episodes) for: ${id}`);
+            setLoadingProviders({
+              'stremio': true
+            });
+            setStreamsLoadStart(Date.now());
+            if (__DEV__) console.log('[StreamsScreen] calling loadStreams (series no episodeId)', id);
+            loadStreams();
+          } else if (type === 'tv') {
+            // TV/live content – fetch streams directly
+            logger.log(`📺 Loading TV streams for: ${id}`);
+            setLoadingProviders({
+              'stremio': true
+            });
+            setStreamsLoadStart(Date.now());
+            if (__DEV__) console.log('[StreamsScreen] calling loadStreams (tv)', id);
             loadStreams();
           }
   
@@ -972,7 +1001,7 @@ export const StreamsScreen = () => {
     await new Promise(resolve => setTimeout(resolve, 50));
     
     // Prepare available streams for the change source feature
-    const streamsToPass = type === 'series' ? episodeStreams : groupedStreams;
+    const streamsToPass = (type === 'series' || (type === 'other' && selectedEpisode)) ? episodeStreams : groupedStreams;
     
     // Determine the stream name using the same logic as StreamCard
     const streamName = stream.name || stream.title || 'Unnamed Stream';
@@ -1027,9 +1056,9 @@ export const StreamsScreen = () => {
     navigation.navigate(playerRoute as any, {
       uri: stream.url,
       title: metadata?.name || '',
-      episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
-      season: type === 'series' ? currentEpisode?.season_number : undefined,
-      episode: type === 'series' ? currentEpisode?.episode_number : undefined,
+      episodeTitle: (type === 'series' || type === 'other') ? currentEpisode?.name : undefined,
+      season: (type === 'series' || type === 'other') ? currentEpisode?.season_number : undefined,
+      episode: (type === 'series' || type === 'other') ? currentEpisode?.episode_number : undefined,
       quality: (stream.title?.match(/(\d+)p/) || [])[1] || undefined,
       year: metadata?.year,
       streamProvider: streamProvider,
@@ -1040,7 +1069,7 @@ export const StreamsScreen = () => {
       forceVlc,
       id,
       type,
-      episodeId: type === 'series' && selectedEpisode ? selectedEpisode : undefined,
+      episodeId: (type === 'series' || type === 'other') && selectedEpisode ? selectedEpisode : undefined,
       imdbId: imdbId || undefined,
       availableStreams: streamsToPass,
       backdrop: bannerImage || undefined,
@@ -1221,8 +1250,8 @@ export const StreamsScreen = () => {
               const success = await VideoPlayerService.playVideo(stream.url, {
                 useExternalPlayer: true,
                 title: metadata?.name || 'Video',
-                episodeTitle: type === 'series' ? currentEpisode?.name : undefined,
-                episodeNumber: type === 'series' && currentEpisode ? `S${currentEpisode.season_number}E${currentEpisode.episode_number}` : undefined,
+                episodeTitle: (type === 'series' || type === 'other') ? currentEpisode?.name : undefined,
+                episodeNumber: (type === 'series' || type === 'other') && currentEpisode ? `S${currentEpisode.season_number}E${currentEpisode.episode_number}` : undefined,
               });
               
               if (!success) {
@@ -1280,7 +1309,7 @@ export const StreamsScreen = () => {
       !autoplayTriggered && 
       isAutoplayWaiting
     ) {
-      const streams = type === 'series' ? episodeStreams : groupedStreams;
+      const streams = (type === 'series' || (type === 'other' && selectedEpisode)) ? episodeStreams : groupedStreams;
       
       if (Object.keys(streams).length > 0) {
         const bestStream = getBestStream(streams);
@@ -1311,7 +1340,7 @@ export const StreamsScreen = () => {
 
   const filterItems = useMemo(() => {
     const installedAddons = stremioService.getInstalledAddons();
-    const streams = type === 'series' ? episodeStreams : groupedStreams;
+    const streams = (type === 'series' || (type === 'other' && selectedEpisode)) ? episodeStreams : groupedStreams;
     
     // Make sure we include all providers with streams, not just those in availableProviders
     const allProviders = new Set([
@@ -1389,7 +1418,7 @@ export const StreamsScreen = () => {
   }, [availableProviders, type, episodeStreams, groupedStreams, settings.streamDisplayMode]);
 
   const sections = useMemo(() => {
-    const streams = type === 'series' ? episodeStreams : groupedStreams;
+    const streams = (type === 'series' || (type === 'other' && selectedEpisode)) ? episodeStreams : groupedStreams;
     const installedAddons = stremioService.getInstalledAddons();
 
     // Filter streams by selected provider
@@ -1681,8 +1710,8 @@ export const StreamsScreen = () => {
     });
   }, [episodeImage, bannerImage, metadata]);
 
-  const isLoading = type === 'series' ? loadingEpisodeStreams : loadingStreams;
-  const streams = type === 'series' ? episodeStreams : groupedStreams;
+  const isLoading = (type === 'series' || (type === 'other' && selectedEpisode)) ? loadingEpisodeStreams : loadingStreams;
+  const streams = (type === 'series' || (type === 'other' && selectedEpisode)) ? episodeStreams : groupedStreams;
 
   // Determine extended loading phases
   const streamsEmpty = Object.keys(streams).length === 0;
@@ -1747,7 +1776,7 @@ export const StreamsScreen = () => {
           >
             <MaterialIcons name="arrow-back" size={24} color={colors.white} />
             <Text style={styles.backButtonText}>
-              {type === 'series' ? 'Back to Episodes' : 'Back to Info'}
+              {(type === 'series' || (type === 'other' && selectedEpisode)) ? 'Back to Episodes' : 'Back to Info'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -1772,7 +1801,7 @@ export const StreamsScreen = () => {
         </View>
       )}
 
-      {type === 'series' && (
+      {(type === 'series' || (type === 'other' && selectedEpisode)) && (
         <View style={[styles.streamsHeroContainer]}>
           <View style={StyleSheet.absoluteFill}>
             <View
@@ -1972,9 +2001,9 @@ export const StreamsScreen = () => {
                             showAlert={(t, m) => openAlert(t, m)}
                             parentTitle={metadata?.name}
                             parentType={type as 'movie' | 'series'}
-                            parentSeason={type === 'series' ? currentEpisode?.season_number : undefined}
-                            parentEpisode={type === 'series' ? currentEpisode?.episode_number : undefined}
-                            parentEpisodeTitle={type === 'series' ? currentEpisode?.name : undefined}
+                            parentSeason={(type === 'series' || type === 'other') ? currentEpisode?.season_number : undefined}
+                            parentEpisode={(type === 'series' || type === 'other') ? currentEpisode?.episode_number : undefined}
+                            parentEpisodeTitle={(type === 'series' || type === 'other') ? currentEpisode?.name : undefined}
                             parentPosterUrl={episodeImage || metadata?.poster || undefined}
                             providerName={streams && Object.keys(streams).find(pid => (streams as any)[pid]?.streams?.includes?.(item))}
                           />
