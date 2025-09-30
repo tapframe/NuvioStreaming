@@ -184,4 +184,7 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+
+    // Include only FFmpeg decoder AAR to avoid duplicates with Maven Media3
+    implementation files("libs/lib-decoder-ffmpeg-release.aar")
 }

@@ -12,3 +12,7 @@
 -keep class com.facebook.react.turbomodule.** { *; }
 
 # Add any project specific keep options here:
+
+# Media3 / ExoPlayer keep (extensions and reflection)
+-keep class androidx.media3.** { *; }
+-dontwarn androidx.media3.**

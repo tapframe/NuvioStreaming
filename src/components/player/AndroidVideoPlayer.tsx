@@ -84,16 +84,17 @@ const AndroidVideoPlayer: React.FC = () => {
     const v = rp.forceVlc !== undefined ? rp.forceVlc : rp.forceVLC;
     return typeof v === 'string' ? v.toLowerCase() === 'true' : Boolean(v);
   }, [route.params]);
-  // TEMP toggle disabled; rely on route param forceVlc
+  // TEMP: force React Native Video for testing (disable VLC)
+  const TEMP_FORCE_RNV = false;
   const TEMP_FORCE_VLC = false;
-  const useVLC = Platform.OS === 'android' && (TEMP_FORCE_VLC || forceVlc);
+  const useVLC = Platform.OS === 'android' && !TEMP_FORCE_RNV && (TEMP_FORCE_VLC || forceVlc);
 
   // Log player selection
   useEffect(() => {
     const playerType = useVLC ? 'VLC (expo-libvlc-player)' : 'React Native Video';
     const reason = useVLC
       ? (TEMP_FORCE_VLC ? 'TEMP_FORCE_VLC=true' : `forceVlc=${forceVlc} from route params`)
-      : 'default react-native-video';
+      : (TEMP_FORCE_RNV ? 'TEMP_FORCE_RNV=true' : 'default react-native-video');
     logger.log(`[AndroidVideoPlayer] Player selection: ${playerType} (${reason})`);
   }, [useVLC, forceVlc]);
 
@@ -3397,6 +3398,7 @@ const AndroidVideoPlayer: React.FC = () => {
             onSlidingComplete={handleSlidingComplete}
             buffered={buffered}
             formatTime={formatTime}
+          playerBackend={useVLC ? 'VLC' : 'ExoPlayer'}
           />
 
           {showPauseOverlay && (

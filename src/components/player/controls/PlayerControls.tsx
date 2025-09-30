@@ -40,6 +40,7 @@ interface PlayerControlsProps {
   onSlidingComplete: (value: number) => void;
   buffered: number;
   formatTime: (seconds: number) => string;
+  playerBackend?: string;
 }
 
 export const PlayerControls: React.FC<PlayerControlsProps> = ({
@@ -74,6 +75,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   onSlidingComplete,
   buffered,
   formatTime,
+  playerBackend,
 }) => {
   const { currentTheme } = useTheme();
   return (
@@ -128,6 +130,11 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 {year && <Text style={styles.metadataText}>{year}</Text>}
                 {streamName && <Text style={styles.providerText}>via {streamName}</Text>}
               </View>
+              {playerBackend && (
+                <View style={styles.metadataRow}>
+                  <Text style={[styles.providerText, { fontSize: 11, opacity: 0.9 }]}>{playerBackend}</Text>
+                </View>
+              )}
             </View>
             <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
               <Ionicons name="close" size={24} color="white" />
