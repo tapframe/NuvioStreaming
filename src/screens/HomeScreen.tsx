@@ -58,7 +58,7 @@ import { useLoading } from '../contexts/LoadingContext';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { toast, ToastPosition } from '@backpackapp-io/react-native-toast';
+import { Toast } from 'toastify-react-native';
 import FirstTimeWelcome from '../components/FirstTimeWelcome';
 import { imageCacheService } from '../services/imageCacheService';
 import { HeaderVisibility } from '../contexts/HeaderVisibility';
@@ -341,12 +341,7 @@ const HomeScreen = () => {
           await AsyncStorage.removeItem('showLoginHintToastOnce');
           hideTimer = setTimeout(() => setHintVisible(false), 2000);
           // Also show a global toast for consistency across screens
-          try {
-            toast('You can sign in anytime from Settings → Account', {
-              duration: 1600,
-              position: ToastPosition.BOTTOM,
-            });
-          } catch {}
+          try { Toast.info('You can sign in anytime from Settings → Account', 'bottom'); } catch {}
         }
       } catch {}
     })();

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Platform } from 'react-native';
-import { toast, ToastPosition } from '@backpackapp-io/react-native-toast';
+import { Toast } from 'toastify-react-native';
 import UpdateService, { UpdateInfo } from '../services/updateService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -78,19 +78,13 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
         // The app will automatically reload with the new version
         console.log('Update installed successfully');
       } else {
-        toast('Unable to install the update. Please try again later or check your internet connection.', {
-          duration: 3000,
-          position: ToastPosition.TOP,
-        });
+        Toast.error('Unable to install the update. Please try again later or check your internet connection.');
         // Show popup again after failed installation
         setShowUpdatePopup(true);
       }
     } catch (error) {
       if (__DEV__) console.error('Error installing update:', error);
-      toast('An error occurred while installing the update. Please try again later.', {
-        duration: 3000,
-        position: ToastPosition.TOP,
-      });
+      Toast.error('An error occurred while installing the update. Please try again later.');
       // Show popup again after error
       setShowUpdatePopup(true);
     } finally {
@@ -141,12 +135,7 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
           (async () => {
             try { await AsyncStorage.setItem(UPDATE_BADGE_KEY, 'true'); } catch {}
           })();
-          try {
-            toast('Update available — go to Settings → App Updates', {
-              duration: 3000,
-              position: ToastPosition.TOP,
-            });
-          } catch {}
+          try { Toast.info('Update available — go to Settings → App Updates'); } catch {}
           setShowUpdatePopup(false);
         } else {
           setShowUpdatePopup(true);

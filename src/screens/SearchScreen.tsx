@@ -531,12 +531,6 @@ const SearchScreen = () => {
               <MaterialIcons name="check-circle" size={20} color={currentTheme.colors.success || '#4CAF50'} />
             </View>
           )}
-          {/* 'series'/'movie' text in original place */}
-          <View style={styles.itemTypeContainer}>
-            <Text style={[styles.itemTypeText, { color: currentTheme.colors.white }]}> 
-              {item.type === 'movie' ? 'MOVIE' : 'SERIES'}
-            </Text>
-          </View>
           {item.imdbRating && (
             <View style={styles.ratingContainer}>
               <MaterialIcons name="star" size={12} color="#FFC107" />
@@ -1037,19 +1031,6 @@ const styles = StyleSheet.create({
     width: '40%',
     marginBottom: 16,
     borderRadius: 4,
-  },
-  itemTypeContainer: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  itemTypeText: {
-    fontSize: isTablet ? 7 : 8,
-    fontWeight: '700',
   },
   ratingContainer: {
     position: 'absolute',

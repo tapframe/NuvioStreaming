@@ -47,7 +47,7 @@ import QualityBadge from '../components/metadata/QualityBadge';
 import { logger } from '../utils/logger';
 import { isMkvStream } from '../utils/mkvDetection';
 import CustomAlert from '../components/CustomAlert';
-import { toast, ToastPosition } from '@backpackapp-io/react-native-toast';
+import { Toast } from 'toastify-react-native';
 import { useDownloads } from '../contexts/DownloadsContext';
 
 const TMDB_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tmdb.new.logo.svg/512px-Tmdb.new.logo.svg.png?20200406190906';
@@ -233,10 +233,7 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
         
         // Use toast for Android, custom alert for iOS
         if (Platform.OS === 'android') {
-          toast('Stream URL copied to clipboard!', {
-            duration: 2000,
-            position: ToastPosition.BOTTOM,
-          });
+          Toast.success('Stream URL copied to clipboard!', 'bottom');
         } else {
           // iOS uses custom alert
           setTimeout(() => {
@@ -246,10 +243,7 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
       } catch (error) {
         // Fallback: show URL in alert if clipboard fails
         if (Platform.OS === 'android') {
-          toast(`Stream URL: ${stream.url}`, {
-            duration: 3000,
-            position: ToastPosition.BOTTOM,
-          });
+          Toast.info(`Stream URL: ${stream.url}`, 'bottom');
         } else {
           setTimeout(() => {
             showAlert('Stream URL', stream.url);
@@ -322,7 +316,7 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
         url,
         headers: (stream.headers as any) || undefined,
       });
-      toast('Download started', { duration: 1500, position: ToastPosition.BOTTOM });
+      Toast.success('Download started', 'bottom');
     } catch {}
   }, [startDownload, stream.url, stream.headers, streamInfo.quality, showAlert, stream.name, stream.title]);
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { toast } from '@backpackapp-io/react-native-toast';
+import { Toast } from 'toastify-react-native';
 import { DeviceEventEmitter } from 'react-native';
 import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Platform, Text, Animated, Share } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
@@ -9,6 +9,8 @@ import { useSettings } from '../../hooks/useSettings';
 import { catalogService, StreamingContent } from '../../services/catalogService';
 import { DropUpMenu } from './DropUpMenu';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storageService } from '../../services/storageService';
+import { TraktService } from '../../services/traktService';
 
 interface ContentItemProps {
   item: StreamingContent;
@@ -116,28 +118,52 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
     onPress(item.id, item.type);
   }, [item.id, item.type, onPress]);
 
-  const handleOptionSelect = useCallback((option: string) => {
+  const handleOptionSelect = useCallback(async (option: string) => {
     switch (option) {
       case 'library':
         if (inLibrary) {
           catalogService.removeFromLibrary(item.type, item.id);
-          toast('Removed from Library', { duration: 1200 });
+          Toast.info('Removed from Library');
         } else {
           catalogService.addToLibrary(item);
-          toast('Added to Library', { duration: 1200 });
+          Toast.success('Added to Library');
         }
         break;
       case 'watched': {
-        setIsWatched(prevWatched => {
-          const newWatched = !prevWatched;
-          AsyncStorage.setItem(`watched:${item.type}:${item.id}`, newWatched ? 'true' : 'false');
-          toast(newWatched ? 'Marked as Watched' : 'Marked as Unwatched', { duration: 1200 });
-          // Fire a custom event so other screens can update
-          setTimeout(() => {
-            DeviceEventEmitter.emit('watchedStatusChanged');
-          }, 100);
-          return newWatched;
-        });
+        const targetWatched = !isWatched;
+        setIsWatched(targetWatched);
+        try {
+          await AsyncStorage.setItem(`watched:${item.type}:${item.id}`, targetWatched ? 'true' : 'false');
+        } catch {}
+        Toast.info(targetWatched ? 'Marked as Watched' : 'Marked as Unwatched');
+        setTimeout(() => {
+          DeviceEventEmitter.emit('watchedStatusChanged');
+        }, 100);
+
+        // Best-effort sync: record local progress and push to Trakt if available
+        if (targetWatched) {
+          try {
+            await storageService.setWatchProgress(
+              item.id,
+              item.type,
+              { currentTime: 1, duration: 1, lastUpdated: Date.now() },
+              undefined,
+              { forceNotify: true, forceWrite: true }
+            );
+          } catch {}
+
+          if (item.type === 'movie') {
+            try {
+              const trakt = TraktService.getInstance();
+              if (await trakt.isAuthenticated()) {
+                await trakt.addToWatchedMovies(item.id);
+                try {
+                  await storageService.updateTraktSyncStatus(item.id, item.type, true, 100);
+                } catch {}
+              }
+            } catch {}
+          }
+        }
         setMenuVisible(false);
         break;
       }
@@ -153,7 +179,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
         break;
       }
     }
-  }, [item, inLibrary]);
+  }, [item, inLibrary, isWatched]);
 
   const handleMenuClose = useCallback(() => {
     setMenuVisible(false);

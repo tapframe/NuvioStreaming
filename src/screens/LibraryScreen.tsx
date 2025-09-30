@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { DeviceEventEmitter } from 'react-native';
 import { Share } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { toast } from '@backpackapp-io/react-native-toast';
+import { Toast } from 'toastify-react-native';
 import DropUpMenu from '../components/home/DropUpMenu';
 import {
   View,
@@ -1002,11 +1002,11 @@ const LibraryScreen = () => {
               case 'library': {
               try {
                 await catalogService.removeFromLibrary(selectedItem.type, selectedItem.id);
-                toast('Removed from Library', { duration: 1200 });
+                Toast.info('Removed from Library');
                 setLibraryItems(prev => prev.filter(item => !(item.id === selectedItem.id && item.type === selectedItem.type)));
                 setMenuVisible(false);
               } catch (error) {
-                toast('Failed to update Library', { duration: 1200 });
+                Toast.error('Failed to update Library');
               }
               break;
               }
@@ -1016,7 +1016,7 @@ const LibraryScreen = () => {
                 const key = `watched:${selectedItem.type}:${selectedItem.id}`;
                 const newWatched = !selectedItem.watched;
                 await AsyncStorage.setItem(key, newWatched ? 'true' : 'false');
-                toast(newWatched ? 'Marked as Watched' : 'Marked as Unwatched', { duration: 1200 });
+                Toast.info(newWatched ? 'Marked as Watched' : 'Marked as Unwatched');
                 // Instantly update local state
                 setLibraryItems(prev => prev.map(item =>
                 item.id === selectedItem.id && item.type === selectedItem.type
