@@ -103,11 +103,13 @@ export const DropUpMenu = ({ visible, onClose, item, onOptionSelect, isSaved: is
       label: isWatched ? 'Mark as Unwatched' : 'Mark as Watched',
       action: 'watched'
     },
+    /*
     {
       icon: 'playlist-add',
       label: 'Add to Playlist',
       action: 'playlist'
     },
+    */
     {
       icon: 'share',
       label: 'Share',
