@@ -762,7 +762,8 @@ export const StreamsScreen = () => {
         }, 500);
         return () => clearTimeout(timer);
       } else {
-          if (metadata?.videos && metadata.videos.length > 1 && episodeId) {
+          // For series episodes, do not wait for metadata; load directly when episodeId is present
+          if (episodeId) {
             logger.log(`🎬 Loading episode streams for: ${episodeId}`);
             setLoadingProviders({
               'stremio': true
@@ -776,15 +777,6 @@ export const StreamsScreen = () => {
             setStreamsLoadStart(Date.now());
             if (__DEV__) console.log('[StreamsScreen] calling loadStreams (movie)', id);
             loadStreams();
-          } else if (metadata?.videos && metadata.videos.length > 1 && !episodeId) {
-            // Series with no episodes (e.g., TV/live channels) – fetch streams directly
-            logger.log(`🎬 Loading series streams (no episodes) for: ${id}`);
-            setLoadingProviders({
-              'stremio': true
-            });
-            setStreamsLoadStart(Date.now());
-            if (__DEV__) console.log('[StreamsScreen] calling loadStreams (series no episodeId)', id);
-            loadStreams();
           } else if (type === 'tv') {
             // TV/live content – fetch streams directly
             logger.log(`📺 Loading TV streams for: ${id}`);
@@ -793,6 +785,15 @@ export const StreamsScreen = () => {
             });
             setStreamsLoadStart(Date.now());
             if (__DEV__) console.log('[StreamsScreen] calling loadStreams (tv)', id);
+            loadStreams();
+          } else {
+            // Fallback: series without explicit episodeId (or other types) – fetch streams directly
+            logger.log(`🎬 Loading streams for: ${id}`);
+            setLoadingProviders({
+              'stremio': true
+            });
+            setStreamsLoadStart(Date.now());
+            if (__DEV__) console.log('[StreamsScreen] calling loadStreams (fallback)', id);
             loadStreams();
           }
   
