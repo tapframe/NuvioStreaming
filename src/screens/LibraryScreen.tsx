@@ -1024,7 +1024,7 @@ const LibraryScreen = () => {
                   : item
                 ));
               } catch (error) {
-                toast('Failed to update watched status', { duration: 1200 });
+                Toast.error('Failed to update watched status');
               }
               break;
               }
