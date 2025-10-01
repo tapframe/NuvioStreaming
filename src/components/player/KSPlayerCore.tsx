@@ -183,13 +183,32 @@ const KSPlayerCore: React.FC = () => {
     try {
       // Validate URL first
       const urlObj = new URL(url);
-      
+
       // Only decode if the URL appears to be double-encoded
-      // Check if URL contains encoded characters that shouldn't be there
-      const hasDoubleEncoding = url.includes('%25') || 
-                                (url.includes('%2F') && url.includes('//')) ||
-                                (url.includes('%3A') && url.includes('://'));
-      
+      // Be more conservative - only check for clear double-encoding indicators
+
+      // Check 1: %25 indicates double-encoded % character
+      const hasDoubleEncodedPercent = url.includes('%25');
+
+      // Check 2: Only flag %2F + // if encoded slashes appear in the path/domain part
+      // (not just in query params where they might be legitimate base64/etc)
+      const hasProblematicEncodedSlashes = (() => {
+        const beforeQuery = url.split('?')[0]; // Get URL before query params
+        return beforeQuery.includes('%2F') && beforeQuery.includes('//');
+      })();
+
+      // Check 3: Only flag %3A + :// if colons are encoded in the scheme
+      const hasProblematicEncodedColons = (() => {
+        const schemeEnd = url.indexOf('://');
+        if (schemeEnd === -1) return false;
+        const schemePart = url.substring(0, schemeEnd);
+        return schemePart.includes('%3A');
+      })();
+
+      const hasDoubleEncoding = hasDoubleEncodedPercent ||
+                                hasProblematicEncodedSlashes ||
+                                hasProblematicEncodedColons;
+
       if (hasDoubleEncoding) {
         logger.log('[VideoPlayer] Detected double-encoded URL, decoding once');
         return decodeURIComponent(url);
