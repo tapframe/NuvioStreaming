@@ -1056,7 +1056,7 @@ class LocalScraperService {
                 ...options.headers
               },
               data: options.body,
-              timeout: 30000,
+              timeout: 60000,
               validateStatus: () => true // Don't throw on HTTP error status codes
             };
             

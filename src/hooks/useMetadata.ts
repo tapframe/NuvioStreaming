@@ -1078,12 +1078,12 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       // Check completion less frequently to reduce CPU load
       const completionInterval = setInterval(checkScrapersCompletion, 2000);
       
-      // Fallback timeout after 30 seconds
+      // Fallback timeout after 1 minute
       const fallbackTimeout = setTimeout(() => {
         clearInterval(completionInterval);
         setLoadingStreams(false);
         setActiveFetchingScrapers([]);
-      }, 30000);
+      }, 60000);
 
     } catch (error) {
       if (__DEV__) console.error('❌ [loadStreams] Failed to load streams:', error);
@@ -1254,12 +1254,12 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       // Check completion less frequently to reduce CPU load
       const episodeCompletionInterval = setInterval(checkEpisodeScrapersCompletion, 3000);
       
-      // Fallback timeout after 30 seconds
+      // Fallback timeout after 1 minute
       const episodeFallbackTimeout = setTimeout(() => {
         clearInterval(episodeCompletionInterval);
         setLoadingEpisodeStreams(false);
         setActiveFetchingScrapers([]);
-      }, 30000);
+      }, 60000);
 
     } catch (error) {
       if (__DEV__) console.error('❌ [loadEpisodeStreams] Failed to load episode streams:', error);
