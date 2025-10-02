@@ -5,7 +5,6 @@ export { default as AddonsScreen } from './AddonsScreen';
 export { default as SettingsScreen } from './SettingsScreen';
 export { default as MetadataScreen } from './MetadataScreen';
 export { default as CatalogScreen } from './CatalogScreen';
-export { default as DiscoverScreen } from './DiscoverScreen';
 export { default as LibraryScreen } from './LibraryScreen';
 export { default as ShowRatingsScreen } from './ShowRatingsScreen';
 export { default as CatalogSettingsScreen } from './CatalogSettingsScreen';

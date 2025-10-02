@@ -692,7 +692,7 @@ const MetadataScreen: React.FC = () => {
                   metadata={metadata || undefined}
                 />
               ) : (
-                metadata && <MemoizedMovieContent metadata={metadata} />
+                metadata && <MemoizedMovieContent metadata={metadata} cast={cast} />
               )}
             </Animated.View>
           </Animated.ScrollView>
