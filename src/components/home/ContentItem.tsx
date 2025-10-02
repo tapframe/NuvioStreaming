@@ -277,10 +277,24 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
   const tileAspectRatio = isLandscapePreferred ? 16 / 9 : 2 / 3;
   const tileWidth = React.useMemo(() => {
     if (!isLandscapePreferred) return posterWidth;
+
+    // Apply poster size setting to landscape posters as well
+    let baseWidth = POSTER_WIDTH;
+    switch (settings.posterSize) {
+      case 'small':
+        baseWidth = Math.max(100, Math.min(POSTER_WIDTH - 10, POSTER_WIDTH));
+        break;
+      case 'large':
+        baseWidth = Math.min(POSTER_WIDTH + 20, POSTER_WIDTH + 30);
+        break;
+      default:
+        baseWidth = POSTER_WIDTH;
+    }
+
     // Make landscape tiles significantly larger for better presence
-    const enlarged = posterWidth * 1.8;
-    return Math.min(enlarged, posterWidth + 120);
-  }, [isLandscapePreferred, posterWidth]);
+    const enlarged = baseWidth * 1.8;
+    return Math.min(enlarged, baseWidth + 120);
+  }, [isLandscapePreferred, settings.posterSize]);
   const displayImageUrl = isLandscapePreferred ? (tmdbBackdrop || null) : optimizedPosterUrl;
 
   // Reset load flags whenever the display URL changes to avoid showing stale bitmaps

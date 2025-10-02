@@ -407,7 +407,7 @@ const HomeScreenSettings: React.FC = () => {
             />
           </View>
           <View style={styles.settingsRowInline}>
-            <Text style={[styles.rowLabel, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>Use TMDB Backdrops for Catalogs</Text>
+            <Text style={[styles.rowLabel, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>Use TMDB Backdrops for Catalogs (BETA)</Text>
             <CustomSwitch 
               value={settings.useTmdbBackdropsForCatalogs}
               onValueChange={(value) => handleUpdateSetting('useTmdbBackdropsForCatalogs', value)}
