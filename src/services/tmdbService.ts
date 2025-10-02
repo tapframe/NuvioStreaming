@@ -771,6 +771,32 @@ export class TMDBService {
   }
 
   /**
+   * Get preferred backdrop (landscape poster) for a movie prioritizing localized versions
+   */
+  async getMovieBackdrop(movieId: number | string, preferredLanguage: string = 'en'): Promise<string | null> {
+    try {
+      const config = await this.getAxiosConfig(`${BASE_URL}/movie/${movieId}/images`, {
+        include_image_language: `${preferredLanguage},en,null`
+      });
+      const response = await axios.get(config.url, config);
+      const images = response.data;
+      if (images && images.backdrops && images.backdrops.length > 0) {
+        // Prefer localized backdrops with language code
+        const preferLang = images.backdrops.find((b: any) => b.iso_639_1 === preferredLanguage);
+        if (preferLang) return this.getImageUrl(preferLang.file_path, 'w500');
+        const en = images.backdrops.find((b: any) => b.iso_639_1 === 'en');
+        if (en) return this.getImageUrl(en.file_path, 'w500');
+        // Fallback to highest rated backdrop
+        const sorted = [...images.backdrops].sort((a: any, b: any) => (b.vote_average || 0) - (a.vote_average || 0));
+        if (sorted[0]) return this.getImageUrl(sorted[0].file_path, 'w500');
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
    * Get TV show images (logos, posters, backdrops) by TMDB ID
    */
   async getTvShowImages(showId: number | string, preferredLanguage: string = 'en'): Promise<string | null> {
@@ -863,6 +889,30 @@ export class TMDBService {
 
       return null; // No logos found
     } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Get preferred backdrop (landscape poster) for a TV show prioritizing localized versions
+   */
+  async getTvBackdrop(showId: number | string, preferredLanguage: string = 'en'): Promise<string | null> {
+    try {
+      const config = await this.getAxiosConfig(`${BASE_URL}/tv/${showId}/images`, {
+        include_image_language: `${preferredLanguage},en,null`
+      });
+      const response = await axios.get(config.url, config);
+      const images = response.data;
+      if (images && images.backdrops && images.backdrops.length > 0) {
+        const preferLang = images.backdrops.find((b: any) => b.iso_639_1 === preferredLanguage);
+        if (preferLang) return this.getImageUrl(preferLang.file_path, 'w500');
+        const en = images.backdrops.find((b: any) => b.iso_639_1 === 'en');
+        if (en) return this.getImageUrl(en.file_path, 'w500');
+        const sorted = [...images.backdrops].sort((a: any, b: any) => (b.vote_average || 0) - (a.vote_average || 0));
+        if (sorted[0]) return this.getImageUrl(sorted[0].file_path, 'w500');
+      }
+      return null;
+    } catch (e) {
       return null;
     }
   }

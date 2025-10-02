@@ -6,6 +6,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useSettings } from '../../hooks/useSettings';
+import tmdbService from '../../services/tmdbService';
 import { catalogService, StreamingContent } from '../../services/catalogService';
 import { DropUpMenu } from './DropUpMenu';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -63,6 +64,9 @@ const POSTER_WIDTH = posterLayout.posterWidth;
 
 const PLACEHOLDER_BLURHASH = 'LEHV6nWB2yk8pyo0adR*.7kCMdnj';
 
+// Simple in-memory cache for TMDB backdrops to avoid repeated fetches while scrolling
+const backdropCache: { [key: string]: string } = {};
+
 const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, deferMs = 0 }: ContentItemProps) => {
   // Track inLibrary status locally to force re-render
   const [inLibrary, setInLibrary] = useState(!!item.inLibrary);
@@ -94,6 +98,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
   const { currentTheme } = useTheme();
   const { settings, isLoaded } = useSettings();
   const posterRadius = typeof settings.posterBorderRadius === 'number' ? settings.posterBorderRadius : 12;
+  const [tmdbBackdrop, setTmdbBackdrop] = useState<string | null>(null);
   const fadeInOpacity = React.useRef(new Animated.Value(0)).current;
   // Memoize poster width calculation to avoid recalculating on every render
   const posterWidth = React.useMemo(() => {
@@ -212,6 +217,43 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
     return item.poster;
   }, [item.poster, retryCount, item.id]);
 
+  // Optional: fetch TMDB backdrop for catalogs when enabled
+  useEffect(() => {
+    let cancelled = false;
+    const shouldUseBackdrop = settings.useTmdbBackdropsForCatalogs;
+    const cacheKey = `${item.type}:${item.id}`;
+    if (!shouldUseBackdrop || !item?.id) {
+      setTmdbBackdrop(null);
+      return;
+    }
+    if (backdropCache[cacheKey]) {
+      setTmdbBackdrop(backdropCache[cacheKey]);
+      return;
+    }
+    (async () => {
+      try {
+        // item.id is typically IMDb id (tt...)
+        let tmdbId: number | null = null;
+        if (item.id.startsWith('tt')) {
+          tmdbId = await tmdbService.findTMDBIdByIMDB(item.id);
+        } else if (item.id.startsWith('tmdb:')) {
+          const parts = item.id.split(':');
+          tmdbId = parts[1] ? parseInt(parts[1], 10) : null;
+        }
+        if (!tmdbId) return;
+        const lang = (settings.tmdbLanguagePreference || 'en');
+        const url = item.type === 'movie'
+          ? await tmdbService.getMovieBackdrop(String(tmdbId), lang)
+          : await tmdbService.getTvBackdrop(tmdbId, lang);
+        if (!cancelled && url) {
+          backdropCache[cacheKey] = url;
+          setTmdbBackdrop(url);
+        }
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [item.id, item.type, settings.useTmdbBackdropsForCatalogs, settings.tmdbLanguagePreference]);
+
   // Avoid strong fade animations that can appear as flicker on mount/scroll
   useEffect(() => {
     if (isLoaded) {
@@ -219,32 +261,31 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
     }
   }, [isLoaded, fadeInOpacity]);
 
-  // While settings load, render a placeholder with reserved space (poster aspect + title)
-  if (!isLoaded) {
-    const placeholderRadius = 12;
-    return (
-      <View style={[styles.itemContainer, { width: posterWidth }]}>
-        <View
-          style={[
-            styles.contentItem,
-            {
-              width: posterWidth,
-              borderRadius: placeholderRadius,
-              backgroundColor: currentTheme.colors.elevation1,
-            },
-          ]}
-        />
-        {/* Reserve space for title to keep section spacing stable */}
-        <View style={{ height: 18, marginTop: 4 }} />
-      </View>
-    );
-  }
+  const isPlaceholder = !isLoaded;
+
+  // Choose image and aspect ratio based on setting/backdrop availability
+  const isLandscapePreferred = settings.useTmdbBackdropsForCatalogs;
+  const useBackdrop = isLandscapePreferred && !!tmdbBackdrop;
+  const tileAspectRatio = isLandscapePreferred ? 16 / 9 : 2 / 3;
+  const tileWidth = React.useMemo(() => {
+    if (!isLandscapePreferred) return posterWidth;
+    // Make landscape tiles significantly larger for better presence
+    const enlarged = posterWidth * 1.8;
+    return Math.min(enlarged, posterWidth + 120);
+  }, [isLandscapePreferred, posterWidth]);
+  const displayImageUrl = isLandscapePreferred ? (tmdbBackdrop || null) : optimizedPosterUrl;
+
+  // Reset load flags whenever the display URL changes to avoid showing stale bitmaps
+  useEffect(() => {
+    setImageLoaded(false);
+    setImageError(false);
+  }, [displayImageUrl]);
 
   return (
     <>
-      <Animated.View style={[styles.itemContainer, { width: posterWidth, opacity: fadeInOpacity }]}> 
+      <Animated.View style={[styles.itemContainer, { width: tileWidth, opacity: fadeInOpacity }]}> 
         <TouchableOpacity
-          style={[styles.contentItem, { width: posterWidth, borderRadius: posterRadius }]}
+          style={[styles.contentItem, { width: tileWidth, borderRadius: posterRadius, aspectRatio: tileAspectRatio }]}
           activeOpacity={0.7}
           onPress={handlePress}
           onLongPress={handleLongPress}
@@ -252,33 +293,42 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
         >
           <View ref={itemRef} style={[styles.contentItemContainer, { borderRadius: posterRadius }] }>
             {/* Image with lightweight placeholder to reduce flicker */}
-            {item.poster ? (
-              <ExpoImage
-                source={{ uri: optimizedPosterUrl }}
-                style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, borderRadius: posterRadius }]}
-                contentFit="cover"
-                cachePolicy={Platform.OS === 'android' ? 'disk' : 'memory-disk'}
-                transition={0}
-                allowDownscaling
-                priority="normal" // Normal priority for horizontal scrolling
-                onLoad={() => {
-                  setImageLoaded(true);
-                  setImageError(false);
-                }}
-                onError={(error) => {
-                  if (__DEV__) console.warn('Image load error for:', item.poster, error);
-                  // Try fallback URL on first error
-                  if (retryCount === 0 && item.poster && !item.poster.includes('metahub.space')) {
-                    setRetryCount(1);
-                    // Don't set error state yet, let it try the fallback
-                    return;
-                  }
-                  setImageError(true);
-                  setImageLoaded(false);
-                }}
-                recyclingKey={item.id} // Add recycling key for better performance
-                placeholder={PLACEHOLDER_BLURHASH}
-              />
+            {displayImageUrl && !isPlaceholder ? (
+              <>
+                {!imageLoaded && (
+                  <View style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, borderRadius: posterRadius }]} />
+                )}
+                <ExpoImage
+                  source={{ uri: displayImageUrl }}
+                  key={displayImageUrl}
+                  style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, borderRadius: posterRadius, opacity: imageLoaded ? 1 : 0 }]}
+                  contentFit="cover"
+                  cachePolicy={Platform.OS === 'android' ? 'disk' : 'memory-disk'}
+                  transition={0}
+                  allowDownscaling
+                  priority={useBackdrop ? 'high' : 'normal'}
+                  recyclingKey={`${item.id}-${item.type}`}
+                  onLoadStart={() => {
+                    setImageLoaded(false);
+                    setImageError(false);
+                  }}
+                  onLoad={() => {
+                    setImageLoaded(true);
+                    setImageError(false);
+                  }}
+                  onError={(error) => {
+                    if (__DEV__) console.warn('Image load error for:', item.poster, error);
+                    // Try fallback URL on first error
+                    if (retryCount === 0 && item.poster && !item.poster.includes('metahub.space')) {
+                      setRetryCount(1);
+                      return;
+                    }
+                    setImageError(true);
+                    setImageLoaded(false);
+                  }}
+                  placeholder={PLACEHOLDER_BLURHASH}
+                />
+              </>
             ) : (
               // Show placeholder for items without posters
               <View style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, justifyContent: 'center', alignItems: 'center', borderRadius: posterRadius }] }>

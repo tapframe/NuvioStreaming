@@ -397,6 +397,13 @@ const HomeScreenSettings: React.FC = () => {
               onValueChange={(value) => handleUpdateSetting('showPosterTitles', value)}
             />
           </View>
+          <View style={styles.settingsRowInline}>
+            <Text style={[styles.rowLabel, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>Use TMDB Backdrops for Catalogs</Text>
+            <CustomSwitch 
+              value={settings.useTmdbBackdropsForCatalogs}
+              onValueChange={(value) => handleUpdateSetting('useTmdbBackdropsForCatalogs', value)}
+            />
+          </View>
           <View style={styles.settingsRow}>
             <Text style={[styles.rowLabel, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>Poster Size</Text>
             <SegmentedControl
