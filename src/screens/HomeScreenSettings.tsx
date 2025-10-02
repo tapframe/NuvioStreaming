@@ -243,6 +243,15 @@ const HomeScreenSettings: React.FC = () => {
     }
   }, [settings.selectedHeroCatalogs]);
 
+  // Format selected catalogs text
+  const getSelectedLandscapeCatalogsText = useCallback(() => {
+    if (!settings.selectedLandscapeCatalogs || settings.selectedLandscapeCatalogs.length === 0) {
+      return "All catalogs";
+    } else {
+      return `${settings.selectedLandscapeCatalogs.length} selected`;
+    }
+  }, [settings.selectedLandscapeCatalogs]);
+
   const ChevronRight = () => (
     <MaterialIcons 
       name="chevron-right" 
@@ -422,6 +431,24 @@ const HomeScreenSettings: React.FC = () => {
             />
           </View>
         </SettingsCard>
+
+        {settings.useTmdbBackdropsForCatalogs && (
+          <>
+            <SectionHeader title="CONTENT SOURCES" isDarkMode={isDarkMode} colors={colors} />
+            <SettingsCard isDarkMode={isDarkMode} colors={colors}>
+              <SettingItem
+                title="Landscape Catalogs"
+                description={getSelectedLandscapeCatalogsText()}
+                icon="image"
+                isDarkMode={isDarkMode}
+                colors={colors}
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('AddonSelection')}
+                isLast={true}
+              />
+            </SettingsCard>
+          </>
+        )}
 
         <SectionHeader title="ABOUT THESE SETTINGS" isDarkMode={isDarkMode} colors={colors} />
         <View style={[styles.infoCard, { backgroundColor: isDarkMode ? colors.elevation1 : 'rgba(0,0,0,0.03)' }]}>

@@ -38,6 +38,7 @@ import MDBListSettingsScreen from '../screens/MDBListSettingsScreen';
 import TMDBSettingsScreen from '../screens/TMDBSettingsScreen';
 import HomeScreenSettings from '../screens/HomeScreenSettings';
 import HeroCatalogsScreen from '../screens/HeroCatalogsScreen';
+import AddonSelectionScreen from '../screens/AddonSelectionScreen';
 import TraktSettingsScreen from '../screens/TraktSettingsScreen';
 import PlayerSettingsScreen from '../screens/PlayerSettingsScreen';
 import LogoSourceSettings from '../screens/LogoSourceSettings';
@@ -131,6 +132,7 @@ export type RootStackParamList = {
   TMDBSettings: undefined;
   HomeScreenSettings: undefined;
   HeroCatalogs: undefined;
+  AddonSelection: undefined;
   TraktSettings: undefined;
   PlayerSettings: undefined;
   LogoSourceSettings: undefined;
@@ -1125,9 +1127,24 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen 
-              name="HeroCatalogs" 
+            <Stack.Screen
+              name="HeroCatalogs"
               component={HeroCatalogsScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen
+              name="AddonSelection"
+              component={AddonSelectionScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,

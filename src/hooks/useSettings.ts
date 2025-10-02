@@ -81,6 +81,9 @@ export interface AppSettings {
   useTmdbLocalizedMetadata: boolean; // Use TMDB localized metadata (titles, overviews) per tmdbLanguagePreference
   useTmdbProxy: boolean; // Route TMDB requests through proxy for enhanced privacy
   useTmdbBackdropsForCatalogs: boolean; // Use TMDB backdrops (landscape) for catalog sections
+  // Catalog selection for landscape and normal posters
+  selectedLandscapeCatalogs: string[]; // Array of catalog IDs (addonId:type:catalogId) to use for landscape posters
+  selectedNormalCatalogs: string[]; // Array of catalog IDs (addonId:type:catalogId) to use for normal (portrait) posters
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -134,6 +137,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   useTmdbLocalizedMetadata: false,
   useTmdbProxy: false, // Disabled by default for direct API access
   useTmdbBackdropsForCatalogs: false,
+  // Catalog selection for landscape and normal posters - empty arrays mean all catalogs are selected
+  selectedLandscapeCatalogs: [],
+  selectedNormalCatalogs: [],
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';

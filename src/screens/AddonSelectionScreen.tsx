@@ -13,9 +13,8 @@ import {
   ActivityIndicator,
   Animated
 } from 'react-native';
-import CustomAlert from '../components/CustomAlert';
 import { useSettings, settingsEmitter } from '../hooks/useSettings';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { catalogService, StreamingAddon } from '../services/catalogService';
@@ -30,7 +29,7 @@ interface CatalogItem {
   type: string;
 }
 
-const HeroCatalogsScreen: React.FC = () => {
+const AddonSelectionScreen: React.FC = () => {
   const { settings, updateSetting } = useSettings();
   const systemColorScheme = useColorScheme();
   const { currentTheme } = useTheme();
@@ -51,34 +50,34 @@ const HeroCatalogsScreen: React.FC = () => {
   };
   const isDarkMode = systemColorScheme === 'dark' || settings.enableDarkMode;
   const navigation = useNavigation();
-  // Custom alert state
-  const [alertVisible, setAlertVisible] = useState(false);
-  const [alertTitle, setAlertTitle] = useState('');
-  const [alertMessage, setAlertMessage] = useState('');
-  const [alertActions, setAlertActions] = useState<any[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [catalogs, setCatalogs] = useState<CatalogItem[]>([]);
-  const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>(settings.selectedHeroCatalogs || []);
+  const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([]);
   const { getCustomName, isLoadingCustomNames } = useCustomCatalogNames();
   const [showSavedIndicator, setShowSavedIndicator] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
+  // Initialize selected catalogs
+  useEffect(() => {
+    setSelectedCatalogs(settings.selectedLandscapeCatalogs || []);
+  }, [settings.selectedLandscapeCatalogs]);
+
   // Ensure selected catalogs state is refreshed whenever the screen gains focus
   useFocusEffect(
     useCallback(() => {
-      setSelectedCatalogs(settings.selectedHeroCatalogs || []);
-    }, [settings.selectedHeroCatalogs])
+      setSelectedCatalogs(settings.selectedLandscapeCatalogs || []);
+    }, [settings.selectedLandscapeCatalogs])
   );
 
   // Subscribe to settings changes
   useEffect(() => {
     const unsubscribe = settingsEmitter.addListener(() => {
-      // Refresh selected catalogs when settings change
-      setSelectedCatalogs(settings.selectedHeroCatalogs || []);
+      setSelectedCatalogs(settings.selectedLandscapeCatalogs || []);
     });
-    
+
     return unsubscribe;
-  }, [settings.selectedHeroCatalogs]);
+  }, [settings.selectedLandscapeCatalogs]);
 
   // Fade in/out animation for the "Changes saved" indicator
   useEffect(() => {
@@ -100,14 +99,12 @@ const HeroCatalogsScreen: React.FC = () => {
   }, [showSavedIndicator, fadeAnim]);
 
   const handleSave = useCallback(() => {
-    // First update the settings
-    updateSetting('selectedHeroCatalogs', selectedCatalogs);
-    
+    updateSetting('selectedLandscapeCatalogs', selectedCatalogs);
+
     // Show the confirmation indicator
     setShowSavedIndicator(true);
-    
-    // Short delay before navigating back to allow settings to save
-    // and the user to see the confirmation message
+
+    // Short delay before navigating back
     setTimeout(() => {
       navigation.goBack();
     }, 800);
@@ -124,7 +121,7 @@ const HeroCatalogsScreen: React.FC = () => {
       try {
         const addons = await catalogService.getAllAddons();
         const catalogItems: CatalogItem[] = [];
-        
+
         addons.forEach(addon => {
           if (addon.catalogs && addon.catalogs.length > 0) {
             addon.catalogs.forEach(catalog => {
@@ -137,19 +134,15 @@ const HeroCatalogsScreen: React.FC = () => {
             });
           }
         });
-        
+
         setCatalogs(catalogItems);
       } catch (error) {
         if (__DEV__) console.error('Failed to load catalogs:', error);
-        setAlertTitle('Error');
-        setAlertMessage('Failed to load catalogs');
-        setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
-        setAlertVisible(true);
       } finally {
         setLoading(false);
       }
     };
-    
+
     loadCatalogs();
   }, []);
 
@@ -171,6 +164,9 @@ const HeroCatalogsScreen: React.FC = () => {
     });
   }, []);
 
+  const title = 'Landscape Catalogs';
+  const description = 'Select which catalogs to use for landscape (wide) posters. If none selected, all catalogs will be used for landscape display.';
+
   // Group catalogs by addon
   const catalogsByAddon: Record<string, CatalogItem[]> = {};
   catalogs.forEach(catalog => {
@@ -188,14 +184,14 @@ const HeroCatalogsScreen: React.FC = () => {
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <MaterialIcons 
-            name="arrow-back" 
-            size={24} 
-            color={isDarkMode ? colors.highEmphasis : colors.textDark} 
+          <MaterialIcons
+            name="arrow-back"
+            size={24}
+            color={isDarkMode ? colors.highEmphasis : colors.textDark}
           />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
-          Hero Section Catalogs
+          {title}
         </Text>
       </View>
 
@@ -225,14 +221,14 @@ const HeroCatalogsScreen: React.FC = () => {
       ) : (
         <>
           <View style={styles.actionBar}>
-            <TouchableOpacity 
-              style={[styles.actionButton, { backgroundColor: isDarkMode ? colors.elevation2 : colors.white }]} 
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: isDarkMode ? colors.elevation2 : colors.white }]}
               onPress={handleSelectAll}
             >
               <Text style={[styles.actionButtonText, { color: colors.primary }]}>Select All</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.actionButton, { backgroundColor: isDarkMode ? colors.elevation2 : colors.white }]} 
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: isDarkMode ? colors.elevation2 : colors.white }]}
               onPress={handleSelectNone}
             >
               <Text style={[styles.actionButtonText, { color: colors.primary }]}>Clear All</Text>
@@ -251,11 +247,11 @@ const HeroCatalogsScreen: React.FC = () => {
 
           <View style={[styles.infoCard, { backgroundColor: colors.elevation1 }]}>
             <Text style={[styles.infoText, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>
-              Select which catalogs to display in the hero section. If none are selected, all catalogs will be used. Don't forget to press Save when you're done.
+              {description}
             </Text>
           </View>
 
-          <ScrollView 
+          <ScrollView
             style={styles.scrollView}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
@@ -266,19 +262,19 @@ const HeroCatalogsScreen: React.FC = () => {
                   {addonName}
                 </Text>
                 <View style={[
-                  styles.catalogsContainer, 
+                  styles.catalogsContainer,
                   { backgroundColor: isDarkMode ? colors.elevation1 : colors.white }
                 ]}>
                   {addonCatalogs.map(catalog => {
                     const [addonId, type, catalogId] = catalog.id.split(':');
                     const displayName = getCustomName(addonId, type, catalogId, catalog.name);
-                    
+
                     return (
                       <TouchableOpacity
                         key={catalog.id}
                         style={[
                           styles.catalogItem,
-                          { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }
+                          { borderBottomColor: colors.border }
                         ]}
                         onPress={() => toggleCatalog(catalog.id)}
                       >
@@ -304,14 +300,7 @@ const HeroCatalogsScreen: React.FC = () => {
           </ScrollView>
         </>
       )}
-    <CustomAlert
-      visible={alertVisible}
-      title={alertTitle}
-      message={alertMessage}
-      onClose={() => setAlertVisible(false)}
-      actions={alertActions}
-    />
-  </SafeAreaView>
+    </SafeAreaView>
   );
 };
 
@@ -451,4 +440,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default HeroCatalogsScreen; 
+export default AddonSelectionScreen;

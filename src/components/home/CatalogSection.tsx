@@ -63,12 +63,15 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
 
   const renderContentItem = useCallback(({ item }: { item: StreamingContent, index: number }) => {
     return (
-      <ContentItem 
-        item={item} 
+      <ContentItem
+        item={item}
         onPress={handleContentPress}
+        catalogAddon={catalog.addon}
+        catalogType={catalog.type}
+        catalogId={catalog.id}
       />
     );
-  }, [handleContentPress]);
+  }, [handleContentPress, catalog.addon, catalog.type, catalog.id]);
 
   // Memoize the ItemSeparatorComponent to prevent re-creation
   const ItemSeparator = useCallback(() => <View style={{ width: 8 }} />, []);

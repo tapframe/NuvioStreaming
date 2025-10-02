@@ -18,6 +18,9 @@ interface ContentItemProps {
   onPress: (id: string, type: string) => void;
   shouldLoadImage?: boolean;
   deferMs?: number;
+  catalogAddon?: string;
+  catalogType?: string;
+  catalogId?: string;
 }
 
 const { width } = Dimensions.get('window');
@@ -67,7 +70,7 @@ const PLACEHOLDER_BLURHASH = 'LEHV6nWB2yk8pyo0adR*.7kCMdnj';
 // Simple in-memory cache for TMDB backdrops to avoid repeated fetches while scrolling
 const backdropCache: { [key: string]: string } = {};
 
-const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, deferMs = 0 }: ContentItemProps) => {
+const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, deferMs = 0, catalogAddon, catalogType, catalogId }: ContentItemProps) => {
   // Track inLibrary status locally to force re-render
   const [inLibrary, setInLibrary] = useState(!!item.inLibrary);
 
@@ -264,7 +267,12 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
   const isPlaceholder = !isLoaded;
 
   // Choose image and aspect ratio based on setting/backdrop availability
-  const isLandscapePreferred = settings.useTmdbBackdropsForCatalogs;
+  const catalogSettingKey = catalogAddon && catalogType && catalogId ? `${catalogAddon}:${catalogType}:${catalogId}` : null;
+  const isCatalogSelectedForLandscape = catalogSettingKey && settings.selectedLandscapeCatalogs && settings.selectedLandscapeCatalogs.length > 0
+    ? settings.selectedLandscapeCatalogs.includes(catalogSettingKey)
+    : true; // If no catalogs are selected, all catalogs can use landscape
+
+  const isLandscapePreferred = settings.useTmdbBackdropsForCatalogs && isCatalogSelectedForLandscape;
   const useBackdrop = isLandscapePreferred && !!tmdbBackdrop;
   const tileAspectRatio = isLandscapePreferred ? 16 / 9 : 2 / 3;
   const tileWidth = React.useMemo(() => {
