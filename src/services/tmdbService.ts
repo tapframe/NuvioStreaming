@@ -4,6 +4,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // TMDB API configuration
 const DEFAULT_API_KEY = 'd131017ccc6e5462a81c9304d21476de';
 const BASE_URL = 'https://api.themoviedb.org/3';
+// Rotating proxy: read comma-separated list or single
+const ENV_PROXY_URLS_RAW = (typeof process !== 'undefined' && (process as any).env && (process as any).env.EXPO_PUBLIC_TMDB_PROXY_URLS) || '';
+const ENV_PROXY_URL = (typeof process !== 'undefined' && (process as any).env && (process as any).env.EXPO_PUBLIC_TMDB_PROXY_URL) || '';
 const TMDB_API_KEY_STORAGE_KEY = 'tmdb_api_key';
 const USE_CUSTOM_TMDB_API_KEY = 'use_custom_tmdb_api_key';
 
@@ -76,9 +79,15 @@ export class TMDBService {
   private apiKey: string = DEFAULT_API_KEY;
   private useCustomKey: boolean = false;
   private apiKeyLoaded: boolean = false;
+  private useProxy: boolean = false;
+  private proxyUrl: string = ENV_PROXY_URL || '';
+  private proxyUrls: string[] = [];
+  private proxyIndex: number = 0;
 
   private constructor() {
     this.loadApiKey();
+    this.loadProxySetting();
+    this.initializeProxyList();
   }
 
   static getInstance(): TMDBService {
@@ -110,6 +119,36 @@ export class TMDBService {
     }
   }
 
+  private async loadProxySetting() {
+    try {
+      // Match how settings are stored: scoped app_settings JSON
+      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      const scopedKey = `@user:${scope}:app_settings`;
+      const [scopedJson, legacyJson] = await Promise.all([
+        AsyncStorage.getItem(scopedKey),
+        AsyncStorage.getItem('app_settings')
+      ]);
+
+      const parsedScoped = scopedJson ? JSON.parse(scopedJson) : null;
+      const parsedLegacy = legacyJson ? JSON.parse(legacyJson) : null;
+      const settings = parsedScoped || parsedLegacy || null;
+      this.useProxy = !!(settings && settings.useTmdbProxy);
+    } catch (error) {
+      this.useProxy = false; // Default to false if error
+    }
+  }
+
+  /**
+   * Reload proxy setting - call this when the proxy setting changes
+   */
+  async reloadProxySetting(newValue?: boolean) {
+    if (typeof newValue === 'boolean') {
+      this.useProxy = newValue;
+      return;
+    }
+    await this.loadProxySetting();
+  }
+
   private async getHeaders() {
     // Ensure API key is loaded before returning headers
     if (!this.apiKeyLoaded) {
@@ -137,20 +176,81 @@ export class TMDBService {
     return `${showName.toLowerCase()}_s${seasonNumber}_e${episodeNumber}`;
   }
 
+  private initializeProxyList() {
+    const listFromEnv: string[] = (ENV_PROXY_URLS_RAW || '')
+      .split(',')
+      .map((s: string) => s.trim())
+      .filter((x: string) => Boolean(x));
+    const baseList: string[] = listFromEnv.length > 0 ? listFromEnv : (this.proxyUrl ? [this.proxyUrl] : []);
+    this.proxyUrls = baseList.map((u: string) => {
+      if (!u) return '';
+      const hasDest = u.includes('?destination=');
+      return hasDest ? u : (u.endsWith('/') ? `${u}?destination=` : `${u}/?destination=`);
+    }).filter((x: string) => Boolean(x));
+    if (this.proxyUrl && !this.proxyUrls.includes(this.proxyUrl)) {
+      const normalized = this.proxyUrl.includes('?destination=') ? this.proxyUrl : (this.proxyUrl.endsWith('/') ? `${this.proxyUrl}?destination=` : `${this.proxyUrl}/?destination=`);
+      this.proxyUrls.unshift(normalized);
+    }
+    this.proxyIndex = 0;
+  }
+
+  private getNextProxyBase(): string {
+    if (this.proxyUrls.length === 0) return '';
+    const base = this.proxyUrls[this.proxyIndex % this.proxyUrls.length];
+    this.proxyIndex = (this.proxyIndex + 1) % this.proxyUrls.length;
+    return base;
+  }
+
+  private buildProxiedUrl(originalUrl: string): string {
+    if (this.useProxy) {
+      const base = this.getNextProxyBase();
+      if (base) {
+        return `${base}${encodeURIComponent(originalUrl)}`;
+      }
+    }
+    return originalUrl;
+  }
+
+  private async getAxiosConfig(url: string, additionalParams: any = {}, additionalHeaders: any = {}) {
+    const headers = await this.getHeaders();
+    const params = await this.getParams(additionalParams);
+
+    if (this.useProxy) {
+      // Build full destination URL including query string, then encode it into the proxy URL
+      const usp = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null) usp.append(String(k), String(v));
+      });
+      const urlWithQuery = usp.toString() ? `${url}?${usp.toString()}` : url;
+      const proxied = this.buildProxiedUrl(urlWithQuery);
+      if (__DEV__) {
+        try { console.log('[TMDBService] Proxy ON ->', proxied); } catch {}
+      }
+      return {
+        url: proxied,
+        headers: { ...headers, ...additionalHeaders },
+      } as const;
+    }
+
+    return {
+      url,
+      headers: { ...headers, ...additionalHeaders },
+      params,
+    };
+  }
+
   /**
    * Search for a TV show by name
    */
   async searchTVShow(query: string): Promise<TMDBShow[]> {
     try {
-      const response = await axios.get(`${BASE_URL}/search/tv`, {
-        headers: await this.getHeaders(),
-        params: await this.getParams({
-          query,
-          include_adult: false,
-          language: 'en-US',
-          page: 1,
-        }),
+      const config = await this.getAxiosConfig(`${BASE_URL}/search/tv`, {
+        query,
+        include_adult: false,
+        language: 'en-US',
+        page: 1,
       });
+      const response = await axios.get(config.url, config);
       return response.data.results;
     } catch (error) {
       return [];
@@ -162,15 +262,15 @@ export class TMDBService {
    */
   async getTVShowDetails(tmdbId: number, language: string = 'en'): Promise<TMDBShow | null> {
     try {
-      const response = await axios.get(`${BASE_URL}/tv/${tmdbId}`, {
-        headers: await this.getHeaders(),
-        params: await this.getParams({
-          language,
-          append_to_response: 'external_ids,credits,keywords' // Append external IDs, cast/crew, and keywords for AI context
-        }),
+      const config = await this.getAxiosConfig(`${BASE_URL}/tv/${tmdbId}`, {
+        language,
+        append_to_response: 'external_ids,credits,keywords' // Append external IDs, cast/crew, and keywords for AI context
       });
+      const response = await axios.get(config.url, config);
+      if (__DEV__) { try { console.log('[TMDBService] getTVShowDetails ok', tmdbId); } catch {} }
       return response.data;
     } catch (error) {
+      if (__DEV__) { try { console.log('[TMDBService] getTVShowDetails failed', tmdbId); } catch {} }
       return null;
     }
   }
@@ -184,13 +284,10 @@ export class TMDBService {
     episodeNumber: number
   ): Promise<{ imdb_id: string | null } | null> {
     try {
-      const response = await axios.get(
-        `${BASE_URL}/tv/${tmdbId}/season/${seasonNumber}/episode/${episodeNumber}/external_ids`,
-        {
-          headers: await this.getHeaders(),
-          params: await this.getParams(),
-        }
+      const config = await this.getAxiosConfig(
+        `${BASE_URL}/tv/${tmdbId}/season/${seasonNumber}/episode/${episodeNumber}/external_ids`
       );
+      const response = await axios.get(config.url, config);
       return response.data;
     } catch (error) {
       return null;
@@ -239,12 +336,10 @@ export class TMDBService {
    */
   async getSeasonDetails(tmdbId: number, seasonNumber: number, showName?: string, language: string = 'en-US'): Promise<TMDBSeason | null> {
     try {
-      const response = await axios.get(`${BASE_URL}/tv/${tmdbId}/season/${seasonNumber}`, {
-        headers: await this.getHeaders(),
-        params: await this.getParams({
-          language,
-        }),
+      const config = await this.getAxiosConfig(`${BASE_URL}/tv/${tmdbId}/season/${seasonNumber}`, {
+        language,
       });
+      const response = await axios.get(config.url, config);
 
       const season = response.data;
 
@@ -296,16 +391,14 @@ export class TMDBService {
     language: string = 'en-US'
   ): Promise<TMDBEpisode | null> {
     try {
-      const response = await axios.get(
+      const config = await this.getAxiosConfig(
         `${BASE_URL}/tv/${tmdbId}/season/${seasonNumber}/episode/${episodeNumber}`,
         {
-          headers: await this.getHeaders(),
-          params: await this.getParams({
-            language,
-            append_to_response: 'credits' // Include guest stars and crew for episode context
-          }),
+          language,
+          append_to_response: 'credits'
         }
       );
+      const response = await axios.get(config.url, config);
       return response.data;
     } catch (error) {
       return null;
@@ -338,13 +431,12 @@ export class TMDBService {
       // Extract the IMDB ID without season/episode info
       const baseImdbId = imdbId.split(':')[0];
       
-      const response = await axios.get(`${BASE_URL}/find/${baseImdbId}`, {
-        headers: await this.getHeaders(),
-        params: await this.getParams({
-          external_source: 'imdb_id',
-          language: 'en-US',
-        }),
+      const config = await this.getAxiosConfig(`${BASE_URL}/find/${baseImdbId}`, {
+        external_source: 'imdb_id',
+        language: 'en-US',
       });
+      const response = await axios.get(config.url, config);
+      if (__DEV__) { try { console.log('[TMDBService] findTMDBIdByIMDB ok', baseImdbId); } catch {} }
       
       // Check TV results first
       if (response.data.tv_results && response.data.tv_results.length > 0) {
@@ -358,6 +450,7 @@ export class TMDBService {
       
       return null;
     } catch (error) {
+      if (__DEV__) { try { console.log('[TMDBService] findTMDBIdByIMDB failed'); } catch {} }
       return null;
     }
   }
@@ -373,6 +466,10 @@ export class TMDBService {
     const baseImageUrl = 'https://image.tmdb.org/t/p/';
     const fullUrl = `${baseImageUrl}${size}${path}`;
     
+    // Route images through proxy if enabled to avoid ISP blocks
+    if (this.useProxy) {
+      return this.buildProxiedUrl(fullUrl);
+    }
     return fullUrl;
   }
 
@@ -449,12 +546,10 @@ export class TMDBService {
 
   async getCredits(tmdbId: number, type: string) {
     try {
-      const response = await axios.get(`${BASE_URL}/${type === 'series' ? 'tv' : 'movie'}/${tmdbId}/credits`, {
-        headers: await this.getHeaders(),
-        params: await this.getParams({
-          language: 'en-US',
-        }),
+      const config = await this.getAxiosConfig(`${BASE_URL}/${type === 'series' ? 'tv' : 'movie'}/${tmdbId}/credits`, {
+        language: 'en-US',
       });
+      const response = await axios.get(config.url, config);
       return {
         cast: response.data.cast || [],
         crew: response.data.crew || []
@@ -466,12 +561,10 @@ export class TMDBService {
 
   async getPersonDetails(personId: number) {
     try {
-      const response = await axios.get(`${BASE_URL}/person/${personId}`, {
-        headers: await this.getHeaders(),
-        params: await this.getParams({
-          language: 'en-US',
-        }),
+      const config = await this.getAxiosConfig(`${BASE_URL}/person/${personId}`, {
+        language: 'en-US',
       });
+      const response = await axios.get(config.url, config);
       return response.data;
     } catch (error) {
       return null;
@@ -483,12 +576,10 @@ export class TMDBService {
    */
   async getPersonMovieCredits(personId: number) {
     try {
-      const response = await axios.get(`${BASE_URL}/person/${personId}/movie_credits`, {
-        headers: await this.getHeaders(),
-        params: await this.getParams({
-          language: 'en-US',
-        }),
+      const config = await this.getAxiosConfig(`${BASE_URL}/person/${personId}/movie_credits`, {
+        language: 'en-US',
       });
+      const response = await axios.get(config.url, config);
       return response.data;
     } catch (error) {
       return null;
@@ -500,12 +591,10 @@ export class TMDBService {
    */
   async getPersonTvCredits(personId: number) {
     try {
-      const response = await axios.get(`${BASE_URL}/person/${personId}/tv_credits`, {
-        headers: await this.getHeaders(),
-        params: await this.getParams({
-          language: 'en-US',
-        }),
+      const config = await this.getAxiosConfig(`${BASE_URL}/person/${personId}/tv_credits`, {
+        language: 'en-US',
       });
+      const response = await axios.get(config.url, config);
       return response.data;
     } catch (error) {
       return null;
@@ -517,12 +606,10 @@ export class TMDBService {
    */
   async getPersonCombinedCredits(personId: number) {
     try {
-      const response = await axios.get(`${BASE_URL}/person/${personId}/combined_credits`, {
-        headers: await this.getHeaders(),
-        params: await this.getParams({
-          language: 'en-US',
-        }),
+      const config = await this.getAxiosConfig(`${BASE_URL}/person/${personId}/combined_credits`, {
+        language: 'en-US',
       });
+      const response = await axios.get(config.url, config);
       return response.data;
     } catch (error) {
       return null;
@@ -534,13 +621,8 @@ export class TMDBService {
    */
   async getShowExternalIds(tmdbId: number): Promise<{ imdb_id: string | null } | null> {
     try {
-      const response = await axios.get(
-        `${BASE_URL}/tv/${tmdbId}/external_ids`,
-        {
-          headers: await this.getHeaders(),
-          params: await this.getParams(),
-        }
-      );
+      const config = await this.getAxiosConfig(`${BASE_URL}/tv/${tmdbId}/external_ids`);
+      const response = await axios.get(config.url, config);
       return response.data;
     } catch (error) {
       return null;
@@ -552,10 +634,8 @@ export class TMDBService {
       return [];
     }
     try {
-      const response = await axios.get(`${BASE_URL}/${type}/${tmdbId}/recommendations`, {
-        headers: await this.getHeaders(),
-        params: await this.getParams({ language })
-      });
+      const config = await this.getAxiosConfig(`${BASE_URL}/${type}/${tmdbId}/recommendations`, { language });
+      const response = await axios.get(config.url, config);
       return response.data.results || [];
     } catch (error) {
       return [];
@@ -564,15 +644,13 @@ export class TMDBService {
 
   async searchMulti(query: string): Promise<any[]> {
     try {
-      const response = await axios.get(`${BASE_URL}/search/multi`, {
-        headers: await this.getHeaders(),
-        params: await this.getParams({
-          query,
-          include_adult: false,
-          language: 'en-US',
-          page: 1,
-        }),
+      const config = await this.getAxiosConfig(`${BASE_URL}/search/multi`, {
+        query,
+        include_adult: false,
+        language: 'en-US',
+        page: 1,
       });
+      const response = await axios.get(config.url, config);
       return response.data.results;
     } catch (error) {
       return [];
@@ -584,13 +662,11 @@ export class TMDBService {
    */
   async getMovieDetails(movieId: string, language: string = 'en'): Promise<any> {
     try {
-      const response = await axios.get(`${BASE_URL}/movie/${movieId}`, {
-        headers: await this.getHeaders(),
-        params: await this.getParams({
-          language,
-          append_to_response: 'external_ids,credits,keywords,release_dates' // Include release dates for accurate availability
-        }),
+      const config = await this.getAxiosConfig(`${BASE_URL}/movie/${movieId}`, {
+        language,
+        append_to_response: 'external_ids,credits,keywords,release_dates'
       });
+      const response = await axios.get(config.url, config);
       return response.data;
     } catch (error) {
       return null;
@@ -602,12 +678,10 @@ export class TMDBService {
    */
   async getMovieImages(movieId: number | string, preferredLanguage: string = 'en'): Promise<string | null> {
     try {
-      const response = await axios.get(`${BASE_URL}/movie/${movieId}/images`, {
-        headers: await this.getHeaders(),
-        params: await this.getParams({
-          include_image_language: `${preferredLanguage},en,null`
-        }),
+      const config = await this.getAxiosConfig(`${BASE_URL}/movie/${movieId}/images`, {
+        include_image_language: `${preferredLanguage},en,null`
       });
+      const response = await axios.get(config.url, config);
 
       const images = response.data;
       
@@ -701,12 +775,10 @@ export class TMDBService {
    */
   async getTvShowImages(showId: number | string, preferredLanguage: string = 'en'): Promise<string | null> {
     try {
-      const response = await axios.get(`${BASE_URL}/tv/${showId}/images`, {
-        headers: await this.getHeaders(),
-        params: await this.getParams({
-          include_image_language: `${preferredLanguage},en,null`
-        }),
+      const config = await this.getAxiosConfig(`${BASE_URL}/tv/${showId}/images`, {
+        include_image_language: `${preferredLanguage},en,null`
       });
+      const response = await axios.get(config.url, config);
 
       const images = response.data;
       
@@ -820,10 +892,8 @@ export class TMDBService {
   async getCertification(type: string, id: number): Promise<string | null> {
     try {
       if (type === 'movie') {
-        const response = await axios.get(`${BASE_URL}/movie/${id}/release_dates`, {
-          headers: await this.getHeaders(),
-          params: await this.getParams()
-        });
+        const config = await this.getAxiosConfig(`${BASE_URL}/movie/${id}/release_dates`);
+        const response = await axios.get(config.url, config);
 
         if (response.data && response.data.results) {
           // Prefer US, then GB, then any
@@ -843,10 +913,8 @@ export class TMDBService {
         return null;
       } else {
         // TV uses content ratings endpoint, not release_dates
-        const response = await axios.get(`${BASE_URL}/tv/${id}/content_ratings`, {
-          headers: await this.getHeaders(),
-          params: await this.getParams()
-        });
+        const config = await this.getAxiosConfig(`${BASE_URL}/tv/${id}/content_ratings`);
+        const response = await axios.get(config.url, config);
 
         if (response.data && response.data.results) {
           // Prefer US, then GB, then any
@@ -872,25 +940,18 @@ export class TMDBService {
    */
   async getTrending(type: 'movie' | 'tv', timeWindow: 'day' | 'week'): Promise<TMDBTrendingResult[]> {
     try {
-      const response = await axios.get(`${BASE_URL}/trending/${type}/${timeWindow}`, {
-        headers: await this.getHeaders(),
-        params: await this.getParams({
-          language: 'en-US',
-        }),
+      const config = await this.getAxiosConfig(`${BASE_URL}/trending/${type}/${timeWindow}`, {
+        language: 'en-US',
       });
+      const response = await axios.get(config.url, config);
 
       // Get external IDs for each trending item
       const results = response.data.results || [];
       const resultsWithExternalIds = await Promise.all(
         results.map(async (item: TMDBTrendingResult) => {
           try {
-            const externalIdsResponse = await axios.get(
-              `${BASE_URL}/${type}/${item.id}/external_ids`,
-              {
-                headers: await this.getHeaders(),
-                params: await this.getParams(),
-              }
-            );
+            const externalConfig = await this.getAxiosConfig(`${BASE_URL}/${type}/${item.id}/external_ids`);
+            const externalIdsResponse = await axios.get(externalConfig.url, externalConfig);
             return {
               ...item,
               external_ids: externalIdsResponse.data
@@ -914,26 +975,19 @@ export class TMDBService {
    */
   async getPopular(type: 'movie' | 'tv', page: number = 1): Promise<TMDBTrendingResult[]> {
     try {
-      const response = await axios.get(`${BASE_URL}/${type}/popular`, {
-        headers: await this.getHeaders(),
-        params: await this.getParams({
-          language: 'en-US',
-          page,
-        }),
+      const config = await this.getAxiosConfig(`${BASE_URL}/${type}/popular`, {
+        language: 'en-US',
+        page,
       });
+      const response = await axios.get(config.url, config);
 
       // Get external IDs for each popular item
       const results = response.data.results || [];
       const resultsWithExternalIds = await Promise.all(
         results.map(async (item: TMDBTrendingResult) => {
           try {
-            const externalIdsResponse = await axios.get(
-              `${BASE_URL}/${type}/${item.id}/external_ids`,
-              {
-                headers: await this.getHeaders(),
-                params: await this.getParams(),
-              }
-            );
+            const externalConfig = await this.getAxiosConfig(`${BASE_URL}/${type}/${item.id}/external_ids`);
+            const externalIdsResponse = await axios.get(externalConfig.url, externalConfig);
             return {
               ...item,
               external_ids: externalIdsResponse.data
@@ -960,26 +1014,19 @@ export class TMDBService {
       // For movies use upcoming, for TV use on_the_air
       const endpoint = type === 'movie' ? 'upcoming' : 'on_the_air';
       
-      const response = await axios.get(`${BASE_URL}/${type}/${endpoint}`, {
-        headers: await this.getHeaders(),
-        params: await this.getParams({
-          language: 'en-US',
-          page,
-        }),
+      const config = await this.getAxiosConfig(`${BASE_URL}/${type}/${endpoint}`, {
+        language: 'en-US',
+        page,
       });
+      const response = await axios.get(config.url, config);
 
       // Get external IDs for each upcoming item
       const results = response.data.results || [];
       const resultsWithExternalIds = await Promise.all(
         results.map(async (item: TMDBTrendingResult) => {
           try {
-            const externalIdsResponse = await axios.get(
-              `${BASE_URL}/${type}/${item.id}/external_ids`,
-              {
-                headers: await this.getHeaders(),
-                params: await this.getParams(),
-              }
-            );
+            const externalConfig = await this.getAxiosConfig(`${BASE_URL}/${type}/${item.id}/external_ids`);
+            const externalIdsResponse = await axios.get(externalConfig.url, externalConfig);
             return {
               ...item,
               external_ids: externalIdsResponse.data
@@ -1003,27 +1050,20 @@ export class TMDBService {
    */
   async getNowPlaying(page: number = 1, region: string = 'US'): Promise<TMDBTrendingResult[]> {
     try {
-      const response = await axios.get(`${BASE_URL}/movie/now_playing`, {
-        headers: await this.getHeaders(),
-        params: await this.getParams({
-          language: 'en-US',
-          page,
-          region, // Filter by region to get accurate theater availability
-        }),
+      const config = await this.getAxiosConfig(`${BASE_URL}/movie/now_playing`, {
+        language: 'en-US',
+        page,
+        region,
       });
+      const response = await axios.get(config.url, config);
 
       // Get external IDs for each now playing movie
       const results = response.data.results || [];
       const resultsWithExternalIds = await Promise.all(
         results.map(async (item: TMDBTrendingResult) => {
           try {
-            const externalIdsResponse = await axios.get(
-              `${BASE_URL}/movie/${item.id}/external_ids`,
-              {
-                headers: await this.getHeaders(),
-                params: await this.getParams(),
-              }
-            );
+            const externalConfig = await this.getAxiosConfig(`${BASE_URL}/movie/${item.id}/external_ids`);
+            const externalIdsResponse = await axios.get(externalConfig.url, externalConfig);
             return {
               ...item,
               external_ids: externalIdsResponse.data
@@ -1045,12 +1085,10 @@ export class TMDBService {
    */
   async getMovieGenres(): Promise<{ id: number; name: string }[]> {
     try {
-      const response = await axios.get(`${BASE_URL}/genre/movie/list`, {
-        headers: await this.getHeaders(),
-        params: await this.getParams({
-          language: 'en-US',
-        }),
+      const config = await this.getAxiosConfig(`${BASE_URL}/genre/movie/list`, {
+        language: 'en-US',
       });
+      const response = await axios.get(config.url, config);
       return response.data.genres || [];
     } catch (error) {
       return [];
@@ -1062,12 +1100,10 @@ export class TMDBService {
    */
   async getTvGenres(): Promise<{ id: number; name: string }[]> {
     try {
-      const response = await axios.get(`${BASE_URL}/genre/tv/list`, {
-        headers: await this.getHeaders(),
-        params: await this.getParams({
-          language: 'en-US',
-        }),
+      const config = await this.getAxiosConfig(`${BASE_URL}/genre/tv/list`, {
+        language: 'en-US',
       });
+      const response = await axios.get(config.url, config);
       return response.data.genres || [];
     } catch (error) {
       return [];
@@ -1093,31 +1129,24 @@ export class TMDBService {
         return [];
       }
       
-      const response = await axios.get(`${BASE_URL}/discover/${type}`, {
-        headers: await this.getHeaders(),
-        params: await this.getParams({
-          language: 'en-US',
-          sort_by: 'popularity.desc',
-          include_adult: false,
-          include_video: false,
-          page,
-          with_genres: genre.id.toString(),
-          with_original_language: 'en',
-        }),
+      const config = await this.getAxiosConfig(`${BASE_URL}/discover/${type}`, {
+        language: 'en-US',
+        sort_by: 'popularity.desc',
+        include_adult: false,
+        include_video: false,
+        page,
+        with_genres: genre.id.toString(),
+        with_original_language: 'en',
       });
+      const response = await axios.get(config.url, config);
 
       // Get external IDs for each item
       const results = response.data.results || [];
       const resultsWithExternalIds = await Promise.all(
         results.map(async (item: TMDBTrendingResult) => {
           try {
-            const externalIdsResponse = await axios.get(
-              `${BASE_URL}/${type}/${item.id}/external_ids`,
-              {
-                headers: await this.getHeaders(),
-                params: await this.getParams(),
-              }
-            );
+            const externalConfig = await this.getAxiosConfig(`${BASE_URL}/${type}/${item.id}/external_ids`);
+            const externalIdsResponse = await axios.get(externalConfig.url, externalConfig);
             return {
               ...item,
               external_ids: externalIdsResponse.data

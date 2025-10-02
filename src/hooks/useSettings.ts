@@ -79,6 +79,7 @@ export interface AppSettings {
   // Metadata enrichment
   enrichMetadataWithTMDB: boolean; // Use TMDB to enrich metadata (cast, certification, posters, fallbacks)
   useTmdbLocalizedMetadata: boolean; // Use TMDB localized metadata (titles, overviews) per tmdbLanguagePreference
+  useTmdbProxy: boolean; // Route TMDB requests through proxy for enhanced privacy
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -130,6 +131,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   // Metadata enrichment
   enrichMetadataWithTMDB: true,
   useTmdbLocalizedMetadata: false,
+  useTmdbProxy: false, // Disabled by default for direct API access
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';

@@ -389,6 +389,15 @@ const TMDBSettingsScreen = () => {
             />
           </View>
 
+          {!useCustomKey && (
+            <View style={styles.infoContainer}>
+              <MaterialIcons name="info-outline" size={18} color={currentTheme.colors.primary} />
+              <Text style={[styles.infoText, { color: currentTheme.colors.mediumEmphasis }]}> 
+                Currently using built-in API key. Consider using your own key for better performance.
+              </Text>
+            </View>
+          )}
+
           {useCustomKey && (
             <>
               <View style={styles.divider} />
@@ -492,14 +501,29 @@ const TMDBSettingsScreen = () => {
             </>
           )}
 
-          {!useCustomKey && (
-            <View style={styles.infoContainer}>
-              <MaterialIcons name="info-outline" size={18} color={currentTheme.colors.primary} />
-              <Text style={[styles.infoText, { color: currentTheme.colors.mediumEmphasis }]}>
-                Currently using built-in API key. Consider using your own key for better performance.
+          <View style={styles.divider} />
+
+          <View style={styles.settingRow}>
+            <View style={styles.settingTextContainer}>
+              <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Use Proxy</Text>
+              <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                Route TMDB requests through proxy for enhanced privacy. May be slower.
               </Text>
             </View>
-          )}
+            <Switch
+              value={settings.useTmdbProxy}
+              onValueChange={async (v) => {
+                updateSetting('useTmdbProxy', v);
+                // Immediately apply without waiting for AsyncStorage sync
+                await tmdbService.reloadProxySetting(v);
+              }}
+              trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
+              thumbColor={Platform.OS === 'android' ? (settings.useTmdbProxy ? currentTheme.colors.white : currentTheme.colors.white) : ''}
+              ios_backgroundColor={'rgba(255,255,255,0.1)'}
+            />
+          </View>
+
+          {/* Info note now shown under Custom API Key section above */}
         </View>
 
         {/* Language Picker Modal */}
@@ -557,6 +581,7 @@ const TMDBSettingsScreen = () => {
                           { code: 'fr', label: 'FR' },
                           { code: 'de', label: 'DE' },
                           { code: 'tr', label: 'TR' },
+                          { code: 'el', label: 'EL' },
                         ].map(({ code, label }) => (
                           <TouchableOpacity
                             key={code}
@@ -601,6 +626,7 @@ const TMDBSettingsScreen = () => {
                           { code: 'es', label: 'Español', native: 'Spanish' },
                           { code: 'fr', label: 'Français', native: 'French' },
                           { code: 'de', label: 'Deutsch', native: 'German' },
+                          { code: 'el', label: 'Greek', native: 'Ελληνικά' },
                           { code: 'it', label: 'Italiano', native: 'Italian' },
                           { code: 'pt', label: 'Português', native: 'Portuguese' },
                           { code: 'ru', label: 'Русский', native: 'Russian' },
