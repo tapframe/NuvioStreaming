@@ -498,10 +498,11 @@ export const StreamsScreen = () => {
   const { colors } = currentTheme;
   const { pauseTrailer, resumeTrailer } = useTrailer();
 
-  // Add ref to prevent excessive updates
+  // Add refs to prevent excessive updates and duplicate loads
   const isMounted = useRef(true);
   const loadStartTimeRef = useRef(0);
   const hasDoneInitialLoadRef = useRef(false);
+  const isLoadingStreamsRef = useRef(false);
   
   // CustomAlert state
   const [alertVisible, setAlertVisible] = useState(false);
@@ -729,79 +730,96 @@ export const StreamsScreen = () => {
 
   // Update useEffect to check for sources
   useEffect(() => {
+    // Reset initial load state when content changes
+    hasDoneInitialLoadRef.current = false;
+    isLoadingStreamsRef.current = false;
+
     const checkProviders = async () => {
       if (__DEV__) console.log('[StreamsScreen] checkProviders() start', { id, type, episodeId, fromPlayer });
       logger.log(`[StreamsScreen] checkProviders() start id=${id} type=${type} episodeId=${episodeId || 'none'} fromPlayer=${!!fromPlayer}`);
-      // Check for Stremio addons
-      const hasStremioProviders = await stremioService.hasStreamProviders();
-      if (__DEV__) console.log('[StreamsScreen] hasStremioProviders:', hasStremioProviders);
-      
-      // Check for local scrapers (only if enabled in settings)
-      const hasLocalScrapers = settings.enableLocalScrapers && await localScraperService.hasScrapers();
-      if (__DEV__) console.log('[StreamsScreen] hasLocalScrapers:', hasLocalScrapers, 'enableLocalScrapers:', settings.enableLocalScrapers);
-      
-      // We have providers if we have either Stremio addons OR enabled local scrapers
-      const hasProviders = hasStremioProviders || hasLocalScrapers;
-      logger.log(`[StreamsScreen] provider check: hasProviders=${hasProviders}`);
 
-      if (!isMounted.current) return;
+      // Prevent duplicate calls if already loading
+      if (isLoadingStreamsRef.current) {
+        if (__DEV__) console.log('[StreamsScreen] checkProviders() skipping - already loading');
+        return;
+      }
 
-      setHasStreamProviders(hasProviders);
-      setHasStremioStreamProviders(hasStremioProviders);
+      isLoadingStreamsRef.current = true;
 
-      if (!hasProviders) {
-        logger.log('[StreamsScreen] No providers detected; scheduling no-sources UI');
-        const timer = setTimeout(() => {
-          if (isMounted.current) setShowNoSourcesError(true);
-        }, 500);
-        return () => clearTimeout(timer);
-      } else {
-          // For series episodes, do not wait for metadata; load directly when episodeId is present
-          if (episodeId) {
-            logger.log(`🎬 Loading episode streams for: ${episodeId}`);
-            setLoadingProviders({
-              'stremio': true
-            });
-            setSelectedEpisode(episodeId);
-            setStreamsLoadStart(Date.now());
-            if (__DEV__) console.log('[StreamsScreen] calling loadEpisodeStreams', episodeId);
-            loadEpisodeStreams(episodeId);
-          } else if (type === 'movie') {
-            logger.log(`🎬 Loading movie streams for: ${id}`);
-            setStreamsLoadStart(Date.now());
-            if (__DEV__) console.log('[StreamsScreen] calling loadStreams (movie)', id);
-            loadStreams();
-          } else if (type === 'tv') {
-            // TV/live content – fetch streams directly
-            logger.log(`📺 Loading TV streams for: ${id}`);
-            setLoadingProviders({
-              'stremio': true
-            });
-            setStreamsLoadStart(Date.now());
-            if (__DEV__) console.log('[StreamsScreen] calling loadStreams (tv)', id);
-            loadStreams();
-          } else {
-            // Fallback: series without explicit episodeId (or other types) – fetch streams directly
-            logger.log(`🎬 Loading streams for: ${id}`);
-            setLoadingProviders({
-              'stremio': true
-            });
-            setStreamsLoadStart(Date.now());
-            if (__DEV__) console.log('[StreamsScreen] calling loadStreams (fallback)', id);
-            loadStreams();
-          }
-  
-          // Reset autoplay state when content changes
-          setAutoplayTriggered(false);
-          if (settings.autoplayBestStream && !fromPlayer) {
-            setIsAutoplayWaiting(true);
-            logger.log('🔄 Autoplay enabled, waiting for best stream...');
-          } else {
-            setIsAutoplayWaiting(false);
-            if (fromPlayer) {
-              logger.log('🚫 Autoplay disabled: returning from player');
+      try {
+        // Check for Stremio addons
+        const hasStremioProviders = await stremioService.hasStreamProviders();
+        if (__DEV__) console.log('[StreamsScreen] hasStremioProviders:', hasStremioProviders);
+
+        // Check for local scrapers (only if enabled in settings)
+        const hasLocalScrapers = settings.enableLocalScrapers && await localScraperService.hasScrapers();
+        if (__DEV__) console.log('[StreamsScreen] hasLocalScrapers:', hasLocalScrapers, 'enableLocalScrapers:', settings.enableLocalScrapers);
+
+        // We have providers if we have either Stremio addons OR enabled local scrapers
+        const hasProviders = hasStremioProviders || hasLocalScrapers;
+        logger.log(`[StreamsScreen] provider check: hasProviders=${hasProviders}`);
+
+        if (!isMounted.current) return;
+
+        setHasStreamProviders(hasProviders);
+        setHasStremioStreamProviders(hasStremioProviders);
+
+        if (!hasProviders) {
+          logger.log('[StreamsScreen] No providers detected; scheduling no-sources UI');
+          const timer = setTimeout(() => {
+            if (isMounted.current) setShowNoSourcesError(true);
+          }, 500);
+          return () => clearTimeout(timer);
+        } else {
+            // For series episodes, do not wait for metadata; load directly when episodeId is present
+            if (episodeId) {
+              logger.log(`🎬 Loading episode streams for: ${episodeId}`);
+              setLoadingProviders({
+                'stremio': true
+              });
+              setSelectedEpisode(episodeId);
+              setStreamsLoadStart(Date.now());
+              if (__DEV__) console.log('[StreamsScreen] calling loadEpisodeStreams', episodeId);
+              loadEpisodeStreams(episodeId);
+            } else if (type === 'movie') {
+              logger.log(`🎬 Loading movie streams for: ${id}`);
+              setStreamsLoadStart(Date.now());
+              if (__DEV__) console.log('[StreamsScreen] calling loadStreams (movie)', id);
+              loadStreams();
+            } else if (type === 'tv') {
+              // TV/live content – fetch streams directly
+              logger.log(`📺 Loading TV streams for: ${id}`);
+              setLoadingProviders({
+                'stremio': true
+              });
+              setStreamsLoadStart(Date.now());
+              if (__DEV__) console.log('[StreamsScreen] calling loadStreams (tv)', id);
+              loadStreams();
+            } else {
+              // Fallback: series without explicit episodeId (or other types) – fetch streams directly
+              logger.log(`🎬 Loading streams for: ${id}`);
+              setLoadingProviders({
+                'stremio': true
+              });
+              setStreamsLoadStart(Date.now());
+              if (__DEV__) console.log('[StreamsScreen] calling loadStreams (fallback)', id);
+              loadStreams();
             }
-          }
+
+            // Reset autoplay state when content changes
+            setAutoplayTriggered(false);
+            if (settings.autoplayBestStream && !fromPlayer) {
+              setIsAutoplayWaiting(true);
+              logger.log('🔄 Autoplay enabled, waiting for best stream...');
+            } else {
+              setIsAutoplayWaiting(false);
+              if (fromPlayer) {
+                logger.log('🚫 Autoplay disabled: returning from player');
+              }
+            }
+        }
+      } finally {
+        isLoadingStreamsRef.current = false;
       }
     };
 
