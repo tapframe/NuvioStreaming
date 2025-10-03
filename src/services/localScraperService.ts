@@ -81,6 +81,8 @@ class LocalScraperService {
   private autoRefreshCompleted: boolean = false;
   private isRefreshing: boolean = false;
   private scraperSettingsCache: Record<string, any> | null = null;
+  // Single-flight map to prevent duplicate concurrent runs per scraper+title
+  private inFlightByKey: Map<string, Promise<LocalScraperResult[]>> = new Map();
 
   private constructor() {
     this.initialize();
@@ -876,10 +878,13 @@ class LocalScraperService {
     }
     
     logger.log('[LocalScraperService] Executing', enabledScrapers.length, 'scrapers for', type, tmdbId);
-    
+
+    // Generate a lightweight request id for tracing
+    const requestId = `rs_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+
     // Execute each scraper
     for (const scraper of enabledScrapers) {
-      this.executeScraper(scraper, type, tmdbId, season, episode, callback);
+      this.executeScraper(scraper, type, tmdbId, season, episode, callback, requestId);
     }
   }
 
@@ -890,7 +895,8 @@ class LocalScraperService {
     tmdbId: string, 
     season?: number, 
     episode?: number, 
-    callback?: ScraperCallback
+    callback?: ScraperCallback,
+    requestId?: string
   ): Promise<void> {
     try {
       const code = this.scraperCode.get(scraper.id);
@@ -903,15 +909,32 @@ class LocalScraperService {
       // Load per-scraper settings
       const scraperSettings = await this.getScraperSettings(scraper.id);
       
-      // Create a sandboxed execution environment
-      const results = await this.executeSandboxed(code, {
-        tmdbId,
-        mediaType: type,
-        season,
-        episode,
-        scraperId: scraper.id,
-        settings: scraperSettings
-      });
+      // Build single-flight key
+      const flightKey = `${scraper.id}|${type}|${tmdbId}|${season ?? ''}|${episode ?? ''}`;
+
+      // Create a sandboxed execution environment with single-flight coalescing
+      let promise: Promise<LocalScraperResult[]>;
+      if (this.inFlightByKey.has(flightKey)) {
+        promise = this.inFlightByKey.get(flightKey)!;
+      } else {
+        promise = this.executeSandboxed(code, {
+          tmdbId,
+          mediaType: type,
+          season,
+          episode,
+          scraperId: scraper.id,
+          settings: scraperSettings,
+          requestId
+        });
+        this.inFlightByKey.set(flightKey, promise);
+        // Clean up after settle; guard against races
+        promise.finally(() => {
+          const current = this.inFlightByKey.get(flightKey);
+          if (current === promise) this.inFlightByKey.delete(flightKey);
+        }).catch(() => {});
+      }
+
+      const results = await promise;
       
       // Convert results to Nuvio Stream format
       const streams = this.convertToStreams(results, scraper);
