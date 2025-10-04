@@ -36,6 +36,7 @@ export interface ScraperInfo {
   supportedFormats?: string[];
   repositoryId?: string; // Which repository this scraper came from
   supportsExternalPlayer?: boolean; // Whether this scraper supports external players
+  limited?: boolean; // Whether this scraper has limited functionality
 }
 
 export interface RepositoryInfo {
