@@ -11,7 +11,7 @@ import {
   Dimensions,
   Linking
 } from 'react-native';
-import { toast, ToastPosition } from '@backpackapp-io/react-native-toast';
+import { Toast } from 'toastify-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -152,9 +152,7 @@ const UpdateScreen: React.FC = () => {
     // Also refresh GitHub section on mount (works in dev and prod)
     try { github.refresh(); } catch {}
     if (Platform.OS === 'android') {
-      try {
-        toast('Checking for updates…', { duration: 1200, position: ToastPosition.TOP });
-      } catch {}
+      try { Toast.info('Checking for updates…'); } catch {}
     }
   }, []);
 

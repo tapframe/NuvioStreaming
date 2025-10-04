@@ -160,12 +160,12 @@ export class TMDBService {
   /**
    * Get TV show details by TMDB ID
    */
-  async getTVShowDetails(tmdbId: number): Promise<TMDBShow | null> {
+  async getTVShowDetails(tmdbId: number, language: string = 'en'): Promise<TMDBShow | null> {
     try {
       const response = await axios.get(`${BASE_URL}/tv/${tmdbId}`, {
         headers: await this.getHeaders(),
         params: await this.getParams({
-          language: 'en-US',
+          language,
           append_to_response: 'external_ids,credits,keywords' // Append external IDs, cast/crew, and keywords for AI context
         }),
       });
@@ -237,12 +237,12 @@ export class TMDBService {
   /**
    * Get season details including all episodes with IMDb ratings
    */
-  async getSeasonDetails(tmdbId: number, seasonNumber: number, showName?: string): Promise<TMDBSeason | null> {
+  async getSeasonDetails(tmdbId: number, seasonNumber: number, showName?: string, language: string = 'en-US'): Promise<TMDBSeason | null> {
     try {
       const response = await axios.get(`${BASE_URL}/tv/${tmdbId}/season/${seasonNumber}`, {
         headers: await this.getHeaders(),
         params: await this.getParams({
-          language: 'en-US',
+          language,
         }),
       });
 
@@ -292,7 +292,8 @@ export class TMDBService {
   async getEpisodeDetails(
     tmdbId: number,
     seasonNumber: number,
-    episodeNumber: number
+    episodeNumber: number,
+    language: string = 'en-US'
   ): Promise<TMDBEpisode | null> {
     try {
       const response = await axios.get(
@@ -300,7 +301,7 @@ export class TMDBService {
         {
           headers: await this.getHeaders(),
           params: await this.getParams({
-            language: 'en-US',
+            language,
             append_to_response: 'credits' // Include guest stars and crew for episode context
           }),
         }
@@ -546,14 +547,14 @@ export class TMDBService {
     }
   }
 
-  async getRecommendations(type: 'movie' | 'tv', tmdbId: string): Promise<any[]> {
+  async getRecommendations(type: 'movie' | 'tv', tmdbId: string, language: string = 'en-US'): Promise<any[]> {
     if (!this.apiKey) {
       return [];
     }
     try {
       const response = await axios.get(`${BASE_URL}/${type}/${tmdbId}/recommendations`, {
         headers: await this.getHeaders(),
-        params: await this.getParams({ language: 'en-US' })
+        params: await this.getParams({ language })
       });
       return response.data.results || [];
     } catch (error) {
@@ -581,12 +582,12 @@ export class TMDBService {
   /**
    * Get movie details by TMDB ID
    */
-  async getMovieDetails(movieId: string): Promise<any> {
+  async getMovieDetails(movieId: string, language: string = 'en'): Promise<any> {
     try {
       const response = await axios.get(`${BASE_URL}/movie/${movieId}`, {
         headers: await this.getHeaders(),
         params: await this.getParams({
-          language: 'en-US',
+          language,
           append_to_response: 'external_ids,credits,keywords,release_dates' // Include release dates for accurate availability
         }),
       });

@@ -37,17 +37,18 @@ import { useMetadata } from '../hooks/useMetadata';
 import { useMetadataAssets } from '../hooks/useMetadataAssets';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTrailer } from '../contexts/TrailerContext';
-import { Stream } from '../types/metadata';
+import { Stream, GroupedStreams } from '../types/metadata';
 import { tmdbService } from '../services/tmdbService';
 import { stremioService } from '../services/stremioService';
 import { localScraperService } from '../services/localScraperService';
+import { hybridCacheService } from '../services/hybridCacheService';
 import { VideoPlayerService } from '../services/videoPlayerService';
 import { useSettings } from '../hooks/useSettings';
 import QualityBadge from '../components/metadata/QualityBadge';
 import { logger } from '../utils/logger';
 import { isMkvStream } from '../utils/mkvDetection';
 import CustomAlert from '../components/CustomAlert';
-import { toast, ToastPosition } from '@backpackapp-io/react-native-toast';
+import { Toast } from 'toastify-react-native';
 import { useDownloads } from '../contexts/DownloadsContext';
 
 const TMDB_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tmdb.new.logo.svg/512px-Tmdb.new.logo.svg.png?20200406190906';
@@ -233,10 +234,7 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
         
         // Use toast for Android, custom alert for iOS
         if (Platform.OS === 'android') {
-          toast('Stream URL copied to clipboard!', {
-            duration: 2000,
-            position: ToastPosition.BOTTOM,
-          });
+          Toast.success('Stream URL copied to clipboard!', 'bottom');
         } else {
           // iOS uses custom alert
           setTimeout(() => {
@@ -246,10 +244,7 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
       } catch (error) {
         // Fallback: show URL in alert if clipboard fails
         if (Platform.OS === 'android') {
-          toast(`Stream URL: ${stream.url}`, {
-            duration: 3000,
-            position: ToastPosition.BOTTOM,
-          });
+          Toast.info(`Stream URL: ${stream.url}`, 'bottom');
         } else {
           setTimeout(() => {
             showAlert('Stream URL', stream.url);
@@ -322,7 +317,7 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
         url,
         headers: (stream.headers as any) || undefined,
       });
-      toast('Download started', { duration: 1500, position: ToastPosition.BOTTOM });
+      Toast.success('Download started', 'bottom');
     } catch {}
   }, [startDownload, stream.url, stream.headers, streamInfo.quality, showAlert, stream.name, stream.title]);
 
@@ -504,10 +499,11 @@ export const StreamsScreen = () => {
   const { colors } = currentTheme;
   const { pauseTrailer, resumeTrailer } = useTrailer();
 
-  // Add ref to prevent excessive updates
+  // Add refs to prevent excessive updates and duplicate loads
   const isMounted = useRef(true);
   const loadStartTimeRef = useRef(0);
   const hasDoneInitialLoadRef = useRef(false);
+  const isLoadingStreamsRef = useRef(false);
   
   // CustomAlert state
   const [alertVisible, setAlertVisible] = useState(false);
@@ -733,81 +729,233 @@ export const StreamsScreen = () => {
     }
   }, [selectedProvider, availableProviders, episodeStreams, groupedStreams, type]);
 
+  // Check for cached results immediately on mount
+  useEffect(() => {
+    const checkCachedResults = async () => {
+      if (!settings.enableLocalScrapers) return;
+
+      try {
+        let season: number | undefined;
+        let episode: number | undefined;
+
+        if (episodeId && episodeId.includes(':')) {
+          const parts = episodeId.split(':');
+          if (parts.length >= 3) {
+            season = parseInt(parts[1], 10);
+            episode = parseInt(parts[2], 10);
+          }
+        }
+
+        const installedScrapers = await localScraperService.getInstalledScrapers();
+        const userSettings = {
+          enableLocalScrapers: settings.enableLocalScrapers,
+          enabledScrapers: new Set(
+            installedScrapers
+              .filter(scraper => scraper.enabled)
+              .map(scraper => scraper.id)
+          )
+        };
+        const cachedResults = await hybridCacheService.getCachedResults(type, id, season, episode, userSettings);
+        if (cachedResults.validResults.length > 0) {
+          logger.log(`🔍 Found ${cachedResults.validResults.length} cached scraper results on mount`);
+
+          // If we have cached results, trigger the loading flow immediately
+          if (!hasDoneInitialLoadRef.current) {
+            logger.log('🚀 Triggering immediate load due to cached results');
+            // Force a re-render to ensure cached results are displayed
+            setHasStreamProviders(true);
+            setStreamsLoadStart(Date.now());
+          }
+        }
+      } catch (error) {
+        if (__DEV__) console.log('[StreamsScreen] Error checking cached results on mount:', error);
+      }
+    };
+
+    checkCachedResults();
+  }, [type, id, episodeId, settings.enableLocalScrapers]);
+
   // Update useEffect to check for sources
   useEffect(() => {
+    // Reset initial load state when content changes
+    hasDoneInitialLoadRef.current = false;
+    isLoadingStreamsRef.current = false;
+
     const checkProviders = async () => {
       if (__DEV__) console.log('[StreamsScreen] checkProviders() start', { id, type, episodeId, fromPlayer });
       logger.log(`[StreamsScreen] checkProviders() start id=${id} type=${type} episodeId=${episodeId || 'none'} fromPlayer=${!!fromPlayer}`);
-      // Check for Stremio addons
-      const hasStremioProviders = await stremioService.hasStreamProviders();
-      if (__DEV__) console.log('[StreamsScreen] hasStremioProviders:', hasStremioProviders);
-      
-      // Check for local scrapers (only if enabled in settings)
-      const hasLocalScrapers = settings.enableLocalScrapers && await localScraperService.hasScrapers();
-      if (__DEV__) console.log('[StreamsScreen] hasLocalScrapers:', hasLocalScrapers, 'enableLocalScrapers:', settings.enableLocalScrapers);
-      
-      // We have providers if we have either Stremio addons OR enabled local scrapers
-      const hasProviders = hasStremioProviders || hasLocalScrapers;
-      logger.log(`[StreamsScreen] provider check: hasProviders=${hasProviders}`);
 
-      if (!isMounted.current) return;
+      // Prevent duplicate calls if already loading
+      if (isLoadingStreamsRef.current) {
+        if (__DEV__) console.log('[StreamsScreen] checkProviders() skipping - already loading');
+        return;
+      }
 
-      setHasStreamProviders(hasProviders);
-      setHasStremioStreamProviders(hasStremioProviders);
+      isLoadingStreamsRef.current = true;
 
-      if (!hasProviders) {
-        logger.log('[StreamsScreen] No providers detected; scheduling no-sources UI');
-        const timer = setTimeout(() => {
-          if (isMounted.current) setShowNoSourcesError(true);
-        }, 500);
-        return () => clearTimeout(timer);
-      } else {
-          // For series episodes, do not wait for metadata; load directly when episodeId is present
-          if (episodeId) {
-            logger.log(`🎬 Loading episode streams for: ${episodeId}`);
-            setLoadingProviders({
-              'stremio': true
-            });
-            setSelectedEpisode(episodeId);
-            setStreamsLoadStart(Date.now());
-            if (__DEV__) console.log('[StreamsScreen] calling loadEpisodeStreams', episodeId);
-            loadEpisodeStreams(episodeId);
-          } else if (type === 'movie') {
-            logger.log(`🎬 Loading movie streams for: ${id}`);
-            setStreamsLoadStart(Date.now());
-            if (__DEV__) console.log('[StreamsScreen] calling loadStreams (movie)', id);
-            loadStreams();
-          } else if (type === 'tv') {
-            // TV/live content – fetch streams directly
-            logger.log(`📺 Loading TV streams for: ${id}`);
-            setLoadingProviders({
-              'stremio': true
-            });
-            setStreamsLoadStart(Date.now());
-            if (__DEV__) console.log('[StreamsScreen] calling loadStreams (tv)', id);
-            loadStreams();
-          } else {
-            // Fallback: series without explicit episodeId (or other types) – fetch streams directly
-            logger.log(`🎬 Loading streams for: ${id}`);
-            setLoadingProviders({
-              'stremio': true
-            });
-            setStreamsLoadStart(Date.now());
-            if (__DEV__) console.log('[StreamsScreen] calling loadStreams (fallback)', id);
-            loadStreams();
-          }
-  
-          // Reset autoplay state when content changes
-          setAutoplayTriggered(false);
-          if (settings.autoplayBestStream && !fromPlayer) {
-            setIsAutoplayWaiting(true);
-            logger.log('🔄 Autoplay enabled, waiting for best stream...');
-          } else {
-            setIsAutoplayWaiting(false);
-            if (fromPlayer) {
-              logger.log('🚫 Autoplay disabled: returning from player');
+      try {
+        // Check for Stremio addons
+        const hasStremioProviders = await stremioService.hasStreamProviders();
+        if (__DEV__) console.log('[StreamsScreen] hasStremioProviders:', hasStremioProviders);
+
+        // Check for local scrapers (only if enabled in settings)
+        const hasLocalScrapers = settings.enableLocalScrapers && await localScraperService.hasScrapers();
+        if (__DEV__) console.log('[StreamsScreen] hasLocalScrapers:', hasLocalScrapers, 'enableLocalScrapers:', settings.enableLocalScrapers);
+
+        // Check for cached results (this covers both local and global cache)
+        let hasCachedResults = false;
+        if (settings.enableLocalScrapers) {
+          try {
+            // Check if there are any cached streams for this content
+            let season: number | undefined;
+            let episode: number | undefined;
+
+            if (episodeId && episodeId.includes(':')) {
+              const parts = episodeId.split(':');
+              if (parts.length >= 3) {
+                season = parseInt(parts[1], 10);
+                episode = parseInt(parts[2], 10);
+              }
             }
+
+            const installedScrapers = await localScraperService.getInstalledScrapers();
+            const userSettings = {
+              enableLocalScrapers: settings.enableLocalScrapers,
+              enabledScrapers: new Set(
+                installedScrapers
+                  .filter(scraper => scraper.enabled)
+                  .map(scraper => scraper.id)
+              )
+            };
+            const cachedStreams = await hybridCacheService.getCachedStreams(type, id, season, episode, userSettings);
+            hasCachedResults = cachedStreams.length > 0;
+            if (__DEV__) console.log('[StreamsScreen] hasCachedResults:', hasCachedResults, 'cached streams count:', cachedStreams.length, 'season:', season, 'episode:', episode);
+          } catch (error) {
+            if (__DEV__) console.log('[StreamsScreen] Error checking cached results:', error);
           }
+        }
+
+        // We have providers if we have Stremio addons, enabled local scrapers, OR cached results
+        const hasProviders = hasStremioProviders || hasLocalScrapers || hasCachedResults;
+        logger.log(`[StreamsScreen] provider check: hasProviders=${hasProviders} (stremio:${hasStremioProviders}, local:${hasLocalScrapers}, cached:${hasCachedResults})`);
+
+        if (!isMounted.current) return;
+
+        setHasStreamProviders(hasProviders);
+        setHasStremioStreamProviders(hasStremioProviders);
+
+        if (!hasProviders) {
+          // If we have local scrapers enabled but no cached results yet, wait a bit longer
+          if (settings.enableLocalScrapers && !hasCachedResults) {
+            logger.log('[StreamsScreen] No providers detected but checking for cached results; waiting longer');
+            const timer = setTimeout(() => {
+              if (isMounted.current) setShowNoSourcesError(true);
+            }, 2000); // Wait 2 seconds for cached results
+            return () => clearTimeout(timer);
+          } else {
+            logger.log('[StreamsScreen] No providers detected; scheduling no-sources UI');
+            const timer = setTimeout(() => {
+              if (isMounted.current) setShowNoSourcesError(true);
+            }, 500);
+            return () => clearTimeout(timer);
+          }
+        } else {
+            // Check for cached streams first before loading
+            if (settings.enableLocalScrapers) {
+              try {
+                let season: number | undefined;
+                let episode: number | undefined;
+
+                if (episodeId && episodeId.includes(':')) {
+                  const parts = episodeId.split(':');
+                  if (parts.length >= 3) {
+                    season = parseInt(parts[1], 10);
+                    episode = parseInt(parts[2], 10);
+                  }
+                }
+
+                // Check if we have cached streams and load them immediately
+                const cachedStreams = await hybridCacheService.getCachedStreams(type, id, season, episode);
+                if (cachedStreams.length > 0) {
+                  logger.log(`🎯 Found ${cachedStreams.length} cached streams, displaying immediately`);
+
+                  // Group cached streams by scraper for proper display
+                  const groupedCachedStreams: GroupedStreams = {};
+                  const scrapersWithCachedResults = new Set<string>();
+
+                  // Get cached results to determine which scrapers have results
+                  const cachedResults = await hybridCacheService.getCachedResults(type, id, season, episode);
+
+                  for (const result of cachedResults.validResults) {
+                    if (result.success && result.streams && result.streams.length > 0) {
+                      groupedCachedStreams[result.scraperId] = {
+                        addonName: result.scraperName,
+                        streams: result.streams
+                      };
+                      scrapersWithCachedResults.add(result.scraperId);
+                    }
+                  }
+
+                  // Update the streams state immediately if we have cached results
+                  if (Object.keys(groupedCachedStreams).length > 0) {
+                    logger.log(`🚀 Immediately displaying ${Object.keys(groupedCachedStreams).length} cached scrapers with streams`);
+                    // This will be handled by the useMetadata hook integration
+                  }
+                }
+              } catch (error) {
+                if (__DEV__) console.log('[StreamsScreen] Error checking cached streams:', error);
+              }
+            }
+
+            // For series episodes, do not wait for metadata; load directly when episodeId is present
+            if (episodeId) {
+              logger.log(`🎬 Loading episode streams for: ${episodeId}`);
+              setLoadingProviders({
+                'stremio': true
+              });
+              setSelectedEpisode(episodeId);
+              setStreamsLoadStart(Date.now());
+              if (__DEV__) console.log('[StreamsScreen] calling loadEpisodeStreams', episodeId);
+              loadEpisodeStreams(episodeId);
+            } else if (type === 'movie') {
+              logger.log(`🎬 Loading movie streams for: ${id}`);
+              setStreamsLoadStart(Date.now());
+              if (__DEV__) console.log('[StreamsScreen] calling loadStreams (movie)', id);
+              loadStreams();
+            } else if (type === 'tv') {
+              // TV/live content – fetch streams directly
+              logger.log(`📺 Loading TV streams for: ${id}`);
+              setLoadingProviders({
+                'stremio': true
+              });
+              setStreamsLoadStart(Date.now());
+              if (__DEV__) console.log('[StreamsScreen] calling loadStreams (tv)', id);
+              loadStreams();
+            } else {
+              // Fallback: series without explicit episodeId (or other types) – fetch streams directly
+              logger.log(`🎬 Loading streams for: ${id}`);
+              setLoadingProviders({
+                'stremio': true
+              });
+              setStreamsLoadStart(Date.now());
+              if (__DEV__) console.log('[StreamsScreen] calling loadStreams (fallback)', id);
+              loadStreams();
+            }
+
+            // Reset autoplay state when content changes
+            setAutoplayTriggered(false);
+            if (settings.autoplayBestStream && !fromPlayer) {
+              setIsAutoplayWaiting(true);
+              logger.log('🔄 Autoplay enabled, waiting for best stream...');
+            } else {
+              setIsAutoplayWaiting(false);
+              if (fromPlayer) {
+                logger.log('🚫 Autoplay disabled: returning from player');
+              }
+            }
+        }
+      } finally {
+        isLoadingStreamsRef.current = false;
       }
     };
 

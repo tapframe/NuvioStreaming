@@ -15,7 +15,7 @@ import { HeaderVisibility } from '../contexts/HeaderVisibility';
 import { Stream } from '../types/streams';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
-import { Toasts } from '@backpackapp-io/react-native-toast';
+import ToastManager from 'toastify-react-native';
 import { PostHogProvider } from 'posthog-react-native';
 
 // Import screens with their proper types
@@ -889,6 +889,7 @@ const customFadeInterpolator = ({ current, layouts }: any) => {
 const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootStackParamList }) => {
   const { currentTheme } = useTheme();
   const { user, loading } = useAccount();
+  const insets = useSafeAreaInsets();
   
   // Handle Android-specific optimizations
   useEffect(() => {
@@ -1344,7 +1345,85 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
           </Stack.Navigator>
         </View>
       </PaperProvider>
-      <Toasts />
+      {/* Global toast customization using ThemeContext */}
+      <ToastManager
+        position="top"
+        useModal={false}
+        theme={'dark'}
+        // Dimensions
+        width={'90%'}
+        minHeight={61}
+        // Icon defaults
+        iconFamily="MaterialIcons"
+        iconSize={22}
+        icons={{
+          success: 'check-circle',
+          error: 'error',
+          info: 'info',
+          warn: 'warning',
+          default: 'notifications',
+        }}
+        // Close icon defaults
+        showCloseIcon={true}
+        closeIcon={'close'}
+        closeIconFamily={'MaterialIcons'}
+        closeIconSize={18}
+        // Spacing (ensure below safe area)
+        topOffset={Math.max(8, insets.top + 8)}
+        bottomOffset={40}
+        // Styles bound to ThemeContext
+        style={{
+          backgroundColor: currentTheme.colors.darkBackground,
+          borderRadius: 12,
+          paddingVertical: 12,
+          paddingHorizontal: 14,
+        }}
+        textStyle={{
+          color: currentTheme.colors.highEmphasis,
+          fontWeight: '600',
+        }}
+        config={{
+          default: (props: any) => (
+            <View style={{
+              backgroundColor: currentTheme.colors.elevation2,
+              borderRadius: 12,
+              padding: 12,
+              width: '100%'
+            }}>
+              <Text style={{ color: currentTheme.colors.highEmphasis, fontWeight: '700' }}>{props.text1}</Text>
+              {props.text2 ? (
+                <Text style={{ color: currentTheme.colors.mediumEmphasis, marginTop: 4 }}>{props.text2}</Text>
+              ) : null}
+            </View>
+          ),
+          success: (props: any) => (
+            <View style={{
+              backgroundColor: currentTheme.colors.elevation2,
+              borderRadius: 12,
+              padding: 12,
+              width: '100%'
+            }}>
+              <Text style={{ color: currentTheme.colors.success || '#4CAF50', fontWeight: '800' }}>{props.text1}</Text>
+              {props.text2 ? (
+                <Text style={{ color: currentTheme.colors.mediumEmphasis, marginTop: 4 }}>{props.text2}</Text>
+              ) : null}
+            </View>
+          ),
+          error: (props: any) => (
+            <View style={{
+              backgroundColor: currentTheme.colors.elevation2,
+              borderRadius: 12,
+              padding: 12,
+              width: '100%'
+            }}>
+              <Text style={{ color: currentTheme.colors.error || '#ff4444', fontWeight: '800' }}>{props.text1}</Text>
+              {props.text2 ? (
+                <Text style={{ color: currentTheme.colors.mediumEmphasis, marginTop: 4 }}>{props.text2}</Text>
+              ) : null}
+            </View>
+          ),
+        }}
+      />
     </SafeAreaProvider>
   );
 };

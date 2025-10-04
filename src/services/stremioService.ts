@@ -1180,7 +1180,7 @@ class StremioService {
     
     try {
       // Increase timeout for debrid services
-      const timeout = addon.id.toLowerCase().includes('torrentio') ? 30000 : 10000;
+      const timeout = addon.id.toLowerCase().includes('torrentio') ? 60000 : 10000;
       
       const response = await this.retryRequest(async () => {
         logger.log(`Making request to ${url} with timeout ${timeout}ms`);

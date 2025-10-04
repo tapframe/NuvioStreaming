@@ -778,8 +778,8 @@ const InfoTooltip: React.FC<{ text: string; colors: any }> = ({ text, colors }) 
 );
 
 // Helper component for status badges
-const StatusBadge: React.FC<{ 
-  status: 'enabled' | 'disabled' | 'available' | 'platform-disabled' | 'error';
+const StatusBadge: React.FC<{
+  status: 'enabled' | 'disabled' | 'available' | 'platform-disabled' | 'error' | 'limited';
   colors: any;
 }> = ({ status, colors }) => {
   const getStatusConfig = () => {
@@ -792,6 +792,8 @@ const StatusBadge: React.FC<{
         return { color: colors.primary, text: 'Available' };
       case 'platform-disabled':
         return { color: '#FF9500', text: 'Platform Disabled' };
+      case 'limited':
+        return { color: '#FF9500', text: 'Limited' };
       case 'error':
         return { color: '#FF3B30', text: 'Error' };
       default:
@@ -919,9 +921,10 @@ const PluginsScreen: React.FC = () => {
     }));
   };
 
-  const getScraperStatus = (scraper: ScraperInfo): 'enabled' | 'disabled' | 'available' | 'platform-disabled' | 'error' => {
+  const getScraperStatus = (scraper: ScraperInfo): 'enabled' | 'disabled' | 'available' | 'platform-disabled' | 'error' | 'limited' => {
     if (scraper.manifestEnabled === false) return 'disabled';
     if (scraper.disabledPlatforms?.includes(Platform.OS as 'ios' | 'android')) return 'platform-disabled';
+    if (scraper.limited) return 'limited';
     if (scraper.enabled) return 'enabled';
     return 'available';
   };
@@ -1293,7 +1296,7 @@ const PluginsScreen: React.FC = () => {
   };
 
   // Define available quality options
-  const qualityOptions = ['Auto', '2160p', '4K', '1080p', '720p', '360p', 'DV', 'HDR', 'REMUX', '480p', 'CAM', 'TS'];
+  const qualityOptions = ['Auto', 'Adaptive', '2160p', '4K', '1080p', '720p', '360p', 'DV', 'HDR', 'REMUX', '480p', 'CAM', 'TS'];
 
 
 
@@ -1816,8 +1819,12 @@ const PluginsScreen: React.FC = () => {
         <View style={[styles.section, styles.lastSection]}>
           <Text style={styles.sectionTitle}>About Plugins</Text>
           <Text style={styles.infoText}>
-            Plugins are JavaScript modules that can search for streaming links from various sources. 
+            Plugins are JavaScript modules that can search for streaming links from various sources.
             They run locally on your device and can be installed from trusted repositories.
+          </Text>
+
+          <Text style={[styles.infoText, { marginTop: 8, fontSize: 13, color: colors.mediumEmphasis }]}>
+            <Text style={{ fontWeight: '600' }}>Note:</Text> Providers marked as "Limited" depend on external APIs that may stop working without notice.
           </Text>
         </View>
       </ScrollView>

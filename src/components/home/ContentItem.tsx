@@ -1,11 +1,16 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Platform, Text, Animated } from 'react-native';
+import { Toast } from 'toastify-react-native';
+import { DeviceEventEmitter } from 'react-native';
+import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Platform, Text, Animated, Share } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useSettings } from '../../hooks/useSettings';
 import { catalogService, StreamingContent } from '../../services/catalogService';
 import { DropUpMenu } from './DropUpMenu';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storageService } from '../../services/storageService';
+import { TraktService } from '../../services/traktService';
 
 interface ContentItemProps {
   item: StreamingContent;
@@ -70,6 +75,17 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
     });
     return () => unsubscribe();
   }, [item.id, item.type]);
+
+    // Load watched state from AsyncStorage when item changes
+  useEffect(() => {
+    const updateWatched = () => {
+      AsyncStorage.getItem(`watched:${item.type}:${item.id}`).then(val => setIsWatched(val === 'true'));
+    };
+    updateWatched();
+    const sub = DeviceEventEmitter.addListener('watchedStatusChanged', updateWatched);
+    return () => sub.remove();
+  }, [item.id, item.type]);
+
   const [menuVisible, setMenuVisible] = useState(false);
   const [isWatched, setIsWatched] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -102,24 +118,68 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
     onPress(item.id, item.type);
   }, [item.id, item.type, onPress]);
 
-  const handleOptionSelect = useCallback((option: string) => {
+  const handleOptionSelect = useCallback(async (option: string) => {
     switch (option) {
       case 'library':
         if (inLibrary) {
           catalogService.removeFromLibrary(item.type, item.id);
+          Toast.info('Removed from Library');
         } else {
           catalogService.addToLibrary(item);
+          Toast.success('Added to Library');
         }
         break;
-      case 'watched':
-        setIsWatched(prev => !prev);
+      case 'watched': {
+        const targetWatched = !isWatched;
+        setIsWatched(targetWatched);
+        try {
+          await AsyncStorage.setItem(`watched:${item.type}:${item.id}`, targetWatched ? 'true' : 'false');
+        } catch {}
+        Toast.info(targetWatched ? 'Marked as Watched' : 'Marked as Unwatched');
+        setTimeout(() => {
+          DeviceEventEmitter.emit('watchedStatusChanged');
+        }, 100);
+
+        // Best-effort sync: record local progress and push to Trakt if available
+        if (targetWatched) {
+          try {
+            await storageService.setWatchProgress(
+              item.id,
+              item.type,
+              { currentTime: 1, duration: 1, lastUpdated: Date.now() },
+              undefined,
+              { forceNotify: true, forceWrite: true }
+            );
+          } catch {}
+
+          if (item.type === 'movie') {
+            try {
+              const trakt = TraktService.getInstance();
+              if (await trakt.isAuthenticated()) {
+                await trakt.addToWatchedMovies(item.id);
+                try {
+                  await storageService.updateTraktSyncStatus(item.id, item.type, true, 100);
+                } catch {}
+              }
+            } catch {}
+          }
+        }
+        setMenuVisible(false);
         break;
+      }
       case 'playlist':
         break;
-      case 'share':
+      case 'share': {
+        let url = '';
+        if (item.id) {
+          url = `https://www.imdb.com/title/${item.id}/`;
+        }
+        const message = `${item.name}\n${url}`;
+        Share.share({ message, url, title: item.name });
         break;
+      }
     }
-  }, [item, inLibrary]);
+  }, [item, inLibrary, isWatched]);
 
   const handleMenuClose = useCallback(() => {
     setMenuVisible(false);

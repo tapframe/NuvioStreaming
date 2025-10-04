@@ -7,7 +7,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAccount } from '../contexts/AccountContext';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
-import { toast } from '@backpackapp-io/react-native-toast';
+import ToastManager, { Toast } from 'toastify-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
@@ -144,21 +144,21 @@ const AuthScreen: React.FC = () => {
     if (!isEmailValid) {
       const msg = 'Enter a valid email address';
       setError(msg);
-      toast.error(msg);
+      Toast.error(msg);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       return;
     }
     if (!isPasswordValid) {
       const msg = 'Password must be at least 6 characters';
       setError(msg);
-      toast.error(msg);
+      Toast.error(msg);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       return;
     }
     if (mode === 'signup' && !passwordsMatch) {
       const msg = 'Passwords do not match';
       setError(msg);
-      toast.error(msg);
+      Toast.error(msg);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       return;
     }
@@ -167,11 +167,11 @@ const AuthScreen: React.FC = () => {
     const err = mode === 'signin' ? await signIn(email.trim(), password) : await signUp(email.trim(), password);
     if (err) {
       setError(err);
-      toast.error(err);
+      Toast.error(err);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
     } else {
       const msg = mode === 'signin' ? 'Logged in successfully' : 'Sign up successful';
-      toast.success(msg);
+      Toast.success(msg);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
 
       // Navigate to main tabs after successful authentication
