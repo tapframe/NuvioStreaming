@@ -188,6 +188,8 @@ const AndroidVideoPlayer: React.FC = () => {
   const [textTracks, setTextTracks] = useState<TextTrack[]>([]);
   const [selectedTextTrack, setSelectedTextTrack] = useState<number>(-1);
   const [resizeMode, setResizeMode] = useState<ResizeModeType>('contain');
+  const speedOptions = [0.5, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0];
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
   const [buffered, setBuffered] = useState(0);
   const [seekTime, setSeekTime] = useState<number | null>(null);
   const videoRef = useRef<VideoRef>(null);
@@ -1642,6 +1644,16 @@ const AndroidVideoPlayer: React.FC = () => {
       resizeTimeoutRef.current = null;
     }, 300);
   }, [resizeMode]);
+
+
+
+  // Cycle playback speed
+  const cyclePlaybackSpeed = useCallback(() => {
+    const idx = speedOptions.indexOf(playbackSpeed);
+    const newIdx = (idx + 1) % speedOptions.length;
+    const newSpeed = speedOptions[newIdx];
+    setPlaybackSpeed(newSpeed);
+  }, [playbackSpeed, speedOptions]);
 
   const enableImmersiveMode = () => {
     StatusBar.setHidden(true, 'none');
@@ -3334,7 +3346,7 @@ const AndroidVideoPlayer: React.FC = () => {
                   resizeMode={getVideoResizeMode(resizeMode)}
                   selectedAudioTrack={selectedAudioTrack || undefined}
                   selectedTextTrack={useCustomSubtitles ? { type: SelectedTrackType.DISABLED } : (selectedTextTrack >= 0 ? { type: SelectedTrackType.INDEX, value: selectedTextTrack } : undefined)}
-                  rate={1.0}
+                  rate={playbackSpeed}
                   volume={volume}
                   muted={false}
                   repeat={false}
@@ -3389,6 +3401,8 @@ const AndroidVideoPlayer: React.FC = () => {
             skip={skip}
             handleClose={handleClose}
             cycleAspectRatio={cycleAspectRatio}
+            cyclePlaybackSpeed={cyclePlaybackSpeed}
+            currentPlaybackSpeed={playbackSpeed}
             setShowAudioModal={setShowAudioModal}
             setShowSubtitleModal={setShowSubtitleModal}
             isSubtitleModalOpen={showSubtitleModal}
