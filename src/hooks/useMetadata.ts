@@ -107,6 +107,28 @@ interface UseMetadataReturn {
   imdbId: string | null;
   scraperStatuses: ScraperStatus[];
   activeFetchingScrapers: string[];
+  clearScraperCache: () => Promise<void>;
+  invalidateScraperCache: (scraperId: string) => Promise<void>;
+  invalidateContentCache: (type: string, tmdbId: string, season?: number, episode?: number) => Promise<void>;
+  getScraperCacheStats: () => Promise<{
+    local: {
+      totalEntries: number;
+      totalSize: number;
+      oldestEntry: number | null;
+      newestEntry: number | null;
+    };
+    global: {
+      totalEntries: number;
+      totalSize: number;
+      oldestEntry: number | null;
+      newestEntry: number | null;
+      hitRate: number;
+    };
+    combined: {
+      totalEntries: number;
+      hitRate: number;
+    };
+  }>;
 }
 
 export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadataReturn => {
@@ -1484,6 +1506,23 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     };
   }, [cleanupStreams]);
 
+  // Cache management methods
+  const clearScraperCache = useCallback(async () => {
+    await localScraperService.clearScraperCache();
+  }, []);
+
+  const invalidateScraperCache = useCallback(async (scraperId: string) => {
+    await localScraperService.invalidateScraperCache(scraperId);
+  }, []);
+
+  const invalidateContentCache = useCallback(async (type: string, tmdbId: string, season?: number, episode?: number) => {
+    await localScraperService.invalidateContentCache(type, tmdbId, season, episode);
+  }, []);
+
+  const getScraperCacheStats = useCallback(async () => {
+    return await localScraperService.getCacheStats();
+  }, []);
+
   return {
     metadata,
     loading,
@@ -1517,5 +1556,9 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     imdbId,
     scraperStatuses,
     activeFetchingScrapers,
+    clearScraperCache,
+    invalidateScraperCache,
+    invalidateContentCache,
+    getScraperCacheStats,
   };
 };
