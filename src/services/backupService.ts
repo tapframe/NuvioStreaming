@@ -453,8 +453,43 @@ export class BackupService {
 
   private async getTraktSettings(): Promise<any> {
     try {
+      // Get general Trakt settings
       const traktSettingsJson = await AsyncStorage.getItem('trakt_settings');
-      return traktSettingsJson ? JSON.parse(traktSettingsJson) : {};
+      const traktSettings = traktSettingsJson ? JSON.parse(traktSettingsJson) : {};
+      
+      // Get authentication tokens
+      const [
+        accessToken,
+        refreshToken,
+        tokenExpiry,
+        autosyncEnabled,
+        syncFrequency,
+        completionThreshold
+      ] = await Promise.all([
+        AsyncStorage.getItem('trakt_access_token'),
+        AsyncStorage.getItem('trakt_refresh_token'),
+        AsyncStorage.getItem('trakt_token_expiry'),
+        AsyncStorage.getItem('trakt_autosync_enabled'),
+        AsyncStorage.getItem('trakt_sync_frequency'),
+        AsyncStorage.getItem('trakt_completion_threshold')
+      ]);
+      
+      return {
+        ...traktSettings,
+        authentication: {
+          accessToken,
+          refreshToken,
+          tokenExpiry: tokenExpiry ? parseInt(tokenExpiry, 10) : null
+        },
+        autosync: {
+          enabled: autosyncEnabled ? (() => {
+            try { return JSON.parse(autosyncEnabled); } 
+            catch { return true; }
+          })() : true,
+          frequency: syncFrequency ? parseInt(syncFrequency, 10) : 60000,
+          completionThreshold: completionThreshold ? parseInt(completionThreshold, 10) : 95
+        }
+      };
     } catch (error) {
       logger.error('[BackupService] Failed to get Trakt settings:', error);
       return {};
@@ -607,8 +642,53 @@ export class BackupService {
 
   private async restoreTraktSettings(traktSettings: any): Promise<void> {
     try {
-      await AsyncStorage.setItem('trakt_settings', JSON.stringify(traktSettings));
-      logger.info('[BackupService] Trakt settings restored');
+      // Restore general Trakt settings
+      if (traktSettings && typeof traktSettings === 'object') {
+        const { authentication, autosync, ...generalSettings } = traktSettings;
+        
+        // Restore general settings
+        await AsyncStorage.setItem('trakt_settings', JSON.stringify(generalSettings));
+        
+        // Restore authentication tokens if available
+        if (authentication) {
+          const tokenPromises = [];
+          
+          if (authentication.accessToken) {
+            tokenPromises.push(AsyncStorage.setItem('trakt_access_token', authentication.accessToken));
+          }
+          
+          if (authentication.refreshToken) {
+            tokenPromises.push(AsyncStorage.setItem('trakt_refresh_token', authentication.refreshToken));
+          }
+          
+          if (authentication.tokenExpiry) {
+            tokenPromises.push(AsyncStorage.setItem('trakt_token_expiry', authentication.tokenExpiry.toString()));
+          }
+          
+          await Promise.all(tokenPromises);
+        }
+        
+        // Restore autosync settings if available
+        if (autosync) {
+          const autosyncPromises = [];
+          
+          if (autosync.enabled !== undefined) {
+            autosyncPromises.push(AsyncStorage.setItem('trakt_autosync_enabled', JSON.stringify(autosync.enabled)));
+          }
+          
+          if (autosync.frequency !== undefined) {
+            autosyncPromises.push(AsyncStorage.setItem('trakt_sync_frequency', autosync.frequency.toString()));
+          }
+          
+          if (autosync.completionThreshold !== undefined) {
+            autosyncPromises.push(AsyncStorage.setItem('trakt_completion_threshold', autosync.completionThreshold.toString()));
+          }
+          
+          await Promise.all(autosyncPromises);
+        }
+        
+        logger.info('[BackupService] Trakt settings and authentication restored');
+      }
     } catch (error) {
       logger.error('[BackupService] Failed to restore Trakt settings:', error);
     }

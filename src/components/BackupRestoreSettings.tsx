@@ -10,6 +10,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
+import * as Updates from 'expo-updates';
 import { backupService, BackupOptions } from '../services/backupService';
 import { useTheme } from '../contexts/ThemeContext';
 import { logger } from '../utils/logger';
@@ -38,6 +39,20 @@ const BackupRestoreSettings: React.FC<BackupRestoreSettingsProps> = ({ isTablet 
     setAlertMessage(message);
     setAlertActions(actions && actions.length > 0 ? actions : [{ label: 'OK', onPress: () => {} }]);
     setAlertVisible(true);
+  };
+
+  const restartApp = async () => {
+    try {
+      await Updates.reloadAsync();
+    } catch (error) {
+      logger.error('[BackupRestoreSettings] Failed to restart app:', error);
+      // Fallback: show error message
+      openAlert(
+        'Restart Failed',
+        'Failed to restart the app. Please manually close and reopen the app to see your restored data.',
+        [{ label: 'OK', onPress: () => {} }]
+      );
+    }
   };
 
 
@@ -162,7 +177,14 @@ const BackupRestoreSettings: React.FC<BackupRestoreSettingsProps> = ({ isTablet 
                 openAlert(
                   'Restore Complete',
                   'Your data has been successfully restored. Please restart the app to see all changes.',
-                  [{ label: 'OK', onPress: () => {} }]
+                  [
+                    { label: 'Cancel', onPress: () => {} },
+                    { 
+                      label: 'Restart App', 
+                      onPress: restartApp,
+                      style: { fontWeight: 'bold' }
+                    }
+                  ]
                 );
               } catch (error) {
                 logger.error('[BackupRestoreSettings] Failed to restore backup:', error);
