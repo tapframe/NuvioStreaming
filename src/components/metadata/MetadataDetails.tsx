@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
   metaInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 18,
     paddingHorizontal: 16,
     marginBottom: 12,
   },
