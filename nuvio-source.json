@@ -31,6 +31,14 @@
       ],
       "versions": [
         {
+          "version": "1.2.3",
+          "buildVersion": "18",
+          "date": "2025-10-04",
+          "localizedDescription": "# Version 1.2.3 – Update Notes\n\n### New Features\n- Added **Local Backup & Restore** option\n  - This feature **will replace** the old **Cloud-based Authentication and Sync** system permanently\n  - See the in-app information section for more details on how to use it\n\n- **Playback Speed Control** – contributed by @CrissZollo\n  - Adds the ability to change playback speed directly within the player\n  - Currently tested and supported on **ExoPlayer (Android only)**\n  - Fixes [Issue #86](https://github.com/tapframe/NuvioStreaming/issues/86)\n\n### UI & Metadata Improvements\n- Improvements by @CrissZollo\n  - Fixed runtime display logic in **TMDB catalogs** where there was no space between hours and minutes\n  - Changed runtime labels from \"H and MIN\" to \"H and M\"\n  - Increased gap between metadata by 50% for better readability\n  - Fixes [Issue #160](https://github.com/tapframe/NuvioStreaming/issues/160)\n\n### Bug Fixes\n- Fixed **Trakt list sorting issue** in Library screen\n- Fixed an issue where **autoplay does not work** after closing an episode and selecting another\n\n### General\n- Minor stability and UI refinements",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/1.2.3/Stable_1-2-3.ipa",
+          "size": 25700000
+        },
+        {
           "version": "1.2.2",
           "buildVersion": "17",
           "date": "2025-09-30",
