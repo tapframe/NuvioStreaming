@@ -1647,13 +1647,12 @@ const AndroidVideoPlayer: React.FC = () => {
 
 
 
-  // Function to cycle playback speed
+  // Cycle playback speed
   const cyclePlaybackSpeed = useCallback(() => {
     const idx = speedOptions.indexOf(playbackSpeed);
     const newIdx = (idx + 1) % speedOptions.length;
     const newSpeed = speedOptions[newIdx];
     setPlaybackSpeed(newSpeed);
-    // Playback speed is now set via the rate prop on the Video component
   }, [playbackSpeed, speedOptions]);
 
   const enableImmersiveMode = () => {
@@ -3403,6 +3402,7 @@ const AndroidVideoPlayer: React.FC = () => {
             handleClose={handleClose}
             cycleAspectRatio={cycleAspectRatio}
             cyclePlaybackSpeed={cyclePlaybackSpeed}
+            currentPlaybackSpeed={playbackSpeed}
             setShowAudioModal={setShowAudioModal}
             setShowSubtitleModal={setShowSubtitleModal}
             isSubtitleModalOpen={showSubtitleModal}

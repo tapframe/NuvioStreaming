@@ -31,6 +31,7 @@ interface PlayerControlsProps {
   handleClose: () => void;
   cycleAspectRatio: () => void;
   cyclePlaybackSpeed: () => void;
+  currentPlaybackSpeed: number;
   setShowAudioModal: (show: boolean) => void;
   setShowSubtitleModal: (show: boolean) => void;
   isSubtitleModalOpen?: boolean;
@@ -68,6 +69,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   handleClose,
   cycleAspectRatio,
   cyclePlaybackSpeed,
+  currentPlaybackSpeed,
   setShowAudioModal,
   setShowSubtitleModal,
   isSubtitleModalOpen,
@@ -183,7 +185,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
               <TouchableOpacity style={styles.bottomButton} onPress={cyclePlaybackSpeed}>
                 <Ionicons name="speedometer" size={20} color="white" />
                 <Text style={styles.bottomButtonText}>
-                  Speed
+                  Speed {currentPlaybackSpeed}x
                 </Text>
               </TouchableOpacity>
 
