@@ -1293,7 +1293,7 @@ const PluginsScreen: React.FC = () => {
   };
 
   // Define available quality options
-  const qualityOptions = ['Auto', '2160p', '4K', '1080p', '720p', '360p', 'DV', 'HDR', 'REMUX', '480p', 'CAM', 'TS'];
+  const qualityOptions = ['Auto', 'Adaptive', '2160p', '4K', '1080p', '720p', '360p', 'DV', 'HDR', 'REMUX', '480p', 'CAM', 'TS'];
 
 
 

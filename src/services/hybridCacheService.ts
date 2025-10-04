@@ -48,21 +48,39 @@ class HybridCacheService {
    * Get cached results with hybrid approach (global first, then local)
    */
   async getCachedResults(
-    type: string, 
-    tmdbId: string, 
-    season?: number, 
-    episode?: number
+    type: string,
+    tmdbId: string,
+    season?: number,
+    episode?: number,
+    userSettings?: { enableLocalScrapers?: boolean; enabledScrapers?: Set<string> }
   ): Promise<HybridCacheResult> {
     try {
+      // Filter function to check if scraper is enabled for current user
+      const isScraperEnabled = (scraperId: string): boolean => {
+        if (!userSettings?.enableLocalScrapers) return false;
+        if (userSettings?.enabledScrapers) {
+          return userSettings.enabledScrapers.has(scraperId);
+        }
+        // If no specific scraper settings, assume all are enabled if local scrapers are enabled
+        return true;
+      };
+
       // Try global cache first if enabled
       if (this.ENABLE_GLOBAL_CACHE) {
         try {
           const globalResults = await supabaseGlobalCacheService.getCachedResults(type, tmdbId, season, episode);
-          
-          if (globalResults.validResults.length > 0) {
-            logger.log(`[HybridCache] Using global cache: ${globalResults.validResults.length} results`);
+
+          // Filter results based on user settings
+          const filteredGlobalResults = {
+            ...globalResults,
+            validResults: globalResults.validResults.filter(result => isScraperEnabled(result.scraperId)),
+            expiredScrapers: globalResults.expiredScrapers.filter(scraperId => isScraperEnabled(scraperId))
+          };
+
+          if (filteredGlobalResults.validResults.length > 0) {
+            logger.log(`[HybridCache] Using global cache: ${filteredGlobalResults.validResults.length} results (filtered from ${globalResults.validResults.length})`);
             return {
-              ...globalResults,
+              ...filteredGlobalResults,
               source: 'global'
             };
           }
@@ -74,11 +92,18 @@ class HybridCacheService {
       // Fallback to local cache
       if (this.FALLBACK_TO_LOCAL) {
         const localResults = await localScraperCacheService.getCachedResults(type, tmdbId, season, episode);
-        
-        if (localResults.validResults.length > 0) {
-          logger.log(`[HybridCache] Using local cache: ${localResults.validResults.length} results`);
+
+        // Filter results based on user settings
+        const filteredLocalResults = {
+          ...localResults,
+          validResults: localResults.validResults.filter(result => isScraperEnabled(result.scraperId)),
+          expiredScrapers: localResults.expiredScrapers.filter(scraperId => isScraperEnabled(scraperId))
+        };
+
+        if (filteredLocalResults.validResults.length > 0) {
+          logger.log(`[HybridCache] Using local cache: ${filteredLocalResults.validResults.length} results (filtered from ${localResults.validResults.length})`);
           return {
-            ...localResults,
+            ...filteredLocalResults,
             source: 'local'
           };
         }
@@ -173,9 +198,10 @@ class HybridCacheService {
     tmdbId: string,
     availableScrapers: Array<{ id: string; name: string }>,
     season?: number,
-    episode?: number
+    episode?: number,
+    userSettings?: { enableLocalScrapers?: boolean; enabledScrapers?: Set<string> }
   ): Promise<string[]> {
-    const { validResults, expiredScrapers } = await this.getCachedResults(type, tmdbId, season, episode);
+    const { validResults, expiredScrapers } = await this.getCachedResults(type, tmdbId, season, episode, userSettings);
     
     const validScraperIds = new Set(validResults.map(r => r.scraperId));
     const expiredScraperIds = new Set(expiredScrapers);
@@ -199,10 +225,11 @@ class HybridCacheService {
     type: string,
     tmdbId: string,
     season?: number,
-    episode?: number
+    episode?: number,
+    userSettings?: { enableLocalScrapers?: boolean; enabledScrapers?: Set<string> }
   ): Promise<Stream[]> {
-    const { validResults } = await this.getCachedResults(type, tmdbId, season, episode);
-    
+    const { validResults } = await this.getCachedResults(type, tmdbId, season, episode, userSettings);
+
     // Flatten all valid streams
     const allStreams: Stream[] = [];
     for (const result of validResults) {

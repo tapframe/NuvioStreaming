@@ -879,8 +879,11 @@ class LocalScraperService {
       return;
     }
 
+    // Get current user settings for enabled scrapers
+    const userSettings = await this.getUserScraperSettings();
+
     // Check cache for existing results (hybrid: global first, then local)
-    const { validResults, expiredScrapers, allExpired, source } = await hybridCacheService.getCachedResults(type, tmdbId, season, episode);
+    const { validResults, expiredScrapers, allExpired, source } = await hybridCacheService.getCachedResults(type, tmdbId, season, episode, userSettings);
     
     // Immediately return cached results for valid scrapers
     if (validResults.length > 0) {
@@ -1352,6 +1355,46 @@ class LocalScraperService {
   async hasScrapers(): Promise<boolean> {
     await this.ensureInitialized();
     return Array.from(this.installedScrapers.values()).some(scraper => scraper.enabled);
+  }
+
+  // Get current user scraper settings for cache filtering
+  private async getUserScraperSettings(): Promise<{ enableLocalScrapers?: boolean; enabledScrapers?: Set<string> }> {
+    return this.getUserScraperSettingsWithOverride();
+  }
+
+  // Get user scraper settings (can be overridden for testing or external calls)
+  async getUserScraperSettingsWithOverride(overrideSettings?: { enableLocalScrapers?: boolean; enabledScrapers?: Set<string> }): Promise<{ enableLocalScrapers?: boolean; enabledScrapers?: Set<string> }> {
+    try {
+      // If override settings are provided, use them
+      if (overrideSettings) {
+        return {
+          enableLocalScrapers: overrideSettings.enableLocalScrapers,
+          enabledScrapers: overrideSettings.enabledScrapers
+        };
+      }
+
+      // Get user settings from AsyncStorage
+      const settingsData = await AsyncStorage.getItem('app_settings');
+      const settings = settingsData ? JSON.parse(settingsData) : {};
+
+      // Get enabled scrapers based on current user settings
+      const enabledScrapers = new Set<string>();
+      const installedScrapers = Array.from(this.installedScrapers.values());
+
+      for (const scraper of installedScrapers) {
+        if (scraper.enabled && settings.enableLocalScrapers) {
+          enabledScrapers.add(scraper.id);
+        }
+      }
+
+      return {
+        enableLocalScrapers: settings.enableLocalScrapers,
+        enabledScrapers: enabledScrapers.size > 0 ? enabledScrapers : undefined
+      };
+    } catch (error) {
+      logger.error('[LocalScraperService] Error getting user scraper settings:', error);
+      return { enableLocalScrapers: false };
+    }
   }
 
   // Cache management methods (hybrid: local + global)

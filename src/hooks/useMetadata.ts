@@ -1341,6 +1341,17 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
   useEffect(() => {
     if (!settingsLoaded) return;
+
+    // Check for cached streams immediately on mount
+    const checkAndLoadCachedStreams = async () => {
+      try {
+        // This will be handled by the StreamsScreen component
+        // The useMetadata hook focuses on metadata and episodes
+      } catch (error) {
+        if (__DEV__) console.log('[useMetadata] Error checking cached streams on mount:', error);
+      }
+    };
+
     loadMetadata();
   }, [id, type, settingsLoaded]);
 
