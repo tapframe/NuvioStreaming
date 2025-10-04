@@ -531,7 +531,7 @@ const LibraryScreen = () => {
                 type: 'movie',
                 poster: 'placeholder',
                 year: movie.year,
-                lastWatched: new Date(watchedMovie.last_watched_at).toLocaleDateString(),
+                lastWatched: watchedMovie.last_watched_at, // Store raw timestamp for sorting
                 plays: watchedMovie.plays,
                 imdbId: movie.ids.imdb,
                 traktId: movie.ids.trakt,
@@ -551,7 +551,7 @@ const LibraryScreen = () => {
                 type: 'series',
                 poster: 'placeholder',
                 year: show.year,
-                lastWatched: new Date(watchedShow.last_watched_at).toLocaleDateString(),
+                lastWatched: watchedShow.last_watched_at, // Store raw timestamp for sorting
                 plays: watchedShow.plays,
                 imdbId: show.ids.imdb,
                 traktId: show.ids.trakt,
@@ -573,7 +573,7 @@ const LibraryScreen = () => {
                 type: 'movie',
                 poster: 'placeholder',
                 year: item.movie.year,
-                lastWatched: new Date(item.paused_at).toLocaleDateString(),
+                lastWatched: item.paused_at, // Store raw timestamp for sorting
                 imdbId: item.movie.ids.imdb,
                 traktId: item.movie.ids.trakt,
                 images: item.movie.images,
@@ -585,7 +585,7 @@ const LibraryScreen = () => {
                 type: 'series',
                 poster: 'placeholder',
                 year: item.show.year,
-                lastWatched: new Date(item.paused_at).toLocaleDateString(),
+                lastWatched: item.paused_at, // Store raw timestamp for sorting
                 imdbId: item.show.ids.imdb,
                 traktId: item.show.ids.trakt,
                 images: item.show.images,
@@ -607,7 +607,7 @@ const LibraryScreen = () => {
                 type: 'movie',
                 poster: 'placeholder',
                 year: movie.year,
-                lastWatched: new Date(watchlistMovie.listed_at).toLocaleDateString(),
+                lastWatched: watchlistMovie.listed_at, // Store raw timestamp for sorting
                 imdbId: movie.ids.imdb,
                 traktId: movie.ids.trakt,
                 images: movie.images,
@@ -626,7 +626,7 @@ const LibraryScreen = () => {
                 type: 'series',
                 poster: 'placeholder',
                 year: show.year,
-                lastWatched: new Date(watchlistShow.listed_at).toLocaleDateString(),
+                lastWatched: watchlistShow.listed_at, // Store raw timestamp for sorting
                 imdbId: show.ids.imdb,
                 traktId: show.ids.trakt,
                 images: show.images,
@@ -648,7 +648,7 @@ const LibraryScreen = () => {
                 type: 'movie',
                 poster: 'placeholder',
                 year: movie.year,
-                lastWatched: new Date(collectionMovie.collected_at).toLocaleDateString(),
+                lastWatched: collectionMovie.collected_at, // Store raw timestamp for sorting
                 imdbId: movie.ids.imdb,
                 traktId: movie.ids.trakt,
                 images: movie.images,
@@ -667,7 +667,7 @@ const LibraryScreen = () => {
                 type: 'series',
                 poster: 'placeholder',
                 year: show.year,
-                lastWatched: new Date(collectionShow.collected_at).toLocaleDateString(),
+                lastWatched: collectionShow.collected_at, // Store raw timestamp for sorting
                 imdbId: show.ids.imdb,
                 traktId: show.ids.trakt,
                 images: show.images,
@@ -689,7 +689,7 @@ const LibraryScreen = () => {
                 type: 'movie',
                 poster: 'placeholder',
                 year: movie.year,
-                lastWatched: new Date(ratedItem.rated_at).toLocaleDateString(),
+                lastWatched: ratedItem.rated_at, // Store raw timestamp for sorting
                 rating: ratedItem.rating,
                 imdbId: movie.ids.imdb,
                 traktId: movie.ids.trakt,
@@ -703,7 +703,7 @@ const LibraryScreen = () => {
                 type: 'series',
                 poster: 'placeholder',
                 year: show.year,
-                lastWatched: new Date(ratedItem.rated_at).toLocaleDateString(),
+                lastWatched: ratedItem.rated_at, // Store raw timestamp for sorting
                 rating: ratedItem.rating,
                 imdbId: show.ids.imdb,
                 traktId: show.ids.trakt,
@@ -715,7 +715,7 @@ const LibraryScreen = () => {
         break;
     }
 
-    // Sort by last watched/added date (most recent first)
+    // Sort by last watched/added date (most recent first) using raw timestamps
     return items.sort((a, b) => {
       const dateA = a.lastWatched ? new Date(a.lastWatched).getTime() : 0;
       const dateB = b.lastWatched ? new Date(b.lastWatched).getTime() : 0;

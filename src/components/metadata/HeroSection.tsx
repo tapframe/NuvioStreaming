@@ -653,10 +653,10 @@ const WatchProgressDisplay = memo(({
             
       </View>
           
-          <Text style={[isTablet ? styles.tabletWatchProgressSubText : styles.watchProgressSubText, { 
+          <Text style={[isTablet ? styles.tabletWatchProgressSubText : styles.watchProgressSubText, {
             color: isCompleted ? 'rgba(0,255,136,0.7)' : currentTheme.colors.textMuted,
           }]}>
-            {progressData.episodeInfo} • Last watched {progressData.formattedTime}
+            {progressData.episodeInfo} • {progressData.formattedTime}
           </Text>
           
           {/* Trakt sync status with enhanced styling */}

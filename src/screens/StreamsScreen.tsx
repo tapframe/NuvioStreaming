@@ -705,25 +705,32 @@ export const StreamsScreen = () => {
     
   }, [loadingStreams, loadingEpisodeStreams, groupedStreams, episodeStreams, type]);
 
+  // Reset autoplay state when episode changes (but preserve fromPlayer logic)
+  useEffect(() => {
+    // Reset autoplay triggered state when episode changes
+    // This allows autoplay to work for each episode individually
+    setAutoplayTriggered(false);
+  }, [selectedEpisode]);
+
   // Reset the selected provider to 'all' if the current selection is no longer available
   // But preserve special filter values like 'grouped-plugins' and 'all'
   useEffect(() => {
     // Don't reset if it's a special filter value
     const isSpecialFilter = selectedProvider === 'all' || selectedProvider === 'grouped-plugins';
-    
+
     if (isSpecialFilter) {
       return; // Always preserve special filters
     }
-    
+
     // Check if provider exists in current streams data
     const currentStreamsData = metadata?.videos && metadata.videos.length > 1 && selectedEpisode ? episodeStreams : groupedStreams;
-    const hasStreamsForProvider = currentStreamsData[selectedProvider] && 
-                                 currentStreamsData[selectedProvider].streams && 
+    const hasStreamsForProvider = currentStreamsData[selectedProvider] &&
+                                 currentStreamsData[selectedProvider].streams &&
                                  currentStreamsData[selectedProvider].streams.length > 0;
-    
+
     // Only reset if the provider doesn't exist in available providers AND doesn't have streams
     const isAvailableProvider = availableProviders.has(selectedProvider);
-    
+
     if (!isAvailableProvider && !hasStreamsForProvider) {
       setSelectedProvider('all');
     }

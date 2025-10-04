@@ -797,7 +797,32 @@ export class TraktService {
 
     if (!response.ok) {
       const errorText = await response.text();
-      logger.error(`[TraktService] API Error ${response.status} for ${endpoint}:`, errorText);
+      
+      // Enhanced error logging for debugging
+      logger.error(`[TraktService] API Error ${response.status} for ${endpoint}:`, {
+        status: response.status,
+        statusText: response.statusText,
+        errorText: errorText,
+        requestBody: body ? JSON.stringify(body, null, 2) : 'No body',
+        headers: Object.fromEntries(response.headers.entries())
+      });
+      
+      // Handle 404 errors more gracefully - they might indicate content not found in Trakt
+      if (response.status === 404) {
+        logger.warn(`[TraktService] Content not found in Trakt database (404) for ${endpoint}. This might indicate:`);
+        logger.warn(`[TraktService] 1. Invalid IMDb ID: ${body?.movie?.ids?.imdb || body?.show?.ids?.imdb || 'N/A'}`);
+        logger.warn(`[TraktService] 2. Content not in Trakt database: ${body?.movie?.title || body?.show?.title || 'N/A'}`);
+        logger.warn(`[TraktService] 3. Authentication issues with token`);
+        
+        // Return a graceful response for 404s instead of throwing
+        return {
+          id: 0,
+          action: 'not_found',
+          progress: body?.progress || 0,
+          error: 'Content not found in Trakt database'
+        } as any;
+      }
+      
       throw new Error(`API request failed: ${response.status}`);
     }
 
@@ -1199,6 +1224,13 @@ export class TraktService {
    */
   public async startWatching(contentData: TraktContentData, progress: number): Promise<TraktScrobbleResponse | null> {
     try {
+      // Validate content data before making API call
+      const validation = this.validateContentData(contentData);
+      if (!validation.isValid) {
+        logger.error('[TraktService] Invalid content data for start watching:', validation.errors);
+        return null;
+      }
+
       const payload = await this.buildScrobblePayload(contentData, progress);
       if (!payload) {
         return null;
@@ -1216,6 +1248,13 @@ export class TraktService {
    */
   public async pauseWatching(contentData: TraktContentData, progress: number): Promise<TraktScrobbleResponse | null> {
     try {
+      // Validate content data before making API call
+      const validation = this.validateContentData(contentData);
+      if (!validation.isValid) {
+        logger.error('[TraktService] Invalid content data for pause watching:', validation.errors);
+        return null;
+      }
+
       const payload = await this.buildScrobblePayload(contentData, progress);
       if (!payload) {
         return null;
@@ -1233,6 +1272,13 @@ export class TraktService {
    */
   public async stopWatching(contentData: TraktContentData, progress: number): Promise<TraktScrobbleResponse | null> {
     try {
+      // Validate content data before making API call
+      const validation = this.validateContentData(contentData);
+      if (!validation.isValid) {
+        logger.error('[TraktService] Invalid content data for stop watching:', validation.errors);
+        return null;
+      }
+
       const payload = await this.buildScrobblePayload(contentData, progress);
       if (!payload) {
         return null;
@@ -1255,11 +1301,72 @@ export class TraktService {
   }
 
   /**
+   * Validate content data before making API calls
+   */
+  private validateContentData(contentData: TraktContentData): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+    
+    if (!contentData.type || !['movie', 'episode'].includes(contentData.type)) {
+      errors.push('Invalid content type');
+    }
+    
+    if (!contentData.title || contentData.title.trim() === '') {
+      errors.push('Missing or empty title');
+    }
+    
+    if (!contentData.imdbId || contentData.imdbId.trim() === '') {
+      errors.push('Missing or empty IMDb ID');
+    }
+    
+    if (contentData.type === 'episode') {
+      if (!contentData.season || contentData.season < 1) {
+        errors.push('Invalid season number');
+      }
+      if (!contentData.episode || contentData.episode < 1) {
+        errors.push('Invalid episode number');
+      }
+      if (!contentData.showTitle || contentData.showTitle.trim() === '') {
+        errors.push('Missing or empty show title');
+      }
+      if (!contentData.showYear || contentData.showYear < 1900) {
+        errors.push('Invalid show year');
+      }
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  }
+
+  /**
    * Build scrobble payload for API requests
    */
   private async buildScrobblePayload(contentData: TraktContentData, progress: number): Promise<any | null> {
     try {
+      // Enhanced debug logging for payload building
+      logger.log('[TraktService] Building scrobble payload:', {
+        type: contentData.type,
+        title: contentData.title,
+        imdbId: contentData.imdbId,
+        year: contentData.year,
+        season: contentData.season,
+        episode: contentData.episode,
+        showTitle: contentData.showTitle,
+        showYear: contentData.showYear,
+        showImdbId: contentData.showImdbId,
+        progress: progress
+      });
+
       if (contentData.type === 'movie') {
+        if (!contentData.imdbId || !contentData.title) {
+          logger.error('[TraktService] Missing movie data for scrobbling:', {
+            imdbId: contentData.imdbId,
+            title: contentData.title
+          });
+          return null;
+        }
+
         // Clean IMDB ID - some APIs want it without 'tt' prefix
         const cleanImdbId = contentData.imdbId.startsWith('tt') 
           ? contentData.imdbId.substring(2) 
@@ -1276,11 +1383,16 @@ export class TraktService {
           progress: Math.round(progress * 100) / 100 // Round to 2 decimal places
         };
         
-        // Movie payload logging removed
+        logger.log('[TraktService] Movie payload built:', payload);
         return payload;
       } else if (contentData.type === 'episode') {
         if (!contentData.season || !contentData.episode || !contentData.showTitle || !contentData.showYear) {
-          logger.error('[TraktService] Missing episode data for scrobbling');
+          logger.error('[TraktService] Missing episode data for scrobbling:', {
+            season: contentData.season,
+            episode: contentData.episode,
+            showTitle: contentData.showTitle,
+            showYear: contentData.showYear
+          });
           return null;
         }
 
@@ -1318,7 +1430,7 @@ export class TraktService {
           payload.episode.ids.imdb = cleanEpisodeImdbId;
         }
 
-        // Episode payload logging removed
+        logger.log('[TraktService] Episode payload built:', payload);
         return payload;
       }
 
