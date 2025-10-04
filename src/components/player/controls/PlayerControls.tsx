@@ -30,6 +30,7 @@ interface PlayerControlsProps {
   skip: (seconds: number) => void;
   handleClose: () => void;
   cycleAspectRatio: () => void;
+  cyclePlaybackSpeed: () => void;
   setShowAudioModal: (show: boolean) => void;
   setShowSubtitleModal: (show: boolean) => void;
   isSubtitleModalOpen?: boolean;
@@ -66,6 +67,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   skip,
   handleClose,
   cycleAspectRatio,
+  cyclePlaybackSpeed,
   setShowAudioModal,
   setShowSubtitleModal,
   isSubtitleModalOpen,
@@ -174,6 +176,14 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                      currentResizeMode.charAt(0).toUpperCase() + currentResizeMode.slice(1)) :
                     (zoomScale === 1.1 ? 'Fill' : 'Cover')
                   }
+                </Text>
+              </TouchableOpacity>
+
+              {/* Playback Speed Button */}
+              <TouchableOpacity style={styles.bottomButton} onPress={cyclePlaybackSpeed}>
+                <Ionicons name="speedometer" size={20} color="white" />
+                <Text style={styles.bottomButtonText}>
+                  Speed
                 </Text>
               </TouchableOpacity>
 
