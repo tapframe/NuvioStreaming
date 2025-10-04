@@ -98,7 +98,6 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
   }));
 
 function formatRuntime(runtime: string): string {
-  // Match formats like "1h55min" or "2h 7min" and convert to "1H 55M" or "2H 7M"
   // Try to match formats like "1h55min", "2h 7min", "125 min", etc.
   const match = runtime.match(/(?:(\d+)\s*h\s*)?(\d+)\s*min/i);
   if (match) {
