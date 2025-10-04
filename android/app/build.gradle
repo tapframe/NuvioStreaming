@@ -93,8 +93,8 @@ android {
         applicationId 'com.nuvio.app'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 17
-        versionName "1.2.2"
+        versionCode 18
+        versionName "1.2.3"
     }
     
     splits {
