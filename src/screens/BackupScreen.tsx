@@ -1,0 +1,358 @@
+import React, { useState, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  Platform,
+  SafeAreaView,
+  StatusBar,
+  ScrollView,
+} from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
+import * as Sharing from 'expo-sharing';
+import { useNavigation } from '@react-navigation/native';
+import { backupService, BackupOptions } from '../services/backupService';
+import { useTheme } from '../contexts/ThemeContext';
+import { logger } from '../utils/logger';
+import CustomAlert from '../components/CustomAlert';
+
+const BackupScreen: React.FC = () => {
+  const { currentTheme } = useTheme();
+  const [isLoading, setIsLoading] = useState(false);
+  const navigation = useNavigation();
+
+  // Alert state
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertActions, setAlertActions] = useState<Array<{ label: string; onPress: () => void; style?: object }>>([]);
+
+  const openAlert = (
+    title: string,
+    message: string,
+    actions?: Array<{ label: string; onPress: () => void; style?: object }>
+  ) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertActions(actions && actions.length > 0 ? actions : [{ label: 'OK', onPress: () => {} }]);
+    setAlertVisible(true);
+  };
+
+  // Create backup
+  const handleCreateBackup = useCallback(async () => {
+    try {
+      // First, get backup preview to show what will be backed up
+      setIsLoading(true);
+      const preview = await backupService.getBackupPreview();
+      setIsLoading(false);
+
+      // Calculate total without downloads
+      const totalWithoutDownloads = preview.library + preview.watchProgress + preview.addons + preview.scrapers;
+
+      openAlert(
+        'Create Backup',
+        `Backup Contents:\n\n` +
+        `Library: ${preview.library} items\n` +
+        `Watch Progress: ${preview.watchProgress} entries\n` +
+        `Addons: ${preview.addons} installed\n` +
+        `Plugins: ${preview.scrapers} configurations\n\n` +
+        `Total: ${totalWithoutDownloads} items\n\n` +
+        `This backup includes all your app settings, themes, and integration data.`,
+        [
+          { label: 'Cancel', onPress: () => {} },
+          {
+            label: 'Create Backup',
+            onPress: async () => {
+              try {
+                setIsLoading(true);
+
+                const backupOptions: BackupOptions = {
+                  includeLibrary: true,
+                  includeWatchProgress: true,
+                  includeDownloads: true,
+                  includeAddons: true,
+                  includeSettings: true,
+                  includeTraktData: true,
+                  includeLocalScrapers: true,
+                };
+
+                const fileUri = await backupService.createBackup(backupOptions);
+
+                // Share the backup file
+                if (await Sharing.isAvailableAsync()) {
+                  await Sharing.shareAsync(fileUri, {
+                    mimeType: 'application/json',
+                    dialogTitle: 'Share Nuvio Backup',
+                  });
+                }
+
+                openAlert(
+                  'Backup Created',
+                  'Your backup has been created and is ready to share.',
+                  [{ label: 'OK', onPress: () => {} }]
+                );
+              } catch (error) {
+                logger.error('[BackupScreen] Failed to create backup:', error);
+                openAlert(
+                  'Backup Failed',
+                  `Failed to create backup: ${error instanceof Error ? error.message : String(error)}`,
+                  [{ label: 'OK', onPress: () => {} }]
+                );
+              } finally {
+                setIsLoading(false);
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      logger.error('[BackupScreen] Failed to get backup preview:', error);
+      openAlert(
+        'Error',
+        'Failed to prepare backup information. Please try again.',
+        [{ label: 'OK', onPress: () => {} }]
+      );
+      setIsLoading(false);
+    }
+  }, [openAlert]);
+
+  // Restore backup
+  const handleRestoreBackup = useCallback(async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/json',
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled || !result.assets?.[0]) {
+        return;
+      }
+
+      const fileUri = result.assets[0].uri;
+
+      // Validate backup file
+      const backupInfo = await backupService.getBackupInfo(fileUri);
+
+      openAlert(
+        'Confirm Restore',
+        `This will restore your data from a backup created on ${new Date(backupInfo.timestamp || 0).toLocaleDateString()}.\n\nThis action will overwrite your current data. Are you sure you want to continue?`,
+        [
+          { label: 'Cancel', onPress: () => {} },
+          {
+            label: 'Restore',
+            onPress: async () => {
+              try {
+                setIsLoading(true);
+
+                const restoreOptions: BackupOptions = {
+                  includeLibrary: true,
+                  includeWatchProgress: true,
+                  includeDownloads: true,
+                  includeAddons: true,
+                  includeSettings: true,
+                  includeTraktData: true,
+                  includeLocalScrapers: true,
+                };
+
+                await backupService.restoreBackup(fileUri, restoreOptions);
+
+                openAlert(
+                  'Restore Complete',
+                  'Your data has been successfully restored. Please restart the app to see all changes.',
+                  [{ label: 'OK', onPress: () => {} }]
+                );
+              } catch (error) {
+                logger.error('[BackupScreen] Failed to restore backup:', error);
+                openAlert(
+                  'Restore Failed',
+                  `Failed to restore backup: ${error instanceof Error ? error.message : String(error)}`,
+                  [{ label: 'OK', onPress: () => {} }]
+                );
+              } finally {
+                setIsLoading(false);
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      logger.error('[BackupScreen] Failed to pick backup file:', error);
+      openAlert(
+        'File Selection Failed',
+        `Failed to select backup file: ${error instanceof Error ? error.message : String(error)}`,
+        [{ label: 'OK', onPress: () => {} }]
+      );
+    }
+  }, [openAlert]);
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
+      <StatusBar barStyle="light-content" />
+
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <MaterialIcons name="chevron-left" size={28} color={currentTheme.colors.white} />
+          <Text style={[styles.backText, { color: currentTheme.colors.primary }]}>Settings</Text>
+        </TouchableOpacity>
+        
+        <View style={styles.headerActions}>
+          {/* Empty for now, but keeping structure consistent */}
+        </View>
+      </View>
+      
+      <Text style={[styles.headerTitle, { color: currentTheme.colors.white }]}>
+        Backup & Restore
+      </Text>
+
+      {/* Content */}
+      <ScrollView 
+        style={styles.scrollView} 
+        showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="automatic"
+      >
+        <View style={styles.content}>
+          <CustomAlert
+            visible={alertVisible}
+            title={alertTitle}
+            message={alertMessage}
+            actions={alertActions}
+            onClose={() => setAlertVisible(false)}
+          />
+
+          {/* Backup Actions */}
+          <View style={[styles.section, { backgroundColor: currentTheme.colors.elevation1 }]}>
+            <Text style={[styles.sectionTitle, { color: currentTheme.colors.highEmphasis }]}>
+              Backup & Restore
+            </Text>
+
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                {
+                  backgroundColor: currentTheme.colors.primary,
+                  opacity: isLoading ? 0.6 : 1
+                }
+              ]}
+              onPress={handleCreateBackup}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator color="white" size="small" />
+              ) : (
+                <>
+                  <MaterialIcons name="backup" size={20} color="white" />
+                  <Text style={styles.actionButtonText}>Create Backup</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                {
+                  backgroundColor: currentTheme.colors.secondary,
+                  opacity: isLoading ? 0.6 : 1
+                }
+              ]}
+              onPress={handleRestoreBackup}
+              disabled={isLoading}
+            >
+              <MaterialIcons name="restore" size={20} color="white" />
+              <Text style={styles.actionButtonText}>Restore from Backup</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Info Section */}
+          <View style={[styles.section, { backgroundColor: currentTheme.colors.elevation1 }]}>
+            <Text style={[styles.sectionTitle, { color: currentTheme.colors.highEmphasis }]}>
+              About Backups
+            </Text>
+            <Text style={[styles.infoText, { color: currentTheme.colors.mediumEmphasis }]}>
+              • Backups include all your data: library, watch progress, settings, addons, downloads, and plugins{'\n'}
+              • Backup files are stored locally on your device{'\n'}
+              • Share your backup to transfer data between devices{'\n'}
+              • Restoring will overwrite your current data
+            </Text>
+          </View>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 8 : 8,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+  },
+  backText: {
+    fontSize: 17,
+    fontWeight: '400',
+  },
+  headerTitle: {
+    fontSize: 34,
+    fontWeight: '700',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    paddingTop: 8,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    padding: 16,
+  },
+  section: {
+    marginBottom: 16,
+    borderRadius: 12,
+    padding: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  actionButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  infoText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+});
+
+export default BackupScreen;

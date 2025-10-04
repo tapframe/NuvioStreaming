@@ -52,11 +52,13 @@ import CastMoviesScreen from '../screens/CastMoviesScreen';
 import UpdateScreen from '../screens/UpdateScreen';
 import AISettingsScreen from '../screens/AISettingsScreen';
 import AIChatScreen from '../screens/AIChatScreen';
+import BackupScreen from '../screens/BackupScreen';
 
 // Stack navigator types
 export type RootStackParamList = {
   Onboarding: undefined;
   MainTabs: undefined;
+  Backup: undefined;
   Home: undefined;
   Library: undefined;
   Settings: undefined;
@@ -1312,9 +1314,25 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen 
-              name="AISettings" 
+            <Stack.Screen
+              name="AISettings"
               component={AISettingsScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
+                animationDuration: Platform.OS === 'android' ? 250 : 300,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+
+            <Stack.Screen
+              name="Backup"
+              component={BackupScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,

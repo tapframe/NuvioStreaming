@@ -49,6 +49,7 @@ const SETTINGS_CATEGORIES = [
   { id: 'integrations', title: 'Integrations', icon: 'extension' as keyof typeof MaterialIcons.glyphMap },
   { id: 'ai', title: 'AI Assistant', icon: 'smart-toy' as keyof typeof MaterialIcons.glyphMap },
   { id: 'playback', title: 'Playback', icon: 'play-circle-outline' as keyof typeof MaterialIcons.glyphMap },
+  { id: 'backup', title: 'Backup & Restore', icon: 'save' as keyof typeof MaterialIcons.glyphMap },
   { id: 'updates', title: 'Updates', icon: 'system-update' as keyof typeof MaterialIcons.glyphMap },
   { id: 'about', title: 'About', icon: 'info-outline' as keyof typeof MaterialIcons.glyphMap },
   { id: 'developer', title: 'Developer', icon: 'code' as keyof typeof MaterialIcons.glyphMap },
@@ -197,7 +198,7 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, c
           Settings
         </Text>
       </View>
-      
+
       <ScrollView style={styles.sidebarContent} showsVerticalScrollIndicator={false}>
         {categories.map((category) => (
           <TouchableOpacity
@@ -431,6 +432,8 @@ const SettingsScreen: React.FC = () => {
     if (category.id === 'cache' && !mdblistKeySet) return false;
     return true;
   });
+
+
 
   const renderCategoryContent = (categoryId: string) => {
     switch (categoryId) {
@@ -746,6 +749,21 @@ const SettingsScreen: React.FC = () => {
           </SettingsCard>
         ) : null;
 
+      case 'backup':
+        return (
+          <SettingsCard title="BACKUP & RESTORE" isTablet={isTablet}>
+            <SettingItem
+              title="Backup & Restore"
+              description="Create and restore app backups"
+              icon="backup"
+              renderControl={ChevronRight}
+              onPress={() => navigation.navigate('Backup')}
+              isLast={true}
+              isTablet={isTablet}
+            />
+          </SettingsCard>
+        );
+
       case 'updates':
         return (
           <SettingsCard title="UPDATES" isTablet={isTablet}>
@@ -881,6 +899,7 @@ const SettingsScreen: React.FC = () => {
             {renderCategoryContent('integrations')}
             {renderCategoryContent('ai')}
             {renderCategoryContent('playback')}
+            {renderCategoryContent('backup')}
             {renderCategoryContent('updates')}
             {renderCategoryContent('about')}
             {renderCategoryContent('developer')}
