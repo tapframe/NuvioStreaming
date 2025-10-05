@@ -169,7 +169,7 @@ const CompactCommentCard: React.FC<{
       <View style={[styles.commentContainer, shouldBlurContent ? styles.blurredContent : undefined]}>
         <Text
           style={[styles.compactComment, { color: theme.colors.highEmphasis }]}
-          numberOfLines={shouldBlurContent ? 3 : undefined}
+          numberOfLines={3}
           ellipsizeMode="tail"
         >
           {shouldBlurContent ? '⚠️ This comment contains spoilers. Tap to reveal.' : truncatedComment}
@@ -286,7 +286,7 @@ const ExpandedCommentBottomSheet: React.FC<{
         }
       }}
       index={-1}
-      snapPoints={[200, '50%', '90%']}
+      snapPoints={[200, '50%', '70%']}
       enableDynamicSizing={false}
       keyboardBehavior="interactive"
       android_keyboardInputMode="adjustResize"
@@ -316,7 +316,11 @@ const ExpandedCommentBottomSheet: React.FC<{
           {/* User Info */}
           <View style={styles.modalHeader}>
             <View style={styles.userInfo}>
-              <Text style={[styles.modalUsername, { color: theme.colors.highEmphasis }]}>
+              <Text
+                style={[styles.modalUsername, { color: theme.colors.highEmphasis }]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
                 {username}
               </Text>
               {user.vip && (
@@ -355,16 +359,17 @@ const ExpandedCommentBottomSheet: React.FC<{
           {/* Full Comment */}
           {shouldBlurModalContent ? (
             <View style={styles.spoilerContainer}>
-              <Text style={[styles.spoilerWarning, { color: theme.colors.error }]}>
-                ⚠️ This comment contains spoilers
-              </Text>
+              <View style={[styles.spoilerIcon, { backgroundColor: theme.colors.card }]}>
+                <MaterialIcons name="visibility-off" size={20} color={theme.colors.mediumEmphasis} />
+              </View>
+              <Text style={[styles.spoilerTitle, { color: theme.colors.highEmphasis }]}>Contains spoilers</Text>
               <TouchableOpacity
-                style={[styles.revealButton, { backgroundColor: theme.colors.primary }]}
+                style={[styles.revealButton, { borderColor: theme.colors.primary }]}
                 onPress={onSpoilerPress}
+                activeOpacity={0.9}
               >
-                <Text style={[styles.revealButtonText, { color: theme.colors.white }]}>
-                  Reveal Spoilers
-                </Text>
+                <MaterialIcons name="visibility" size={18} color={theme.colors.primary} />
+                <Text style={[styles.revealButtonText, { color: theme.colors.primary }]}>Reveal</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -660,7 +665,7 @@ export const CommentBottomSheet: React.FC<{
         }
       }}
       index={sheetIndex}
-      snapPoints={[200, '50%', '90%']}
+      snapPoints={[200, '50%', '70%']}
       enableDynamicSizing={false}
       keyboardBehavior="interactive"
       android_keyboardInputMode="adjustResize"
@@ -685,7 +690,11 @@ export const CommentBottomSheet: React.FC<{
           {/* User Info */}
           <View style={styles.modalHeader}>
             <View style={styles.userInfo}>
-              <Text style={[styles.modalUsername, { color: theme.colors.highEmphasis }]}>
+              <Text
+                style={[styles.modalUsername, { color: theme.colors.highEmphasis }]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
                 {username}
               </Text>
               {user.vip && (
@@ -724,16 +733,17 @@ export const CommentBottomSheet: React.FC<{
           {/* Full Comment */}
           {shouldBlurModalContent ? (
             <View style={styles.spoilerContainer}>
-              <Text style={[styles.spoilerWarning, { color: theme.colors.error }]}>
-                ⚠️ This comment contains spoilers
-              </Text>
+              <View style={[styles.spoilerIcon, { backgroundColor: theme.colors.card }]}>
+                <MaterialIcons name="visibility-off" size={20} color={theme.colors.mediumEmphasis} />
+              </View>
+              <Text style={[styles.spoilerTitle, { color: theme.colors.highEmphasis }]}>Contains spoilers</Text>
               <TouchableOpacity
-                style={[styles.revealButton, { backgroundColor: theme.colors.primary }]}
+                style={[styles.revealButton, { borderColor: theme.colors.primary }]}
                 onPress={onSpoilerPress}
+                activeOpacity={0.9}
               >
-                <Text style={[styles.revealButtonText, { color: theme.colors.white }]}>
-                  Reveal Spoilers
-                </Text>
+                <MaterialIcons name="visibility" size={18} color={theme.colors.primary} />
+                <Text style={[styles.revealButtonText, { color: theme.colors.primary }]}>Reveal</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -791,8 +801,9 @@ const styles = StyleSheet.create({
   },
   compactCard: {
     width: 280,
-    height: 160,
+    height: 170,
     padding: 12,
+    paddingBottom: 16,
     marginRight: 12,
     borderRadius: 12,
     borderWidth: 1,
@@ -854,7 +865,7 @@ const styles = StyleSheet.create({
   },
   compactComment: {
     fontSize: 14,
-    lineHeight: 20,
+    lineHeight: 18,
   },
   blurredContent: {
     opacity: 0.3,
@@ -866,6 +877,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: 'auto',
+    paddingTop: 6,
   },
   compactBadges: {
     flexDirection: 'row',
@@ -1066,7 +1079,8 @@ const styles = StyleSheet.create({
   modalUsername: {
     fontSize: 18,
     fontWeight: '600',
-    flex: 1,
+    flexShrink: 1,
+    marginRight: 8,
   },
   modalDate: {
     fontSize: 12,
@@ -1107,21 +1121,33 @@ const styles = StyleSheet.create({
   },
   spoilerContainer: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: 16,
   },
-  spoilerWarning: {
-    fontSize: 16,
+  spoilerIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  spoilerTitle: {
+    fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   revealButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
   },
   revealButtonText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
   modalMeta: {
