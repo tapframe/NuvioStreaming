@@ -1,13 +1,12 @@
 import { localScraperCacheService, CachedScraperResult } from './localScraperCacheService';
-import { supabaseGlobalCacheService, GlobalCachedScraperResult } from './supabaseGlobalCacheService';
 import { logger } from '../utils/logger';
 import { Stream } from '../types/streams';
 
 export interface HybridCacheResult {
-  validResults: Array<CachedScraperResult | GlobalCachedScraperResult>;
+  validResults: Array<CachedScraperResult>;
   expiredScrapers: string[];
   allExpired: boolean;
-  source: 'local' | 'global' | 'hybrid';
+  source: 'local';
 }
 
 export interface HybridCacheStats {
@@ -17,23 +16,11 @@ export interface HybridCacheStats {
     oldestEntry: number | null;
     newestEntry: number | null;
   };
-  global: {
-    totalEntries: number;
-    totalSize: number;
-    oldestEntry: number | null;
-    newestEntry: number | null;
-    hitRate: number;
-  };
-  combined: {
-    totalEntries: number;
-    hitRate: number;
-  };
 }
 
 class HybridCacheService {
   private static instance: HybridCacheService;
-  private readonly ENABLE_GLOBAL_CACHE = true; // Can be made configurable
-  private readonly FALLBACK_TO_LOCAL = true; // Fallback to local if global fails
+  // Global caching removed; local-only
 
   private constructor() {}
 
@@ -45,7 +32,7 @@ class HybridCacheService {
   }
 
   /**
-   * Get cached results with hybrid approach (global first, then local)
+   * Get cached results (local-only)
    */
   async getCachedResults(
     type: string,
@@ -65,56 +52,20 @@ class HybridCacheService {
         return true;
       };
 
-      // Try global cache first if enabled
-      if (this.ENABLE_GLOBAL_CACHE) {
-        try {
-          const globalResults = await supabaseGlobalCacheService.getCachedResults(type, tmdbId, season, episode);
+      // Local cache only
+      const localResults = await localScraperCacheService.getCachedResults(type, tmdbId, season, episode);
 
-          // Filter results based on user settings
-          const filteredGlobalResults = {
-            ...globalResults,
-            validResults: globalResults.validResults.filter(result => isScraperEnabled(result.scraperId)),
-            expiredScrapers: globalResults.expiredScrapers.filter(scraperId => isScraperEnabled(scraperId))
-          };
+      // Filter results based on user settings
+      const filteredLocalResults = {
+        ...localResults,
+        validResults: localResults.validResults.filter(result => isScraperEnabled(result.scraperId)),
+        expiredScrapers: localResults.expiredScrapers.filter(scraperId => isScraperEnabled(scraperId))
+      };
 
-          if (filteredGlobalResults.validResults.length > 0) {
-            logger.log(`[HybridCache] Using global cache: ${filteredGlobalResults.validResults.length} results (filtered from ${globalResults.validResults.length})`);
-            return {
-              ...filteredGlobalResults,
-              source: 'global'
-            };
-          }
-        } catch (error) {
-          logger.warn('[HybridCache] Global cache failed, falling back to local:', error);
-        }
-      }
-
-      // Fallback to local cache
-      if (this.FALLBACK_TO_LOCAL) {
-        const localResults = await localScraperCacheService.getCachedResults(type, tmdbId, season, episode);
-
-        // Filter results based on user settings
-        const filteredLocalResults = {
-          ...localResults,
-          validResults: localResults.validResults.filter(result => isScraperEnabled(result.scraperId)),
-          expiredScrapers: localResults.expiredScrapers.filter(scraperId => isScraperEnabled(scraperId))
-        };
-
-        if (filteredLocalResults.validResults.length > 0) {
-          logger.log(`[HybridCache] Using local cache: ${filteredLocalResults.validResults.length} results (filtered from ${localResults.validResults.length})`);
-          return {
-            ...filteredLocalResults,
-            source: 'local'
-          };
-        }
-      }
-
-      // No valid results found
+      logger.log(`[HybridCache] Using local cache: ${filteredLocalResults.validResults.length} results (filtered from ${localResults.validResults.length})`);
       return {
-        validResults: [],
-        expiredScrapers: [],
-        allExpired: true,
-        source: 'hybrid'
+        ...filteredLocalResults,
+        source: 'local'
       };
 
     } catch (error) {
@@ -123,13 +74,13 @@ class HybridCacheService {
         validResults: [],
         expiredScrapers: [],
         allExpired: true,
-        source: 'hybrid'
+        source: 'local'
       };
     }
   }
 
   /**
-   * Cache results in both local and global cache
+   * Cache results (local-only)
    */
   async cacheResults(
     type: string,
@@ -144,7 +95,7 @@ class HybridCacheService {
     episode?: number
   ): Promise<void> {
     try {
-      // Cache in local storage first (fastest)
+      // Cache in local storage
       const localPromises = results.map(result => 
         localScraperCacheService.cacheScraperResult(
           type, tmdbId, result.scraperId, result.scraperName, 
@@ -152,17 +103,7 @@ class HybridCacheService {
         )
       );
       await Promise.all(localPromises);
-
-      // Cache in global storage (shared across users)
-      if (this.ENABLE_GLOBAL_CACHE) {
-        try {
-          await supabaseGlobalCacheService.cacheResults(type, tmdbId, results, season, episode);
-          logger.log(`[HybridCache] Cached ${results.length} results in both local and global cache`);
-        } catch (error) {
-          logger.warn('[HybridCache] Failed to cache in global storage:', error);
-          // Local cache succeeded, so we continue
-        }
-      }
+      logger.log(`[HybridCache] Cached ${results.length} results in local cache`);
 
     } catch (error) {
       logger.error('[HybridCache] Error caching results:', error);
@@ -242,7 +183,7 @@ class HybridCacheService {
   }
 
   /**
-   * Invalidate cache for specific content
+   * Invalidate cache for specific content (local-only)
    */
   async invalidateContent(
     type: string,
@@ -251,18 +192,7 @@ class HybridCacheService {
     episode?: number
   ): Promise<void> {
     try {
-      // Invalidate both local and global cache
-      const promises = [
-        localScraperCacheService.invalidateContent(type, tmdbId, season, episode)
-      ];
-
-      if (this.ENABLE_GLOBAL_CACHE) {
-        promises.push(
-          supabaseGlobalCacheService.invalidateContent(type, tmdbId, season, episode)
-        );
-      }
-
-      await Promise.all(promises);
+      await localScraperCacheService.invalidateContent(type, tmdbId, season, episode);
       logger.log(`[HybridCache] Invalidated cache for ${type}:${tmdbId}`);
     } catch (error) {
       logger.error('[HybridCache] Error invalidating cache:', error);
@@ -270,22 +200,11 @@ class HybridCacheService {
   }
 
   /**
-   * Invalidate cache for specific scraper
+   * Invalidate cache for specific scraper (local-only)
    */
   async invalidateScraper(scraperId: string): Promise<void> {
     try {
-      // Invalidate both local and global cache
-      const promises = [
-        localScraperCacheService.invalidateScraper(scraperId)
-      ];
-
-      if (this.ENABLE_GLOBAL_CACHE) {
-        promises.push(
-          supabaseGlobalCacheService.invalidateScraper(scraperId)
-        );
-      }
-
-      await Promise.all(promises);
+      await localScraperCacheService.invalidateScraper(scraperId);
       logger.log(`[HybridCache] Invalidated cache for scraper ${scraperId}`);
     } catch (error) {
       logger.error('[HybridCache] Error invalidating scraper cache:', error);
@@ -293,113 +212,43 @@ class HybridCacheService {
   }
 
   /**
-   * Clear all cached results
+   * Clear all cached results (local-only)
    */
   async clearAllCache(): Promise<void> {
     try {
-      // Clear both local and global cache
-      const promises = [
-        localScraperCacheService.clearAllCache()
-      ];
-
-      if (this.ENABLE_GLOBAL_CACHE) {
-        promises.push(
-          supabaseGlobalCacheService.clearAllCache()
-        );
-      }
-
-      await Promise.all(promises);
-      logger.log('[HybridCache] Cleared all cache (local and global)');
+      await localScraperCacheService.clearAllCache();
+      logger.log('[HybridCache] Cleared all local cache');
     } catch (error) {
       logger.error('[HybridCache] Error clearing cache:', error);
     }
   }
 
   /**
-   * Get combined cache statistics
+   * Get cache statistics (local-only)
    */
   async getCacheStats(): Promise<HybridCacheStats> {
     try {
-      const [localStats, globalStats] = await Promise.all([
-        localScraperCacheService.getCacheStats(),
-        this.ENABLE_GLOBAL_CACHE ? supabaseGlobalCacheService.getCacheStats() : Promise.resolve({
-          totalEntries: 0,
-          totalSize: 0,
-          oldestEntry: null,
-          newestEntry: null,
-          hitRate: 0
-        })
-      ]);
-
-      return {
-        local: localStats,
-        global: globalStats,
-        combined: {
-          totalEntries: localStats.totalEntries + globalStats.totalEntries,
-          hitRate: globalStats.hitRate // Global cache hit rate is more meaningful
-        }
-      };
+      const localStats = await localScraperCacheService.getCacheStats();
+      return { local: localStats };
     } catch (error) {
       logger.error('[HybridCache] Error getting cache stats:', error);
-      return {
-        local: { totalEntries: 0, totalSize: 0, oldestEntry: null, newestEntry: null },
-        global: { totalEntries: 0, totalSize: 0, oldestEntry: null, newestEntry: null, hitRate: 0 },
-        combined: { totalEntries: 0, hitRate: 0 }
-      };
+      return { local: { totalEntries: 0, totalSize: 0, oldestEntry: null, newestEntry: null } };
     }
   }
 
   /**
-   * Clean up old entries in both caches
+   * Clean up old entries (local-only)
    */
   async cleanupOldEntries(): Promise<void> {
     try {
-      const promises = [
-        localScraperCacheService.clearAllCache() // Local cache handles cleanup automatically
-      ];
-
-      if (this.ENABLE_GLOBAL_CACHE) {
-        promises.push(
-          supabaseGlobalCacheService.cleanupOldEntries()
-        );
-      }
-
-      await Promise.all(promises);
+      await localScraperCacheService.clearAllCache();
       logger.log('[HybridCache] Cleaned up old entries');
     } catch (error) {
       logger.error('[HybridCache] Error cleaning up old entries:', error);
     }
   }
 
-  /**
-   * Get cache configuration
-   */
-  getConfig(): {
-    enableGlobalCache: boolean;
-    fallbackToLocal: boolean;
-  } {
-    return {
-      enableGlobalCache: this.ENABLE_GLOBAL_CACHE,
-      fallbackToLocal: this.FALLBACK_TO_LOCAL
-    };
-  }
-
-  /**
-   * Update cache configuration
-   */
-  updateConfig(config: {
-    enableGlobalCache?: boolean;
-    fallbackToLocal?: boolean;
-  }): void {
-    if (config.enableGlobalCache !== undefined) {
-      (this as any).ENABLE_GLOBAL_CACHE = config.enableGlobalCache;
-    }
-    if (config.fallbackToLocal !== undefined) {
-      (this as any).FALLBACK_TO_LOCAL = config.fallbackToLocal;
-    }
-    
-    logger.log('[HybridCache] Configuration updated:', this.getConfig());
-  }
+  // Configuration APIs removed; local-only
 }
 
 export const hybridCacheService = HybridCacheService.getInstance();

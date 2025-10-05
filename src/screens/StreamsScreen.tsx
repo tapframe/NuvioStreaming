@@ -37,11 +37,10 @@ import { useMetadata } from '../hooks/useMetadata';
 import { useMetadataAssets } from '../hooks/useMetadataAssets';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTrailer } from '../contexts/TrailerContext';
-import { Stream, GroupedStreams } from '../types/metadata';
+import { Stream } from '../types/metadata';
 import { tmdbService } from '../services/tmdbService';
 import { stremioService } from '../services/stremioService';
 import { localScraperService } from '../services/localScraperService';
-import { hybridCacheService } from '../services/hybridCacheService';
 import { VideoPlayerService } from '../services/videoPlayerService';
 import { useSettings } from '../hooks/useSettings';
 import QualityBadge from '../components/metadata/QualityBadge';
@@ -736,51 +735,7 @@ export const StreamsScreen = () => {
     }
   }, [selectedProvider, availableProviders, episodeStreams, groupedStreams, type]);
 
-  // Check for cached results immediately on mount
-  useEffect(() => {
-    const checkCachedResults = async () => {
-      if (!settings.enableLocalScrapers) return;
-
-      try {
-        let season: number | undefined;
-        let episode: number | undefined;
-
-        if (episodeId && episodeId.includes(':')) {
-          const parts = episodeId.split(':');
-          if (parts.length >= 3) {
-            season = parseInt(parts[1], 10);
-            episode = parseInt(parts[2], 10);
-          }
-        }
-
-        const installedScrapers = await localScraperService.getInstalledScrapers();
-        const userSettings = {
-          enableLocalScrapers: settings.enableLocalScrapers,
-          enabledScrapers: new Set(
-            installedScrapers
-              .filter(scraper => scraper.enabled)
-              .map(scraper => scraper.id)
-          )
-        };
-        const cachedResults = await hybridCacheService.getCachedResults(type, id, season, episode, userSettings);
-        if (cachedResults.validResults.length > 0) {
-          logger.log(`🔍 Found ${cachedResults.validResults.length} cached scraper results on mount`);
-
-          // If we have cached results, trigger the loading flow immediately
-          if (!hasDoneInitialLoadRef.current) {
-            logger.log('🚀 Triggering immediate load due to cached results');
-            // Force a re-render to ensure cached results are displayed
-            setHasStreamProviders(true);
-            setStreamsLoadStart(Date.now());
-          }
-        }
-      } catch (error) {
-        if (__DEV__) console.log('[StreamsScreen] Error checking cached results on mount:', error);
-      }
-    };
-
-    checkCachedResults();
-  }, [type, id, episodeId, settings.enableLocalScrapers]);
+  // Removed global/local cached results pre-check on mount
 
   // Update useEffect to check for sources
   useEffect(() => {
@@ -826,52 +781,7 @@ export const StreamsScreen = () => {
           }, 500);
           return () => clearTimeout(timer);
         } else {
-            // Check for cached streams first before loading
-            if (settings.enableLocalScrapers) {
-              try {
-                let season: number | undefined;
-                let episode: number | undefined;
-
-                if (episodeId && episodeId.includes(':')) {
-                  const parts = episodeId.split(':');
-                  if (parts.length >= 3) {
-                    season = parseInt(parts[1], 10);
-                    episode = parseInt(parts[2], 10);
-                  }
-                }
-
-                // Check if we have cached streams and load them immediately
-                const cachedStreams = await hybridCacheService.getCachedStreams(type, id, season, episode);
-                if (cachedStreams.length > 0) {
-                  logger.log(`🎯 Found ${cachedStreams.length} cached streams, displaying immediately`);
-
-                  // Group cached streams by scraper for proper display
-                  const groupedCachedStreams: GroupedStreams = {};
-                  const scrapersWithCachedResults = new Set<string>();
-
-                  // Get cached results to determine which scrapers have results
-                  const cachedResults = await hybridCacheService.getCachedResults(type, id, season, episode);
-
-                  for (const result of cachedResults.validResults) {
-                    if (result.success && result.streams && result.streams.length > 0) {
-                      groupedCachedStreams[result.scraperId] = {
-                        addonName: result.scraperName,
-                        streams: result.streams
-                      };
-                      scrapersWithCachedResults.add(result.scraperId);
-                    }
-                  }
-
-                  // Update the streams state immediately if we have cached results
-                  if (Object.keys(groupedCachedStreams).length > 0) {
-                    logger.log(`🚀 Immediately displaying ${Object.keys(groupedCachedStreams).length} cached scrapers with streams`);
-                    // This will be handled by the useMetadata hook integration
-                  }
-                }
-              } catch (error) {
-                if (__DEV__) console.log('[StreamsScreen] Error checking cached streams:', error);
-              }
-            }
+            // Removed cached streams pre-display logic
 
             // For series episodes, do not wait for metadata; load directly when episodeId is present
             if (episodeId) {

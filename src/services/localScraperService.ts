@@ -1421,17 +1421,6 @@ class LocalScraperService {
       oldestEntry: number | null;
       newestEntry: number | null;
     };
-    global: {
-      totalEntries: number;
-      totalSize: number;
-      oldestEntry: number | null;
-      newestEntry: number | null;
-      hitRate: number;
-    };
-    combined: {
-      totalEntries: number;
-      hitRate: number;
-    };
   }> {
     return await hybridCacheService.getCacheStats();
   }
