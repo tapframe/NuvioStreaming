@@ -489,6 +489,10 @@ class CatalogService {
       
       for (let i = 0; i < 2; i++) {
         try {
+          // Skip meta requests for non-content ids (e.g., provider slugs)
+          if (!stremioService.isValidContentId(type, id)) {
+            break;
+          }
           meta = await stremioService.getMetaDetails(type, id, preferredAddonId);
           if (meta) break;
           await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));
@@ -536,6 +540,10 @@ class CatalogService {
       
       for (let i = 0; i < 3; i++) {
         try {
+          // Skip meta requests for non-content ids (e.g., provider slugs)
+          if (!stremioService.isValidContentId(type, id)) {
+            break;
+          }
           meta = await stremioService.getMetaDetails(type, id, preferredAddonId);
           if (meta) break;
           await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));

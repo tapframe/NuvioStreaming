@@ -31,6 +31,7 @@ interface SubtitleModalsProps {
   fetchAvailableSubtitles: () => void;
   loadWyzieSubtitle: (subtitle: WyzieSubtitle) => void;
   selectTextTrack: (trackId: number) => void;
+  disableCustomSubtitles: () => void;
   increaseSubtitleSize: () => void;
   decreaseSubtitleSize: () => void;
   toggleSubtitleBackground: () => void;
@@ -79,6 +80,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   fetchAvailableSubtitles,
   loadWyzieSubtitle,
   selectTextTrack,
+  disableCustomSubtitles,
   increaseSubtitleSize,
   decreaseSubtitleSize,
   toggleSubtitleBackground,
@@ -160,6 +162,22 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
     setSelectedOnlineSubtitleId(subtitle.id);
     setLoadingSubtitleId(subtitle.id);
     loadWyzieSubtitle(subtitle);
+  };
+
+  const getFileNameFromUrl = (url?: string): string | null => {
+    if (!url || typeof url !== 'string') return null;
+    try {
+      // Prefer URL parsing to safely strip query/hash
+      const u = new URL(url);
+      const raw = u.pathname.split('/').pop() || '';
+      const decoded = decodeURIComponent(raw);
+      return decoded || null;
+    } catch {
+      // Fallback for non-standard URLs
+      const path = url.split('?')[0].split('#')[0];
+      const raw = path.split('/').pop() || '';
+      try { return decodeURIComponent(raw) || null; } catch { return raw || null; }
+    }
   };
 
   // Main subtitle menu
@@ -383,32 +401,61 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                 }}>
                   Addon Subtitles
                 </Text>
-                <TouchableOpacity
-                  style={{
-                    backgroundColor: 'rgba(34, 197, 94, 0.15)',
-                    borderRadius: 12,
-                    paddingHorizontal: chipPadH,
-                    paddingVertical: chipPadV-2,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                  }}
-                  onPress={() => fetchAvailableSubtitles()}
-                  disabled={isLoadingSubtitleList}
-                >
-                  {isLoadingSubtitleList ? (
-                    <ActivityIndicator size="small" color="#22C55E" />
-                  ) : (
-                    <MaterialIcons name="refresh" size={16} color="#22C55E" />
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {useCustomSubtitles && (
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                        borderRadius: 12,
+                        paddingHorizontal: chipPadH,
+                        paddingVertical: chipPadV-2,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                      }}
+                      onPress={() => {
+                        disableCustomSubtitles();
+                        setSelectedOnlineSubtitleId(null);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <MaterialIcons name="close" size={16} color="#EF4444" />
+                      <Text style={{
+                        color: '#EF4444',
+                        fontSize: isCompact ? 11 : 12,
+                        fontWeight: '600',
+                        marginLeft: 6,
+                      }}>
+                        Disable
+                      </Text>
+                    </TouchableOpacity>
                   )}
-                  <Text style={{
-                    color: '#22C55E',
-                    fontSize: isCompact ? 11 : 12,
-                    fontWeight: '600',
-                    marginLeft: 6,
-                  }}>
-                    {isLoadingSubtitleList ? 'Searching' : 'Refresh'}
-                  </Text>
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: 'rgba(34, 197, 94, 0.15)',
+                      borderRadius: 12,
+                      paddingHorizontal: chipPadH,
+                      paddingVertical: chipPadV-2,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                    }}
+                    onPress={() => fetchAvailableSubtitles()}
+                    disabled={isLoadingSubtitleList}
+                  >
+                    {isLoadingSubtitleList ? (
+                      <ActivityIndicator size="small" color="#22C55E" />
+                    ) : (
+                      <MaterialIcons name="refresh" size={16} color="#22C55E" />
+                    )}
+                    <Text style={{
+                      color: '#22C55E',
+                      fontSize: isCompact ? 11 : 12,
+                      fontWeight: '600',
+                      marginLeft: 6,
+                    }}>
+                      {isLoadingSubtitleList ? 'Searching' : 'Refresh'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {(availableSubtitles.length === 0) && !isLoadingSubtitleList ? (
@@ -473,10 +520,19 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                       >
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                           <View style={{ flex: 1 }}>
-                            <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '500', marginBottom: 4 }}>
+                            <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '500' }}>
                               {sub.display}
                             </Text>
-                            <Text style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: 13 }}>
+                            {(() => {
+                              const filename = getFileNameFromUrl(sub.url);
+                              if (!filename) return null;
+                              return (
+                                <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, marginTop: 2 }} numberOfLines={1}>
+                                  {filename}
+                                </Text>
+                              );
+                            })()}
+                            <Text style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: 13, marginTop: 2 }}>
                               {formatLanguage(sub.language)}{sub.source ? ` · ${sub.source}` : ''}
                             </Text>
                           </View>

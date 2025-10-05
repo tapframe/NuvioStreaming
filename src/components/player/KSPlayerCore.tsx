@@ -178,6 +178,14 @@ const KSPlayerCore: React.FC = () => {
   const [isLoadingSubtitleList, setIsLoadingSubtitleList] = useState<boolean>(false);
   const [showSourcesModal, setShowSourcesModal] = useState<boolean>(false);
   const [availableStreams, setAvailableStreams] = useState<{ [providerId: string]: { streams: any[]; addonName: string } }>(passedAvailableStreams || {});
+  // Playback speed controls required by PlayerControls
+  const speedOptions = [0.5, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0];
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
+  const cyclePlaybackSpeed = useCallback(() => {
+    const idx = speedOptions.indexOf(playbackSpeed);
+    const nextIdx = (idx + 1) % speedOptions.length;
+    setPlaybackSpeed(speedOptions[nextIdx]);
+  }, [playbackSpeed, speedOptions]);
   // Smart URL processing for KSPlayer compatibility
   const processUrlForKsPlayer = (url: string): string => {
     try {
@@ -1640,6 +1648,13 @@ const KSPlayerCore: React.FC = () => {
     }
   };
 
+  const disableCustomSubtitles = () => {
+    setUseCustomSubtitles(false);
+    setCustomSubtitles([]);
+    // Reset to first available built-in track or disable all tracks
+    setSelectedTextTrack(ksTextTracks.length > 0 ? 0 : -1);
+  };
+
   // Ensure native KSPlayer text tracks are disabled when using custom (addon) subtitles
   // and re-applied when switching back to built-in tracks. This prevents double-rendering.
   useEffect(() => {
@@ -2687,6 +2702,8 @@ const KSPlayerCore: React.FC = () => {
             onSlidingComplete={handleSlidingComplete}
             buffered={buffered}
             formatTime={formatTime}
+          cyclePlaybackSpeed={cyclePlaybackSpeed}
+          currentPlaybackSpeed={playbackSpeed}
           />
 
           {showPauseOverlay && (
@@ -3290,6 +3307,7 @@ const KSPlayerCore: React.FC = () => {
         fetchAvailableSubtitles={fetchAvailableSubtitles}
         loadWyzieSubtitle={loadWyzieSubtitle}
         selectTextTrack={selectTextTrack}
+        disableCustomSubtitles={disableCustomSubtitles}
         increaseSubtitleSize={increaseSubtitleSize}
         decreaseSubtitleSize={decreaseSubtitleSize}
         toggleSubtitleBackground={toggleSubtitleBackground}

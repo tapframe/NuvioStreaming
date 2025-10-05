@@ -188,6 +188,21 @@ class StremioService {
     this.initializationPromise = this.initialize();
   }
 
+  // Shared validator for content IDs eligible for metadata requests
+  public isValidContentId(type: string, id: string | null | undefined): boolean {
+    const isValidType = type === 'movie' || type === 'series';
+    const lowerId = (id || '').toLowerCase();
+    const looksLikeImdb = /^tt\d+/.test(lowerId);
+    const looksLikeKitsu = lowerId.startsWith('kitsu:') || lowerId === 'kitsu';
+    const looksLikeSeriesId = lowerId.startsWith('series:');
+    const isNullishId = !id || lowerId === 'null' || lowerId === 'undefined';
+    const providerLikeIds = new Set<string>(['moviebox', 'torbox']);
+    const isProviderSlug = providerLikeIds.has(lowerId);
+
+    if (!isValidType || isNullishId || isProviderSlug) return false;
+    return looksLikeImdb || looksLikeKitsu || looksLikeSeriesId;
+  }
+
   static getInstance(): StremioService {
     if (!StremioService.instance) {
       StremioService.instance = new StremioService();

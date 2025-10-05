@@ -521,6 +521,9 @@ const AndroidVideoPlayer: React.FC = () => {
   // Volume and brightness controls
   const [volume, setVolume] = useState(1.0);
   const [brightness, setBrightness] = useState(1.0);
+  // Store Android system brightness state to restore on exit/unmount
+  const originalSystemBrightnessRef = useRef<number | null>(null);
+  const originalSystemBrightnessModeRef = useRef<number | null>(null);
   const [showVolumeOverlay, setShowVolumeOverlay] = useState(false);
   const [showBrightnessOverlay, setShowBrightnessOverlay] = useState(false);
   const [subtitleSettingsLoaded, setSubtitleSettingsLoaded] = useState(false);
@@ -848,6 +851,22 @@ const AndroidVideoPlayer: React.FC = () => {
       }
       
       try {
+        // Capture Android system brightness and mode to restore later
+        if (Platform.OS === 'android') {
+          try {
+            const [sysBright, sysMode] = await Promise.all([
+              (Brightness as any).getSystemBrightnessAsync?.(),
+              (Brightness as any).getSystemBrightnessModeAsync?.()
+            ]);
+            originalSystemBrightnessRef.current = typeof sysBright === 'number' ? sysBright : null;
+            originalSystemBrightnessModeRef.current = typeof sysMode === 'number' ? sysMode : null;
+            if (DEBUG_MODE) {
+              logger.log(`[AndroidVideoPlayer] Captured system brightness=${originalSystemBrightnessRef.current}, mode=${originalSystemBrightnessModeRef.current}`);
+            }
+          } catch (e) {
+            if (__DEV__) logger.warn('[AndroidVideoPlayer] Failed to capture system brightness state:', e);
+          }
+        }
         const currentBrightness = await Brightness.getBrightnessAsync();
         setBrightness(currentBrightness);
         if (DEBUG_MODE) {
@@ -1694,6 +1713,27 @@ const AndroidVideoPlayer: React.FC = () => {
     
     logger.log(`[AndroidVideoPlayer] Current progress: ${actualCurrentTime}/${duration} (${progressPercent.toFixed(1)}%)`);
     
+    // Restore Android system brightness state so app does not lock brightness
+    const restoreSystemBrightness = async () => {
+      if (Platform.OS !== 'android') return;
+      try {
+        // Restore mode first (if available), then brightness value
+        if (originalSystemBrightnessModeRef.current !== null && typeof (Brightness as any).setSystemBrightnessModeAsync === 'function') {
+          await (Brightness as any).setSystemBrightnessModeAsync(originalSystemBrightnessModeRef.current);
+        }
+        if (originalSystemBrightnessRef.current !== null && typeof (Brightness as any).setSystemBrightnessAsync === 'function') {
+          await (Brightness as any).setSystemBrightnessAsync(originalSystemBrightnessRef.current);
+        }
+        if (DEBUG_MODE) {
+          logger.log('[AndroidVideoPlayer] Restored Android system brightness and mode');
+        }
+      } catch (e) {
+        logger.warn('[AndroidVideoPlayer] Failed to restore system brightness state:', e);
+      }
+    };
+
+    await restoreSystemBrightness();
+
     // Navigate immediately without delay
     ScreenOrientation.unlockAsync().then(() => {
       // On tablets keep rotation unlocked; on phones, return to portrait
@@ -2226,7 +2266,17 @@ const AndroidVideoPlayer: React.FC = () => {
       }
     }
   }, [useVLC, selectVlcSubtitleTrack]);
-  
+
+  const disableCustomSubtitles = useCallback(() => {
+    setUseCustomSubtitles(false);
+    setCustomSubtitles([]);
+    // Reset to first available built-in track or disable all tracks
+    if (useVLC) {
+      selectVlcSubtitleTrack(ksTextTracks.length > 0 ? 0 : null);
+    }
+    setSelectedTextTrack(ksTextTracks.length > 0 ? 0 : -1);
+  }, [useVLC, selectVlcSubtitleTrack, ksTextTracks.length]);
+
   const loadSubtitleSize = async () => {
     try {
       // Prefer scoped subtitle settings
@@ -2759,6 +2809,19 @@ const AndroidVideoPlayer: React.FC = () => {
       if (progressSaveInterval) {
         clearInterval(progressSaveInterval);
         setProgressSaveInterval(null);
+      }
+      // Best-effort restore of Android system brightness state on unmount
+      if (Platform.OS === 'android') {
+        try {
+          if (originalSystemBrightnessModeRef.current !== null && typeof (Brightness as any).setSystemBrightnessModeAsync === 'function') {
+            (Brightness as any).setSystemBrightnessModeAsync(originalSystemBrightnessModeRef.current);
+          }
+          if (originalSystemBrightnessRef.current !== null && typeof (Brightness as any).setSystemBrightnessAsync === 'function') {
+            (Brightness as any).setSystemBrightnessAsync(originalSystemBrightnessRef.current);
+          }
+        } catch (e) {
+          logger.warn('[AndroidVideoPlayer] Failed to restore system brightness on unmount:', e);
+        }
       }
     };
   }, []);
@@ -4018,6 +4081,7 @@ const AndroidVideoPlayer: React.FC = () => {
         fetchAvailableSubtitles={fetchAvailableSubtitles}
         loadWyzieSubtitle={loadWyzieSubtitle}
         selectTextTrack={selectTextTrack}
+        disableCustomSubtitles={disableCustomSubtitles}
         increaseSubtitleSize={increaseSubtitleSize}
         decreaseSubtitleSize={decreaseSubtitleSize}
         toggleSubtitleBackground={toggleSubtitleBackground}
