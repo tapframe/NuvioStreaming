@@ -11,10 +11,12 @@ import {
   ScrollView,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import TraktIcon from '../../../assets/rating-icons/trakt.svg';
 import { useTheme } from '../../contexts/ThemeContext';
 import { TraktContentComment } from '../../services/traktService';
 import { logger } from '../../utils/logger';
 import { useTraktComments } from '../../hooks/useTraktComments';
+import { useSettings } from '../../hooks/useSettings';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 
 const { width } = Dimensions.get('window');
@@ -134,16 +136,23 @@ const CompactCommentCard: React.FC<{
       }}
       activeOpacity={0.7}
     >
+      {/* Trakt Icon - Top Right Corner */}
+      <View style={styles.traktIconContainer}>
+        <TraktIcon width={16} height={16} />
+      </View>
+
       {/* Header Section - Fixed at top */}
       <View style={styles.compactHeader}>
-        <Text style={[styles.compactUsername, { color: theme.colors.highEmphasis }]}>
-          {username}
-        </Text>
-        {user.vip && (
-          <View style={styles.miniVipBadge}>
-            <Text style={styles.miniVipText}>VIP</Text>
-          </View>
-        )}
+        <View style={styles.usernameContainer}>
+          <Text style={[styles.compactUsername, { color: theme.colors.highEmphasis }]}>
+            {username}
+          </Text>
+          {user.vip && (
+            <View style={styles.miniVipBadge}>
+              <Text style={styles.miniVipText}>VIP</Text>
+            </View>
+          )}
+        </View>
       </View>
 
       {/* Rating - Show stars */}
@@ -400,6 +409,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
   onCommentPress,
 }) => {
   const { currentTheme } = useTheme();
+  const { settings } = useSettings();
 
   const {
     comments,
@@ -468,8 +478,17 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
     );
   }, [loading, error, currentTheme]);
 
-  // Don't show section if not authenticated
-  if (!isAuthenticated) {
+  // Don't show section if not authenticated, if comments are disabled in settings, or if still checking authentication
+  // Only show when authentication is definitively true and settings allow it
+  if (isAuthenticated !== true || !settings.showTraktComments) {
+    // Show loading state only if we're checking authentication but settings allow comments
+    if (isAuthenticated === null && settings.showTraktComments) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color={currentTheme.colors.primary} />
+        </View>
+      );
+    }
     return null;
   }
 
@@ -787,10 +806,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
+  usernameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
   compactUsername: {
     fontSize: 16,
     fontWeight: '600',
-    flex: 1,
+    marginRight: 8,
   },
   miniVipBadge: {
     backgroundColor: '#FFD700',
@@ -798,6 +822,12 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
     borderRadius: 6,
     marginLeft: 6,
+  },
+  traktIconContainer: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    zIndex: 1,
   },
   miniVipText: {
     fontSize: 9,
@@ -983,7 +1013,7 @@ const styles = StyleSheet.create({
   loadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 40,
+    paddingVertical: 20,
   },
   loadingText: {
     fontSize: 14,

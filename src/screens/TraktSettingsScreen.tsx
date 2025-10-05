@@ -46,7 +46,7 @@ const redirectUri = makeRedirectUri({
 });
 
 const TraktSettingsScreen: React.FC = () => {
-  const { settings } = useSettings();
+  const { settings, updateSetting } = useSettings();
   const isDarkMode = settings.enableDarkMode;
   const navigation = useNavigation();
   const [isLoading, setIsLoading] = useState(true);
@@ -247,7 +247,7 @@ const TraktSettingsScreen: React.FC = () => {
       >
         <View style={[
           styles.card,
-          { backgroundColor: isDarkMode ? currentTheme.colors.elevation2 : currentTheme.colors.white }
+          { backgroundColor: currentTheme.colors.elevation2 }
         ]}>
           {isLoading ? (
             <View style={styles.loadingContainer}>
@@ -357,67 +357,73 @@ const TraktSettingsScreen: React.FC = () => {
             <View style={styles.settingsSection}>
               <Text style={[
                 styles.sectionTitle,
-                { color: isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark }
+                { color: currentTheme.colors.highEmphasis }
               ]}>
                 Sync Settings
               </Text>
               <View style={[
                 styles.infoBox,
-                { backgroundColor: isDarkMode ? currentTheme.colors.elevation1 : '#F5F7FB', borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#E3E8F0' }
+                { backgroundColor: currentTheme.colors.elevation1, borderColor: currentTheme.colors.border }
               ]}>
                 <Text style={[
                   styles.infoText,
-                  { color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark }
+                  { color: currentTheme.colors.mediumEmphasis }
                 ]}>
                   When connected to Trakt, Continue Watching is sourced from Trakt. Account sync for watch progress is disabled to avoid conflicts.
                 </Text>
               </View>
               <View style={styles.settingItem}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <View style={{ flex: 1 }}>
-                <Text style={[
-                  styles.settingLabel,
-                  { color: isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark }
-                ]}>
-                  Auto-sync playback progress
-                </Text>
-                <Text style={[
-                  styles.settingDescription,
-                  { color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark }
-                ]}>
+                <View style={styles.settingContent}>
+                  <View style={styles.settingTextContainer}>
+                    <Text style={[
+                      styles.settingLabel,
+                      { color: currentTheme.colors.highEmphasis }
+                    ]}>
+                      Auto-sync playback progress
+                    </Text>
+                    <Text style={[
+                      styles.settingDescription,
+                      { color: currentTheme.colors.mediumEmphasis }
+                    ]}>
                       Automatically sync watch progress to Trakt
-                </Text>
+                    </Text>
                   </View>
-                  <Switch
-                    value={autosyncSettings.enabled}
-                    onValueChange={setAutosyncEnabled}
-                    trackColor={{ 
-                      false: isDarkMode ? 'rgba(120,120,128,0.3)' : 'rgba(120,120,128,0.2)',
-                      true: currentTheme.colors.primary + '80'
-                    }}
-                    thumbColor={autosyncSettings.enabled ? currentTheme.colors.primary : (isDarkMode ? '#ffffff' : '#f4f3f4')}
-                  />
+                  <View style={styles.settingToggleContainer}>
+                    <Switch
+                      value={autosyncSettings.enabled}
+                      onValueChange={setAutosyncEnabled}
+                      trackColor={{
+                        false: currentTheme.colors.border,
+                        true: currentTheme.colors.primary + '80'
+                      }}
+                      thumbColor={autosyncSettings.enabled ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis}
+                    />
+                  </View>
                 </View>
               </View>
               <View style={styles.settingItem}>
-                <Text style={[
-                  styles.settingLabel,
-                  { color: isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark }
-                ]}>
-                  Import watched history
-                </Text>
-                <Text style={[
-                  styles.settingDescription,
-                  { color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark }
-                ]}>
-                  Use "Sync Now" to import your watch history and progress from Trakt
-                </Text>
+                <View style={styles.settingContent}>
+                  <View style={styles.settingTextContainer}>
+                    <Text style={[
+                      styles.settingLabel,
+                      { color: currentTheme.colors.highEmphasis }
+                    ]}>
+                      Import watched history
+                    </Text>
+                    <Text style={[
+                      styles.settingDescription,
+                      { color: currentTheme.colors.mediumEmphasis }
+                    ]}>
+                      Use "Sync Now" to import your watch history and progress from Trakt
+                    </Text>
+                  </View>
+                </View>
               </View>
               <TouchableOpacity
                 style={[
                   styles.button,
-                  { 
-                    backgroundColor: isDarkMode ? currentTheme.colors.primary + '40' : currentTheme.colors.primary + '20',
+                  {
+                    backgroundColor: currentTheme.colors.card,
                     opacity: isSyncing ? 0.6 : 1
                   }
                 ]}
@@ -431,19 +437,57 @@ const TraktSettingsScreen: React.FC = () => {
                 }}
               >
                 {isSyncing ? (
-                  <ActivityIndicator 
-                    size="small" 
-                    color={isDarkMode ? currentTheme.colors.primary : currentTheme.colors.primary} 
+                  <ActivityIndicator
+                    size="small"
+                    color={currentTheme.colors.primary}
                   />
                 ) : (
                   <Text style={[
                     styles.buttonText,
-                    { color: isDarkMode ? currentTheme.colors.primary : currentTheme.colors.primary }
+                    { color: currentTheme.colors.primary }
                   ]}>
                     Sync Now
                   </Text>
                 )}
               </TouchableOpacity>
+
+              {/* Display Settings Section */}
+              <Text style={[
+                styles.sectionTitle,
+                { color: currentTheme.colors.highEmphasis, marginTop: 24 }
+              ]}>
+                Display Settings
+              </Text>
+
+              <View style={styles.settingItem}>
+                <View style={styles.settingContent}>
+                  <View style={styles.settingTextContainer}>
+                    <Text style={[
+                      styles.settingLabel,
+                      { color: currentTheme.colors.highEmphasis }
+                    ]}>
+                      Show Trakt Comments
+                    </Text>
+                    <Text style={[
+                      styles.settingDescription,
+                      { color: currentTheme.colors.mediumEmphasis }
+                    ]}>
+                      Display Trakt comments in metadata screens when available
+                    </Text>
+                  </View>
+                  <View style={styles.settingToggleContainer}>
+                    <Switch
+                      value={settings.showTraktComments}
+                      onValueChange={(value) => updateSetting('showTraktComments', value)}
+                      trackColor={{
+                        false: currentTheme.colors.border,
+                        true: currentTheme.colors.primary + '80'
+                      }}
+                      thumbColor={settings.showTraktComments ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis}
+                    />
+                  </View>
+                </View>
+              </View>
 
 
             </View>
@@ -612,9 +656,24 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 16,
+    marginTop: 8,
   },
   settingItem: {
     marginBottom: 16,
+  },
+  settingContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    minHeight: 60,
+  },
+  settingTextContainer: {
+    flex: 1,
+    marginRight: 16,
+  },
+  settingToggleContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   settingLabel: {
     fontSize: 15,

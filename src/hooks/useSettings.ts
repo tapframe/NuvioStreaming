@@ -79,6 +79,8 @@ export interface AppSettings {
   // Metadata enrichment
   enrichMetadataWithTMDB: boolean; // Use TMDB to enrich metadata (cast, certification, posters, fallbacks)
   useTmdbLocalizedMetadata: boolean; // Use TMDB localized metadata (titles, overviews) per tmdbLanguagePreference
+  // Trakt integration
+  showTraktComments: boolean; // Show Trakt comments in metadata screens
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -130,6 +132,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   // Metadata enrichment
   enrichMetadataWithTMDB: true,
   useTmdbLocalizedMetadata: false,
+  // Trakt integration
+  showTraktComments: true, // Show Trakt comments by default when authenticated
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';

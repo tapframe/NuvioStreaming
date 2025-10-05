@@ -24,7 +24,7 @@ export const useTraktComments = ({
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [page, setPage] = useState(1);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   const COMMENTS_PER_PAGE = 10;
 
@@ -42,12 +42,14 @@ export const useTraktComments = ({
     };
 
     if (enabled) {
+      // Set to null initially to indicate we're checking
+      setIsAuthenticated(null);
       checkAuth();
     }
   }, [enabled]);
 
   const loadComments = useCallback(async (pageNum: number = 1, append: boolean = false) => {
-    if (!enabled || !imdbId || !isAuthenticated) {
+    if (!enabled || !imdbId || isAuthenticated !== true) {
       return;
     }
 
@@ -103,7 +105,7 @@ export const useTraktComments = ({
   }, [enabled, imdbId, tmdbId, type, season, episode, isAuthenticated]);
 
   const loadMore = useCallback(() => {
-    if (!loading && hasMore && isAuthenticated) {
+    if (!loading && hasMore && isAuthenticated === true) {
       loadComments(page + 1, true);
     }
   }, [loading, hasMore, page, loadComments, isAuthenticated]);
