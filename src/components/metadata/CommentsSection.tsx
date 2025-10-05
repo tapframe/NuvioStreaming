@@ -123,7 +123,7 @@ const CompactCommentCard: React.FC<{
       style={[
         styles.compactCard,
         {
-          backgroundColor: isPressed ? theme.colors.primary + '20' : theme.colors.card,
+          backgroundColor: theme.colors.card,
           borderColor: theme.colors.border,
           transform: isPressed ? [{ scale: 0.98 }] : [{ scale: 1 }]
         }
@@ -134,7 +134,7 @@ const CompactCommentCard: React.FC<{
         console.log('CompactCommentCard: TouchableOpacity pressed for comment:', comment.id);
         onPress();
       }}
-      activeOpacity={0.7}
+      activeOpacity={1}
     >
       {/* Trakt Icon - Top Right Corner */}
       <View style={styles.traktIconContainer}>
