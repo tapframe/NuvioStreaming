@@ -17,7 +17,7 @@ import { TraktContentComment } from '../../services/traktService';
 import { logger } from '../../utils/logger';
 import { useTraktComments } from '../../hooks/useTraktComments';
 import { useSettings } from '../../hooks/useSettings';
-import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 
 const { width } = Dimensions.get('window');
 
@@ -287,6 +287,9 @@ const ExpandedCommentBottomSheet: React.FC<{
       }}
       index={-1}
       snapPoints={[200, '50%', '90%']}
+      enableDynamicSizing={false}
+      keyboardBehavior="interactive"
+      android_keyboardInputMode="adjustResize"
       enablePanDownToClose={true}
       animateOnMount={true}
       backgroundStyle={{
@@ -298,9 +301,13 @@ const ExpandedCommentBottomSheet: React.FC<{
         backgroundColor: theme.colors.mediumEmphasis || '#CCCCCC',
       }}
     >
-      <BottomSheetView style={[styles.bottomSheetContent, {
-        backgroundColor: theme.colors.darkGray || '#0A0C0C',
-      }]}>
+      <BottomSheetScrollView
+        style={[styles.bottomSheetContent, { backgroundColor: theme.colors.darkGray || '#0A0C0C' }]}
+        contentContainerStyle={styles.modalCommentContent}
+        showsVerticalScrollIndicator
+        nestedScrollEnabled
+        keyboardShouldPersistTaps="handled"
+      >
           {/* Close Button */}
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <MaterialIcons name="close" size={24} color={theme.colors.highEmphasis} />
@@ -361,15 +368,9 @@ const ExpandedCommentBottomSheet: React.FC<{
               </TouchableOpacity>
             </View>
           ) : (
-            <ScrollView
-              style={styles.modalCommentScroll}
-              showsVerticalScrollIndicator={true}
-              nestedScrollEnabled
-            >
-              <Text style={[styles.modalComment, { color: theme.colors.highEmphasis }]}>
-                {comment.comment}
-              </Text>
-            </ScrollView>
+            <Text style={[styles.modalComment, { color: theme.colors.highEmphasis }]}>
+              {comment.comment}
+            </Text>
           )}
 
           {/* Comment Meta */}
@@ -396,7 +397,7 @@ const ExpandedCommentBottomSheet: React.FC<{
               )}
             </View>
           </View>
-        </BottomSheetView>
+      </BottomSheetScrollView>
     </BottomSheet>
   );
 };
@@ -659,7 +660,10 @@ export const CommentBottomSheet: React.FC<{
         }
       }}
       index={sheetIndex}
-      snapPoints={[200, '50%']}
+      snapPoints={[200, '50%', '90%']}
+      enableDynamicSizing={false}
+      keyboardBehavior="interactive"
+      android_keyboardInputMode="adjustResize"
       enablePanDownToClose={true}
       animateOnMount={true}
       backgroundStyle={{
@@ -671,9 +675,13 @@ export const CommentBottomSheet: React.FC<{
         backgroundColor: theme.colors.mediumEmphasis || '#CCCCCC',
       }}
     >
-      <BottomSheetView style={[styles.bottomSheetContent, {
-        backgroundColor: theme.colors.darkGray || '#0A0C0C',
-      }]}>
+      <BottomSheetScrollView
+        style={[styles.bottomSheetContent, { backgroundColor: theme.colors.darkGray || '#0A0C0C' }]}
+        contentContainerStyle={styles.modalCommentContent}
+        showsVerticalScrollIndicator
+        nestedScrollEnabled
+        keyboardShouldPersistTaps="handled"
+      >
           {/* User Info */}
           <View style={styles.modalHeader}>
             <View style={styles.userInfo}>
@@ -729,15 +737,9 @@ export const CommentBottomSheet: React.FC<{
               </TouchableOpacity>
             </View>
           ) : (
-            <ScrollView
-              style={styles.modalCommentScroll}
-              showsVerticalScrollIndicator={true}
-              nestedScrollEnabled
-            >
-              <Text style={[styles.modalComment, { color: theme.colors.highEmphasis }]}>
-                {comment.comment}
-              </Text>
-            </ScrollView>
+            <Text style={[styles.modalComment, { color: theme.colors.highEmphasis }]}>
+              {comment.comment}
+            </Text>
           )}
 
           {/* Comment Meta */}
@@ -764,7 +766,7 @@ export const CommentBottomSheet: React.FC<{
               )}
             </View>
           </View>
-        </BottomSheetView>
+      </BottomSheetScrollView>
     </BottomSheet>
   );
 };
@@ -1093,10 +1095,15 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   modalCommentScroll: {
-    // Constrain height so only text area scrolls, not the entire modal
-    maxHeight: 400,
-    marginBottom: 16,
+    // Let the scroll view expand to use available space inside the sheet
+    flex: 1,
+    flexGrow: 1,
     flexShrink: 1,
+    minHeight: 0,
+    marginBottom: 16,
+  },
+  modalCommentContent: {
+    paddingBottom: 16,
   },
   spoilerContainer: {
     alignItems: 'center',
