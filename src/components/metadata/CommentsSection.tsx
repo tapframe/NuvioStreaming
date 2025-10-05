@@ -9,6 +9,7 @@ import {
   Dimensions,
   Alert,
   ScrollView,
+  Animated,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import TraktIcon from '../../../assets/rating-icons/trakt.svg';
@@ -43,6 +44,15 @@ const CompactCommentCard: React.FC<{
   onSpoilerPress: () => void;
 }> = ({ comment, theme, onPress, isSpoilerRevealed, onSpoilerPress }) => {
   const [isPressed, setIsPressed] = useState(false);
+  const fadeInOpacity = useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    Animated.timing(fadeInOpacity, {
+      toValue: 1,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [fadeInOpacity]);
 
   // Safety check - ensure comment data exists
   if (!comment || !comment.comment) {
@@ -119,23 +129,27 @@ const CompactCommentCard: React.FC<{
   };
 
   return (
-    <TouchableOpacity
+    <Animated.View
       style={[
         styles.compactCard,
         {
           backgroundColor: theme.colors.card,
           borderColor: theme.colors.border,
-          transform: isPressed ? [{ scale: 0.98 }] : [{ scale: 1 }]
-        }
+          opacity: fadeInOpacity,
+          transform: isPressed ? [{ scale: 0.98 }] : [{ scale: 1 }],
+        },
       ]}
-      onPressIn={() => setIsPressed(true)}
-      onPressOut={() => setIsPressed(false)}
-      onPress={() => {
-        console.log('CompactCommentCard: TouchableOpacity pressed for comment:', comment.id);
-        onPress();
-      }}
-      activeOpacity={1}
     >
+      <TouchableOpacity
+        style={{ flex: 1 }}
+        onPressIn={() => setIsPressed(true)}
+        onPressOut={() => setIsPressed(false)}
+        onPress={() => {
+          console.log('CompactCommentCard: TouchableOpacity pressed for comment:', comment.id);
+          onPress();
+        }}
+        activeOpacity={1}
+      >
       {/* Trakt Icon - Top Right Corner */}
       <View style={styles.traktIconContainer}>
         <TraktIcon width={16} height={16} />
@@ -199,7 +213,8 @@ const CompactCommentCard: React.FC<{
           )}
         </View>
       </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 
@@ -416,6 +431,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
 }) => {
   const { currentTheme } = useTheme();
   const { settings } = useSettings();
+  const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false);
 
   const {
     comments,
@@ -433,6 +449,13 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
     episode,
     enabled: true,
   });
+
+  // Track when first load completes to avoid premature empty state
+  React.useEffect(() => {
+    if (!loading) {
+      setHasLoadedOnce(true);
+    }
+  }, [loading]);
 
   // Debug logging
   console.log('CommentsSection: Comments data:', comments);
@@ -484,6 +507,44 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
     );
   }, [loading, error, currentTheme]);
 
+  const renderSkeletons = useCallback(() => {
+    const placeholders = [0, 1, 2];
+    return (
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
+        {placeholders.map((i) => (
+          <View key={`skeleton-${i}`} style={[styles.compactCard, { backgroundColor: currentTheme.colors.card, borderColor: currentTheme.colors.border }]}>
+            <View style={styles.traktIconContainer}>
+              <View style={[styles.skeletonDot]} />
+            </View>
+
+            <View style={styles.compactHeader}>
+              <View style={[styles.skeletonLine, { width: 120 }]} />
+              <View style={[styles.miniVipBadge, styles.skeletonBadge]} />
+            </View>
+
+            <View style={styles.compactRating}>
+              <View style={[styles.skeletonLine, { width: 80, height: 10 }]} />
+            </View>
+
+            <View style={styles.commentContainer}>
+              <View style={[styles.skeletonLine, { width: '95%' }]} />
+              <View style={[styles.skeletonLine, { width: '90%', marginTop: 6 }]} />
+              <View style={[styles.skeletonLine, { width: '70%', marginTop: 6 }]} />
+            </View>
+
+            <View style={styles.compactMeta}>
+              <View style={[styles.skeletonBadge, { width: 50, height: 12, borderRadius: 6 }]} />
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={[styles.skeletonLine, { width: 36, height: 10 }]} />
+                <View style={[styles.skeletonLine, { width: 36, height: 10 }]} />
+              </View>
+            </View>
+          </View>
+        ))}
+      </ScrollView>
+    );
+  }, [currentTheme]);
+
   // Don't show section if not authenticated, if comments are disabled in settings, or if still checking authentication
   // Only show when authentication is definitively true and settings allow it
   if (isAuthenticated !== true || !settings.showTraktComments) {
@@ -523,23 +584,18 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
         </View>
       )}
 
-      {loading && comments.length === 0 && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={currentTheme.colors.primary} />
-          <Text style={[styles.loadingText, { color: currentTheme.colors.mediumEmphasis }]}>
-            Loading comments...
-          </Text>
-        </View>
+      {loading && comments.length === 0 && renderSkeletons()}
+
+      {(!loading && comments.length === 0 && hasLoadedOnce && !error) && (
+        renderEmpty()
       )}
 
-      {comments.length === 0 ? (
-        renderEmpty()
-      ) : (
-        <FlatList
+      {comments.length > 0 && (
+        <Animated.FlatList
           horizontal
           showsHorizontalScrollIndicator={false}
           data={comments}
-          keyExtractor={(item) => item?.id?.toString() || Math.random().toString()}
+          keyExtractor={(item, index) => item?.id?.toString() || `comment-${index}`}
           renderItem={renderComment}
           contentContainerStyle={styles.horizontalList}
           removeClippedSubviews={false}
@@ -566,7 +622,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
                     <ActivityIndicator size="small" color={currentTheme.colors.primary} />
                   ) : (
                     <>
-                      <Text style={[styles.loadMoreText, { color: currentTheme.colors.primary }]}>
+                      <Text style={[styles.loadMoreText, { color: currentTheme.colors.primary }]}> 
                         Load More
                       </Text>
                       <MaterialIcons name="chevron-right" size={20} color={currentTheme.colors.primary} />
@@ -576,6 +632,8 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
               </View>
             ) : null
           }
+          extraData={loading}
+          style={{ opacity: 1 }}
         />
       )}
 
@@ -1033,6 +1091,20 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 14,
     marginTop: 12,
+  },
+  skeletonLine: {
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  skeletonBadge: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  skeletonDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.08)'
   },
   errorContainer: {
     flexDirection: 'row',
