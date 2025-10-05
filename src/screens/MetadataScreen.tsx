@@ -10,6 +10,7 @@ import {
   InteractionManager,
   BackHandler,
   Platform,
+  Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -24,7 +25,7 @@ import { SeriesContent } from '../components/metadata/SeriesContent';
 import { MovieContent } from '../components/metadata/MovieContent';
 import { MoreLikeThisSection } from '../components/metadata/MoreLikeThisSection';
 import { RatingsSection } from '../components/metadata/RatingsSection';
-import { CommentsSection } from '../components/metadata/CommentsSection';
+import { CommentsSection, CommentBottomSheet } from '../components/metadata/CommentsSection';
 import { RouteParams, Episode } from '../types/metadata';
 import Animated, {
   useAnimatedStyle,
@@ -87,6 +88,20 @@ const MetadataScreen: React.FC = () => {
   // Source switching removed
   const transitionOpacity = useSharedValue(1);
   const interactionComplete = useRef(false);
+
+  // Comment bottom sheet state
+  const [commentBottomSheetVisible, setCommentBottomSheetVisible] = useState(false);
+  const [selectedComment, setSelectedComment] = useState<any>(null);
+  const [revealedSpoilers, setRevealedSpoilers] = useState<Set<string>>(new Set());
+
+  // Debug state changes
+  React.useEffect(() => {
+    console.log('MetadataScreen: commentBottomSheetVisible changed to:', commentBottomSheetVisible);
+  }, [commentBottomSheetVisible]);
+
+  React.useEffect(() => {
+    console.log('MetadataScreen: selectedComment changed to:', selectedComment?.id);
+  }, [selectedComment]);
 
   const {
     metadata,
@@ -527,6 +542,43 @@ const MetadataScreen: React.FC = () => {
     setShowCastModal(true);
   }, [isScreenFocused]);
 
+  const handleCommentPress = useCallback((comment: any) => {
+    console.log('MetadataScreen: handleCommentPress called with comment:', comment?.id);
+    if (!isScreenFocused) {
+      console.log('MetadataScreen: Screen not focused, ignoring');
+      return;
+    }
+    console.log('MetadataScreen: Setting selected comment and opening bottomsheet');
+    setSelectedComment(comment);
+    setCommentBottomSheetVisible(true);
+    console.log('MetadataScreen: State should be updated now');
+  }, [isScreenFocused]);
+
+  const handleCommentBottomSheetClose = useCallback(() => {
+    setCommentBottomSheetVisible(false);
+    setSelectedComment(null);
+  }, []);
+
+  const handleSpoilerPress = useCallback((comment: any) => {
+    Alert.alert(
+      'Spoiler Warning',
+      'This comment contains spoilers. Are you sure you want to reveal it?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Reveal Spoilers',
+          style: 'destructive',
+          onPress: () => {
+            setRevealedSpoilers(prev => new Set([...prev, comment.id.toString()]));
+          },
+        },
+      ]
+    );
+  }, []);
+
   // Source switching removed
 
   // Ultra-optimized animated styles - minimal calculations with conditional updates
@@ -678,8 +730,8 @@ const MetadataScreen: React.FC = () => {
               {shouldLoadSecondaryData && imdbId && (
                 <MemoizedCommentsSection
                   imdbId={imdbId}
-                  tmdbId={tmdbId || undefined}
                   type={Object.keys(groupedEpisodes).length > 0 ? 'show' : 'movie'}
+                  onCommentPress={handleCommentPress}
                 />
               )}
 
@@ -718,6 +770,16 @@ const MetadataScreen: React.FC = () => {
           castMember={selectedCastMember}
         />
       )}
+
+      {/* Comment Bottom Sheet - Memoized */}
+      <CommentBottomSheet
+        comment={selectedComment}
+        visible={commentBottomSheetVisible}
+        onClose={handleCommentBottomSheetClose}
+        theme={currentTheme}
+        isSpoilerRevealed={selectedComment ? revealedSpoilers.has(selectedComment.id.toString()) : false}
+        onSpoilerPress={() => selectedComment && handleSpoilerPress(selectedComment)}
+      />
     </SafeAreaView>
     </Animated.View>
   );

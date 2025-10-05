@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,14 +7,15 @@ import {
   TouchableOpacity,
   FlatList,
   Dimensions,
-  Modal,
   Alert,
+  ScrollView,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { TraktContentComment } from '../../services/traktService';
 import { logger } from '../../utils/logger';
 import { useTraktComments } from '../../hooks/useTraktComments';
+import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 
 const { width } = Dimensions.get('window');
 
@@ -23,6 +24,7 @@ interface CommentsSectionProps {
   type: 'movie' | 'show';
   season?: number;
   episode?: number;
+  onCommentPress?: (comment: TraktContentComment) => void;
 }
 
 interface CommentItemProps {
@@ -38,6 +40,8 @@ const CompactCommentCard: React.FC<{
   isSpoilerRevealed: boolean;
   onSpoilerPress: () => void;
 }> = ({ comment, theme, onPress, isSpoilerRevealed, onSpoilerPress }) => {
+  const [isPressed, setIsPressed] = useState(false);
+
   // Safety check - ensure comment data exists
   if (!comment || !comment.comment) {
     return null;
@@ -112,18 +116,22 @@ const CompactCommentCard: React.FC<{
     return stars;
   };
 
-  const handlePress = () => {
-    if (hasSpoiler && !isSpoilerRevealed) {
-      onSpoilerPress();
-    } else {
-      onPress();
-    }
-  };
-
   return (
     <TouchableOpacity
-      style={[styles.compactCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
-      onPress={handlePress}
+      style={[
+        styles.compactCard,
+        {
+          backgroundColor: isPressed ? theme.colors.primary + '20' : theme.colors.card,
+          borderColor: theme.colors.border,
+          transform: isPressed ? [{ scale: 0.98 }] : [{ scale: 1 }]
+        }
+      ]}
+      onPressIn={() => setIsPressed(true)}
+      onPressOut={() => setIsPressed(false)}
+      onPress={() => {
+        console.log('CompactCommentCard: TouchableOpacity pressed for comment:', comment.id);
+        onPress();
+      }}
       activeOpacity={0.7}
     >
       {/* Header Section - Fixed at top */}
@@ -162,15 +170,8 @@ const CompactCommentCard: React.FC<{
       {/* Meta Info - Fixed at bottom */}
       <View style={styles.compactMeta}>
         <View style={styles.compactBadges}>
-          {comment.review && (
-            <View style={[styles.miniReviewBadgeContainer, { backgroundColor: theme.colors.primary }]}>
-              <Text style={styles.miniBadgeText}>Review</Text>
-            </View>
-          )}
           {comment.spoiler && (
-            <View style={[styles.miniSpoilerBadgeContainer, { backgroundColor: theme.colors.error }]}>
-              <Text style={styles.miniBadgeText}>Spoiler</Text>
-            </View>
+            <Text style={[styles.spoilerMiniText, { color: theme.colors.error }]}>Spoiler</Text>
           )}
         </View>
         <View style={styles.compactStats}>
@@ -193,8 +194,8 @@ const CompactCommentCard: React.FC<{
   );
 };
 
-// Expanded comment modal
-const ExpandedCommentModal: React.FC<{
+// Expanded comment bottom sheet
+const ExpandedCommentBottomSheet: React.FC<{
   comment: TraktContentComment | null;
   visible: boolean;
   onClose: () => void;
@@ -202,6 +203,17 @@ const ExpandedCommentModal: React.FC<{
   isSpoilerRevealed: boolean;
   onSpoilerPress: () => void;
 }> = ({ comment, visible, onClose, theme, isSpoilerRevealed, onSpoilerPress }) => {
+  const bottomSheetRef = useRef<BottomSheet>(null);
+
+  // Handle visibility changes - always call this hook
+  React.useEffect(() => {
+    if (visible && comment) {
+      bottomSheetRef.current?.expand();
+    } else {
+      bottomSheetRef.current?.close();
+    }
+  }, [visible, comment]);
+
   if (!comment) return null;
 
   const user = comment.user || {};
@@ -209,18 +221,21 @@ const ExpandedCommentModal: React.FC<{
   const hasSpoiler = comment.spoiler;
   const shouldBlurModalContent = hasSpoiler && !isSpoilerRevealed;
 
-  const formatDate = (dateString: string) => {
+  const formatDateParts = (dateString: string) => {
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
+      const datePart = date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
+      });
+      const timePart = date.toLocaleTimeString('en-US', {
         hour: '2-digit',
         minute: '2-digit',
       });
+      return { datePart, timePart };
     } catch {
-      return 'Unknown date';
+      return { datePart: 'Unknown date', timePart: '' };
     }
   };
 
@@ -254,26 +269,29 @@ const ExpandedCommentModal: React.FC<{
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={onClose}
+    <BottomSheet
+      ref={bottomSheetRef}
+      onChange={(index) => {
+        if (index === -1) {
+          onClose();
+        }
+      }}
+      index={-1}
+      snapPoints={[200, '50%', '90%']}
+      enablePanDownToClose={true}
+      animateOnMount={true}
+      backgroundStyle={{
+        backgroundColor: theme.colors.darkGray || '#0A0C0C',
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
+      }}
+      handleIndicatorStyle={{
+        backgroundColor: theme.colors.mediumEmphasis || '#CCCCCC',
+      }}
     >
-      <TouchableOpacity
-        style={styles.modalOverlay}
-        activeOpacity={1}
-        onPress={onClose}
-      >
-        <TouchableOpacity
-          style={[styles.modalContent, {
-            backgroundColor: theme.colors.darkGray || '#0A0C0C',
-            borderColor: theme.colors.border || '#CCCCCC',
-            borderWidth: 1
-          }]}
-          activeOpacity={1}
-          onPress={() => {}} // Prevent closing when clicking on modal content
-        >
+      <BottomSheetView style={[styles.bottomSheetContent, {
+        backgroundColor: theme.colors.darkGray || '#0A0C0C',
+      }]}>
           {/* Close Button */}
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <MaterialIcons name="close" size={24} color={theme.colors.highEmphasis} />
@@ -291,9 +309,21 @@ const ExpandedCommentModal: React.FC<{
                 </View>
               )}
             </View>
-            <Text style={[styles.modalDate, { color: theme.colors.mediumEmphasis }]}>
-              {formatDate(comment.created_at)}
-            </Text>
+            {(() => {
+              const { datePart, timePart } = formatDateParts(comment.created_at);
+              return (
+                <View style={styles.dateTimeContainer}>
+                  <Text style={[styles.modalDate, { color: theme.colors.mediumEmphasis }]}>
+                    {datePart}
+                  </Text>
+                  {!!timePart && (
+                    <Text style={[styles.modalTime, { color: theme.colors.mediumEmphasis }]}>
+                      {timePart}
+                    </Text>
+                  )}
+                </View>
+              );
+            })()}
           </View>
 
           {/* Rating */}
@@ -322,18 +352,21 @@ const ExpandedCommentModal: React.FC<{
               </TouchableOpacity>
             </View>
           ) : (
-            <Text style={[styles.modalComment, { color: theme.colors.highEmphasis }]}>
-              {comment.comment}
-            </Text>
+            <ScrollView
+              style={styles.modalCommentScroll}
+              showsVerticalScrollIndicator={true}
+              nestedScrollEnabled
+            >
+              <Text style={[styles.modalComment, { color: theme.colors.highEmphasis }]}>
+                {comment.comment}
+              </Text>
+            </ScrollView>
           )}
 
           {/* Comment Meta */}
           <View style={styles.modalMeta}>
-            {comment.review && (
-              <Text style={[styles.reviewBadge, { color: theme.colors.primary }]}>Review</Text>
-            )}
             {comment.spoiler && (
-              <Text style={[styles.spoilerBadge, { color: theme.colors.error }]}>Spoiler</Text>
+              <Text style={[styles.spoilerText, { color: theme.colors.error }]}>Spoiler</Text>
             )}
             <View style={styles.modalStats}>
               {comment.likes > 0 && (
@@ -354,9 +387,8 @@ const ExpandedCommentModal: React.FC<{
               )}
             </View>
           </View>
-        </TouchableOpacity>
-      </TouchableOpacity>
-    </Modal>
+        </BottomSheetView>
+    </BottomSheet>
   );
 };
 
@@ -365,11 +397,9 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
   type,
   season,
   episode,
+  onCommentPress,
 }) => {
   const { currentTheme } = useTheme();
-  const [selectedComment, setSelectedComment] = useState<TraktContentComment | null>(null);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [revealedSpoilers, setRevealedSpoilers] = useState<Set<string>>(new Set());
 
   const {
     comments,
@@ -388,45 +418,36 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
     enabled: true,
   });
 
-  const handleCommentPress = useCallback((comment: TraktContentComment) => {
-    setSelectedComment(comment);
-    setModalVisible(true);
-  }, []);
+  // Debug logging
+  console.log('CommentsSection: Comments data:', comments);
+  console.log('CommentsSection: Comments length:', comments?.length);
+  console.log('CommentsSection: Loading:', loading);
+  console.log('CommentsSection: Error:', error);
 
-  const handleModalClose = useCallback(() => {
-    setModalVisible(false);
-    setSelectedComment(null);
-  }, []);
+  const renderComment = useCallback(({ item }: { item: TraktContentComment }) => {
+    // Safety check for null/undefined items
+    if (!item || !item.id) {
+      console.log('CommentsSection: Invalid comment item:', item);
+      return null;
+    }
 
-  const handleSpoilerPress = useCallback((comment: TraktContentComment) => {
-    Alert.alert(
-      'Spoiler Warning',
-      'This comment contains spoilers. Are you sure you want to reveal it?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Reveal Spoilers',
-          style: 'destructive',
-          onPress: () => {
-            setRevealedSpoilers(prev => new Set([...prev, comment.id.toString()]));
-          },
-        },
-      ]
+    console.log('CommentsSection: Rendering comment:', item.id);
+
+    return (
+      <CompactCommentCard
+        comment={item}
+        theme={currentTheme}
+        onPress={() => {
+          console.log('CommentsSection: Comment pressed:', item.id);
+          onCommentPress?.(item);
+        }}
+        isSpoilerRevealed={true}
+        onSpoilerPress={() => {
+          // Do nothing for now - spoilers are handled by parent
+        }}
+      />
     );
-  }, []);
-
-  const renderComment = useCallback(({ item }: { item: TraktContentComment }) => (
-    <CompactCommentCard
-      comment={item}
-      theme={currentTheme}
-      onPress={() => handleCommentPress(item)}
-      isSpoilerRevealed={revealedSpoilers.has(item.id.toString())}
-      onSpoilerPress={() => handleSpoilerPress(item)}
-    />
-  ), [currentTheme, handleCommentPress, revealedSpoilers, handleSpoilerPress]);
+  }, [currentTheme, onCommentPress]);
 
   const renderEmpty = useCallback(() => {
     if (loading) return null;
@@ -496,6 +517,12 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
           keyExtractor={(item) => item?.id?.toString() || Math.random().toString()}
           renderItem={renderComment}
           contentContainerStyle={styles.horizontalList}
+          removeClippedSubviews={false}
+          getItemLayout={(data, index) => ({
+            length: 292, // width + marginRight
+            offset: 292 * index,
+            index,
+          })}
           onEndReached={() => {
             if (hasMore && !loading) {
               loadMore();
@@ -527,16 +554,199 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
         />
       )}
 
-      {/* Expanded Comment Modal */}
-      <ExpandedCommentModal
-        comment={selectedComment}
-        visible={modalVisible}
-        onClose={handleModalClose}
-        theme={currentTheme}
-        isSpoilerRevealed={selectedComment ? revealedSpoilers.has(selectedComment.id.toString()) : false}
-        onSpoilerPress={() => selectedComment && handleSpoilerPress(selectedComment)}
-      />
     </View>
+  );
+};
+
+// BottomSheet component that should be rendered at a higher level
+export const CommentBottomSheet: React.FC<{
+  comment: TraktContentComment | null;
+  visible: boolean;
+  onClose: () => void;
+  theme: any;
+  isSpoilerRevealed: boolean;
+  onSpoilerPress: () => void;
+}> = ({ comment, visible, onClose, theme, isSpoilerRevealed, onSpoilerPress }) => {
+  const bottomSheetRef = useRef<BottomSheet>(null);
+
+  console.log('CommentBottomSheet: Rendered with visible:', visible, 'comment:', comment?.id);
+
+  // Calculate the index based on visibility - start at medium height (50%)
+  const sheetIndex = visible && comment ? 1 : -1;
+
+  console.log('CommentBottomSheet: Calculated sheetIndex:', sheetIndex);
+
+  if (!comment) return null;
+
+  const user = comment.user || {};
+  const username = user.name || user.username || 'Anonymous User';
+  const hasSpoiler = comment.spoiler;
+  const shouldBlurModalContent = hasSpoiler && !isSpoilerRevealed;
+
+  const formatDateParts = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      const datePart = date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+      const timePart = date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      return { datePart, timePart };
+    } catch {
+      return { datePart: 'Unknown date', timePart: '' };
+    }
+  };
+
+  const renderStars = (rating: number | null) => {
+    if (rating === null) return null;
+
+    const stars = [];
+    const fullStars = Math.floor(rating / 2);
+    const hasHalfStar = rating % 2 >= 1;
+
+    for (let i = 0; i < fullStars; i++) {
+      stars.push(
+        <MaterialIcons key={`full-${i}`} name="star" size={16} color="#FFD700" />
+      );
+    }
+
+    if (hasHalfStar) {
+      stars.push(
+        <MaterialIcons key="half" name="star-half" size={16} color="#FFD700" />
+      );
+    }
+
+    const emptyStars = 5 - Math.ceil(rating / 2);
+    for (let i = 0; i < emptyStars; i++) {
+      stars.push(
+        <MaterialIcons key={`empty-${i}`} name="star-border" size={16} color="#FFD700" />
+      );
+    }
+
+    return stars;
+  };
+
+  return (
+    <BottomSheet
+      ref={bottomSheetRef}
+      onChange={(index) => {
+        console.log('CommentBottomSheet: onChange called with index:', index);
+        if (index === -1) {
+          onClose();
+        }
+      }}
+      index={sheetIndex}
+      snapPoints={[200, '50%']}
+      enablePanDownToClose={true}
+      animateOnMount={true}
+      backgroundStyle={{
+        backgroundColor: theme.colors.darkGray || '#0A0C0C',
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
+      }}
+      handleIndicatorStyle={{
+        backgroundColor: theme.colors.mediumEmphasis || '#CCCCCC',
+      }}
+    >
+      <BottomSheetView style={[styles.bottomSheetContent, {
+        backgroundColor: theme.colors.darkGray || '#0A0C0C',
+      }]}>
+          {/* User Info */}
+          <View style={styles.modalHeader}>
+            <View style={styles.userInfo}>
+              <Text style={[styles.modalUsername, { color: theme.colors.highEmphasis }]}>
+                {username}
+              </Text>
+              {user.vip && (
+                <View style={styles.vipBadge}>
+                  <Text style={styles.vipText}>VIP</Text>
+                </View>
+              )}
+            </View>
+            {(() => {
+              const { datePart, timePart } = formatDateParts(comment.created_at);
+              return (
+                <View style={styles.dateTimeContainer}>
+                  <Text style={[styles.modalDate, { color: theme.colors.mediumEmphasis }]}>
+                    {datePart}
+                  </Text>
+                  {!!timePart && (
+                    <Text style={[styles.modalTime, { color: theme.colors.mediumEmphasis }]}>
+                      {timePart}
+                    </Text>
+                  )}
+                </View>
+              );
+            })()}
+          </View>
+
+          {/* Rating */}
+          {comment.user_stats?.rating && (
+            <View style={styles.modalRating}>
+              {renderStars(comment.user_stats.rating)}
+              <Text style={[styles.modalRatingText, { color: theme.colors.mediumEmphasis }]}>
+                {comment.user_stats.rating}/10
+              </Text>
+            </View>
+          )}
+
+          {/* Full Comment */}
+          {shouldBlurModalContent ? (
+            <View style={styles.spoilerContainer}>
+              <Text style={[styles.spoilerWarning, { color: theme.colors.error }]}>
+                ⚠️ This comment contains spoilers
+              </Text>
+              <TouchableOpacity
+                style={[styles.revealButton, { backgroundColor: theme.colors.primary }]}
+                onPress={onSpoilerPress}
+              >
+                <Text style={[styles.revealButtonText, { color: theme.colors.white }]}>
+                  Reveal Spoilers
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <ScrollView
+              style={styles.modalCommentScroll}
+              showsVerticalScrollIndicator={true}
+              nestedScrollEnabled
+            >
+              <Text style={[styles.modalComment, { color: theme.colors.highEmphasis }]}>
+                {comment.comment}
+              </Text>
+            </ScrollView>
+          )}
+
+          {/* Comment Meta */}
+          <View style={styles.modalMeta}>
+            {comment.spoiler && (
+              <Text style={[styles.spoilerText, { color: theme.colors.error }]}>Spoiler</Text>
+            )}
+            <View style={styles.modalStats}>
+              {comment.likes > 0 && (
+                <View style={styles.likesContainer}>
+                  <MaterialIcons name="thumb-up" size={16} color={theme.colors.mediumEmphasis} />
+                  <Text style={[styles.likesText, { color: theme.colors.mediumEmphasis }]}>
+                    {comment.likes}
+                  </Text>
+                </View>
+              )}
+              {comment.replies > 0 && (
+                <View style={styles.repliesContainer}>
+                  <MaterialIcons name="chat-bubble-outline" size={16} color={theme.colors.mediumEmphasis} />
+                  <Text style={[styles.repliesText, { color: theme.colors.mediumEmphasis }]}>
+                    {comment.replies}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </BottomSheetView>
+    </BottomSheet>
   );
 };
 
@@ -629,20 +839,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 4,
   },
-  miniReviewBadgeContainer: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  miniSpoilerBadgeContainer: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  miniBadgeText: {
-    fontSize: 9,
+  spoilerMiniText: {
+    fontSize: 11,
     fontWeight: '700',
-    color: '#FFFFFF',
   },
   compactStats: {
     flexDirection: 'row',
@@ -721,22 +920,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  reviewBadge: {
+  spoilerText: {
     fontSize: 12,
     fontWeight: '600',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    backgroundColor: 'rgba(33, 150, 243, 0.1)',
-  },
-  spoilerBadge: {
-    fontSize: 12,
-    fontWeight: '600',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    backgroundColor: 'rgba(244, 67, 54, 0.1)',
-    marginLeft: 8,
+    marginRight: 8,
   },
   metaRight: {
     flexDirection: 'row',
@@ -825,23 +1012,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  modalOverlay: {
+  bottomSheetContent: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
     padding: 20,
-  },
-  modalContent: {
-    width: '90%',
-    maxWidth: 400,
-    maxHeight: '80%',
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
   },
   closeButton: {
     position: 'absolute',
@@ -867,6 +1040,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
   },
+  modalTime: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  dateTimeContainer: {
+    alignItems: 'flex-end',
+  },
   modalRating: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -881,6 +1061,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     marginBottom: 16,
+  },
+  modalCommentScroll: {
+    // Constrain height so only text area scrolls, not the entire modal
+    maxHeight: 400,
+    marginBottom: 16,
+    flexShrink: 1,
   },
   spoilerContainer: {
     alignItems: 'center',
