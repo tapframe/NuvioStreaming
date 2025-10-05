@@ -383,6 +383,177 @@ export interface TraktHistoryRemoveResponse {
   };
 }
 
+// Comment types
+export interface TraktComment {
+  id: number;
+  comment: string;
+  spoiler: boolean;
+  review: boolean;
+  parent_id: number;
+  created_at: string;
+  updated_at: string;
+  replies: number;
+  likes: number;
+  user_stats?: {
+    rating?: number | null;
+    play_count?: number;
+    completed_count?: number;
+  };
+  user: {
+    username: string;
+    private: boolean;
+    name?: string;
+    vip: boolean;
+    vip_ep: boolean;
+    ids: {
+      slug: string;
+    };
+  };
+}
+
+export interface TraktMovieComment {
+  type: 'movie';
+  movie: {
+    title: string;
+    year: number;
+    ids: {
+      trakt: number;
+      slug: string;
+      imdb: string;
+      tmdb: number;
+    };
+  };
+  comment: TraktComment;
+}
+
+export interface TraktShowComment {
+  type: 'show';
+  show: {
+    title: string;
+    year: number;
+    ids: {
+      trakt: number;
+      slug: string;
+      tvdb?: number;
+      imdb: string;
+      tmdb: number;
+    };
+  };
+  comment: TraktComment;
+}
+
+export interface TraktSeasonComment {
+  type: 'season';
+  season: {
+    number: number;
+    ids: {
+      trakt: number;
+      tvdb?: number;
+      tmdb?: number;
+    };
+  };
+  show: {
+    title: string;
+    year: number;
+    ids: {
+      trakt: number;
+      slug: string;
+      tvdb?: number;
+      imdb: string;
+      tmdb: number;
+    };
+  };
+  comment: TraktComment;
+}
+
+export interface TraktEpisodeComment {
+  type: 'episode';
+  episode: {
+    season: number;
+    number: number;
+    title: string;
+    ids: {
+      trakt: number;
+      tvdb?: number;
+      imdb?: string;
+      tmdb?: number;
+    };
+  };
+  show: {
+    title: string;
+    year: number;
+    ids: {
+      trakt: number;
+      slug: string;
+      tvdb?: number;
+      imdb: string;
+      tmdb: number;
+    };
+  };
+  comment: TraktComment;
+}
+
+export interface TraktListComment {
+  type: 'list';
+  list: {
+    name: string;
+    description?: string;
+    privacy: string;
+    share_link?: string;
+    display_numbers: boolean;
+    allow_comments: boolean;
+    updated_at: string;
+    item_count: number;
+    comment_count: number;
+    likes: number;
+    ids: {
+      trakt: number;
+      slug: string;
+    };
+  };
+  comment: TraktComment;
+}
+
+// Simplified comment type based on actual API response
+export interface TraktContentComment {
+  id: number;
+  comment: string;
+  spoiler: boolean;
+  review: boolean;
+  parent_id: number;
+  created_at: string;
+  updated_at: string;
+  replies: number;
+  likes: number;
+  language: string;
+  user_rating?: number;
+  user_stats?: {
+    rating?: number;
+    play_count?: number;
+    completed_count?: number;
+  };
+  user: {
+    username: string;
+    private: boolean;
+    deleted?: boolean;
+    name?: string;
+    vip: boolean;
+    vip_ep: boolean;
+    director?: boolean;
+    ids: {
+      slug: string;
+    };
+  };
+}
+
+// Keep the old types for backward compatibility if needed
+export type TraktContentCommentLegacy =
+  | TraktMovieComment
+  | TraktShowComment
+  | TraktSeasonComment
+  | TraktEpisodeComment
+  | TraktListComment;
+
 export class TraktService {
   private static instance: TraktService;
   private accessToken: string | null = null;
@@ -1062,24 +1233,56 @@ export class TraktService {
   /**
    * Get trakt id from IMDb id
    */
-  public async getTraktIdFromImdbId(imdbId: string, type: 'movies' | 'shows'): Promise<number | null> {
+  public async getTraktIdFromImdbId(imdbId: string, type: 'movie' | 'show'): Promise<number | null> {
     try {
-      const response = await fetch(`${TRAKT_API_URL}/search/${type}?id_type=imdb&id=${imdbId}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'trakt-api-version': '2',
-          'trakt-api-key': TRAKT_CLIENT_ID
+      // Clean IMDb ID - remove 'tt' prefix if present
+      const cleanImdbId = imdbId.startsWith('tt') ? imdbId.substring(2) : imdbId;
+
+      logger.log(`[TraktService] Searching Trakt for ${type} with IMDb ID: ${cleanImdbId}`);
+
+      // Try multiple search approaches
+      const searchUrls = [
+        `${TRAKT_API_URL}/search/${type}?id_type=imdb&id=${cleanImdbId}`,
+        `${TRAKT_API_URL}/search/${type}?query=${encodeURIComponent(cleanImdbId)}&id_type=imdb`,
+        // Also try with the full tt-prefixed ID in case the API accepts it
+        `${TRAKT_API_URL}/search/${type}?id_type=imdb&id=tt${cleanImdbId}`
+      ];
+
+      for (const searchUrl of searchUrls) {
+        try {
+          logger.log(`[TraktService] Trying search URL: ${searchUrl}`);
+
+          const response = await fetch(searchUrl, {
+            headers: {
+              'Content-Type': 'application/json',
+              'trakt-api-version': '2',
+              'trakt-api-key': TRAKT_CLIENT_ID
+            }
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            logger.warn(`[TraktService] Search attempt failed (${response.status}): ${errorText}`);
+            continue; // Try next URL
+          }
+
+          const data = await response.json();
+          logger.log(`[TraktService] Search response data:`, data);
+
+          if (data && data.length > 0) {
+            const traktId = data[0][type]?.ids?.trakt;
+            if (traktId) {
+              logger.log(`[TraktService] Found Trakt ID: ${traktId} for IMDb ID: ${cleanImdbId}`);
+              return traktId;
+            }
+          }
+        } catch (urlError) {
+          logger.warn(`[TraktService] URL attempt failed:`, urlError);
+          continue;
         }
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to get Trakt ID: ${response.status}`);
       }
 
-      const data = await response.json();
-      if (data && data.length > 0) {
-        return data[0][type.slice(0, -1)].ids.trakt;
-      }
+      logger.warn(`[TraktService] No results found for IMDb ID: ${cleanImdbId} after trying all search methods`);
       return null;
     } catch (error) {
       logger.error('[TraktService] Failed to get Trakt ID from IMDb ID:', error);
@@ -1092,7 +1295,7 @@ export class TraktService {
    */
   public async addToWatchedMovies(imdbId: string, watchedAt: Date = new Date()): Promise<boolean> {
     try {
-      const traktId = await this.getTraktIdFromImdbId(imdbId, 'movies');
+      const traktId = await this.getTraktIdFromImdbId(imdbId, 'movie');
       if (!traktId) {
         return false;
       }
@@ -1124,7 +1327,7 @@ export class TraktService {
     watchedAt: Date = new Date()
   ): Promise<boolean> {
     try {
-      const traktId = await this.getTraktIdFromImdbId(imdbId, 'shows');
+      const traktId = await this.getTraktIdFromImdbId(imdbId, 'show');
       if (!traktId) {
         return false;
       }
@@ -1165,7 +1368,7 @@ export class TraktService {
         return false;
       }
 
-      const traktId = await this.getTraktIdFromImdbId(imdbId, 'movies');
+      const traktId = await this.getTraktIdFromImdbId(imdbId, 'movie');
       if (!traktId) {
         return false;
       }
@@ -1191,7 +1394,7 @@ export class TraktService {
         return false;
       }
 
-      const traktId = await this.getTraktIdFromImdbId(imdbId, 'shows');
+      const traktId = await this.getTraktIdFromImdbId(imdbId, 'show');
       if (!traktId) {
         return false;
       }
@@ -2157,6 +2360,137 @@ export class TraktService {
     } catch (error) {
       logger.error('[TraktService] Failed to remove history by IDs:', error);
       return false;
+    }
+  }
+
+  /**
+   * Get trakt id from TMDB id (fallback method)
+   */
+  public async getTraktIdFromTmdbId(tmdbId: number, type: 'movie' | 'show'): Promise<number | null> {
+    try {
+      logger.log(`[TraktService] Searching Trakt for ${type} with TMDB ID: ${tmdbId}`);
+
+      const response = await fetch(`${TRAKT_API_URL}/search/${type}?id_type=tmdb&id=${tmdbId}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'trakt-api-version': '2',
+          'trakt-api-key': TRAKT_CLIENT_ID
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        logger.warn(`[TraktService] TMDB search failed (${response.status}): ${errorText}`);
+        return null;
+      }
+
+      const data = await response.json();
+      logger.log(`[TraktService] TMDB search response:`, data);
+      if (data && data.length > 0) {
+        const traktId = data[0][type]?.ids?.trakt;
+        if (traktId) {
+          logger.log(`[TraktService] Found Trakt ID via TMDB: ${traktId} for TMDB ID: ${tmdbId}`);
+          return traktId;
+        }
+      }
+
+      logger.warn(`[TraktService] No TMDB results found for TMDB ID: ${tmdbId}`);
+      return null;
+    } catch (error) {
+      logger.error('[TraktService] Failed to get Trakt ID from TMDB ID:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get comments for a movie
+   */
+  public async getMovieComments(imdbId: string, tmdbId?: number, page: number = 1, limit: number = 10): Promise<TraktContentComment[]> {
+    try {
+      let traktId = await this.getTraktIdFromImdbId(imdbId, 'movie');
+
+      // Fallback to TMDB ID if IMDb search failed
+      if (!traktId && tmdbId) {
+        logger.log(`[TraktService] IMDb search failed, trying TMDB ID: ${tmdbId}`);
+        traktId = await this.getTraktIdFromTmdbId(tmdbId, 'movie');
+      }
+
+      if (!traktId) {
+        logger.warn(`[TraktService] Could not find Trakt ID for movie with IMDb: ${imdbId}, TMDB: ${tmdbId}`);
+        return [];
+      }
+
+      const endpoint = `/movies/${traktId}/comments?page=${page}&limit=${limit}`;
+      const result = await this.apiRequest<TraktContentComment[]>(endpoint, 'GET');
+      console.log(`[TraktService] Movie comments response:`, result);
+      return result;
+    } catch (error) {
+      logger.error('[TraktService] Failed to get movie comments:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get comments for a show
+   */
+  public async getShowComments(imdbId: string, tmdbId?: number, page: number = 1, limit: number = 10): Promise<TraktContentComment[]> {
+    try {
+      let traktId = await this.getTraktIdFromImdbId(imdbId, 'show');
+
+      // Fallback to TMDB ID if IMDb search failed
+      if (!traktId && tmdbId) {
+        logger.log(`[TraktService] IMDb search failed, trying TMDB ID: ${tmdbId}`);
+        traktId = await this.getTraktIdFromTmdbId(tmdbId, 'show');
+      }
+
+      if (!traktId) {
+        logger.warn(`[TraktService] Could not find Trakt ID for show with IMDb: ${imdbId}, TMDB: ${tmdbId}`);
+        return [];
+      }
+
+      const endpoint = `/shows/${traktId}/comments?page=${page}&limit=${limit}`;
+      const result = await this.apiRequest<TraktContentComment[]>(endpoint, 'GET');
+      console.log(`[TraktService] Show comments response:`, result);
+      return result;
+    } catch (error) {
+      logger.error('[TraktService] Failed to get show comments:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get comments for a season
+   */
+  public async getSeasonComments(imdbId: string, season: number, page: number = 1, limit: number = 10): Promise<TraktContentComment[]> {
+    try {
+      const traktId = await this.getTraktIdFromImdbId(imdbId, 'show');
+      if (!traktId) {
+        return [];
+      }
+
+      const endpoint = `/shows/${traktId}/seasons/${season}/comments?page=${page}&limit=${limit}`;
+      return this.apiRequest<TraktContentComment[]>(endpoint, 'GET');
+    } catch (error) {
+      logger.error('[TraktService] Failed to get season comments:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get comments for an episode
+   */
+  public async getEpisodeComments(imdbId: string, season: number, episode: number, page: number = 1, limit: number = 10): Promise<TraktContentComment[]> {
+    try {
+      const traktId = await this.getTraktIdFromImdbId(imdbId, 'show');
+      if (!traktId) {
+        return [];
+      }
+
+      const endpoint = `/shows/${traktId}/seasons/${season}/episodes/${episode}/comments?page=${page}&limit=${limit}`;
+      return this.apiRequest<TraktContentComment[]>(endpoint, 'GET');
+    } catch (error) {
+      logger.error('[TraktService] Failed to get episode comments:', error);
+      return [];
     }
   }
 

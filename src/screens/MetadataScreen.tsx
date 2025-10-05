@@ -24,6 +24,7 @@ import { SeriesContent } from '../components/metadata/SeriesContent';
 import { MovieContent } from '../components/metadata/MovieContent';
 import { MoreLikeThisSection } from '../components/metadata/MoreLikeThisSection';
 import { RatingsSection } from '../components/metadata/RatingsSection';
+import { CommentsSection } from '../components/metadata/CommentsSection';
 import { RouteParams, Episode } from '../types/metadata';
 import Animated, {
   useAnimatedStyle,
@@ -63,6 +64,7 @@ const MemoizedSeriesContent = memo(SeriesContent);
 const MemoizedMovieContent = memo(MovieContent);
 const MemoizedMoreLikeThisSection = memo(MoreLikeThisSection);
 const MemoizedRatingsSection = memo(RatingsSection);
+const MemoizedCommentsSection = memo(CommentsSection);
 const MemoizedCastDetailsModal = memo(CastDetailsModal);
 
 const MetadataScreen: React.FC = () => {
@@ -672,9 +674,18 @@ const MetadataScreen: React.FC = () => {
                 />
               )}
 
+              {/* Comments Section - Lazy loaded */}
+              {shouldLoadSecondaryData && imdbId && (
+                <MemoizedCommentsSection
+                  imdbId={imdbId}
+                  tmdbId={tmdbId || undefined}
+                  type={Object.keys(groupedEpisodes).length > 0 ? 'show' : 'movie'}
+                />
+              )}
+
               {/* Recommendations Section with skeleton when loading - Lazy loaded */}
               {type === 'movie' && shouldLoadSecondaryData && (
-                <MemoizedMoreLikeThisSection 
+                <MemoizedMoreLikeThisSection
                   recommendations={recommendations}
                   loadingRecommendations={loadingRecommendations}
                 />
