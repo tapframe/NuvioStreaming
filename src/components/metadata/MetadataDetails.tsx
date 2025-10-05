@@ -19,6 +19,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
 import { isMDBListEnabled } from '../../screens/MDBListSettingsScreen';
+import { getAgeRatingColor } from '../../utils/ageRatingColors';
 // MetadataSourceSelector removed
 
 interface MetadataDetailsProps {
@@ -153,7 +154,11 @@ function formatRuntime(runtime: string): string {
           </Text>
         )}
         {metadata.certification && (
-          <Text style={[styles.metaText, { color: currentTheme.colors.text }]}>{metadata.certification}</Text>
+          <Text style={[
+            styles.metaText,
+            styles.premiumOutlinedText,
+            { color: getAgeRatingColor(metadata.certification, type === 'series' ? 'series' : 'movie') }
+          ]}>{metadata.certification}</Text>
         )}
         {metadata.imdbRating && !isMDBEnabled && (
           <View style={styles.ratingContainer}>
@@ -272,6 +277,15 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
     textTransform: 'uppercase',
     opacity: 0.9,
+  },
+  premiumOutlinedText: {
+    // Subtle premium outline effect for letters
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+    // Enhanced letter definition
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   ratingContainer: {
     flexDirection: 'row',

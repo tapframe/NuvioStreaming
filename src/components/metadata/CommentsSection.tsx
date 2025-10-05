@@ -10,6 +10,7 @@ import {
   Alert,
   ScrollView,
   Animated,
+  Linking,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import TraktIcon from '../../../assets/rating-icons/trakt.svg';
@@ -34,6 +35,142 @@ interface CommentItemProps {
   comment: TraktContentComment;
   theme: any;
 }
+
+// Minimal markdown renderer with inline spoiler handling
+const MarkdownText: React.FC<{
+  text: string;
+  theme: any;
+  numberOfLines?: number;
+  revealedInlineSpoilers: boolean;
+  onSpoilerPress?: () => void;
+  textStyle?: any;
+}> = ({ text, theme, numberOfLines, revealedInlineSpoilers, onSpoilerPress, textStyle }) => {
+  // Regexes for simple markdown
+  const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g; // [text](url)
+  const boldRegex = /\*\*([^*]+)\*\*/g; // **bold**
+  const italicRegex = /\*([^*]+)\*/g; // *italic*
+  const codeRegex = /`([^`]+)`/g; // `code`
+  const spoilerRegex = /\[spoiler\]([\s\S]*?)\[\/spoiler\]/gi;
+
+  // Tokenize spoilers first to keep nesting simple
+  const spoilerTokens: Array<{ type: 'spoiler' | 'text'; content: string }> = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = spoilerRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      spoilerTokens.push({ type: 'text', content: text.slice(lastIndex, match.index) });
+    }
+    spoilerTokens.push({ type: 'spoiler', content: match[1] });
+    lastIndex = spoilerRegex.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    spoilerTokens.push({ type: 'text', content: text.slice(lastIndex) });
+  }
+
+  const renderInline = (segment: string, keyPrefix: string) => {
+    // Process code
+    const codeSplit = segment.split(codeRegex);
+    const codeNodes: React.ReactNode[] = [];
+    for (let i = 0; i < codeSplit.length; i++) {
+      if (i % 2 === 1) {
+        codeNodes.push(
+          <Text key={`${keyPrefix}-code-${i}`} style={[{ fontFamily: 'Courier', backgroundColor: theme.colors.card, paddingHorizontal: 3, borderRadius: 3 }, textStyle]}>
+            {codeSplit[i]}
+          </Text>
+        );
+      } else {
+        // process bold and italic and links inside normal text
+        let chunk = codeSplit[i] ?? '';
+        const parts: React.ReactNode[] = [];
+
+        // Links
+        let cursor = 0;
+        let linkMatch: RegExpExecArray | null;
+        while ((linkMatch = linkRegex.exec(chunk)) !== null) {
+          const before = chunk.slice(cursor, linkMatch.index);
+          if (before) parts.push(<Text key={`${keyPrefix}-lnk-before-${cursor}`} style={textStyle}>{before}</Text>);
+          const label = linkMatch[1];
+          const url = linkMatch[2];
+          parts.push(
+            <Text
+              key={`${keyPrefix}-link-${cursor}`}
+              style={[{ color: theme.colors.primary }, textStyle]}
+              onPress={() => Linking.openURL(url)}
+              suppressHighlighting
+            >
+              {label}
+            </Text>
+          );
+          cursor = linkMatch.index + linkMatch[0].length;
+        }
+        if (cursor < chunk.length) {
+          parts.push(<Text key={`${keyPrefix}-lnk-tail`} style={textStyle}>{chunk.slice(cursor)}</Text>);
+        }
+
+        // Wrap bold & italic via nested Text by replacing markers
+        const applyFormat = (nodes: React.ReactNode[]): React.ReactNode[] => {
+          return nodes.flatMap((node, idx) => {
+            if (typeof node !== 'string' && !(node as any).props?.children) return node;
+            const str = typeof node === 'string' ? node : (node as any).props.children as string;
+            if (typeof str !== 'string') return node;
+
+            // bold
+            const boldSplit = str.split(boldRegex);
+            const boldNodes: React.ReactNode[] = [];
+            for (let b = 0; b < boldSplit.length; b++) {
+              if (b % 2 === 1) {
+                boldNodes.push(<Text key={`${keyPrefix}-b-${idx}-${b}`} style={[{ fontWeight: '700' }, textStyle]}>{boldSplit[b]}</Text>);
+              } else {
+                // italic inside non-bold chunk
+                const italSplit = boldSplit[b].split(italicRegex);
+                for (let it = 0; it < italSplit.length; it++) {
+                  if (it % 2 === 1) {
+                    boldNodes.push(<Text key={`${keyPrefix}-i-${idx}-${b}-${it}`} style={[{ fontStyle: 'italic' }, textStyle]}>{italSplit[it]}</Text>);
+                  } else {
+                    if (italSplit[it]) boldNodes.push(<Text key={`${keyPrefix}-t-${idx}-${b}-${it}`} style={textStyle}>{italSplit[it]}</Text>);
+                  }
+                }
+              }
+            }
+            return boldNodes;
+          });
+        };
+
+        codeNodes.push(
+          <Text key={`${keyPrefix}-txt-${i}`} style={[{ color: theme.colors.highEmphasis }, textStyle]}>
+            {applyFormat(parts)}
+          </Text>
+        );
+      }
+    }
+    return codeNodes;
+  };
+
+  return (
+    <Text numberOfLines={numberOfLines} ellipsizeMode="tail" style={[{ color: theme.colors.highEmphasis }, textStyle]}>
+      {spoilerTokens.map((tok, idx) => {
+        if (tok.type === 'text') {
+          return <Text key={`seg-${idx}`} style={textStyle}>{renderInline(tok.content, `seg-${idx}`)}</Text>;
+        }
+        if (revealedInlineSpoilers) {
+          return <Text key={`spl-${idx}`} style={textStyle}>{renderInline(tok.content, `spl-${idx}`)}</Text>;
+        }
+        return (
+          <Text key={`splmask-${idx}`} style={textStyle}>
+            <Text style={textStyle}> </Text>
+            <Text
+              onPress={onSpoilerPress}
+              style={[{ color: theme.colors.error, fontWeight: '700' }, textStyle]}
+            >
+              [spoiler]
+            </Text>
+            <Text style={textStyle}> </Text>
+          </Text>
+        );
+      })}
+    </Text>
+  );
+};
 
 // Compact comment card for horizontal scrolling
 const CompactCommentCard: React.FC<{
@@ -67,9 +204,7 @@ const CompactCommentCard: React.FC<{
   const hasSpoiler = comment.spoiler;
   const shouldBlurContent = hasSpoiler && !isSpoilerRevealed;
 
-  const truncatedComment = comment.comment.length > 100
-    ? comment.comment.substring(0, 100) + '...'
-    : comment.comment;
+  // We render markdown with inline spoilers; limit lines to keep card compact
 
   // Format relative time
   const formatRelativeTime = (dateString: string) => {
@@ -181,13 +316,18 @@ const CompactCommentCard: React.FC<{
 
       {/* Comment Preview - Flexible area that fills space */}
       <View style={[styles.commentContainer, shouldBlurContent ? styles.blurredContent : undefined]}>
-        <Text
-          style={[styles.compactComment, { color: theme.colors.highEmphasis }]}
-          numberOfLines={3}
-          ellipsizeMode="tail"
-        >
-          {shouldBlurContent ? '⚠️ This comment contains spoilers. Tap to reveal.' : truncatedComment}
-        </Text>
+        {shouldBlurContent ? (
+          <Text style={[styles.compactComment, { color: theme.colors.highEmphasis }]}>⚠️ This comment contains spoilers. Tap to reveal.</Text>
+        ) : (
+          <MarkdownText
+            text={comment.comment}
+            theme={theme}
+            numberOfLines={3}
+            revealedInlineSpoilers={isSpoilerRevealed}
+            onSpoilerPress={onSpoilerPress}
+            textStyle={styles.compactComment}
+          />
+        )}
       </View>
 
       {/* Meta Info - Fixed at bottom */}
@@ -371,7 +511,7 @@ const ExpandedCommentBottomSheet: React.FC<{
             </View>
           )}
 
-          {/* Full Comment */}
+          {/* Full Comment (Markdown with inline spoilers) */}
           {shouldBlurModalContent ? (
             <View style={styles.spoilerContainer}>
               <View style={[styles.spoilerIcon, { backgroundColor: theme.colors.card }]}>
@@ -388,9 +528,14 @@ const ExpandedCommentBottomSheet: React.FC<{
               </TouchableOpacity>
             </View>
           ) : (
-            <Text style={[styles.modalComment, { color: theme.colors.highEmphasis }]}>
-              {comment.comment}
-            </Text>
+            <View style={{ marginBottom: 16 }}>
+              <MarkdownText
+                text={comment.comment}
+                theme={theme}
+                revealedInlineSpoilers={true}
+                textStyle={styles.modalComment}
+              />
+            </View>
           )}
 
           {/* Comment Meta */}
@@ -788,7 +933,7 @@ export const CommentBottomSheet: React.FC<{
             </View>
           )}
 
-          {/* Full Comment */}
+          {/* Full Comment (Markdown with inline spoilers) */}
           {shouldBlurModalContent ? (
             <View style={styles.spoilerContainer}>
               <View style={[styles.spoilerIcon, { backgroundColor: theme.colors.card }]}>
@@ -805,9 +950,14 @@ export const CommentBottomSheet: React.FC<{
               </TouchableOpacity>
             </View>
           ) : (
-            <Text style={[styles.modalComment, { color: theme.colors.highEmphasis }]}>
-              {comment.comment}
-            </Text>
+            <View style={{ marginBottom: 16 }}>
+              <MarkdownText
+                text={comment.comment}
+                theme={theme}
+                revealedInlineSpoilers={true}
+                textStyle={styles.modalComment}
+              />
+            </View>
           )}
 
           {/* Comment Meta */}
