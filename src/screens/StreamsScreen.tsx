@@ -809,42 +809,10 @@ export const StreamsScreen = () => {
         const hasLocalScrapers = settings.enableLocalScrapers && await localScraperService.hasScrapers();
         if (__DEV__) console.log('[StreamsScreen] hasLocalScrapers:', hasLocalScrapers, 'enableLocalScrapers:', settings.enableLocalScrapers);
 
-        // Check for cached results (this covers both local and global cache)
-        let hasCachedResults = false;
-        if (settings.enableLocalScrapers) {
-          try {
-            // Check if there are any cached streams for this content
-            let season: number | undefined;
-            let episode: number | undefined;
-
-            if (episodeId && episodeId.includes(':')) {
-              const parts = episodeId.split(':');
-              if (parts.length >= 3) {
-                season = parseInt(parts[1], 10);
-                episode = parseInt(parts[2], 10);
-              }
-            }
-
-            const installedScrapers = await localScraperService.getInstalledScrapers();
-            const userSettings = {
-              enableLocalScrapers: settings.enableLocalScrapers,
-              enabledScrapers: new Set(
-                installedScrapers
-                  .filter(scraper => scraper.enabled)
-                  .map(scraper => scraper.id)
-              )
-            };
-            const cachedStreams = await hybridCacheService.getCachedStreams(type, id, season, episode, userSettings);
-            hasCachedResults = cachedStreams.length > 0;
-            if (__DEV__) console.log('[StreamsScreen] hasCachedResults:', hasCachedResults, 'cached streams count:', cachedStreams.length, 'season:', season, 'episode:', episode);
-          } catch (error) {
-            if (__DEV__) console.log('[StreamsScreen] Error checking cached results:', error);
-          }
-        }
-
-        // We have providers if we have Stremio addons, enabled local scrapers, OR cached results
-        const hasProviders = hasStremioProviders || hasLocalScrapers || hasCachedResults;
-        logger.log(`[StreamsScreen] provider check: hasProviders=${hasProviders} (stremio:${hasStremioProviders}, local:${hasLocalScrapers}, cached:${hasCachedResults})`);
+        // We have providers if we have Stremio addons OR enabled local scrapers
+        // Note: Cached results do NOT count as active providers - they are just old data
+        const hasProviders = hasStremioProviders || hasLocalScrapers;
+        logger.log(`[StreamsScreen] provider check: hasProviders=${hasProviders} (stremio:${hasStremioProviders}, local:${hasLocalScrapers})`);
 
         if (!isMounted.current) return;
 
@@ -852,20 +820,11 @@ export const StreamsScreen = () => {
         setHasStremioStreamProviders(hasStremioProviders);
 
         if (!hasProviders) {
-          // If we have local scrapers enabled but no cached results yet, wait a bit longer
-          if (settings.enableLocalScrapers && !hasCachedResults) {
-            logger.log('[StreamsScreen] No providers detected but checking for cached results; waiting longer');
-            const timer = setTimeout(() => {
-              if (isMounted.current) setShowNoSourcesError(true);
-            }, 2000); // Wait 2 seconds for cached results
-            return () => clearTimeout(timer);
-          } else {
-            logger.log('[StreamsScreen] No providers detected; scheduling no-sources UI');
-            const timer = setTimeout(() => {
-              if (isMounted.current) setShowNoSourcesError(true);
-            }, 500);
-            return () => clearTimeout(timer);
-          }
+          logger.log('[StreamsScreen] No providers detected; showing no-sources UI');
+          const timer = setTimeout(() => {
+            if (isMounted.current) setShowNoSourcesError(true);
+          }, 500);
+          return () => clearTimeout(timer);
         } else {
             // Check for cached streams first before loading
             if (settings.enableLocalScrapers) {
