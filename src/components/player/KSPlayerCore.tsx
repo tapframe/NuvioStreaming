@@ -2483,28 +2483,10 @@ const KSPlayerCore: React.FC = () => {
                 }}
               />
             </Animated.View>
-            {/* Minimal provider/quality indicator under logo (not animated) */}
-            <Text style={{
-              color: '#B8B8B8',
-              fontSize: 12,
-              marginTop: 8,
-              opacity: 0.9
-            }} numberOfLines={1}>
-              {`Via ${(currentStreamProvider || streamProvider || '').toString().toUpperCase()}${(currentQuality || quality) ? ` • ${(currentQuality || quality)}p` : ''}`}
-            </Text>
             </>
           ) : (
             <>
               <ActivityIndicator size="large" color="#E50914" />
-              {/* Minimal provider/quality indicator under spinner */}
-              <Text style={{
-                color: '#B8B8B8',
-                fontSize: 12,
-                marginTop: 12,
-                opacity: 0.9
-              }} numberOfLines={1}>
-                {`Via ${(currentStreamProvider || streamProvider || '').toString().toUpperCase()}${(currentQuality || quality) ? ` • ${(currentQuality || quality)}p` : ''}`}
-              </Text>
             </>
           )}
         </View>

@@ -3156,26 +3156,10 @@ const AndroidVideoPlayer: React.FC = () => {
                 }}
               />
             </Animated.View>
-            <Text style={{
-              color: '#B8B8B8',
-              fontSize: 12,
-              marginTop: 8,
-              opacity: 0.9
-            }} numberOfLines={1}>
-              {`Via ${(currentStreamProvider || streamProvider || '').toString().toUpperCase()}${(currentQuality || quality) ? ` • ${(currentQuality || quality)}p` : ''}`}
-            </Text>
             </>
           ) : (
             <>
           <ActivityIndicator size="large" color="#E50914" />
-              <Text style={{
-                color: '#B8B8B8',
-                fontSize: 12,
-                marginTop: 12,
-                opacity: 0.9
-              }} numberOfLines={1}>
-                {`Via ${(currentStreamProvider || streamProvider || '').toString().toUpperCase()}${(currentQuality || quality) ? ` • ${(currentQuality || quality)}p` : ''}`}
-              </Text>
             </>
           )}
         </View>

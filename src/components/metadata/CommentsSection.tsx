@@ -513,7 +513,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
         {placeholders.map((i) => (
           <View key={`skeleton-${i}`} style={[styles.compactCard, { backgroundColor: currentTheme.colors.card, borderColor: currentTheme.colors.border }]}>
-            <View style={styles.traktIconContainer}>
+            <View style={styles.skeletonTraktContainer}>
               <View style={[styles.skeletonDot]} />
             </View>
 
@@ -895,6 +895,12 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   traktIconContainer: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    zIndex: 1,
+  },
+  skeletonTraktContainer: {
     position: 'absolute',
     top: 8,
     right: 8,
