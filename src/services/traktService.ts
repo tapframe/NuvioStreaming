@@ -1570,17 +1570,17 @@ export class TraktService {
           return null;
         }
 
-        // Clean IMDB ID - some APIs want it without 'tt' prefix
-        const cleanImdbId = contentData.imdbId.startsWith('tt') 
-          ? contentData.imdbId.substring(2) 
-          : contentData.imdbId;
+        // Ensure IMDb ID includes the 'tt' prefix for Trakt scrobble payloads
+        const imdbIdWithPrefix = contentData.imdbId.startsWith('tt')
+          ? contentData.imdbId
+          : `tt${contentData.imdbId}`;
         
         const payload = {
           movie: {
             title: contentData.title,
             year: contentData.year,
             ids: {
-              imdb: cleanImdbId
+              imdb: imdbIdWithPrefix
             }
           },
           progress: Math.round(progress * 100) / 100 // Round to 2 decimal places
@@ -1614,23 +1614,23 @@ export class TraktService {
 
         // Add show IMDB ID if available
         if (contentData.showImdbId) {
-          const cleanShowImdbId = contentData.showImdbId.startsWith('tt') 
-            ? contentData.showImdbId.substring(2) 
-            : contentData.showImdbId;
-          payload.show.ids.imdb = cleanShowImdbId;
+          const showImdbWithPrefix = contentData.showImdbId.startsWith('tt')
+            ? contentData.showImdbId
+            : `tt${contentData.showImdbId}`;
+          payload.show.ids.imdb = showImdbWithPrefix;
         }
 
         // Add episode IMDB ID if available (for specific episode IDs)
         if (contentData.imdbId && contentData.imdbId !== contentData.showImdbId) {
-          const cleanEpisodeImdbId = contentData.imdbId.startsWith('tt') 
-            ? contentData.imdbId.substring(2) 
-            : contentData.imdbId;
+          const episodeImdbWithPrefix = contentData.imdbId.startsWith('tt')
+            ? contentData.imdbId
+            : `tt${contentData.imdbId}`;
           
           if (!payload.episode.ids) {
             payload.episode.ids = {};
           }
           
-          payload.episode.ids.imdb = cleanEpisodeImdbId;
+          payload.episode.ids.imdb = episodeImdbWithPrefix;
         }
 
         logger.log('[TraktService] Episode payload built:', payload);
@@ -1818,23 +1818,26 @@ export class TraktService {
       // Record this stop attempt
       this.lastStopCalls.set(watchingKey, now);
 
+      // Respect higher user threshold by pausing below effective threshold
+      const effectiveThreshold = Math.max(80, this.completionThreshold);
       const result = await this.queueRequest(async () => {
+        if (progress < effectiveThreshold) {
+          return await this.pauseWatching(contentData, progress);
+        }
         return await this.stopWatching(contentData, progress);
       });
 
       if (result) {
         this.currentlyWatching.delete(watchingKey);
 
-        // Mark as scrobbled if >= 80% to prevent future duplicates and restarts
+        // Mark as scrobbled if >= user threshold to prevent future duplicates and restarts
         if (progress >= this.completionThreshold) {
           this.scrobbledItems.add(watchingKey);
           this.scrobbledTimestamps.set(watchingKey, Date.now());
           logger.log(`[TraktService] Marked as scrobbled to prevent restarts: ${watchingKey}`);
         }
 
-        // The stop endpoint automatically handles the 80%+ completion logic
-        // and will mark as scrobbled if >= 80%, or pause if < 80%
-        const action = progress >= this.completionThreshold ? 'scrobbled' : 'paused';
+        const action = progress >= effectiveThreshold ? 'scrobbled' : 'paused';
         logger.log(`[TraktService] Stopped watching ${contentData.type}: ${contentData.title} (${progress.toFixed(1)}% - ${action})`);
 
         return true;
@@ -1913,19 +1916,22 @@ export class TraktService {
 
       this.lastStopCalls.set(watchingKey, Date.now());
 
-      // BYPASS QUEUE: Call API directly for immediate response
-      const result = await this.stopWatching(contentData, progress);
+      // BYPASS QUEUE: Respect higher user threshold by pausing below effective threshold
+      const effectiveThreshold = Math.max(80, this.completionThreshold);
+      const result = progress < effectiveThreshold
+        ? await this.pauseWatching(contentData, progress)
+        : await this.stopWatching(contentData, progress);
 
       if (result) {
         this.currentlyWatching.delete(watchingKey);
 
-        // Mark as scrobbled if >= 80% to prevent future duplicates and restarts
+        // Mark as scrobbled if >= user threshold to prevent future duplicates and restarts
         if (progress >= this.completionThreshold) {
           this.scrobbledItems.add(watchingKey);
           this.scrobbledTimestamps.set(watchingKey, Date.now());
         }
 
-        const action = progress >= this.completionThreshold ? 'scrobbled' : 'paused';
+        const action = progress >= effectiveThreshold ? 'scrobbled' : 'paused';
         logger.log(`[TraktService] IMMEDIATE: Stopped watching ${contentData.type}: ${contentData.title} (${progress.toFixed(1)}% - ${action})`);
 
         return true;
