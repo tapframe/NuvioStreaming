@@ -1082,21 +1082,41 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     if (!shouldLoadSecondaryData || !metadata?.genres?.length) return null;
 
     const genresToDisplay = metadata.genres.slice(0, 3); // Reduced to 3 for performance
-    return genresToDisplay.map((genreName: string, index: number, array: string[]) => (
-      <Animated.View
-        key={`${genreName}-${index}`}
-        entering={FadeIn.duration(400).delay(200 + index * 100)}
-        style={{ flexDirection: 'row', alignItems: 'center' }}
-      >
-        <Text style={[isTablet ? styles.tabletGenreText : styles.genreText, { color: themeColors.text }]}>
+    const elements: React.ReactNode[] = [];
+
+    genresToDisplay.forEach((genreName: string, index: number) => {
+      // Add genre text
+      elements.push(
+        <Text
+          key={`genre-${index}`}
+          style={[isTablet ? styles.tabletGenreText : styles.genreText, { color: themeColors.text }]}
+        >
           {genreName}
         </Text>
-        {index < array.length - 1 && (
-          <Text style={[isTablet ? styles.tabletGenreDot : styles.genreDot, { color: themeColors.text }]}>•</Text>
-        )}
+      );
+
+      // Add dot separator if not the last element
+      if (index < genresToDisplay.length - 1) {
+        elements.push(
+          <Text
+            key={`dot-${index}`}
+            style={[isTablet ? styles.tabletGenreDot : styles.genreDot, { color: themeColors.text }]}
+          >
+            •
+          </Text>
+        );
+      }
+    });
+
+    return (
+      <Animated.View
+        entering={FadeIn.duration(400).delay(200)}
+        style={{ flexDirection: 'row', alignItems: 'center' }}
+      >
+        {elements}
       </Animated.View>
-    ));
-  }, [metadata.genres, themeColors.text, shouldLoadSecondaryData]);
+    );
+  }, [metadata.genres, themeColors.text, shouldLoadSecondaryData, isTablet]);
 
   // Memoized play button text
   const playButtonText = useMemo(() => getPlayButtonText(), [getPlayButtonText]);
@@ -1614,7 +1634,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 6,
     marginBottom: 14,
-    gap: 6,
+    gap: 0,
     maxWidth: isTablet ? 600 : '100%',
     alignSelf: 'center',
   },
@@ -1622,12 +1642,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     opacity: 0.9,
+    marginLeft: 0,
+    paddingLeft: 0,
+    marginRight: 0,
+    paddingRight: 0,
+    marginVertical: 0,
+    paddingVertical: 0,
   },
   genreDot: {
     fontSize: 12,
     fontWeight: '500',
     opacity: 0.6,
-    marginHorizontal: 2,
+    marginHorizontal: 4,
+    paddingHorizontal: 0,
+    marginVertical: 0,
+    paddingVertical: 0,
   },
   actionButtons: {
     flexDirection: 'row',
@@ -2020,18 +2049,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
     marginBottom: 20,
-    gap: 8,
+    gap: 0,
   },
   tabletGenreText: {
     fontSize: 16,
     fontWeight: '500',
     opacity: 0.9,
+    marginLeft: 0,
+    paddingLeft: 0,
+    marginRight: 0,
+    paddingRight: 0,
+    marginVertical: 0,
+    paddingVertical: 0,
   },
   tabletGenreDot: {
     fontSize: 16,
     fontWeight: '500',
     opacity: 0.6,
-    marginHorizontal: 4,
+    marginHorizontal: 6,
+    paddingHorizontal: 0,
+    marginVertical: 0,
+    paddingVertical: 0,
   },
   tabletWatchProgressContainer: {
     marginTop: 8,
