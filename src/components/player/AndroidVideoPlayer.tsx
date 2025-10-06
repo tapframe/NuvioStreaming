@@ -3409,8 +3409,8 @@ const AndroidVideoPlayer: React.FC = () => {
                   allowsExternalPlayback={false as any}
                   preventsDisplaySleepDuringVideoPlayback={true as any}
                   // ExoPlayer HLS optimization - let the player use optimal defaults
-                  // Use textureView on Android: allows 3D mapping but DRM not supported
-                  viewType={Platform.OS === 'android' ? ViewType.TEXTURE : undefined}
+                  // Use surfaceView on Android for improved compatibility
+                  viewType={Platform.OS === 'android' ? ViewType.SURFACE : undefined}
                 />
                 )}
               </TouchableOpacity>

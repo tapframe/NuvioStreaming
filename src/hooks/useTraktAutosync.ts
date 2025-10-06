@@ -196,8 +196,8 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
         // BACKGROUND: Periodic sync - use queued method
         const progressDiff = Math.abs(progressPercent - lastSyncProgress.current);
 
-        // Only skip if not forced and progress difference is minimal (< 1%)
-        if (progressDiff < 1) {
+        // Only skip if not forced and progress difference is minimal (< 0.5%)
+        if (progressDiff < 0.5) {
           return;
         }
 
@@ -265,8 +265,8 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
     let useImmediate = reason === 'user_close';
 
     // IMMEDIATE SYNC: Remove debouncing for instant sync when closing
-    // Only prevent truly duplicate calls (within 1 second for regular, 200ms for immediate)
-    const debounceThreshold = useImmediate ? 200 : 1000;
+    // Only prevent truly duplicate calls (within 500ms for regular, 100ms for immediate)
+    const debounceThreshold = useImmediate ? 100 : 500;
     if (!isSignificantUpdate && now - lastStopCall.current < debounceThreshold) {
       logger.log(`[TraktAutosync] Ignoring duplicate stop call within ${debounceThreshold}ms (reason: ${reason})`);
       return;

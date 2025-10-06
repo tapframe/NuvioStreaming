@@ -561,9 +561,9 @@ export class TraktService {
   private tokenExpiry: number = 0;
   private isInitialized: boolean = false;
   
-  // Rate limiting
+  // Rate limiting - Optimized for real-time scrobbling
   private lastApiCall: number = 0;
-  private readonly MIN_API_INTERVAL = 3000; // Minimum 3 seconds between API calls (further reduce heating)
+  private readonly MIN_API_INTERVAL = 1000; // Reduced from 3000ms to 1000ms for real-time updates
   private requestQueue: Array<() => Promise<any>> = [];
   private isProcessingQueue: boolean = false;
 
@@ -572,14 +572,14 @@ export class TraktService {
   private readonly SCROBBLE_EXPIRY_MS = 46 * 60 * 1000; // 46 minutes (based on Trakt's expiry window)
   private scrobbledTimestamps: Map<string, number> = new Map();
 
-  // Track currently watching sessions to avoid duplicate starts// Sync debouncing
+  // Track currently watching sessions to avoid duplicate starts// Sync debouncing - Optimized for real-time updates
   private currentlyWatching: Set<string> = new Set();
   private lastSyncTimes: Map<string, number> = new Map();
-  private readonly SYNC_DEBOUNCE_MS = 20000; // 20 seconds to further reduce API calls
+  private readonly SYNC_DEBOUNCE_MS = 5000; // Reduced from 20000ms to 5000ms for real-time updates
   
-  // Debounce for stop calls
+  // Debounce for stop calls - Optimized for responsiveness
   private lastStopCalls: Map<string, number> = new Map();
-  private readonly STOP_DEBOUNCE_MS = 3000; // 3 seconds to avoid duplicate stop calls
+  private readonly STOP_DEBOUNCE_MS = 1000; // Reduced from 3000ms to 1000ms for better responsiveness
   
   // Default completion threshold (overridden by user settings)
   private readonly DEFAULT_COMPLETION_THRESHOLD = 80; // 80%
@@ -1767,8 +1767,8 @@ export class TraktService {
       const watchingKey = this.getWatchingKey(contentData);
       const lastSync = this.lastSyncTimes.get(watchingKey) || 0;
       
-      // IMMEDIATE SYNC: Remove debouncing for instant sync, only prevent truly rapid calls (< 500ms)
-      if (!force && (now - lastSync) < 500) {
+      // IMMEDIATE SYNC: Remove debouncing for instant sync, only prevent truly rapid calls (< 300ms)
+      if (!force && (now - lastSync) < 300) {
         return true; // Skip this sync, but return success
       }
 
@@ -1874,9 +1874,9 @@ export class TraktService {
 
       const watchingKey = this.getWatchingKey(contentData);
 
-      // MINIMAL DEDUPLICATION: Only prevent calls within 100ms for immediate actions
+      // MINIMAL DEDUPLICATION: Only prevent calls within 50ms for immediate actions
       const lastSync = this.lastSyncTimes.get(watchingKey) || 0;
-      if ((Date.now() - lastSync) < 100) {
+      if ((Date.now() - lastSync) < 50) {
         return true; // Skip this sync, but return success
       }
 
