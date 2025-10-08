@@ -240,6 +240,33 @@ class StremioService {
     return Array.from(prefixes);
   }
 
+  // Check if a content ID belongs to a collection addon
+  public isCollectionContent(id: string): { isCollection: boolean; addon?: Manifest } {
+    const addons = this.getInstalledAddons();
+    
+    for (const addon of addons) {
+      // Check if this addon supports collections
+      const supportsCollections = addon.types?.includes('collections') || 
+                                 addon.catalogs?.some(catalog => catalog.type === 'collections');
+      
+      if (!supportsCollections) continue;
+      
+      // Check if our ID matches this addon's prefixes
+      const addonPrefixes = addon.idPrefixes || [];
+      const resourcePrefixes = addon.resources
+        ?.filter(resource => typeof resource === 'object' && resource !== null && 'name' in resource)
+        ?.filter(resource => (resource as any).name === 'meta' || (resource as any).name === 'catalog')
+        ?.flatMap(resource => (resource as any).idPrefixes || []) || [];
+      
+      const allPrefixes = [...addonPrefixes, ...resourcePrefixes];
+      if (allPrefixes.some(prefix => id.startsWith(prefix))) {
+        return { isCollection: true, addon };
+      }
+    }
+    
+    return { isCollection: false };
+  }
+
   static getInstance(): StremioService {
     if (!StremioService.instance) {
       StremioService.instance = new StremioService();

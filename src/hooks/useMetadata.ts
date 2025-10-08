@@ -1203,8 +1203,29 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       if (__DEV__) console.log('🔍 [loadEpisodeStreams] Getting TMDB ID for:', id);
       let tmdbId;
       let stremioEpisodeId = episodeId; // Default to original episode ID
+      let isCollection = false;
       
-      if (id.startsWith('tmdb:')) {
+      // Dynamically detect if this is a collection by checking addon capabilities
+      const { isCollection: detectedCollection, addon: collectionAddon } = stremioService.isCollectionContent(id);
+      isCollection = detectedCollection;
+      
+      if (isCollection && collectionAddon) {
+        if (__DEV__) console.log(`🎬 [loadEpisodeStreams] Detected collection from addon: ${collectionAddon.name}, treating episodes as individual movies`);
+        
+        // For collections, extract the individual movie ID from the episodeId
+        // episodeId format for collections: "tt7888964" (IMDb ID of individual movie)
+        if (episodeId.startsWith('tt')) {
+          // This is an IMDb ID of an individual movie in the collection
+          tmdbId = await withTimeout(tmdbService.findTMDBIdByIMDB(episodeId), API_TIMEOUT);
+          stremioEpisodeId = episodeId; // Use the IMDb ID directly for Stremio addons
+          if (__DEV__) console.log('✅ [loadEpisodeStreams] Collection movie - using IMDb ID:', episodeId, 'TMDB ID:', tmdbId);
+        } else {
+          // Fallback: try to parse as TMDB ID
+          tmdbId = episodeId;
+          stremioEpisodeId = episodeId;
+          if (__DEV__) console.log('⚠️ [loadEpisodeStreams] Collection movie - using episodeId as-is:', episodeId);
+        }
+      } else if (id.startsWith('tmdb:')) {
         tmdbId = id.split(':')[1];
         if (__DEV__) console.log('✅ [loadEpisodeStreams] Using TMDB ID from ID:', tmdbId);
         
@@ -1259,7 +1280,12 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       
       // Start Stremio request using the converted episode ID format
       if (__DEV__) console.log('🎬 [loadEpisodeStreams] Using episode ID for Stremio addons:', stremioEpisodeId);
-      processStremioSource('series', stremioEpisodeId, true);
+      
+      // For collections, treat episodes as individual movies, not series
+      const contentType = isCollection ? 'movie' : 'series';
+      if (__DEV__) console.log(`🎬 [loadEpisodeStreams] Using content type: ${contentType} for ${isCollection ? 'collection' : 'series'}`);
+      
+      processStremioSource(contentType, stremioEpisodeId, true);
       
       // Monitor scraper completion status instead of using fixed timeout
       const checkEpisodeScrapersCompletion = () => {
@@ -1531,7 +1557,21 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
   }, []);
 
   const getScraperCacheStats = useCallback(async () => {
-    return await localScraperService.getCacheStats();
+    const localStats = await localScraperService.getCacheStats();
+    return {
+      local: localStats.local,
+      global: {
+        totalEntries: 0,
+        totalSize: 0,
+        oldestEntry: null,
+        newestEntry: null,
+        hitRate: 0
+      },
+      combined: {
+        totalEntries: localStats.local.totalEntries,
+        hitRate: 0
+      }
+    };
   }, []);
 
   return {
