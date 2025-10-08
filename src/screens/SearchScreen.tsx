@@ -381,27 +381,41 @@ const SearchScreen = () => {
       } catch {}
 
       const handle = catalogService.startLiveSearch(searchQuery, async (section: AddonSearchResults) => {
-        // Append/update this addon section immediately
+        // Append/update this addon section immediately with minimal changes
         setResults(prev => {
-          const existingIndex = prev.byAddon.findIndex(s => s.addonId === section.addonId);
-          let nextByAddon: AddonSearchResults[];
-          if (existingIndex >= 0) {
-            nextByAddon = prev.byAddon.slice();
-            nextByAddon[existingIndex] = section;
-          } else {
-            nextByAddon = [...prev.byAddon, section];
-          }
-          // Sort by installation order
           const rank = addonOrderRankRef.current;
-          nextByAddon = nextByAddon.slice().sort((a, b) => {
-            const ra = rank[a.addonId] ?? Number.MAX_SAFE_INTEGER;
-            const rb = rank[b.addonId] ?? Number.MAX_SAFE_INTEGER;
-            return ra - rb;
-          });
+          const getRank = (id: string) => rank[id] ?? Number.MAX_SAFE_INTEGER;
+          
+          const existingIndex = prev.byAddon.findIndex(s => s.addonId === section.addonId);
+          
+          if (existingIndex >= 0) {
+            // Update existing section in-place (preserve order and other sections)
+            const copy = prev.byAddon.slice();
+            copy[existingIndex] = section;
+            return { byAddon: copy, allResults: prev.allResults };
+          }
+          
+          // Insert new section at correct position based on rank
+          const insertRank = getRank(section.addonId);
+          let insertAt = prev.byAddon.length;
+          for (let i = 0; i < prev.byAddon.length; i++) {
+            if (getRank(prev.byAddon[i].addonId) > insertRank) {
+              insertAt = i;
+              break;
+            }
+          }
+          
+          const nextByAddon = [
+            ...prev.byAddon.slice(0, insertAt),
+            section,
+            ...prev.byAddon.slice(insertAt)
+          ];
+          
           // Hide loading overlay once first section arrives
-          if (nextByAddon.length === 1) {
+          if (prev.byAddon.length === 0) {
             setSearching(false);
           }
+          
           return { byAddon: nextByAddon, allResults: prev.allResults };
         });
 
@@ -601,6 +615,131 @@ const SearchScreen = () => {
     return results.byAddon.length > 0;
   }, [results]);
 
+  // Memoized addon section to prevent re-rendering unchanged sections
+  const AddonSection = React.memo(({ 
+    addonGroup, 
+    addonIndex 
+  }: { 
+    addonGroup: AddonSearchResults; 
+    addonIndex: number;
+  }) => {
+    const movieResults = useMemo(() => 
+      addonGroup.results.filter(item => item.type === 'movie'), 
+      [addonGroup.results]
+    );
+    const seriesResults = useMemo(() => 
+      addonGroup.results.filter(item => item.type === 'series'), 
+      [addonGroup.results]
+    );
+    const otherResults = useMemo(() => 
+      addonGroup.results.filter(item => item.type !== 'movie' && item.type !== 'series'), 
+      [addonGroup.results]
+    );
+
+    return (
+      <Animated.View entering={FadeIn.duration(300).delay(addonIndex * 50)}>
+        {/* Addon Header */}
+        <View style={styles.addonHeaderContainer}>
+          <Text style={[styles.addonHeaderText, { color: currentTheme.colors.white }]}>
+            {addonGroup.addonName}
+          </Text>
+          <View style={[styles.addonHeaderBadge, { backgroundColor: currentTheme.colors.elevation2 }]}>
+            <Text style={[styles.addonHeaderBadgeText, { color: currentTheme.colors.lightGray }]}>
+              {addonGroup.results.length}
+            </Text>
+          </View>
+        </View>
+
+        {/* Movies */}
+        {movieResults.length > 0 && (
+          <Animated.View style={styles.carouselContainer} entering={FadeIn.duration(300)}>
+            <Text style={[styles.carouselSubtitle, { color: currentTheme.colors.lightGray }]}> 
+              Movies ({movieResults.length})
+            </Text>
+            <FlatList
+              data={movieResults}
+              renderItem={({ item, index }) => (
+                <SearchResultItem
+                  item={item}
+                  index={index}
+                  navigation={navigation}
+                  setSelectedItem={setSelectedItem}
+                  setMenuVisible={setMenuVisible}
+                  currentTheme={currentTheme}
+                  refreshFlag={refreshFlag}
+                />
+              )}
+              keyExtractor={item => `${addonGroup.addonId}-movie-${item.id}`}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalListContent}
+              extraData={refreshFlag}
+            />
+          </Animated.View>
+        )}
+
+        {/* TV Shows */}
+        {seriesResults.length > 0 && (
+          <Animated.View style={styles.carouselContainer} entering={FadeIn.duration(300)}>
+            <Text style={[styles.carouselSubtitle, { color: currentTheme.colors.lightGray }]}> 
+              TV Shows ({seriesResults.length})
+            </Text>
+            <FlatList
+              data={seriesResults}
+              renderItem={({ item, index }) => (
+                <SearchResultItem
+                  item={item}
+                  index={index}
+                  navigation={navigation}
+                  setSelectedItem={setSelectedItem}
+                  setMenuVisible={setMenuVisible}
+                  currentTheme={currentTheme}
+                  refreshFlag={refreshFlag}
+                />
+              )}
+              keyExtractor={item => `${addonGroup.addonId}-series-${item.id}`}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalListContent}
+              extraData={refreshFlag}
+            />
+          </Animated.View>
+        )}
+
+        {/* Other types */}
+        {otherResults.length > 0 && (
+          <Animated.View style={styles.carouselContainer} entering={FadeIn.duration(300)}>
+            <Text style={[styles.carouselSubtitle, { color: currentTheme.colors.lightGray }]}> 
+              {otherResults[0].type.charAt(0).toUpperCase() + otherResults[0].type.slice(1)} ({otherResults.length})
+            </Text>
+            <FlatList
+              data={otherResults}
+              renderItem={({ item, index }) => (
+                <SearchResultItem
+                  item={item}
+                  index={index}
+                  navigation={navigation}
+                  setSelectedItem={setSelectedItem}
+                  setMenuVisible={setMenuVisible}
+                  currentTheme={currentTheme}
+                  refreshFlag={refreshFlag}
+                />
+              )}
+              keyExtractor={item => `${addonGroup.addonId}-${item.type}-${item.id}`}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalListContent}
+              extraData={refreshFlag}
+            />
+          </Animated.View>
+        )}
+      </Animated.View>
+    );
+  }, (prev, next) => {
+    // Only re-render if this section's reference changed
+    return prev.addonGroup === next.addonGroup && prev.addonIndex === next.addonIndex;
+  });
+
   const headerBaseHeight = Platform.OS === 'android' ? 80 : 60;
   const topSpacing = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top;
   const headerHeight = headerBaseHeight + topSpacing + 60;
@@ -741,131 +880,14 @@ const SearchScreen = () => {
               showsVerticalScrollIndicator={false}
             >
               {!query.trim() && renderRecentSearches()}
-              {/* Render results grouped by addon */}
-              {results.byAddon.map((addonGroup, addonIndex) => {
-                // Group by type within each addon
-                const movieResults = addonGroup.results.filter(item => item.type === 'movie');
-                const seriesResults = addonGroup.results.filter(item => item.type === 'series');
-                const otherResults = addonGroup.results.filter(item => item.type !== 'movie' && item.type !== 'series');
-
-                return (
-                  <Animated.View 
-                    key={addonGroup.addonId}
-                    entering={FadeIn.duration(300).delay(addonIndex * 100)}
-                  >
-                    {/* Addon Header */}
-                    <View style={styles.addonHeaderContainer}>
-                      <MaterialIcons 
-                        name="extension" 
-                        size={20} 
-                        color={currentTheme.colors.primary}
-                        style={styles.addonHeaderIcon}
-                      />
-                      <Text style={[styles.addonHeaderText, { color: currentTheme.colors.white }]}>
-                        {addonGroup.addonName}
-                      </Text>
-                      <View style={[styles.addonHeaderBadge, { backgroundColor: currentTheme.colors.elevation2 }]}>
-                        <Text style={[styles.addonHeaderBadgeText, { color: currentTheme.colors.lightGray }]}>
-                          {addonGroup.results.length}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Movies from this addon */}
-                    {movieResults.length > 0 && (
-                      <Animated.View 
-                        style={styles.carouselContainer}
-                        entering={FadeIn.duration(300)}
-                      >
-                        <Text style={[styles.carouselSubtitle, { color: currentTheme.colors.lightGray }]}> 
-                          Movies ({movieResults.length})
-                        </Text>
-                        <FlatList
-                          data={movieResults}
-                          renderItem={({ item, index }) => (
-                            <SearchResultItem
-                              item={item}
-                              index={index}
-                              navigation={navigation}
-                              setSelectedItem={setSelectedItem}
-                              setMenuVisible={setMenuVisible}
-                              currentTheme={currentTheme}
-                              refreshFlag={refreshFlag}
-                            />
-                          )}
-                          keyExtractor={item => `${addonGroup.addonId}-movie-${item.id}`}
-                          horizontal
-                          showsHorizontalScrollIndicator={false}
-                          contentContainerStyle={styles.horizontalListContent}
-                          extraData={refreshFlag}
-                        />
-                      </Animated.View>
-                    )}
-
-                    {/* TV Shows from this addon */}
-                    {seriesResults.length > 0 && (
-                      <Animated.View 
-                        style={styles.carouselContainer}
-                        entering={FadeIn.duration(300)}
-                      >
-                        <Text style={[styles.carouselSubtitle, { color: currentTheme.colors.lightGray }]}> 
-                          TV Shows ({seriesResults.length})
-                        </Text>
-                        <FlatList
-                          data={seriesResults}
-                          renderItem={({ item, index }) => (
-                            <SearchResultItem
-                              item={item}
-                              index={index}
-                              navigation={navigation}
-                              setSelectedItem={setSelectedItem}
-                              setMenuVisible={setMenuVisible}
-                              currentTheme={currentTheme}
-                              refreshFlag={refreshFlag}
-                            />
-                          )}
-                          keyExtractor={item => `${addonGroup.addonId}-series-${item.id}`}
-                          horizontal
-                          showsHorizontalScrollIndicator={false}
-                          contentContainerStyle={styles.horizontalListContent}
-                          extraData={refreshFlag}
-                        />
-                      </Animated.View>
-                    )}
-
-                    {/* Other content types (anime, etc.) */}
-                    {otherResults.length > 0 && (
-                      <Animated.View 
-                        style={styles.carouselContainer}
-                        entering={FadeIn.duration(300)}
-                      >
-                        <Text style={[styles.carouselSubtitle, { color: currentTheme.colors.lightGray }]}> 
-                          {otherResults[0].type.charAt(0).toUpperCase() + otherResults[0].type.slice(1)} ({otherResults.length})
-                        </Text>
-                        <FlatList
-                          data={otherResults}
-                          renderItem={({ item, index }) => (
-                            <SearchResultItem
-                              item={item}
-                              index={index}
-                              navigation={navigation}
-                              setSelectedItem={setSelectedItem}
-                              setMenuVisible={setMenuVisible}
-                              currentTheme={currentTheme}
-                              refreshFlag={refreshFlag}
-                            />
-                          )}
-                          keyExtractor={item => `${addonGroup.addonId}-${item.type}-${item.id}`}
-                          horizontal
-                          showsHorizontalScrollIndicator={false}
-                          contentContainerStyle={styles.horizontalListContent}
-                          extraData={refreshFlag}
-                        />
-                      </Animated.View>
-                    )}
-                  </Animated.View>
-                );
-              })}
+              {/* Render results grouped by addon using memoized component */}
+              {results.byAddon.map((addonGroup, addonIndex) => (
+                <AddonSection
+                  key={addonGroup.addonId}
+                  addonGroup={addonGroup}
+                  addonIndex={addonIndex}
+                />
+              ))}
             </Animated.ScrollView>
           )}
         </View>
@@ -1015,7 +1037,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(255,255,255,0.1)',
   },
   addonHeaderIcon: {
-    marginRight: 8,
+    // removed icon
   },
   addonHeaderText: {
     fontSize: isTablet ? 18 : 16,
