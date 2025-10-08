@@ -213,6 +213,8 @@ const SearchScreen = () => {
   const liveSearchHandle = useRef<{ cancel: () => void; done: Promise<void> } | null>(null);
   // Addon installation order map for stable section ordering
   const addonOrderRankRef = useRef<Record<string, number>>({});
+  // Track if this is the initial mount to prevent unnecessary operations
+  const isInitialMount = useRef(true);
   // DropUpMenu state
   const [menuVisible, setMenuVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<StreamingContent | null>(null);
@@ -355,8 +357,9 @@ const SearchScreen = () => {
     }
   };
 
-  const debouncedSearch = useCallback(
-    debounce(async (searchQuery: string) => {
+  // Create a stable debounced search function using useMemo
+  const debouncedSearch = useMemo(() => {
+    return debounce(async (searchQuery: string) => {
       if (!searchQuery.trim()) {
         // Cancel any in-flight live search
         liveSearchHandle.current?.cancel();
@@ -385,16 +388,16 @@ const SearchScreen = () => {
         setResults(prev => {
           const rank = addonOrderRankRef.current;
           const getRank = (id: string) => rank[id] ?? Number.MAX_SAFE_INTEGER;
-          
+
           const existingIndex = prev.byAddon.findIndex(s => s.addonId === section.addonId);
-          
+
           if (existingIndex >= 0) {
             // Update existing section in-place (preserve order and other sections)
             const copy = prev.byAddon.slice();
             copy[existingIndex] = section;
             return { byAddon: copy, allResults: prev.allResults };
           }
-          
+
           // Insert new section at correct position based on rank
           const insertRank = getRank(section.addonId);
           let insertAt = prev.byAddon.length;
@@ -404,18 +407,18 @@ const SearchScreen = () => {
               break;
             }
           }
-          
+
           const nextByAddon = [
             ...prev.byAddon.slice(0, insertAt),
             section,
             ...prev.byAddon.slice(insertAt)
           ];
-          
+
           // Hide loading overlay once first section arrives
           if (prev.byAddon.length === 0) {
             setSearching(false);
           }
-          
+
           return { byAddon: nextByAddon, allResults: prev.allResults };
         });
 
@@ -425,11 +428,17 @@ const SearchScreen = () => {
         } catch {}
       });
       liveSearchHandle.current = handle;
-    }, 800),
-    []
-  );
+    }, 800);
+  }, []); // Empty dependency array - create once and never recreate
 
   useEffect(() => {
+    // Skip initial mount to prevent unnecessary operations
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      loadRecentSearches();
+      return;
+    }
+
     if (query.trim() && query.trim().length >= 2) {
       setSearching(true);
       setSearched(true);
@@ -452,12 +461,12 @@ const SearchScreen = () => {
       setShowRecent(true);
       loadRecentSearches();
     }
-    
+
     // Cleanup function to cancel pending searches
     return () => {
       debouncedSearch.cancel();
     };
-  }, [query, debouncedSearch]);
+  }, [query]); // Removed debouncedSearch since it's now stable with useMemo
 
   const handleClearSearch = () => {
     setQuery('');
@@ -518,24 +527,16 @@ const SearchScreen = () => {
     );
   };
 
-  const SearchResultItem = ({ item, index, navigation, setSelectedItem, setMenuVisible, currentTheme, refreshFlag }: {
+  const SearchResultItem = ({ item, index, navigation, setSelectedItem, setMenuVisible, currentTheme }: {
     item: StreamingContent;
     index: number;
     navigation: any;
     setSelectedItem: (item: StreamingContent) => void;
     setMenuVisible: (visible: boolean) => void;
     currentTheme: any;
-    refreshFlag: boolean;
   }) => {
     const [inLibrary, setInLibrary] = React.useState(!!item.inLibrary);
     const [watched, setWatched] = React.useState(false);
-    // Re-check status when refreshFlag changes
-    React.useEffect(() => {
-      AsyncStorage.getItem(`watched:${item.type}:${item.id}`).then(val => setWatched(val === 'true'));
-      const items = catalogService.getLibraryItems();
-      const found = items.find((libItem: any) => libItem.id === item.id && libItem.type === item.type);
-      setInLibrary(!!found);
-    }, [refreshFlag, item.id, item.type]);
     React.useEffect(() => {
       const updateWatched = () => {
         AsyncStorage.getItem(`watched:${item.type}:${item.id}`).then(val => setWatched(val === 'true'));
@@ -666,14 +667,12 @@ const SearchScreen = () => {
                   setSelectedItem={setSelectedItem}
                   setMenuVisible={setMenuVisible}
                   currentTheme={currentTheme}
-                  refreshFlag={refreshFlag}
                 />
               )}
               keyExtractor={item => `${addonGroup.addonId}-movie-${item.id}`}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.horizontalListContent}
-              extraData={refreshFlag}
             />
           </Animated.View>
         )}
@@ -694,14 +693,12 @@ const SearchScreen = () => {
                   setSelectedItem={setSelectedItem}
                   setMenuVisible={setMenuVisible}
                   currentTheme={currentTheme}
-                  refreshFlag={refreshFlag}
                 />
               )}
               keyExtractor={item => `${addonGroup.addonId}-series-${item.id}`}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.horizontalListContent}
-              extraData={refreshFlag}
             />
           </Animated.View>
         )}
@@ -722,14 +719,12 @@ const SearchScreen = () => {
                   setSelectedItem={setSelectedItem}
                   setMenuVisible={setMenuVisible}
                   currentTheme={currentTheme}
-                  refreshFlag={refreshFlag}
                 />
               )}
               keyExtractor={item => `${addonGroup.addonId}-${item.type}-${item.id}`}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.horizontalListContent}
-              extraData={refreshFlag}
             />
           </Animated.View>
         )}
@@ -744,14 +739,21 @@ const SearchScreen = () => {
   const topSpacing = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top;
   const headerHeight = headerBaseHeight + topSpacing + 60;
 
+  // Set up listeners for watched status and library updates
+  // These will trigger re-renders in individual SearchResultItem components
   useEffect(() => {
-    const watchedSub = DeviceEventEmitter.addListener('watchedStatusChanged', () => setRefreshFlag(f => !f));
-    const librarySub = catalogService.subscribeToLibraryUpdates(() => setRefreshFlag(f => !f));
-    const focusSub = navigation.addListener('focus', () => setRefreshFlag(f => !f));
+    const watchedSub = DeviceEventEmitter.addListener('watchedStatusChanged', () => {
+      // Individual items will handle their own watched status updates
+      // No need to force a full re-render of all results
+    });
+    const librarySub = catalogService.subscribeToLibraryUpdates(() => {
+      // Individual items will handle their own library status updates
+      // No need to force a full re-render of all results
+    });
+
     return () => {
       watchedSub.remove();
       librarySub();
-      focusSub();
     };
   }, []);
 
