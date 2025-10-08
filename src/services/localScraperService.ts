@@ -905,16 +905,26 @@ class LocalScraperService {
     }
 
     // Determine which scrapers need to be re-run
-    const scrapersToRerun = enabledScrapers.filter(scraper => 
-      expiredScrapers.includes(scraper.id) || !validResults.some(r => r.scraperId === scraper.id)
-    );
+    const scrapersToRerun = enabledScrapers.filter(scraper => {
+      const hasValidResult = validResults.some(r => r.scraperId === scraper.id);
+      const isExpired = expiredScrapers.includes(scraper.id);
+      const hasFailedResult = validResults.some(r => r.scraperId === scraper.id && (!r.success || r.streams.length === 0));
+      
+      return !hasValidResult || isExpired || hasFailedResult;
+    });
 
     if (scrapersToRerun.length === 0) {
       logger.log('[LocalScraperService] All scrapers have valid cached results');
       return;
     }
 
-    logger.log(`[LocalScraperService] Re-running ${scrapersToRerun.length} scrapers (${expiredScrapers.length} expired, ${scrapersToRerun.length - expiredScrapers.length} not cached) for ${type}:${tmdbId}`);
+    logger.log(`[LocalScraperService] Re-running ${scrapersToRerun.length} scrapers for ${type}:${tmdbId}`, {
+      totalEnabled: enabledScrapers.length,
+      expired: expiredScrapers.length,
+      failed: validResults.filter(r => !r.success || r.streams.length === 0).length,
+      notCached: enabledScrapers.length - validResults.length,
+      scrapersToRerun: scrapersToRerun.map(s => s.name)
+    });
 
     // Generate a lightweight request id for tracing
     const requestId = `rs_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;

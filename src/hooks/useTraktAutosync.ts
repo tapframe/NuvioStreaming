@@ -134,7 +134,9 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
     }
 
     try {
-      const progressPercent = (currentTime / duration) * 100;
+      // Clamp progress between 0 and 100
+      const rawProgress = (currentTime / duration) * 100;
+      const progressPercent = Math.min(100, Math.max(0, rawProgress));
       const contentData = buildContentData();
       
       const success = await startWatching(contentData, progressPercent);
@@ -164,7 +166,8 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
     }
 
     try {
-      const progressPercent = (currentTime / duration) * 100;
+      const rawProgress = (currentTime / duration) * 100;
+      const progressPercent = Math.min(100, Math.max(0, rawProgress));
       const now = Date.now();
 
       // IMMEDIATE SYNC: Use immediate method for user-triggered actions (force=true)
@@ -280,6 +283,8 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
 
     try {
       let progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+      // Clamp progress between 0 and 100
+      progressPercent = Math.min(100, Math.max(0, progressPercent));
       // Initial progress calculation logging removed
 
       // For unmount calls, always use the highest available progress
@@ -301,7 +306,7 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
           );
 
           if (savedProgress && savedProgress.duration > 0) {
-            const savedProgressPercent = (savedProgress.currentTime / savedProgress.duration) * 100;
+            const savedProgressPercent = Math.min(100, Math.max(0, (savedProgress.currentTime / savedProgress.duration) * 100));
             if (savedProgressPercent > maxProgress) {
               maxProgress = savedProgressPercent;
             }
@@ -334,10 +339,11 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
         return;
       }
 
-      // For natural end events, always set progress to at least 90%
-      if (reason === 'ended' && progressPercent < 90) {
-        logger.log(`[TraktAutosync] Natural end detected but progress is low (${progressPercent.toFixed(1)}%), boosting to 90%`);
-        progressPercent = 90;
+      // For natural end events, ensure we cross Trakt's 80% scrobble threshold reliably.
+      // If close to the end, boost to 95% to avoid rounding issues.
+      if (reason === 'ended' && progressPercent < 95) {
+        logger.log(`[TraktAutosync] Natural end detected at ${progressPercent.toFixed(1)}%, boosting to 95% for scrobble`);
+        progressPercent = 95;
       }
 
       // Mark stop attempt and update timestamp
@@ -366,6 +372,25 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
         if (progressPercent >= 80) {
           isSessionComplete.current = true;
           logger.log(`[TraktAutosync] Session marked as complete (scrobbled) at ${progressPercent.toFixed(1)}%`);
+
+          // Ensure local watch progress reflects completion so UI shows as watched
+          try {
+            if (duration > 0) {
+              await storageService.setWatchProgress(
+                options.id,
+                options.type,
+                {
+                  currentTime: duration,
+                  duration,
+                  lastUpdated: Date.now(),
+                  traktSynced: true,
+                  traktProgress: Math.max(progressPercent, 100),
+                } as any,
+                options.episodeId,
+                { forceNotify: true }
+              );
+            }
+          } catch {}
         }
 
         logger.log(`[TraktAutosync] ${useImmediate ? 'IMMEDIATE: ' : ''}Successfully stopped watching: ${contentData.title} (${progressPercent.toFixed(1)}% - ${reason})`);

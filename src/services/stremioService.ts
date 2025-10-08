@@ -188,19 +188,56 @@ class StremioService {
     this.initializationPromise = this.initialize();
   }
 
-  // Shared validator for content IDs eligible for metadata requests
+  // Dynamic validator for content IDs based on installed addon capabilities
   public isValidContentId(type: string, id: string | null | undefined): boolean {
     const isValidType = type === 'movie' || type === 'series';
     const lowerId = (id || '').toLowerCase();
-    const looksLikeImdb = /^tt\d+/.test(lowerId);
-    const looksLikeKitsu = lowerId.startsWith('kitsu:') || lowerId === 'kitsu';
-    const looksLikeSeriesId = lowerId.startsWith('series:');
     const isNullishId = !id || lowerId === 'null' || lowerId === 'undefined';
     const providerLikeIds = new Set<string>(['moviebox', 'torbox']);
     const isProviderSlug = providerLikeIds.has(lowerId);
 
     if (!isValidType || isNullishId || isProviderSlug) return false;
-    return looksLikeImdb || looksLikeKitsu || looksLikeSeriesId;
+    
+    // Get all supported ID prefixes from installed addons
+    const supportedPrefixes = this.getAllSupportedIdPrefixes(type);
+    
+    // Check if the ID matches any supported prefix
+    return supportedPrefixes.some(prefix => lowerId.startsWith(prefix.toLowerCase()));
+  }
+
+  // Get all ID prefixes supported by installed addons for a given content type
+  public getAllSupportedIdPrefixes(type: string): string[] {
+    const addons = this.getInstalledAddons();
+    const prefixes = new Set<string>();
+    
+    for (const addon of addons) {
+      // Check addon-level idPrefixes
+      if (addon.idPrefixes && Array.isArray(addon.idPrefixes)) {
+        addon.idPrefixes.forEach(prefix => prefixes.add(prefix));
+      }
+      
+      // Check resource-level idPrefixes
+      if (addon.resources && Array.isArray(addon.resources)) {
+        for (const resource of addon.resources) {
+          if (typeof resource === 'object' && resource !== null && 'name' in resource) {
+            const typedResource = resource as ResourceObject;
+            // Only include prefixes for resources that support the content type
+            if (Array.isArray(typedResource.types) && typedResource.types.includes(type)) {
+              if (Array.isArray(typedResource.idPrefixes)) {
+                typedResource.idPrefixes.forEach(prefix => prefixes.add(prefix));
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // Always include common prefixes as fallback
+    prefixes.add('tt'); // IMDb
+    prefixes.add('kitsu:'); // Kitsu
+    prefixes.add('series:'); // Series
+    
+    return Array.from(prefixes);
   }
 
   static getInstance(): StremioService {
@@ -723,13 +760,16 @@ class StremioService {
 
   async getMetaDetails(type: string, id: string, preferredAddonId?: string): Promise<MetaDetails | null> {
     try {
+      // Validate content ID first
+      if (!this.isValidContentId(type, id)) {
+        return null;
+      }
+      
       const addons = this.getInstalledAddons();
       
       // If a preferred addon is specified, try it first
       if (preferredAddonId) {
-        logger.log(`🔍 [getMetaDetails] Looking for preferred addon: ${preferredAddonId}`);
         const preferredAddon = addons.find(addon => addon.id === preferredAddonId);
-        logger.log(`🔍 [getMetaDetails] Found preferred addon: ${preferredAddon ? preferredAddon.id : 'null'}`);
 
         if (preferredAddon && preferredAddon.resources) {
           // Build URL for metadata request
@@ -739,6 +779,7 @@ class StremioService {
 
           // Check if addon supports meta resource for this type
           let hasMetaSupport = false;
+          let supportsIdPrefix = false;
           
           for (const resource of preferredAddon.resources) {
             // Check if the current element is a ResourceObject
@@ -748,6 +789,12 @@ class StremioService {
                   Array.isArray(typedResource.types) && 
                   typedResource.types.includes(type)) {
                 hasMetaSupport = true;
+                // Check idPrefix support
+                if (Array.isArray(typedResource.idPrefixes) && typedResource.idPrefixes.length > 0) {
+                  supportsIdPrefix = typedResource.idPrefixes.some(p => id.startsWith(p));
+                } else {
+                  supportsIdPrefix = true;
+                }
                 break;
               }
             } 
@@ -755,17 +802,19 @@ class StremioService {
             else if (typeof resource === 'string' && resource === 'meta' && preferredAddon.types) {
               if (Array.isArray(preferredAddon.types) && preferredAddon.types.includes(type)) {
                 hasMetaSupport = true;
+                // Check addon-level idPrefixes
+                if (preferredAddon.idPrefixes && Array.isArray(preferredAddon.idPrefixes) && preferredAddon.idPrefixes.length > 0) {
+                  supportsIdPrefix = preferredAddon.idPrefixes.some(p => id.startsWith(p));
+                } else {
+                  supportsIdPrefix = true;
+                }
                 break;
               }
             }
           }
           
-          logger.log(`🔍 Meta support check: ${hasMetaSupport} (addon types: ${JSON.stringify(preferredAddon.types)})`);
-          
-                    if (hasMetaSupport) {
+          if (hasMetaSupport && supportsIdPrefix) {
             try {
-              logger.log(`🔗 [${preferredAddon.name}] Requesting metadata: ${url} (preferred, id=${id}, type=${type})`);
-
               const response = await this.retryRequest(async () => {
                 return await axios.get(url, { timeout: 10000 });
               });
@@ -773,7 +822,7 @@ class StremioService {
               if (response.data && response.data.meta) {
                 return response.data.meta;
               }
-            } catch (error) {
+            } catch (error: any) {
               // Continue trying other addons
             }
           }
@@ -785,7 +834,7 @@ class StremioService {
         'https://v3-cinemeta.strem.io',
         'http://v3-cinemeta.strem.io'
       ];
-
+      
       for (const baseUrl of cinemetaUrls) {
         try {
           const encodedId = encodeURIComponent(id);
@@ -804,7 +853,6 @@ class StremioService {
       }
 
       // If Cinemeta fails, try other addons (excluding the preferred one already tried)
-      
       for (const addon of addons) {
         if (!addon.resources || addon.id === 'com.linvo.cinemeta' || addon.id === preferredAddonId) continue;
         
@@ -843,6 +891,7 @@ class StremioService {
             }
           }
         }
+        
         // Require both meta support and idPrefix compatibility
         if (!(hasMetaSupport && supportsIdPrefix)) continue;
         
@@ -851,7 +900,6 @@ class StremioService {
           const encodedId = encodeURIComponent(id);
           const url = queryParams ? `${baseUrl}/meta/${type}/${encodedId}.json?${queryParams}` : `${baseUrl}/meta/${type}/${encodedId}.json`;
 
-          logger.log(`🔗 [${addon.name}] Requesting metadata: ${url} (id=${id}, type=${type})`);
           const response = await this.retryRequest(async () => {
             return await axios.get(url, { timeout: 10000 });
           });
@@ -860,15 +908,10 @@ class StremioService {
             return response.data.meta;
           }
         } catch (error) {
-          logger.warn(`❌ Failed to fetch meta from ${addon.name} (${addon.id}):`, error);
           continue; // Try next addon
         }
       }
       
-      // Only log this warning in debug mode to reduce noise
-      if (__DEV__) {
-        logger.warn('No metadata found from any addon');
-      }
       return null;
     } catch (error) {
       logger.error('Error in getMetaDetails:', error);
@@ -1476,6 +1519,7 @@ class StremioService {
 
     return false;
   }
+
 }
 
 export const stremioService = StremioService.getInstance();

@@ -1547,6 +1547,9 @@ export class TraktService {
    */
   private async buildScrobblePayload(contentData: TraktContentData, progress: number): Promise<any | null> {
     try {
+      // Clamp progress between 0 and 100 and round to 2 decimals for API
+      const clampedProgress = Math.min(100, Math.max(0, Math.round(progress * 100) / 100));
+
       // Enhanced debug logging for payload building
       logger.log('[TraktService] Building scrobble payload:', {
         type: contentData.type,
@@ -1558,7 +1561,7 @@ export class TraktService {
         showTitle: contentData.showTitle,
         showYear: contentData.showYear,
         showImdbId: contentData.showImdbId,
-        progress: progress
+        progress: clampedProgress
       });
 
       if (contentData.type === 'movie') {
@@ -1583,7 +1586,7 @@ export class TraktService {
               imdb: imdbIdWithPrefix
             }
           },
-          progress: Math.round(progress * 100) / 100 // Round to 2 decimal places
+          progress: clampedProgress
         };
         
         logger.log('[TraktService] Movie payload built:', payload);
@@ -1609,7 +1612,7 @@ export class TraktService {
             season: contentData.season,
             number: contentData.episode
           },
-          progress: Math.round(progress * 100) / 100
+          progress: clampedProgress
         };
 
         // Add show IMDB ID if available

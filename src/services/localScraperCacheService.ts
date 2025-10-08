@@ -215,7 +215,7 @@ class LocalScraperCacheService {
   }
 
   /**
-   * Get list of scrapers that need to be re-run (expired or failed)
+   * Get list of scrapers that need to be re-run (expired, failed, or not cached)
    */
   async getScrapersToRerun(
     type: string,
@@ -229,14 +229,26 @@ class LocalScraperCacheService {
     const validScraperIds = new Set(validResults.map(r => r.scraperId));
     const expiredScraperIds = new Set(expiredScrapers);
     
-    // Return scrapers that are either expired or not cached at all
+    // Get scrapers that previously failed (returned no streams)
+    const failedScraperIds = new Set(
+      validResults
+        .filter(r => !r.success || r.streams.length === 0)
+        .map(r => r.scraperId)
+    );
+    
+    // Return scrapers that are:
+    // 1. Not cached at all
+    // 2. Expired
+    // 3. Previously failed (regardless of cache status)
     const scrapersToRerun = availableScrapers
       .filter(scraper => 
-        !validScraperIds.has(scraper.id) || expiredScraperIds.has(scraper.id)
+        !validScraperIds.has(scraper.id) || 
+        expiredScraperIds.has(scraper.id) ||
+        failedScraperIds.has(scraper.id)
       )
       .map(scraper => scraper.id);
 
-    logger.log(`[LocalScraperCache] Scrapers to re-run: ${scrapersToRerun.join(', ')}`);
+    logger.log(`[LocalScraperCache] Scrapers to re-run: ${scrapersToRerun.join(', ')} (not cached: ${availableScrapers.filter(s => !validScraperIds.has(s.id)).length}, expired: ${expiredScrapers.length}, failed: ${failedScraperIds.size})`);
     
     return scrapersToRerun;
   }

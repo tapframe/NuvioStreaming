@@ -643,21 +643,24 @@ const WatchProgressDisplay = memo(({
         {/* Enhanced text container with better typography */}
         <View style={styles.watchProgressTextContainer}>
           <View style={styles.progressInfoMain}>
-            <Text style={[isTablet ? styles.tabletWatchProgressMainText : styles.watchProgressMainText, { 
+            <Text style={[isTablet ? styles.tabletWatchProgressMainText : styles.watchProgressMainText, {
               color: isCompleted ? '#00ff88' : currentTheme.colors.white,
               fontSize: isCompleted ? (isTablet ? 15 : 13) : (isTablet ? 14 : 12),
               fontWeight: isCompleted ? '700' : '600'
             }]}>
               {progressData.displayText}
             </Text>
-            
-      </View>
-          
-          <Text style={[isTablet ? styles.tabletWatchProgressSubText : styles.watchProgressSubText, {
-            color: isCompleted ? 'rgba(0,255,136,0.7)' : currentTheme.colors.textMuted,
-          }]}>
-            {progressData.episodeInfo}
-          </Text>
+
+          </View>
+
+          {/* Only show episode info for series */}
+          {progressData.episodeInfo && (
+            <Text style={[isTablet ? styles.tabletWatchProgressSubText : styles.watchProgressSubText, {
+              color: isCompleted ? 'rgba(0,255,136,0.7)' : currentTheme.colors.textMuted,
+            }]}>
+              {progressData.episodeInfo}
+            </Text>
+          )}
           
           {/* Trakt sync status with enhanced styling */}
           {progressData.syncStatus && (
