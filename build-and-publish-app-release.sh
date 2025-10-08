@@ -1,10 +1,4 @@
-#!/bin/bash
 
-# Usage: build-and-publish-app-release.sh <xavia-ota-url> [--yes] [--release-notes "text here"]
-# --yes           Skip interactive confirmation
-# --release-notes Provide release notes to attach to this upload
-
-# Parse arguments
 if [ "$#" -lt 1 ]; then
   echo "Usage: $0 <xavia-ota-url> [--yes] [--release-notes \"text here\"]"
   echo "Example: $0 https://grim-reyna-tapframe-69970143.koyeb.app --yes --release-notes \"Bug fixes and improvements\""

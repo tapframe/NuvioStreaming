@@ -313,16 +313,7 @@ const HomeScreenSettings: React.FC = () => {
               />
             )}
           />
-          <SettingItem
-            title="Featured Content Source"
-            description={settings.featuredContentSource === 'tmdb' ? 'TMDB Trending' : 'From Catalogs'}
-            icon="settings-input-component"
-            isDarkMode={isDarkMode}
-            colors={colors}
-            renderControl={() => <View />}
-            isLast={!settings.showHeroSection || settings.featuredContentSource !== 'catalogs'}
-          />
-          {settings.showHeroSection && settings.featuredContentSource === 'catalogs' && (
+          {settings.showHeroSection && (
             <SettingItem
               title="Select Catalogs"
               description={getSelectedCatalogsText()}
@@ -350,21 +341,15 @@ const HomeScreenSettings: React.FC = () => {
 
             <View style={styles.segmentCard}>
               <Text style={[styles.segmentTitle, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Featured Source</Text>
-              <SegmentedControl
-                options={[{ label: 'TMDB', value: 'tmdb' }, { label: 'Catalogs', value: 'catalogs' }]}
-                value={settings.featuredContentSource}
-                onChange={(val) => handleUpdateSetting('featuredContentSource', val as any)}
-              />
-              {settings.featuredContentSource === 'catalogs' && (
-                <TouchableOpacity
-                  onPress={() => navigation.navigate('HeroCatalogs')}
-                  style={[styles.manageLink, { backgroundColor: isDarkMode ? colors.elevation1 : 'rgba(0,0,0,0.04)' }]}
-                  activeOpacity={0.8}
-                >
-                  <Text style={{ color: isDarkMode ? colors.highEmphasis : colors.textDark, fontWeight: '600' }}>Manage selected catalogs</Text>
-                  <MaterialIcons name="chevron-right" size={20} color={isDarkMode ? colors.mediumEmphasis : colors.textMutedDark} />
-                </TouchableOpacity>
-              )}
+              <Text style={[styles.segmentHint, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Using Catalogs</Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('HeroCatalogs')}
+                style={[styles.manageLink, { backgroundColor: isDarkMode ? colors.elevation1 : 'rgba(0,0,0,0.04)' }]}
+                activeOpacity={0.8}
+              >
+                <Text style={{ color: isDarkMode ? colors.highEmphasis : colors.textDark, fontWeight: '600' }}>Manage selected catalogs</Text>
+                <MaterialIcons name="chevron-right" size={20} color={isDarkMode ? colors.mediumEmphasis : colors.textMutedDark} />
+              </TouchableOpacity>
             </View>
 
             {settings.heroStyle === 'carousel' && (
