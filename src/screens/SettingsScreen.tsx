@@ -557,18 +557,10 @@ const SettingsScreen: React.FC = () => {
             />
             <SettingItem
               title="TMDB"
-              description="Metadata provider"
+              description="Metadata & logo source provider"
               icon="movie"
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('TMDBSettings')}
-              isTablet={isTablet}
-            />
-            <SettingItem
-              title="Media Sources"
-              description="Logo & image preferences"
-              icon="image"
-              renderControl={ChevronRight}
-              onPress={() => navigation.navigate('LogoSourceSettings')}
               isLast={true}
               isTablet={isTablet}
             />

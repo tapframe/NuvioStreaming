@@ -40,7 +40,6 @@ import HomeScreenSettings from '../screens/HomeScreenSettings';
 import HeroCatalogsScreen from '../screens/HeroCatalogsScreen';
 import TraktSettingsScreen from '../screens/TraktSettingsScreen';
 import PlayerSettingsScreen from '../screens/PlayerSettingsScreen';
-import LogoSourceSettings from '../screens/LogoSourceSettings';
 import ThemeScreen from '../screens/ThemeScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import AuthScreen from '../screens/AuthScreen';
@@ -135,7 +134,6 @@ export type RootStackParamList = {
   HeroCatalogs: undefined;
   TraktSettings: undefined;
   PlayerSettings: undefined;
-  LogoSourceSettings: undefined;
   ThemeSettings: undefined;
   ScraperSettings: undefined;
   CastMovies: {
@@ -1227,21 +1225,6 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             <Stack.Screen 
               name="PlayerSettings" 
               component={PlayerSettingsScreen}
-              options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
-                animationDuration: Platform.OS === 'android' ? 250 : 200,
-                presentation: 'card',
-                gestureEnabled: true,
-                gestureDirection: 'horizontal',
-                headerShown: false,
-                contentStyle: {
-                  backgroundColor: currentTheme.colors.darkBackground,
-                },
-              }}
-            />
-            <Stack.Screen 
-              name="LogoSourceSettings" 
-              component={LogoSourceSettings}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,

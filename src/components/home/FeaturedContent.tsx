@@ -253,7 +253,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
     setLogoLoadError(false);
   }, [featuredContent?.id]);
 
-  // Fetch logo based on preference
+  // Fetch logo when enrichment is enabled; otherwise only use addon logo
   useEffect(() => {
     if (!featuredContent || logoFetchInProgress.current) return;
 
@@ -267,8 +267,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
         const contentData = featuredContent; // Use a clearer variable name
         const currentLogo = contentData.logo;
 
-        // Get preferences
-        const logoPreference = settings.logoSourcePreference || 'tmdb';
+        // Get language preference (only relevant when enrichment is enabled)
         const preferredLanguage = settings.tmdbLanguagePreference || 'en';
 
         // If enrichment is disabled, use addon logo and don't fetch from external sources
@@ -281,7 +280,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
           });
           
           // If we have an addon logo, use it and don't fetch external logos
-          if (contentData.logo && !isTmdbUrl(contentData.logo)) {
+          if (contentData.logo) {
             logger.info('[FeaturedContent] enrichment disabled, using addon logo', { logo: contentData.logo });
             setLogoUrl(contentData.logo);
             logoFetchInProgress.current = false;
@@ -334,11 +333,11 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
         let primaryAttempted = false;
         let fallbackAttempted = false;
 
-        // --- Logo Fetching Logic ---
-        logger.debug('[FeaturedContent] fetchLogo:ids', { imdbId, tmdbId, preference: logoPreference, lang: preferredLanguage });
+        // --- Logo Fetching Logic (TMDB only when enrichment is enabled) ---
+        logger.debug('[FeaturedContent] fetchLogo:ids', { imdbId, tmdbId, lang: preferredLanguage });
 
-        // Only try TMDB if preference is 'tmdb' and we have tmdbId
-        if (logoPreference === 'tmdb' && tmdbId) {
+        // Try TMDB if we have a TMDB id
+        if (tmdbId) {
           primaryAttempted = true;
           try {
             const tmdbService = TMDBService.getInstance();
@@ -354,11 +353,11 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
         // --- Set Final Logo ---
         if (finalLogoUrl) {
           setLogoUrl(finalLogoUrl);
-          logger.info('[FeaturedContent] fetchLogo:done', { id: contentId, result: 'ok', duration: since(t0) });
+          logger.info('[FeaturedContent] fetchLogo:done', { id: contentId, result: 'tmdb', url: finalLogoUrl, duration: since(t0) });
         } else if (currentLogo) {
           // Use existing logo only if primary and fallback failed or weren't applicable
           setLogoUrl(currentLogo);
-          logger.info('[FeaturedContent] fetchLogo:done', { id: contentId, result: 'existing', duration: since(t0) });
+          logger.info('[FeaturedContent] fetchLogo:done', { id: contentId, result: 'addon', url: currentLogo, duration: since(t0) });
         } else {
           // No logo found from any source
           setLogoLoadError(true);
@@ -377,7 +376,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
 
     // Trigger fetch when content changes
     fetchLogo();
-  }, [featuredContent, settings.logoSourcePreference, settings.tmdbLanguagePreference, settings.enrichMetadataWithTMDB]);
+  }, [featuredContent, settings.tmdbLanguagePreference, settings.enrichMetadataWithTMDB]);
 
   // Load poster and logo
   useEffect(() => {

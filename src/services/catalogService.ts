@@ -588,6 +588,14 @@ class CatalogService {
     if (!logoUrl || logoUrl.trim() === '' || logoUrl === 'null' || logoUrl === 'undefined') {
       logoUrl = undefined;
     }
+    try {
+      logger.debug('[CatalogService] convertMetaToStreamingContent:logo', {
+        id: meta.id,
+        name: meta.name,
+        hasLogo: Boolean(logoUrl),
+        logo: logoUrl || undefined,
+      });
+    } catch {}
     
     return {
       id: meta.id,

@@ -115,7 +115,6 @@ export const useLibrary = () => {
   // Subscribe to catalogService library updates
   useEffect(() => {
     const unsubscribe = catalogService.subscribeToLibraryUpdates((items) => {
-      if (__DEV__) console.log('[useLibrary] Received library update from catalogService:', items.length, 'items');
       setLibraryItems(items);
       setLoading(false);
     });

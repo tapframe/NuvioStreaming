@@ -49,7 +49,6 @@ class RobustCalendarCache {
         return null;
       }
       
-      logger.log(`[Cache] Valid cache found for key ${key}`);
       return cache.data;
     } catch (error) {
       logger.error(`[Cache] Error getting cached data for key ${key}:`, error);

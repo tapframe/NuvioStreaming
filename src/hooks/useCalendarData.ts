@@ -50,7 +50,6 @@ export const useCalendarData = (): UseCalendarDataReturn => {
     } = useTraktContext();
 
     const fetchCalendarData = useCallback(async (forceRefresh = false) => {
-        logger.log("[CalendarData] Starting to fetch calendar data");
         setLoading(true);
         
         try {
@@ -68,14 +67,12 @@ export const useCalendarData = (): UseCalendarDataReturn => {
             );
     
             if (cachedData) {
-              logger.log(`[CalendarData] Using cached data with ${cachedData.length} sections`);
               setCalendarData(cachedData);
               setLoading(false);
               return;
             }
           }
     
-          logger.log("[CalendarData] Fetching fresh data from APIs");
     
           const librarySeries = libraryItems.filter(item => item.type === 'series');
           let allSeries: StreamingContent[] = [...librarySeries];

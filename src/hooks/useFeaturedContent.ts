@@ -131,9 +131,8 @@ export function useFeaturedContent() {
               };
             });
             
-          // Then fetch logos for each item based on preference
+          // Then fetch logos for each item (TMDB when enrichment enabled)
           const tLogos = Date.now();
-          const preference = settings.logoSourcePreference || 'tmdb';
           const preferredLanguage = settings.tmdbLanguagePreference || 'en';
 
           const fetchLogoForItem = async (item: StreamingContent): Promise<StreamingContent> => {
@@ -152,58 +151,21 @@ export function useFeaturedContent() {
                 return item;
               }
 
-              if (preference === 'tmdb') {
-                logger.debug('[useFeaturedContent] logo:try:tmdb', { name: item.name, id: item.id, tmdbId, lang: preferredLanguage });
-                // Resolve TMDB id if we only have IMDb
-                if (!tmdbId && imdbId) {
-                  const found = await tmdbService.findTMDBIdByIMDB(imdbId);
-                  tmdbId = found ? String(found) : null;
-                }
-                if (!tmdbId) return item;
-                const logoUrl = tmdbId ? await tmdbService.getContentLogo('movie', tmdbId as string, preferredLanguage) : null;
-                if (logoUrl) {
-                  logger.debug('[useFeaturedContent] logo:tmdb:ok', { name: item.name, id: item.id, url: logoUrl, lang: preferredLanguage });
-                  return { ...item, logo: logoUrl };
-                }
-                // Fallback to Metahub via IMDb ID
-                if (!imdbId && tmdbId) {
-                  const movieDetails: any = await tmdbService.getMovieDetails(tmdbId);
-                  imdbId = movieDetails?.imdb_id;
-                }
-                if (imdbId) {
-                  const metahubUrl = `https://images.metahub.space/logo/medium/${imdbId}/img`;
-                  logger.debug('[useFeaturedContent] logo:fallback:metahub', { name: item.name, id: item.id, url: metahubUrl });
-                  return { ...item, logo: metahubUrl };
-                }
-                logger.debug('[useFeaturedContent] logo:none', { name: item.name, id: item.id });
-                return item;
-              } else {
-                // preference === 'metahub'
-                // If have IMDb, use directly
-                if (!imdbId && tmdbId) {
-                  const movieDetails: any = await tmdbService.getMovieDetails(tmdbId);
-                  imdbId = movieDetails?.imdb_id;
-                }
-                if (imdbId) {
-                  const metahubUrl = `https://images.metahub.space/logo/medium/${imdbId}/img`;
-                  logger.debug('[useFeaturedContent] logo:metahub:ok', { name: item.name, id: item.id, url: metahubUrl });
-                  return { ...item, logo: metahubUrl };
-                }
-                // Fallback to TMDB logo
-                logger.debug('[useFeaturedContent] logo:metahub:miss → fallback:tmdb', { name: item.name, id: item.id, lang: preferredLanguage });
-                if (!tmdbId && imdbId) {
-                  const found = await tmdbService.findTMDBIdByIMDB(imdbId);
-                  tmdbId = found ? String(found) : null;
-                }
-                if (!tmdbId) return item;
-                const logoUrl = tmdbId ? await tmdbService.getContentLogo('movie', tmdbId as string, preferredLanguage) : null;
-                if (logoUrl) {
-                  logger.debug('[useFeaturedContent] logo:tmdb:fallback:ok', { name: item.name, id: item.id, url: logoUrl, lang: preferredLanguage });
-                  return { ...item, logo: logoUrl };
-                }
-                logger.debug('[useFeaturedContent] logo:none', { name: item.name, id: item.id });
-                return item;
+              // Enrichment path: TMDB only
+              logger.debug('[useFeaturedContent] logo:try:tmdb', { name: item.name, id: item.id, tmdbId, lang: preferredLanguage });
+              // Resolve TMDB id if we only have IMDb
+              if (!tmdbId && imdbId) {
+                const found = await tmdbService.findTMDBIdByIMDB(imdbId);
+                tmdbId = found ? String(found) : null;
               }
+              if (!tmdbId) return item;
+              const logoUrl = tmdbId ? await tmdbService.getContentLogo('movie', tmdbId as string, preferredLanguage) : null;
+              if (logoUrl) {
+                logger.debug('[useFeaturedContent] logo:tmdb:ok', { name: item.name, id: item.id, url: logoUrl, lang: preferredLanguage });
+                return { ...item, logo: logoUrl };
+              }
+              logger.debug('[useFeaturedContent] logo:none', { name: item.name, id: item.id });
+              return item;
             } catch (error) {
               logger.error('[useFeaturedContent] logo:error', { name: item.name, id: item.id, error: String(error) });
               return item;
@@ -220,7 +182,17 @@ export function useFeaturedContent() {
               logo: item.logo && !isTmdbUrl(item.logo) ? item.logo : undefined
             }));
           }
-          logger.info('[useFeaturedContent] logos:resolved', { count: formattedContent.length, duration: `${Date.now() - tLogos}ms`, preference });
+          logger.info('[useFeaturedContent] logos:resolved', { count: formattedContent.length, duration: `${Date.now() - tLogos}ms` });
+          try {
+            const details = formattedContent.slice(0, 20).map((c) => ({
+              id: c.id,
+              name: c.name,
+              hasLogo: Boolean(c.logo),
+              logoSource: c.logo ? (isTmdbUrl(String(c.logo)) ? 'tmdb' : 'addon') : 'none',
+              logo: c.logo || undefined,
+            }));
+            logger.debug('[useFeaturedContent] logos:details', { items: details });
+          } catch {}
         }
       } else {
         // Load from installed catalogs
@@ -256,8 +228,7 @@ export function useFeaturedContent() {
           // Sort by popular, newest, etc. (possibly enhanced later) and take first 10
           const topItems = allItems.sort(() => Math.random() - 0.5).slice(0, 10);
 
-          // Optionally enrich with logos based on preference for tmdb-sourced IDs
-          const preference = settings.logoSourcePreference || 'tmdb';
+          // Optionally enrich with logos (TMDB only) for tmdb/imdb sourced IDs
           const preferredLanguage = settings.tmdbLanguagePreference || 'en';
 
           const enrichLogo = async (item: any): Promise<StreamingContent> => {
@@ -298,8 +269,8 @@ export function useFeaturedContent() {
                 tmdbId = found ? String(found) : null;
               }
               if (!tmdbId && !imdbId) return base;
-              // Only try TMDB if preference is 'tmdb' and we have tmdbId
-              if (preference === 'tmdb' && tmdbId) {
+              // Try TMDB if we have a TMDB id
+              if (tmdbId) {
                 logger.debug('[useFeaturedContent] logo:try:tmdb', { name: item.name, id: item.id, tmdbId, lang: preferredLanguage });
                 const logoUrl = await tmdbService.getContentLogo(item.type === 'series' ? 'tv' : 'movie', tmdbId as string, preferredLanguage);
                 if (logoUrl) {
@@ -314,17 +285,29 @@ export function useFeaturedContent() {
             }
           };
 
-          // When enrichment is disabled, only use addon logos and never fetch external logos
-          if (!settings.enrichMetadataWithTMDB) {
-            logger.debug('[useFeaturedContent] enrichment disabled, using only addon logos');
-            formattedContent = topItems.map((item: any) => {
+          // Only enrich with logos if enrichment is enabled
+          if (settings.enrichMetadataWithTMDB) {
+            formattedContent = await Promise.all(topItems.map(enrichLogo));
+            try {
+              const details = formattedContent.slice(0, 20).map((c) => ({
+                id: c.id,
+                name: c.name,
+                hasLogo: Boolean(c.logo),
+                logoSource: c.logo ? (isTmdbUrl(String(c.logo)) ? 'tmdb' : 'addon') : 'none',
+                logo: c.logo || undefined,
+              }));
+              logger.debug('[useFeaturedContent] catalogs:logos:details', { items: details });
+            } catch {}
+          } else {
+            // When enrichment is disabled, prefer addon-provided logos; if missing, fetch basic meta to pull logo (like HeroSection)
+            const baseItems = topItems.map((item: any) => {
               const base: StreamingContent = {
                 id: item.id,
                 type: item.type,
                 name: item.name,
                 poster: item.poster,
                 banner: (item as any).banner,
-                logo: (item as any).logo && !isTmdbUrl((item as any).logo) ? (item as any).logo : undefined,
+                logo: (item as any).logo || undefined,
                 description: (item as any).description,
                 year: (item as any).year,
                 genres: (item as any).genres,
@@ -332,9 +315,49 @@ export function useFeaturedContent() {
               };
               return base;
             });
-          } else {
-            // Only enrich with logos if enrichment is enabled
-            formattedContent = await Promise.all(topItems.map(enrichLogo));
+
+            // Attempt to fill missing logos from addon meta details for a limited subset
+            const candidates = baseItems.filter(i => !i.logo).slice(0, 10);
+            logger.debug('[useFeaturedContent] catalogs:no-enrich:missing-logos', { count: candidates.length });
+
+            try {
+              const filled = await Promise.allSettled(candidates.map(async (item) => {
+                try {
+                  const meta = await catalogService.getBasicContentDetails(item.type, item.id);
+                  if (meta?.logo) {
+                    logger.debug('[useFeaturedContent] catalogs:no-enrich:filled-logo', { id: item.id, name: item.name, logo: meta.logo });
+                    return { id: item.id, logo: meta.logo } as { id: string; logo: string };
+                  }
+                } catch (e) {
+                  logger.warn('[useFeaturedContent] catalogs:no-enrich:fill-failed', { id: item.id, error: String(e) });
+                }
+                return { id: item.id, logo: undefined as any };
+              }));
+
+              const idToLogo = new Map<string, string>();
+              filled.forEach(res => {
+                if (res.status === 'fulfilled' && res.value && res.value.logo) {
+                  idToLogo.set(res.value.id, res.value.logo);
+                }
+              });
+
+              formattedContent = baseItems.map(i => (
+                idToLogo.has(i.id) ? { ...i, logo: idToLogo.get(i.id)! } : i
+              ));
+            } catch {
+              formattedContent = baseItems;
+            }
+
+            try {
+              const details = formattedContent.slice(0, 20).map((c) => ({
+                id: c.id,
+                name: c.name,
+                hasLogo: Boolean(c.logo),
+                logoSource: c.logo ? (isTmdbUrl(String(c.logo)) ? 'tmdb' : 'addon') : 'none',
+                logo: c.logo || undefined,
+              }));
+              logger.debug('[useFeaturedContent] catalogs:logos:details (no-enrich)', { items: details });
+            } catch {}
           }
         }
       }

@@ -32,6 +32,35 @@ import CustomAlert from '../components/CustomAlert';
 
 const TMDB_API_KEY_STORAGE_KEY = 'tmdb_api_key';
 const USE_CUSTOM_TMDB_API_KEY = 'use_custom_tmdb_api_key';
+const TMDB_API_KEY = '439c478a771f35c05022f9feabcca01c';
+
+// Define example shows with their IMDB IDs and TMDB IDs
+const EXAMPLE_SHOWS = [
+  { 
+    name: 'Breaking Bad', 
+    imdbId: 'tt0903747', 
+    tmdbId: '1396',
+    type: 'tv' as const
+  },
+  { 
+    name: 'Friends', 
+    imdbId: 'tt0108778', 
+    tmdbId: '1668',
+    type: 'tv' as const
+  },
+  { 
+    name: 'Stranger Things', 
+    imdbId: 'tt4574334', 
+    tmdbId: '66732',
+    type: 'tv' as const
+  },
+  { 
+    name: 'Avatar', 
+    imdbId: 'tt0499549', 
+    tmdbId: '19995',
+    type: 'movie' as const
+  },
+];
 
 const TMDBSettingsScreen = () => {
   const navigation = useNavigation();
@@ -53,6 +82,14 @@ const TMDBSettingsScreen = () => {
   const { settings, updateSetting } = useSettings();
   const [languagePickerVisible, setLanguagePickerVisible] = useState(false);
   const [languageSearch, setLanguageSearch] = useState('');
+  
+  // Logo preview state
+  const [selectedShow, setSelectedShow] = useState(EXAMPLE_SHOWS[0]);
+  const [tmdbLogo, setTmdbLogo] = useState<string | null>(null);
+  const [tmdbBanner, setTmdbBanner] = useState<string | null>(null);
+  const [loadingLogos, setLoadingLogos] = useState(true);
+  const [previewLanguage, setPreviewLanguage] = useState<string>('');
+  const [isPreviewFallback, setIsPreviewFallback] = useState<boolean>(false);
 
   const openAlert = (
     title: string,
@@ -253,6 +290,151 @@ const TMDBSettingsScreen = () => {
     });
   };
 
+  // Logo preview functions
+  const fetchExampleLogos = async (show: typeof EXAMPLE_SHOWS[0]) => {
+    setLoadingLogos(true);
+    setTmdbLogo(null);
+    setTmdbBanner(null);
+    
+    try {
+      const tmdbId = show.tmdbId;
+      const contentType = show.type;
+      
+      logger.log(`[TMDBSettingsScreen] Fetching ${show.name} with TMDB ID: ${tmdbId}`);
+      
+      const preferredTmdbLanguage = settings.tmdbLanguagePreference || 'en';
+      
+      const apiKey = TMDB_API_KEY;
+      const endpoint = contentType === 'tv' ? 'tv' : 'movie';
+      const response = await fetch(`https://api.themoviedb.org/3/${endpoint}/${tmdbId}/images?api_key=${apiKey}`);
+      const imagesData = await response.json();
+      
+      if (imagesData.logos && imagesData.logos.length > 0) {
+        let logoPath: string | null = null;
+        let logoLanguage = preferredTmdbLanguage;
+        
+        // Try to find logo in preferred language
+        const preferredLogo = imagesData.logos.find((logo: { iso_639_1: string; file_path: string }) => logo.iso_639_1 === preferredTmdbLanguage);
+        
+        if (preferredLogo) {
+          logoPath = preferredLogo.file_path;
+          logoLanguage = preferredTmdbLanguage;
+          setIsPreviewFallback(false);
+        } else {
+          // Fallback to English
+          const englishLogo = imagesData.logos.find((logo: { iso_639_1: string; file_path: string }) => logo.iso_639_1 === 'en');
+          
+          if (englishLogo) {
+            logoPath = englishLogo.file_path;
+            logoLanguage = 'en';
+            setIsPreviewFallback(true);
+          } else if (imagesData.logos[0]) {
+            // Fallback to first available
+            logoPath = imagesData.logos[0].file_path;
+            logoLanguage = imagesData.logos[0].iso_639_1 || 'unknown';
+            setIsPreviewFallback(true);
+          }
+        }
+        
+        if (logoPath) {
+          setTmdbLogo(`https://image.tmdb.org/t/p/original${logoPath}`);
+          setPreviewLanguage(logoLanguage);
+        } else {
+          setPreviewLanguage('');
+          setIsPreviewFallback(false);
+        }
+      } else {
+        setPreviewLanguage('');
+        setIsPreviewFallback(false);
+      }
+      
+      // Get TMDB banner (backdrop)
+      if (imagesData.backdrops && imagesData.backdrops.length > 0) {
+        const backdropPath = imagesData.backdrops[0].file_path;
+        setTmdbBanner(`https://image.tmdb.org/t/p/original${backdropPath}`);
+      } else {
+        const detailsResponse = await fetch(`https://api.themoviedb.org/3/${endpoint}/${tmdbId}?api_key=${apiKey}`);
+        const details = await detailsResponse.json();
+        
+        if (details.backdrop_path) {
+          setTmdbBanner(`https://image.tmdb.org/t/p/original${details.backdrop_path}`);
+        }
+      }
+    } catch (err) {
+      logger.error(`[TMDBSettingsScreen] Error fetching ${show.name} preview:`, err);
+    } finally {
+      setLoadingLogos(false);
+    }
+  };
+
+  const handleShowSelect = (show: typeof EXAMPLE_SHOWS[0]) => {
+    setSelectedShow(show);
+    try {
+      AsyncStorage.setItem('tmdb_settings_selected_show', show.imdbId);
+    } catch (e) {
+      if (__DEV__) console.error('Error saving selected show:', e);
+    }
+  };
+
+  const renderLogoExample = (logo: string | null, banner: string | null, isLoading: boolean) => {
+    if (isLoading) {
+      return (
+        <View style={[styles.exampleImage, styles.loadingContainer]}>
+          <ActivityIndicator size="small" color={currentTheme.colors.primary} />
+        </View>
+      );
+    }
+    
+    return (
+      <View style={styles.bannerContainer}>
+        <Image 
+          source={{ uri: banner || undefined }}
+          style={styles.bannerImage}
+          resizeMode="cover"
+        />
+        <View style={styles.bannerOverlay} />
+        {logo && (
+          <Image 
+            source={{ uri: logo }}
+            style={styles.logoOverBanner}
+            resizeMode="contain"
+          />
+        )}
+        {!logo && (
+          <View style={styles.noLogoContainer}>
+            <Text style={styles.noLogoText}>No logo available</Text>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  // Load example logos when show or language changes
+  useEffect(() => {
+    if (settings.enrichMetadataWithTMDB && settings.useTmdbLocalizedMetadata) {
+      fetchExampleLogos(selectedShow);
+    }
+  }, [selectedShow, settings.enrichMetadataWithTMDB, settings.useTmdbLocalizedMetadata, settings.tmdbLanguagePreference]);
+
+  // Load selected show from AsyncStorage on mount
+  useEffect(() => {
+    const loadSelectedShow = async () => {
+      try {
+        const savedShowId = await AsyncStorage.getItem('tmdb_settings_selected_show');
+        if (savedShowId) {
+          const foundShow = EXAMPLE_SHOWS.find(show => show.imdbId === savedShowId);
+          if (foundShow) {
+            setSelectedShow(foundShow);
+          }
+        }
+      } catch (e) {
+        if (__DEV__) console.error('Error loading selected show:', e);
+      }
+    };
+    
+    loadSelectedShow();
+  }, []);
+
   const headerBaseHeight = Platform.OS === 'android' ? 80 : 60;
   const topSpacing = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top;
   const headerHeight = headerBaseHeight + topSpacing;
@@ -356,6 +538,56 @@ const TMDBSettingsScreen = () => {
                     >
                       <Text style={[styles.languageButtonText, { color: currentTheme.colors.white }]}>Change</Text>
                     </TouchableOpacity>
+                  </View>
+
+                  {/* Logo Preview */}
+                  <View style={styles.divider} />
+                  
+                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text, marginBottom: 8 }]}>Logo Preview</Text>
+                  <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis, marginBottom: 12 }]}>
+                    Preview shows how localized logos will appear in the selected language.
+                  </Text>
+
+                  {/* Show selector */}
+                  <Text style={[styles.selectorLabel, { color: currentTheme.colors.mediumEmphasis }]}>Example:</Text>
+                  <ScrollView 
+                    horizontal 
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.showsScrollContent}
+                    style={styles.showsScrollView}
+                  >
+                    {EXAMPLE_SHOWS.map((show) => (
+                      <TouchableOpacity
+                        key={show.imdbId}
+                        style={[
+                          styles.showItem,
+                          { backgroundColor: currentTheme.colors.elevation1 },
+                          selectedShow.imdbId === show.imdbId && [styles.selectedShowItem, { borderColor: currentTheme.colors.primary }]
+                        ]}
+                        onPress={() => handleShowSelect(show)}
+                        activeOpacity={0.7}
+                      >
+                        <Text 
+                          style={[
+                            styles.showItemText,
+                            { color: currentTheme.colors.mediumEmphasis },
+                            selectedShow.imdbId === show.imdbId && [styles.selectedShowItemText, { color: currentTheme.colors.white }]
+                          ]}
+                        >
+                          {show.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+
+                  {/* Preview card */}
+                  <View style={[styles.logoPreviewCard, { backgroundColor: currentTheme.colors.elevation1 }]}>
+                    {renderLogoExample(tmdbLogo, tmdbBanner, loadingLogos)}
+                    {tmdbLogo && (
+                      <Text style={[styles.logoSourceLabel, { color: currentTheme.colors.mediumEmphasis }]}>
+                        {`Language: ${(previewLanguage || '').toUpperCase() || 'N/A'}${isPreviewFallback ? ' (fallback to available)' : ''}`}
+                      </Text>
+                    )}
                   </View>
                 </>
               )}
@@ -1112,6 +1344,91 @@ const styles = StyleSheet.create({
   doneButtonText: {
     fontSize: 16,
     fontWeight: '700',
+  },
+
+  // Logo Source Styles
+  selectorLabel: {
+    fontSize: 13,
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  showsScrollView: {
+    marginBottom: 16,
+  },
+  showsScrollContent: {
+    paddingRight: 16,
+    paddingVertical: 2,
+  },
+  showItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginRight: 6,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  selectedShowItem: {
+    borderWidth: 2,
+  },
+  showItemText: {
+    fontSize: 13,
+  },
+  selectedShowItemText: {
+    fontWeight: '600',
+  },
+  logoPreviewCard: {
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
+  },
+  exampleImage: {
+    height: 60,
+    width: '100%',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 8,
+  },
+  bannerContainer: {
+    height: 80,
+    width: '100%',
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
+    marginTop: 4,
+  },
+  bannerImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  bannerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  logoOverBanner: {
+    position: 'absolute',
+    width: '80%',
+    height: '70%',
+    alignSelf: 'center',
+    top: '15%',
+  },
+  noLogoContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  noLogoText: {
+    color: '#fff',
+    fontSize: 13,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+  },
+  logoSourceLabel: {
+    fontSize: 11,
+    marginTop: 6,
   },
 });
 
