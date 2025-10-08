@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { logger } from '../utils/logger';
 import { TMDBService } from '../services/tmdbService';
-import { isMetahubUrl, isTmdbUrl } from '../utils/logoUtils';
+import { isTmdbUrl } from '../utils/logoUtils';
 import { Image } from 'expo-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -83,7 +83,7 @@ export const useMetadataAssets = (
     
     // Force logo refresh on preference change
     if (metadata?.logo) {
-      const currentLogoIsMetahub = isMetahubUrl(metadata.logo);
+      const currentLogoIsExternal = isTmdbUrl(metadata.logo);
       const currentLogoIsTmdb = isTmdbUrl(metadata.logo);
       const preferenceIsMetahub = settings.logoSourcePreference === 'metahub';
 
@@ -102,20 +102,29 @@ export const useMetadataAssets = (
 
   // Optimized logo fetching
   useEffect(() => {
-    const logoPreference = settings.logoSourcePreference || 'metahub';
+    const logoPreference = settings.logoSourcePreference || 'tmdb';
     const currentLogoUrl = metadata?.logo;
     let shouldFetchLogo = false;
 
-    // Determine if we need to fetch a new logo
+    // If enrichment is disabled, use addon logo and don't fetch from external sources
+    if (!settings.enrichMetadataWithTMDB) {
+      // If we have an addon logo, use it and don't fetch external logos
+      if (metadata?.logo && !isTmdbUrl(metadata.logo)) {
+        // This is an addon logo, keep it
+        return;
+      }
+      // If no addon logo, don't fetch external logos when enrichment is disabled
+      return;
+    }
+
+    // Determine if we need to fetch a new logo (only when enrichment is enabled)
     if (!currentLogoUrl) {
       shouldFetchLogo = true;
     } else {
-      const isCurrentLogoMetahub = isMetahubUrl(currentLogoUrl);
+      const isCurrentLogoExternal = isTmdbUrl(currentLogoUrl);
       const isCurrentLogoTmdb = isTmdbUrl(currentLogoUrl);
       
       if (logoPreference === 'tmdb' && !isCurrentLogoTmdb) {
-        shouldFetchLogo = true;
-      } else if (logoPreference === 'metahub' && !isCurrentLogoMetahub) {
         shouldFetchLogo = true;
       }
     }
@@ -133,19 +142,7 @@ export const useMetadataAssets = (
         try {
           const preferredLanguage = settings.tmdbLanguagePreference || 'en';
           
-          if (logoPreference === 'metahub' && imdbId) {
-            // Metahub path - with cached availability check
-            const metahubUrl = `https://images.metahub.space/logo/medium/${imdbId}/img`;
-            
-            const isAvailable = await checkImageAvailability(metahubUrl);
-            if (isAvailable) {
-              // Preload the image
-              await Image.prefetch(metahubUrl);
-              
-              // Update metadata with Metahub logo
-              setMetadata((prevMetadata: any) => ({ ...prevMetadata!, logo: metahubUrl }));
-            }
-          } else if (logoPreference === 'tmdb') {
+          if (logoPreference === 'tmdb') {
             // TMDB path - optimized flow
             let tmdbId: string | null = null;
             let contentType = type === 'series' ? 'tv' : 'movie';
@@ -205,6 +202,7 @@ export const useMetadataAssets = (
     metadata?.logo,
     settings.logoSourcePreference, 
     settings.tmdbLanguagePreference,
+    settings.enrichMetadataWithTMDB,
     setMetadata
   ]);
 
@@ -221,16 +219,27 @@ export const useMetadataAssets = (
       setBannerSource('default');
     }
     
+    // If enrichment is disabled, use addon banner and don't fetch from external sources
+    if (!settings.enrichMetadataWithTMDB) {
+      const addonBanner = metadata?.banner || metadata?.poster || null;
+      if (addonBanner && addonBanner !== bannerImage) {
+        setBannerImage(addonBanner);
+        setBannerSource('default');
+      }
+      setLoadingBanner(false);
+      return;
+    }
+    
     try {
-      const currentPreference = settings.logoSourcePreference || 'metahub';
+      const currentPreference = settings.logoSourcePreference || 'tmdb';
       const preferredLanguage = settings.tmdbLanguagePreference || 'en';
       const contentType = type === 'series' ? 'tv' : 'movie';
       
       // Try to get a banner from the preferred source
       let finalBanner: string | null = null;
-      let bannerSourceType: 'tmdb' | 'metahub' | 'default' = 'default';
+      let bannerSourceType: 'tmdb' | 'default' = 'default';
       
-      // TMDB path
+      // TMDB path only
       if (currentPreference === 'tmdb') {
         let tmdbId = null;
         if (id.startsWith('tmdb:')) {
@@ -282,89 +291,12 @@ export const useMetadataAssets = (
             // Handle error silently
           }
         }
-      } 
-      // Metahub path
-      else if (currentPreference === 'metahub' && imdbId) {
-        const metahubUrl = `https://images.metahub.space/background/medium/${imdbId}/img`;
-        
-        const isAvailable = await checkImageAvailability(metahubUrl);
-        if (isAvailable) {
-          finalBanner = metahubUrl;
-          bannerSourceType = 'metahub';
-          
-          // Preload the image
-          if (finalBanner) {
-            await Image.prefetch(finalBanner);
-          }
-        }
       }
       
-      // If preferred source failed, try fallback
+      // Final fallback to metadata
       if (!finalBanner) {
-        // Try the other source
-        if (currentPreference === 'tmdb' && imdbId) {
-          const metahubUrl = `https://images.metahub.space/background/medium/${imdbId}/img`;
-          
-          const isAvailable = await checkImageAvailability(metahubUrl);
-          if (isAvailable) {
-            finalBanner = metahubUrl;
-            bannerSourceType = 'metahub';
-            
-            // Preload the image
-            if (finalBanner) {
-              await Image.prefetch(finalBanner);
-            }
-          }
-        } 
-        else if (currentPreference === 'metahub') {
-          // Try TMDB as fallback
-          let tmdbId = null;
-          if (id.startsWith('tmdb:')) {
-            tmdbId = id.split(':')[1];
-          } else if (foundTmdbId) {
-            tmdbId = foundTmdbId;
-          } else if ((metadata as any).tmdbId) {
-            tmdbId = (metadata as any).tmdbId;
-          }
-          
-          if (tmdbId) {
-            try {
-              const tmdbService = TMDBService.getInstance();
-              const endpoint = contentType === 'tv' ? 'tv' : 'movie';
-              
-              const details = endpoint === 'movie' 
-                ? await tmdbService.getMovieDetails(tmdbId) 
-                : await tmdbService.getTVShowDetails(Number(tmdbId));
-              
-              if (details?.backdrop_path) {
-                finalBanner = tmdbService.getImageUrl(details.backdrop_path);
-                bannerSourceType = 'tmdb';
-                
-                // Preload the image
-                if (finalBanner) {
-                  await Image.prefetch(finalBanner);
-                }
-              } 
-              else if (details?.poster_path) {
-                finalBanner = tmdbService.getImageUrl(details.poster_path);
-                bannerSourceType = 'tmdb';
-                
-                // Preload the image
-                if (finalBanner) {
-                  await Image.prefetch(finalBanner);
-                }
-              }
-            } catch (error) {
-              // Handle error silently
-            }
-          }
-        }
-        
-        // Final fallback to metadata
-        if (!finalBanner) {
-          finalBanner = metadata?.banner || metadata?.poster || null;
-          bannerSourceType = 'default';
-        }
+        finalBanner = metadata?.banner || metadata?.poster || null;
+        bannerSourceType = 'default';
       }
       
       // Update state if the banner changed
@@ -384,11 +316,11 @@ export const useMetadataAssets = (
     } finally {
       setLoadingBanner(false);
     }
-  }, [metadata, id, type, imdbId, settings.logoSourcePreference, settings.tmdbLanguagePreference, foundTmdbId, bannerImage, bannerSource]);
+  }, [metadata, id, type, imdbId, settings.logoSourcePreference, settings.tmdbLanguagePreference, settings.enrichMetadataWithTMDB, foundTmdbId, bannerImage, bannerSource]);
 
   // Fetch banner when needed
   useEffect(() => {
-    const currentPreference = settings.logoSourcePreference || 'metahub';
+    const currentPreference = settings.logoSourcePreference || 'tmdb';
     
     if (bannerSource !== currentPreference && !forcedBannerRefreshDone.current) {
       fetchBanner();

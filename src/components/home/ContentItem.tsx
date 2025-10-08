@@ -193,8 +193,9 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
     }
 
     // If we've had an error, try metahub fallback
-    if (retryCount > 0 && !item.poster.includes('metahub.space')) {
-      return `https://images.metahub.space/poster/small/${item.id}/img`;
+    // Use addon poster if available, otherwise use placeholder
+    if (retryCount > 0 && !item.poster) {
+      return 'https://via.placeholder.com/300x450/cccccc/666666?text=No+Image';
     }
 
     // For TMDB images, use smaller sizes
@@ -204,7 +205,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
     }
 
     // For metahub images, use smaller sizes
-    if (item.poster.includes('images.metahub.space')) {
+    if (item.poster.includes('placeholder')) {
       return item.poster.replace('/medium/', '/small/');
     }
 
@@ -268,7 +269,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
                 onError={(error) => {
                   if (__DEV__) console.warn('Image load error for:', item.poster, error);
                   // Try fallback URL on first error
-                  if (retryCount === 0 && item.poster && !item.poster.includes('metahub.space')) {
+                  if (retryCount === 0 && item.poster && !item.poster.includes('placeholder')) {
                     setRetryCount(1);
                     // Don't set error state yet, let it try the fallback
                     return;

@@ -577,10 +577,16 @@ class CatalogService {
 
   private convertMetaToStreamingContent(meta: Meta): StreamingContent {
     // Basic conversion for catalog display - no enhanced metadata processing
-    // Validate poster URL and provide better fallback
+    // Use addon's poster if available, otherwise use placeholder
     let posterUrl = meta.poster;
     if (!posterUrl || posterUrl.trim() === '' || posterUrl === 'null' || posterUrl === 'undefined') {
-      posterUrl = `https://images.metahub.space/poster/medium/${meta.id}/img`;
+      posterUrl = 'https://via.placeholder.com/300x450/cccccc/666666?text=No+Image';
+    }
+    
+    // Use addon's logo if available, otherwise undefined
+    let logoUrl = (meta as any).logo;
+    if (!logoUrl || logoUrl.trim() === '' || logoUrl === 'null' || logoUrl === 'undefined') {
+      logoUrl = undefined;
     }
     
     return {
@@ -590,7 +596,7 @@ class CatalogService {
       poster: posterUrl,
       posterShape: 'poster',
       banner: meta.background,
-      logo: `https://images.metahub.space/logo/medium/${meta.id}/img`, // Use metahub for catalog display
+      logo: logoUrl,
       imdbRating: meta.imdbRating,
       year: meta.year,
       genres: meta.genres,
@@ -612,8 +618,8 @@ class CatalogService {
       poster: meta.poster || 'https://via.placeholder.com/300x450/cccccc/666666?text=No+Image',
       posterShape: 'poster',
       banner: meta.background,
-      // Use addon's logo if available, fallback to metahub
-      logo: (meta as any).logo || `https://images.metahub.space/logo/medium/${meta.id}/img`,
+      // Use addon's logo if available, otherwise undefined
+      logo: (meta as any).logo || undefined,
       imdbRating: meta.imdbRating,
       year: meta.year,
       genres: meta.genres,

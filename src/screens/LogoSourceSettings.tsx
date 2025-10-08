@@ -530,31 +530,6 @@ const LogoSourceSettings = () => {
           logger.error(`[LogoSourceSettings] Error fetching TMDB images:`, tmdbError);
         }
         
-        // Get Metahub logo and banner
-        try {
-          // Metahub logo
-          const metahubLogoUrl = `https://images.metahub.space/logo/medium/${imdbId}/img`;
-          const logoResponse = await fetch(metahubLogoUrl, { method: 'HEAD' });
-          
-          if (logoResponse.ok) {
-            setMetahubLogo(metahubLogoUrl);
-            logger.log(`[LogoSourceSettings] Got ${show.name} Metahub logo: ${metahubLogoUrl}`);
-          }
-          
-          // Metahub banner
-          const metahubBannerUrl = `https://images.metahub.space/background/medium/${imdbId}/img`;
-          const bannerResponse = await fetch(metahubBannerUrl, { method: 'HEAD' });
-          
-          if (bannerResponse.ok) {
-            setMetahubBanner(metahubBannerUrl);
-            logger.log(`[LogoSourceSettings] Got ${show.name} Metahub banner: ${metahubBannerUrl}`);
-          } else if (tmdbBanner) {
-            // If Metahub banner doesn't exist, use TMDB banner
-            setMetahubBanner(tmdbBanner);
-          }
-        } catch (metahubErr) {
-          logger.error(`[LogoSourceSettings] Error checking Metahub images:`, metahubErr);
-        }
       } catch (err) {
         logger.error(`[LogoSourceSettings] Error fetching ${show.name} logos:`, err);
       } finally {

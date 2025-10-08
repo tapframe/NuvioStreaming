@@ -27,7 +27,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { StreamingContent } from '../../services/catalogService';
 import { SkeletonFeatured } from './SkeletonLoaders';
-import { isValidMetahubLogo, hasValidLogoFormat, isMetahubUrl, isTmdbUrl } from '../../utils/logoUtils';
+import { hasValidLogoFormat, isTmdbUrl } from '../../utils/logoUtils';
 import { useSettings } from '../../hooks/useSettings';
 import { TMDBService } from '../../services/tmdbService';
 import { logger } from '../../utils/logger';
@@ -268,8 +268,30 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
         const currentLogo = contentData.logo;
 
         // Get preferences
-        const logoPreference = settings.logoSourcePreference || 'metahub';
+        const logoPreference = settings.logoSourcePreference || 'tmdb';
         const preferredLanguage = settings.tmdbLanguagePreference || 'en';
+
+        // If enrichment is disabled, use addon logo and don't fetch from external sources
+        if (!settings.enrichMetadataWithTMDB) {
+          logger.info('[FeaturedContent] enrichment disabled, checking for addon logo', { 
+            hasLogo: !!contentData.logo, 
+            logo: contentData.logo,
+            isExternal: contentData.logo ? isTmdbUrl(contentData.logo) : false,
+            isTmdb: contentData.logo ? isTmdbUrl(contentData.logo) : false
+          });
+          
+          // If we have an addon logo, use it and don't fetch external logos
+          if (contentData.logo && !isTmdbUrl(contentData.logo)) {
+            logger.info('[FeaturedContent] enrichment disabled, using addon logo', { logo: contentData.logo });
+            setLogoUrl(contentData.logo);
+            logoFetchInProgress.current = false;
+            return;
+          }
+          // If no addon logo, don't fetch external logos when enrichment is disabled
+          logger.info('[FeaturedContent] enrichment disabled, no addon logo available');
+          logoFetchInProgress.current = false;
+          return;
+        }
 
         // Reset state for new fetch only if switching to a different item
         if (prevContentIdRef.current !== contentId) {
@@ -277,7 +299,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
         }
         setLogoLoadError(false);
 
-        // Extract IDs
+        // Extract IDs (only when enrichment is enabled)
         let imdbId: string | null = null;
         if (contentData.id.startsWith('tt')) {
           imdbId = contentData.id;
@@ -294,7 +316,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
           tmdbId = String((contentData as any).tmdb_id);
         }
 
-        // If we only have IMDB ID, try to find TMDB ID proactively
+        // If we only have IMDB ID, try to find TMDB ID proactively (only when enrichment is enabled)
         if (imdbId && !tmdbId) {
           try {
             const tmdbService = TMDBService.getInstance();
@@ -315,63 +337,18 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
         // --- Logo Fetching Logic ---
         logger.debug('[FeaturedContent] fetchLogo:ids', { imdbId, tmdbId, preference: logoPreference, lang: preferredLanguage });
 
-        if (logoPreference === 'metahub') {
-          // Primary: Metahub (needs imdbId)
-          if (imdbId) {
-            primaryAttempted = true;
-            const metahubUrl = `https://images.metahub.space/logo/medium/${imdbId}/img`;
-            try {
-              const tHead = nowMs();
-              const response = await fetch(metahubUrl, { method: 'HEAD' });
-              if (response.ok) {
-                finalLogoUrl = metahubUrl;
-                logger.debug('[FeaturedContent] fetchLogo:metahub:ok', { url: metahubUrl, duration: since(tHead) });
-              }
-            } catch (error) { /* Log if needed */ }
-          }
-
-          // Fallback: TMDB (needs tmdbId)
-          if (!finalLogoUrl && tmdbId) {
-            fallbackAttempted = true;
-            try {
-              const tmdbService = TMDBService.getInstance();
-              const tTmdb = nowMs();
-              const logoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId, preferredLanguage);
-              if (logoUrl) {
-                finalLogoUrl = logoUrl;
-                logger.debug('[FeaturedContent] fetchLogo:tmdb:fallback:ok', { url: logoUrl, duration: since(tTmdb) });
-              }
-            } catch (error) { /* Log if needed */ }
-          }
-
-        } else { // logoPreference === 'tmdb'
-          // Primary: TMDB (needs tmdbId)
-          if (tmdbId) {
-            primaryAttempted = true;
-            try {
-              const tmdbService = TMDBService.getInstance();
-              const tTmdb = nowMs();
-              const logoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId, preferredLanguage);
-              if (logoUrl) {
-                finalLogoUrl = logoUrl;
-                logger.debug('[FeaturedContent] fetchLogo:tmdb:ok', { url: logoUrl, duration: since(tTmdb) });
-              }
-            } catch (error) { /* Log if needed */ }
-          }
-
-          // Fallback: Metahub (needs imdbId)
-          if (!finalLogoUrl && imdbId) {
-            fallbackAttempted = true;
-            const metahubUrl = `https://images.metahub.space/logo/medium/${imdbId}/img`;
-            try {
-              const tHead = nowMs();
-              const response = await fetch(metahubUrl, { method: 'HEAD' });
-              if (response.ok) {
-                finalLogoUrl = metahubUrl;
-                logger.debug('[FeaturedContent] fetchLogo:metahub:fallback:ok', { url: metahubUrl, duration: since(tHead) });
-              }
-            } catch (error) { /* Log if needed */ }
-          }
+        // Only try TMDB if preference is 'tmdb' and we have tmdbId
+        if (logoPreference === 'tmdb' && tmdbId) {
+          primaryAttempted = true;
+          try {
+            const tmdbService = TMDBService.getInstance();
+            const tTmdb = nowMs();
+            const logoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId, preferredLanguage);
+            if (logoUrl) {
+              finalLogoUrl = logoUrl;
+              logger.debug('[FeaturedContent] fetchLogo:tmdb:ok', { url: logoUrl, duration: since(tTmdb) });
+            }
+          } catch (error) { /* Log if needed */ }
         }
 
         // --- Set Final Logo ---
@@ -400,7 +377,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
 
     // Trigger fetch when content changes
     fetchLogo();
-  }, [featuredContent, settings.logoSourcePreference, settings.tmdbLanguagePreference]);
+  }, [featuredContent, settings.logoSourcePreference, settings.tmdbLanguagePreference, settings.enrichMetadataWithTMDB]);
 
   // Load poster and logo
   useEffect(() => {

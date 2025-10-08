@@ -710,7 +710,6 @@ class StremioService {
       cleanBaseUrl = `https://${cleanBaseUrl}`;
     }
     
-    logger.log('Addon base URL:', cleanBaseUrl, queryString ? `with query: ${queryString}` : '');
     return { baseUrl: cleanBaseUrl, queryParams: queryString };
   }
 
@@ -760,16 +759,13 @@ class StremioService {
       
       // Add filters
       if (filters.length > 0) {
-        logger.log(`Adding ${filters.length} filters to ${manifest.name} request`);
         filters.forEach(filter => {
           if (filter.value) {
-            logger.log(`Adding filter ${filter.title}=${filter.value}`);
             url += `&${encodeURIComponent(filter.title)}=${encodeURIComponent(filter.value)}`;
           }
         });
       }
       
-      logger.log(`🔗 [${manifest.name}] Requesting catalog: ${url}`);
       
       const response = await this.retryRequest(async () => {
         return await axios.get(url);

@@ -96,7 +96,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   featuredContentSource: 'catalogs',
   heroStyle: 'carousel',
   selectedHeroCatalogs: [], // Empty array means all catalogs are selected
-  logoSourcePreference: 'metahub', // Default to Metahub as first source
+  logoSourcePreference: 'tmdb', // Default to TMDB as first source
   tmdbLanguagePreference: 'en', // Default to English
   episodeLayoutStyle: 'vertical', // Default to vertical layout for new installs
   autoplayBestStream: false, // Disabled by default for user choice
