@@ -539,11 +539,7 @@ class StremioService {
   }
 
   async removeAddon(id: string): Promise<void> {
-    // Prevent removal of Cinemeta as it's a pre-installed addon
-    if (id === 'com.linvo.cinemeta') {
-      return;
-    }
-    
+    // Allow removal of any addon, including pre-installed ones like Cinemeta
     if (this.installedAddons.has(id)) {
       this.installedAddons.delete(id);
       // Remove from order
@@ -568,25 +564,6 @@ class StremioService {
     const result = this.addonOrder
       .filter(id => this.installedAddons.has(id))
       .map(id => this.installedAddons.get(id)!);
-    // Ensure pre-installed presence
-    const cinId = 'com.linvo.cinemeta';
-    const osId = 'org.stremio.opensubtitlesv3';
-    if (!result.find(a => a.id === cinId) && this.installedAddons.has(cinId)) {
-      result.unshift(this.installedAddons.get(cinId)!);
-    }
-    // Only include OpenSubtitles if user hasn't explicitly removed it
-    if (!result.find(a => a.id === osId) && this.installedAddons.has(osId)) {
-      // Check if user has removed OpenSubtitles (async check, but we'll handle it synchronously for now)
-      // For now, we'll rely on the fact that if user removed it, it shouldn't be in installedAddons
-      // Put OpenSubtitles right after Cinemeta if possible, else at start
-      const cinIdx = result.findIndex(a => a.id === cinId);
-      const osManifest = this.installedAddons.get(osId)!;
-      if (cinIdx >= 0) {
-        result.splice(cinIdx + 1, 0, osManifest);
-      } else {
-        result.unshift(osManifest);
-      }
-    }
     return result;
   }
 
@@ -597,7 +574,8 @@ class StremioService {
 
   // Check if an addon is pre-installed and cannot be removed
   isPreInstalledAddon(id: string): boolean {
-    return id === 'com.linvo.cinemeta';
+    // Allow removing all addons, including Cinemeta
+    return false;
   }
 
   // Check if user has explicitly removed an addon

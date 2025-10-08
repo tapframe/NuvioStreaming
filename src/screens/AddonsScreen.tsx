@@ -776,14 +776,6 @@ const AddonsScreen = () => {
   };
 
   const handleRemoveAddon = (addon: ExtendedManifest) => {
-    // Check if this is a pre-installed addon
-    if (stremioService.isPreInstalledAddon(addon.id)) {
-      setAlertTitle('Cannot Remove Addon');
-      setAlertMessage(`${addon.name} is a pre-installed addon and cannot be removed.`);
-      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
-      setAlertVisible(true);
-      return;
-    }
     setAlertTitle('Uninstall Addon');
     setAlertMessage(`Are you sure you want to uninstall ${addon.name}?`);
     setAlertActions([

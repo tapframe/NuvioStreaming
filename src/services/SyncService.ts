@@ -932,7 +932,7 @@ class SyncService {
             .map(r => r.addon_id as string)
             .map(async id => {
               if (localIds.has(id)) return null; // Don't delete if still installed locally
-              if (id === 'com.linvo.cinemeta') return null; // Never delete Cinemeta
+              // If user removed Cinemeta locally, allow server deletion as well
               // If user explicitly removed this addon locally, prefer local removal and delete remotely
               if (removedList.includes(id)) return id;
               return id; // Delete other addons that are no longer installed locally
