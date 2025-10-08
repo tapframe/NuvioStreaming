@@ -595,21 +595,111 @@ const MetadataScreen: React.FC = () => {
     opacity: transitionOpacity.value,
   }), []);
 
-  // Memoized error component for performance
+  // Improved error component with user-friendly messages and error codes
   const ErrorComponent = useMemo(() => {
     if (!metadataError) return null;
-    
+
+    // Parse error to extract code and user-friendly message
+    const parseError = (error: string) => {
+      console.log('🔍 Parsing error in MetadataScreen:', error);
+
+      // Check for HTTP status codes - handle multiple formats
+      // Match patterns like: "status code 500", "status": 500, "Request failed with status code 500"
+      const statusCodeMatch = error.match(/status code (\d+)/) ||
+                             error.match(/"status":\s*(\d+)/) ||
+                             error.match(/Request failed with status code (\d+)/) ||
+                             error.match(/\b(\d{3})\b/); // Match any 3-digit number (last resort)
+
+      if (statusCodeMatch) {
+        const code = parseInt(statusCodeMatch[1]);
+        console.log('✅ Found status code:', code);
+        switch (code) {
+          case 404:
+            return { code: '404', message: 'Content not found', userMessage: 'This content doesn\'t exist or may have been removed.' };
+          case 500:
+            return { code: '500', message: 'Server error', userMessage: 'The server is temporarily unavailable. Please try again later.' };
+          case 502:
+            return { code: '502', message: 'Bad gateway', userMessage: 'The server is experiencing issues. Please try again later.' };
+          case 503:
+            return { code: '503', message: 'Service unavailable', userMessage: 'The service is currently down for maintenance. Please try again later.' };
+          case 429:
+            return { code: '429', message: 'Too many requests', userMessage: 'You\'re making too many requests. Please wait a moment and try again.' };
+          case 408:
+            return { code: '408', message: 'Request timeout', userMessage: 'The request took too long. Please try again.' };
+          default:
+            return { code: code.toString(), message: `Error ${code}`, userMessage: 'Something went wrong. Please try again.' };
+        }
+      }
+
+      // Check for network/Axios errors
+      if (error.includes('Network Error') ||
+          error.includes('ERR_BAD_RESPONSE') ||
+          error.includes('Request failed') ||
+          error.includes('ERR_NETWORK')) {
+        return { code: 'NETWORK', message: 'Network error', userMessage: 'Please check your internet connection and try again.' };
+      }
+
+      // Check for timeout errors
+      if (error.includes('timeout') ||
+          error.includes('timed out') ||
+          error.includes('ECONNABORTED') ||
+          error.includes('ETIMEDOUT')) {
+        return { code: 'TIMEOUT', message: 'Request timeout', userMessage: 'The request took too long. Please try again.' };
+      }
+
+      // Check for authentication errors
+      if (error.includes('401') || error.includes('Unauthorized') || error.includes('authentication')) {
+        return { code: '401', message: 'Authentication error', userMessage: 'Please check your account settings and try again.' };
+      }
+
+      // Check for permission errors
+      if (error.includes('403') || error.includes('Forbidden') || error.includes('permission')) {
+        return { code: '403', message: 'Access denied', userMessage: 'You don\'t have permission to access this content.' };
+      }
+
+      // Check for "not found" errors - but only if no status code was found
+      if (!statusCodeMatch && (error.includes('Content not found') || error.includes('not found'))) {
+        return { code: '404', message: 'Content not found', userMessage: 'This content doesn\'t exist or may have been removed.' };
+      }
+
+      // Check for retry/attempt errors
+      if (error.includes('attempts') || error.includes('Please check your connection')) {
+        return { code: 'CONNECTION', message: 'Connection error', userMessage: 'Please check your internet connection and try again.' };
+      }
+
+      // Check for streams-related errors
+      if (error.includes('streams') || error.includes('Failed to load streams')) {
+        return { code: 'STREAMS', message: 'Streams unavailable', userMessage: 'Streaming sources are currently unavailable. Please try again later.' };
+      }
+
+      // Default case
+      return { code: 'UNKNOWN', message: 'Unknown error', userMessage: 'An unexpected error occurred. Please try again.' };
+    };
+
+    const errorInfo = parseError(metadataError);
+
     return (
-      <SafeAreaView 
+      <SafeAreaView
         style={[styles.container, { backgroundColor: dynamicBackgroundColor }]}
         edges={['bottom']}
       >
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
         <View style={styles.errorContainer}>
-          <MaterialIcons name="error-outline" size={64} color={currentTheme.colors.textMuted} />
-          <Text style={[styles.errorText, { color: currentTheme.colors.highEmphasis }]}>
-            {metadataError || 'Content not found'}
+          <MaterialIcons name="error-outline" size={64} color={currentTheme.colors.error || '#FF6B6B'} />
+          <Text style={[styles.errorTitle, { color: currentTheme.colors.highEmphasis }]}>
+            Unable to Load Content
           </Text>
+          <Text style={[styles.errorCode, { color: currentTheme.colors.textMuted }]}>
+            Error Code: {errorInfo.code}
+          </Text>
+          <Text style={[styles.errorMessage, { color: currentTheme.colors.highEmphasis }]}>
+            {errorInfo.userMessage}
+          </Text>
+          {__DEV__ && (
+            <Text style={[styles.errorDetails, { color: currentTheme.colors.textMuted }]}>
+              {metadataError}
+            </Text>
+          )}
           <TouchableOpacity
             style={[styles.retryButton, { backgroundColor: currentTheme.colors.primary }]}
             onPress={loadMetadata}
@@ -801,6 +891,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  errorCode: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 8,
+    fontFamily: 'monospace',
+  },
+  errorMessage: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 16,
+    lineHeight: 22,
+  },
+  errorDetails: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 16,
+    padding: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+    fontFamily: 'monospace',
   },
   errorText: {
     fontSize: 18,

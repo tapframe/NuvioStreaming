@@ -16,7 +16,7 @@ import { useSettings } from './useSettings';
 
 // Constants for timeouts and retries
 const API_TIMEOUT = 10000; // 10 seconds
-const MAX_RETRIES = 2;
+const MAX_RETRIES = 1; // Reduced since stremioService already retries
 const RETRY_DELAY = 1000; // 1 second
 
 // Utility function to add timeout to promises
@@ -393,7 +393,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
   const loadMetadata = async () => {
     try {
       if (loadAttempts >= MAX_RETRIES) {
-        setError('Failed to load content after multiple attempts');
+        setError(`Failed to load content after ${MAX_RETRIES + 1} attempts. Please check your connection and try again.`);
         setLoading(false);
         return;
       }
@@ -662,11 +662,40 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         const isInLib = catalogService.getLibraryItems().some(item => item.id === id);
         setInLibrary(isInLib);
       } else {
-        if (__DEV__) logger.warn('[loadMetadata] addon metadata:not found or failed', { status: content.status, reason: (content as any)?.reason?.message });
-        throw new Error('Content not found');
+        // Extract the error from the rejected promise
+        const reason = (content as any)?.reason;
+        const reasonMessage = reason?.message || String(reason);
+        
+        if (__DEV__) {
+          console.log('[loadMetadata] addon metadata:not found or failed', { 
+            status: content.status, 
+            reason: reasonMessage,
+            fullReason: reason 
+          });
+        }
+
+        // Check if this was a network/server error rather than content not found
+        if (reasonMessage && (
+          reasonMessage.includes('500') ||
+          reasonMessage.includes('502') ||
+          reasonMessage.includes('503') ||
+          reasonMessage.includes('Network Error') ||
+          reasonMessage.includes('Request failed')
+        )) {
+          // This was a server/network error, preserve the original error message
+          throw reason instanceof Error ? reason : new Error(reasonMessage);
+        } else {
+          // This was likely a content not found error
+          throw new Error('Content not found');
+        }
       }
     } catch (error) {
-      if (__DEV__) console.error('Failed to load metadata:', error);
+      if (__DEV__) {
+        console.error('Failed to load metadata:', error);
+        console.log('Error message being set:', error instanceof Error ? error.message : String(error));
+      }
+      
+      // Preserve the original error details for better error parsing
       const errorMessage = error instanceof Error ? error.message : 'Failed to load content';
       setError(errorMessage);
       
@@ -1109,7 +1138,9 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
     } catch (error) {
       if (__DEV__) console.error('❌ [loadStreams] Failed to load streams:', error);
-      setError('Failed to load streams');
+      // Preserve the original error details for better error parsing
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load streams';
+      setError(errorMessage);
       setLoadingStreams(false);
     }
   };
@@ -1311,7 +1342,9 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
     } catch (error) {
       if (__DEV__) console.error('❌ [loadEpisodeStreams] Failed to load episode streams:', error);
-      setError('Failed to load episode streams');
+      // Preserve the original error details for better error parsing
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load episode streams';
+      setError(errorMessage);
       setLoadingEpisodeStreams(false);
     }
   };

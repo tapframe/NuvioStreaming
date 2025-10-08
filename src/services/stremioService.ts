@@ -425,7 +425,7 @@ class StremioService {
     }
   }
 
-  private async retryRequest<T>(request: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
+  private async retryRequest<T>(request: () => Promise<T>, retries = 1, delay = 1000): Promise<T> {
     let lastError: any;
     for (let attempt = 0; attempt < retries + 1; attempt++) {
       try {
