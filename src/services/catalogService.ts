@@ -25,14 +25,29 @@ export interface StreamingAddon {
     type: string;
     id: string;
     name: string;
+    extraSupported?: string[];
+    extra?: Array<{ name: string; options?: string[] }>;
   }[];
   resources: {
     name: string;
     types: string[];
     idPrefixes?: string[];
   }[];
+  url?: string; // preferred base URL (manifest or original)
+  originalUrl?: string; // original addon URL if provided
   transportUrl?: string;
   transportName?: string;
+}
+
+export interface AddonSearchResults {
+  addonId: string;
+  addonName: string;
+  results: StreamingContent[];
+}
+
+export interface GroupedSearchResults {
+  byAddon: AddonSearchResults[];
+  allResults: StreamingContent[]; // Deduplicated flat list for backwards compatibility
 }
 
 export interface StreamingContent {
@@ -172,6 +187,8 @@ class CatalogService {
       types: manifest.types || [],
       catalogs: manifest.catalogs || [],
       resources: manifest.resources || [],
+      url: (manifest.url || manifest.originalUrl) as any,
+      originalUrl: (manifest.originalUrl || manifest.url) as any,
       transportUrl: manifest.url,
       transportName: manifest.name
     };
@@ -812,54 +829,259 @@ class CatalogService {
     return uniqueResults;
   }
 
-  async searchContentCinemeta(query: string): Promise<StreamingContent[]> {
+  /**
+   * Search across all installed addons that support search functionality.
+   * This dynamically queries any addon with catalogs that have 'search' in their extraSupported or extra fields.
+   * Results are grouped by addon source with headers.
+   * 
+   * @param query - The search query string
+   * @returns Promise<GroupedSearchResults> - Search results grouped by addon with headers
+   */
+  async searchContentCinemeta(query: string): Promise<GroupedSearchResults> {
     if (!query) {
-      return [];
+      return { byAddon: [], allResults: [] };
     }
 
     const trimmedQuery = query.trim().toLowerCase();
-    logger.log('Searching Cinemeta for:', trimmedQuery);
+    logger.log('Searching across all addons for:', trimmedQuery);
 
     const addons = await this.getAllAddons();
-    const results: StreamingContent[] = [];
+    const byAddon: AddonSearchResults[] = [];
 
-    // Find Cinemeta addon by its ID
-    const cinemeta = addons.find(addon => addon.id === 'com.linvo.cinemeta');
-    
-    if (!cinemeta || !cinemeta.catalogs) {
-      logger.error('Cinemeta addon not found');
-      return [];
+    // Find all addons that support search
+    const searchableAddons = addons.filter(addon => {
+      if (!addon.catalogs) return false;
+      
+      // Check if any catalog supports search
+      return addon.catalogs.some(catalog => {
+        const extraSupported = catalog.extraSupported || [];
+        const extra = catalog.extra || [];
+        
+        // Check if 'search' is in extraSupported or extra
+        return extraSupported.includes('search') || 
+               extra.some((e: any) => e.name === 'search');
+      });
+    });
+
+    logger.log(`Found ${searchableAddons.length} searchable addons:`, searchableAddons.map(a => a.name).join(', '));
+
+    // Search each addon and keep results grouped
+    for (const addon of searchableAddons) {
+      const searchableCatalogs = (addon.catalogs || []).filter(catalog => {
+        const extraSupported = catalog.extraSupported || [];
+        const extra = catalog.extra || [];
+        return extraSupported.includes('search') || 
+               extra.some((e: any) => e.name === 'search');
+      });
+
+      // Search all catalogs for this addon in parallel
+      const catalogPromises = searchableCatalogs.map(catalog => 
+        this.searchAddonCatalog(addon, catalog.type, catalog.id, trimmedQuery)
+      );
+
+      const catalogResults = await Promise.allSettled(catalogPromises);
+      
+      // Collect all results for this addon
+      const addonResults: StreamingContent[] = [];
+      catalogResults.forEach((result) => {
+        if (result.status === 'fulfilled' && result.value) {
+          addonResults.push(...result.value);
+        } else if (result.status === 'rejected') {
+          logger.error(`Search failed for ${addon.name}:`, result.reason);
+        }
+      });
+
+      // Only add addon section if it has results
+      if (addonResults.length > 0) {
+        // Deduplicate within this addon's results
+        const seen = new Set<string>();
+        const uniqueAddonResults = addonResults.filter(item => {
+          const key = `${item.type}:${item.id}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+
+        byAddon.push({
+          addonId: addon.id,
+          addonName: addon.name,
+          results: uniqueAddonResults,
+        });
+      }
     }
 
-    // Search in both movie and series catalogs simultaneously
-    const searchPromises = ['movie', 'series'].map(async (type) => {
-      try {
-        // Direct API call to Cinemeta
-        const url = `https://v3-cinemeta.strem.io/catalog/${type}/top/search=${encodeURIComponent(trimmedQuery)}.json`;
-        logger.log('Request URL:', url);
-        
-        const response = await axios.get<{ metas: any[] }>(url);
-        const metas = response.data.metas || [];
-        
-        if (metas && metas.length > 0) {
-          const items = metas.map(meta => this.convertMetaToStreamingContent(meta));
-          results.push(...items);
+    // Create deduplicated flat list for backwards compatibility
+    const allResults: StreamingContent[] = [];
+    const globalSeen = new Set<string>();
+    
+    byAddon.forEach(addonGroup => {
+      addonGroup.results.forEach(item => {
+        const key = `${item.type}:${item.id}`;
+        if (!globalSeen.has(key)) {
+          globalSeen.add(key);
+          allResults.push(item);
         }
-      } catch (error) {
-        logger.error(`Cinemeta search failed for ${type}:`, error);
+      });
+    });
+
+    logger.log(`Search complete: ${byAddon.length} addons returned results, ${allResults.length} unique items total`);
+
+    return { byAddon, allResults };
+  }
+
+  /**
+   * Live search that emits results per-addon as they arrive.
+   * Returns a handle with cancel() and a done promise.
+   */
+  startLiveSearch(
+    query: string,
+    onAddonResults: (section: AddonSearchResults) => void
+  ): { cancel: () => void; done: Promise<void> } {
+    const controller = { cancelled: false } as { cancelled: boolean };
+
+    const done = (async () => {
+      if (!query || !query.trim()) return;
+
+      const trimmedQuery = query.trim().toLowerCase();
+      logger.log('Live search across addons for:', trimmedQuery);
+
+      const addons = await this.getAllAddons();
+
+      // Determine searchable addons
+      const searchableAddons = addons.filter(addon =>
+        (addon.catalogs || []).some(c =>
+          (c.extraSupported && c.extraSupported.includes('search')) ||
+          (c.extra && c.extra.some(e => e.name === 'search'))
+        )
+      );
+
+      // Global dedupe across emitted results
+      const globalSeen = new Set<string>();
+
+      await Promise.all(
+        searchableAddons.map(async (addon) => {
+          if (controller.cancelled) return;
+          try {
+            const searchableCatalogs = (addon.catalogs || []).filter(c =>
+              (c.extraSupported && c.extraSupported.includes('search')) ||
+              (c.extra && c.extra.some(e => e.name === 'search'))
+            );
+
+            // Fetch all catalogs for this addon in parallel
+            const settled = await Promise.allSettled(
+              searchableCatalogs.map(c => this.searchAddonCatalog(addon, c.type, c.id, trimmedQuery))
+            );
+            if (controller.cancelled) return;
+
+            const addonResults: StreamingContent[] = [];
+            for (const s of settled) {
+              if (s.status === 'fulfilled' && Array.isArray(s.value)) {
+                addonResults.push(...s.value);
+              }
+            }
+            if (addonResults.length === 0) return;
+
+            // Dedupe within addon and against global
+            const localSeen = new Set<string>();
+            const unique = addonResults.filter(item => {
+              const key = `${item.type}:${item.id}`;
+              if (localSeen.has(key) || globalSeen.has(key)) return false;
+              localSeen.add(key);
+              globalSeen.add(key);
+              return true;
+            });
+
+            if (unique.length > 0 && !controller.cancelled) {
+              onAddonResults({ addonId: addon.id, addonName: addon.name, results: unique });
+            }
+          } catch (e) {
+            // ignore individual addon errors
+          }
+        })
+      );
+    })();
+
+    return {
+      cancel: () => { controller.cancelled = true; },
+      done,
+    };
+  }
+
+  /**
+   * Search a specific catalog from a specific addon.
+   * Handles URL construction for both Cinemeta (hardcoded) and other addons (dynamic).
+   * 
+   * @param addon - The addon manifest containing id, name, and url
+   * @param type - Content type (movie, series, anime, etc.)
+   * @param catalogId - The catalog ID to search within
+   * @param query - The search query string
+   * @returns Promise<StreamingContent[]> - Search results from this specific addon catalog
+   */
+  private async searchAddonCatalog(
+    addon: any, 
+    type: string, 
+    catalogId: string, 
+    query: string
+  ): Promise<StreamingContent[]> {
+    try {
+      let url: string;
+      
+      // Special handling for Cinemeta (hardcoded URL)
+      if (addon.id === 'com.linvo.cinemeta') {
+        const encodedCatalogId = encodeURIComponent(catalogId);
+        const encodedQuery = encodeURIComponent(query);
+        url = `https://v3-cinemeta.strem.io/catalog/${type}/${encodedCatalogId}/search=${encodedQuery}.json`;
+      } 
+      // Handle other addons
+      else {
+        // Choose best available URL
+        const chosenUrl: string | undefined = addon.url || addon.originalUrl || addon.transportUrl;
+        if (!chosenUrl) {
+          logger.warn(`Addon ${addon.name} has no URL, skipping search`);
+          return [];
+        }
+        // Extract base URL and preserve query params
+        const [baseUrlPart, queryParams] = chosenUrl.split('?');
+        let cleanBaseUrl = baseUrlPart.replace(/manifest\.json$/, '').replace(/\/$/, '');
+        
+        // Ensure URL has protocol
+        if (!cleanBaseUrl.startsWith('http')) {
+          cleanBaseUrl = `https://${cleanBaseUrl}`;
+        }
+        
+        const encodedCatalogId = encodeURIComponent(catalogId);
+        const encodedQuery = encodeURIComponent(query);
+        url = `${cleanBaseUrl}/catalog/${type}/${encodedCatalogId}/search=${encodedQuery}.json`;
+        
+        // Append original query params if they existed
+        if (queryParams) {
+          url += `?${queryParams}`;
+        }
       }
-    });
 
-    await Promise.all(searchPromises);
-
-    // Remove duplicates while preserving order
-    const seen = new Set();
-    return results.filter(item => {
-      const key = `${item.type}:${item.id}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+      logger.log(`Searching ${addon.name} (${type}/${catalogId}):`, url);
+      
+      const response = await axios.get<{ metas: any[] }>(url, {
+        timeout: 10000, // 10 second timeout per addon
+      });
+      
+      const metas = response.data?.metas || [];
+      
+      if (metas.length > 0) {
+        const items = metas.map(meta => this.convertMetaToStreamingContent(meta));
+        logger.log(`Found ${items.length} results from ${addon.name}`);
+        return items;
+      }
+      
+      return [];
+    } catch (error: any) {
+      // Don't throw, just log and return empty
+      const errorMsg = error?.response?.status 
+        ? `HTTP ${error.response.status}` 
+        : error?.message || 'Unknown error';
+      logger.error(`Search failed for ${addon.name} (${type}/${catalogId}): ${errorMsg}`);
+      return [];
+    }
   }
 
   async getStremioId(type: string, tmdbId: string): Promise<string | null> {

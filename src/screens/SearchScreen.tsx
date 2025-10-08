@@ -21,7 +21,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { catalogService, StreamingContent } from '../services/catalogService';
+import { catalogService, StreamingContent, GroupedSearchResults, AddonSearchResults } from '../services/catalogService';
 import { Image } from 'expo-image';
 import debounce from 'lodash/debounce';
 import { DropUpMenu } from '../components/home/DropUpMenu';
@@ -201,7 +201,7 @@ const SearchScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const isDarkMode = true;
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<StreamingContent[]>([]);
+  const [results, setResults] = useState<GroupedSearchResults>({ byAddon: [], allResults: [] });
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
@@ -209,6 +209,10 @@ const SearchScreen = () => {
   const inputRef = useRef<TextInput>(null);
   const insets = useSafeAreaInsets();
   const { currentTheme } = useTheme();
+  // Live search handle
+  const liveSearchHandle = useRef<{ cancel: () => void; done: Promise<void> } | null>(null);
+  // Addon installation order map for stable section ordering
+  const addonOrderRankRef = useRef<Record<string, number>>({});
   // DropUpMenu state
   const [menuVisible, setMenuVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<StreamingContent | null>(null);
@@ -306,7 +310,7 @@ const SearchScreen = () => {
     Keyboard.dismiss();
     if (query) {
       setQuery('');
-      setResults([]);
+      setResults({ byAddon: [], allResults: [] });
       setSearched(false);
       setShowRecent(true);
       loadRecentSearches();
@@ -354,25 +358,59 @@ const SearchScreen = () => {
   const debouncedSearch = useCallback(
     debounce(async (searchQuery: string) => {
       if (!searchQuery.trim()) {
-        setResults([]);
+        // Cancel any in-flight live search
+        liveSearchHandle.current?.cancel();
+        liveSearchHandle.current = null;
+        setResults({ byAddon: [], allResults: [] });
         setSearching(false);
         return;
       }
 
+      // Cancel prior live search
+      liveSearchHandle.current?.cancel();
+      setResults({ byAddon: [], allResults: [] });
+      setSearching(true);
+
+      logger.info('Starting live search for:', searchQuery);
+      // Preload addon order to keep sections sorted by installation order
       try {
-        logger.info('Performing search for:', searchQuery);
-        const searchResults = await catalogService.searchContentCinemeta(searchQuery);
-        setResults(searchResults);
-        if (searchResults.length > 0) {
+        const addons = await catalogService.getAllAddons();
+        const rank: Record<string, number> = {};
+        addons.forEach((a, idx) => { rank[a.id] = idx; });
+        addonOrderRankRef.current = rank;
+      } catch {}
+
+      const handle = catalogService.startLiveSearch(searchQuery, async (section: AddonSearchResults) => {
+        // Append/update this addon section immediately
+        setResults(prev => {
+          const existingIndex = prev.byAddon.findIndex(s => s.addonId === section.addonId);
+          let nextByAddon: AddonSearchResults[];
+          if (existingIndex >= 0) {
+            nextByAddon = prev.byAddon.slice();
+            nextByAddon[existingIndex] = section;
+          } else {
+            nextByAddon = [...prev.byAddon, section];
+          }
+          // Sort by installation order
+          const rank = addonOrderRankRef.current;
+          nextByAddon = nextByAddon.slice().sort((a, b) => {
+            const ra = rank[a.addonId] ?? Number.MAX_SAFE_INTEGER;
+            const rb = rank[b.addonId] ?? Number.MAX_SAFE_INTEGER;
+            return ra - rb;
+          });
+          // Hide loading overlay once first section arrives
+          if (nextByAddon.length === 1) {
+            setSearching(false);
+          }
+          return { byAddon: nextByAddon, allResults: prev.allResults };
+        });
+
+        // Save to recents after first result batch
+        try {
           await saveRecentSearch(searchQuery);
-        }
-        logger.info('Search completed, found', searchResults.length, 'results');
-      } catch (error) {
-        logger.error('Search failed:', error);
-        setResults([]);
-      } finally {
-        setSearching(false);
-      }
+        } catch {}
+      });
+      liveSearchHandle.current = handle;
     }, 800),
     []
   );
@@ -388,11 +426,13 @@ const SearchScreen = () => {
       setSearching(false);
       setSearched(false);
       setShowRecent(false);
-      setResults([]);
+      setResults({ byAddon: [], allResults: [] });
     } else {
       // Cancel any pending search when query is cleared
       debouncedSearch.cancel();
-      setResults([]);
+      liveSearchHandle.current?.cancel();
+      liveSearchHandle.current = null;
+      setResults({ byAddon: [], allResults: [] });
       setSearched(false);
       setSearching(false);
       setShowRecent(true);
@@ -407,7 +447,9 @@ const SearchScreen = () => {
 
   const handleClearSearch = () => {
     setQuery('');
-    setResults([]);
+    liveSearchHandle.current?.cancel();
+    liveSearchHandle.current = null;
+    setResults({ byAddon: [], allResults: [] });
     setSearched(false);
     setShowRecent(true);
     loadRecentSearches();
@@ -555,17 +597,9 @@ const SearchScreen = () => {
     );
   };
   
-  const movieResults = useMemo(() => {
-    return results.filter(item => item.type === 'movie');
-  }, [results]);
-
-  const seriesResults = useMemo(() => {
-    return results.filter(item => item.type === 'series');
-  }, [results]);
-
   const hasResultsToShow = useMemo(() => {
-     return movieResults.length > 0 || seriesResults.length > 0;
-  }, [movieResults, seriesResults]);
+    return results.byAddon.length > 0;
+  }, [results]);
 
   const headerBaseHeight = Platform.OS === 'android' ? 80 : 60;
   const topSpacing = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top;
@@ -707,64 +741,131 @@ const SearchScreen = () => {
               showsVerticalScrollIndicator={false}
             >
               {!query.trim() && renderRecentSearches()}
-              {movieResults.length > 0 && (
-                <Animated.View 
-                  style={styles.carouselContainer}
-                  entering={FadeIn.duration(300)}
-                >
-                  <Text style={[styles.carouselTitle, { color: currentTheme.colors.white }]}> 
-                    Movies ({movieResults.length})
-                  </Text>
-                  <FlatList
-                    data={movieResults}
-                    renderItem={({ item, index }) => (
-                      <SearchResultItem
-                        item={item}
-                        index={index}
-                        navigation={navigation}
-                        setSelectedItem={setSelectedItem}
-                        setMenuVisible={setMenuVisible}
-                        currentTheme={currentTheme}
-                        refreshFlag={refreshFlag}
+              {/* Render results grouped by addon */}
+              {results.byAddon.map((addonGroup, addonIndex) => {
+                // Group by type within each addon
+                const movieResults = addonGroup.results.filter(item => item.type === 'movie');
+                const seriesResults = addonGroup.results.filter(item => item.type === 'series');
+                const otherResults = addonGroup.results.filter(item => item.type !== 'movie' && item.type !== 'series');
+
+                return (
+                  <Animated.View 
+                    key={addonGroup.addonId}
+                    entering={FadeIn.duration(300).delay(addonIndex * 100)}
+                  >
+                    {/* Addon Header */}
+                    <View style={styles.addonHeaderContainer}>
+                      <MaterialIcons 
+                        name="extension" 
+                        size={20} 
+                        color={currentTheme.colors.primary}
+                        style={styles.addonHeaderIcon}
                       />
+                      <Text style={[styles.addonHeaderText, { color: currentTheme.colors.white }]}>
+                        {addonGroup.addonName}
+                      </Text>
+                      <View style={[styles.addonHeaderBadge, { backgroundColor: currentTheme.colors.elevation2 }]}>
+                        <Text style={[styles.addonHeaderBadgeText, { color: currentTheme.colors.lightGray }]}>
+                          {addonGroup.results.length}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Movies from this addon */}
+                    {movieResults.length > 0 && (
+                      <Animated.View 
+                        style={styles.carouselContainer}
+                        entering={FadeIn.duration(300)}
+                      >
+                        <Text style={[styles.carouselSubtitle, { color: currentTheme.colors.lightGray }]}> 
+                          Movies ({movieResults.length})
+                        </Text>
+                        <FlatList
+                          data={movieResults}
+                          renderItem={({ item, index }) => (
+                            <SearchResultItem
+                              item={item}
+                              index={index}
+                              navigation={navigation}
+                              setSelectedItem={setSelectedItem}
+                              setMenuVisible={setMenuVisible}
+                              currentTheme={currentTheme}
+                              refreshFlag={refreshFlag}
+                            />
+                          )}
+                          keyExtractor={item => `${addonGroup.addonId}-movie-${item.id}`}
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          contentContainerStyle={styles.horizontalListContent}
+                          extraData={refreshFlag}
+                        />
+                      </Animated.View>
                     )}
-                    keyExtractor={item => `movie-${item.id}`}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.horizontalListContent}
-                    extraData={refreshFlag}
-                  />
-                </Animated.View>
-              )}
-              {seriesResults.length > 0 && (
-                <Animated.View 
-                  style={styles.carouselContainer}
-                  entering={FadeIn.duration(300).delay(50)}
-                >
-                  <Text style={[styles.carouselTitle, { color: currentTheme.colors.white }]}> 
-                    TV Shows ({seriesResults.length})
-                  </Text>
-                  <FlatList
-                    data={seriesResults}
-                    renderItem={({ item, index }) => (
-                      <SearchResultItem
-                        item={item}
-                        index={index}
-                        navigation={navigation}
-                        setSelectedItem={setSelectedItem}
-                        setMenuVisible={setMenuVisible}
-                        currentTheme={currentTheme}
-                        refreshFlag={refreshFlag}
-                      />
+
+                    {/* TV Shows from this addon */}
+                    {seriesResults.length > 0 && (
+                      <Animated.View 
+                        style={styles.carouselContainer}
+                        entering={FadeIn.duration(300)}
+                      >
+                        <Text style={[styles.carouselSubtitle, { color: currentTheme.colors.lightGray }]}> 
+                          TV Shows ({seriesResults.length})
+                        </Text>
+                        <FlatList
+                          data={seriesResults}
+                          renderItem={({ item, index }) => (
+                            <SearchResultItem
+                              item={item}
+                              index={index}
+                              navigation={navigation}
+                              setSelectedItem={setSelectedItem}
+                              setMenuVisible={setMenuVisible}
+                              currentTheme={currentTheme}
+                              refreshFlag={refreshFlag}
+                            />
+                          )}
+                          keyExtractor={item => `${addonGroup.addonId}-series-${item.id}`}
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          contentContainerStyle={styles.horizontalListContent}
+                          extraData={refreshFlag}
+                        />
+                      </Animated.View>
                     )}
-                    keyExtractor={item => `series-${item.id}`}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.horizontalListContent}
-                    extraData={refreshFlag}
-                  />
-                </Animated.View>
-              )}
+
+                    {/* Other content types (anime, etc.) */}
+                    {otherResults.length > 0 && (
+                      <Animated.View 
+                        style={styles.carouselContainer}
+                        entering={FadeIn.duration(300)}
+                      >
+                        <Text style={[styles.carouselSubtitle, { color: currentTheme.colors.lightGray }]}> 
+                          {otherResults[0].type.charAt(0).toUpperCase() + otherResults[0].type.slice(1)} ({otherResults.length})
+                        </Text>
+                        <FlatList
+                          data={otherResults}
+                          renderItem={({ item, index }) => (
+                            <SearchResultItem
+                              item={item}
+                              index={index}
+                              navigation={navigation}
+                              setSelectedItem={setSelectedItem}
+                              setMenuVisible={setMenuVisible}
+                              currentTheme={currentTheme}
+                              refreshFlag={refreshFlag}
+                            />
+                          )}
+                          keyExtractor={item => `${addonGroup.addonId}-${item.type}-${item.id}`}
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          contentContainerStyle={styles.horizontalListContent}
+                          extraData={refreshFlag}
+                        />
+                      </Animated.View>
+                    )}
+                  </Animated.View>
+                );
+              })}
             </Animated.ScrollView>
           )}
         </View>
@@ -896,6 +997,39 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: isTablet ? 16 : 12,
     paddingHorizontal: 16,
+  },
+  carouselSubtitle: {
+    fontSize: isTablet ? 16 : 14,
+    fontWeight: '600',
+    marginBottom: isTablet ? 12 : 8,
+    paddingHorizontal: 16,
+  },
+  addonHeaderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: isTablet ? 16 : 12,
+    marginTop: isTablet ? 24 : 16,
+    marginBottom: isTablet ? 8 : 4,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  addonHeaderIcon: {
+    marginRight: 8,
+  },
+  addonHeaderText: {
+    fontSize: isTablet ? 18 : 16,
+    fontWeight: '700',
+    flex: 1,
+  },
+  addonHeaderBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  addonHeaderBadgeText: {
+    fontSize: isTablet ? 12 : 11,
+    fontWeight: '600',
   },
   horizontalListContent: {
     paddingHorizontal: isTablet ? 16 : 12,
