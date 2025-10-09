@@ -186,12 +186,18 @@ interface SidebarProps {
   onCategorySelect: (category: string) => void;
   currentTheme: any;
   categories: typeof SETTINGS_CATEGORIES;
+  extraTopPadding?: number;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, currentTheme, categories }) => {
+const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, currentTheme, categories, extraTopPadding = 0 }) => {
   return (
     <View style={[styles.sidebar, { backgroundColor: currentTheme.colors.elevation1 }]}>
-      <View style={styles.sidebarHeader}>
+      <View style={[
+        styles.sidebarHeader,
+        {
+          paddingTop: (Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 24 : 48) + extraTopPadding,
+        }
+      ]}>
         <Text style={[styles.sidebarTitle, { color: currentTheme.colors.highEmphasis }]}>
           Settings
         </Text>
@@ -750,7 +756,9 @@ const SettingsScreen: React.FC = () => {
   };
 
   const headerBaseHeight = Platform.OS === 'android' ? 80 : 60;
-  const topSpacing = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top;
+  // Keep headers below floating top navigator on tablets by adding extra offset
+  const tabletNavOffset = isTablet ? 64 : 0;
+  const topSpacing = (Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top) + tabletNavOffset;
   const headerHeight = headerBaseHeight + topSpacing;
 
   if (isTablet) {
@@ -766,9 +774,15 @@ const SettingsScreen: React.FC = () => {
             onCategorySelect={setSelectedCategory}
             currentTheme={currentTheme}
             categories={visibleCategories}
+            extraTopPadding={tabletNavOffset}
           />
           
-          <View style={styles.tabletContent}>
+          <View style={[
+            styles.tabletContent,
+            {
+              paddingTop: (Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 24 : 48) + tabletNavOffset,
+            }
+          ]}>
             <ScrollView 
               style={styles.tabletScrollView}
               showsVerticalScrollIndicator={false}

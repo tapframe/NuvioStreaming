@@ -736,7 +736,9 @@ const SearchScreen = () => {
   });
 
   const headerBaseHeight = Platform.OS === 'android' ? 80 : 60;
-  const topSpacing = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top;
+  // Keep header below floating top navigator on tablets by adding extra offset
+  const tabletNavOffset = isTablet ? 64 : 0;
+  const topSpacing = (Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top) + tabletNavOffset;
   const headerHeight = headerBaseHeight + topSpacing + 60;
 
   // Set up listeners for watched status and library updates

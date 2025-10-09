@@ -192,10 +192,14 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
       return 'https://via.placeholder.com/154x231/333/666?text=No+Image';
     }
 
-    // If we've had an error, try metahub fallback
-    // Use addon poster if available, otherwise use placeholder
-    if (retryCount > 0 && !item.poster) {
-      return 'https://via.placeholder.com/300x450/cccccc/666666?text=No+Image';
+    // Retry 1: cache-busting query to avoid stale memory artifacts
+    if (retryCount === 1) {
+      const bust = item.poster.includes('?') ? `&r=${Date.now()}` : `?r=${Date.now()}`;
+      return item.poster + bust;
+    }
+    // Retry 2+: hard fallback placeholder
+    if (retryCount >= 2) {
+      return 'https://via.placeholder.com/154x231/333/666?text=No+Image';
     }
 
     // For TMDB images, use smaller sizes
@@ -268,16 +272,15 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
                 }}
                 onError={(error) => {
                   if (__DEV__) console.warn('Image load error for:', item.poster, error);
-                  // Try fallback URL on first error
-                  if (retryCount === 0 && item.poster && !item.poster.includes('placeholder')) {
-                    setRetryCount(1);
-                    // Don't set error state yet, let it try the fallback
-                    return;
+                  // Increment retry; 0 -> 1 (cache-bust), 1 -> 2 (placeholder)
+                  setRetryCount((prev) => prev + 1);
+                  // Only show broken state after final retry
+                  if (retryCount >= 1) {
+                    setImageError(true);
+                    setImageLoaded(false);
                   }
-                  setImageError(true);
-                  setImageLoaded(false);
                 }}
-                recyclingKey={item.id} // Add recycling key for better performance
+                recyclingKey={`${item.id}-${optimizedPosterUrl}`} // Tie texture reuse to URL to avoid stale reuse
                 placeholder={PLACEHOLDER_BLURHASH}
               />
             ) : (
