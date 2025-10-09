@@ -14,7 +14,7 @@ interface CachedImage {
 
 class ImageCacheService {
   private cache = new Map<string, CachedImage>();
-  private readonly CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+  private readonly CACHE_DURATION = Infinity; // Session-only: valid until app close
   private readonly MAX_CACHE_SIZE = 25; // Further reduced maximum number of cached images
   private readonly MAX_MEMORY_MB = 40; // Further reduced maximum memory usage in MB
   private currentMemoryUsage = 0;

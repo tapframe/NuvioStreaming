@@ -199,6 +199,8 @@ const TraktSettingsScreen: React.FC = () => {
               await traktService.logout();
               setIsAuthenticated(false);
               setUserProfile(null);
+              // Refresh auth status in the integration hook to ensure UI consistency
+              await refreshAuthStatus();
             } catch (error) {
               logger.error('[TraktSettingsScreen] Error signing out:', error);
               openAlert('Error', 'Failed to sign out of Trakt.');
@@ -494,6 +496,14 @@ const TraktSettingsScreen: React.FC = () => {
           </View>
         )}
       </ScrollView>
+      
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        onClose={() => setAlertVisible(false)}
+        actions={alertActions}
+      />
     </SafeAreaView>
   );
 };

@@ -60,7 +60,7 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   onError,
   contentFit = 'cover',
   transition = 200,
-  cachePolicy = 'memory-disk'
+  cachePolicy = 'memory'
 }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);

@@ -165,7 +165,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
             style={styles.backgroundImage as ImageStyle}
             contentFit="cover"
             blurRadius={Platform.OS === 'android' ? 8 : 12}
-            cachePolicy="memory-disk"
+            cachePolicy="memory"
             transition={0}
             priority="low"
           />
@@ -191,7 +191,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
                 source={{ uri: data[activeIndex + 1].banner || data[activeIndex + 1].poster }}
                 style={{ width: 1, height: 1 }}
                 contentFit="cover"
-                cachePolicy="memory-disk"
+                cachePolicy="memory"
                 transition={0}
               />
             )}
@@ -200,7 +200,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
                 source={{ uri: data[activeIndex - 1].banner || data[activeIndex - 1].poster }}
                 style={{ width: 1, height: 1 }}
                 contentFit="cover"
-                cachePolicy="memory-disk"
+                cachePolicy="memory"
                 transition={0}
               />
             )}
@@ -285,7 +285,7 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
             style={styles.banner as ImageStyle}
             contentFit="cover"
             transition={0}
-            cachePolicy="memory-disk"
+            cachePolicy="memory"
           />
           <LinearGradient
             colors={["transparent", "rgba(0,0,0,0.2)", "rgba(0,0,0,0.6)"]}
@@ -300,7 +300,7 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
               style={styles.logo as ImageStyle}
               contentFit="contain"
               transition={0}
-              cachePolicy="memory-disk"
+              cachePolicy="memory"
               onError={onLogoError}
             />
           ) : (

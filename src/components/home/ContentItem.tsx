@@ -258,7 +258,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
                 source={{ uri: optimizedPosterUrl }}
                 style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, borderRadius: posterRadius }]}
                 contentFit="cover"
-                cachePolicy={Platform.OS === 'android' ? 'disk' : 'memory-disk'}
+                cachePolicy="memory"
                 transition={0}
                 allowDownscaling
                 priority="normal" // Normal priority for horizontal scrolling

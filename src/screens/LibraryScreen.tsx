@@ -403,11 +403,12 @@ const LibraryScreen = () => {
     >
       <View>
         <View style={[styles.posterContainer, { shadowColor: currentTheme.colors.black }]}> 
-          <Image
+              <Image
             source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
             style={styles.poster}
             contentFit="cover"
-            transition={300}
+                cachePolicy="memory"
+                transition={300}
           />
           {item.watched && (
             <View style={styles.watchedIndicator}>
