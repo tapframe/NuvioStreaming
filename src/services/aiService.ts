@@ -304,7 +304,7 @@ Answer questions about this movie using only the verified database information a
           'X-Title': 'Nuvio - AI Chat',
         },
         body: JSON.stringify({
-          model: 'x-ai/grok-4-fast:free',
+          model: 'openai/gpt-oss-20b:free',
           messages,
           max_tokens: 1000,
           temperature: 0.7,

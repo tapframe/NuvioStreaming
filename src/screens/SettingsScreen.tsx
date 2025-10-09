@@ -26,13 +26,11 @@ import { stremioService } from '../services/stremioService';
 import { useCatalogContext } from '../contexts/CatalogContext';
 import { useTraktContext } from '../contexts/TraktContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { useAccount } from '../contexts/AccountContext';
 import { catalogService } from '../services/catalogService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
 import { getDisplayedAppVersion } from '../utils/version';
 import CustomAlert from '../components/CustomAlert';
-import ProfileIcon from '../components/icons/ProfileIcon';
 import PluginIcon from '../components/icons/PluginIcon';
 import TraktIcon from '../components/icons/TraktIcon';
 
@@ -275,7 +273,6 @@ const SettingsScreen: React.FC = () => {
   const { isAuthenticated, userProfile, refreshAuthStatus } = useTraktContext();
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
-  const { user, signOut, loading: accountLoading, refreshCurrentUser } = useAccount();
   
   // Tablet-specific state
   const [selectedCategory, setSelectedCategory] = useState('account');
@@ -289,7 +286,7 @@ const SettingsScreen: React.FC = () => {
   const [openRouterKeySet, setOpenRouterKeySet] = useState<boolean>(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState<boolean>(false);
 
-  // Add a useEffect to check authentication status on focus
+  // Add a useEffect to check Trakt authentication status on focus
   useEffect(() => {
     // This will reload the Trakt auth status whenever the settings screen is focused
     const unsubscribe = navigation.addListener('focus', () => {
@@ -301,15 +298,10 @@ const SettingsScreen: React.FC = () => {
         if (__DEV__) console.log('SettingsScreen focused, refreshing auth status. Current state:', { isAuthenticated, userProfile: userProfile?.username });
       }
       refreshAuthStatus();
-      // Don't refresh account user on every focus - the context handles auth state changes
-      // Only refresh if we have no user at all and aren't loading (rare edge case)
-      if (!user && !accountLoading && !initialLoadComplete) {
-        refreshCurrentUser();
-      }
     });
     
     return unsubscribe;
-  }, [navigation, isAuthenticated, userProfile, refreshAuthStatus, refreshCurrentUser, user, accountLoading, initialLoadComplete]);
+  }, [navigation, isAuthenticated, userProfile, refreshAuthStatus]);
 
   const loadData = useCallback(async () => {
     try {
@@ -440,32 +432,6 @@ const SettingsScreen: React.FC = () => {
       case 'account':
         return (
           <SettingsCard title="ACCOUNT" isTablet={isTablet}>
-            {!accountLoading && user ? (
-              <>
-                <SettingItem
-                  title={user.displayName || user.email || user.id}
-                  description="Manage account"
-                  customIcon={<ProfileIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
-                  onPress={() => navigation.navigate('AccountManage')}
-                  isTablet={isTablet}
-                />
-              </>
-            ) : !accountLoading && !user ? (
-              <SettingItem
-                title="Sign in / Create account"
-                description="Sync across devices"
-                icon="login"
-                onPress={() => navigation.navigate('Account')}
-                isTablet={isTablet}
-              />
-            ) : (
-              <SettingItem
-                title="Loading account..."
-                description="Please wait"
-                icon="hourglass-empty"
-                isTablet={isTablet}
-              />
-            )}
             <SettingItem
               title="Trakt"
               description={isAuthenticated ? `@${userProfile?.username || 'User'}` : "Sign in to sync"}
