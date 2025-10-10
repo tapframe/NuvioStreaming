@@ -143,7 +143,7 @@ const TraktItem = React.memo(({ item, width, navigation, currentTheme }: { item:
 
 const SkeletonLoader = () => {
   const pulseAnim = React.useRef(new RNAnimated.Value(0)).current;
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const { numColumns, itemWidth } = getGridLayout(width);
   const { currentTheme } = useTheme();
 
@@ -204,7 +204,7 @@ const SkeletonLoader = () => {
 const LibraryScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const isDarkMode = useColorScheme() === 'dark';
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const { numColumns, itemWidth } = useMemo(() => getGridLayout(width), [width]);
   const [loading, setLoading] = useState(true);
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
@@ -913,7 +913,14 @@ const LibraryScreen = () => {
   };
 
   const headerBaseHeight = Platform.OS === 'android' ? 80 : 60;
-  const topSpacing = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top;
+  // Tablet detection aligned with navigation tablet logic
+  const isTablet = useMemo(() => {
+    const smallestDimension = Math.min(width, height);
+    return (Platform.OS === 'ios' ? (Platform as any).isPad === true : smallestDimension >= 768);
+  }, [width, height]);
+  // Keep header below floating top navigator on tablets
+  const tabletNavOffset = isTablet ? 64 : 0;
+  const topSpacing = (Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top) + tabletNavOffset;
   const headerHeight = headerBaseHeight + topSpacing;
 
   return (

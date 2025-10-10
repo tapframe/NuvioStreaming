@@ -73,6 +73,11 @@ const MetadataScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { id, type, episodeId, addonId } = route.params;
   
+  // Log route parameters for debugging
+  React.useEffect(() => {
+    console.log('🔍 [MetadataScreen] Route params:', { id, type, episodeId, addonId });
+  }, [id, type, episodeId, addonId]);
+  
   // Consolidated hooks for better performance
   const { settings } = useSettings();
   const { currentTheme } = useTheme();
@@ -123,6 +128,22 @@ const MetadataScreen: React.FC = () => {
     imdbId,
     tmdbId,
   } = useMetadata({ id, type, addonId });
+
+  // Log useMetadata hook state changes for debugging
+  React.useEffect(() => {
+    console.log('🔍 [MetadataScreen] useMetadata state:', {
+      loading,
+      hasMetadata: !!metadata,
+      metadataId: metadata?.id,
+      metadataName: metadata?.name,
+      error: metadataError,
+      hasCast: cast.length > 0,
+      hasEpisodes: episodes.length > 0,
+      seasonsCount: Object.keys(groupedEpisodes).length,
+      imdbId,
+      tmdbId
+    });
+  }, [loading, metadata, metadataError, cast.length, episodes.length, Object.keys(groupedEpisodes).length, imdbId, tmdbId]);
 
   // Optimized hooks with memoization and conditional loading
   const watchProgressData = useWatchProgress(id, Object.keys(groupedEpisodes).length > 0 ? 'series' : type as 'movie' | 'series', episodeId, episodes);
@@ -390,6 +411,17 @@ const MetadataScreen: React.FC = () => {
 
   // Memoized derived values for performance
   const isReady = useMemo(() => !loading && metadata && !metadataError, [loading, metadata, metadataError]);
+  
+  // Log readiness state for debugging
+  React.useEffect(() => {
+    console.log('🔍 [MetadataScreen] Readiness state:', {
+      isReady,
+      loading,
+      hasMetadata: !!metadata,
+      hasError: !!metadataError,
+      errorMessage: metadataError
+    });
+  }, [isReady, loading, metadata, metadataError]);
   
   // Optimized content ready state management
   useEffect(() => {
@@ -720,11 +752,24 @@ const MetadataScreen: React.FC = () => {
 
   // Show error if exists
   if (metadataError || (!loading && !metadata)) {
+    console.log('🔍 [MetadataScreen] Showing error component:', {
+      hasError: !!metadataError,
+      errorMessage: metadataError,
+      isLoading: loading,
+      hasMetadata: !!metadata,
+      loadingState: loading
+    });
     return ErrorComponent;
   }
 
   // Show loading screen if metadata is not yet available
   if (loading || !isContentReady) {
+    console.log('🔍 [MetadataScreen] Showing loading screen:', {
+      isLoading: loading,
+      isContentReady,
+      hasMetadata: !!metadata,
+      errorMessage: metadataError
+    });
     return <MetadataLoadingScreen type={Object.keys(groupedEpisodes).length > 0 ? 'series' : type as 'movie' | 'series'} />;
   }
 

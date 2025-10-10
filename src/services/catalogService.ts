@@ -499,6 +499,7 @@ class CatalogService {
   }
 
   async getContentDetails(type: string, id: string, preferredAddonId?: string): Promise<StreamingContent | null> {
+    console.log(`🔍 [CatalogService] getContentDetails called:`, { type, id, preferredAddonId });
     try {
       // Try up to 2 times with increasing delays to reduce CPU load
       let meta = null;
@@ -506,21 +507,48 @@ class CatalogService {
       
       for (let i = 0; i < 2; i++) {
         try {
+          console.log(`🔍 [CatalogService] Attempt ${i + 1}/2 for getContentDetails:`, { type, id, preferredAddonId });
+          
           // Skip meta requests for non-content ids (e.g., provider slugs)
-          if (!stremioService.isValidContentId(type, id)) {
+          const isValidId = stremioService.isValidContentId(type, id);
+          console.log(`🔍 [CatalogService] Content ID validation:`, { type, id, isValidId });
+          
+          if (!isValidId) {
+            console.log(`🔍 [CatalogService] Invalid content ID, breaking retry loop`);
             break;
           }
+          
+          console.log(`🔍 [CatalogService] Calling stremioService.getMetaDetails:`, { type, id, preferredAddonId });
           meta = await stremioService.getMetaDetails(type, id, preferredAddonId);
+          console.log(`🔍 [CatalogService] stremioService.getMetaDetails result:`, { 
+            hasMeta: !!meta, 
+            metaId: meta?.id, 
+            metaName: meta?.name,
+            metaType: meta?.type 
+          });
+          
           if (meta) break;
           await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));
         } catch (error) {
           lastError = error;
+          console.log(`🔍 [CatalogService] Attempt ${i + 1} failed:`, {
+            errorMessage: error instanceof Error ? error.message : String(error),
+            isAxiosError: (error as any)?.isAxiosError,
+            responseStatus: (error as any)?.response?.status,
+            responseData: (error as any)?.response?.data
+          });
           logger.error(`Attempt ${i + 1} failed to get content details for ${type}:${id}:`, error);
           await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));
         }
       }
 
       if (meta) {
+        console.log(`🔍 [CatalogService] Meta found, converting to StreamingContent:`, { 
+          metaId: meta.id, 
+          metaName: meta.name, 
+          metaType: meta.type 
+        });
+        
         // Add to recent content using enhanced conversion for full metadata
         const content = this.convertMetaToStreamingContentEnhanced(meta);
         this.addToRecentContent(content);
@@ -528,15 +556,39 @@ class CatalogService {
         // Check if it's in the library
         content.inLibrary = this.library[`${type}:${id}`] !== undefined;
         
+        console.log(`🔍 [CatalogService] Successfully converted meta to StreamingContent:`, { 
+          contentId: content.id, 
+          contentName: content.name, 
+          contentType: content.type,
+          inLibrary: content.inLibrary
+        });
+        
         return content;
       }
 
+      console.log(`🔍 [CatalogService] No meta found, checking lastError:`, { 
+        hasLastError: !!lastError,
+        lastErrorMessage: lastError instanceof Error ? lastError.message : String(lastError)
+      });
+
       if (lastError) {
+        console.log(`🔍 [CatalogService] Throwing lastError:`, {
+          errorMessage: lastError instanceof Error ? lastError.message : String(lastError),
+          isAxiosError: (lastError as any)?.isAxiosError,
+          responseStatus: (lastError as any)?.response?.status
+        });
         throw lastError;
       }
       
+      console.log(`🔍 [CatalogService] No meta and no error, returning null`);
       return null;
     } catch (error) {
+      console.log(`🔍 [CatalogService] getContentDetails caught error:`, {
+        errorMessage: error instanceof Error ? error.message : String(error),
+        isAxiosError: (error as any)?.isAxiosError,
+        responseStatus: (error as any)?.response?.status,
+        responseData: (error as any)?.response?.data
+      });
       logger.error(`Failed to get content details for ${type}:${id}:`, error);
       return null;
     }
@@ -544,8 +596,27 @@ class CatalogService {
 
   // Public method for getting enhanced metadata details (used by MetadataScreen)
   async getEnhancedContentDetails(type: string, id: string, preferredAddonId?: string): Promise<StreamingContent | null> {
+    console.log(`🔍 [CatalogService] getEnhancedContentDetails called:`, { type, id, preferredAddonId });
     logger.log(`🔍 [MetadataScreen] Fetching enhanced metadata for ${type}:${id} ${preferredAddonId ? `from addon ${preferredAddonId}` : ''}`);
-    return this.getContentDetails(type, id, preferredAddonId);
+    
+    try {
+      const result = await this.getContentDetails(type, id, preferredAddonId);
+      console.log(`🔍 [CatalogService] getEnhancedContentDetails result:`, { 
+        hasResult: !!result, 
+        resultId: result?.id, 
+        resultName: result?.name,
+        resultType: result?.type 
+      });
+      return result;
+    } catch (error) {
+      console.log(`🔍 [CatalogService] getEnhancedContentDetails error:`, {
+        errorMessage: error instanceof Error ? error.message : String(error),
+        isAxiosError: (error as any)?.isAxiosError,
+        responseStatus: (error as any)?.response?.status,
+        responseData: (error as any)?.response?.data
+      });
+      throw error;
+    }
   }
 
   // Public method for getting basic content details without enhanced processing (used by ContinueWatching, etc.)

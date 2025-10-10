@@ -201,6 +201,11 @@ class StremioService {
     // Get all supported ID prefixes from installed addons
     const supportedPrefixes = this.getAllSupportedIdPrefixes(type);
     
+    // If no addons declare specific prefixes, allow any non-empty string
+    if (supportedPrefixes.length === 0) {
+      return true;
+    }
+    
     // Check if the ID matches any supported prefix
     return supportedPrefixes.some(prefix => lowerId.startsWith(prefix.toLowerCase()));
   }
@@ -232,10 +237,8 @@ class StremioService {
       }
     }
     
-    // Always include common prefixes as fallback
-    prefixes.add('tt'); // IMDb
-    prefixes.add('kitsu:'); // Kitsu
-    prefixes.add('series:'); // Series
+    // No hardcoded prefixes - let addons declare their own support dynamically
+    // If no addons declare prefixes, we'll allow any non-empty string
     
     return Array.from(prefixes);
   }
@@ -760,16 +763,23 @@ class StremioService {
   }
 
   async getMetaDetails(type: string, id: string, preferredAddonId?: string): Promise<MetaDetails | null> {
+    console.log(`🔍 [StremioService] getMetaDetails called:`, { type, id, preferredAddonId });
     try {
       // Validate content ID first
-      if (!this.isValidContentId(type, id)) {
+      const isValidId = this.isValidContentId(type, id);
+      console.log(`🔍 [StremioService] Content ID validation:`, { type, id, isValidId });
+      
+      if (!isValidId) {
+        console.log(`🔍 [StremioService] Invalid content ID, returning null`);
         return null;
       }
       
       const addons = this.getInstalledAddons();
+      console.log(`🔍 [StremioService] Found ${addons.length} installed addons`);
       
       // If a preferred addon is specified, try it first
       if (preferredAddonId) {
+        console.log(`🔍 [StremioService] Preferred addon specified:`, { preferredAddonId });
         const preferredAddon = addons.find(addon => addon.id === preferredAddonId);
 
         if (preferredAddon && preferredAddon.resources) {
@@ -814,18 +824,49 @@ class StremioService {
             }
           }
           
-          if (hasMetaSupport && supportsIdPrefix) {
+          console.log(`🔍 [StremioService] Preferred addon support check:`, { 
+            hasMetaSupport, 
+            supportsIdPrefix, 
+            addonId: preferredAddon.id,
+            addonName: preferredAddon.name,
+            hasDeclaredPrefixes: preferredAddon.idPrefixes && preferredAddon.idPrefixes.length > 0
+          });
+          
+          // Only require ID prefix compatibility if the addon has declared specific prefixes
+          const requiresIdPrefix = preferredAddon.idPrefixes && preferredAddon.idPrefixes.length > 0;
+          const isSupported = hasMetaSupport && (!requiresIdPrefix || supportsIdPrefix);
+          
+          if (isSupported) {
+            console.log(`🔍 [StremioService] Requesting metadata from preferred addon:`, { url });
             try {
               const response = await this.retryRequest(async () => {
                 return await axios.get(url, { timeout: 10000 });
               });
               
+              console.log(`🔍 [StremioService] Preferred addon response:`, { 
+                hasData: !!response.data, 
+                hasMeta: !!response.data?.meta,
+                metaId: response.data?.meta?.id,
+                metaName: response.data?.meta?.name
+              });
+              
               if (response.data && response.data.meta) {
+                console.log(`🔍 [StremioService] Successfully got metadata from preferred addon`);
                 return response.data.meta;
+              } else {
+                console.log(`🔍 [StremioService] Preferred addon returned no metadata`);
               }
             } catch (error: any) {
+              console.log(`🔍 [StremioService] Preferred addon request failed:`, {
+                errorMessage: error.message,
+                isAxiosError: error.isAxiosError,
+                responseStatus: error.response?.status,
+                responseData: error.response?.data
+              });
               // Continue trying other addons
             }
+          } else {
+            console.log(`🔍 [StremioService] Preferred addon doesn't support this content type${requiresIdPrefix ? ' or ID prefix' : ''}`);
           }
         }
       }
@@ -836,19 +877,40 @@ class StremioService {
         'http://v3-cinemeta.strem.io'
       ];
       
+      console.log(`🔍 [StremioService] Trying Cinemeta URLs:`, { cinemetaUrls });
+      
       for (const baseUrl of cinemetaUrls) {
         try {
           const encodedId = encodeURIComponent(id);
           const url = `${baseUrl}/meta/${type}/${encodedId}.json`;
+          
+          console.log(`🔍 [StremioService] Requesting from Cinemeta:`, { url });
 
           const response = await this.retryRequest(async () => {
             return await axios.get(url, { timeout: 10000 });
           });
           
+          console.log(`🔍 [StremioService] Cinemeta response:`, { 
+            hasData: !!response.data, 
+            hasMeta: !!response.data?.meta,
+            metaId: response.data?.meta?.id,
+            metaName: response.data?.meta?.name
+          });
+          
           if (response.data && response.data.meta) {
+            console.log(`🔍 [StremioService] Successfully got metadata from Cinemeta`);
             return response.data.meta;
+          } else {
+            console.log(`🔍 [StremioService] Cinemeta returned no metadata`);
           }
         } catch (error: any) {
+          console.log(`🔍 [StremioService] Cinemeta request failed:`, {
+            baseUrl,
+            errorMessage: error.message,
+            isAxiosError: error.isAxiosError,
+            responseStatus: error.response?.status,
+            responseData: error.response?.data
+          });
           continue; // Try next URL
         }
       }
@@ -893,28 +955,75 @@ class StremioService {
           }
         }
         
-        // Require both meta support and idPrefix compatibility
-        if (!(hasMetaSupport && supportsIdPrefix)) continue;
+        // Require meta support, but allow any ID if addon doesn't declare specific prefixes
+        console.log(`🔍 [StremioService] Addon support check:`, { 
+          addonId: addon.id, 
+          addonName: addon.name,
+          hasMetaSupport, 
+          supportsIdPrefix,
+          hasDeclaredPrefixes: addon.idPrefixes && addon.idPrefixes.length > 0
+        });
+        
+        // Only require ID prefix compatibility if the addon has declared specific prefixes
+        const requiresIdPrefix = addon.idPrefixes && addon.idPrefixes.length > 0;
+        const isSupported = hasMetaSupport && (!requiresIdPrefix || supportsIdPrefix);
+        
+        if (!isSupported) {
+          console.log(`🔍 [StremioService] Addon doesn't support this content type${requiresIdPrefix ? ' or ID prefix' : ''}, skipping`);
+          continue;
+        }
         
         try {
           const { baseUrl, queryParams } = this.getAddonBaseURL(addon.url || '');
           const encodedId = encodeURIComponent(id);
           const url = queryParams ? `${baseUrl}/meta/${type}/${encodedId}.json?${queryParams}` : `${baseUrl}/meta/${type}/${encodedId}.json`;
+          
+          console.log(`🔍 [StremioService] Requesting from addon:`, { 
+            addonId: addon.id, 
+            addonName: addon.name, 
+            url 
+          });
 
           const response = await this.retryRequest(async () => {
             return await axios.get(url, { timeout: 10000 });
           });
           
+          console.log(`🔍 [StremioService] Addon response:`, { 
+            addonId: addon.id,
+            hasData: !!response.data, 
+            hasMeta: !!response.data?.meta,
+            metaId: response.data?.meta?.id,
+            metaName: response.data?.meta?.name
+          });
+          
           if (response.data && response.data.meta) {
+            console.log(`🔍 [StremioService] Successfully got metadata from addon:`, { addonId: addon.id });
             return response.data.meta;
+          } else {
+            console.log(`🔍 [StremioService] Addon returned no metadata:`, { addonId: addon.id });
           }
-        } catch (error) {
+        } catch (error: any) {
+          console.log(`🔍 [StremioService] Addon request failed:`, {
+            addonId: addon.id,
+            addonName: addon.name,
+            errorMessage: error.message,
+            isAxiosError: error.isAxiosError,
+            responseStatus: error.response?.status,
+            responseData: error.response?.data
+          });
           continue; // Try next addon
         }
       }
       
+      console.log(`🔍 [StremioService] No metadata found from any addon`);
       return null;
     } catch (error) {
+      console.log(`🔍 [StremioService] getMetaDetails caught error:`, {
+        errorMessage: error instanceof Error ? error.message : String(error),
+        isAxiosError: (error as any)?.isAxiosError,
+        responseStatus: (error as any)?.response?.status,
+        responseData: (error as any)?.response?.data
+      });
       logger.error('Error in getMetaDetails:', error);
       return null;
     }
@@ -1045,6 +1154,14 @@ class StremioService {
                 season = parseInt(idParts[2], 10);
                 episode = parseInt(idParts[3], 10);
               }
+            } else if (idParts[0] === 'tmdb') {
+              // Format: tmdb:286801:season:episode (direct TMDB ID)
+              baseId = idParts[1];
+              idType = 'tmdb';
+              if (scraperType === 'tv' && idParts.length >= 4) {
+                season = parseInt(idParts[2], 10);
+                episode = parseInt(idParts[3], 10);
+              }
             } else {
               // Fallback: assume first part is the ID
               baseId = idParts[0];
@@ -1054,8 +1171,9 @@ class StremioService {
               }
             }
             
-            // Only try to convert to TMDB ID for IMDb IDs (local scrapers need TMDB)
+            // Handle ID conversion for local scrapers (they need TMDB ID)
             if (idType === 'imdb') {
+              // Convert IMDb ID to TMDB ID
               const tmdbService = TMDBService.getInstance();
               const tmdbIdNumber = await tmdbService.findTMDBIdByIMDB(baseId);
               if (tmdbIdNumber) {
@@ -1063,16 +1181,24 @@ class StremioService {
               } else {
                 logger.log('🔧 [getStreams] Skipping local scrapers: could not convert IMDb to TMDB for', baseId);
               }
+            } else if (idType === 'tmdb') {
+              // Already have TMDB ID, use it directly
+              tmdbId = baseId;
+              logger.log('🔧 [getStreams] Using TMDB ID directly for local scrapers:', tmdbId);
             } else if (idType === 'kitsu') {
               // For kitsu IDs, skip local scrapers as they don't support kitsu
               logger.log('🔧 [getStreams] Skipping local scrapers for kitsu ID:', baseId);
+            } else {
+              // For other ID types, try to use as TMDB ID
+              tmdbId = baseId;
+              logger.log('🔧 [getStreams] Using base ID as TMDB ID for local scrapers:', tmdbId);
             }
           } catch (error) {
             logger.warn('🔧 [getStreams] Skipping local scrapers due to ID parsing error:', error);
           }
           
-          // Execute local scrapers asynchronously with TMDB ID (only for IMDb IDs)
-          if (idType === 'imdb' && tmdbId) {
+          // Execute local scrapers asynchronously with TMDB ID (when available)
+          if (tmdbId) {
             localScraperService.getStreams(scraperType, tmdbId, season, episode, (streams, scraperId, scraperName, error) => {
               if (error) {
                 if (callback) {
