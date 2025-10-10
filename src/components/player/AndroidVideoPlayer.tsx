@@ -2267,6 +2267,14 @@ const AndroidVideoPlayer: React.FC = () => {
     }
   }, [useVLC, selectVlcSubtitleTrack]);
 
+  // Automatically disable VLC internal subtitles when external subtitles are enabled
+  useEffect(() => {
+    if (useVLC && useCustomSubtitles) {
+      logger.log('[AndroidVideoPlayer][VLC] External subtitles enabled, disabling internal subtitles');
+      selectVlcSubtitleTrack(null);
+    }
+  }, [useVLC, useCustomSubtitles, selectVlcSubtitleTrack]);
+
   const disableCustomSubtitles = useCallback(() => {
     setUseCustomSubtitles(false);
     setCustomSubtitles([]);

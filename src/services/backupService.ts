@@ -20,7 +20,7 @@ export interface BackupData {
     downloads: DownloadItem[];
     subtitles: any;
     tombstones: Record<string, number>;
-    continueWatchingRemoved: string[];
+    continueWatchingRemoved: Record<string, number>;
     contentDuration: Record<string, number>;
     syncQueue: any[];
     traktSettings?: any;
@@ -32,7 +32,19 @@ export interface BackupData {
       scraperSettings: any;
       scraperCode: Record<string, string>;
     };
-    customThemes?: any[];
+    // API Keys
+    apiKeys?: {
+      mdblistApiKey?: string;
+      openRouterApiKey?: string;
+    };
+    // User preferences
+    catalogSettings?: any;
+    addonOrder?: string[];
+    removedAddons?: string[];
+    globalSeasonViewMode?: string;
+    // Onboarding/flags
+    hasCompletedOnboarding?: boolean;
+    showLoginHintToastOnce?: boolean;
   };
   metadata: {
     totalItems: number;
@@ -52,6 +64,9 @@ export interface BackupOptions {
   includeSettings?: boolean;
   includeTraktData?: boolean;
   includeLocalScrapers?: boolean;
+  includeApiKeys?: boolean;
+  includeCatalogSettings?: boolean;
+  includeUserPreferences?: boolean;
 }
 
 export class BackupService {
@@ -87,7 +102,7 @@ export class BackupService {
         platform: Platform.OS as 'ios' | 'android',
         userScope,
         data: {
-          settings: await this.getSettings(),
+          settings: options.includeSettings !== false ? await this.getSettings() : DEFAULT_SETTINGS,
           library: options.includeLibrary !== false ? await this.getLibrary() : [],
           watchProgress: options.includeWatchProgress !== false ? await this.getWatchProgress() : {},
           addons: options.includeAddons !== false ? await this.getAddons() : [],
@@ -99,6 +114,13 @@ export class BackupService {
           syncQueue: await this.getSyncQueue(),
           traktSettings: options.includeTraktData !== false ? await this.getTraktSettings() : undefined,
           localScrapers: options.includeLocalScrapers !== false ? await this.getLocalScrapers() : undefined,
+          apiKeys: options.includeApiKeys !== false ? await this.getApiKeys() : undefined,
+          catalogSettings: options.includeCatalogSettings !== false ? await this.getCatalogSettings() : undefined,
+          addonOrder: options.includeUserPreferences !== false ? await this.getAddonOrder() : undefined,
+          removedAddons: options.includeUserPreferences !== false ? await this.getRemovedAddons() : undefined,
+          globalSeasonViewMode: options.includeUserPreferences !== false ? await this.getGlobalSeasonViewMode() : undefined,
+          hasCompletedOnboarding: options.includeUserPreferences !== false ? await this.getHasCompletedOnboarding() : undefined,
+          showLoginHintToastOnce: options.includeUserPreferences !== false ? await this.getShowLoginHintToastOnce() : undefined,
         },
         metadata: {
           totalItems: 0,
@@ -205,23 +227,23 @@ export class BackupService {
       logger.info(`[BackupService] Backup contains: ${backupData.metadata.totalItems} items`);
 
       // Restore data based on options
-      if (options.includeSettings !== false) {
+      if (options.includeSettings !== false && backupData.data.settings) {
         await this.restoreSettings(backupData.data.settings);
       }
       
-      if (options.includeLibrary !== false) {
+      if (options.includeLibrary !== false && backupData.data.library) {
         await this.restoreLibrary(backupData.data.library);
       }
       
-      if (options.includeWatchProgress !== false) {
+      if (options.includeWatchProgress !== false && backupData.data.watchProgress) {
         await this.restoreWatchProgress(backupData.data.watchProgress);
       }
       
-      if (options.includeAddons !== false) {
+      if (options.includeAddons !== false && backupData.data.addons) {
         await this.restoreAddons(backupData.data.addons);
       }
       
-      if (options.includeDownloads !== false) {
+      if (options.includeDownloads !== false && backupData.data.downloads) {
         await this.restoreDownloads(backupData.data.downloads);
       }
       
@@ -233,12 +255,48 @@ export class BackupService {
         await this.restoreLocalScrapers(backupData.data.localScrapers);
       }
 
+      if (options.includeApiKeys !== false && backupData.data.apiKeys) {
+        await this.restoreApiKeys(backupData.data.apiKeys);
+      }
+
+      if (options.includeCatalogSettings !== false && backupData.data.catalogSettings) {
+        await this.restoreCatalogSettings(backupData.data.catalogSettings);
+      }
+
+      if (options.includeUserPreferences !== false) {
+        if (backupData.data.addonOrder) {
+          await this.restoreAddonOrder(backupData.data.addonOrder);
+        }
+        if (backupData.data.removedAddons) {
+          await this.restoreRemovedAddons(backupData.data.removedAddons);
+        }
+        if (backupData.data.globalSeasonViewMode) {
+          await this.restoreGlobalSeasonViewMode(backupData.data.globalSeasonViewMode);
+        }
+        if (backupData.data.hasCompletedOnboarding !== undefined) {
+          await this.restoreHasCompletedOnboarding(backupData.data.hasCompletedOnboarding);
+        }
+        if (backupData.data.showLoginHintToastOnce !== undefined) {
+          await this.restoreShowLoginHintToastOnce(backupData.data.showLoginHintToastOnce);
+        }
+      }
+
       // Restore additional data
-      await this.restoreSubtitleSettings(backupData.data.subtitles);
-      await this.restoreTombstones(backupData.data.tombstones);
-      await this.restoreContinueWatchingRemoved(backupData.data.continueWatchingRemoved);
-      await this.restoreContentDuration(backupData.data.contentDuration);
-      await this.restoreSyncQueue(backupData.data.syncQueue);
+      if (backupData.data.subtitles) {
+        await this.restoreSubtitleSettings(backupData.data.subtitles);
+      }
+      if (backupData.data.tombstones) {
+        await this.restoreTombstones(backupData.data.tombstones);
+      }
+      if (backupData.data.continueWatchingRemoved) {
+        await this.restoreContinueWatchingRemoved(backupData.data.continueWatchingRemoved);
+      }
+      if (backupData.data.contentDuration) {
+        await this.restoreContentDuration(backupData.data.contentDuration);
+      }
+      if (backupData.data.syncQueue) {
+        await this.restoreSyncQueue(backupData.data.syncQueue);
+      }
 
       logger.info('[BackupService] Backup restore completed successfully');
     } catch (error) {
@@ -405,15 +463,15 @@ export class BackupService {
     }
   }
 
-  private async getContinueWatchingRemoved(): Promise<string[]> {
+  private async getContinueWatchingRemoved(): Promise<Record<string, number>> {
     try {
       const scope = await this.getUserScope();
       const scopedKey = `@user:${scope}:@continue_watching_removed`;
       const removedJson = await AsyncStorage.getItem(scopedKey);
-      return removedJson ? JSON.parse(removedJson) : [];
+      return removedJson ? JSON.parse(removedJson) : {};
     } catch (error) {
       logger.error('[BackupService] Failed to get continue watching removed:', error);
-      return [];
+      return {};
     }
   }
 
@@ -535,6 +593,93 @@ export class BackupService {
     }
   }
 
+  private async getApiKeys(): Promise<{ mdblistApiKey?: string; openRouterApiKey?: string }> {
+    try {
+      const [mdblistKey, openRouterKey] = await Promise.all([
+        AsyncStorage.getItem('mdblist_api_key'),
+        AsyncStorage.getItem('openrouter_api_key')
+      ]);
+      
+      return {
+        mdblistApiKey: mdblistKey || undefined,
+        openRouterApiKey: openRouterKey || undefined
+      };
+    } catch (error) {
+      logger.error('[BackupService] Failed to get API keys:', error);
+      return {};
+    }
+  }
+
+  private async getCatalogSettings(): Promise<any> {
+    try {
+      const catalogSettingsJson = await AsyncStorage.getItem('catalog_settings');
+      return catalogSettingsJson ? JSON.parse(catalogSettingsJson) : null;
+    } catch (error) {
+      logger.error('[BackupService] Failed to get catalog settings:', error);
+      return null;
+    }
+  }
+
+  private async getAddonOrder(): Promise<string[]> {
+    try {
+      const scope = await this.getUserScope();
+      const scopedKey = `@user:${scope}:stremio-addon-order`;
+      
+      // Try scoped key first, then legacy keys
+      const [scopedOrder, legacyOrder, localOrder] = await Promise.all([
+        AsyncStorage.getItem(scopedKey),
+        AsyncStorage.getItem('stremio-addon-order'),
+        AsyncStorage.getItem('@user:local:stremio-addon-order')
+      ]);
+      
+      const orderJson = scopedOrder || legacyOrder || localOrder;
+      return orderJson ? JSON.parse(orderJson) : [];
+    } catch (error) {
+      logger.error('[BackupService] Failed to get addon order:', error);
+      return [];
+    }
+  }
+
+  private async getRemovedAddons(): Promise<string[]> {
+    try {
+      const removedAddonsJson = await AsyncStorage.getItem('user_removed_addons');
+      return removedAddonsJson ? JSON.parse(removedAddonsJson) : [];
+    } catch (error) {
+      logger.error('[BackupService] Failed to get removed addons:', error);
+      return [];
+    }
+  }
+
+  private async getGlobalSeasonViewMode(): Promise<string | undefined> {
+    try {
+      const mode = await AsyncStorage.getItem('global_season_view_mode');
+      return mode || undefined;
+    } catch (error) {
+      logger.error('[BackupService] Failed to get global season view mode:', error);
+      return undefined;
+    }
+  }
+
+  private async getHasCompletedOnboarding(): Promise<boolean | undefined> {
+    try {
+      const value = await AsyncStorage.getItem('hasCompletedOnboarding');
+      return value === 'true' ? true : value === 'false' ? false : undefined;
+    } catch (error) {
+      logger.error('[BackupService] Failed to get has completed onboarding:', error);
+      return undefined;
+    }
+  }
+
+  private async getShowLoginHintToastOnce(): Promise<boolean | undefined> {
+    try {
+      const value = await AsyncStorage.getItem('showLoginHintToastOnce');
+      return value === 'true' ? true : value === 'false' ? false : undefined;
+    } catch (error) {
+      logger.error('[BackupService] Failed to get show login hint toast once:', error);
+      return undefined;
+    }
+  }
+
   // Private helper methods for data restoration
   private async restoreSettings(settings: AppSettings): Promise<void> {
     try {
@@ -610,7 +755,7 @@ export class BackupService {
     }
   }
 
-  private async restoreContinueWatchingRemoved(removed: string[]): Promise<void> {
+  private async restoreContinueWatchingRemoved(removed: Record<string, number>): Promise<void> {
     try {
       const scope = await this.getUserScope();
       const scopedKey = `@user:${scope}:@continue_watching_removed`;
@@ -729,6 +874,87 @@ export class BackupService {
       logger.info('[BackupService] Local scrapers and plugin settings restored');
     } catch (error) {
       logger.error('[BackupService] Failed to restore local scrapers:', error);
+    }
+  }
+
+  private async restoreApiKeys(apiKeys: { mdblistApiKey?: string; openRouterApiKey?: string }): Promise<void> {
+    try {
+      const setPromises: Promise<void>[] = [];
+      
+      if (apiKeys.mdblistApiKey) {
+        setPromises.push(AsyncStorage.setItem('mdblist_api_key', apiKeys.mdblistApiKey));
+      }
+      
+      if (apiKeys.openRouterApiKey) {
+        setPromises.push(AsyncStorage.setItem('openrouter_api_key', apiKeys.openRouterApiKey));
+      }
+      
+      await Promise.all(setPromises);
+      logger.info('[BackupService] API keys restored');
+    } catch (error) {
+      logger.error('[BackupService] Failed to restore API keys:', error);
+    }
+  }
+
+  private async restoreCatalogSettings(catalogSettings: any): Promise<void> {
+    try {
+      await AsyncStorage.setItem('catalog_settings', JSON.stringify(catalogSettings));
+      logger.info('[BackupService] Catalog settings restored');
+    } catch (error) {
+      logger.error('[BackupService] Failed to restore catalog settings:', error);
+    }
+  }
+
+  private async restoreAddonOrder(addonOrder: string[]): Promise<void> {
+    try {
+      const scope = await this.getUserScope();
+      const scopedKey = `@user:${scope}:stremio-addon-order`;
+      
+      // Restore to both scoped and legacy keys for compatibility
+      await Promise.all([
+        AsyncStorage.setItem(scopedKey, JSON.stringify(addonOrder)),
+        AsyncStorage.setItem('stremio-addon-order', JSON.stringify(addonOrder))
+      ]);
+      
+      logger.info('[BackupService] Addon order restored');
+    } catch (error) {
+      logger.error('[BackupService] Failed to restore addon order:', error);
+    }
+  }
+
+  private async restoreRemovedAddons(removedAddons: string[]): Promise<void> {
+    try {
+      await AsyncStorage.setItem('user_removed_addons', JSON.stringify(removedAddons));
+      logger.info('[BackupService] Removed addons restored');
+    } catch (error) {
+      logger.error('[BackupService] Failed to restore removed addons:', error);
+    }
+  }
+
+  private async restoreGlobalSeasonViewMode(mode: string): Promise<void> {
+    try {
+      await AsyncStorage.setItem('global_season_view_mode', mode);
+      logger.info('[BackupService] Global season view mode restored');
+    } catch (error) {
+      logger.error('[BackupService] Failed to restore global season view mode:', error);
+    }
+  }
+
+  private async restoreHasCompletedOnboarding(value: boolean): Promise<void> {
+    try {
+      await AsyncStorage.setItem('hasCompletedOnboarding', value.toString());
+      logger.info('[BackupService] Has completed onboarding restored');
+    } catch (error) {
+      logger.error('[BackupService] Failed to restore has completed onboarding:', error);
+    }
+  }
+
+  private async restoreShowLoginHintToastOnce(value: boolean): Promise<void> {
+    try {
+      await AsyncStorage.setItem('showLoginHintToastOnce', value.toString());
+      logger.info('[BackupService] Show login hint toast once restored');
+    } catch (error) {
+      logger.error('[BackupService] Failed to restore show login hint toast once:', error);
     }
   }
 

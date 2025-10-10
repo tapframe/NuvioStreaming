@@ -55,6 +55,8 @@ export interface AppSettings {
   showScraperLogos: boolean; // Show scraper logos next to streaming links
   // Quality filtering settings
   excludedQualities: string[]; // Array of quality strings to exclude (e.g., ['2160p', '4K', '1080p', '720p'])
+  // Language filtering settings
+  excludedLanguages: string[]; // Array of language strings to exclude (e.g., ['Spanish', 'German', 'French'])
   // Playback behavior
   alwaysResume: boolean; // If true, resume automatically without prompt when progress < 85%
   // Downloads
@@ -110,6 +112,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showScraperLogos: true, // Show scraper logos by default
   // Quality filtering defaults
   excludedQualities: [], // No qualities excluded by default
+  // Language filtering defaults
+  excludedLanguages: [], // No languages excluded by default
   // Playback behavior defaults
   alwaysResume: true,
   // Downloads

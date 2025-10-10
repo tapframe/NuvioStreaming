@@ -17,12 +17,14 @@ interface CastSectionProps {
   cast: any[];
   loadingCast: boolean;
   onSelectCastMember: (castMember: any) => void;
+  isTmdbEnrichmentEnabled?: boolean;
 }
 
 export const CastSection: React.FC<CastSectionProps> = ({
   cast,
   loadingCast,
   onSelectCastMember,
+  isTmdbEnrichmentEnabled = true,
 }) => {
   const { currentTheme } = useTheme();
 
@@ -80,7 +82,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
                 )}
               </View>
               <Text style={[styles.castName, { color: currentTheme.colors.text }]} numberOfLines={1}>{item.name}</Text>
-              {item.character && (
+              {isTmdbEnrichmentEnabled && item.character && (
                 <Text style={[styles.characterName, { color: currentTheme.colors.textMuted }]} numberOfLines={1}>{item.character}</Text>
               )}
             </TouchableOpacity>

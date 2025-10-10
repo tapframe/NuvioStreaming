@@ -10,7 +10,8 @@ import {
   View,
   StyleSheet,
   I18nManager,
-  Platform
+  Platform,
+  LogBox
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -60,6 +61,12 @@ Sentry.init({
 // This ensures posters and UI elements remain visible and properly positioned
 I18nManager.allowRTL(false);
 I18nManager.forceRTL(false);
+
+// Suppress duplicate key warnings app-wide
+LogBox.ignoreLogs([
+  'Warning: Encountered two children with the same key',
+  'Keys should be unique so that components maintain their identity across updates'
+]);
 
 // This fixes many navigation layout issues by using native screen containers
 enableScreens(true);

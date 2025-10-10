@@ -858,6 +858,7 @@ const MetadataScreen: React.FC = () => {
                   cast={cast}
                   loadingCast={loadingCast}
                   onSelectCastMember={handleSelectCastMember}
+                  isTmdbEnrichmentEnabled={settings.enrichMetadataWithTMDB}
                 />
               )}
 

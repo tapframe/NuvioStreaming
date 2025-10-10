@@ -391,6 +391,16 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     try {
       if (!settings.enrichMetadataWithTMDB) {
         if (__DEV__) logger.log('[loadCast] TMDB enrichment disabled by settings');
+        
+        // Check if we have addon cast data available
+        if (metadata?.addonCast && metadata.addonCast.length > 0) {
+          if (__DEV__) logger.log(`[loadCast] Using addon cast data: ${metadata.addonCast.length} cast members`);
+          setCast(metadata.addonCast);
+          setLoadingCast(false);
+          return;
+        }
+        
+        if (__DEV__) logger.log('[loadCast] No addon cast data available');
         setLoadingCast(false);
         return;
       }
@@ -1712,6 +1722,14 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       };
     }
   }, [tmdbId, loadRecommendations, settings.enrichMetadataWithTMDB]);
+
+  // Load addon cast data when metadata is available and TMDB enrichment is disabled
+  useEffect(() => {
+    if (!settings.enrichMetadataWithTMDB && metadata?.addonCast && metadata.addonCast.length > 0) {
+      if (__DEV__) logger.log('[useMetadata] Loading addon cast data after metadata loaded');
+      loadCast();
+    }
+  }, [metadata, settings.enrichMetadataWithTMDB]);
 
   // Ensure certification is attached whenever a TMDB id is known and metadata lacks it
   useEffect(() => {

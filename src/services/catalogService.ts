@@ -87,6 +87,12 @@ export interface StreamingContent {
   slug?: string;
   releaseInfo?: string;
   traktSource?: 'watchlist' | 'continue-watching' | 'watched';
+  addonCast?: Array<{
+    id: number;
+    name: string;
+    character: string;
+    profile_path: string | null;
+  }>;
 }
 
 export interface CatalogContent {
@@ -737,7 +743,25 @@ class CatalogService {
       behaviorHints: (meta as any).behaviorHints || undefined,
     };
 
-    // Cast is handled separately by the dedicated CastSection component via TMDB
+    // Extract addon cast data if available
+    // Check for both app_extras.cast (structured) and cast (simple array) formats
+    if ((meta as any).app_extras?.cast && Array.isArray((meta as any).app_extras.cast)) {
+      // Structured format with name, character, photo
+      converted.addonCast = (meta as any).app_extras.cast.map((castMember: any, index: number) => ({
+        id: index + 1, // Use index as numeric ID
+        name: castMember.name || 'Unknown',
+        character: castMember.character || '',
+        profile_path: castMember.photo || null
+      }));
+    } else if (meta.cast && Array.isArray(meta.cast)) {
+      // Simple array format with just names
+      converted.addonCast = meta.cast.map((castName: string, index: number) => ({
+        id: index + 1, // Use index as numeric ID
+        name: castName || 'Unknown',
+        character: '', // No character info available in simple format
+        profile_path: null // No profile images available in simple format
+      }));
+    }
 
     // Log if rich metadata is found
     if ((meta as any).trailerStreams?.length > 0) {
@@ -746,6 +770,10 @@ class CatalogService {
 
     if ((meta as any).links?.length > 0) {
       logger.log(`🔗 Enhanced metadata: Found ${(meta as any).links.length} links for ${meta.name}`);
+    }
+
+    if (converted.addonCast && converted.addonCast.length > 0) {
+      logger.log(`🎭 Enhanced metadata: Found ${converted.addonCast.length} cast members from addon for ${meta.name}`);
     }
 
     // Handle videos/episodes if available

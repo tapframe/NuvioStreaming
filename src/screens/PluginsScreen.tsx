@@ -1295,8 +1295,27 @@ const PluginsScreen: React.FC = () => {
     await updateSetting('excludedQualities', newExcluded);
   };
 
+  const handleToggleLanguageExclusion = async (language: string) => {
+    const currentExcluded = settings.excludedLanguages || [];
+    const isExcluded = currentExcluded.includes(language);
+    
+    let newExcluded: string[];
+    if (isExcluded) {
+      // Remove from excluded list
+      newExcluded = currentExcluded.filter(l => l !== language);
+    } else {
+      // Add to excluded list
+      newExcluded = [...currentExcluded, language];
+    }
+    
+    await updateSetting('excludedLanguages', newExcluded);
+  };
+
   // Define available quality options
   const qualityOptions = ['Auto', 'Adaptive', '2160p', '4K', '1080p', '720p', '360p', 'DV', 'HDR', 'REMUX', '480p', 'CAM', 'TS'];
+  
+  // Define available language options
+  const languageOptions = ['Original', 'English', 'Spanish', 'Latin', 'French', 'German', 'Italian', 'Portuguese', 'Russian', 'Japanese', 'Korean', 'Chinese', 'Arabic', 'Hindi', 'Turkish', 'Dutch', 'Polish'];
 
 
 
@@ -1811,6 +1830,55 @@ const PluginsScreen: React.FC = () => {
           {(settings.excludedQualities || []).length > 0 && (
             <Text style={[styles.infoText, { marginTop: 12 }, !settings.enableLocalScrapers && styles.disabledText]}>
               Excluded qualities: {(settings.excludedQualities || []).join(', ')}
+            </Text>
+          )}
+        </CollapsibleSection>
+
+        {/* Language Filtering */}
+        <CollapsibleSection
+          title="Language Filtering"
+          isExpanded={expandedSections.quality}
+          onToggle={() => toggleSection('quality')}
+          colors={colors}
+          styles={styles}
+        >
+          <Text style={styles.sectionDescription}>
+            Exclude specific languages from search results. Tap on a language to exclude it from plugin results.
+          </Text>
+          
+          <Text style={[styles.infoText, { marginTop: 8, fontSize: 13, color: colors.mediumEmphasis }]}>
+            <Text style={{ fontWeight: '600' }}>Note:</Text> This filter only applies to providers that include language information in their stream names. It does not affect other providers.
+          </Text>
+          
+          <View style={styles.qualityChipsContainer}>
+            {languageOptions.map((language) => {
+              const isExcluded = (settings.excludedLanguages || []).includes(language);
+              return (
+                <TouchableOpacity
+                  key={language}
+                  style={[
+                    styles.qualityChip,
+                    isExcluded && styles.qualityChipSelected,
+                    !settings.enableLocalScrapers && styles.disabledButton
+                  ]}
+                  onPress={() => handleToggleLanguageExclusion(language)}
+                  disabled={!settings.enableLocalScrapers}
+                >
+                  <Text style={[
+                    styles.qualityChipText,
+                    isExcluded && styles.qualityChipTextSelected,
+                    !settings.enableLocalScrapers && styles.disabledText
+                  ]}>
+                    {isExcluded ? '✕ ' : ''}{language}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          
+          {(settings.excludedLanguages || []).length > 0 && (
+            <Text style={[styles.infoText, { marginTop: 12 }, !settings.enableLocalScrapers && styles.disabledText]}>
+              Excluded languages: {(settings.excludedLanguages || []).join(', ')}
             </Text>
           )}
         </CollapsibleSection>

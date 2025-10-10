@@ -878,6 +878,86 @@ export const StreamsScreen = () => {
     });
   }, [settings.excludedQualities]);
 
+  // Helper function to filter streams by language exclusions
+  const filterStreamsByLanguage = useCallback((streams: Stream[]) => {
+    if (!settings.excludedLanguages || settings.excludedLanguages.length === 0) {
+      console.log('🔍 [filterStreamsByLanguage] No excluded languages, returning all streams');
+      return streams;
+    }
+
+    console.log('🔍 [filterStreamsByLanguage] Filtering with excluded languages:', settings.excludedLanguages);
+
+    // Log first few stream details to see what fields contain language info
+    if (streams.length > 0) {
+      console.log('🔍 [filterStreamsByLanguage] Sample stream details:', streams.slice(0, 3).map(s => ({
+        title: s.title || s.name,
+        description: s.description?.substring(0, 100),
+        name: s.name,
+        addonName: s.addonName,
+        addonId: s.addonId
+      })));
+    }
+
+    const filtered = streams.filter(stream => {
+      const streamName = stream.name || '';  // This contains the language info like "VIDEASY Gekko (Latin) - Adaptive"
+      const streamTitle = stream.title || '';
+      const streamDescription = stream.description || '';
+      const searchText = `${streamName} ${streamTitle} ${streamDescription}`.toLowerCase();
+
+      // Check if any excluded language is found in the stream title or description
+      const hasExcludedLanguage = settings.excludedLanguages.some(excludedLanguage => {
+        const langLower = excludedLanguage.toLowerCase();
+        
+        // Check multiple variations of the language name
+        const variations = [langLower];
+
+        // Add common variations for each language
+        if (langLower === 'latin') {
+          variations.push('latino', 'latina', 'lat');
+        } else if (langLower === 'spanish') {
+          variations.push('español', 'espanol', 'spa');
+        } else if (langLower === 'german') {
+          variations.push('deutsch', 'ger');
+        } else if (langLower === 'french') {
+          variations.push('français', 'francais', 'fre');
+        } else if (langLower === 'portuguese') {
+          variations.push('português', 'portugues', 'por');
+        } else if (langLower === 'italian') {
+          variations.push('ita');
+        } else if (langLower === 'english') {
+          variations.push('eng');
+        } else if (langLower === 'japanese') {
+          variations.push('jap');
+        } else if (langLower === 'korean') {
+          variations.push('kor');
+        } else if (langLower === 'chinese') {
+          variations.push('chi', 'cn');
+        } else if (langLower === 'arabic') {
+          variations.push('ara');
+        } else if (langLower === 'russian') {
+          variations.push('rus');
+        } else if (langLower === 'turkish') {
+          variations.push('tur');
+        } else if (langLower === 'hindi') {
+          variations.push('hin');
+        }
+        
+        const matches = variations.some(variant => searchText.includes(variant));
+        
+        if (matches) {
+          console.log(`🔍 [filterStreamsByLanguage] ✕ Excluding stream with ${excludedLanguage}:`, streamName.substring(0, 100));
+        }
+        return matches;
+      });
+
+      // Return true to keep the stream (if it doesn't have excluded language)
+      return !hasExcludedLanguage;
+    });
+
+    console.log(`🔍 [filterStreamsByLanguage] Filtered ${streams.length} → ${filtered.length} streams`);
+    return filtered;
+  }, [settings.excludedLanguages]);
+
   // Note: No additional sorting applied to stream cards; preserve provider order
 
   // Function to determine the best stream based on quality, provider priority, and other factors
@@ -934,8 +1014,9 @@ export const StreamsScreen = () => {
     }> = [];
 
     Object.entries(streamsData).forEach(([addonId, { streams }]) => {
-      // Apply quality filtering to streams before processing
-      const filteredStreams = filterStreamsByQuality(streams);
+      // Apply quality and language filtering to streams before processing
+      const qualityFiltered = filterStreamsByQuality(streams);
+      const filteredStreams = filterStreamsByLanguage(qualityFiltered);
       
       filteredStreams.forEach(stream => {
         const quality = getQualityNumeric(stream.name || stream.title);
@@ -1502,8 +1583,9 @@ export const StreamsScreen = () => {
           // For ADDONS: Keep all streams in original order, NO filtering or sorting
           addonStreams.push(...providerStreams);
         } else {
-          // For PLUGINS: Apply quality filtering and sorting
-          const filteredStreams = filterStreamsByQuality(providerStreams);
+          // For PLUGINS: Apply quality and language filtering and sorting
+          const qualityFiltered = filterStreamsByQuality(providerStreams);
+          const filteredStreams = filterStreamsByLanguage(qualityFiltered);
 
           if (filteredStreams.length > 0) {
             pluginStreams.push(...filteredStreams);
@@ -1621,23 +1703,25 @@ export const StreamsScreen = () => {
         let filteredStreams = providerStreams;
         let isEmptyDueToQualityFilter = false;
 
-        // Only apply quality filtering to plugins, NOT addons
+        // Only apply quality and language filtering to plugins, NOT addons
         if (!isInstalledAddon) {
-          console.log('🔍 [StreamsScreen] Applying quality filter to plugin:', {
+          console.log('🔍 [StreamsScreen] Applying quality and language filters to plugin:', {
             addonId,
             addonName,
             originalCount,
-            excludedQualities: settings.excludedQualities
+            excludedQualities: settings.excludedQualities,
+            excludedLanguages: settings.excludedLanguages
           });
-          filteredStreams = filterStreamsByQuality(providerStreams);
+          const qualityFiltered = filterStreamsByQuality(providerStreams);
+          filteredStreams = filterStreamsByLanguage(qualityFiltered);
           isEmptyDueToQualityFilter = originalCount > 0 && filteredStreams.length === 0;
-          console.log('🔍 [StreamsScreen] Quality filter result:', {
+          console.log('🔍 [StreamsScreen] Quality and language filter result:', {
             addonId,
             filteredCount: filteredStreams.length,
             isEmptyDueToQualityFilter
           });
         } else {
-          console.log('🔍 [StreamsScreen] Skipping quality filter for addon:', {
+          console.log('🔍 [StreamsScreen] Skipping quality and language filters for addon:', {
             addonId,
             addonName,
             originalCount
@@ -2081,7 +2165,7 @@ export const StreamsScreen = () => {
                       data={section.data}
                       keyExtractor={(item, index) => {
                         if (item && item.url) {
-                          return item.url;
+                          return `${item.url}-${sectionIndex}-${index}`;
                         }
                         return `empty-${sectionIndex}-${index}`;
                       }}
