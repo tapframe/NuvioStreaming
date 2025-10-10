@@ -190,16 +190,19 @@ class StremioService {
 
   // Dynamic validator for content IDs based on installed addon capabilities
   public async isValidContentId(type: string, id: string | null | undefined): Promise<boolean> {
-    const isValidType = type === 'movie' || type === 'series' || type === 'tv';
+    // Ensure addons are initialized before checking types
+    await this.ensureInitialized();
+    
+    // Get all supported types from installed addons
+    const supportedTypes = this.getAllSupportedTypes();
+    const isValidType = supportedTypes.includes(type);
+    
     const lowerId = (id || '').toLowerCase();
     const isNullishId = !id || lowerId === 'null' || lowerId === 'undefined';
     const providerLikeIds = new Set<string>(['moviebox', 'torbox']);
     const isProviderSlug = providerLikeIds.has(lowerId);
 
     if (!isValidType || isNullishId || isProviderSlug) return false;
-    
-    // Ensure addons are initialized before checking prefixes
-    await this.ensureInitialized();
     
     // Get all supported ID prefixes from installed addons
     const supportedPrefixes = this.getAllSupportedIdPrefixes(type);
@@ -211,6 +214,42 @@ class StremioService {
     
     // Check if the ID matches any supported prefix
     return supportedPrefixes.some(prefix => lowerId.startsWith(prefix.toLowerCase()));
+  }
+
+  // Get all content types supported by installed addons
+  public getAllSupportedTypes(): string[] {
+    const addons = this.getInstalledAddons();
+    const types = new Set<string>();
+    
+    for (const addon of addons) {
+      // Check addon-level types
+      if (addon.types && Array.isArray(addon.types)) {
+        addon.types.forEach(type => types.add(type));
+      }
+      
+      // Check resource-level types
+      if (addon.resources && Array.isArray(addon.resources)) {
+        for (const resource of addon.resources) {
+          if (typeof resource === 'object' && resource !== null && 'name' in resource) {
+            const typedResource = resource as ResourceObject;
+            if (Array.isArray(typedResource.types)) {
+              typedResource.types.forEach(type => types.add(type));
+            }
+          }
+        }
+      }
+      
+      // Check catalog-level types
+      if (addon.catalogs && Array.isArray(addon.catalogs)) {
+        for (const catalog of addon.catalogs) {
+          if (catalog.type) {
+            types.add(catalog.type);
+          }
+        }
+      }
+    }
+    
+    return Array.from(types);
   }
 
   // Get all ID prefixes supported by installed addons for a given content type
