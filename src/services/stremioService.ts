@@ -189,14 +189,17 @@ class StremioService {
   }
 
   // Dynamic validator for content IDs based on installed addon capabilities
-  public isValidContentId(type: string, id: string | null | undefined): boolean {
-    const isValidType = type === 'movie' || type === 'series';
+  public async isValidContentId(type: string, id: string | null | undefined): Promise<boolean> {
+    const isValidType = type === 'movie' || type === 'series' || type === 'tv';
     const lowerId = (id || '').toLowerCase();
     const isNullishId = !id || lowerId === 'null' || lowerId === 'undefined';
     const providerLikeIds = new Set<string>(['moviebox', 'torbox']);
     const isProviderSlug = providerLikeIds.has(lowerId);
 
     if (!isValidType || isNullishId || isProviderSlug) return false;
+    
+    // Ensure addons are initialized before checking prefixes
+    await this.ensureInitialized();
     
     // Get all supported ID prefixes from installed addons
     const supportedPrefixes = this.getAllSupportedIdPrefixes(type);
@@ -236,9 +239,6 @@ class StremioService {
         }
       }
     }
-    
-    // No hardcoded prefixes - let addons declare their own support dynamically
-    // If no addons declare prefixes, we'll allow any non-empty string
     
     return Array.from(prefixes);
   }
@@ -766,7 +766,7 @@ class StremioService {
     console.log(`🔍 [StremioService] getMetaDetails called:`, { type, id, preferredAddonId });
     try {
       // Validate content ID first
-      const isValidId = this.isValidContentId(type, id);
+      const isValidId = await this.isValidContentId(type, id);
       console.log(`🔍 [StremioService] Content ID validation:`, { type, id, isValidId });
       
       if (!isValidId) {

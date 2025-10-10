@@ -516,7 +516,7 @@ class CatalogService {
           console.log(`🔍 [CatalogService] Attempt ${i + 1}/2 for getContentDetails:`, { type, id, preferredAddonId });
           
           // Skip meta requests for non-content ids (e.g., provider slugs)
-          const isValidId = stremioService.isValidContentId(type, id);
+          const isValidId = await stremioService.isValidContentId(type, id);
           console.log(`🔍 [CatalogService] Content ID validation:`, { type, id, isValidId });
           
           if (!isValidId) {
@@ -635,7 +635,7 @@ class CatalogService {
       for (let i = 0; i < 3; i++) {
         try {
           // Skip meta requests for non-content ids (e.g., provider slugs)
-          if (!stremioService.isValidContentId(type, id)) {
+          if (!(await stremioService.isValidContentId(type, id))) {
             break;
           }
           meta = await stremioService.getMetaDetails(type, id, preferredAddonId);

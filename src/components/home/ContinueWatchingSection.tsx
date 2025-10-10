@@ -124,7 +124,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     }
     
     try {
-      const shouldFetchMeta = stremioService.isValidContentId(type, id);
+      const shouldFetchMeta = await stremioService.isValidContentId(type, id);
       const [metadata, basicContent] = await Promise.all([
         shouldFetchMeta ? stremioService.getMetaDetails(type, id) : Promise.resolve(null),
         catalogService.getBasicContentDetails(type, id)
