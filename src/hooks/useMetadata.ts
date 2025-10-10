@@ -232,6 +232,28 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         (streams, addonId, addonName, error) => {
           const processTime = Date.now() - sourceStartTime;
           
+          console.log('🔍 [processStremioSource] Callback received:', {
+            addonId,
+            addonName,
+            streamCount: streams?.length || 0,
+            error: error?.message || null,
+            processTime
+          });
+          
+          // ALWAYS remove from active fetching list when callback is received
+          // This ensures that even failed scrapers are removed from the "Fetching from:" chip
+          if (addonName) {
+            setActiveFetchingScrapers(prev => {
+              const updated = prev.filter(name => name !== addonName);
+              console.log('🔍 [processStremioSource] Removing from activeFetchingScrapers:', {
+                addonName,
+                before: prev,
+                after: updated
+              });
+              return updated;
+            });
+          }
+          
           // Update scraper status when we get a callback
           if (addonId && addonName) {
             setScraperStatuses(prevStatuses => {
@@ -254,9 +276,6 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
                 return [...prevStatuses, newStatus];
               }
             });
-            
-            // Remove from active fetching list
-            setActiveFetchingScrapers(prev => prev.filter(name => name !== addonName));
           }
           
           if (error) {
@@ -314,7 +333,53 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     } catch (error) {
        // Catch errors from the initial call to getStreams (e.g., initialization errors)
        logger.error(`❌ [${logPrefix}:${sourceName}] Initial call failed:`, error);
-       // Maybe update state to show a general Stremio error?
+       
+       // Remove all addons and scrapers from active fetching since the entire request failed
+       setActiveFetchingScrapers(prev => {
+         // Get both Stremio addon names and local scraper names
+         const stremioAddons = stremioService.getInstalledAddons();
+         const stremioNames = stremioAddons.map(addon => addon.name);
+         
+         // Get local scraper names
+         localScraperService.getInstalledScrapers().then(localScrapers => {
+           const localScraperNames = localScrapers.filter(s => s.enabled).map(s => s.name);
+           const allNames = [...stremioNames, ...localScraperNames];
+           
+           // Remove all from active fetching
+           setActiveFetchingScrapers(current => 
+             current.filter(name => !allNames.includes(name))
+           );
+         }).catch(() => {
+           // If we can't get local scrapers, just remove Stremio addons
+           setActiveFetchingScrapers(current => 
+             current.filter(name => !stremioNames.includes(name))
+           );
+         });
+         
+         // Immediately remove Stremio addons (local scrapers will be removed async above)
+         return prev.filter(name => !stremioNames.includes(name));
+       });
+       
+       // Update scraper statuses to mark all scrapers as failed
+       setScraperStatuses(prevStatuses => {
+         const stremioAddons = stremioService.getInstalledAddons();
+         
+         return prevStatuses.map(status => {
+           const isStremioAddon = stremioAddons.some(addon => addon.id === status.id || addon.name === status.name);
+           
+           // Mark both Stremio addons and local scrapers as failed
+           if (isStremioAddon || !status.hasCompleted) {
+             return {
+               ...status,
+               isLoading: false,
+               hasCompleted: true,
+               error: error instanceof Error ? error.message : 'Initial request failed',
+               endTime: Date.now()
+             };
+           }
+           return status;
+         });
+       });
     }
     // Note: This function completes when getStreams returns, not when all callbacks have fired.
     // Loading indicators should probably be managed based on callbacks completing.
@@ -358,9 +423,9 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         }
       }
 
-      // Handle IMDb IDs or convert to TMDB ID
+      // Handle IMDb IDs or convert to TMDB ID (only if enrichment is enabled)
       let tmdbId;
-      if (id.startsWith('tt')) {
+      if (id.startsWith('tt') && settings.enrichMetadataWithTMDB) {
         if (__DEV__) logger.log('[loadCast] Converting IMDb ID to TMDB ID');
         tmdbId = await tmdbService.findTMDBIdByIMDB(id);
       }
@@ -1119,9 +1184,13 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       } else if (id.startsWith('tt')) {
         // This is already an IMDB ID, perfect for Stremio
         stremioId = id;
-        if (__DEV__) console.log('📝 [loadStreams] Converting IMDB ID to TMDB ID...');
-        tmdbId = await withTimeout(tmdbService.findTMDBIdByIMDB(id), API_TIMEOUT);
-        if (__DEV__) console.log('✅ [loadStreams] Converted to TMDB ID:', tmdbId);
+        if (settings.enrichMetadataWithTMDB) {
+          if (__DEV__) console.log('📝 [loadStreams] Converting IMDB ID to TMDB ID...');
+          tmdbId = await withTimeout(tmdbService.findTMDBIdByIMDB(id), API_TIMEOUT);
+          if (__DEV__) console.log('✅ [loadStreams] Converted to TMDB ID:', tmdbId);
+        } else {
+          if (__DEV__) console.log('📝 [loadStreams] TMDB enrichment disabled, skipping IMDB to TMDB conversion');
+        }
       } else {
         tmdbId = id;
         stremioId = id;
@@ -1215,6 +1284,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
          
          setScraperStatuses(initialStatuses);
          setActiveFetchingScrapers(initialActiveFetching);
+         console.log('🔍 [loadStreams] Initialized activeFetchingScrapers:', initialActiveFetching);
        } catch (error) {
          if (__DEV__) console.error('Failed to initialize scraper tracking:', error);
        }
@@ -1243,6 +1313,14 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         clearInterval(completionInterval);
         setLoadingStreams(false);
         setActiveFetchingScrapers([]);
+        // Mark all incomplete scrapers as failed
+        setScraperStatuses(prevStatuses => 
+          prevStatuses.map(status => 
+            !status.hasCompleted && !status.error 
+              ? { ...status, isLoading: false, hasCompleted: true, error: 'Request timed out', endTime: Date.now() }
+              : status
+          )
+        );
       }, 60000);
 
     } catch (error) {
@@ -1335,6 +1413,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
          
          setScraperStatuses(initialStatuses);
          setActiveFetchingScrapers(initialActiveFetching);
+         console.log('🔍 [loadEpisodeStreams] Initialized activeFetchingScrapers:', initialActiveFetching);
        } catch (error) {
          if (__DEV__) console.error('Failed to initialize episode scraper tracking:', error);
        }
@@ -1356,7 +1435,9 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         // episodeId format for collections: "tt7888964" (IMDb ID of individual movie)
         if (episodeId.startsWith('tt')) {
           // This is an IMDb ID of an individual movie in the collection
-          tmdbId = await withTimeout(tmdbService.findTMDBIdByIMDB(episodeId), API_TIMEOUT);
+          if (settings.enrichMetadataWithTMDB) {
+            tmdbId = await withTimeout(tmdbService.findTMDBIdByIMDB(episodeId), API_TIMEOUT);
+          }
           stremioEpisodeId = episodeId; // Use the IMDb ID directly for Stremio addons
           if (__DEV__) console.log('✅ [loadEpisodeStreams] Collection movie - using IMDb ID:', episodeId, 'TMDB ID:', tmdbId);
         } else {
@@ -1397,8 +1478,12 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         }
       } else if (id.startsWith('tt')) {
         // This is already an IMDB ID, perfect for Stremio
-        if (__DEV__) console.log('📝 [loadEpisodeStreams] Converting IMDB ID to TMDB ID...');
-        tmdbId = await withTimeout(tmdbService.findTMDBIdByIMDB(id), API_TIMEOUT);
+        if (settings.enrichMetadataWithTMDB) {
+          if (__DEV__) console.log('📝 [loadEpisodeStreams] Converting IMDB ID to TMDB ID...');
+          tmdbId = await withTimeout(tmdbService.findTMDBIdByIMDB(id), API_TIMEOUT);
+        } else {
+          if (__DEV__) console.log('📝 [loadEpisodeStreams] TMDB enrichment disabled, skipping IMDB to TMDB conversion');
+        }
         if (__DEV__) console.log('✅ [loadEpisodeStreams] Converted to TMDB ID:', tmdbId);
         // Normalize episode id to 'tt:season:episode' format for addons that expect tt prefix
         const parts = episodeId.split(':');
@@ -1447,6 +1532,14 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         clearInterval(episodeCompletionInterval);
         setLoadingEpisodeStreams(false);
         setActiveFetchingScrapers([]);
+        // Mark all incomplete scrapers as failed
+        setScraperStatuses(prevStatuses => 
+          prevStatuses.map(status => 
+            !status.hasCompleted && !status.error 
+              ? { ...status, isLoading: false, hasCompleted: true, error: 'Request timed out', endTime: Date.now() }
+              : status
+          )
+        );
       }, 60000);
 
     } catch (error) {

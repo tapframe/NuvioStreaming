@@ -1427,6 +1427,18 @@ export const StreamsScreen = () => {
   const sections = useMemo(() => {
     const streams = metadata?.videos && metadata.videos.length > 1 && selectedEpisode ? episodeStreams : groupedStreams;
     const installedAddons = stremioService.getInstalledAddons();
+    
+    console.log('🔍 [StreamsScreen] Sections debug:', {
+      streamsKeys: Object.keys(streams),
+      installedAddons: installedAddons.map(a => ({ id: a.id, name: a.name })),
+      selectedProvider,
+      streamDisplayMode: settings.streamDisplayMode,
+      streamsData: Object.entries(streams).map(([key, data]) => ({
+        provider: key,
+        addonName: data.addonName,
+        streamCount: data.streams?.length || 0
+      }))
+    });
 
     // Filter streams by selected provider
     const filteredEntries = Object.entries(streams)
@@ -1444,8 +1456,18 @@ export const StreamsScreen = () => {
 
         // Otherwise only show the selected provider
         return addonId === selectedProvider;
-      })
-      .sort(([addonIdA], [addonIdB]) => {
+      });
+      
+    console.log('🔍 [StreamsScreen] Filtered entries:', {
+      filteredCount: filteredEntries.length,
+      filteredEntries: filteredEntries.map(([addonId, data]) => ({
+        addonId,
+        addonName: data.addonName,
+        streamCount: data.streams?.length || 0
+      }))
+    });
+    
+    const sortedEntries = filteredEntries.sort(([addonIdA], [addonIdB]) => {
         // Sort by response order (actual order addons responded)
         const indexA = addonResponseOrder.indexOf(addonIdA);
         const indexB = addonResponseOrder.indexOf(addonIdB);
@@ -1470,7 +1492,7 @@ export const StreamsScreen = () => {
       const pluginStreams: Stream[] = [];
       let totalOriginalCount = 0;
 
-      filteredEntries.forEach(([addonId, { addonName, streams: providerStreams }]) => {
+      sortedEntries.forEach(([addonId, { addonName, streams: providerStreams }]) => {
         const isInstalledAddon = installedAddons.some(addon => addon.id === addonId);
 
         // Count original streams before filtering
@@ -1572,15 +1594,25 @@ export const StreamsScreen = () => {
         combinedStreams.push(...pluginStreams);
       }
 
-      return [{
+      const result = [{
         title: 'Available Streams',
         addonId: 'grouped-all',
         data: combinedStreams,
         isEmptyDueToQualityFilter: false
       }];
+      
+      console.log('🔍 [StreamsScreen] Grouped mode result:', {
+        resultCount: result.length,
+        combinedStreamsCount: combinedStreams.length,
+        addonStreamsCount: addonStreams.length,
+        pluginStreamsCount: pluginStreams.length,
+        totalOriginalCount
+      });
+      
+      return result;
     } else {
       // Use separate sections for each provider (current behavior)
-      return filteredEntries.map(([addonId, { addonName, streams: providerStreams }]) => {
+      return sortedEntries.map(([addonId, { addonName, streams: providerStreams }]) => {
         const isInstalledAddon = installedAddons.some(addon => addon.id === addonId);
 
         // Count original streams before filtering
@@ -1591,8 +1623,25 @@ export const StreamsScreen = () => {
 
         // Only apply quality filtering to plugins, NOT addons
         if (!isInstalledAddon) {
+          console.log('🔍 [StreamsScreen] Applying quality filter to plugin:', {
+            addonId,
+            addonName,
+            originalCount,
+            excludedQualities: settings.excludedQualities
+          });
           filteredStreams = filterStreamsByQuality(providerStreams);
           isEmptyDueToQualityFilter = originalCount > 0 && filteredStreams.length === 0;
+          console.log('🔍 [StreamsScreen] Quality filter result:', {
+            addonId,
+            filteredCount: filteredStreams.length,
+            isEmptyDueToQualityFilter
+          });
+        } else {
+          console.log('🔍 [StreamsScreen] Skipping quality filter for addon:', {
+            addonId,
+            addonName,
+            originalCount
+          });
         }
 
         if (isEmptyDueToQualityFilter) {
@@ -1661,15 +1710,38 @@ export const StreamsScreen = () => {
           });
         }
 
-        return {
+        const result = {
           title: addonName,
           addonId,
           data: processedStreams,
           isEmptyDueToQualityFilter: false
         };
+        
+        console.log('🔍 [StreamsScreen] Individual mode result:', {
+          addonId,
+          addonName,
+          processedStreamsCount: processedStreams.length,
+          originalCount,
+          isInstalledAddon
+        });
+        
+        return result;
       });
     }
-  }, [selectedProvider, type, episodeStreams, groupedStreams, settings.streamDisplayMode, filterStreamsByQuality, addonResponseOrder, settings.streamSortMode]);
+  }, [selectedProvider, type, episodeStreams, groupedStreams, settings.streamDisplayMode, filterStreamsByQuality, addonResponseOrder, settings.streamSortMode, selectedEpisode, metadata]);
+  
+  // Debug log for sections result
+  React.useEffect(() => {
+    console.log('🔍 [StreamsScreen] Final sections:', {
+      sectionsCount: sections.length,
+      sections: sections.map(s => ({
+        title: s.title,
+        addonId: s.addonId,
+        dataCount: s.data?.length || 0,
+        isEmptyDueToQualityFilter: s.isEmptyDueToQualityFilter
+      }))
+    });
+  }, [sections]);
 
   const episodeImage = useMemo(() => {
     if (episodeThumbnail) {
@@ -1725,6 +1797,25 @@ export const StreamsScreen = () => {
   const loadElapsed = streamsLoadStart ? Date.now() - streamsLoadStart : 0;
   const showInitialLoading = streamsEmpty && (streamsLoadStart === null || loadElapsed < 10000);
   const showStillFetching = streamsEmpty && loadElapsed >= 10000;
+
+  // Debug logging for stream availability
+  React.useEffect(() => {
+    console.log('🔍 [StreamsScreen] Streams debug:', {
+      streamsEmpty,
+      streamsKeys: Object.keys(streams),
+      streamsData: Object.entries(streams).map(([key, data]) => ({
+        provider: key,
+        addonName: data.addonName,
+        streamCount: data.streams?.length || 0,
+        streams: data.streams?.slice(0, 3).map(s => ({ name: s.name, title: s.title })) || []
+      })),
+      isLoading,
+      loadingStreams,
+      loadingEpisodeStreams,
+      selectedEpisode,
+      type
+    });
+  }, [streams, streamsEmpty, isLoading, loadingStreams, loadingEpisodeStreams, selectedEpisode, type]);
 
 
 

@@ -97,7 +97,8 @@ const ActionButtons = memo(({
   watchProgress,
   groupedEpisodes,
   metadata,
-  aiChatEnabled
+  aiChatEnabled,
+  settings
 }: {
   handleShowStreams: () => void;
   toggleLibrary: () => void;
@@ -112,6 +113,7 @@ const ActionButtons = memo(({
   groupedEpisodes?: { [seasonNumber: number]: any[] };
   metadata: any;
   aiChatEnabled?: boolean;
+  settings: any;
 }) => {
   const { currentTheme } = useTheme();
   
@@ -135,7 +137,7 @@ const ActionButtons = memo(({
       if (!isNaN(parsedId)) {
         finalTmdbId = parsedId;
       }
-    } else if (id.startsWith('tt')) {
+    } else if (id.startsWith('tt') && settings.enrichMetadataWithTMDB) {
       try {
         const tmdbService = TMDBService.getInstance();
         const convertedId = await tmdbService.findTMDBIdByIMDB(id);
@@ -158,7 +160,7 @@ const ActionButtons = memo(({
         navigation.navigate('ShowRatings', { showId: finalTmdbId });
       });
     }
-  }, [id, navigation]);
+  }, [id, navigation, settings.enrichMetadataWithTMDB]);
 
   // Optimized play button style calculation
   const playButtonStyle = useMemo(() => {
@@ -1538,6 +1540,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
             groupedEpisodes={groupedEpisodes}
             metadata={metadata}
             aiChatEnabled={settings?.aiChatEnabled}
+            settings={settings}
           />
         </View>
       </LinearGradient>

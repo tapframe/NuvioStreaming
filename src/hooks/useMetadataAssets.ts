@@ -150,7 +150,7 @@ export const useMetadataAssets = (
             // Extract or find TMDB ID in one step
             if (id.startsWith('tmdb:')) {
               tmdbId = id.split(':')[1];
-            } else if (imdbId) {
+            } else if (imdbId && settings.enrichMetadataWithTMDB) {
               try {
                 const tmdbService = TMDBService.getInstance();
                 const foundId = await tmdbService.findTMDBIdByIMDB(imdbId);
@@ -248,7 +248,7 @@ export const useMetadataAssets = (
           tmdbId = foundTmdbId;
         } else if ((metadata as any).tmdbId) {
           tmdbId = (metadata as any).tmdbId;
-        } else if (imdbId) {
+        } else if (imdbId && settings.enrichMetadataWithTMDB) {
           try {
             const tmdbService = TMDBService.getInstance();
             const foundId = await tmdbService.findTMDBIdByIMDB(imdbId);
