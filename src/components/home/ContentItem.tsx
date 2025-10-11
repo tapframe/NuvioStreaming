@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Toast } from 'toastify-react-native';
 import { DeviceEventEmitter } from 'react-native';
 import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Platform, Text, Animated, Share } from 'react-native';
-import { Image as ExpoImage } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useSettings } from '../../hooks/useSettings';
@@ -61,8 +61,6 @@ const calculatePosterLayout = (screenWidth: number) => {
 const posterLayout = calculatePosterLayout(width);
 const POSTER_WIDTH = posterLayout.posterWidth;
 
-const PLACEHOLDER_BLURHASH = 'LEHV6nWB2yk8pyo0adR*.7kCMdnj';
-
 const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, deferMs = 0 }: ContentItemProps) => {
   // Track inLibrary status locally to force re-render
   const [inLibrary, setInLibrary] = useState(!!item.inLibrary);
@@ -88,13 +86,11 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
 
   const [menuVisible, setMenuVisible] = useState(false);
   const [isWatched, setIsWatched] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
   const { currentTheme } = useTheme();
   const { settings, isLoaded } = useSettings();
   const posterRadius = typeof settings.posterBorderRadius === 'number' ? settings.posterBorderRadius : 12;
-  const fadeInOpacity = React.useRef(new Animated.Value(0)).current;
+  const fadeInOpacity = React.useRef(new Animated.Value(1)).current;
   // Memoize poster width calculation to avoid recalculating on every render
   const posterWidth = React.useMemo(() => {
     switch (settings.posterSize) {
@@ -192,16 +188,6 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
       return 'https://via.placeholder.com/154x231/333/666?text=No+Image';
     }
 
-    // Retry 1: cache-busting query to avoid stale memory artifacts
-    if (retryCount === 1) {
-      const bust = item.poster.includes('?') ? `&r=${Date.now()}` : `?r=${Date.now()}`;
-      return item.poster + bust;
-    }
-    // Retry 2+: hard fallback placeholder
-    if (retryCount >= 2) {
-      return 'https://via.placeholder.com/154x231/333/666?text=No+Image';
-    }
-
     // For TMDB images, use smaller sizes
     if (item.poster.includes('image.tmdb.org')) {
       // Replace any size with w154 (fits 100-130px tiles perfectly)
@@ -215,14 +201,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
 
     // Return original URL for other sources to avoid breaking them
     return item.poster;
-  }, [item.poster, retryCount, item.id]);
-
-  // Avoid strong fade animations that can appear as flicker on mount/scroll
-  useEffect(() => {
-    if (isLoaded) {
-      fadeInOpacity.setValue(1);
-    }
-  }, [isLoaded, fadeInOpacity]);
+  }, [item.poster, item.id]);
 
   // While settings load, render a placeholder with reserved space (poster aspect + title)
   if (!isLoaded) {
@@ -256,32 +235,20 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
           delayLongPress={300}
         >
           <View ref={itemRef} style={[styles.contentItemContainer, { borderRadius: posterRadius }] }>
-            {/* Image with lightweight placeholder to reduce flicker */}
+            {/* Image with FastImage for aggressive caching */}
             {item.poster ? (
-              <ExpoImage
-                source={{ uri: optimizedPosterUrl }}
+              <FastImage
+                source={{ 
+                  uri: optimizedPosterUrl,
+                  priority: FastImage.priority.normal,
+                  cache: FastImage.cacheControl.immutable
+                }}
                 style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, borderRadius: posterRadius }]}
-                contentFit="cover"
-                cachePolicy="memory"
-                transition={0}
-                allowDownscaling
-                priority="normal" // Normal priority for horizontal scrolling
-                onLoad={() => {
-                  setImageLoaded(true);
-                  setImageError(false);
+                resizeMode={FastImage.resizeMode.cover}
+                onError={() => {
+                  if (__DEV__) console.warn('Image load error for:', item.poster);
+                  setImageError(true);
                 }}
-                onError={(error) => {
-                  if (__DEV__) console.warn('Image load error for:', item.poster, error);
-                  // Increment retry; 0 -> 1 (cache-bust), 1 -> 2 (placeholder)
-                  setRetryCount((prev) => prev + 1);
-                  // Only show broken state after final retry
-                  if (retryCount >= 1) {
-                    setImageError(true);
-                    setImageLoaded(false);
-                  }
-                }}
-                recyclingKey={`${item.id}-${optimizedPosterUrl}`} // Tie texture reuse to URL to avoid stale reuse
-                placeholder={PLACEHOLDER_BLURHASH}
               />
             ) : (
               // Show placeholder for items without posters
@@ -392,8 +359,6 @@ const styles = StyleSheet.create({
 });
 
 export default React.memo(ContentItem, (prev, next) => {
-  // Re-render when identity changes or poster changes
-  if (prev.item.id !== next.item.id) return false;
-  if (prev.item.poster !== next.item.poster) return false;
-  return true;
+  // Only re-render when the item ID changes (FastImage handles caching internally)
+  return prev.item.id === next.item.id && prev.item.type === next.item.type;
 });

@@ -16,7 +16,7 @@ import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { StreamingContent, catalogService } from '../../services/catalogService';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image as ExpoImage } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import { useTheme } from '../../contexts/ThemeContext';
 import { storageService } from '../../services/storageService';
 import { logger } from '../../utils/logger';
@@ -623,15 +623,14 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     >
       {/* Poster Image */}
       <View style={styles.posterContainer}>
-        <ExpoImage
-          source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
+        <FastImage
+          source={{ 
+            uri: item.poster || 'https://via.placeholder.com/300x450',
+            priority: FastImage.priority.high,
+            cache: FastImage.cacheControl.immutable
+          }}
           style={styles.continueWatchingPoster}
-          contentFit="cover"
-          cachePolicy="memory"
-          transition={0}
-          placeholder={{ uri: 'https://via.placeholder.com/300x450' }}
-          placeholderContentFit="cover"
-          recyclingKey={item.id}
+          resizeMode={FastImage.resizeMode.cover}
         />
         
         {/* Delete Indicator Overlay */}

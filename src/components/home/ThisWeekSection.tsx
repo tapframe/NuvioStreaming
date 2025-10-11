@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
-import { Image } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -125,11 +125,14 @@ export const ThisWeekSection = React.memo(() => {
           activeOpacity={0.8}
         >
           <View style={styles.imageContainer}>
-          <Image
-            source={{ uri: imageUrl }}
+          <FastImage
+            source={{ 
+              uri: imageUrl || undefined,
+              priority: FastImage.priority.normal,
+              cache: FastImage.cacheControl.immutable
+            }}
             style={styles.poster}
-            contentFit="cover"
-            transition={0}
+            resizeMode={FastImage.resizeMode.cover}
           />
           
                         {/* Enhanced gradient overlay */}

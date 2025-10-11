@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect, useCallback, memo } from 'react';
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ViewStyle, TextStyle, ImageStyle, FlatList, StyleProp, Platform } from 'react-native';
 import Animated, { FadeIn, FadeOut, Easing, useSharedValue, withTiming, useAnimatedStyle, useAnimatedScrollHandler, useAnimatedReaction, runOnJS } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image as ExpoImage } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -160,14 +160,15 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
           key={item.id}
           style={[animatedStyle, { flex: 1 }] as any}
         >
-          <ExpoImage
-            source={{ uri: item.banner || item.poster }}
+          <FastImage
+            source={{ 
+              uri: item.banner || item.poster,
+              priority: FastImage.priority.low,
+              cache: FastImage.cacheControl.immutable
+            }}
             style={styles.backgroundImage as ImageStyle}
-            contentFit="cover"
+            resizeMode={FastImage.resizeMode.cover}
             blurRadius={Platform.OS === 'android' ? 8 : 12}
-            cachePolicy="memory"
-            transition={0}
-            priority="low"
           />
           <LinearGradient
             colors={["rgba(0,0,0,0.45)", "rgba(0,0,0,0.75)"]}
@@ -187,21 +188,25 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
         {settings.enableHomeHeroBackground && data.length > 0 && (
           <View style={{ height: 0, width: 0, overflow: 'hidden' }}>
             {data[activeIndex + 1] && (
-              <ExpoImage
-                source={{ uri: data[activeIndex + 1].banner || data[activeIndex + 1].poster }}
+              <FastImage
+                source={{ 
+                  uri: data[activeIndex + 1].banner || data[activeIndex + 1].poster,
+                  priority: FastImage.priority.low,
+                  cache: FastImage.cacheControl.immutable
+                }}
                 style={{ width: 1, height: 1 }}
-                contentFit="cover"
-                cachePolicy="memory"
-                transition={0}
+                resizeMode={FastImage.resizeMode.cover}
               />
             )}
             {activeIndex > 0 && data[activeIndex - 1] && (
-              <ExpoImage
-                source={{ uri: data[activeIndex - 1].banner || data[activeIndex - 1].poster }}
+              <FastImage
+                source={{ 
+                  uri: data[activeIndex - 1].banner || data[activeIndex - 1].poster,
+                  priority: FastImage.priority.low,
+                  cache: FastImage.cacheControl.immutable
+                }}
                 style={{ width: 1, height: 1 }}
-                contentFit="cover"
-                cachePolicy="memory"
-                transition={0}
+                resizeMode={FastImage.resizeMode.cover}
               />
             )}
           </View>
@@ -280,12 +285,14 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
         }
       ] as StyleProp<ViewStyle>}>
         <View style={styles.bannerContainer as ViewStyle}>
-          <ExpoImage
-            source={{ uri: item.banner || item.poster }}
+          <FastImage
+            source={{ 
+              uri: item.banner || item.poster,
+              priority: FastImage.priority.normal,
+              cache: FastImage.cacheControl.immutable
+            }}
             style={styles.banner as ImageStyle}
-            contentFit="cover"
-            transition={0}
-            cachePolicy="memory"
+            resizeMode={FastImage.resizeMode.cover}
           />
           <LinearGradient
             colors={["transparent", "rgba(0,0,0,0.2)", "rgba(0,0,0,0.6)"]}
@@ -295,12 +302,14 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
         </View>
         <View style={styles.info as ViewStyle}>
           {item.logo && !logoFailed ? (
-            <ExpoImage
-              source={{ uri: item.logo }}
+            <FastImage
+              source={{ 
+                uri: item.logo,
+                priority: FastImage.priority.high,
+                cache: FastImage.cacheControl.immutable
+              }}
               style={styles.logo as ImageStyle}
-              contentFit="contain"
-              transition={0}
-              cachePolicy="memory"
+              resizeMode={FastImage.resizeMode.contain}
               onError={onLogoError}
             />
           ) : (

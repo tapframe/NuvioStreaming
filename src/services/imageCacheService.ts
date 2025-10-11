@@ -1,5 +1,5 @@
 import { logger } from '../utils/logger';
-import { Image as ExpoImage } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import { AppState, AppStateStatus } from 'react-native';
 
 interface CachedImage {

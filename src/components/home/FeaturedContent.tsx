@@ -15,7 +15,7 @@ import {
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image as ExpoImage } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import Animated, {
   FadeIn,
@@ -564,13 +564,14 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
         <Animated.View style={[styles.tabletOverlayContent as ViewStyle, contentAnimatedStyle]}>
           {logoUrl && !logoLoadError ? (
             <Animated.View style={logoAnimatedStyle}>
-              <ExpoImage
-                source={{ uri: logoUrl }}
+              <FastImage
+                source={{ 
+                  uri: logoUrl,
+                  priority: FastImage.priority.high,
+                  cache: FastImage.cacheControl.immutable
+                }}
                 style={styles.tabletLogo as ImageStyle}
-                contentFit="contain"
-                cachePolicy="memory"
-                transition={300}
-                recyclingKey={`logo-${featuredContent.id}`}
+                resizeMode={FastImage.resizeMode.contain}
                 onError={onLogoLoadError}
               />
             </Animated.View>
@@ -697,13 +698,14 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
                 >
                   {logoUrl && !logoLoadError ? (
                     <Animated.View style={logoAnimatedStyle}>
-                      <ExpoImage
-                        source={{ uri: logoUrl }}
+                      <FastImage
+                        source={{ 
+                          uri: logoUrl,
+                          priority: FastImage.priority.high,
+                          cache: FastImage.cacheControl.immutable
+                        }}
                         style={styles.featuredLogo as ImageStyle}
-                        contentFit="contain"
-                        cachePolicy="memory"
-                        transition={300}
-                        recyclingKey={`logo-${featuredContent.id}`}
+                        resizeMode={FastImage.resizeMode.contain}
                         onError={onLogoLoadError}
                       />
                     </Animated.View>

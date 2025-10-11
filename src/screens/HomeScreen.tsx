@@ -16,7 +16,8 @@ import {
   Modal,
   Pressable,
   Alert,
-  InteractionManager
+  InteractionManager,
+  AppState
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -27,7 +28,7 @@ import { stremioService } from '../services/stremioService';
 import { Stream } from '../types/metadata';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image as ExpoImage } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { PanGestureHandler } from 'react-native-gesture-handler';
 import {
@@ -400,6 +401,26 @@ const HomeScreen = () => {
     }, [])
   );
 
+  // Handle app state changes for smart cache management
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'background') {
+        // Only clear memory cache when app goes to background
+        // This frees memory while keeping disk cache intact for fast restoration
+        try {
+          FastImage.clearMemoryCache();
+          if (__DEV__) console.log('[HomeScreen] Cleared memory cache on background');
+        } catch (error) {
+          if (__DEV__) console.warn('[HomeScreen] Failed to clear memory cache:', error);
+        }
+      }
+    });
+
+    return () => {
+      subscription?.remove();
+    };
+  }, []);
+
   useEffect(() => {
     // Only run cleanup when component unmounts completely
     return () => {
@@ -413,58 +434,40 @@ const HomeScreen = () => {
         clearTimeout(refreshTimeoutRef.current);
       }
       
-      // Clear image cache when component unmounts to free memory
-       try {
-         ExpoImage.clearMemoryCache();
-       } catch (error) {
-         if (__DEV__) console.warn('Failed to clear image cache:', error);
-       }
+      // Don't clear FastImage cache on unmount - it causes broken images on remount
+      // FastImage's native libraries (SDWebImage/Glide) handle memory automatically
+      // Cache clearing only happens on app background (see AppState handler above)
     };
   }, [currentTheme.colors.darkBackground]);
 
   // Removed periodic forced cache clearing to avoid churn under load
   // useEffect(() => {}, [catalogs]);
 
-  // Balanced preload images function
+  // Balanced preload images function using FastImage
   const preloadImages = useCallback(async (content: StreamingContent[]) => {
     if (!content.length) return;
     
     try {
       // Moderate prefetching for better performance balance
-      const MAX_IMAGES = 6; // Preload 6 most important images
+      const MAX_IMAGES = 10; // Preload 10 most important images
       
       // Only preload poster images (skip banner and logo entirely)
       const posterImages = content.slice(0, MAX_IMAGES)
         .map(item => item.poster)
         .filter(Boolean) as string[];
 
-      // Process in batches of 2 with moderate delays
-      for (let i = 0; i < posterImages.length; i += 2) {
-        const batch = posterImages.slice(i, i + 2);
-        
-        await Promise.all(batch.map(async (imageUrl) => {
-          try {
-            // Use our cache service with timeout
-            const timeoutPromise = new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Timeout')), 2000)
-            );
-            
-            await Promise.race([
-              imageCacheService.getCachedImageUrl(imageUrl),
-              timeoutPromise
-            ]);
-          } catch (error) {
-            // Skip failed images and continue
-          }
-        }));
-        
-        // Moderate delay between batches
-        if (i + 2 < posterImages.length) {
-          await new Promise(resolve => setTimeout(resolve, 200));
-        }
-      }
+      // FastImage preload with proper source format
+      const sources = posterImages.map(uri => ({
+        uri,
+        priority: FastImage.priority.normal,
+        cache: FastImage.cacheControl.immutable
+      }));
+
+      // Preload all images at once - FastImage handles batching internally
+      await FastImage.preload(sources);
     } catch (error) {
       // Silently handle preload errors
+      if (__DEV__) console.warn('Image preload error:', error);
     }
   }, []);
 
@@ -476,14 +479,8 @@ const HomeScreen = () => {
     if (!featuredContent) return;
     
     try {
-      // Clear image cache to reduce memory pressure before orientation change
-      if (typeof (global as any)?.ExpoImage?.clearMemoryCache === 'function') {
-        try {
-          (global as any).ExpoImage.clearMemoryCache();
-        } catch (e) {
-          // Ignore cache clear errors
-        }
-      }
+      // Don't clear cache before player - causes broken images on return
+      // FastImage's native libraries handle memory efficiently
       
       // Lock orientation to landscape before navigation to prevent glitches
       try {

@@ -11,7 +11,7 @@ import {
   Platform
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Image as ExpoImage } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import { colors } from '../../styles/colors';
 import Animated, {
   useAnimatedStyle,
@@ -138,10 +138,14 @@ export const DropUpMenu = ({ visible, onClose, item, onOptionSelect, isSaved: is
             <Animated.View style={[styles.menuContainer, menuStyle, { backgroundColor }]}>
               <View style={styles.dragHandle} />
               <View style={styles.menuHeader}>
-                <ExpoImage
-                  source={{ uri: item.poster }}
+                <FastImage
+                  source={{ 
+                    uri: item.poster,
+                    priority: FastImage.priority.high,
+                    cache: FastImage.cacheControl.immutable
+                  }}
                   style={styles.menuPoster}
-                  contentFit="cover"
+                  resizeMode={FastImage.resizeMode.cover}
                 />
                 <View style={styles.menuTitleContainer}>
                   <Text style={[styles.menuTitle, { color: isDarkMode ? '#FFFFFF' : '#000000' }]}>
