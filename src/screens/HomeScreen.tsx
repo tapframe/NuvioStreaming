@@ -61,7 +61,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Toast } from 'toastify-react-native';
 import FirstTimeWelcome from '../components/FirstTimeWelcome';
-import { imageCacheService } from '../services/imageCacheService';
 import { HeaderVisibility } from '../contexts/HeaderVisibility';
 
 // Constants

@@ -87,6 +87,12 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
   const [menuVisible, setMenuVisible] = useState(false);
   const [isWatched, setIsWatched] = useState(false);
   const [imageError, setImageError] = useState(false);
+
+  useEffect(() => {
+    // Reset image error state when item changes, allowing for retry on re-render
+    setImageError(false);
+  }, [item.id, item.poster]);
+
   const { currentTheme } = useTheme();
   const { settings, isLoaded } = useSettings();
   const posterRadius = typeof settings.posterBorderRadius === 'number' ? settings.posterBorderRadius : 12;
@@ -245,6 +251,9 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
                 }}
                 style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, borderRadius: posterRadius }]}
                 resizeMode={FastImage.resizeMode.cover}
+                onLoad={() => {
+                  setImageError(false);
+                }}
                 onError={() => {
                   if (__DEV__) console.warn('Image load error for:', item.poster);
                   setImageError(true);
@@ -359,6 +368,8 @@ const styles = StyleSheet.create({
 });
 
 export default React.memo(ContentItem, (prev, next) => {
-  // Only re-render when the item ID changes (FastImage handles caching internally)
-  return prev.item.id === next.item.id && prev.item.type === next.item.type;
+  // Re-render when identity or poster changes. Caching is handled by FastImage.
+  if (prev.item.id !== next.item.id) return false;
+  if (prev.item.poster !== next.item.poster) return false;
+  return true;
 });

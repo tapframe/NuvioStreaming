@@ -1176,7 +1176,7 @@ export class TraktService {
   }
 
   /**
-   * Extract poster URL from Trakt images with basic caching
+   * Extract poster URL from Trakt images
    */
   public static getTraktPosterUrl(images?: TraktImages): string | null {
     if (!images || !images.poster || images.poster.length === 0) {
@@ -1185,36 +1185,7 @@ export class TraktService {
     
     // Get the first poster and add https prefix
     const posterPath = images.poster[0];
-    const fullUrl = posterPath.startsWith('http') ? posterPath : `https://${posterPath}`;
-    
-    // Try to use cached version synchronously (basic cache check)
-    const isCached = imageCacheService.isCached(fullUrl);
-    if (isCached) {
-      logger.log(`[TraktService] 🎯 Using cached poster: ${fullUrl.substring(0, 60)}...`);
-    } else {
-      logger.log(`[TraktService] 📥 New poster URL: ${fullUrl.substring(0, 60)}...`);
-      // Queue for async caching
-      imageCacheService.getCachedImageUrl(fullUrl).catch(error => {
-        logger.error('[TraktService] Background caching failed:', error);
-      });
-    }
-    
-    return fullUrl;
-  }
-  
-  /**
-   * Extract poster URL from Trakt images with async caching
-   */
-  public static async getTraktPosterUrlCached(images?: TraktImages): Promise<string | null> {
-    const url = this.getTraktPosterUrl(images);
-    if (!url) return null;
-    
-    try {
-      return await imageCacheService.getCachedImageUrl(url);
-    } catch (error) {
-      logger.error('[TraktService] Failed to cache image:', error);
-      return url;
-    }
+    return posterPath.startsWith('http') ? posterPath : `https://${posterPath}`;
   }
 
   /**
@@ -2027,17 +1998,6 @@ export class TraktService {
       }
     } catch (error) {
       logger.error('[TraktService] DEBUG: Error fetching playback progress:', error);
-    }
-  }
-  /**
-   * Debug image cache status
-   */
-  public static debugImageCache(): void {
-    try {
-      logger.log('[TraktService] === IMAGE CACHE DEBUG ===');
-      imageCacheService.logCacheStatus();
-    } catch (error) {
-      logger.error('[TraktService] Debug image cache failed:', error);
     }
   }
 

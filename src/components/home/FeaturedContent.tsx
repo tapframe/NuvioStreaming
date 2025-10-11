@@ -32,7 +32,6 @@ import { useSettings } from '../../hooks/useSettings';
 import { TMDBService } from '../../services/tmdbService';
 import { logger } from '../../utils/logger';
 import { useTheme } from '../../contexts/ThemeContext';
-import { imageCacheService } from '../../services/imageCacheService';
 
 interface FeaturedContentProps {
   featuredContent: StreamingContent | null;
@@ -234,7 +233,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
       });
 
       await Promise.race([
-        imageCacheService.getCachedImageUrl(url),
+        FastImage.preload([{ uri: url }]),
         timeout,
       ]);
       imageCache[url] = true;

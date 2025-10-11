@@ -94,7 +94,7 @@ const TraktItem = React.memo(({ item, width, navigation, currentTheme }: { item:
     let isMounted = true;
     const fetchPoster = async () => {
       if (item.images) {
-        const url = await TraktService.getTraktPosterUrlCached(item.images);
+        const url = TraktService.getTraktPosterUrl(item.images);
         if (isMounted && url) {
           setPosterUrl(url);
         }
