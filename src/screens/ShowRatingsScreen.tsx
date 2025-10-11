@@ -474,7 +474,7 @@ const ShowRatingsScreen = ({ route }: Props) => {
                       onScroll={onScroll}
                       scrollEventThrottle={16}
                     >
-                      <View>
+                      <View style={styles.seasonsContainer}>
                         {/* Seasons Header */}
                         <View style={[styles.gridHeader, { borderBottomColor: colors.black + '40' }]}>
                           {seasons.map((season) => (
@@ -697,9 +697,15 @@ const styles = StyleSheet.create({
     width: 40,
     borderRightWidth: 1,
     paddingRight: 6,
+    justifyContent: 'flex-start',
+    paddingTop: 8,
   },
   seasonsScrollView: {
     flex: 1,
+  },
+  seasonsContainer: {
+    flexDirection: 'column',
+    paddingTop: 8,
   },
   gridHeader: {
     flexDirection: 'row',
@@ -707,26 +713,38 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     paddingBottom: 6,
     paddingLeft: 6,
+    height: 32,
+    alignItems: 'center',
   },
   gridRow: {
     flexDirection: 'row',
     marginBottom: 6,
     paddingLeft: 6,
+    height: 32,
+    alignItems: 'center',
   },
   episodeCell: {
-    height: 26,
+    height: 32,
     justifyContent: 'center',
     paddingRight: 6,
+    alignItems: 'center',
+    marginBottom: 6,
   },
   episodeColumn: {
-    height: 26,
+    height: 32,
     justifyContent: 'center',
     marginBottom: 8,
     paddingRight: 6,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: 'transparent',
+    paddingBottom: 6,
   },
   ratingColumn: {
     width: 40,
     alignItems: 'center',
+    height: 32,
+    justifyContent: 'center',
   },
   headerText: {
     fontWeight: '700',
@@ -753,6 +771,8 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: 32,
     height: 26,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   warningIcon: {
     position: 'absolute',
@@ -767,6 +787,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     opacity: 0.7,
+    height: 32,
   },
   loadingProgressContainer: {
     alignItems: 'center',
