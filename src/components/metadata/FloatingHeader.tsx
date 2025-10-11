@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { BlurView as ExpoBlurView } from 'expo-blur';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import Animated, {
   useAnimatedStyle,
   interpolate,
@@ -96,11 +96,10 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
             
             <View style={styles.headerTitleContainer}>
               {metadata.logo && !logoLoadError ? (
-                <Image
+                <FastImage
                   source={{ uri: metadata.logo }}
                   style={styles.floatingHeaderLogo}
-                  contentFit="contain"
-                  transition={150}
+                  resizeMode={FastImage.resizeMode.contain}
                   onError={() => {
                     logger.warn(`[FloatingHeader] Logo failed to load: ${metadata.logo}`);
                     setLogoLoadError(true);
@@ -146,11 +145,10 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
             
             <View style={styles.headerTitleContainer}>
               {metadata.logo && !logoLoadError ? (
-                <Image
+                <FastImage
                   source={{ uri: metadata.logo }}
                   style={styles.floatingHeaderLogo}
-                  contentFit="contain"
-                  transition={150}
+                  resizeMode={FastImage.resizeMode.contain}
                   onError={() => {
                     logger.warn(`[FloatingHeader] Logo failed to load: ${metadata.logo}`);
                     setLogoLoadError(true);

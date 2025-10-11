@@ -463,7 +463,7 @@ const HomeScreen = () => {
       }));
 
       // Preload all images at once - FastImage handles batching internally
-      await FastImage.preload(sources);
+      FastImage.preload(sources);
     } catch (error) {
       // Silently handle preload errors
       if (__DEV__) console.warn('Image preload error:', error);

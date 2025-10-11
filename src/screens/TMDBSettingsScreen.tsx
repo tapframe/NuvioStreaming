@@ -14,7 +14,6 @@ import {
   Keyboard,
   Clipboard,
   Switch,
-  Image,
   KeyboardAvoidingView,
   TouchableWithoutFeedback,
   Modal,
@@ -22,6 +21,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import FastImage from '@d11/react-native-fast-image';
 import { tmdbService } from '../services/tmdbService';
 import { useSettings } from '../hooks/useSettings';
 import { logger } from '../utils/logger';
@@ -387,17 +387,17 @@ const TMDBSettingsScreen = () => {
     
     return (
       <View style={styles.bannerContainer}>
-        <Image 
+        <FastImage 
           source={{ uri: banner || undefined }}
           style={styles.bannerImage}
-          resizeMode="cover"
+          resizeMode={FastImage.resizeMode.cover}
         />
         <View style={styles.bannerOverlay} />
         {logo && (
-          <Image 
+          <FastImage 
             source={{ uri: logo }}
             style={styles.logoOverBanner}
-            resizeMode="contain"
+            resizeMode={FastImage.resizeMode.contain}
           />
         )}
         {!logo && (

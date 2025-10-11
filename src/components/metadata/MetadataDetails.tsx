@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import Animated, {
   FadeIn,
   useAnimatedStyle,
@@ -162,10 +162,10 @@ function formatRuntime(runtime: string): string {
         )}
         {metadata.imdbRating && !isMDBEnabled && (
           <View style={styles.ratingContainer}>
-            <Image
+            <FastImage
               source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/IMDB_Logo_2016.svg/575px-IMDB_Logo_2016.svg.png' }}
               style={styles.imdbLogo}
-              contentFit="contain"
+              resizeMode={FastImage.resizeMode.contain}
             />
             <Text style={[styles.ratingText, { color: currentTheme.colors.text }]}>{metadata.imdbRating}</Text>
           </View>

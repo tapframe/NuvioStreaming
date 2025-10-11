@@ -240,15 +240,9 @@ PODS:
     - ExpoModulesCore
   - ExpoHaptics (14.0.1):
     - ExpoModulesCore
-  - ExpoImage (2.0.7):
-    - ExpoModulesCore
-    - libavif/libdav1d
-    - SDWebImage (~> 5.19.1)
-    - SDWebImageAVIFCoder (~> 0.11.0)
-    - SDWebImageSVGCoder (~> 1.7.0)
   - ExpoKeepAwake (14.0.3):
     - ExpoModulesCore
-  - ExpoLibVlcPlayer (2.1.7):
+  - ExpoLibVlcPlayer (2.2.1):
     - ExpoModulesCore
     - MobileVLCKit (= 3.6.1b1)
   - ExpoLinearGradient (14.0.2):
@@ -2519,11 +2513,9 @@ PODS:
   - SDWebImage (5.19.7):
     - SDWebImage/Core (= 5.19.7)
   - SDWebImage/Core (5.19.7)
-  - SDWebImageAVIFCoder (0.11.0):
+  - SDWebImageAVIFCoder (0.11.1):
     - libavif/core (>= 0.11.0)
     - SDWebImage (~> 5.10)
-  - SDWebImageSVGCoder (1.7.0):
-    - SDWebImage/Core (~> 5.6)
   - SDWebImageWebPCoder (0.14.6):
     - libwebp (~> 1.0)
     - SDWebImage/Core (~> 5.17)
@@ -2555,7 +2547,6 @@ DEPENDENCIES:
   - ExpoFileSystem (from `../node_modules/expo-file-system/ios`)
   - ExpoFont (from `../node_modules/expo-font/ios`)
   - ExpoHaptics (from `../node_modules/expo-haptics/ios`)
-  - ExpoImage (from `../node_modules/expo-image/ios`)
   - ExpoKeepAwake (from `../node_modules/expo-keep-awake/ios`)
   - ExpoLibVlcPlayer (from `../node_modules/expo-libvlc-player/ios`)
   - ExpoLinearGradient (from `../node_modules/expo-linear-gradient/ios`)
@@ -2666,7 +2657,6 @@ SPEC REPOS:
     - ReachabilitySwift
     - SDWebImage
     - SDWebImageAVIFCoder
-    - SDWebImageSVGCoder
     - SDWebImageWebPCoder
     - Sentry
     - SocketRocket
@@ -2719,8 +2709,6 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-font/ios"
   ExpoHaptics:
     :path: "../node_modules/expo-haptics/ios"
-  ExpoImage:
-    :path: "../node_modules/expo-image/ios"
   ExpoKeepAwake:
     :path: "../node_modules/expo-keep-awake/ios"
   ExpoLibVlcPlayer:
@@ -2958,9 +2946,8 @@ SPEC CHECKSUMS:
   ExpoFileSystem: 42d363d3b96f9afab980dcef60d5657a4443c655
   ExpoFont: f354e926f8feae5e831ec8087f36652b44a0b188
   ExpoHaptics: 8d199b2f33245ea85289ff6c954c7ee7c00a5b5d
-  ExpoImage: d840b256050f4428d2942bc2b6e9251f9e0d7021
   ExpoKeepAwake: b0171a73665bfcefcfcc311742a72a956e6aa680
-  ExpoLibVlcPlayer: 027c16c178364a133f6ee10fc7a7d8636f92dbe8
+  ExpoLibVlcPlayer: dce3d0b5847838cd5f8c5f3c3aa1bc55c92e911d
   ExpoLinearGradient: 35ebd83b16f80b3add053a2fd68cc328ed927f60
   ExpoLinking: 8d12bee174ba0cdf31239706578e29e74a417402
   ExpoLocalization: 7776ea3bdb112125390745bbaf919b734b2ad1c7
@@ -3062,8 +3049,7 @@ SPEC CHECKSUMS:
   RNSVG: b889dc9c1948eeea0576a16cc405c91c37a12c19
   RNVectorIcons: c95fdae217b0ed388f2b4d7ed7a4edc457c1df47
   SDWebImage: 8a6b7b160b4d710e2a22b6900e25301075c34cb3
-  SDWebImageAVIFCoder: 00310d246aab3232ce77f1d8f0076f8c4b021d90
-  SDWebImageSVGCoder: 15a300a97ec1c8ac958f009c02220ac0402e936c
+  SDWebImageAVIFCoder: afe194a084e851f70228e4be35ef651df0fc5c57
   SDWebImageWebPCoder: e38c0a70396191361d60c092933e22c20d5b1380
   Sentry: 1ca8405451040482877dcd344dfa3ef80b646631
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748

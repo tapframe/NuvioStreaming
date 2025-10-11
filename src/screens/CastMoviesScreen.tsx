@@ -10,7 +10,7 @@ import {
   FlatList,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import Animated, {
   FadeIn,
   FadeOut,
@@ -379,12 +379,12 @@ const CastMoviesScreen: React.FC = () => {
           backgroundColor: 'rgba(255, 255, 255, 0.05)',
         }}>
           {item.poster_path ? (
-            <Image
+            <FastImage
               source={{
                 uri: `https://image.tmdb.org/t/p/w500${item.poster_path}`,
               }}
               style={{ width: '100%', height: '100%' }}
-              contentFit="cover"
+              resizeMode={FastImage.resizeMode.cover}
             />
           ) : (
             <View style={{
@@ -589,12 +589,12 @@ const CastMoviesScreen: React.FC = () => {
             backgroundColor: 'rgba(255, 255, 255, 0.08)',
           }}>
             {castMember?.profile_path ? (
-              <Image
+              <FastImage
                 source={{
                   uri: `https://image.tmdb.org/t/p/w185${castMember.profile_path}`,
                 }}
                 style={{ width: '100%', height: '100%' }}
-                contentFit="cover"
+                resizeMode={FastImage.resizeMode.cover}
               />
             ) : (
               <View style={{

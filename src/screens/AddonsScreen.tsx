@@ -21,7 +21,7 @@ import {
 } from 'react-native';
 import { stremioService, Manifest } from '../services/stremioService';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Image as ExpoImage } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -972,10 +972,10 @@ const AddonsScreen = () => {
         
         <View style={styles.addonHeader}>
           {logo ? (
-            <ExpoImage 
+            <FastImage 
               source={{ uri: logo }} 
-              style={styles.addonIcon} 
-              contentFit="contain"
+              style={styles.addonIcon}
+              resizeMode={FastImage.resizeMode.contain}
             />
           ) : (
             <View style={styles.addonIconPlaceholder}>
@@ -1048,10 +1048,10 @@ const AddonsScreen = () => {
     return (
       <View style={styles.communityAddonItem}>
         {logo ? (
-          <ExpoImage
+          <FastImage
             source={{ uri: logo }}
             style={styles.communityAddonIcon}
-            contentFit="contain"
+            resizeMode={FastImage.resizeMode.contain}
           />
         ) : (
           <View style={styles.communityAddonIconPlaceholder}>
@@ -1240,10 +1240,10 @@ const AddonsScreen = () => {
                  <View style={styles.addonItem}>
                    <View style={styles.addonHeader}>
                      {promoAddon.logo ? (
-                       <ExpoImage 
+                       <FastImage 
                          source={{ uri: promoAddon.logo }} 
-                         style={styles.addonIcon} 
-                         contentFit="contain"
+                         style={styles.addonIcon}
+                         resizeMode={FastImage.resizeMode.contain}
                        />
                      ) : (
                        <View style={styles.addonIconPlaceholder}>
@@ -1318,10 +1318,10 @@ const AddonsScreen = () => {
                     <View style={styles.addonItem}>
                       <View style={styles.addonHeader}>
                         {item.manifest.logo ? (
-                          <ExpoImage 
+                          <FastImage 
                             source={{ uri: item.manifest.logo }} 
-                            style={styles.addonIcon} 
-                            contentFit="contain"
+                            style={styles.addonIcon}
+                            resizeMode={FastImage.resizeMode.contain}
                           />
                         ) : (
                           <View style={styles.addonIconPlaceholder}>
@@ -1419,10 +1419,10 @@ const AddonsScreen = () => {
                   <View style={styles.addonDetailHeader}>
                     {/* @ts-ignore */}
                     {addonDetails.logo ? (
-                      <ExpoImage
+                      <FastImage
                         source={{ uri: addonDetails.logo }}
                         style={styles.addonLogo}
-                        contentFit="contain"
+                        resizeMode={FastImage.resizeMode.contain}
                       />
                     ) : (
                       <View style={styles.addonLogoPlaceholder}>

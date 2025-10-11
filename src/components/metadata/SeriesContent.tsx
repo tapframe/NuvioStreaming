@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, useWindowDimensions, useColorScheme, FlatList } from 'react-native';
-import { Image } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FlashList, FlashListRef } from '@shopify/flash-list';
@@ -454,10 +454,10 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                   onPress={() => onSeasonChange(season)}
                 >
                   <View style={[styles.seasonPosterContainer, isTablet && styles.seasonPosterContainerTablet]}>
-                    <Image
+                    <FastImage
                       source={{ uri: seasonPoster }}
                       style={styles.seasonPoster}
-                      contentFit="cover"
+                      resizeMode={FastImage.resizeMode.cover}
                     />
                     {selectedSeason === season && (
                       <View style={[
@@ -559,10 +559,10 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
           styles.episodeImageContainer,
           isTablet && styles.episodeImageContainerTablet
         ]}>
-          <Image
+          <FastImage
             source={{ uri: episodeImage }}
             style={styles.episodeImage}
-            contentFit="cover"
+            resizeMode={FastImage.resizeMode.cover}
           />
           <View style={styles.episodeNumberBadge}>
             <Text style={styles.episodeNumberText}>{episodeString}</Text>
@@ -605,10 +605,10 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
             ]}>
               {effectiveVote > 0 && (
                 <View style={styles.ratingContainer}>
-                  <Image
+                  <FastImage
                     source={{ uri: TMDB_LOGO }}
                     style={styles.tmdbLogo}
-                    contentFit="contain"
+                    resizeMode={FastImage.resizeMode.contain}
                   />
                   <Text style={[styles.ratingText, { color: currentTheme.colors.textMuted }]}>
                     {effectiveVote.toFixed(1)}
@@ -727,10 +727,10 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
         </View>
 
         {/* Background Image */}
-        <Image
+        <FastImage
           source={{ uri: episodeImage }}
           style={styles.episodeBackgroundImage}
-          contentFit="cover"
+          resizeMode={FastImage.resizeMode.cover}
         />
         
         {/* Standard Gradient Overlay */}

@@ -23,7 +23,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { catalogService } from '../services/catalogService';
@@ -119,13 +119,10 @@ const TraktItem = React.memo(({ item, width, navigation, currentTheme }: { item:
       <View>
         <View style={[styles.posterContainer, { shadowColor: currentTheme.colors.black }]}>
           {posterUrl ? (
-            <Image
+            <FastImage
               source={{ uri: posterUrl }}
               style={styles.poster}
-              contentFit="cover"
-              cachePolicy="disk"
-              transition={0}
-              allowDownscaling
+              resizeMode={FastImage.resizeMode.cover}
             />
           ) : (
             <View style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, justifyContent: 'center', alignItems: 'center' }]}>
@@ -403,12 +400,10 @@ const LibraryScreen = () => {
     >
       <View>
         <View style={[styles.posterContainer, { shadowColor: currentTheme.colors.black }]}> 
-              <Image
+              <FastImage
             source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
             style={styles.poster}
-            contentFit="cover"
-                cachePolicy="memory"
-                transition={300}
+            resizeMode={FastImage.resizeMode.cover}
           />
           {item.watched && (
             <View style={styles.watchedIndicator}>

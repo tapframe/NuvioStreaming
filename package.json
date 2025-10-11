@@ -47,7 +47,6 @@
     "expo-document-picker": "~13.0.3",
     "expo-file-system": "~18.0.12",
     "expo-haptics": "~14.0.1",
-    "expo-image": "~2.0.7",
     "expo-intent-launcher": "~12.0.2",
     "expo-libvlc-player": "^2.1.7",
     "expo-linear-gradient": "~14.0.2",

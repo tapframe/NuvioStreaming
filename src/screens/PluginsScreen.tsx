@@ -16,7 +16,7 @@ import {
   Animated,
 } from 'react-native';
 import CustomAlert from '../components/CustomAlert';
-import { Image } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -1598,10 +1598,10 @@ const PluginsScreen: React.FC = () => {
                 <View key={scraper.id} style={styles.scraperCard}>
                   <View style={styles.scraperCardHeader}>
                         {scraper.logo ? (
-                          <Image
+                          <FastImage
                             source={{ uri: scraper.logo }}
                             style={styles.scraperLogo}
-                            contentFit="contain"
+                            resizeMode={FastImage.resizeMode.contain}
                           />
                         ) : (
                       <View style={styles.scraperLogo} />

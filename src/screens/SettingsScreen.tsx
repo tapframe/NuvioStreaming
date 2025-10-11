@@ -10,7 +10,6 @@ import {
   StatusBar,
   Platform,
   Dimensions,
-  Image,
   Button,
   Linking,
   Clipboard
@@ -18,6 +17,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
+import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import { useSettings, DEFAULT_SETTINGS } from '../hooks/useSettings';
@@ -805,10 +805,10 @@ const SettingsScreen: React.FC = () => {
                         activeOpacity={0.7}
                       >
                         <View style={styles.discordButtonContent}>
-                          <Image
+                          <FastImage
                             source={{ uri: 'https://pngimg.com/uploads/discord/discord_PNG3.png' }}
                             style={styles.discordLogo}
-                            resizeMode="contain"
+                            resizeMode={FastImage.resizeMode.contain}
                           />
                           <Text style={[styles.discordButtonText, { color: currentTheme.colors.highEmphasis }]}> 
                             Join Discord
@@ -821,10 +821,10 @@ const SettingsScreen: React.FC = () => {
                         onPress={() => Linking.openURL('https://ko-fi.com/tapframe')}
                         activeOpacity={0.7}
                       >
-                        <Image
+                        <FastImage
                           source={require('../../assets/support_me_on_kofi_red.png')}
                           style={styles.kofiImage}
-                          resizeMode="contain"
+                          resizeMode={FastImage.resizeMode.contain}
                         />
                       </TouchableOpacity>
                     </View>
@@ -892,10 +892,10 @@ const SettingsScreen: React.FC = () => {
                   activeOpacity={0.7}
                 >
                   <View style={styles.discordButtonContent}>
-                    <Image
+                    <FastImage
                       source={{ uri: 'https://pngimg.com/uploads/discord/discord_PNG3.png' }}
                       style={styles.discordLogo}
-                      resizeMode="contain"
+                      resizeMode={FastImage.resizeMode.contain}
                     />
                     <Text style={[styles.discordButtonText, { color: currentTheme.colors.highEmphasis }]}> 
                       Join Discord
@@ -908,10 +908,10 @@ const SettingsScreen: React.FC = () => {
                   onPress={() => Linking.openURL('https://ko-fi.com/tapframe')}
                   activeOpacity={0.7}
                 >
-                  <Image
+                  <FastImage
                     source={require('../../assets/support_me_on_kofi_red.png')}
                     style={styles.kofiImage}
-                    resizeMode="contain"
+                    resizeMode={FastImage.resizeMode.contain}
                   />
                 </TouchableOpacity>
               </View>

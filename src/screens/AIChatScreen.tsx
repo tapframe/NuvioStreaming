@@ -18,7 +18,7 @@ import CustomAlert from '../components/CustomAlert';
 import { useRoute, useNavigation, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
-import { Image } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import { BlurView as ExpoBlurView } from 'expo-blur';
 // Lazy-safe community blur import (avoid bundling issues on web)
 let AndroidBlurView: any = null;
@@ -642,11 +642,10 @@ const AIChatScreen: React.FC = () => {
     <SafeAreaView edges={['top','bottom']} style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
       {backdropUrl && (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Image
+          <FastImage
             source={{ uri: backdropUrl }}
             style={StyleSheet.absoluteFill}
-            contentFit="cover"
-            recyclingKey={backdropUrl || undefined}
+            resizeMode={FastImage.resizeMode.cover}
           />
           {Platform.OS === 'android' && AndroidBlurView
             ? <AndroidBlurView blurAmount={12} blurRadius={6} style={StyleSheet.absoluteFill} />

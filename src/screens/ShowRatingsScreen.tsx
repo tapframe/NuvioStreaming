@@ -10,7 +10,7 @@ import {
   Platform,
   StatusBar,
 } from 'react-native';
-import { Image } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import { BlurView } from 'expo-blur';
 import { useTheme } from '../contexts/ThemeContext';
 import { TMDBService, TMDBShow as Show, TMDBSeason, TMDBEpisode } from '../services/tmdbService';
@@ -175,11 +175,10 @@ const RatingSourceToggle = memo(({ ratingSource, setRatingSource, theme }: {
 
 const ShowInfo = memo(({ show, theme }: { show: Show | null, theme: any }) => (
   <View style={styles.showInfo}>
-    <Image
+    <FastImage
       source={{ uri: `https://image.tmdb.org/t/p/w500${show?.poster_path}` }}
       style={styles.poster}
-      contentFit="cover"
-      transition={200}
+      resizeMode={FastImage.resizeMode.cover}
     />
     <View style={styles.showDetails}>
       <Text style={[styles.showTitle, { color: theme.colors.white }]}>{show?.name}</Text>

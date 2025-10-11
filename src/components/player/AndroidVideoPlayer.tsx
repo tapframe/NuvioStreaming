@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { View, TouchableOpacity, TouchableWithoutFeedback, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, Image, StyleSheet, Modal, AppState } from 'react-native';
+import { View, TouchableOpacity, TouchableWithoutFeedback, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, StyleSheet, Modal, AppState } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Video, { VideoRef, SelectedTrack, SelectedTrackType, BufferingStrategyType, ViewType } from 'react-native-video';
+import FastImage from '@d11/react-native-fast-image';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { PinchGestureHandler, PanGestureHandler, TapGestureHandler, State, PinchGestureHandlerGestureEvent, PanGestureHandlerGestureEvent, TapGestureHandlerGestureEvent } from 'react-native-gesture-handler';
@@ -586,22 +587,21 @@ const AndroidVideoPlayer: React.FC = () => {
       backdropImageOpacityAnim.setValue(0);
 
       // Prefetch the image
-      Image.prefetch(backdrop)
-        .then(() => {
-          // Image loaded successfully, fade it in smoothly
-          setIsBackdropLoaded(true);
-          Animated.timing(backdropImageOpacityAnim, {
-            toValue: 1,
-            duration: 400,
-            useNativeDriver: true,
-          }).start();
-        })
-        .catch((error) => {
-          // If prefetch fails, still show the image but without animation
-          if (__DEV__) logger.warn('[AndroidVideoPlayer] Backdrop prefetch failed, showing anyway:', error);
-          setIsBackdropLoaded(true);
-          backdropImageOpacityAnim.setValue(1);
-        });
+      try {
+        FastImage.preload([{ uri: backdrop }]);
+        // Image prefetch initiated, fade it in smoothly
+        setIsBackdropLoaded(true);
+        Animated.timing(backdropImageOpacityAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }).start();
+      } catch (error) {
+        // If prefetch fails, still show the image but without animation
+        if (__DEV__) logger.warn('[AndroidVideoPlayer] Backdrop prefetch failed, showing anyway:', error);
+        setIsBackdropLoaded(true);
+        backdropImageOpacityAnim.setValue(1);
+      }
     } else {
       // No backdrop provided, consider it "loaded"
       setIsBackdropLoaded(true);
@@ -612,7 +612,11 @@ const AndroidVideoPlayer: React.FC = () => {
   useEffect(() => {
     const logoUrl = (metadata && (metadata as any).logo) as string | undefined;
     if (logoUrl && typeof logoUrl === 'string') {
-      Image.prefetch(logoUrl).catch(() => {});
+      try {
+        FastImage.preload([{ uri: logoUrl }]);
+      } catch (error) {
+        // Silently ignore logo prefetch errors
+      }
     }
   }, [metadata]);
 
@@ -3112,19 +3116,20 @@ const AndroidVideoPlayer: React.FC = () => {
         pointerEvents={isOpeningAnimationComplete ? 'none' : 'auto'}
       >
         {backdrop && (
-          <Animated.Image
-            source={{ uri: backdrop }}
-            style={[
+          <Animated.View style={[
               StyleSheet.absoluteFill,
               {
                 width: screenDimensions.width,
                 height: screenDimensions.height,
                 opacity: backdropImageOpacityAnim
               }
-            ]}
-            resizeMode="cover"
-            blurRadius={0}
-          />
+            ]}>
+            <FastImage
+              source={{ uri: backdrop }}
+              style={StyleSheet.absoluteFillObject}
+              resizeMode={FastImage.resizeMode.cover}
+            />
+          </Animated.View>
         )}
         <LinearGradient
           colors={[
@@ -3155,13 +3160,13 @@ const AndroidVideoPlayer: React.FC = () => {
               opacity: logoOpacityAnim,
               alignItems: 'center',
             }}>
-              <Image
+              <FastImage
                 source={{ uri: metadata.logo }}
                 style={{
                   width: 300,
                   height: 180,
-                  resizeMode: 'contain',
                 }}
+                resizeMode={FastImage.resizeMode.contain}
               />
             </Animated.View>
             </>
@@ -3599,7 +3604,7 @@ const AndroidVideoPlayer: React.FC = () => {
                               shadowRadius: 8,
                               elevation: 5,
                             }}>
-                              <Image
+                              <FastImage
                                 source={{ uri: `https://image.tmdb.org/t/p/w300${selectedCastMember.profile_path}` }}
                                 style={{
                                   width: Math.min(120, screenDimensions.width * 0.18),
@@ -3607,7 +3612,7 @@ const AndroidVideoPlayer: React.FC = () => {
                                   borderRadius: 12,
                                   backgroundColor: 'rgba(255,255,255,0.1)'
                                 }}
-                                resizeMode="cover"
+                                resizeMode={FastImage.resizeMode.cover}
                               />
                             </View>
                           )}

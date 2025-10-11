@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, StatusBar, Platform, Animated, Easing, TextInput, ActivityIndicator } from 'react-native';
-import { Image } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -110,10 +110,10 @@ const AccountManageScreen: React.FC = () => {
         <View style={styles.profileContainer}>
           {avatarUrl && !avatarError ? (
             <View style={[styles.avatar, { overflow: 'hidden' }]}> 
-              <Image
+              <FastImage
                 source={{ uri: avatarUrl }}
                 style={styles.avatarImage}
-                contentFit="cover"
+                resizeMode={FastImage.resizeMode.cover}
                 onError={() => setAvatarError(true)}
               />
             </View>

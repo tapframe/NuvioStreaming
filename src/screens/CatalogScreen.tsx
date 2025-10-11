@@ -18,7 +18,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { Meta, stremioService } from '../services/stremioService';
 import { useTheme } from '../contexts/ThemeContext';
-import { Image } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import { BlurView } from 'expo-blur';
 import { MaterialIcons } from '@expo/vector-icons';
 import { logger } from '../utils/logger';
@@ -620,15 +620,10 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
         onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type, addonId })}
         activeOpacity={0.7}
       >
-        <Image
+        <FastImage
           source={{ uri: optimizePosterUrl(item.poster) }}
           style={styles.poster}
-          contentFit="cover"
-          cachePolicy={Platform.OS === 'android' ? 'memory-disk' : 'memory-disk'}
-          transition={100}
-          allowDownscaling
-          priority="normal"
-          recyclingKey={`${item.id}-${item.type}`}
+          resizeMode={FastImage.resizeMode.cover}
         />
 
         {type === 'movie' && nowPlayingMovies.has(item.id) && (

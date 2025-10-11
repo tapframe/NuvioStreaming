@@ -16,7 +16,7 @@ import {
 import { InteractionManager } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
-import { Image } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../contexts/ThemeContext';
@@ -138,11 +138,10 @@ const CalendarScreen = () => {
             onPress={() => handleSeriesPress(item.seriesId, item)}
             activeOpacity={0.7}
           >
-            <Image
-              source={{ uri: imageUrl }}
+            <FastImage
+              source={{ uri: imageUrl || '' }}
               style={styles.poster}
-              contentFit="cover"
-              transition={300}
+              resizeMode={FastImage.resizeMode.cover}
             />
           </TouchableOpacity>
           

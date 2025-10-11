@@ -106,7 +106,7 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
     if (!optimizedUrl || !isVisible) return;
 
     try {
-      await FastImage.preload([{ uri: optimizedUrl }]);
+      FastImage.preload([{ uri: optimizedUrl }]);
       if (!mountedRef.current) return;
       setIsLoaded(true);
       onLoad?.();

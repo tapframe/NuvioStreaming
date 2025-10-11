@@ -13,7 +13,7 @@ import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import { BlurView as ExpoBlurView } from 'expo-blur';
 import { BlurView as CommunityBlurView } from '@react-native-community/blur';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
@@ -1489,11 +1489,10 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
           <Animated.View style={[styles.logoContainer, titleCardAnimatedStyle]}>
             <Animated.View style={[styles.titleLogoContainer, logoAnimatedStyle]}>
               {shouldLoadSecondaryData && metadata.logo && !logoLoadError ? (
-                <Image
+                <FastImage
                   source={{ uri: metadata.logo }}
                   style={isTablet ? styles.tabletTitleLogo : styles.titleLogo}
-                  contentFit="contain"
-                  transition={150}
+                  resizeMode={FastImage.resizeMode.contain}
                   onError={() => {
                     runOnJS(setLogoLoadError)(true);
                   }}

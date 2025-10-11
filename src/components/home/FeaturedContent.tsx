@@ -232,10 +232,9 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
         }, 1500);
       });
 
-      await Promise.race([
-        FastImage.preload([{ uri: url }]),
-        timeout,
-      ]);
+      // FastImage.preload doesn't return a promise, so we just call it and use timeout
+      FastImage.preload([{ uri: url }]);
+      await timeout;
       imageCache[url] = true;
       logger.debug('[FeaturedContent] preloadImage:success', { url, duration: since(t0) });
       return true;
@@ -569,7 +568,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
                   priority: FastImage.priority.high,
                   cache: FastImage.cacheControl.immutable
                 }}
-                style={styles.tabletLogo as ImageStyle}
+                style={styles.tabletLogo as any}
                 resizeMode={FastImage.resizeMode.contain}
                 onError={onLogoLoadError}
               />
@@ -703,7 +702,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
                           priority: FastImage.priority.high,
                           cache: FastImage.cacheControl.immutable
                         }}
-                        style={styles.featuredLogo as ImageStyle}
+                        style={styles.featuredLogo as any}
                         resizeMode={FastImage.resizeMode.contain}
                         onError={onLogoLoadError}
                       />

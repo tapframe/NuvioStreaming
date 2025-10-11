@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Dimensions,
 } from 'react-native';
-import { Image } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import { useNavigation, StackActions } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
@@ -97,11 +97,10 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
       style={styles.itemContainer}
       onPress={() => handleItemPress(item)}
     >
-      <Image
+      <FastImage
         source={{ uri: item.poster }}
         style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1 }]}
-        contentFit="cover"
-        transition={200}
+        resizeMode={FastImage.resizeMode.cover}
       />
       <Text style={[styles.title, { color: currentTheme.colors.mediumEmphasis }]} numberOfLines={2}>
         {item.name}

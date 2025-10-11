@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  Image,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -16,6 +15,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { makeRedirectUri, useAuthRequest, ResponseType, Prompt, CodeChallengeMethod } from 'expo-auth-session';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import FastImage from '@d11/react-native-fast-image';
 import { traktService, TraktUser } from '../services/traktService';
 import { useSettings } from '../hooks/useSettings';
 import { logger } from '../utils/logger';
@@ -259,9 +259,10 @@ const TraktSettingsScreen: React.FC = () => {
             <View style={styles.profileContainer}>
               <View style={styles.profileHeader}>
                 {userProfile.avatar ? (
-                  <Image 
+                  <FastImage 
                     source={{ uri: userProfile.avatar }} 
                     style={styles.avatar}
+                    resizeMode={FastImage.resizeMode.cover}
                   />
                 ) : (
                   <View style={[styles.avatarPlaceholder, { backgroundColor: currentTheme.colors.primary }]}>

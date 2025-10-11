@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { logger } from '../utils/logger';
 import { TMDBService } from '../services/tmdbService';
 import { isTmdbUrl } from '../utils/logoUtils';
-import { Image } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Cache for image availability checks
@@ -176,7 +176,7 @@ export const useMetadataAssets = (
                   
                 if (logoUrl) {
                   // Preload the image
-                  await Image.prefetch(logoUrl);
+                  FastImage.preload([{ uri: logoUrl }]);
                   
                   setMetadata((prevMetadata: any) => ({ ...prevMetadata!, logo: logoUrl }));
                 }
@@ -275,7 +275,7 @@ export const useMetadataAssets = (
               
               // Preload the image
               if (finalBanner) {
-                await Image.prefetch(finalBanner);
+                FastImage.preload([{ uri: finalBanner }]);
               }
             } 
             else if (details?.poster_path) {
@@ -284,7 +284,7 @@ export const useMetadataAssets = (
               
               // Preload the image
               if (finalBanner) {
-                await Image.prefetch(finalBanner);
+                FastImage.preload([{ uri: finalBanner }]);
               }
             }
           } catch (error) {

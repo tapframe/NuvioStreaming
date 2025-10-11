@@ -166,9 +166,8 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
               priority: FastImage.priority.low,
               cache: FastImage.cacheControl.immutable
             }}
-            style={styles.backgroundImage as ImageStyle}
+            style={styles.backgroundImage as any}
             resizeMode={FastImage.resizeMode.cover}
-            blurRadius={Platform.OS === 'android' ? 8 : 12}
           />
           <LinearGradient
             colors={["rgba(0,0,0,0.45)", "rgba(0,0,0,0.75)"]}
@@ -291,7 +290,7 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
               priority: FastImage.priority.normal,
               cache: FastImage.cacheControl.immutable
             }}
-            style={styles.banner as ImageStyle}
+            style={styles.banner as any}
             resizeMode={FastImage.resizeMode.cover}
           />
           <LinearGradient
@@ -308,7 +307,7 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
                 priority: FastImage.priority.high,
                 cache: FastImage.cacheControl.immutable
               }}
-              style={styles.logo as ImageStyle}
+              style={styles.logo as any}
               resizeMode={FastImage.resizeMode.contain}
               onError={onLogoError}
             />

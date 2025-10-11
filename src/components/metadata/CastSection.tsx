@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import { Image } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import Animated, {
   FadeIn,
 } from 'react-native-reanimated';
@@ -65,13 +65,12 @@ export const CastSection: React.FC<CastSectionProps> = ({
             >
               <View style={styles.castImageContainer}>
                 {item.profile_path ? (
-                  <Image
+                  <FastImage
                     source={{
                       uri: `https://image.tmdb.org/t/p/w185${item.profile_path}`,
                     }}
                     style={styles.castImage}
-                    contentFit="cover"
-                    transition={200}
+                    resizeMode={FastImage.resizeMode.cover}
                   />
                 ) : (
                   <View style={[styles.castImagePlaceholder, { backgroundColor: currentTheme.colors.darkBackground }]}>

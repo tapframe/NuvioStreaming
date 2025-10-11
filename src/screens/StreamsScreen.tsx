@@ -31,7 +31,7 @@ import { RouteProp } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import { RootStackParamList, RootStackNavigationProp } from '../navigation/AppNavigator';
 import { useMetadata } from '../hooks/useMetadata';
 import { useMetadataAssets } from '../hooks/useMetadataAssets';
@@ -116,10 +116,10 @@ const AnimatedImage = memo(({
 
   return (
     <Animated.View style={[style, animatedStyle]}>
-      <Image
+      <FastImage
         source={source}
         style={StyleSheet.absoluteFillObject}
-        contentFit={contentFit}
+        resizeMode={FastImage.resizeMode.cover}
         onLoad={onLoad}
       />
     </Animated.View>
@@ -336,10 +336,10 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
         {/* Scraper Logo */}
         {showLogos && scraperLogo && (
           <View style={styles.scraperLogoContainer}>
-            <Image
+            <FastImage
               source={{ uri: scraperLogo }}
               style={styles.scraperLogo}
-              resizeMode="contain"
+              resizeMode={FastImage.resizeMode.contain}
             />
           </View>
         )}
@@ -1968,10 +1968,10 @@ export const StreamsScreen = () => {
         <View style={[styles.movieTitleContainer]}>
           <View style={styles.movieTitleContent}>
             {metadata.logo && !movieLogoError ? (
-              <Image
+              <FastImage
                 source={{ uri: metadata.logo }}
                 style={styles.movieLogo}
-                contentFit="contain"
+                resizeMode={FastImage.resizeMode.contain}
                 onError={() => setMovieLogoError(true)}
               />
             ) : (
@@ -2021,7 +2021,7 @@ export const StreamsScreen = () => {
                         </Text>
                         {effectiveEpisodeVote > 0 && (
                           <View style={styles.streamsHeroRating}>
-                            <Image source={{ uri: TMDB_LOGO }} style={styles.tmdbLogo} contentFit="contain" />
+                            <FastImage source={{ uri: TMDB_LOGO }} style={styles.tmdbLogo} resizeMode={FastImage.resizeMode.contain} />
                             <Text style={styles.streamsHeroRatingText}>
                               {effectiveEpisodeVote.toFixed(1)}
                             </Text>
