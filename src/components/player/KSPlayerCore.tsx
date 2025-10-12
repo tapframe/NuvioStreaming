@@ -159,16 +159,16 @@ const KSPlayerCore: React.FC = () => {
   const [customSubtitles, setCustomSubtitles] = useState<SubtitleCue[]>([]);
   const [currentSubtitle, setCurrentSubtitle] = useState<string>('');
   const [subtitleSize, setSubtitleSize] = useState<number>(DEFAULT_SUBTITLE_SIZE);
-  const [subtitleBackground, setSubtitleBackground] = useState<boolean>(true);
+  const [subtitleBackground, setSubtitleBackground] = useState<boolean>(false);
   // External subtitle customization
   const [subtitleTextColor, setSubtitleTextColor] = useState<string>('#FFFFFF');
   const [subtitleBgOpacity, setSubtitleBgOpacity] = useState<number>(0.7);
   const [subtitleTextShadow, setSubtitleTextShadow] = useState<boolean>(true);
-  const [subtitleOutline, setSubtitleOutline] = useState<boolean>(false);
+  const [subtitleOutline, setSubtitleOutline] = useState<boolean>(true);
   const [subtitleOutlineColor, setSubtitleOutlineColor] = useState<string>('#000000');
-  const [subtitleOutlineWidth, setSubtitleOutlineWidth] = useState<number>(2);
+  const [subtitleOutlineWidth, setSubtitleOutlineWidth] = useState<number>(4);
   const [subtitleAlign, setSubtitleAlign] = useState<'center' | 'left' | 'right'>('center');
-  const [subtitleBottomOffset, setSubtitleBottomOffset] = useState<number>(20);
+  const [subtitleBottomOffset, setSubtitleBottomOffset] = useState<number>(10);
   const [subtitleLetterSpacing, setSubtitleLetterSpacing] = useState<number>(0);
   const [subtitleLineHeightMultiplier, setSubtitleLineHeightMultiplier] = useState<number>(1.2);
   const [subtitleOffsetSec, setSubtitleOffsetSec] = useState<number>(0);
@@ -1694,9 +1694,14 @@ const KSPlayerCore: React.FC = () => {
           } catch {}
         }
         try { await AsyncStorage.removeItem(SUBTITLE_SIZE_KEY); } catch {}
+        return;
       }
+      // If no saved settings, use default
+      setSubtitleSize(DEFAULT_SUBTITLE_SIZE);
     } catch (error) {
       logger.error('[VideoPlayer] Error loading subtitle size:', error);
+      // Fallback to default on error
+      setSubtitleSize(DEFAULT_SUBTITLE_SIZE);
     }
   };
 
@@ -2260,7 +2265,7 @@ const KSPlayerCore: React.FC = () => {
   }, [selectedAudioTrack, ksAudioTracks]);
 
   const increaseSubtitleSize = () => {
-    const newSize = Math.min(subtitleSize + 2, 32);
+    const newSize = Math.min(subtitleSize + 2, 80);
     saveSubtitleSize(newSize);
   };
 

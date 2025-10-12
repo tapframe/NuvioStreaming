@@ -599,11 +599,11 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                         setSubtitleTextColor('#FFFFFF');
                         setSubtitleBgOpacity(0.7);
                         setSubtitleTextShadow(true);
-                        setSubtitleOutline(false);
+                        setSubtitleOutline(true);
                         setSubtitleOutlineColor('#000000');
-                        setSubtitleOutlineWidth(2);
+                        setSubtitleOutlineWidth(4);
                         setSubtitleAlign('center');
-                        setSubtitleBottomOffset(20);
+                        setSubtitleBottomOffset(10);
                         setSubtitleLetterSpacing(0);
                         setSubtitleLineHeightMultiplier(1.2);
                       }}
@@ -616,7 +616,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                         setSubtitleTextColor('#FFD700');
                         setSubtitleOutline(true);
                         setSubtitleOutlineColor('#000000');
-                        setSubtitleOutlineWidth(2);
+                        setSubtitleOutlineWidth(4);
                         setSubtitleBgOpacity(0.3);
                         setSubtitleTextShadow(false);
                       }}
@@ -643,7 +643,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                         setSubtitleTextColor('#FFFFFF');
                         setSubtitleBgOpacity(0.6);
                         setSubtitleTextShadow(true);
-                        setSubtitleOutline(false);
+                        setSubtitleOutline(true);
                         setSubtitleAlign('center');
                         setSubtitleLineHeightMultiplier(1.3);
                       }}
@@ -765,39 +765,12 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                     </View>
                   </View>
 
-                  {/* Shadow & Outline */}
-                  <View style={{ flexDirection: isCompact ? 'column' : 'row', justifyContent: 'space-between', gap: 12 }}>
-                    {/* Shadow */}
-                    <View style={{ flex: 1, gap: 8 }}>
-                      <Text style={{ color: 'white', fontWeight: '600' }}>Text Shadow</Text>
-                      <TouchableOpacity onPress={() => setSubtitleTextShadow(!subtitleTextShadow)} style={{ paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: subtitleTextShadow ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', alignItems: 'center' }}>
-                        <Text style={{ color: '#fff', fontWeight: '700' }}>{subtitleTextShadow ? 'On' : 'Off'}</Text>
-                      </TouchableOpacity>
-                    </View>
-                    {/* Outline */}
-                    <View style={{ flex: 1, gap: 8 }}>
-                      <Text style={{ color: 'white', fontWeight: '600' }}>Outline</Text>
-                      <TouchableOpacity onPress={() => {
-                        const next = !subtitleOutline;
-                        setSubtitleOutline(next);
-                        if (next) {
-                          // Apply sensible defaults when enabling outline unless user already set larger values
-                          if (subtitleSize < 24) {
-                            // increase by calling increase handler enough times or provide a direct setter via size controls
-                            // We only have +/- handlers here, so set via stepping until >= 24
-                            const steps = Math.ceil((24 - subtitleSize) / 1); // size is integer steps
-                            for (let i = 0; i < steps; i++) {
-                              increaseSubtitleSize();
-                            }
-                          }
-                          if (subtitleBottomOffset < 40) {
-                            setSubtitleBottomOffset(40);
-                          }
-                        }
-                      }} style={{ paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: subtitleOutline ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', alignItems: 'center' }}>
-                        <Text style={{ color: '#fff', fontWeight: '700' }}>{subtitleOutline ? 'On' : 'Off'}</Text>
-                      </TouchableOpacity>
-                    </View>
+                  {/* Shadow */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Text style={{ color: 'white', fontWeight: '600' }}>Text Shadow</Text>
+                    <TouchableOpacity onPress={() => setSubtitleTextShadow(!subtitleTextShadow)} style={{ paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: subtitleTextShadow ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', alignItems: 'center' }}>
+                      <Text style={{ color: '#fff', fontWeight: '700' }}>{subtitleTextShadow ? 'On' : 'Off'}</Text>
+                    </TouchableOpacity>
                   </View>
                   {/* Outline color & width */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -881,11 +854,11 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                         setSubtitleTextColor('#FFFFFF');
                         setSubtitleBgOpacity(0.7);
                         setSubtitleTextShadow(true);
-                        setSubtitleOutline(false);
+                        setSubtitleOutline(true);
                         setSubtitleOutlineColor('#000000');
-                        setSubtitleOutlineWidth(2);
+                        setSubtitleOutlineWidth(4);
                         setSubtitleAlign('center');
-                        setSubtitleBottomOffset(20);
+                        setSubtitleBottomOffset(10);
                         setSubtitleLetterSpacing(0);
                         setSubtitleLineHeightMultiplier(1.2);
                         setSubtitleOffsetSec(0);
