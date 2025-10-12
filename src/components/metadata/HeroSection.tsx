@@ -859,13 +859,23 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   }, [trailerOpacity, thumbnailOpacity]);
 
   // Handle trailer end - seamless transition back to thumbnail
-  const handleTrailerEnd = useCallback(() => {
+  const handleTrailerEnd = useCallback(async () => {
     logger.info('HeroSection', 'Trailer ended - transitioning back to thumbnail');
     setTrailerPlaying(false);
     
     // Reset trailer state to prevent auto-restart
     setTrailerReady(false);
     setTrailerPreloaded(false);
+    
+    // If trailer is in fullscreen, dismiss it first
+    try {
+      if (trailerVideoRef.current) {
+        await trailerVideoRef.current.dismissFullscreenPlayer();
+        logger.info('HeroSection', 'Dismissed fullscreen player after trailer ended');
+      }
+    } catch (error) {
+      logger.warn('HeroSection', 'Error dismissing fullscreen player:', error);
+    }
     
     // Smooth fade transition: trailer out, thumbnail in
     trailerOpacity.value = withTiming(0, { duration: 500 });

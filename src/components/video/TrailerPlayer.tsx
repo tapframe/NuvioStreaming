@@ -288,6 +288,11 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
       if (videoRef.current && isComponentMounted) {
         return videoRef.current.presentFullscreenPlayer();
       }
+    },
+    dismissFullscreenPlayer: () => {
+      if (videoRef.current && isComponentMounted) {
+        return videoRef.current.dismissFullscreenPlayer();
+      }
     }
   }));
 
