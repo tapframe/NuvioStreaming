@@ -2857,7 +2857,7 @@ const AndroidVideoPlayer: React.FC = () => {
       }
       return;
     }
-    const adjustedTime = currentTime + (subtitleOffsetSec || 0);
+    const adjustedTime = currentTime + (subtitleOffsetSec || 0) - 0.2;
     const currentCue = customSubtitles.find(cue => 
       adjustedTime >= cue.start && adjustedTime <= cue.end
     );
