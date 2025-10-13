@@ -918,6 +918,83 @@ const MetadataScreen: React.FC = () => {
                 />
               )}
 
+              {/* Movie Details section - shown above recommendations for movies when TMDB enrichment is ON */}
+              {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length === 0 && metadata?.movieDetails && (
+                <View style={styles.tvDetailsContainer}>
+                  <Text style={styles.tvDetailsHeader}>Movie Details</Text>
+
+                  {metadata.movieDetails.tagline && (
+                    <View style={styles.tvDetailRow}>
+                      <Text style={styles.tvDetailLabel}>Tagline</Text>
+                      <Text style={[styles.tvDetailValue, { fontStyle: 'italic' }]}>
+                        "{metadata.movieDetails.tagline}"
+                      </Text>
+                    </View>
+                  )}
+
+                  {metadata.movieDetails.status && (
+                    <View style={styles.tvDetailRow}>
+                      <Text style={styles.tvDetailLabel}>Status</Text>
+                      <Text style={styles.tvDetailValue}>{metadata.movieDetails.status}</Text>
+                    </View>
+                  )}
+
+                  {metadata.movieDetails.releaseDate && (
+                    <View style={styles.tvDetailRow}>
+                      <Text style={styles.tvDetailLabel}>Release Date</Text>
+                      <Text style={styles.tvDetailValue}>
+                        {new Date(metadata.movieDetails.releaseDate).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })}
+                      </Text>
+                    </View>
+                  )}
+
+                  {metadata.movieDetails.runtime && (
+                    <View style={styles.tvDetailRow}>
+                      <Text style={styles.tvDetailLabel}>Runtime</Text>
+                      <Text style={styles.tvDetailValue}>
+                        {Math.floor(metadata.movieDetails.runtime / 60)}h {metadata.movieDetails.runtime % 60}m
+                      </Text>
+                    </View>
+                  )}
+
+                  {metadata.movieDetails.budget && metadata.movieDetails.budget > 0 && (
+                    <View style={styles.tvDetailRow}>
+                      <Text style={styles.tvDetailLabel}>Budget</Text>
+                      <Text style={styles.tvDetailValue}>
+                        ${metadata.movieDetails.budget.toLocaleString()}
+                      </Text>
+                    </View>
+                  )}
+
+                  {metadata.movieDetails.revenue && metadata.movieDetails.revenue > 0 && (
+                    <View style={styles.tvDetailRow}>
+                      <Text style={styles.tvDetailLabel}>Revenue</Text>
+                      <Text style={styles.tvDetailValue}>
+                        ${metadata.movieDetails.revenue.toLocaleString()}
+                      </Text>
+                    </View>
+                  )}
+
+                  {metadata.movieDetails.originCountry && metadata.movieDetails.originCountry.length > 0 && (
+                    <View style={styles.tvDetailRow}>
+                      <Text style={styles.tvDetailLabel}>Origin Country</Text>
+                      <Text style={styles.tvDetailValue}>{metadata.movieDetails.originCountry.join(', ')}</Text>
+                    </View>
+                  )}
+
+                  {metadata.movieDetails.originalLanguage && (
+                    <View style={styles.tvDetailRow}>
+                      <Text style={styles.tvDetailLabel}>Original Language</Text>
+                      <Text style={styles.tvDetailValue}>{metadata.movieDetails.originalLanguage.toUpperCase()}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
               {/* Recommendations Section with skeleton when loading - Lazy loaded */}
               {type === 'movie' && shouldLoadSecondaryData && (
                 <MemoizedMoreLikeThisSection
@@ -939,6 +1016,92 @@ const MetadataScreen: React.FC = () => {
                 />
               ) : (
                 metadata && <MemoizedMovieContent metadata={metadata} />
+              )}
+
+              {/* TV Details section - shown after episodes for series when TMDB enrichment is ON */}
+              {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length > 0 && metadata?.tvDetails && (
+                <View style={styles.tvDetailsContainer}>
+                  <Text style={styles.tvDetailsHeader}>Show Details</Text>
+
+                  {metadata.tvDetails.status && (
+                    <View style={styles.tvDetailRow}>
+                      <Text style={styles.tvDetailLabel}>Status</Text>
+                      <Text style={styles.tvDetailValue}>{metadata.tvDetails.status}</Text>
+                    </View>
+                  )}
+
+                  {metadata.tvDetails.firstAirDate && (
+                    <View style={styles.tvDetailRow}>
+                      <Text style={styles.tvDetailLabel}>First Air Date</Text>
+                      <Text style={styles.tvDetailValue}>
+                        {new Date(metadata.tvDetails.firstAirDate).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })}
+                      </Text>
+                    </View>
+                  )}
+
+                  {metadata.tvDetails.lastAirDate && (
+                    <View style={styles.tvDetailRow}>
+                      <Text style={styles.tvDetailLabel}>Last Air Date</Text>
+                      <Text style={styles.tvDetailValue}>
+                        {new Date(metadata.tvDetails.lastAirDate).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })}
+                      </Text>
+                    </View>
+                  )}
+
+                  {metadata.tvDetails.numberOfSeasons && (
+                    <View style={styles.tvDetailRow}>
+                      <Text style={styles.tvDetailLabel}>Seasons</Text>
+                      <Text style={styles.tvDetailValue}>{metadata.tvDetails.numberOfSeasons}</Text>
+                    </View>
+                  )}
+
+                  {metadata.tvDetails.numberOfEpisodes && (
+                    <View style={styles.tvDetailRow}>
+                      <Text style={styles.tvDetailLabel}>Total Episodes</Text>
+                      <Text style={styles.tvDetailValue}>{metadata.tvDetails.numberOfEpisodes}</Text>
+                    </View>
+                  )}
+
+                  {metadata.tvDetails.episodeRunTime && metadata.tvDetails.episodeRunTime.length > 0 && (
+                    <View style={styles.tvDetailRow}>
+                      <Text style={styles.tvDetailLabel}>Episode Runtime</Text>
+                      <Text style={styles.tvDetailValue}>
+                        {metadata.tvDetails.episodeRunTime.join(' - ')} min
+                      </Text>
+                    </View>
+                  )}
+
+                  {metadata.tvDetails.originCountry && metadata.tvDetails.originCountry.length > 0 && (
+                    <View style={styles.tvDetailRow}>
+                      <Text style={styles.tvDetailLabel}>Origin Country</Text>
+                      <Text style={styles.tvDetailValue}>{metadata.tvDetails.originCountry.join(', ')}</Text>
+                    </View>
+                  )}
+
+                  {metadata.tvDetails.originalLanguage && (
+                    <View style={styles.tvDetailRow}>
+                      <Text style={styles.tvDetailLabel}>Original Language</Text>
+                      <Text style={styles.tvDetailValue}>{metadata.tvDetails.originalLanguage.toUpperCase()}</Text>
+                    </View>
+                  )}
+
+                  {metadata.tvDetails.createdBy && metadata.tvDetails.createdBy.length > 0 && (
+                    <View style={styles.tvDetailRow}>
+                      <Text style={styles.tvDetailLabel}>Created By</Text>
+                      <Text style={styles.tvDetailValue}>
+                        {metadata.tvDetails.createdBy.map(creator => creator.name).join(', ')}
+                      </Text>
+                    </View>
+                  )}
+                </View>
               )}
             </Animated.View>
           </Animated.ScrollView>
@@ -1114,13 +1277,49 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   productionHeader: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
     color: '#fff',
-    marginBottom: 8,
+    marginBottom: 12,
     textTransform: 'uppercase',
     letterSpacing: 1,
+    opacity: 0.9,
+  },
+  tvDetailsContainer: {
+    paddingHorizontal: 16,
+    marginTop: 20,
+    marginBottom: 16,
+  },
+  tvDetailsHeader: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    opacity: 0.9,
+  },
+  tvDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  tvDetailLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
     opacity: 0.8,
+  },
+  tvDetailValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#fff',
+    opacity: 0.9,
+    textAlign: 'right',
+    flex: 1,
   },
 });
 

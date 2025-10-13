@@ -1781,32 +1781,76 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         let productionInfo: any[] = [];
 
         if (type === 'series') {
-          // Fetch networks for TV shows
+          // Fetch networks and additional details for TV shows
           const showDetails = await tmdbService.getTVShowDetails(tmdbId, 'en-US');
-          if (showDetails && showDetails.networks) {
-            productionInfo = Array.isArray(showDetails.networks)
-              ? showDetails.networks
-                  .map((n: any) => ({
-                    id: n?.id,
-                    name: n?.name,
-                    logo: tmdbService.getImageUrl(n?.logo_path, 'w185'),
-                  }))
-                  .filter((n: any) => n && (n.logo || n.name))
-              : [];
+          if (showDetails) {
+            // Fetch networks
+            if (showDetails.networks) {
+              productionInfo = Array.isArray(showDetails.networks)
+                ? showDetails.networks
+                    .map((n: any) => ({
+                      id: n?.id,
+                      name: n?.name,
+                      logo: tmdbService.getImageUrl(n?.logo_path, 'w185'),
+                    }))
+                    .filter((n: any) => n && (n.logo || n.name))
+                : [];
+            }
+
+            // Fetch additional TV details
+            const tvDetails = {
+              status: showDetails.status,
+              firstAirDate: showDetails.first_air_date,
+              lastAirDate: showDetails.last_air_date,
+              numberOfSeasons: showDetails.number_of_seasons,
+              numberOfEpisodes: showDetails.number_of_episodes,
+              episodeRunTime: showDetails.episode_run_time,
+              type: showDetails.type,
+              originCountry: showDetails.origin_country,
+              originalLanguage: showDetails.original_language,
+              createdBy: showDetails.created_by,
+            };
+
+            // Update metadata with TV details
+            setMetadata((prev: any) => ({
+              ...prev,
+              tvDetails
+            }));
           }
         } else if (type === 'movie') {
-          // Fetch production companies for movies
+          // Fetch production companies and additional details for movies
           const movieDetails = await tmdbService.getMovieDetails(String(tmdbId), 'en-US');
-          if (movieDetails && movieDetails.production_companies) {
-            productionInfo = Array.isArray(movieDetails.production_companies)
-              ? movieDetails.production_companies
-                  .map((c: any) => ({
-                    id: c?.id,
-                    name: c?.name,
-                    logo: tmdbService.getImageUrl(c?.logo_path, 'w185'),
-                  }))
-                  .filter((c: any) => c && (c.logo || c.name))
-              : [];
+          if (movieDetails) {
+            // Fetch production companies
+            if (movieDetails.production_companies) {
+              productionInfo = Array.isArray(movieDetails.production_companies)
+                ? movieDetails.production_companies
+                    .map((c: any) => ({
+                      id: c?.id,
+                      name: c?.name,
+                      logo: tmdbService.getImageUrl(c?.logo_path, 'w185'),
+                    }))
+                    .filter((c: any) => c && (c.logo || c.name))
+                : [];
+            }
+
+            // Fetch additional movie details
+            const movieDetailsObj = {
+              status: movieDetails.status,
+              releaseDate: movieDetails.release_date,
+              runtime: movieDetails.runtime,
+              budget: movieDetails.budget,
+              revenue: movieDetails.revenue,
+              originalLanguage: movieDetails.original_language,
+              originCountry: movieDetails.origin_country,
+              tagline: movieDetails.tagline,
+            };
+
+            // Update metadata with movie details
+            setMetadata((prev: any) => ({
+              ...prev,
+              movieDetails: movieDetailsObj
+            }));
           }
         }
 

@@ -98,6 +98,32 @@ export interface StreamingContent {
     name: string;
     logo?: string;
   }>;
+  tvDetails?: {
+    status?: string;
+    firstAirDate?: string;
+    lastAirDate?: string;
+    numberOfSeasons?: number;
+    numberOfEpisodes?: number;
+    episodeRunTime?: number[];
+    type?: string;
+    originCountry?: string[];
+    originalLanguage?: string;
+    createdBy?: Array<{
+      id: number;
+      name: string;
+      profile_path?: string;
+    }>;
+  };
+  movieDetails?: {
+    status?: string;
+    releaseDate?: string;
+    runtime?: number;
+    budget?: number;
+    revenue?: number;
+    originalLanguage?: string;
+    originCountry?: string[];
+    tagline?: string;
+  };
 }
 
 export interface CatalogContent {
