@@ -1,48 +1,104 @@
-# Nuvio Media Hub
+<!-- Improved compatibility of back to top link -->
+<a id="readme-top"></a>
 
-<p align="center">
-  <img src="assets/titlelogo.png" alt="Nuvio Logo" width="300"/>
-</p>
+<!-- PROJECT SHIELDS -->
+[![Contributors][contributors-shield]][contributors-url]
+[![Forks][forks-shield]][forks-url]
+[![Stargazers][stars-shield]][stars-url]
+[![Issues][issues-shield]][issues-url]
+[![License][license-shield]][license-url]
 
-<p align="center">
-  A modern media hub built with React Native and Expo, featuring comprehensive addon integration and content synchronization.
-</p>
+<!-- PROJECT LOGO -->
+<br />
+<div align="center">
+  <img src="assets/titlelogo.png" alt="Nuvio Logo" width="120" />
+  <h1 align="center">🎬 Nuvio Media Hub</h1>
+  <p align="center">
+    A modern media hub built with React Native and Expo
+    <br />
+    Addon ecosystem • Cross‑platform • Offline metadata & sync
+    <br />
+    <br />
+    <a href="#getting-started"><strong>Get Started »</strong></a>
+    <br />
+    <br />
+    <a href="#demo">View Screenshots</a>
+    ·
+    <a href="https://github.com/tapframe/NuvioStreaming/issues/new?labels=bug&template=bug_report.md">Report Bug</a>
+    ·
+    <a href="https://github.com/tapframe/NuvioStreaming/issues/new?labels=enhancement&template=feature_request.md">Request Feature</a>
+  </p>
+</div>
 
----
+<!-- TABLE OF CONTENTS -->
+<details>
+  <summary>Table of Contents</summary>
+  <ol>
+    <li>
+      <a href="#about-the-project">About The Project</a>
+      <ul>
+        <li><a href="#key-features">Key Features</a></li>
+        <li><a href="#built-with">Built With</a></li>
+      </ul>
+    </li>
+    <li><a href="#demo">Screenshots</a></li>
+    <li>
+      <a href="#getting-started">Getting Started</a>
+      <ul>
+        <li><a href="#installation">Installation</a></li>
+        <li><a href="#build">Build</a></li>
+      </ul>
+    </li>
+    <li><a href="#usage-notes">Usage Notes</a></li>
+    <li><a href="#contributing">Contributing</a></li>
+    <li><a href="#support">Support</a></li>
+    <li><a href="#license">License</a></li>
+    <li><a href="#contact">Contact</a></li>
+    <li><a href="#acknowledgments">Acknowledgments</a></li>
+  </ol>
+  </details>
 
-## Installation
+<!-- ABOUT THE PROJECT -->
+## About The Project
 
-### AltStore
-<img src="https://upload.wikimedia.org/wikipedia/commons/2/20/AltStore_logo.png" width="32" height="32" align="left"> [![Add to AltStore](https://img.shields.io/badge/Add%20to-AltStore-blue?style=for-the-badge)](https://tinyurl.com/NuvioAltstore)
+Nuvio Media Hub is a cross‑platform app for managing, discovering, and streaming your media via a flexible addon ecosystem. Built with React Native + Expo, it integrates providers and sync services while keeping a simple, fast UI.
 
-### SideStore
-<img src="https://github.com/SideStore/assets/blob/main/icon.png?raw=true" width="32" height="32" align="left"> [![Add to SideStore](https://img.shields.io/badge/Add%20to-SideStore-green?style=for-the-badge)](https://tinyurl.com/NuvioSidestore)
+### Key Features
 
-**Manual URL:** `https://raw.githubusercontent.com/tapframe/NuvioStreaming/main/nuvio-source.json`
+* **🌐 Addon Ecosystem** – Integrate multiple providers and services
+* **⚡ Fast & Modern UI** – React Native + Expo with optimized navigation
+* **📱 Cross‑Platform** – iOS, Android, and Web (Expo) support
+* **🔐 Privacy‑First** – No bundled content; you control sources via addons
+* **🗂️ Library Sync** – Keep metadata and progress in sync across devices
+* **🧩 Extensible** – Community addons, customizations, and theme support
 
----
-
-## Screenshots
-
-| Home | Details |
-|:----:|:-------:|
-| ![Home](screenshots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.08.32-portrait.png) | ![Details](screenshots/WhatsApp%20Image%202025-09-02%20at%2000.24.31-portrait.png) |
-
----
-
-## Tech Stack
+### Built With
 
 <p align="left">
   <a href="https://skillicons.dev">
     <img src="https://skillicons.dev/icons?i=react,typescript,nodejs,expo,github,githubactions&theme=light&perline=6" />
   </a>
-</p>
+  <br/>
+  React Native • Expo • TypeScript
+  </p>
 
----
+<!-- DEMO / SCREENSHOTS -->
+## Demo
+<a id="demo"></a>
 
-## Development
+| Home | Details |
+|:----:|:-------:|
+| ![Home](screenshots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.08.32-portrait.png) | ![Details](screenshots/WhatsApp%20Image%202025-09-02%20at%2000.24.31-portrait.png) |
 
-### Setup
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- GETTING STARTED -->
+## Getting Started
+
+Follow the steps below to run the app locally.
+
+### Installation
+
 ```bash
 git clone https://github.com/tapframe/NuvioStreaming.git
 cd NuvioStreaming
@@ -51,36 +107,90 @@ npx expo start
 ```
 
 ### Build
+
 ```bash
 npx expo run:android  # Android
 npx expo run:ios      # iOS
 ```
 
----
+<details>
+  <summary>Alternative iOS Installation</summary>
+
+  ### AltStore
+  <img src="https://upload.wikimedia.org/wikipedia/commons/2/20/AltStore_logo.png" width="24" height="24" align="left"> [![Add to AltStore](https://img.shields.io/badge/Add%20to-AltStore-blue?style=for-the-badge)](https://tinyurl.com/NuvioAltstore)
+
+  ### SideStore
+  <img src="https://github.com/SideStore/assets/blob/main/icon.png?raw=true" width="24" height="24" align="left"> [![Add to SideStore](https://img.shields.io/badge/Add%20to-SideStore-green?style=for-the-badge)](https://tinyurl.com/NuvioSidestore)
+
+  **Manual URL:** `https://raw.githubusercontent.com/tapframe/NuvioStreaming/main/nuvio-source.json`
+
+</details>
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Usage Notes
+
+* Nuvio ships without built‑in content. Install addons to access sources.
+* Some providers may require accounts, API keys, or region access.
+* Performance depends on device and provider; enable caching where available.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+Contributions make the open‑source community amazing! Any contributions are greatly appreciated.
 
----
+1. Fork the project
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-## Issues
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-Report bugs and request features via [GitHub Issues](https://github.com/tapframe/NuvioStreaming/issues)
+## Support
 
----
+If you find Nuvio helpful, consider supporting development:
+
+* **Ko‑Fi** – `https://ko-fi.com/tapframe`
+* **GitHub Star** – Star the repo to show support
+* **Share** – Tell others about the project
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## License
 
-[![GNU GPLv3](https://www.gnu.org/graphics/gplv3-127x51.png)](http://www.gnu.org/licenses/gpl-3.0.en.html)
+Distributed under the GNU GPLv3 License. See `LICENSE` for more information.
 
-This project is licensed under the GNU General Public License v3.0.
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
----
+## Contact
 
-## Disclaimer
+**Project Links:**
+* GitHub: `https://github.com/tapframe`
+* Issues: `https://github.com/tapframe/NuvioStreaming/issues`
 
-This application functions as a media hub with addon/plugin support. It does not contain any built-in content or host media content. Content access is only available through user-installed plugins and addons. Any legal concerns should be directed to the specific websites providing the content.
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Acknowledgments
+
+* [React Native](https://reactnative.dev/)
+* [Expo](https://expo.dev/)
+* [TypeScript](https://www.typescriptlang.org/)
+* Community contributors and testers
+
+**Disclaimer:** This application functions as a media hub with addon/plugin support. It does not contain any built‑in content or host media content. Content access is only available through user‑installed plugins and addons. Any legal concerns should be directed to the specific websites providing the content.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- MARKDOWN LINKS & IMAGES -->
+[contributors-shield]: https://img.shields.io/github/contributors/tapframe/NuvioStreaming.svg?style=for-the-badge
+[contributors-url]: https://github.com/tapframe/NuvioStreaming/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/tapframe/NuvioStreaming.svg?style=for-the-badge
+[forks-url]: https://github.com/tapframe/NuvioStreaming/network/members
+[stars-shield]: https://img.shields.io/github/stars/tapframe/NuvioStreaming.svg?style=for-the-badge
+[stars-url]: https://github.com/tapframe/NuvioStreaming/stargazers
+[issues-shield]: https://img.shields.io/github/issues/tapframe/NuvioStreaming.svg?style=for-the-badge
+[issues-url]: https://github.com/tapframe/NuvioStreaming/issues
+[license-shield]: https://img.shields.io/github/license/tapframe/NuvioStreaming.svg?style=for-the-badge
+[license-url]: http://www.gnu.org/licenses/gpl-3.0.en.html

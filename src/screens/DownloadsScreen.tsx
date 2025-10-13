@@ -10,6 +10,7 @@ import {
   RefreshControl,
   Alert,
   Platform,
+  Clipboard,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -27,6 +28,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useDownloads } from '../contexts/DownloadsContext';
 import type { DownloadItem } from '../contexts/DownloadsContext';
+import { Toast } from 'toastify-react-native';
 
 const { height, width } = Dimensions.get('window');
 
@@ -72,6 +74,24 @@ const DownloadItemComponent: React.FC<{
   onAction: (item: DownloadItem, action: 'pause' | 'resume' | 'cancel' | 'retry') => void;
 }> = React.memo(({ item, onPress, onAction }) => {
   const { currentTheme } = useTheme();
+
+  const handleLongPress = useCallback(() => {
+    if (item.status === 'completed' && item.fileUri) {
+      Clipboard.setString(item.fileUri);
+      if (Platform.OS === 'android') {
+        Toast.success('Local file path copied to clipboard');
+      } else {
+        Alert.alert('Copied', 'Local file path copied to clipboard');
+      }
+    } else if (item.status !== 'completed') {
+      if (Platform.OS === 'android') {
+        Toast.info('Download is not complete yet');
+      } else {
+        Alert.alert('Not Available', 'The local file path is available only after the download is complete.');
+      }
+    }
+  }, [item.status, item.fileUri]);
+
   const formatBytes = (bytes?: number) => {
     if (!bytes || bytes <= 0) return '0 B';
     const sizes = ['B','KB','MB','GB','TB'];
@@ -118,15 +138,12 @@ const DownloadItemComponent: React.FC<{
   const getActionIcon = () => {
     switch (item.status) {
       case 'downloading':
-        // return 'pause'; // Resume support commented out
-        return null;
+        return 'pause';
       case 'paused':
       case 'error':
-        // return 'play'; // Resume support commented out
-        return null;
+        return 'play';
       case 'queued':
-        // return 'play'; // Resume support commented out
-        return null;
+        return 'play';
       default:
         return null;
     }
@@ -137,12 +154,12 @@ const DownloadItemComponent: React.FC<{
 
     switch (item.status) {
       case 'downloading':
-        // onAction(item, 'pause'); // Resume support commented out
+        onAction(item, 'pause');
         break;
       case 'paused':
       case 'error':
       case 'queued':
-        // onAction(item, 'resume'); // Resume support commented out
+        onAction(item, 'resume');
         break;
     }
   };
@@ -151,6 +168,7 @@ const DownloadItemComponent: React.FC<{
     <TouchableOpacity
       style={[styles.downloadItem, { backgroundColor: currentTheme.colors.card }]}
       onPress={() => onPress(item)}
+      onLongPress={handleLongPress}
       activeOpacity={0.8}
     >
       {/* Content info */}
@@ -262,10 +280,10 @@ const DownloadsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const { top: safeAreaTop } = useSafeAreaInsets();
-  const { downloads, /*pauseDownload, resumeDownload,*/ cancelDownload } = useDownloads();
+  const { downloads, pauseDownload, resumeDownload, cancelDownload } = useDownloads();
 
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedFilter, setSelectedFilter] = useState<'all' | 'downloading' | 'completed'>('all');
+  const [selectedFilter, setSelectedFilter] = useState<'all' | 'downloading' | 'completed' | 'paused'>('all');
 
   // Animation values
   const headerOpacity = useSharedValue(1);
@@ -279,8 +297,8 @@ const DownloadsScreen: React.FC = () => {
           return item.status === 'downloading' || item.status === 'queued';
         case 'completed':
           return item.status === 'completed';
-        // case 'paused':
-        //   return item.status === 'paused' || item.status === 'error'; // Resume support commented out
+        case 'paused':
+          return item.status === 'paused' || item.status === 'error';
         default:
           return true;
       }
@@ -294,11 +312,11 @@ const DownloadsScreen: React.FC = () => {
       item.status === 'downloading' || item.status === 'queued'
     ).length;
     const completed = downloads.filter(item => item.status === 'completed').length;
-    // const paused = downloads.filter(item =>
-    //   item.status === 'paused' || item.status === 'error'
-    // ).length; // Resume support commented out
+    const paused = downloads.filter(item =>
+      item.status === 'paused' || item.status === 'error'
+    ).length;
 
-    return { total, downloading, completed /*, paused*/ };
+    return { total, downloading, completed, paused };
   }, [downloads]);
 
   // Handlers
@@ -350,12 +368,12 @@ const DownloadsScreen: React.FC = () => {
   }, [navigation]);
 
   const handleDownloadAction = useCallback((item: DownloadItem, action: 'pause' | 'resume' | 'cancel' | 'retry') => {
-    // if (action === 'pause') pauseDownload(item.id);
-    // if (action === 'resume') resumeDownload(item.id);
+    if (action === 'pause') pauseDownload(item.id);
+    if (action === 'resume') resumeDownload(item.id);
     if (action === 'cancel') cancelDownload(item.id);
-  }, [/*pauseDownload, resumeDownload,*/ cancelDownload]);
+  }, [pauseDownload, resumeDownload, cancelDownload]);
 
-  const handleFilterPress = useCallback((filter: 'all' | 'downloading' | 'completed') => {
+  const handleFilterPress = useCallback((filter: 'all' | 'downloading' | 'completed' | 'paused') => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedFilter(filter);
   }, []);
@@ -447,7 +465,7 @@ const DownloadsScreen: React.FC = () => {
             {renderFilterButton('all', 'All', stats.total)}
             {renderFilterButton('downloading', 'Active', stats.downloading)}
             {renderFilterButton('completed', 'Done', stats.completed)}
-            {/* {renderFilterButton('paused', 'Paused', stats.paused)} */} {/* Resume support commented out */}
+            {renderFilterButton('paused', 'Paused', stats.paused)}
           </View>
         )}
       </Animated.View>

@@ -48,8 +48,8 @@ type StartDownloadInput = {
 type DownloadsContextValue = {
   downloads: DownloadItem[];
   startDownload: (input: StartDownloadInput) => Promise<void>;
-  // pauseDownload: (id: string) => Promise<void>;
-  // resumeDownload: (id: string) => Promise<void>;
+  pauseDownload: (id: string) => Promise<void>;
+  resumeDownload: (id: string) => Promise<void>;
   cancelDownload: (id: string) => Promise<void>;
   removeDownload: (id: string) => Promise<void>;
 };
@@ -64,15 +64,56 @@ function sanitizeFilename(name: string): string {
 
 function getExtensionFromUrl(url: string): string {
   const lower = url.toLowerCase();
-  if (/(\.|ext=)(m3u8)(\b|$)/i.test(lower)) return 'm3u8';
+  
+  // Return appropriate extensions for various formats
   if (/(\.|ext=)(mp4)(\b|$)/i.test(lower)) return 'mp4';
   if (/(\.|ext=)(mkv)(\b|$)/i.test(lower)) return 'mkv';
-  if (/(\.|ext=)(mpd)(\b|$)/i.test(lower)) return 'mpd';
+  if (/(\.|ext=)(avi)(\b|$)/i.test(lower)) return 'avi';
+  if (/(\.|ext=)(mov)(\b|$)/i.test(lower)) return 'mov';
+  if (/(\.|ext=)(wmv)(\b|$)/i.test(lower)) return 'wmv';
+  if (/(\.|ext=)(flv)(\b|$)/i.test(lower)) return 'flv';
+  if (/(\.|ext=)(webm)(\b|$)/i.test(lower)) return 'webm';
+  if (/(\.|ext=)(m4v)(\b|$)/i.test(lower)) return 'm4v';
+  if (/(\.|ext=)(3gp)(\b|$)/i.test(lower)) return '3gp';
+  if (/(\.|ext=)(ts)(\b|$)/i.test(lower)) return 'ts';
+  if (/(\.|ext=)(mpg)(\b|$)/i.test(lower)) return 'mpg';
+  if (/(\.|ext=)(mpeg)(\b|$)/i.test(lower)) return 'mpeg';
+  
+  // Default to mp4 for unknown formats
   return 'mp4';
+}
+
+function isDownloadableUrl(url: string): boolean {
+  if (!url) return false;
+  
+  const lower = url.toLowerCase();
+  
+  // Check for streaming formats that should NOT be downloadable (only m3u8 and DASH)
+  const streamingFormats = [
+    '.m3u8',           // HLS streaming
+    '.mpd',            // DASH streaming
+    'm3u8',            // HLS without extension
+    'mpd',             // DASH without extension
+  ];
+  
+  // Check if URL contains streaming format indicators
+  const isStreamingFormat = streamingFormats.some(format => 
+    lower.includes(format) || 
+    lower.includes(`ext=${format}`) ||
+    lower.includes(`format=${format}`) ||
+    lower.includes(`container=${format}`)
+  );
+  
+  // Return true if it's NOT a streaming format (m3u8 or DASH)
+  return !isStreamingFormat;
 }
 
 export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [downloads, setDownloads] = useState<DownloadItem[]>([]);
+  const downloadsRef = useRef(downloads);
+  useEffect(() => {
+    downloadsRef.current = downloads;
+  }, [downloads]);
   // Keep active resumables in memory (not persisted)
   const resumablesRef = useRef<Map<string, FileSystem.DownloadResumable>>(new Map());
   const lastBytesRef = useRef<Map<string, { bytes: number; time: number }>>(new Map());
@@ -159,17 +200,158 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setDownloads(prev => prev.map(d => (d.id === id ? updater(d) : d)));
   }, []);
 
+  const resumeDownload = useCallback(async (id: string) => {
+    console.log(`[DownloadsContext] Resuming download: ${id}`);
+    const item = downloadsRef.current.find(d => d.id === id); // Use ref
+    if (!item) {
+      console.log(`[DownloadsContext] No item found for download: ${id}`);
+      return;
+    }
+
+    // Update status to downloading immediately
+    updateDownload(id, (d) => ({ ...d, status: 'downloading', updatedAt: Date.now() }));
+
+    // Always try to use existing resumable first - this is crucial for proper resume
+    let resumable = resumablesRef.current.get(id);
+
+    if (resumable) {
+      console.log(`[DownloadsContext] Using existing resumable for download: ${id}`);
+      // Existing resumable should already have the correct progress callback and file URI
+      // No need to recreate it
+    } else {
+      console.log(`[DownloadsContext] Creating new resumable for download: ${id}`);
+      // Only create new resumable if none exists (should be rare for resume operations)
+
+      const progressCallback: FileSystem.DownloadProgressCallback = (data) => {
+        const { totalBytesWritten, totalBytesExpectedToWrite } = data;
+        const now = Date.now();
+        const last = lastBytesRef.current.get(id);
+        let speedBps = 0;
+        if (last) {
+          const deltaBytes = totalBytesWritten - last.bytes;
+          const deltaTime = Math.max(1, now - last.time) / 1000;
+          speedBps = deltaBytes / deltaTime;
+        }
+        lastBytesRef.current.set(id, { bytes: totalBytesWritten, time: now });
+
+        updateDownload(id, (d) => ({
+          ...d,
+          downloadedBytes: totalBytesWritten,
+          totalBytes: totalBytesExpectedToWrite || d.totalBytes,
+          progress: totalBytesExpectedToWrite ? Math.floor((totalBytesWritten / totalBytesExpectedToWrite) * 100) : d.progress,
+          speedBps,
+          status: 'downloading',
+          updatedAt: now,
+        }));
+
+        // Fire background progress notification (throttled)
+        const current = downloadsRef.current.find(x => x.id === id);
+        if (current) {
+          maybeNotifyProgress({ ...current, downloadedBytes: totalBytesWritten, totalBytes: totalBytesExpectedToWrite || current.totalBytes, progress: totalBytesExpectedToWrite ? Math.floor((totalBytesWritten / totalBytesExpectedToWrite) * 100) : current.progress });
+        }
+      };
+
+      // Use the exact same file URI that was used initially
+      const fileUri = item.fileUri || `${FileSystem.documentDirectory}downloads/${sanitizeFilename(item.title)}.${getExtensionFromUrl(item.sourceUrl)}`;
+
+      resumable = FileSystem.createDownloadResumable(
+        item.sourceUrl,
+        fileUri,
+        { headers: item.headers || {} },
+        progressCallback
+      );
+      resumablesRef.current.set(id, resumable);
+      lastBytesRef.current.set(id, { bytes: item.downloadedBytes, time: Date.now() });
+    }
+
+    try {
+      console.log(`[DownloadsContext] Calling resumeAsync for download: ${id}`);
+      const result = await resumable.resumeAsync();
+
+      // Check if download was paused during resume
+      const currentItem = downloadsRef.current.find(d => d.id === id);
+      if (currentItem && currentItem.status === 'paused') {
+        console.log(`[DownloadsContext] Download was paused during resume, keeping paused state: ${id}`);
+        // Keep resumable for next resume attempt - DO NOT DELETE
+        return;
+      }
+
+      if (!result) throw new Error('Resume failed');
+
+      console.log(`[DownloadsContext] Resume successful for download: ${id}`);
+
+      // Validate the downloaded file
+      try {
+        const fileInfo = await FileSystem.getInfoAsync(result.uri);
+        if (!fileInfo.exists || fileInfo.size === 0) {
+          throw new Error('Downloaded file is empty or missing');
+        }
+        console.log(`[DownloadsContext] File validation passed: ${result.uri} (${fileInfo.size} bytes)`);
+      } catch (validationError) {
+        console.error(`[DownloadsContext] File validation failed: ${validationError}`);
+        throw new Error('Downloaded file validation failed');
+      }
+
+      // Ensure we use the correct file URI from the result
+      const finalFileUri = result.uri;
+      updateDownload(id, (d) => ({ ...d, status: 'completed', progress: 100, updatedAt: Date.now(), fileUri: finalFileUri }));
+
+      const done = downloadsRef.current.find(x => x.id === id);
+      if (done) notifyCompleted({ ...done, status: 'completed', progress: 100, fileUri: finalFileUri } as DownloadItem);
+
+      // Clean up only after successful completion
+      resumablesRef.current.delete(id);
+      lastBytesRef.current.delete(id);
+    } catch (e) {
+      console.log(`[DownloadsContext] Resume threw error for download: ${id}`, e);
+
+      // Check if the error was due to pause
+      const currentItem = downloadsRef.current.find(d => d.id === id);
+      if (currentItem && currentItem.status === 'paused') {
+        console.log(`[DownloadsContext] Error was due to pause, keeping paused state and resumable: ${id}`);
+        // Keep resumable for next resume attempt - DO NOT DELETE
+        return;
+      }
+
+      // Only mark as error and clean up if it's a real error (not pause-related)
+      console.log(`[DownloadsContext] Marking download as error: ${id}`);
+      // Don't clean up resumable for validation errors - allow retry
+      if (e.message.includes('validation failed')) {
+        console.log(`[DownloadsContext] Keeping resumable for potential retry: ${id}`);
+        updateDownload(id, (d) => ({ ...d, status: 'error', updatedAt: Date.now() }));
+      } else {
+        // Clean up for other errors
+        updateDownload(id, (d) => ({ ...d, status: 'error', updatedAt: Date.now() }));
+        resumablesRef.current.delete(id);
+        lastBytesRef.current.delete(id);
+      }
+    }
+  }, [updateDownload, maybeNotifyProgress, notifyCompleted]);
+
   const startDownload = useCallback(async (input: StartDownloadInput) => {
+    // Validate that the URL is downloadable (not m3u8 or DASH)
+    if (!isDownloadableUrl(input.url)) {
+      throw new Error('This stream format cannot be downloaded. M3U8 (HLS) and DASH streaming formats are not supported for download.');
+    }
+
     const contentId = input.id;
     // Compose per-episode id for series
     const compoundId = input.type === 'series' && input.season && input.episode
       ? `${contentId}:S${input.season}E${input.episode}`
       : contentId;
 
-    // If already exists and completed, do nothing
-    const existing = downloads.find(d => d.id === compoundId);
-    if (existing && (existing.status === 'completed' || existing.status === 'downloading' || existing.status === 'paused')) {
-      return;
+    // If already exists, handle based on status
+    const existing = downloadsRef.current.find(d => d.id === compoundId);
+    if (existing) {
+      if (existing.status === 'completed') {
+        return; // Already completed, do nothing
+      } else if (existing.status === 'downloading') {
+        return; // Already downloading, do nothing
+      } else if (existing.status === 'paused' || existing.status === 'error') {
+        // Resume the paused or errored download instead of starting new one
+        await resumeDownload(compoundId);
+        return;
+      }
     }
 
     // Create file path
@@ -232,7 +414,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         updatedAt: now,
       }));
       // Fire background progress notification (throttled)
-      const current = downloads.find(x => x.id === compoundId);
+      const current = downloadsRef.current.find(x => x.id === compoundId);
       if (current) {
         maybeNotifyProgress({ ...current, downloadedBytes: totalBytesWritten, totalBytes: totalBytesExpectedToWrite || current.totalBytes, progress: totalBytesExpectedToWrite ? Math.floor((totalBytesWritten / totalBytesExpectedToWrite) * 100) : current.progress });
       }
@@ -250,82 +432,78 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     try {
       const result = await resumable.downloadAsync();
+      
+      // Check if download was paused during download
+      const currentItem = downloadsRef.current.find(d => d.id === compoundId);
+      if (currentItem && currentItem.status === 'paused') {
+        console.log(`[DownloadsContext] Download was paused during initial download, keeping paused state: ${compoundId}`);
+        // Don't delete resumable - keep it for resume
+        return;
+      }
+      
       if (!result) throw new Error('Download failed');
+
+      // Validate the downloaded file
+      try {
+        const fileInfo = await FileSystem.getInfoAsync(result.uri);
+        if (!fileInfo.exists || fileInfo.size === 0) {
+          throw new Error('Downloaded file is empty or missing');
+        }
+        console.log(`[DownloadsContext] File validation passed: ${result.uri} (${fileInfo.size} bytes)`);
+      } catch (validationError) {
+        console.error(`[DownloadsContext] File validation failed: ${validationError}`);
+        throw new Error('Downloaded file validation failed');
+      }
+
       updateDownload(compoundId, (d) => ({ ...d, status: 'completed', progress: 100, updatedAt: Date.now(), fileUri: result.uri }));
-      const done = downloads.find(x => x.id === compoundId);
+      const done = downloadsRef.current.find(x => x.id === compoundId);
       if (done) notifyCompleted({ ...done, status: 'completed', progress: 100, fileUri: result.uri } as DownloadItem);
       resumablesRef.current.delete(compoundId);
       lastBytesRef.current.delete(compoundId);
     } catch (e) {
       // If user paused, keep paused state, else error
-      const current = downloads.find(d => d.id === compoundId);
+      const current = downloadsRef.current.find(d => d.id === compoundId);
       if (current && current.status === 'paused') {
+        console.log(`[DownloadsContext] Error was due to pause during initial download, keeping paused state and resumable: ${compoundId}`);
+        // Don't delete resumable - keep it for resume
         return;
       }
-      updateDownload(compoundId, (d) => ({ ...d, status: 'error', updatedAt: Date.now() }));
-      resumablesRef.current.delete(compoundId);
-      lastBytesRef.current.delete(compoundId);
+
+      console.log(`[DownloadsContext] Marking initial download as error: ${compoundId}`);
+      // Don't clean up resumable for validation errors - allow retry
+      if (e.message.includes('validation failed')) {
+        console.log(`[DownloadsContext] Keeping resumable for potential retry: ${compoundId}`);
+        updateDownload(compoundId, (d) => ({ ...d, status: 'error', updatedAt: Date.now() }));
+      } else {
+        // Clean up for other errors
+        updateDownload(compoundId, (d) => ({ ...d, status: 'error', updatedAt: Date.now() }));
+        resumablesRef.current.delete(compoundId);
+        lastBytesRef.current.delete(compoundId);
+      }
     }
-  }, [downloads, updateDownload]);
+  }, [updateDownload, resumeDownload]);
 
-  // const pauseDownload = useCallback(async (id: string) => {
-  //   const resumable = resumablesRef.current.get(id);
-  //   if (resumable) {
-  //     try {
-  //       await resumable.pauseAsync();
-  //     } catch {}
-  //   }
-  //   updateDownload(id, (d) => ({ ...d, status: 'paused', updatedAt: Date.now() }));
-  // }, [updateDownload]);
-
-  // const resumeDownload = useCallback(async (id: string) => {
-  //   const item = downloads.find(d => d.id === id);
-  //   if (!item) return;
-  //   const progressCallback: FileSystem.DownloadProgressCallback = (data) => {
-  //     const { totalBytesWritten, totalBytesExpectedToWrite } = data;
-  //     const now = Date.now();
-  //     const last = lastBytesRef.current.get(id);
-  //     let speedBps = 0;
-  //     if (last) {
-  //       const deltaBytes = totalBytesWritten - last.bytes;
-  //       const deltaTime = Math.max(1, now - last.time) / 1000;
-  //       speedBps = deltaBytes / deltaTime;
-  //     }
-  //     lastBytesRef.current.set(id, { bytes: totalBytesWritten, time: now });
-
-  //     updateDownload(id, (d) => ({
-  //       ...d,
-  //       downloadedBytes: totalBytesWritten,
-  //       totalBytes: totalBytesExpectedToWrite || d.totalBytes,
-  //       progress: totalBytesExpectedToWrite ? Math.floor((totalBytesWritten / totalBytesExpectedToWrite) * 100) : d.progress,
-  //       speedBps,
-  //       status: 'downloading',
-  //       updatedAt: now,
-  //     }));
-  //   };
-
-  //   let resumable = resumablesRef.current.get(id);
-  //   if (!resumable) {
-  //     resumable = FileSystem.createDownloadResumable(
-  //       item.sourceUrl,
-  //       item.fileUri || `${FileSystem.documentDirectory}downloads/${sanitizeFilename(item.title)}.mp4`,
-  //       { headers: item.headers || {} },
-  //       progressCallback
-  //     );
-  //     resumablesRef.current.set(id, resumable);
-  //   }
-  //   try {
-  //     const result = await resumable.resumeAsync();
-  //     if (!result) throw new Error('Resume failed');
-  //     updateDownload(id, (d) => ({ ...d, status: 'completed', progress: 100, updatedAt: Date.now(), fileUri: result.uri }));
-  //     resumablesRef.current.delete(id);
-  //     lastBytesRef.current.delete(id);
-  //   } catch (e) {
-  //     updateDownload(id, (d) => ({ ...d, status: 'error', updatedAt: Date.now() }));
-  //     resumablesRef.current.delete(id);
-  //     lastBytesRef.current.delete(id);
-  //   }
-  // }, [downloads, updateDownload]);
+  const pauseDownload = useCallback(async (id: string) => {
+    console.log(`[DownloadsContext] Pausing download: ${id}`);
+    
+    // First, update the status to 'paused' immediately
+    // This will cause any ongoing download/resume operations to check status and exit gracefully
+    updateDownload(id, (d) => ({ ...d, status: 'paused', updatedAt: Date.now() }));
+    
+    const resumable = resumablesRef.current.get(id);
+    if (resumable) {
+      try {
+        await resumable.pauseAsync();
+        console.log(`[DownloadsContext] Successfully paused download: ${id}`);
+        // Keep the resumable in memory for resume - DO NOT DELETE
+      } catch (error) {
+        console.log(`[DownloadsContext] Pause async failed (this is normal if already paused): ${id}`, error);
+        // Keep resumable even if pause fails - we still want to be able to resume
+      }
+    } else {
+      console.log(`[DownloadsContext] No resumable found for download: ${id}, just marked as paused`);
+    }
+  }, [updateDownload]);
 
   const cancelDownload = useCallback(async (id: string) => {
     const resumable = resumablesRef.current.get(id);
@@ -338,29 +516,29 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       lastBytesRef.current.delete(id);
     }
 
-    const item = downloads.find(d => d.id === id);
+    const item = downloadsRef.current.find(d => d.id === id);
     if (item?.fileUri) {
       await FileSystem.deleteAsync(item.fileUri, { idempotent: true }).catch(() => {});
     }
     setDownloads(prev => prev.filter(d => d.id !== id));
-  }, [downloads]);
+  }, []);
 
   const removeDownload = useCallback(async (id: string) => {
-    const item = downloads.find(d => d.id === id);
+    const item = downloadsRef.current.find(d => d.id === id);
     if (item?.fileUri && item.status === 'completed') {
       await FileSystem.deleteAsync(item.fileUri, { idempotent: true }).catch(() => {});
     }
     setDownloads(prev => prev.filter(d => d.id !== id));
-  }, [downloads]);
+  }, []);
 
   const value = useMemo<DownloadsContextValue>(() => ({
     downloads,
     startDownload,
-    // pauseDownload,
-    // resumeDownload,
+    pauseDownload,
+    resumeDownload,
     cancelDownload,
     removeDownload,
-  }), [downloads, startDownload, /*pauseDownload, resumeDownload,*/ cancelDownload, removeDownload]);
+  }), [downloads, startDownload, pauseDownload, resumeDownload, cancelDownload, removeDownload]);
 
   return (
     <DownloadsContext.Provider value={value}>
