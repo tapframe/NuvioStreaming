@@ -1,7 +1,8 @@
 import React, { useMemo, useState, useEffect, useCallback, memo } from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ViewStyle, TextStyle, ImageStyle, FlatList, StyleProp, Platform } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ViewStyle, TextStyle, ImageStyle, FlatList, StyleProp, Platform, Image } from 'react-native';
 import Animated, { FadeIn, FadeOut, Easing, useSharedValue, withTiming, useAnimatedStyle, useAnimatedScrollHandler, useAnimatedReaction, runOnJS } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -160,15 +161,31 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
           key={item.id}
           style={[animatedStyle, { flex: 1 }] as any}
         >
-          <FastImage
-            source={{ 
-              uri: item.banner || item.poster,
-              priority: FastImage.priority.low,
-              cache: FastImage.cacheControl.immutable
-            }}
-            style={styles.backgroundImage as any}
-            resizeMode={FastImage.resizeMode.cover}
-          />
+          {Platform.OS === 'android' ? (
+            <Image
+              source={{ uri: item.banner || item.poster }}
+              style={styles.backgroundImage as any}
+              resizeMode="cover"
+              blurRadius={20}
+            />
+          ) : (
+            <>
+              <FastImage
+                source={{ 
+                  uri: item.banner || item.poster,
+                  priority: FastImage.priority.low,
+                  cache: FastImage.cacheControl.immutable
+                }}
+                style={styles.backgroundImage as any}
+                resizeMode={FastImage.resizeMode.cover}
+              />
+              <BlurView
+                style={styles.backgroundImage as any}
+                intensity={30}
+                tint="dark"
+              />
+            </>
+          )}
           <LinearGradient
             colors={["rgba(0,0,0,0.45)", "rgba(0,0,0,0.75)"]}
             locations={[0.4, 1]}
