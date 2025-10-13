@@ -581,7 +581,7 @@ const SettingsScreen: React.FC = () => {
               isTablet={isTablet}
             />
             <SettingItem
-              title="Enable Downloads"
+              title="Enable Downloads (Beta)"
               description="Show Downloads tab and enable saving streams"
               icon="download"
               renderControl={() => (

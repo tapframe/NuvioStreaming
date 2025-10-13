@@ -58,7 +58,7 @@ const optimizePosterUrl = (poster: string | undefined | null): string => {
 // Download items come from DownloadsContext
 
 // Empty state component
-const EmptyDownloadsState: React.FC = () => {
+const EmptyDownloadsState: React.FC<{ navigation: NavigationProp<RootStackParamList> }> = ({ navigation }) => {
   const { currentTheme } = useTheme();
   
   return (
@@ -79,7 +79,7 @@ const EmptyDownloadsState: React.FC = () => {
       <TouchableOpacity 
         style={[styles.exploreButton, { backgroundColor: currentTheme.colors.primary }]}
         onPress={() => {
-          // Navigate to search or home to find content
+          navigation.navigate('Search');
         }}
       >
         <Text style={[styles.exploreButtonText, { color: currentTheme.colors.background }]}>
@@ -567,7 +567,7 @@ const DownloadsScreen: React.FC = () => {
 
       {/* Content */}
       {downloads.length === 0 ? (
-        <EmptyDownloadsState />
+        <EmptyDownloadsState navigation={navigation} />
       ) : (
         <FlatList
           data={filteredDownloads}
