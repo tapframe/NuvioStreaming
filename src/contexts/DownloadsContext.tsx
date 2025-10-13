@@ -63,23 +63,25 @@ function sanitizeFilename(name: string): string {
 }
 
 function getExtensionFromUrl(url: string): string {
+  // Try to get extension from URL path
+  try {
+    const urlPath = new URL(url).pathname;
+    const match = urlPath.match(/\.([a-z0-9]{2,4})$/i);
+    if (match) return match[1];
+  } catch {}
+  
+  // Fallback to checking for common video extensions in the URL
   const lower = url.toLowerCase();
+  if (lower.includes('.mp4')) return 'mp4';
+  if (lower.includes('.mkv')) return 'mkv';
+  if (lower.includes('.avi')) return 'avi';
+  if (lower.includes('.mov')) return 'mov';
+  if (lower.includes('.webm')) return 'webm';
+  if (lower.includes('.flv')) return 'flv';
+  if (lower.includes('.wmv')) return 'wmv';
+  if (lower.includes('.m4v')) return 'm4v';
   
-  // Return appropriate extensions for various formats
-  if (/(\.|ext=)(mp4)(\b|$)/i.test(lower)) return 'mp4';
-  if (/(\.|ext=)(mkv)(\b|$)/i.test(lower)) return 'mkv';
-  if (/(\.|ext=)(avi)(\b|$)/i.test(lower)) return 'avi';
-  if (/(\.|ext=)(mov)(\b|$)/i.test(lower)) return 'mov';
-  if (/(\.|ext=)(wmv)(\b|$)/i.test(lower)) return 'wmv';
-  if (/(\.|ext=)(flv)(\b|$)/i.test(lower)) return 'flv';
-  if (/(\.|ext=)(webm)(\b|$)/i.test(lower)) return 'webm';
-  if (/(\.|ext=)(m4v)(\b|$)/i.test(lower)) return 'm4v';
-  if (/(\.|ext=)(3gp)(\b|$)/i.test(lower)) return '3gp';
-  if (/(\.|ext=)(ts)(\b|$)/i.test(lower)) return 'ts';
-  if (/(\.|ext=)(mpg)(\b|$)/i.test(lower)) return 'mpg';
-  if (/(\.|ext=)(mpeg)(\b|$)/i.test(lower)) return 'mpeg';
-  
-  // Default to mp4 for unknown formats
+  // Default to mp4 if no extension found
   return 'mp4';
 }
 
@@ -252,7 +254,12 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       };
 
       // Use the exact same file URI that was used initially
-      const fileUri = item.fileUri || `${FileSystem.documentDirectory}downloads/${sanitizeFilename(item.title)}.${getExtensionFromUrl(item.sourceUrl)}`;
+      const fileUri = item.fileUri;
+      if (!fileUri) {
+        console.error(`[DownloadsContext] No fileUri found for download: ${id}`);
+        updateDownload(id, (d) => ({ ...d, status: 'error', updatedAt: Date.now() }));
+        return;
+      }
 
       resumable = FileSystem.createDownloadResumable(
         item.sourceUrl,
@@ -302,7 +309,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       // Clean up only after successful completion
       resumablesRef.current.delete(id);
       lastBytesRef.current.delete(id);
-    } catch (e) {
+    } catch (e: any) {
       console.log(`[DownloadsContext] Resume threw error for download: ${id}`, e);
 
       // Check if the error was due to pause
@@ -354,13 +361,11 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
     }
 
-    // Create file path
+    // Create file path - use a simple unique identifier with extension from URL
     const baseDir = FileSystem.documentDirectory || FileSystem.cacheDirectory || FileSystem.documentDirectory;
-    const ext = getExtensionFromUrl(input.url);
-    const filenameBase = input.type === 'series'
-      ? `${sanitizeFilename(input.title)}.S${String(input.season || 0).padStart(2, '0')}E${String(input.episode || 0).padStart(2, '0')}`
-      : sanitizeFilename(input.title);
-    const fileUri = `${baseDir}downloads/${filenameBase}.${ext}`;
+    const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    const extension = getExtensionFromUrl(input.url);
+    const fileUri = `${baseDir}downloads/${uniqueId}.${extension}`;
 
     // Ensure directory exists
     await FileSystem.makeDirectoryAsync(`${baseDir}downloads`, { intermediates: true }).catch(() => {});
@@ -460,7 +465,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (done) notifyCompleted({ ...done, status: 'completed', progress: 100, fileUri: result.uri } as DownloadItem);
       resumablesRef.current.delete(compoundId);
       lastBytesRef.current.delete(compoundId);
-    } catch (e) {
+    } catch (e: any) {
       // If user paused, keep paused state, else error
       const current = downloadsRef.current.find(d => d.id === compoundId);
       if (current && current.status === 'paused') {
