@@ -62,27 +62,27 @@ function sanitizeFilename(name: string): string {
   return name.replace(/[^a-z0-9\-_.()\s]/gi, '_').slice(0, 120).trim();
 }
 
-function getExtensionFromUrl(url: string): string {
-  // Try to get extension from URL path
+async function getExtensionFromHeaders(url: string, headers?: Record<string, string>): Promise<string | null> {
   try {
-    const urlPath = new URL(url).pathname;
-    const match = urlPath.match(/\.([a-z0-9]{2,4})$/i);
-    if (match) return match[1];
-  } catch {}
+    const response = await fetch(url, { method: 'HEAD', headers });
+    const contentType = response.headers.get('content-type');
+    
+    if (contentType) {
+      // Map common content types to extensions
+      if (contentType.includes('video/mp4')) return 'mp4';
+      if (contentType.includes('video/x-matroska')) return 'mkv';
+      if (contentType.includes('video/avi')) return 'avi';
+      if (contentType.includes('video/quicktime')) return 'mov';
+      if (contentType.includes('video/webm')) return 'webm';
+      if (contentType.includes('video/x-flv')) return 'flv';
+      if (contentType.includes('video/x-ms-wmv')) return 'wmv';
+      if (contentType.includes('video/x-m4v')) return 'm4v';
+    }
+  } catch (error) {
+    console.warn('[DownloadsContext] Could not get content-type from HEAD request', error);
+  }
   
-  // Fallback to checking for common video extensions in the URL
-  const lower = url.toLowerCase();
-  if (lower.includes('.mp4')) return 'mp4';
-  if (lower.includes('.mkv')) return 'mkv';
-  if (lower.includes('.avi')) return 'avi';
-  if (lower.includes('.mov')) return 'mov';
-  if (lower.includes('.webm')) return 'webm';
-  if (lower.includes('.flv')) return 'flv';
-  if (lower.includes('.wmv')) return 'wmv';
-  if (lower.includes('.m4v')) return 'm4v';
-  
-  // Default to mp4 if no extension found
-  return 'mp4';
+  return null;
 }
 
 function isDownloadableUrl(url: string): boolean {
@@ -361,11 +361,11 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
     }
 
-    // Create file path - use a simple unique identifier with extension from URL
+    // Create file path - use a simple unique identifier with extension from HEAD request
     const baseDir = FileSystem.documentDirectory || FileSystem.cacheDirectory || FileSystem.documentDirectory;
     const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    const extension = getExtensionFromUrl(input.url);
-    const fileUri = `${baseDir}downloads/${uniqueId}.${extension}`;
+    const extension = await getExtensionFromHeaders(input.url, input.headers);
+    const fileUri = extension ? `${baseDir}downloads/${uniqueId}.${extension}` : `${baseDir}downloads/${uniqueId}`;
 
     // Ensure directory exists
     await FileSystem.makeDirectoryAsync(`${baseDir}downloads`, { intermediates: true }).catch(() => {});
