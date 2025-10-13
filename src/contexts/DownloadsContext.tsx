@@ -8,7 +8,7 @@ export type DownloadStatus = 'downloading' | 'completed' | 'paused' | 'error' | 
 
 export interface DownloadItem {
   id: string; // unique id for this download (content id + episode if any)
-  contentId: string; // base id
+  contentId: string; // base id (e.g., tt0903747 for series, tt0499549 for movies)
   type: 'movie' | 'series';
   title: string; // movie title or show name
   providerName?: string;
@@ -29,10 +29,13 @@ export interface DownloadItem {
   fileUri?: string; // local file uri once downloading/finished
   createdAt: number;
   updatedAt: number;
+  // Additional metadata for progress tracking
+  imdbId?: string; // IMDb ID for better tracking
+  tmdbId?: number; // TMDB ID if available
 }
 
 type StartDownloadInput = {
-  id: string;
+  id: string; // Base content ID (e.g., tt0903747)
   type: 'movie' | 'series';
   title: string;
   providerName?: string;
@@ -43,6 +46,9 @@ type StartDownloadInput = {
   posterUrl?: string | null;
   url: string;
   headers?: Record<string, string>;
+  // Additional metadata for progress tracking
+  imdbId?: string;
+  tmdbId?: number;
 };
 
 type DownloadsContextValue = {
@@ -153,6 +159,9 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               fileUri: d.fileUri ? String(d.fileUri) : undefined,
               createdAt: typeof d.createdAt === 'number' ? d.createdAt : Date.now(),
               updatedAt: typeof d.updatedAt === 'number' ? d.updatedAt : Date.now(),
+              // Restore metadata for progress tracking
+              imdbId: (d as any).imdbId ? String((d as any).imdbId) : undefined,
+              tmdbId: typeof (d as any).tmdbId === 'number' ? (d as any).tmdbId : undefined,
             };
             return safe;
           });
@@ -394,6 +403,9 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       fileUri,
       createdAt,
       updatedAt: createdAt,
+      // Store metadata for progress tracking
+      imdbId: input.imdbId,
+      tmdbId: input.tmdbId,
     };
 
     setDownloads(prev => [newItem, ...prev]);

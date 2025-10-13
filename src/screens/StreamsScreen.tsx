@@ -203,7 +203,7 @@ const AnimatedView = memo(({
 });
 
 // Extracted Components
-const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, theme, showLogos, scraperLogo, showAlert, parentTitle, parentType, parentSeason, parentEpisode, parentEpisodeTitle, parentPosterUrl, providerName }: { 
+const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, theme, showLogos, scraperLogo, showAlert, parentTitle, parentType, parentSeason, parentEpisode, parentEpisodeTitle, parentPosterUrl, providerName, parentId, parentImdbId }: { 
   stream: Stream; 
   onPress: () => void; 
   index: number;
@@ -220,6 +220,8 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
   parentEpisodeTitle?: string;
   parentPosterUrl?: string | null;
   providerName?: string;
+  parentId?: string; // Content ID (e.g., tt0903747 or tmdb:1396)
+  parentImdbId?: string; // IMDb ID if available
 }) => {
   const { useSettings } = require('../hooks/useSettings');
   const { settings } = useSettings();
@@ -301,7 +303,17 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
       const episodeTitle = parentEpisodeTitle || parent.episodeTitle || parent.episode_name;
       // Prefer the stream's display name (often includes provider + resolution)
       const provider = (stream.name as any) || (stream.title as any) || providerName || parent.addonName || parent.addonId || (stream.addonName as any) || (stream.addonId as any) || 'Provider';
-      const idForContent = parent.imdbId || parent.tmdbId || parent.addonId || inferredTitle;
+      
+      // Use parentId first (from route params), fallback to stream metadata
+      const idForContent = parentId || parent.imdbId || parent.tmdbId || parent.addonId || inferredTitle;
+      
+      // Extract tmdbId if available (from parentId or parent metadata)
+      let tmdbId: number | undefined = undefined;
+      if (parentId && parentId.startsWith('tmdb:')) {
+        tmdbId = parseInt(parentId.split(':')[1], 10);
+      } else if (typeof parent.tmdbId === 'number') {
+        tmdbId = parent.tmdbId;
+      }
 
       await startDownload({
         id: String(idForContent),
@@ -315,10 +327,13 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
         posterUrl: parentPosterUrl || parent.poster || parent.backdrop || null,
         url,
         headers: (stream.headers as any) || undefined,
+        // Pass metadata for progress tracking
+        imdbId: parentImdbId || parent.imdbId || undefined,
+        tmdbId: tmdbId,
       });
       Toast.success('Download started', 'bottom');
     } catch {}
-  }, [startDownload, stream.url, stream.headers, streamInfo.quality, showAlert, stream.name, stream.title]);
+  }, [startDownload, stream.url, stream.headers, streamInfo.quality, showAlert, stream.name, stream.title, parentId, parentImdbId, parentTitle, parentType, parentSeason, parentEpisode, parentEpisodeTitle, parentPosterUrl, providerName]);
 
   const isDebrid = streamInfo.isDebrid;
   return (
@@ -2188,6 +2203,8 @@ export const StreamsScreen = () => {
                             parentEpisodeTitle={(type === 'series' || type === 'other') ? currentEpisode?.name : undefined}
                             parentPosterUrl={episodeImage || metadata?.poster || undefined}
                             providerName={streams && Object.keys(streams).find(pid => (streams as any)[pid]?.streams?.includes?.(item))}
+                            parentId={id}
+                            parentImdbId={imdbId}
                           />
                         </View>
                       )}

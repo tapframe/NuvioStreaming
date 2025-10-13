@@ -105,11 +105,11 @@ const DownloadItemComponent: React.FC<{
       case 'downloading':
         return currentTheme.colors.primary;
       case 'completed':
-        return currentTheme.colors.success;
+        return currentTheme.colors.success || '#4CAF50';
       case 'paused':
-        return currentTheme.colors.warning;
+        return currentTheme.colors.warning || '#FF9500';
       case 'error':
-        return currentTheme.colors.error;
+        return currentTheme.colors.error || '#FF3B30';
       case 'queued':
         return currentTheme.colors.mediumEmphasis;
       default:
@@ -166,7 +166,7 @@ const DownloadItemComponent: React.FC<{
 
   return (
     <TouchableOpacity
-      style={[styles.downloadItem, { backgroundColor: currentTheme.colors.card }]}
+      style={[styles.downloadItem, { backgroundColor: currentTheme.colors.elevation2 }]}
       onPress={() => onPress(item)}
       onLongPress={handleLongPress}
       activeOpacity={0.8}
@@ -192,7 +192,7 @@ const DownloadItemComponent: React.FC<{
           {/* Provider + quality row */}
           <View style={styles.providerRow}>
             <Text style={[styles.providerText, { color: currentTheme.colors.mediumEmphasis }]}>
-              {(item.providerName || 'Provider') + (item.quality ? `  ${item.quality}` : '')}
+              {item.providerName || 'Provider'}
             </Text>
           </View>
           {/* Status row */}
@@ -344,6 +344,11 @@ const DownloadsScreen: React.FC = () => {
     const isMp4 = /\.mp4(\?|$)/i.test(lower);
     const videoType = isM3u8 ? 'm3u8' : isMpd ? 'mpd' : isMp4 ? 'mp4' : undefined;
 
+    // Build episodeId for series progress tracking (format: contentId:season:episode)
+    const episodeId = item.type === 'series' && item.season && item.episode
+      ? `${item.contentId}:${item.season}:${item.episode}`
+      : undefined;
+
     const playerRoute = Platform.OS === 'ios' ? 'PlayerIOS' : 'PlayerAndroid';
     navigation.navigate(playerRoute as any, {
       uri,
@@ -357,10 +362,10 @@ const DownloadsScreen: React.FC = () => {
       streamName: item.providerName || 'Offline',
       headers: undefined,
       forceVlc: Platform.OS === 'android' ? isMkv : false,
-      id: item.id,
+      id: item.contentId, // Use contentId (base ID) instead of compound id for progress tracking
       type: item.type,
-      episodeId: undefined,
-      imdbId: undefined,
+      episodeId: episodeId, // Pass episodeId for series progress tracking
+      imdbId: (item as any).imdbId || item.contentId, // Use imdbId if available, fallback to contentId
       availableStreams: {},
       backdrop: undefined,
       videoType,
@@ -409,7 +414,7 @@ const DownloadsScreen: React.FC = () => {
         styles.filterButtonText,
         {
           color: selectedFilter === filter 
-            ? currentTheme.colors.background 
+            ? currentTheme.colors.white 
             : currentTheme.colors.text,
         }
       ]}>
@@ -420,7 +425,7 @@ const DownloadsScreen: React.FC = () => {
           styles.filterBadge,
           {
             backgroundColor: selectedFilter === filter 
-              ? currentTheme.colors.background 
+              ? currentTheme.colors.white 
               : currentTheme.colors.primary,
           }
         ]}>
@@ -429,7 +434,7 @@ const DownloadsScreen: React.FC = () => {
             {
               color: selectedFilter === filter 
                 ? currentTheme.colors.primary 
-                : currentTheme.colors.background,
+                : currentTheme.colors.white,
             }
           ]}>
             {count}
@@ -440,7 +445,7 @@ const DownloadsScreen: React.FC = () => {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: currentTheme.colors.background }]}>
+    <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
       <StatusBar
         translucent
         barStyle="light-content"
@@ -451,8 +456,9 @@ const DownloadsScreen: React.FC = () => {
       <Animated.View style={[
         styles.header,
         {
-          backgroundColor: currentTheme.colors.background,
+          backgroundColor: currentTheme.colors.darkBackground,
           paddingTop: safeAreaTop + 16,
+          borderBottomColor: currentTheme.colors.border,
         },
         headerStyle,
       ]}>
@@ -484,6 +490,7 @@ const DownloadsScreen: React.FC = () => {
               onAction={handleDownloadAction}
             />
           )}
+          style={{ backgroundColor: currentTheme.colors.darkBackground }}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -523,7 +530,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
   headerTitle: {
     fontSize: 32,
