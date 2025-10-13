@@ -786,30 +786,68 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         try {
           if (settings.enrichMetadataWithTMDB && settings.useTmdbLocalizedMetadata) {
             const tmdbSvc = TMDBService.getInstance();
-            // Ensure we have a TMDB ID
             let finalTmdbId: number | null = tmdbId;
             if (!finalTmdbId) {
               finalTmdbId = await tmdbSvc.extractTMDBIdFromStremioId(actualId);
               if (finalTmdbId) setTmdbId(finalTmdbId);
             }
+
             if (finalTmdbId) {
               const lang = settings.tmdbLanguagePreference || 'en';
               if (type === 'movie') {
                 const localized = await tmdbSvc.getMovieDetails(String(finalTmdbId), lang);
                 if (localized) {
+                  const movieDetailsObj = {
+                    status: localized.status,
+                    releaseDate: localized.release_date,
+                    runtime: localized.runtime,
+                    budget: localized.budget,
+                    revenue: localized.revenue,
+                    originalLanguage: localized.original_language,
+                    originCountry: localized.production_countries?.map((c: any) => c.iso_3166_1),
+                    tagline: localized.tagline,
+                  };
+                  const productionInfo = Array.isArray(localized.production_companies)
+                    ? localized.production_companies
+                        .map((c: any) => ({ id: c?.id, name: c?.name, logo: tmdbSvc.getImageUrl(c?.logo_path, 'w185') }))
+                        .filter((c: any) => c && (c.logo || c.name))
+                    : [];
+
                   finalMetadata = {
                     ...finalMetadata,
                     name: localized.title || finalMetadata.name,
                     description: localized.overview || finalMetadata.description,
+                    movieDetails: movieDetailsObj,
+                    ...(productionInfo.length > 0 && { networks: productionInfo }),
                   };
                 }
-              } else {
+              } else { // 'series'
                 const localized = await tmdbSvc.getTVShowDetails(Number(finalTmdbId), lang);
                 if (localized) {
+                   const tvDetails = {
+                    status: localized.status,
+                    firstAirDate: localized.first_air_date,
+                    lastAirDate: localized.last_air_date,
+                    numberOfSeasons: localized.number_of_seasons,
+                    numberOfEpisodes: localized.number_of_episodes,
+                    episodeRunTime: localized.episode_run_time,
+                    type: localized.type,
+                    originCountry: localized.origin_country,
+                    originalLanguage: localized.original_language,
+                    createdBy: localized.created_by,
+                  };
+                  const productionInfo = Array.isArray(localized.networks)
+                    ? localized.networks
+                        .map((n: any) => ({ id: n?.id, name: n?.name, logo: tmdbSvc.getImageUrl(n?.logo_path, 'w185') }))
+                        .filter((n: any) => n && (n.logo || n.name))
+                    : [];
+
                   finalMetadata = {
                     ...finalMetadata,
                     name: localized.name || finalMetadata.name,
                     description: localized.overview || finalMetadata.description,
+                    tvDetails,
+                    ...(productionInfo.length > 0 && { networks: productionInfo }),
                   };
                 }
               }
@@ -1781,10 +1819,24 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         const tmdbService = TMDBService.getInstance();
         let productionInfo: any[] = [];
 
+        if (__DEV__) console.log('[useMetadata] fetchProductionInfo starting', {
+          contentKey,
+          type,
+          tmdbId,
+          useLocalized: settings.useTmdbLocalizedMetadata,
+          lang: settings.useTmdbLocalizedMetadata ? (settings.tmdbLanguagePreference || 'en') : 'en',
+          hasExistingNetworks: !!(metadata as any).networks
+        });
+
         if (type === 'series') {
           // Fetch networks and additional details for TV shows
-          const showDetails = await tmdbService.getTVShowDetails(tmdbId, 'en-US');
+          const lang = settings.useTmdbLocalizedMetadata ? (settings.tmdbLanguagePreference || 'en') : 'en';
+          const showDetails = await tmdbService.getTVShowDetails(tmdbId, lang);
           if (showDetails) {
+            if (__DEV__) console.log('[useMetadata] fetchProductionInfo got showDetails', {
+              hasNetworks: !!showDetails.networks,
+              networksCount: showDetails.networks?.length || 0
+            });
             // Fetch networks
             if (showDetails.networks) {
               productionInfo = Array.isArray(showDetails.networks)
@@ -1821,8 +1873,13 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
           }
         } else if (type === 'movie') {
           // Fetch production companies and additional details for movies
-          const movieDetails = await tmdbService.getMovieDetails(String(tmdbId), 'en-US');
+          const lang = settings.useTmdbLocalizedMetadata ? (settings.tmdbLanguagePreference || 'en') : 'en';
+          const movieDetails = await tmdbService.getMovieDetails(String(tmdbId), lang);
           if (movieDetails) {
+            if (__DEV__) console.log('[useMetadata] fetchProductionInfo got movieDetails', {
+              hasProductionCompanies: !!movieDetails.production_companies,
+              productionCompaniesCount: movieDetails.production_companies?.length || 0
+            });
             // Fetch production companies
             if (movieDetails.production_companies) {
               productionInfo = Array.isArray(movieDetails.production_companies)
@@ -1844,7 +1901,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
               budget: movieDetails.budget,
               revenue: movieDetails.revenue,
               originalLanguage: movieDetails.original_language,
-              originCountry: movieDetails.origin_country,
+              originCountry: movieDetails.production_countries?.map((c: any) => c.iso_3166_1),
               tagline: movieDetails.tagline,
             };
 
@@ -1859,7 +1916,10 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
         if (__DEV__) console.log('[useMetadata] Fetched production info via TMDB:', productionInfo);
         if (productionInfo.length > 0) {
+          if (__DEV__) console.log('[useMetadata] Setting production info on metadata', { productionInfoCount: productionInfo.length });
           setMetadata((prev: any) => ({ ...prev, networks: productionInfo }));
+        } else {
+          if (__DEV__) console.log('[useMetadata] No production info found, not setting networks');
         }
       } catch (error) {
         if (__DEV__) console.error('[useMetadata] Failed to fetch production info:', error);

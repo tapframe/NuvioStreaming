@@ -11,7 +11,6 @@ import { storageService } from '../../services/storageService';
 import { logger } from '../../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
-import { getSelectedBackdropUrl } from '../../utils/backdropStorage';
 import { LinearGradient } from 'expo-linear-gradient';
 import Slider from '@react-native-community/slider';
 import KSPlayerComponent, { KSPlayerRef, KSPlayerSource } from './KSPlayerComponent';
@@ -135,9 +134,6 @@ const KSPlayerCore: React.FC = () => {
   const backgroundFadeAnim = useRef(new Animated.Value(1)).current;
   const [isBackdropLoaded, setIsBackdropLoaded] = useState(false);
   const backdropImageOpacityAnim = useRef(new Animated.Value(0)).current;
-
-  // Custom backdrop state
-  const [customBackdropUrl, setCustomBackdropUrl] = useState<string | null>(null);
 
   const [isBuffering, setIsBuffering] = useState(false);
   const [ksAudioTracks, setKsAudioTracks] = useState<Array<{ id: number, name: string, language?: string }>>([]);
@@ -316,26 +312,16 @@ const KSPlayerCore: React.FC = () => {
   const hasLogo = metadata && metadata.logo && !metadataLoading;
 
   // Load custom backdrop on mount
-  useEffect(() => {
-    const loadCustomBackdrop = async () => {
-      const backdropUrl = await getSelectedBackdropUrl('original');
-      setCustomBackdropUrl(backdropUrl);
-    };
-
-    loadCustomBackdrop();
-  }, []);
-
   // Prefetch backdrop and title logo for faster loading screen appearance
   useEffect(() => {
-    const finalBackdrop = customBackdropUrl || backdrop;
-    if (finalBackdrop && typeof finalBackdrop === 'string') {
+    if (backdrop && typeof backdrop === 'string') {
       // Reset loading state
       setIsBackdropLoaded(false);
       backdropImageOpacityAnim.setValue(0);
 
       // Prefetch the image
       try {
-        FastImage.preload([{ uri: finalBackdrop }]);
+        FastImage.preload([{ uri: backdrop }]);
         // Image prefetch initiated, fade it in smoothly
         setIsBackdropLoaded(true);
         Animated.timing(backdropImageOpacityAnim, {
@@ -354,7 +340,7 @@ const KSPlayerCore: React.FC = () => {
       setIsBackdropLoaded(true);
       backdropImageOpacityAnim.setValue(0);
     }
-  }, [backdrop, customBackdropUrl]);
+  }, [backdrop]);
 
   useEffect(() => {
     const logoUrl = (metadata && (metadata as any).logo) as string | undefined;
@@ -2455,7 +2441,7 @@ const KSPlayerCore: React.FC = () => {
         ]}
         pointerEvents={shouldHideOpeningOverlay ? 'none' : 'auto'}
       >
-        {(customBackdropUrl || backdrop) && (
+        {backdrop && (
           <Animated.View style={[
               StyleSheet.absoluteFill,
               {
@@ -2465,7 +2451,7 @@ const KSPlayerCore: React.FC = () => {
               }
             ]}>
             <FastImage
-              source={{ uri: customBackdropUrl || backdrop }}
+              source={{ uri: backdrop }}
               style={StyleSheet.absoluteFillObject}
               resizeMode={FastImage.resizeMode.cover}
             />

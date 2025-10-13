@@ -46,7 +46,6 @@ import { useSettings } from '../hooks/useSettings';
 import { MetadataLoadingScreen } from '../components/loading/MetadataLoadingScreen';
 import { useTrailer } from '../contexts/TrailerContext';
 import FastImage from '@d11/react-native-fast-image';
-import { getSelectedBackdropUrl } from '../utils/backdropStorage';
 
 // Import our optimized components and hooks
 import HeroSection from '../components/metadata/HeroSection';
@@ -96,30 +95,20 @@ const MetadataScreen: React.FC = () => {
   const transitionOpacity = useSharedValue(1);
   const interactionComplete = useRef(false);
 
+  // Animation values for network/production sections
+  const networkSectionOpacity = useSharedValue(0);
+  const productionSectionOpacity = useSharedValue(0);
+
   // Comment bottom sheet state
   const [commentBottomSheetVisible, setCommentBottomSheetVisible] = useState(false);
   const [selectedComment, setSelectedComment] = useState<any>(null);
   const [revealedSpoilers, setRevealedSpoilers] = useState<Set<string>>(new Set());
 
-  // Custom backdrop state
-  const [customBackdropUrl, setCustomBackdropUrl] = useState<string | null>(null);
 
   // Debug state changes
   React.useEffect(() => {
     console.log('MetadataScreen: commentBottomSheetVisible changed to:', commentBottomSheetVisible);
   }, [commentBottomSheetVisible]);
-
-  // Load custom backdrop when screen comes into focus (for instant updates when returning from gallery)
-  useFocusEffect(
-    React.useCallback(() => {
-      const loadCustomBackdrop = async () => {
-        const backdropUrl = await getSelectedBackdropUrl('original');
-        setCustomBackdropUrl(backdropUrl);
-      };
-
-      loadCustomBackdrop();
-    }, [])
-  );
 
   React.useEffect(() => {
     console.log('MetadataScreen: selectedComment changed to:', selectedComment?.id);
@@ -146,6 +135,7 @@ const MetadataScreen: React.FC = () => {
     tmdbId,
   } = useMetadata({ id, type, addonId });
 
+
   // Log useMetadata hook state changes for debugging
   React.useEffect(() => {
     console.log('🔍 [MetadataScreen] useMetadata state:', {
@@ -163,6 +153,28 @@ const MetadataScreen: React.FC = () => {
       networksCount: metadata?.networks ? metadata.networks.length : 0
     });
   }, [loading, metadata, metadataError, cast.length, episodes.length, Object.keys(groupedEpisodes).length, imdbId, tmdbId]);
+
+  // Animate network section when data becomes available (for series)
+  useEffect(() => {
+    const hasNetworks = metadata?.networks && metadata.networks.length > 0;
+    const isSeries = Object.keys(groupedEpisodes).length > 0;
+    const shouldShow = shouldLoadSecondaryData && hasNetworks && isSeries;
+
+    if (shouldShow && networkSectionOpacity.value === 0) {
+      networkSectionOpacity.value = withTiming(1, { duration: 400 });
+    }
+  }, [metadata?.networks, Object.keys(groupedEpisodes).length, shouldLoadSecondaryData, networkSectionOpacity]);
+
+  // Animate production section when data becomes available (for movies)
+  useEffect(() => {
+    const hasNetworks = metadata?.networks && metadata.networks.length > 0;
+    const isMovie = Object.keys(groupedEpisodes).length === 0;
+    const shouldShow = shouldLoadSecondaryData && hasNetworks && isMovie;
+
+    if (shouldShow && productionSectionOpacity.value === 0) {
+      productionSectionOpacity.value = withTiming(1, { duration: 400 });
+    }
+  }, [metadata?.networks, Object.keys(groupedEpisodes).length, shouldLoadSecondaryData, productionSectionOpacity]);
 
   // Optimized hooks with memoization and conditional loading
   const watchProgressData = useWatchProgress(id, Object.keys(groupedEpisodes).length > 0 ? 'series' : type as 'movie' | 'series', episodeId, episodes);
@@ -240,7 +252,16 @@ const MetadataScreen: React.FC = () => {
     );
     return { backgroundColor: color as any };
   });
-  
+
+  // Animated styles for network and production sections
+  const networkSectionAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: networkSectionOpacity.value,
+  }));
+
+  const productionSectionAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: productionSectionOpacity.value,
+  }));
+
   // For compatibility with existing code, maintain the static value as well
   const dynamicBackgroundColor = useMemo(() => {
     if (settings.useDominantBackgroundColor && dominantColor && dominantColor !== '#1a1a1a' && dominantColor !== null && dominantColor !== currentTheme.colors.darkBackground) {
@@ -830,7 +851,7 @@ const MetadataScreen: React.FC = () => {
             {/* Hero Section - Optimized */}
             <HeroSection
               metadata={metadata}
-              bannerImage={customBackdropUrl || assetData.bannerImage}
+              bannerImage={assetData.bannerImage}
               loadingBanner={assetData.loadingBanner}
               logoLoadError={assetData.logoLoadError}
               scrollY={animations.scrollY}
@@ -873,7 +894,7 @@ const MetadataScreen: React.FC = () => {
 
               {/* Production info row — shown below description and above cast for series */}
               {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length > 0 && metadata?.networks && metadata.networks.length > 0 && (
-                <View style={styles.productionContainer}>
+                <Animated.View style={[styles.productionContainer, networkSectionAnimatedStyle]}>
                   <Text style={styles.productionHeader}>Network</Text>
                   <View style={styles.productionRow}>
                     {metadata.networks.slice(0, 6).map((net) => (
@@ -890,7 +911,7 @@ const MetadataScreen: React.FC = () => {
                       </View>
                     ))}
                   </View>
-                </View>
+                </Animated.View>
               )}
 
               {/* Cast Section with skeleton when loading - Lazy loaded */}
@@ -905,7 +926,7 @@ const MetadataScreen: React.FC = () => {
 
               {/* Production info row — shown after cast for movies */}
               {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length === 0 && metadata?.networks && metadata.networks.length > 0 && (
-                <View style={styles.productionContainer}>
+                <Animated.View style={[styles.productionContainer, productionSectionAnimatedStyle]}>
                   <Text style={styles.productionHeader}>Production</Text>
                   <View style={styles.productionRow}>
                     {metadata.networks.slice(0, 6).map((net) => (
@@ -922,7 +943,7 @@ const MetadataScreen: React.FC = () => {
                       </View>
                     ))}
                   </View>
-                </View>
+                </Animated.View>
               )}
 
               {/* Comments Section - Lazy loaded */}

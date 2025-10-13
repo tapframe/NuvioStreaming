@@ -1160,7 +1160,7 @@ export const StreamsScreen = () => {
       episodeId: (type === 'series' || type === 'other') && selectedEpisode ? selectedEpisode : undefined,
       imdbId: imdbId || undefined,
       availableStreams: streamsToPass,
-      backdrop: bannerImage || undefined,
+      backdrop: bannerImage,
       // Hint for Android ExoPlayer/react-native-video
       videoType: videoType,
     } as any);

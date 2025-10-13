@@ -12,7 +12,6 @@ import { storageService } from '../../services/storageService';
 import { logger } from '../../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
-import { getSelectedBackdropUrl } from '../../utils/backdropStorage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTraktAutosync } from '../../hooks/useTraktAutosync';
 import { useTraktAutosyncSettings } from '../../hooks/useTraktAutosyncSettings';
@@ -558,8 +557,6 @@ const AndroidVideoPlayer: React.FC = () => {
   const [nextLoadingQuality, setNextLoadingQuality] = useState<string | null>(null);
   const [nextLoadingTitle, setNextLoadingTitle] = useState<string | null>(null);
 
-  // Custom backdrop state
-  const [customBackdropUrl, setCustomBackdropUrl] = useState<string | null>(null);
   const nextEpisodeButtonOpacity = useRef(new Animated.Value(0)).current;
   const nextEpisodeButtonScale = useRef(new Animated.Value(0.8)).current;
 
@@ -583,27 +580,16 @@ const AndroidVideoPlayer: React.FC = () => {
   // Check if we have a logo to show
   const hasLogo = metadata && metadata.logo && !metadataLoading;
 
-  // Load custom backdrop on mount
-  useEffect(() => {
-    const loadCustomBackdrop = async () => {
-      const backdropUrl = await getSelectedBackdropUrl('original');
-      setCustomBackdropUrl(backdropUrl);
-    };
-
-    loadCustomBackdrop();
-  }, []);
-
   // Prefetch backdrop and title logo for faster loading screen appearance
   useEffect(() => {
-    const finalBackdrop = customBackdropUrl || backdrop;
-    if (finalBackdrop && typeof finalBackdrop === 'string') {
+    if (backdrop && typeof backdrop === 'string') {
       // Reset loading state
       setIsBackdropLoaded(false);
       backdropImageOpacityAnim.setValue(0);
 
       // Prefetch the image
       try {
-        FastImage.preload([{ uri: finalBackdrop }]);
+        FastImage.preload([{ uri: backdrop }]);
         // Image prefetch initiated, fade it in smoothly
         setIsBackdropLoaded(true);
         Animated.timing(backdropImageOpacityAnim, {
@@ -622,7 +608,7 @@ const AndroidVideoPlayer: React.FC = () => {
       setIsBackdropLoaded(true);
       backdropImageOpacityAnim.setValue(0);
     }
-  }, [backdrop, customBackdropUrl]);
+  }, [backdrop]);
 
   useEffect(() => {
     const logoUrl = (metadata && (metadata as any).logo) as string | undefined;
@@ -3135,7 +3121,7 @@ const AndroidVideoPlayer: React.FC = () => {
         ]}
         pointerEvents={isOpeningAnimationComplete ? 'none' : 'auto'}
       >
-        {(customBackdropUrl || backdrop) && (
+        {backdrop && (
           <Animated.View style={[
               StyleSheet.absoluteFill,
               {
@@ -3145,7 +3131,7 @@ const AndroidVideoPlayer: React.FC = () => {
               }
             ]}>
             <Image
-              source={{ uri: customBackdropUrl || backdrop }}
+              source={{ uri: backdrop }}
               style={StyleSheet.absoluteFillObject}
               resizeMode="cover"
             />
