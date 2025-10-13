@@ -1766,6 +1766,62 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     maybeAttachCertification();
   }, [tmdbId, metadata, type, settings.enrichMetadataWithTMDB]);
 
+  // Fetch TMDB networks/production companies when TMDB ID is available and enrichment is enabled
+  const productionInfoFetchedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!tmdbId || !settings.enrichMetadataWithTMDB || !metadata) return;
+
+    const contentKey = `${type}-${tmdbId}`;
+    if (productionInfoFetchedRef.current === contentKey || (metadata as any).networks) return;
+
+    const fetchProductionInfo = async () => {
+      try {
+        productionInfoFetchedRef.current = contentKey;
+        const tmdbService = TMDBService.getInstance();
+        let productionInfo: any[] = [];
+
+        if (type === 'series') {
+          // Fetch networks for TV shows
+          const showDetails = await tmdbService.getTVShowDetails(tmdbId, 'en-US');
+          if (showDetails && showDetails.networks) {
+            productionInfo = Array.isArray(showDetails.networks)
+              ? showDetails.networks
+                  .map((n: any) => ({
+                    id: n?.id,
+                    name: n?.name,
+                    logo: tmdbService.getImageUrl(n?.logo_path, 'w185'),
+                  }))
+                  .filter((n: any) => n && (n.logo || n.name))
+              : [];
+          }
+        } else if (type === 'movie') {
+          // Fetch production companies for movies
+          const movieDetails = await tmdbService.getMovieDetails(String(tmdbId), 'en-US');
+          if (movieDetails && movieDetails.production_companies) {
+            productionInfo = Array.isArray(movieDetails.production_companies)
+              ? movieDetails.production_companies
+                  .map((c: any) => ({
+                    id: c?.id,
+                    name: c?.name,
+                    logo: tmdbService.getImageUrl(c?.logo_path, 'w185'),
+                  }))
+                  .filter((c: any) => c && (c.logo || c.name))
+              : [];
+          }
+        }
+
+        if (__DEV__) console.log('[useMetadata] Fetched production info via TMDB:', productionInfo);
+        if (productionInfo.length > 0) {
+          setMetadata((prev: any) => ({ ...prev, networks: productionInfo }));
+        }
+      } catch (error) {
+        if (__DEV__) console.error('[useMetadata] Failed to fetch production info:', error);
+      }
+    };
+
+    fetchProductionInfo();
+  }, [tmdbId, settings.enrichMetadataWithTMDB, metadata, type]);
+
   // Reset tmdbId when id changes
   useEffect(() => {
     setTmdbId(null);
@@ -1791,7 +1847,10 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       
       // Force cleanup
       cleanupStreams();
-      
+
+      // Reset production info fetch tracking
+      productionInfoFetchedRef.current = null;
+
       if (__DEV__) console.log('[useMetadata] Component unmounted, memory cleaned up');
     };
   }, [cleanupStreams]);

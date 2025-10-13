@@ -45,6 +45,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { useSettings } from '../hooks/useSettings';
 import { MetadataLoadingScreen } from '../components/loading/MetadataLoadingScreen';
 import { useTrailer } from '../contexts/TrailerContext';
+import FastImage from '@d11/react-native-fast-image';
 
 // Import our optimized components and hooks
 import HeroSection from '../components/metadata/HeroSection';
@@ -141,7 +142,9 @@ const MetadataScreen: React.FC = () => {
       hasEpisodes: episodes.length > 0,
       seasonsCount: Object.keys(groupedEpisodes).length,
       imdbId,
-      tmdbId
+      tmdbId,
+      hasNetworks: !!(metadata as any)?.networks,
+      networksCount: metadata?.networks ? metadata.networks.length : 0
     });
   }, [loading, metadata, metadataError, cast.length, episodes.length, Object.keys(groupedEpisodes).length, imdbId, tmdbId]);
 
@@ -852,6 +855,28 @@ const MetadataScreen: React.FC = () => {
                 ) : null}
               />
 
+              {/* Production info row — shown below description and above cast for series */}
+              {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length > 0 && metadata?.networks && metadata.networks.length > 0 && (
+                <View style={styles.productionContainer}>
+                  <Text style={styles.productionHeader}>Network</Text>
+                  <View style={styles.productionRow}>
+                    {metadata.networks.slice(0, 6).map((net) => (
+                      <View key={String(net.id || net.name)} style={styles.productionChip}>
+                        {net.logo ? (
+                          <FastImage
+                            source={{ uri: net.logo }}
+                            style={styles.productionLogo}
+                            resizeMode={FastImage.resizeMode.contain}
+                          />
+                        ) : (
+                          <Text style={styles.productionText}>{net.name}</Text>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+
               {/* Cast Section with skeleton when loading - Lazy loaded */}
               {shouldLoadSecondaryData && (
                 <MemoizedCastSection
@@ -860,6 +885,28 @@ const MetadataScreen: React.FC = () => {
                   onSelectCastMember={handleSelectCastMember}
                   isTmdbEnrichmentEnabled={settings.enrichMetadataWithTMDB}
                 />
+              )}
+
+              {/* Production info row — shown after cast for movies */}
+              {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length === 0 && metadata?.networks && metadata.networks.length > 0 && (
+                <View style={styles.productionContainer}>
+                  <Text style={styles.productionHeader}>Production</Text>
+                  <View style={styles.productionRow}>
+                    {metadata.networks.slice(0, 6).map((net) => (
+                      <View key={String(net.id || net.name)} style={styles.productionChip}>
+                        {net.logo ? (
+                          <FastImage
+                            source={{ uri: net.logo }}
+                            style={styles.productionLogo}
+                            resizeMode={FastImage.resizeMode.contain}
+                          />
+                        ) : (
+                          <Text style={styles.productionText}>{net.name}</Text>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                </View>
               )}
 
               {/* Comments Section - Lazy loaded */}
@@ -1033,6 +1080,47 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 8,
     marginBottom: 8,
+  },
+  productionContainer: {
+    paddingHorizontal: 16,
+    marginTop: 0,
+    marginBottom: 20,
+  },
+  productionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+  },
+  productionChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(245,245,245,0.9)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 36,
+  },
+  productionLogo: {
+    width: 64,
+    height: 22,
+  },
+  productionText: {
+    color: '#333',
+    fontSize: 12,
+    fontWeight: '600',
+    opacity: 0.9,
+  },
+  productionHeader: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    opacity: 0.8,
   },
 });
 

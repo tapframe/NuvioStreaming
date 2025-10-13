@@ -93,6 +93,11 @@ export interface StreamingContent {
     character: string;
     profile_path: string | null;
   }>;
+  networks?: Array<{
+    id: number | string;
+    name: string;
+    logo?: string;
+  }>;
 }
 
 export interface CatalogContent {

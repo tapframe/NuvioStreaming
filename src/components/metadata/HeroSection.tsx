@@ -1534,6 +1534,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
             </Animated.View>
           )}
 
+
           {/* Optimized Action Buttons */}
           <ActionButtons 
             handleShowStreams={handleShowStreams}

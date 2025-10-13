@@ -166,7 +166,7 @@ export class TMDBService {
         headers: await this.getHeaders(),
         params: await this.getParams({
           language,
-          append_to_response: 'external_ids,credits,keywords' // Append external IDs, cast/crew, and keywords for AI context
+          append_to_response: 'external_ids,credits,keywords,networks' // Append external IDs, cast/crew, keywords, and networks
         }),
       });
       return response.data;
@@ -588,7 +588,7 @@ export class TMDBService {
         headers: await this.getHeaders(),
         params: await this.getParams({
           language,
-          append_to_response: 'external_ids,credits,keywords,release_dates' // Include release dates for accurate availability
+          append_to_response: 'external_ids,credits,keywords,release_dates,production_companies' // Include release dates and production companies
         }),
       });
       return response.data;
