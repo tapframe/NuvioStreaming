@@ -8,16 +8,20 @@ import {
   Dimensions,
   ActivityIndicator,
   StatusBar,
+  Alert,
 } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TMDBService } from '../services/tmdbService';
 
 const { width } = Dimensions.get('window');
 const BACKDROP_WIDTH = width * 0.9;
 const BACKDROP_HEIGHT = (BACKDROP_WIDTH * 9) / 16; // 16:9 aspect ratio
+
+const SELECTED_BACKDROP_KEY = 'selected_custom_backdrop';
 
 interface BackdropItem {
   file_path: string;
@@ -40,6 +44,7 @@ const BackdropGalleryScreen: React.FC = () => {
   const [backdrops, setBackdrops] = useState<BackdropItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedBackdrop, setSelectedBackdrop] = useState<BackdropItem | null>(null);
 
   useEffect(() => {
     const fetchBackdrops = async () => {
@@ -82,16 +87,74 @@ const BackdropGalleryScreen: React.FC = () => {
     }
   }, [tmdbId, type]);
 
+  // Load selected backdrop from storage
+  useEffect(() => {
+    const loadSelectedBackdrop = async () => {
+      try {
+        const saved = await AsyncStorage.getItem(SELECTED_BACKDROP_KEY);
+        if (saved) {
+          const backdrop = JSON.parse(saved);
+          setSelectedBackdrop(backdrop);
+        }
+      } catch (error) {
+        console.error('Failed to load selected backdrop:', error);
+      }
+    };
+
+    loadSelectedBackdrop();
+  }, []);
+
+  const saveSelectedBackdrop = async (backdrop: BackdropItem) => {
+    try {
+      await AsyncStorage.setItem(SELECTED_BACKDROP_KEY, JSON.stringify(backdrop));
+      setSelectedBackdrop(backdrop);
+      Alert.alert('Success', 'Custom backdrop set successfully!');
+    } catch (error) {
+      console.error('Failed to save selected backdrop:', error);
+      Alert.alert('Error', 'Failed to save backdrop');
+    }
+  };
+
+  const resetSelectedBackdrop = async () => {
+    try {
+      await AsyncStorage.removeItem(SELECTED_BACKDROP_KEY);
+      setSelectedBackdrop(null);
+      Alert.alert('Success', 'Custom backdrop reset to default!');
+    } catch (error) {
+      console.error('Failed to reset selected backdrop:', error);
+      Alert.alert('Error', 'Failed to reset backdrop');
+    }
+  };
+
   const renderBackdrop = ({ item, index }: { item: BackdropItem; index: number }) => {
     const imageUrl = `https://image.tmdb.org/t/p/w1280${item.file_path}`;
+    const isSelected = selectedBackdrop?.file_path === item.file_path;
 
     return (
-      <View style={styles.backdropContainer}>
+      <TouchableOpacity
+        style={styles.backdropContainer}
+        onLongPress={() => {
+          Alert.alert(
+            'Set as Default Backdrop',
+            'Use this backdrop for metadata screens and player loading?',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Set as Default', onPress: () => saveSelectedBackdrop(item) }
+            ]
+          );
+        }}
+        delayLongPress={500}
+      >
         <FastImage
           source={{ uri: imageUrl }}
           style={styles.backdropImage}
           resizeMode={FastImage.resizeMode.cover}
         />
+        {isSelected && (
+          <View style={styles.selectedIndicator}>
+            <MaterialIcons name="check-circle" size={24} color="#fff" />
+          </View>
+        )}
         <View style={styles.backdropInfo}>
           <Text style={styles.backdropResolution}>
             {item.width} × {item.height}
@@ -100,7 +163,7 @@ const BackdropGalleryScreen: React.FC = () => {
             {item.aspect_ratio.toFixed(2)}:1
           </Text>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -120,6 +183,23 @@ const BackdropGalleryScreen: React.FC = () => {
           {backdrops.length} Backdrop{backdrops.length !== 1 ? 's' : ''}
         </Text>
       </View>
+      {selectedBackdrop && (
+        <TouchableOpacity
+          style={styles.resetButton}
+          onPress={() => {
+            Alert.alert(
+              'Reset Backdrop',
+              'Remove custom backdrop and use default?',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Reset', style: 'destructive', onPress: resetSelectedBackdrop }
+              ]
+            );
+          }}
+        >
+          <MaterialIcons name="refresh" size={24} color="#fff" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 
@@ -155,6 +235,14 @@ const BackdropGalleryScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       {renderHeader()}
+
+      {/* Explanatory note */}
+      <View style={styles.noteContainer}>
+        <Text style={styles.noteText}>
+          Long press any backdrop to set it as your default for metadata screens and player loading overlay.
+        </Text>
+      </View>
+
       <FlatList
         data={backdrops}
         keyExtractor={(item, index) => `${item.file_path}-${index}`}
@@ -226,6 +314,32 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#fff',
     opacity: 0.8,
+  },
+  selectedIndicator: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(0, 123, 255, 0.9)',
+    borderRadius: 12,
+    padding: 4,
+  },
+  resetButton: {
+    padding: 8,
+    marginLeft: 12,
+  },
+  noteContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 8,
+  },
+  noteText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+    lineHeight: 16,
   },
   loadingContainer: {
     flex: 1,

@@ -46,6 +46,7 @@ import { useSettings } from '../hooks/useSettings';
 import { MetadataLoadingScreen } from '../components/loading/MetadataLoadingScreen';
 import { useTrailer } from '../contexts/TrailerContext';
 import FastImage from '@d11/react-native-fast-image';
+import { getSelectedBackdropUrl } from '../utils/backdropStorage';
 
 // Import our optimized components and hooks
 import HeroSection from '../components/metadata/HeroSection';
@@ -100,10 +101,23 @@ const MetadataScreen: React.FC = () => {
   const [selectedComment, setSelectedComment] = useState<any>(null);
   const [revealedSpoilers, setRevealedSpoilers] = useState<Set<string>>(new Set());
 
+  // Custom backdrop state
+  const [customBackdropUrl, setCustomBackdropUrl] = useState<string | null>(null);
+
   // Debug state changes
   React.useEffect(() => {
     console.log('MetadataScreen: commentBottomSheetVisible changed to:', commentBottomSheetVisible);
   }, [commentBottomSheetVisible]);
+
+  // Load custom backdrop on mount
+  useEffect(() => {
+    const loadCustomBackdrop = async () => {
+      const backdropUrl = await getSelectedBackdropUrl('original');
+      setCustomBackdropUrl(backdropUrl);
+    };
+
+    loadCustomBackdrop();
+  }, []);
 
   React.useEffect(() => {
     console.log('MetadataScreen: selectedComment changed to:', selectedComment?.id);
@@ -812,9 +826,9 @@ const MetadataScreen: React.FC = () => {
             contentContainerStyle={styles.scrollContent}
           >
             {/* Hero Section - Optimized */}
-            <HeroSection 
+            <HeroSection
               metadata={metadata}
-              bannerImage={assetData.bannerImage}
+              bannerImage={customBackdropUrl || assetData.bannerImage}
               loadingBanner={assetData.loadingBanner}
               logoLoadError={assetData.logoLoadError}
               scrollY={animations.scrollY}
