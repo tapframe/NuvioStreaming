@@ -51,6 +51,7 @@ import CastMoviesScreen from '../screens/CastMoviesScreen';
 import UpdateScreen from '../screens/UpdateScreen';
 import AISettingsScreen from '../screens/AISettingsScreen';
 import AIChatScreen from '../screens/AIChatScreen';
+import BackdropGalleryScreen from '../screens/BackdropGalleryScreen';
 import BackupScreen from '../screens/BackupScreen';
 
 // Stack navigator types
@@ -151,6 +152,11 @@ export type RootStackParamList = {
     episodeId?: string;
     seasonNumber?: number;
     episodeNumber?: number;
+    title: string;
+  };
+  BackdropGallery: {
+    tmdbId: number;
+    type: 'movie' | 'tv';
     title: string;
   };
 };
@@ -1328,8 +1334,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen 
-              name="AIChat" 
+            <Stack.Screen
+              name="AIChat"
               component={AIChatScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'none' : 'slide_from_right',
@@ -1340,6 +1346,17 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 headerShown: false,
                 contentStyle: {
                   backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen
+              name="BackdropGallery"
+              component={BackdropGalleryScreen}
+              options={{
+                animation: 'slide_from_right',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: '#000',
                 },
               }}
             />

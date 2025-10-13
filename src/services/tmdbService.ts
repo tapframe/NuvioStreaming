@@ -598,7 +598,25 @@ export class TMDBService {
   }
 
   /**
-   * Get movie images (logos, posters, backdrops) by TMDB ID
+   * Get movie images (logos, posters, backdrops) by TMDB ID - returns full images object
+   */
+  async getMovieImagesFull(movieId: number | string): Promise<any> {
+    try {
+      const response = await axios.get(`${BASE_URL}/movie/${movieId}/images`, {
+        headers: await this.getHeaders(),
+        params: await this.getParams({
+          include_image_language: `en,null`
+        }),
+      });
+
+      return response.data;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Get movie images (logos only) by TMDB ID - legacy method
    */
   async getMovieImages(movieId: number | string, preferredLanguage: string = 'en'): Promise<string | null> {
     try {
@@ -697,7 +715,25 @@ export class TMDBService {
   }
 
   /**
-   * Get TV show images (logos, posters, backdrops) by TMDB ID
+   * Get TV show images (logos, posters, backdrops) by TMDB ID - returns full images object
+   */
+  async getTvShowImagesFull(showId: number | string): Promise<any> {
+    try {
+      const response = await axios.get(`${BASE_URL}/tv/${showId}/images`, {
+        headers: await this.getHeaders(),
+        params: await this.getParams({
+          include_image_language: `en,null`
+        }),
+      });
+
+      return response.data;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Get TV show images (logos only) by TMDB ID - legacy method
    */
   async getTvShowImages(showId: number | string, preferredLanguage: string = 'en'): Promise<string | null> {
     try {

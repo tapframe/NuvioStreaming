@@ -54,6 +54,7 @@ export interface StreamingContent {
   id: string;
   type: string;
   name: string;
+  tmdbId?: number;
   poster: string;
   posterShape?: string;
   banner?: string;

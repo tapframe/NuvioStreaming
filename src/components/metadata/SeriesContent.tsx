@@ -936,12 +936,12 @@ const styles = StyleSheet.create({
   
   // Vertical Layout Styles
   episodeListContentVertical: {
-    paddingBottom: 20,
+    paddingBottom: 8,
     paddingHorizontal: 16,
   },
   episodeListContentVerticalTablet: {
     paddingHorizontal: 16,
-    paddingBottom: 20,
+    paddingBottom: 8,
   },
   episodeGridVertical: {
     flexDirection: 'row',

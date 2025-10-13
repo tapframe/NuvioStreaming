@@ -995,6 +995,24 @@ const MetadataScreen: React.FC = () => {
                 </View>
               )}
 
+              {/* Backdrop Gallery section - shown after details for movies/TV when TMDB ID is available */}
+              {shouldLoadSecondaryData && metadata?.tmdbId && (
+                <View style={styles.backdropGalleryContainer}>
+                  <TouchableOpacity
+                    style={styles.backdropGalleryButton}
+                    onPress={() => navigation.navigate('BackdropGallery' as any, {
+                      tmdbId: metadata.tmdbId,
+                      type: Object.keys(groupedEpisodes).length > 0 ? 'tv' : 'movie',
+                      title: metadata.name || 'Gallery'
+                    })}
+                  >
+                    <MaterialIcons name="photo-library" size={24} color="#fff" />
+                    <Text style={styles.backdropGalleryText}>Backdrop Gallery</Text>
+                    <MaterialIcons name="chevron-right" size={24} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              )}
+
               {/* Recommendations Section with skeleton when loading - Lazy loaded */}
               {type === 'movie' && shouldLoadSecondaryData && (
                 <MemoizedMoreLikeThisSection
@@ -1287,7 +1305,7 @@ const styles = StyleSheet.create({
   },
   tvDetailsContainer: {
     paddingHorizontal: 16,
-    marginTop: 20,
+    marginTop: 8,
     marginBottom: 16,
   },
   tvDetailsHeader: {
@@ -1320,6 +1338,30 @@ const styles = StyleSheet.create({
     opacity: 0.9,
     textAlign: 'right',
     flex: 1,
+  },
+  backdropGalleryContainer: {
+    paddingHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 16,
+  },
+  backdropGalleryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  backdropGalleryText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    marginLeft: 12,
+    opacity: 0.9,
   },
 });
 

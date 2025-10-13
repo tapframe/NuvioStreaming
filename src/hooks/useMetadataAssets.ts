@@ -103,6 +103,17 @@ export const useMetadataAssets = (
   // Optimized logo fetching
   useEffect(() => {
     const logoPreference = settings.logoSourcePreference || 'tmdb';
+
+    if (__DEV__) {
+      console.log('[useMetadataAssets] Logo fetch triggered:', {
+        id,
+        type,
+        logoPreference,
+        hasImdbId: !!imdbId,
+        tmdbEnrichmentEnabled: settings.enrichMetadataWithTMDB,
+        logoFetchInProgress: logoFetchInProgress.current
+      });
+    }
     const currentLogoUrl = metadata?.logo;
     let shouldFetchLogo = false;
 
@@ -141,12 +152,12 @@ export const useMetadataAssets = (
         
         try {
           const preferredLanguage = settings.tmdbLanguagePreference || 'en';
-          
+
           if (logoPreference === 'tmdb') {
             // TMDB path - optimized flow
             let tmdbId: string | null = null;
             let contentType = type === 'series' ? 'tv' : 'movie';
-            
+
             // Extract or find TMDB ID in one step
             if (id.startsWith('tmdb:')) {
               tmdbId = id.split(':')[1];
@@ -157,9 +168,11 @@ export const useMetadataAssets = (
                 if (foundId) {
                   tmdbId = String(foundId);
                   setFoundTmdbId(tmdbId); // Save for banner fetching
+                } else if (__DEV__) {
+                  console.log('[useMetadataAssets] Could not find TMDB ID for IMDB:', imdbId);
                 }
               } catch (error) {
-                // Handle error silently
+                if (__DEV__) console.error('[useMetadataAssets] Error finding TMDB ID:', error);
               }
             } else {
               const parsedId = parseInt(id, 10);
@@ -173,15 +186,39 @@ export const useMetadataAssets = (
                 // Direct fetch - avoid multiple service calls
                 const tmdbService = TMDBService.getInstance();
                 const logoUrl = await tmdbService.getContentLogo(contentType as 'tv' | 'movie', tmdbId, preferredLanguage);
-                  
+
+                if (__DEV__) {
+                  console.log('[useMetadataAssets] Logo fetch result:', {
+                    contentType,
+                    tmdbId,
+                    preferredLanguage,
+                    logoUrl,
+                    logoPreference
+                  });
+                }
+
                 if (logoUrl) {
                   // Preload the image
                   FastImage.preload([{ uri: logoUrl }]);
-                  
+
                   setMetadata((prevMetadata: any) => ({ ...prevMetadata!, logo: logoUrl }));
+                } else {
+                  // TMDB logo not found, try to restore addon logo if it exists
+                  if (currentLogoUrl && !isTmdbUrl(currentLogoUrl)) {
+                    if (__DEV__) console.log('[useMetadataAssets] Restoring addon logo after TMDB logo not found');
+                    setMetadata((prevMetadata: any) => ({ ...prevMetadata!, logo: currentLogoUrl }));
+                  } else if (__DEV__) {
+                    console.log('[useMetadataAssets] No logo found for TMDB ID:', tmdbId);
+                  }
                 }
               } catch (error) {
-                // Handle error silently
+                // TMDB logo fetch failed, try to restore addon logo if it exists
+                if (currentLogoUrl && !isTmdbUrl(currentLogoUrl)) {
+                  if (__DEV__) console.log('[useMetadataAssets] Restoring addon logo after TMDB fetch error');
+                  setMetadata((prevMetadata: any) => ({ ...prevMetadata!, logo: currentLogoUrl }));
+                } else if (__DEV__) {
+                  console.error('[useMetadataAssets] Logo fetch error:', error);
+                }
               }
             }
           }

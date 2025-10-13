@@ -1692,6 +1692,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
               if (__DEV__) console.log('[useMetadata] fetched certification via TMDB id (extract path)', { type, fetchedTmdbId, certification });
               setMetadata(prev => prev ? {
                 ...prev,
+                tmdbId: fetchedTmdbId,
                 certification
               } : null);
             } else {
@@ -1755,7 +1756,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         const cert = await tmdbSvc.getCertification(type, tmdbId);
         if (cert) {
           if (__DEV__) console.log('[useMetadata] fetched certification (attach path)', { type, tmdbId, cert });
-          setMetadata(prev => prev ? { ...prev, certification: cert } : prev);
+          setMetadata(prev => prev ? { ...prev, tmdbId, certification: cert } : prev);
         } else {
           if (__DEV__) console.warn('[useMetadata] TMDB returned no certification (attach path)', { type, tmdbId });
         }
@@ -1814,6 +1815,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             // Update metadata with TV details
             setMetadata((prev: any) => ({
               ...prev,
+              tmdbId,
               tvDetails
             }));
           }
@@ -1849,6 +1851,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             // Update metadata with movie details
             setMetadata((prev: any) => ({
               ...prev,
+              tmdbId,
               movieDetails: movieDetailsObj
             }));
           }
