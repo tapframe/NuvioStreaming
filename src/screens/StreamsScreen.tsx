@@ -238,18 +238,14 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
           Toast.success('Stream URL copied to clipboard!', 'bottom');
         } else {
           // iOS uses custom alert
-          setTimeout(() => {
-            showAlert('Copied!', 'Stream URL has been copied to clipboard.');
-          }, 50);
+          showAlert('Copied!', 'Stream URL has been copied to clipboard.');
         }
       } catch (error) {
         // Fallback: show URL in alert if clipboard fails
         if (Platform.OS === 'android') {
           Toast.info(`Stream URL: ${stream.url}`, 'bottom');
         } else {
-          setTimeout(() => {
-            showAlert('Stream URL', stream.url);
-          }, 50);
+          showAlert('Stream URL', stream.url);
         }
       }
     }
@@ -331,19 +327,18 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
         imdbId: parentImdbId || parent.imdbId || undefined,
         tmdbId: tmdbId,
       });
-      Toast.success('Download started', 'bottom');
+      showAlert('Download Started', 'Your download has been added to the queue.');
     } catch {}
   }, [startDownload, stream.url, stream.headers, streamInfo.quality, showAlert, stream.name, stream.title, parentId, parentImdbId, parentTitle, parentType, parentSeason, parentEpisode, parentEpisodeTitle, parentPosterUrl, providerName]);
 
   const isDebrid = streamInfo.isDebrid;
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
         style={[
-          styles.streamCard, 
+          styles.streamCard,
           isLoading && styles.streamCardLoading,
           isDebrid && styles.streamCardHighlighted
-        ]} 
-        onPress={onPress}
+        ]}
         onLongPress={handleLongPress}
         disabled={isLoading}
         activeOpacity={0.7}
@@ -402,20 +397,24 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
           </View>
         </View>
         
-        <View style={styles.streamAction}>
-          <MaterialIcons 
-            name="play-arrow" 
-            size={22} 
-            color={theme.colors.white} 
+        <TouchableOpacity
+          style={styles.streamAction}
+          onPress={() => onPress()}
+          activeOpacity={0.7}
+        >
+          <MaterialIcons
+            name="play-arrow"
+            size={22}
+            color={theme.colors.white}
           />
-        </View>
+        </TouchableOpacity>
         {settings?.enableDownloads !== false && (
           <TouchableOpacity
             style={[styles.streamAction, { marginLeft: 8, backgroundColor: theme.colors.elevation2 }]}
             onPress={handleDownload}
             activeOpacity={0.7}
           >
-            <MaterialIcons 
+            <MaterialIcons
               name="download"
               size={20}
               color={theme.colors.highEmphasis}
@@ -2204,7 +2203,7 @@ export const StreamsScreen = () => {
                             parentPosterUrl={episodeImage || metadata?.poster || undefined}
                             providerName={streams && Object.keys(streams).find(pid => (streams as any)[pid]?.streams?.includes?.(item))}
                             parentId={id}
-                            parentImdbId={imdbId}
+                            parentImdbId={imdbId || undefined}
                           />
                         </View>
                       )}

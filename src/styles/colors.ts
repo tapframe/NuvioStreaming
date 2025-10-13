@@ -49,8 +49,8 @@ export const colors = {
   surfaceVariant: 'rgba(255, 255, 255, 0.03)', // Material dark theme surface variant
   
   // Material Design elevation overlays
-  elevation1: 'rgba(255, 255, 255, 0.05)',
-  elevation2: 'rgba(255, 255, 255, 0.08)',
+  elevation1: 'rgba(255, 255, 255, 0.03)',
+  elevation2: 'rgba(255, 255, 255, 0.03)',
   elevation3: 'rgba(255, 255, 255, 0.11)',
   elevation4: 'rgba(255, 255, 255, 0.12)',
   

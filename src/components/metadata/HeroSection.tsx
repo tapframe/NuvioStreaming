@@ -38,7 +38,6 @@ import { logger } from '../../utils/logger';
 import { TMDBService } from '../../services/tmdbService';
 import TrailerService from '../../services/trailerService';
 import TrailerPlayer from '../video/TrailerPlayer';
-import { isTmdbUrl } from '../../utils/logoUtils';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -895,17 +894,10 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     bannerImage || metadata.banner || metadata.poster
   , [bannerImage, metadata.banner, metadata.poster]);
 
-  // Prefer TMDB logo when enrichment is enabled; fallback to addon's logo
+  // Use the logo provided by metadata (already enriched by useMetadataAssets based on settings)
   const logoUri = useMemo(() => {
-    const candidate = metadata?.logo as string | undefined;
-    if (!candidate) return undefined;
-    if (settings?.enrichMetadataWithTMDB) {
-      // If the current logo is a TMDB URL, use it; otherwise still use available logo
-      if (isTmdbUrl(candidate)) return candidate;
-      return candidate;
-    }
-    return candidate;
-  }, [metadata.logo, settings?.enrichMetadataWithTMDB]);
+    return metadata?.logo as string | undefined;
+  }, [metadata?.logo]);
   
   // Performance optimization: Lazy loading setup
   useEffect(() => {

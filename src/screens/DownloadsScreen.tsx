@@ -26,11 +26,34 @@ import Animated, {
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { LinearGradient } from 'expo-linear-gradient';
+import FastImage from '@d11/react-native-fast-image';
 import { useDownloads } from '../contexts/DownloadsContext';
 import type { DownloadItem } from '../contexts/DownloadsContext';
 import { Toast } from 'toastify-react-native';
+import CustomAlert from '../components/CustomAlert';
 
 const { height, width } = Dimensions.get('window');
+const isTablet = width >= 768;
+
+// Tablet-optimized poster sizes
+const HORIZONTAL_ITEM_WIDTH = isTablet ? width * 0.18 : width * 0.3;
+const HORIZONTAL_POSTER_HEIGHT = HORIZONTAL_ITEM_WIDTH * 1.5;
+const POSTER_WIDTH = isTablet ? 70 : 90;
+const POSTER_HEIGHT = isTablet ? 105 : 135;
+
+// Helper function to optimize poster URLs
+const optimizePosterUrl = (poster: string | undefined | null): string => {
+  if (!poster || poster.includes('placeholder')) {
+    return 'https://via.placeholder.com/80x120/333333/666666?text=No+Image';
+  }
+
+  // For TMDB images, use larger sizes for bigger posters
+  if (poster.includes('image.tmdb.org')) {
+    return poster.replace(/\/w\d+\//, '/w300/');
+  }
+
+  return poster;
+};
 
 // Download items come from DownloadsContext
 
@@ -74,6 +97,16 @@ const DownloadItemComponent: React.FC<{
   onAction: (item: DownloadItem, action: 'pause' | 'resume' | 'cancel' | 'retry') => void;
 }> = React.memo(({ item, onPress, onAction }) => {
   const { currentTheme } = useTheme();
+  const [posterUrl, setPosterUrl] = useState<string | null>(item.posterUrl || null);
+
+  // Try to fetch poster if not available
+  useEffect(() => {
+    if (!posterUrl && (item.imdbId || item.tmdbId)) {
+      // This could be enhanced to fetch poster from TMDB API if needed
+      // For now, we'll use the existing posterUrl or fallback to placeholder
+      setPosterUrl(item.posterUrl || null);
+    }
+  }, [item.imdbId, item.tmdbId, item.posterUrl, posterUrl]);
 
   const handleLongPress = useCallback(() => {
     if (item.status === 'completed' && item.fileUri) {
@@ -171,6 +204,29 @@ const DownloadItemComponent: React.FC<{
       onLongPress={handleLongPress}
       activeOpacity={0.8}
     >
+      {/* Poster */}
+      <View style={styles.posterContainer}>
+        <FastImage
+          source={{ uri: optimizePosterUrl(posterUrl) }}
+          style={styles.poster}
+          resizeMode={FastImage.resizeMode.cover}
+        />
+        {/* Status indicator overlay */}
+        <View style={[styles.statusOverlay, { backgroundColor: getStatusColor() }]}>
+          <MaterialCommunityIcons
+            name={
+              item.status === 'completed' ? 'check' :
+              item.status === 'downloading' ? 'download' :
+              item.status === 'paused' ? 'pause' :
+              item.status === 'error' ? 'alert-circle' :
+              'clock'
+            }
+            size={12}
+            color="white"
+          />
+        </View>
+      </View>
+
       {/* Content info */}
       <View style={styles.downloadContent}>
         <View style={styles.downloadHeader}>
@@ -208,7 +264,21 @@ const DownloadItemComponent: React.FC<{
               {formatBytes(item.downloadedBytes)} / {item.totalBytes ? formatBytes(item.totalBytes) : '—'}
             </Text>
           </View>
-          
+
+          {/* Warning for small files */}
+          {item.totalBytes && item.totalBytes < 1048576 && ( // Less than 1MB
+            <View style={styles.warningRow}>
+              <MaterialCommunityIcons
+                name="alert-circle"
+                size={14}
+                color={currentTheme.colors.warning || '#FF9500'}
+              />
+              <Text style={[styles.warningText, { color: currentTheme.colors.warning || '#FF9500' }]}>
+                May not play - streaming playlist
+              </Text>
+            </View>
+          )}
+
           {/* Progress bar */}
           <View style={[styles.progressContainer, { backgroundColor: currentTheme.colors.elevation1 }]}>
             <Animated.View
@@ -284,6 +354,7 @@ const DownloadsScreen: React.FC = () => {
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'downloading' | 'completed' | 'paused'>('all');
+  const [showHelpAlert, setShowHelpAlert] = useState(false);
 
   // Animation values
   const headerOpacity = useSharedValue(1);
@@ -383,6 +454,11 @@ const DownloadsScreen: React.FC = () => {
     setSelectedFilter(filter);
   }, []);
 
+  const showDownloadHelp = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowHelpAlert(true);
+  }, []);
+
   // Focus effect
   useFocusEffect(
     useCallback(() => {
@@ -462,9 +538,22 @@ const DownloadsScreen: React.FC = () => {
         },
         headerStyle,
       ]}>
-        <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
-          Downloads
-        </Text>
+        <View style={styles.headerTitleRow}>
+          <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
+            Downloads
+          </Text>
+          <TouchableOpacity
+            style={styles.helpButton}
+            onPress={showDownloadHelp}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons
+              name="help-circle-outline"
+              size={24}
+              color={currentTheme.colors.mediumEmphasis}
+            />
+          </TouchableOpacity>
+        </View>
         
         {downloads.length > 0 && (
           <View style={styles.filterContainer}>
@@ -518,6 +607,14 @@ const DownloadsScreen: React.FC = () => {
           )}
         />
       )}
+
+      {/* Help Alert */}
+      <CustomAlert
+        visible={showHelpAlert}
+        title="Download Limitations"
+        message="• Files smaller than 1MB are typically M3U8 streaming playlists and cannot be downloaded for offline viewing. These only work with online streaming and contain links to video segments, not the actual video content."
+        onClose={() => setShowHelpAlert(false)}
+      />
     </View>
   );
 };
@@ -527,29 +624,38 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingHorizontal: isTablet ? 24 : 20,
+    paddingBottom: isTablet ? 20 : 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: isTablet ? 20 : 16,
+  },
   headerTitle: {
-    fontSize: 32,
+    fontSize: isTablet ? 36 : 32,
     fontWeight: '700',
-    marginBottom: 16,
+  },
+  helpButton: {
+    padding: 8,
+    marginLeft: 8,
   },
   filterContainer: {
     flexDirection: 'row',
-    gap: 12,
+    gap: isTablet ? 16 : 12,
   },
   filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: isTablet ? 20 : 16,
+    paddingVertical: isTablet ? 10 : 8,
     borderRadius: 20,
     gap: 8,
   },
   filterButtonText: {
-    fontSize: 14,
+    fontSize: isTablet ? 16 : 14,
     fontWeight: '600',
   },
   filterBadge: {
@@ -565,24 +671,54 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   listContainer: {
-    padding: 20,
+    padding: isTablet ? 24 : 20,
     paddingTop: 8,
+    paddingBottom: isTablet ? 120 : 100, // Extra padding for tablet bottom nav
   },
   downloadItem: {
     borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    padding: isTablet ? 20 : 16,
+    marginBottom: isTablet ? 16 : 12,
     flexDirection: 'row',
     alignItems: 'center',
+    minHeight: isTablet ? 165 : 152, // Accommodate tablet poster + padding
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
   },
+  posterContainer: {
+    width: POSTER_WIDTH,
+    height: POSTER_HEIGHT,
+    borderRadius: 8,
+    marginRight: isTablet ? 20 : 16,
+    position: 'relative',
+    overflow: 'hidden',
+    backgroundColor: '#333',
+  },
+  poster: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
+  },
+  statusOverlay: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 2,
+  },
   downloadContent: {
     flex: 1,
-    marginRight: 12,
   },
   downloadHeader: {
     marginBottom: 12,
@@ -626,6 +762,16 @@ const styles = StyleSheet.create({
   },
   sizeRow: {
     marginBottom: 6,
+  },
+  warningRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 6,
+  },
+  warningText: {
+    fontSize: 11,
+    fontWeight: '500',
   },
   progressInfo: {
     flexDirection: 'row',
@@ -679,7 +825,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: isTablet ? 64 : 40,
+    paddingBottom: isTablet ? 120 : 100,
   },
   emptyIconContainer: {
     width: 96,
@@ -690,16 +837,16 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   emptyTitle: {
-    fontSize: 24,
+    fontSize: isTablet ? 28 : 24,
     fontWeight: '700',
     marginBottom: 8,
     textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: 16,
+    fontSize: isTablet ? 18 : 16,
     textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 32,
+    lineHeight: isTablet ? 28 : 24,
+    marginBottom: isTablet ? 40 : 32,
   },
   exploreButton: {
     paddingHorizontal: 24,
@@ -713,7 +860,7 @@ const styles = StyleSheet.create({
   emptyFilterContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
+    paddingVertical: isTablet ? 80 : 60,
   },
   emptyFilterTitle: {
     fontSize: 18,

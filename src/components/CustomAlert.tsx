@@ -44,13 +44,13 @@ export const CustomAlert = ({
   const themeColors = currentTheme.colors;
 
   useEffect(() => {
-    const animDuration = Platform.OS === 'android' ? 200 : 120;
+    const duration = Platform.OS === 'android' ? 200 : 150;
     if (visible) {
-      opacity.value = withTiming(1, { duration: animDuration });
-      scale.value = withTiming(1, { duration: animDuration });
+      opacity.value = withTiming(1, { duration });
+      scale.value = withTiming(1, { duration });
     } else {
-      opacity.value = withTiming(0, { duration: animDuration });
-      scale.value = withTiming(0.95, { duration: animDuration });
+      opacity.value = withTiming(0, { duration });
+      scale.value = withTiming(0.95, { duration });
     }
   }, [visible]);
 
@@ -62,10 +62,6 @@ export const CustomAlert = ({
     transform: [{ scale: scale.value }],
     opacity: opacity.value,
   }));
-
-  const backgroundColor = isDarkMode ? themeColors.darkBackground : themeColors.elevation2 || '#FFFFFF';
-  const textColor = isDarkMode ? themeColors.white : themeColors.black || '#000000';
-  const borderColor = isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
 
   // Safe action handler to prevent crashes
   const handleActionPress = useCallback((action: { label: string; onPress: () => void; style?: object }) => {
@@ -95,23 +91,54 @@ export const CustomAlert = ({
         statusBarTranslucent={false}
         hardwareAccelerated={true}
       >
-        <View style={[styles.overlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+        <View style={[styles.overlay, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
           <Pressable style={styles.overlayPressable} onPress={onClose} />
           <View style={styles.centered}>
-            <View style={[styles.alertContainer, { backgroundColor, borderColor }]}> 
-              <Text style={[styles.title, { color: textColor }]}>{title}</Text>
-              <Text style={[styles.message, { color: textColor }]}>{message}</Text>
+            <View style={[
+              styles.alertContainer,
+              {
+                backgroundColor: themeColors.darkBackground,
+                borderColor: themeColors.primary,
+              }
+            ]}>
+              {/* Title */}
+              <Text style={[styles.title, { color: themeColors.highEmphasis }]}>
+                {title}
+              </Text>
+              
+              {/* Message */}
+              <Text style={[styles.message, { color: themeColors.mediumEmphasis }]}>
+                {message}
+              </Text>
+              
+              {/* Actions */}
               <View style={styles.actionsRow}>
-                {actions.map((action, idx) => (
-                  <TouchableOpacity
-                    key={action.label}
-                    style={[styles.actionButton, idx === actions.length - 1 && styles.lastActionButton, action.style]}
-                    onPress={() => handleActionPress(action)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.actionText, { color: themeColors.primary }]}>{action.label}</Text>
-                  </TouchableOpacity>
-                ))}
+                {actions.map((action, idx) => {
+                  const isPrimary = idx === actions.length - 1;
+                  return (
+                    <TouchableOpacity
+                      key={action.label}
+                      style={[
+                        styles.actionButton,
+                        isPrimary 
+                          ? { ...styles.primaryButton, backgroundColor: themeColors.primary }
+                          : styles.secondaryButton,
+                        action.style
+                      ]}
+                      onPress={() => handleActionPress(action)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[
+                        styles.actionText,
+                        isPrimary 
+                          ? { color: themeColors.white }
+                          : { color: themeColors.primary }
+                      ]}>
+                        {action.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
           </View>
@@ -129,23 +156,55 @@ export const CustomAlert = ({
       onRequestClose={onClose}
       presentationStyle="overFullScreen"
     >
-      <Animated.View style={[styles.overlay, { backgroundColor: themeColors.transparentDark || 'rgba(0,0,0,0.5)' }, overlayStyle]}>
+      <Animated.View style={[styles.overlay, { backgroundColor: 'rgba(0,0,0,0.6)' }, overlayStyle]}>
         <Pressable style={styles.overlayPressable} onPress={onClose} />
         <View style={styles.centered}>
-          <Animated.View style={[styles.alertContainer, alertStyle, { backgroundColor, borderColor }]}> 
-            <Text style={[styles.title, { color: textColor }]}>{title}</Text>
-            <Text style={[styles.message, { color: textColor }]}>{message}</Text>
+          <Animated.View style={[
+            styles.alertContainer,
+            alertStyle,
+            {
+              backgroundColor: themeColors.darkBackground,
+              borderColor: themeColors.primary,
+            }
+          ]}>
+            {/* Title */}
+            <Text style={[styles.title, { color: themeColors.highEmphasis }]}>
+              {title}
+            </Text>
+
+            {/* Message */}
+            <Text style={[styles.message, { color: themeColors.mediumEmphasis }]}>
+              {message}
+            </Text>
+
+            {/* Actions */}
             <View style={styles.actionsRow}>
-              {actions.map((action, idx) => (
-                <TouchableOpacity
-                  key={action.label}
-                  style={[styles.actionButton, idx === actions.length - 1 && styles.lastActionButton, action.style]}
-                  onPress={() => handleActionPress(action)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.actionText, { color: themeColors.primary }]}>{action.label}</Text>
-                </TouchableOpacity>
-              ))}
+              {actions.map((action, idx) => {
+                const isPrimary = idx === actions.length - 1;
+                return (
+                  <TouchableOpacity
+                    key={action.label}
+                    style={[
+                      styles.actionButton,
+                      isPrimary
+                        ? { ...styles.primaryButton, backgroundColor: themeColors.primary }
+                        : styles.secondaryButton,
+                      action.style
+                    ]}
+                    onPress={() => handleActionPress(action)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[
+                      styles.actionText,
+                      isPrimary
+                        ? { color: themeColors.white }
+                        : { color: themeColors.primary }
+                    ]}>
+                      {action.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </Animated.View>
         </View>
@@ -167,52 +226,66 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 24,
   },
   alertContainer: {
-    minWidth: 280,
-    maxWidth: '85%',
-    borderRadius: 20,
-    padding: 24,
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: 24,
+    padding: 28,
     borderWidth: 1,
+    borderColor: '#007AFF', // iOS blue - will be overridden by theme
+    overflow: 'hidden', // Ensure background fills entire card
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 24,
       },
       android: {
-        elevation: 8,
+        elevation: 12,
       },
     }),
   },
   title: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
-    marginBottom: 12,
+    marginBottom: 8,
     textAlign: 'center',
+    letterSpacing: 0.2,
   },
   message: {
-    fontSize: 16,
-    marginBottom: 20,
+    fontSize: 15,
+    marginBottom: 24,
     textAlign: 'center',
+    lineHeight: 22,
+    letterSpacing: 0.1,
   },
   actionsRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: 12,
+    marginTop: 4,
   },
   actionButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+    borderRadius: 12,
+    minWidth: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  lastActionButton: {
-    // Optionally style the last button differently
+  primaryButton: {
+    // Background color set dynamically via theme
+  },
+  secondaryButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   actionText: {
     fontSize: 16,
     fontWeight: '600',
+    letterSpacing: 0.2,
   },
 });
 
