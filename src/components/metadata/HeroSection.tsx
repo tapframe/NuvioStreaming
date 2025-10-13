@@ -8,12 +8,13 @@ import {
   Platform,
   InteractionManager,
   AppState,
+  Image,
 } from 'react-native';
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import FastImage from '@d11/react-native-fast-image';
+// Replaced FastImage with standard Image for logos
 import { BlurView as ExpoBlurView } from 'expo-blur';
 import { BlurView as CommunityBlurView } from '@react-native-community/blur';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
@@ -37,6 +38,7 @@ import { logger } from '../../utils/logger';
 import { TMDBService } from '../../services/tmdbService';
 import TrailerService from '../../services/trailerService';
 import TrailerPlayer from '../video/TrailerPlayer';
+import { isTmdbUrl } from '../../utils/logoUtils';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -892,6 +894,18 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   const imageSource = useMemo(() => 
     bannerImage || metadata.banner || metadata.poster
   , [bannerImage, metadata.banner, metadata.poster]);
+
+  // Prefer TMDB logo when enrichment is enabled; fallback to addon's logo
+  const logoUri = useMemo(() => {
+    const candidate = metadata?.logo as string | undefined;
+    if (!candidate) return undefined;
+    if (settings?.enrichMetadataWithTMDB) {
+      // If the current logo is a TMDB URL, use it; otherwise still use available logo
+      if (isTmdbUrl(candidate)) return candidate;
+      return candidate;
+    }
+    return candidate;
+  }, [metadata.logo, settings?.enrichMetadataWithTMDB]);
   
   // Performance optimization: Lazy loading setup
   useEffect(() => {
@@ -1498,11 +1512,11 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
           {/* Optimized Title/Logo */}
           <Animated.View style={[styles.logoContainer, titleCardAnimatedStyle]}>
             <Animated.View style={[styles.titleLogoContainer, logoAnimatedStyle]}>
-              {shouldLoadSecondaryData && metadata.logo && !logoLoadError ? (
-                <FastImage
-                  source={{ uri: metadata.logo }}
+              {shouldLoadSecondaryData && logoUri && !logoLoadError ? (
+                <Image
+                  source={{ uri: logoUri }}
                   style={isTablet ? styles.tabletTitleLogo : styles.titleLogo}
-                  resizeMode={FastImage.resizeMode.contain}
+                  resizeMode={'contain'}
                   onError={() => {
                     runOnJS(setLogoLoadError)(true);
                   }}
