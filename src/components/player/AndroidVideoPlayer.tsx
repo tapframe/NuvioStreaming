@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { View, TouchableOpacity, TouchableWithoutFeedback, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, StyleSheet, Modal, AppState } from 'react-native';
+import { View, TouchableOpacity, TouchableWithoutFeedback, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, StyleSheet, Modal, AppState, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Video, { VideoRef, SelectedTrack, SelectedTrackType, BufferingStrategyType, ViewType } from 'react-native-video';
 import FastImage from '@d11/react-native-fast-image';
@@ -3129,10 +3129,10 @@ const AndroidVideoPlayer: React.FC = () => {
                 opacity: backdropImageOpacityAnim
               }
             ]}>
-            <FastImage
+            <Image
               source={{ uri: backdrop }}
               style={StyleSheet.absoluteFillObject}
-              resizeMode={FastImage.resizeMode.cover}
+              resizeMode="cover"
             />
           </Animated.View>
         )}

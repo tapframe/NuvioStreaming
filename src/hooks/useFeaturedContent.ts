@@ -197,7 +197,7 @@ export function useFeaturedContent() {
                 logoSource: c.logo ? (isTmdbUrl(String(c.logo)) ? 'tmdb' : 'addon') : 'none',
                 logo: c.logo || undefined,
               }));
-              logger.debug('[useFeaturedContent] catalogs:logos:details', { items: details });
+              logger.info('[useFeaturedContent] catalogs:logos:details (enrich=true)', { items: details });
             } catch {}
           } else {
             // When enrichment is disabled, prefer addon-provided logos; if missing, fetch basic meta to pull logo (like HeroSection)
@@ -257,7 +257,7 @@ export function useFeaturedContent() {
                 logoSource: c.logo ? (isTmdbUrl(String(c.logo)) ? 'tmdb' : 'addon') : 'none',
                 logo: c.logo || undefined,
               }));
-              logger.debug('[useFeaturedContent] catalogs:logos:details (no-enrich)', { items: details });
+              logger.info('[useFeaturedContent] catalogs:logos:details (no-enrich)', { items: details });
             } catch {}
           }
         }
@@ -294,7 +294,13 @@ export function useFeaturedContent() {
       
       if (formattedContent.length > 0) {
         persistentStore.featuredContent = formattedContent[0];
-        setFeaturedContent(formattedContent[0]); 
+        setFeaturedContent(formattedContent[0]);
+        logger.info('[useFeaturedContent] setting featuredContent', {
+          id: formattedContent[0].id,
+          name: formattedContent[0].name,
+          hasLogo: Boolean(formattedContent[0].logo),
+          logo: formattedContent[0].logo
+        });
         currentIndexRef.current = 0;
         // Persist cache for fast startup (skipped when cache disabled)
         if (!DISABLE_CACHE) {

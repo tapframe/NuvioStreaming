@@ -28,8 +28,6 @@ import Animated, {
 import { StreamingContent } from '../../services/catalogService';
 import { SkeletonFeatured } from './SkeletonLoaders';
 import { hasValidLogoFormat, isTmdbUrl } from '../../utils/logoUtils';
-import { useSettings } from '../../hooks/useSettings';
-import { TMDBService } from '../../services/tmdbService';
 import { logger } from '../../utils/logger';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -150,15 +148,11 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
   const [showSkeleton, setShowSkeleton] = useState(true);
   const [logoError, setLogoError] = useState(false);
   const [bannerError, setBannerError] = useState(false);
-  const { settings } = useSettings();
   const logoOpacity = useSharedValue(0);
   const bannerOpacity = useSharedValue(0);
   const posterOpacity = useSharedValue(0);
   const prevContentIdRef = useRef<string | null>(null);
-  // Add state for tracking logo load errors
   const [logoLoadError, setLogoLoadError] = useState(false);
-  // Add a ref to track logo fetch in progress
-  const logoFetchInProgress = useRef<boolean>(false);
   const firstRenderTsRef = useRef<number>(nowMs());
   const lastContentChangeTsRef = useRef<number>(0);
 
@@ -251,130 +245,29 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
     setLogoLoadError(false);
   }, [featuredContent?.id]);
 
-  // Fetch logo when enrichment is enabled; otherwise only use addon logo
+  // Use logo from featuredContent data (already processed by useFeaturedContent hook)
   useEffect(() => {
-    if (!featuredContent || logoFetchInProgress.current) return;
+    if (!featuredContent) {
+      setLogoUrl(null);
+      setLogoLoadError(false);
+      return;
+    }
 
-    const fetchLogo = async () => {
-      logoFetchInProgress.current = true;
-      const t0 = nowMs();
-      logger.info('[FeaturedContent] fetchLogo:start', { id: featuredContent?.id, type: featuredContent?.type });
+    // Simply use the logo that's already been processed by the useFeaturedContent hook
+    const logo = featuredContent.logo;
+    logger.info('[FeaturedContent] using logo from data', {
+      id: featuredContent.id,
+      name: featuredContent.name,
+      hasLogo: Boolean(logo),
+      logo: logo,
+      logoSource: logo ? (isTmdbUrl(logo) ? 'tmdb' : 'addon') : 'none',
+      type: featuredContent.type
+    });
 
-      try {
-        const contentId = featuredContent.id;
-        const contentData = featuredContent; // Use a clearer variable name
-        const currentLogo = contentData.logo;
-
-        // Get language preference (only relevant when enrichment is enabled)
-        const preferredLanguage = settings.tmdbLanguagePreference || 'en';
-
-        // If enrichment is disabled, use addon logo and don't fetch from external sources
-        if (!settings.enrichMetadataWithTMDB) {
-          logger.info('[FeaturedContent] enrichment disabled, checking for addon logo', { 
-            hasLogo: !!contentData.logo, 
-            logo: contentData.logo,
-            isExternal: contentData.logo ? isTmdbUrl(contentData.logo) : false,
-            isTmdb: contentData.logo ? isTmdbUrl(contentData.logo) : false
-          });
-          
-          // If we have an addon logo, use it and don't fetch external logos
-          if (contentData.logo) {
-            logger.info('[FeaturedContent] enrichment disabled, using addon logo', { logo: contentData.logo });
-            setLogoUrl(contentData.logo);
-            logoFetchInProgress.current = false;
-            return;
-          }
-          // If no addon logo, don't fetch external logos when enrichment is disabled
-          logger.info('[FeaturedContent] enrichment disabled, no addon logo available');
-          logoFetchInProgress.current = false;
-          return;
-        }
-
-        // Reset state for new fetch only if switching to a different item
-        if (prevContentIdRef.current !== contentId) {
-          setLogoUrl(null);
-        }
-        setLogoLoadError(false);
-
-        // Extract IDs (only when enrichment is enabled)
-        let imdbId: string | null = null;
-        if (contentData.id.startsWith('tt')) {
-          imdbId = contentData.id;
-        } else if ((contentData as any).imdbId) {
-          imdbId = (contentData as any).imdbId;
-        } else if ((contentData as any).externalIds?.imdb_id) {
-          imdbId = (contentData as any).externalIds.imdb_id;
-        }
-
-        let tmdbId: string | null = null;
-        if (contentData.id.startsWith('tmdb:')) {
-          tmdbId = contentData.id.split(':')[1];
-        } else if ((contentData as any).tmdb_id) {
-          tmdbId = String((contentData as any).tmdb_id);
-        }
-
-        // If we only have IMDB ID, try to find TMDB ID proactively (only when enrichment is enabled)
-        if (imdbId && !tmdbId) {
-          try {
-            const tmdbService = TMDBService.getInstance();
-            const foundData = await tmdbService.findTMDBIdByIMDB(imdbId);
-            if (foundData) {
-              tmdbId = String(foundData);
-            }
-          } catch (findError) {
-            // logger.warn(`[FeaturedContent] Failed to find TMDB ID for ${imdbId}:`, findError);
-          }
-        }
-
-        const tmdbType = contentData.type === 'series' ? 'tv' : 'movie';
-        let finalLogoUrl: string | null = null;
-        let primaryAttempted = false;
-        let fallbackAttempted = false;
-
-        // --- Logo Fetching Logic (TMDB only when enrichment is enabled) ---
-        logger.debug('[FeaturedContent] fetchLogo:ids', { imdbId, tmdbId, lang: preferredLanguage });
-
-        // Try TMDB if we have a TMDB id
-        if (tmdbId) {
-          primaryAttempted = true;
-          try {
-            const tmdbService = TMDBService.getInstance();
-            const tTmdb = nowMs();
-            const logoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId, preferredLanguage);
-            if (logoUrl) {
-              finalLogoUrl = logoUrl;
-              logger.debug('[FeaturedContent] fetchLogo:tmdb:ok', { url: logoUrl, duration: since(tTmdb) });
-            }
-          } catch (error) { /* Log if needed */ }
-        }
-
-        // --- Set Final Logo ---
-        if (finalLogoUrl) {
-          setLogoUrl(finalLogoUrl);
-          logger.info('[FeaturedContent] fetchLogo:done', { id: contentId, result: 'tmdb', url: finalLogoUrl, duration: since(t0) });
-        } else if (currentLogo) {
-          // Use existing logo only if primary and fallback failed or weren't applicable
-          setLogoUrl(currentLogo);
-          logger.info('[FeaturedContent] fetchLogo:done', { id: contentId, result: 'addon', url: currentLogo, duration: since(t0) });
-        } else {
-          // No logo found from any source
-          setLogoLoadError(true);
-          logger.warn('[FeaturedContent] fetchLogo:none', { id: contentId, primaryAttempted, fallbackAttempted, duration: since(t0) });
-          // logger.warn(`[FeaturedContent] No logo found for ${contentData.name} (${contentId}) with preference ${logoPreference}. Primary attempted: ${primaryAttempted}, Fallback attempted: ${fallbackAttempted}`);
-        }
-
-      } catch (error) {
-        // logger.error('[FeaturedContent] Error in fetchLogo:', error);
-        setLogoLoadError(true);
-        logger.error('[FeaturedContent] fetchLogo:error', { error: String(error), duration: since(t0) });
-      } finally {
-        logoFetchInProgress.current = false;
-      }
-    };
-
-    // Trigger fetch when content changes
-    fetchLogo();
-  }, [featuredContent, settings.tmdbLanguagePreference, settings.enrichMetadataWithTMDB]);
+    setLogoUrl(logo || null);
+    setLogoLoadError(!logo);
+    setLogoError(false); // Reset any previous errors
+  }, [featuredContent]);
 
   // Load poster and logo
   useEffect(() => {
@@ -475,17 +368,20 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
       // Load logo if available with enhanced timing
       if (logoUrl) {
         const tLogo = nowMs();
+        // Try to preload but don't fail if it times out - still show the logo
         const logoSuccess = await preloadImage(logoUrl);
         if (logoSuccess) {
-          logoOpacity.value = withDelay(500, withTiming(1, {
-            duration: 600,
-            easing: Easing.out(Easing.cubic)
-          }));
-          logger.debug('[FeaturedContent] logo:ready', { id: contentId, duration: since(tLogo) });
+          logger.debug('[FeaturedContent] logo:preload:success', { id: contentId, duration: since(tLogo) });
         } else {
-          setLogoLoadError(true);
-          logger.warn('[FeaturedContent] logo:failed', { id: contentId, duration: since(tLogo) });
+          logger.debug('[FeaturedContent] logo:preload:failed', { id: contentId, duration: since(tLogo) });
         }
+
+        // Always animate in the logo since we have the URL
+        logoOpacity.value = withDelay(500, withTiming(1, {
+          duration: 600,
+          easing: Easing.out(Easing.cubic)
+        }));
+        logger.debug('[FeaturedContent] logo:animated', { id: contentId });
       }
       logger.info('[FeaturedContent] images:load:done', { id: contentId, total: since(t0) });
     };
@@ -495,7 +391,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
 
   const onLogoLoadError = () => {
     setLogoLoaded(true); // Treat error as "loaded" to stop spinner
-    setLogoError(true);
+    setLogoLoadError(true);
     logger.warn('[FeaturedContent] logo:onError', { id: featuredContent?.id, url: logoUrl });
   };
 
