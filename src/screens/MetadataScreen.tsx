@@ -1011,8 +1011,8 @@ const MetadataScreen: React.FC = () => {
                 </View>
               )}
 
-              {/* Backdrop Gallery section - shown after movie details for movies when TMDB ID is available */}
-              {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length === 0 && metadata?.tmdbId && (
+              {/* Backdrop Gallery section - shown after movie details for movies when TMDB ID is available and enrichment is enabled */}
+              {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length === 0 && metadata?.tmdbId && settings.enrichMetadataWithTMDB && (
                 <View style={styles.backdropGalleryContainer}>
                   <TouchableOpacity
                     style={styles.backdropGalleryButton}
@@ -1137,8 +1137,8 @@ const MetadataScreen: React.FC = () => {
                 </View>
               )}
 
-              {/* Backdrop Gallery section - shown after show details for TV shows when TMDB ID is available */}
-              {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length > 0 && metadata?.tmdbId && (
+              {/* Backdrop Gallery section - shown after show details for TV shows when TMDB ID is available and enrichment is enabled */}
+              {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length > 0 && metadata?.tmdbId && settings.enrichMetadataWithTMDB && (
                 <View style={styles.backdropGalleryContainer}>
                   <TouchableOpacity
                     style={styles.backdropGalleryButton}
