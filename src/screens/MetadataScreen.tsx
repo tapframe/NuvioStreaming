@@ -109,15 +109,17 @@ const MetadataScreen: React.FC = () => {
     console.log('MetadataScreen: commentBottomSheetVisible changed to:', commentBottomSheetVisible);
   }, [commentBottomSheetVisible]);
 
-  // Load custom backdrop on mount
-  useEffect(() => {
-    const loadCustomBackdrop = async () => {
-      const backdropUrl = await getSelectedBackdropUrl('original');
-      setCustomBackdropUrl(backdropUrl);
-    };
+  // Load custom backdrop when screen comes into focus (for instant updates when returning from gallery)
+  useFocusEffect(
+    React.useCallback(() => {
+      const loadCustomBackdrop = async () => {
+        const backdropUrl = await getSelectedBackdropUrl('original');
+        setCustomBackdropUrl(backdropUrl);
+      };
 
-    loadCustomBackdrop();
-  }, []);
+      loadCustomBackdrop();
+    }, [])
+  );
 
   React.useEffect(() => {
     console.log('MetadataScreen: selectedComment changed to:', selectedComment?.id);
@@ -1009,20 +1011,19 @@ const MetadataScreen: React.FC = () => {
                 </View>
               )}
 
-              {/* Backdrop Gallery section - shown after details for movies/TV when TMDB ID is available */}
-              {shouldLoadSecondaryData && metadata?.tmdbId && (
+              {/* Backdrop Gallery section - shown after movie details for movies when TMDB ID is available */}
+              {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length === 0 && metadata?.tmdbId && (
                 <View style={styles.backdropGalleryContainer}>
                   <TouchableOpacity
                     style={styles.backdropGalleryButton}
                     onPress={() => navigation.navigate('BackdropGallery' as any, {
                       tmdbId: metadata.tmdbId,
-                      type: Object.keys(groupedEpisodes).length > 0 ? 'tv' : 'movie',
+                      type: 'movie',
                       title: metadata.name || 'Gallery'
                     })}
                   >
-                    <MaterialIcons name="photo-library" size={24} color="#fff" />
-                    <Text style={styles.backdropGalleryText}>Backdrop Gallery</Text>
-                    <MaterialIcons name="chevron-right" size={24} color="#fff" />
+                    <Text style={[styles.backdropGalleryText, { color: currentTheme.colors.highEmphasis }]}>Backdrop Gallery</Text>
+                    <MaterialIcons name="chevron-right" size={24} color={currentTheme.colors.highEmphasis} />
                   </TouchableOpacity>
                 </View>
               )}
@@ -1133,6 +1134,23 @@ const MetadataScreen: React.FC = () => {
                       </Text>
                     </View>
                   )}
+                </View>
+              )}
+
+              {/* Backdrop Gallery section - shown after show details for TV shows when TMDB ID is available */}
+              {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length > 0 && metadata?.tmdbId && (
+                <View style={styles.backdropGalleryContainer}>
+                  <TouchableOpacity
+                    style={styles.backdropGalleryButton}
+                    onPress={() => navigation.navigate('BackdropGallery' as any, {
+                      tmdbId: metadata.tmdbId,
+                      type: 'tv',
+                      title: metadata.name || 'Gallery'
+                    })}
+                  >
+                    <Text style={[styles.backdropGalleryText, { color: currentTheme.colors.highEmphasis }]}>Backdrop Gallery</Text>
+                    <MaterialIcons name="chevron-right" size={24} color={currentTheme.colors.highEmphasis} />
+                  </TouchableOpacity>
                 </View>
               )}
             </Animated.View>
@@ -1361,7 +1379,6 @@ const styles = StyleSheet.create({
   backdropGalleryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingVertical: 16,
     paddingHorizontal: 20,
     backgroundColor: 'rgba(255,255,255,0.08)',
@@ -1373,8 +1390,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
-    marginLeft: 12,
     opacity: 0.9,
   },
 });

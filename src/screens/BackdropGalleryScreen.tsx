@@ -16,6 +16,7 @@ import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TMDBService } from '../services/tmdbService';
+import { useTheme } from '../contexts/ThemeContext';
 
 const { width } = Dimensions.get('window');
 const BACKDROP_WIDTH = width * 0.9;
@@ -40,6 +41,7 @@ const BackdropGalleryScreen: React.FC = () => {
   const route = useRoute();
   const navigation = useNavigation();
   const { tmdbId, type, title } = route.params as RouteParams;
+  const { currentTheme } = useTheme();
 
   const [backdrops, setBackdrops] = useState<BackdropItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -108,7 +110,9 @@ const BackdropGalleryScreen: React.FC = () => {
     try {
       await AsyncStorage.setItem(SELECTED_BACKDROP_KEY, JSON.stringify(backdrop));
       setSelectedBackdrop(backdrop);
-      Alert.alert('Success', 'Custom backdrop set successfully!');
+      Alert.alert('Success', 'Custom backdrop set successfully!', [
+        { text: 'OK', onPress: () => navigation.goBack() }
+      ]);
     } catch (error) {
       console.error('Failed to save selected backdrop:', error);
       Alert.alert('Error', 'Failed to save backdrop');
@@ -119,7 +123,9 @@ const BackdropGalleryScreen: React.FC = () => {
     try {
       await AsyncStorage.removeItem(SELECTED_BACKDROP_KEY);
       setSelectedBackdrop(null);
-      Alert.alert('Success', 'Custom backdrop reset to default!');
+      Alert.alert('Success', 'Custom backdrop reset to default!', [
+        { text: 'OK', onPress: () => navigation.goBack() }
+      ]);
     } catch (error) {
       console.error('Failed to reset selected backdrop:', error);
       Alert.alert('Error', 'Failed to reset backdrop');
@@ -152,14 +158,14 @@ const BackdropGalleryScreen: React.FC = () => {
         />
         {isSelected && (
           <View style={styles.selectedIndicator}>
-            <MaterialIcons name="check-circle" size={24} color="#fff" />
+            <MaterialIcons name="check-circle" size={24} color={currentTheme.colors.highEmphasis} />
           </View>
         )}
         <View style={styles.backdropInfo}>
-          <Text style={styles.backdropResolution}>
+          <Text style={[styles.backdropResolution, { color: currentTheme.colors.highEmphasis }]}>
             {item.width} × {item.height}
           </Text>
-          <Text style={styles.backdropAspect}>
+          <Text style={[styles.backdropAspect, { color: currentTheme.colors.highEmphasis }]}>
             {item.aspect_ratio.toFixed(2)}:1
           </Text>
         </View>
@@ -173,13 +179,13 @@ const BackdropGalleryScreen: React.FC = () => {
         style={styles.backButton}
         onPress={() => navigation.goBack()}
       >
-        <MaterialIcons name="arrow-back" size={24} color="#fff" />
+        <MaterialIcons name="arrow-back" size={24} color={currentTheme.colors.highEmphasis} />
       </TouchableOpacity>
       <View style={styles.titleContainer}>
-        <Text style={styles.title} numberOfLines={1}>
+        <Text style={[styles.title, { color: currentTheme.colors.highEmphasis }]} numberOfLines={1}>
           {title}
         </Text>
-        <Text style={styles.subtitle}>
+        <Text style={[styles.subtitle, { color: currentTheme.colors.textMuted }]}>
           {backdrops.length} Backdrop{backdrops.length !== 1 ? 's' : ''}
         </Text>
       </View>
@@ -197,7 +203,7 @@ const BackdropGalleryScreen: React.FC = () => {
             );
           }}
         >
-          <MaterialIcons name="refresh" size={24} color="#fff" />
+          <MaterialIcons name="refresh" size={24} color={currentTheme.colors.highEmphasis} />
         </TouchableOpacity>
       )}
     </View>
@@ -209,8 +215,8 @@ const BackdropGalleryScreen: React.FC = () => {
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
         {renderHeader()}
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#fff" />
-          <Text style={styles.loadingText}>Loading backdrops...</Text>
+          <ActivityIndicator size="large" color={currentTheme.colors.primary} />
+          <Text style={[styles.loadingText, { color: currentTheme.colors.textMuted }]}>Loading backdrops...</Text>
         </View>
       </SafeAreaView>
     );
@@ -222,8 +228,8 @@ const BackdropGalleryScreen: React.FC = () => {
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
         {renderHeader()}
         <View style={styles.errorContainer}>
-          <MaterialIcons name="image-not-supported" size={64} color="rgba(255,255,255,0.5)" />
-          <Text style={styles.errorText}>
+          <MaterialIcons name="image-not-supported" size={64} color={currentTheme.colors.textMuted} />
+          <Text style={[styles.errorText, { color: currentTheme.colors.textMuted }]}>
             {error || 'No backdrops available'}
           </Text>
         </View>
@@ -238,7 +244,7 @@ const BackdropGalleryScreen: React.FC = () => {
 
       {/* Explanatory note */}
       <View style={styles.noteContainer}>
-        <Text style={styles.noteText}>
+        <Text style={[styles.noteText, { color: currentTheme.colors.textMuted }]}>
           Long press any backdrop to set it as your default for metadata screens and player loading overlay.
         </Text>
       </View>
@@ -277,12 +283,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#fff',
     marginBottom: 2,
   },
   subtitle: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.7)',
   },
   listContainer: {
     padding: 16,
@@ -307,12 +311,10 @@ const styles = StyleSheet.create({
   },
   backdropResolution: {
     fontSize: 12,
-    color: '#fff',
     opacity: 0.8,
   },
   backdropAspect: {
     fontSize: 12,
-    color: '#fff',
     opacity: 0.8,
   },
   selectedIndicator: {
@@ -337,7 +339,6 @@ const styles = StyleSheet.create({
   },
   noteText: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.7)',
     textAlign: 'center',
     lineHeight: 16,
   },
@@ -349,7 +350,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: 'rgba(255,255,255,0.7)',
   },
   errorContainer: {
     flex: 1,
@@ -360,7 +360,6 @@ const styles = StyleSheet.create({
   errorText: {
     marginTop: 16,
     fontSize: 16,
-    color: 'rgba(255,255,255,0.7)',
     textAlign: 'center',
   },
 });
