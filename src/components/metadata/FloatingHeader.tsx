@@ -16,6 +16,7 @@ import Animated, {
   Extrapolate,
   useAnimatedReaction,
   runOnJS,
+  SharedValue,
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
 import { logger } from '../../utils/logger';
@@ -28,9 +29,9 @@ interface FloatingHeaderProps {
   handleBack: () => void;
   handleToggleLibrary: () => void;
   inLibrary: boolean;
-  headerOpacity: Animated.SharedValue<number>;
-  headerElementsY: Animated.SharedValue<number>;
-  headerElementsOpacity: Animated.SharedValue<number>;
+  headerOpacity: SharedValue<number>;
+  headerElementsY: SharedValue<number>;
+  headerElementsOpacity: SharedValue<number>;
   safeAreaTop: number;
   setLogoLoadError: (error: boolean) => void;
 }

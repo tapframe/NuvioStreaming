@@ -29,6 +29,7 @@ import Animated, {
   FadeIn,
   runOnUI,
   useDerivedValue,
+  SharedValue,
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useTraktContext } from '../../contexts/TraktContext';
@@ -52,14 +53,14 @@ interface HeroSectionProps {
   bannerImage: string | null;
   loadingBanner: boolean;
   logoLoadError: boolean;
-  scrollY: Animated.SharedValue<number>;
-  heroHeight: Animated.SharedValue<number>;
-  heroOpacity: Animated.SharedValue<number>;
-  logoOpacity: Animated.SharedValue<number>;
-  buttonsOpacity: Animated.SharedValue<number>;
-  buttonsTranslateY: Animated.SharedValue<number>;
-  watchProgressOpacity: Animated.SharedValue<number>;
-  watchProgressWidth: Animated.SharedValue<number>;
+  scrollY: SharedValue<number>;
+  heroHeight: SharedValue<number>;
+  heroOpacity: SharedValue<number>;
+  logoOpacity: SharedValue<number>;
+  buttonsOpacity: SharedValue<number>;
+  buttonsTranslateY: SharedValue<number>;
+  watchProgressOpacity: SharedValue<number>;
+  watchProgressWidth: SharedValue<number>;
   watchProgress: {
     currentTime: number;
     duration: number;

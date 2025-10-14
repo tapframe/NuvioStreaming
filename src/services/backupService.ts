@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
 import { logger } from '../utils/logger';
 import { AppSettings, DEFAULT_SETTINGS } from '../hooks/useSettings';
@@ -150,7 +150,7 @@ export class BackupService {
         scraperCount;
 
       // Save to file
-      const fileUri = `${FileSystem.documentDirectory}${filename}`;
+      const fileUri = `${(FileSystem as any).documentDirectory || '/tmp/'}${filename}`;
       await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(backupData, null, 2));
 
       logger.info(`[BackupService] Backup created successfully: ${filename}`);
@@ -332,7 +332,7 @@ export class BackupService {
    */
   public async listBackups(): Promise<string[]> {
     try {
-      const files = await FileSystem.readDirectoryAsync(FileSystem.documentDirectory!);
+      const files = await FileSystem.readDirectoryAsync((FileSystem as any).documentDirectory || '/tmp/');
       return files
         .filter(file => file.startsWith(this.BACKUP_FILENAME_PREFIX) && file.endsWith('.json'))
         .sort((a, b) => b.localeCompare(a)); // Sort by filename (newest first)

@@ -52,6 +52,13 @@ export interface TMDBShow {
     poster_path: string | null;
     air_date: string;
   }[];
+  status?: string;
+  episode_run_time?: number[];
+  type?: string;
+  origin_country?: string[];
+  original_language?: string;
+  created_by?: { id: number; name: string; profile_path?: string | null }[];
+  networks?: { id: number; name: string; logo_path: string | null; origin_country: string }[];
 }
 
 export interface TMDBTrendingResult {

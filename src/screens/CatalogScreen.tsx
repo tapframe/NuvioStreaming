@@ -766,9 +766,6 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           removeClippedSubviews={true}
-          maxToRenderPerBatch={effectiveNumColumns * 3}
-          windowSize={10}
-          initialNumToRender={effectiveNumColumns * 4}
           getItemType={() => 'item'}
         />
       ) : renderEmptyState()}

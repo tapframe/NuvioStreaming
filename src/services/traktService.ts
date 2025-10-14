@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, AppStateStatus } from 'react-native';
 import { logger } from '../utils/logger';
-import { imageCacheService } from './imageCacheService';
 
 // Storage keys
 export const TRAKT_ACCESS_TOKEN_KEY = 'trakt_access_token';

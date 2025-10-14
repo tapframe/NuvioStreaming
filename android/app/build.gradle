@@ -94,10 +94,49 @@ android {
         applicationId 'com.nuvio.app'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 19
-        versionName "1.2.4"
+        versionCode 20
+        versionName "1.2.5"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
+    }
+
+    // Split APKs by architecture and density for smaller downloads
+    splits {
+        abi {
+            enable true
+            reset()
+            include "arm64-v8a", "armeabi-v7a", "x86", "x86_64"
+            universalApk true // Generate universal APK as well
+        }
+        density {
+            enable true
+            reset()
+            include "ldpi", "mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"
+            universalApk true // Generate universal APK as well
+        }
+    }
+
+    // Generate unique version codes for each split APK
+    def abiVersionCodes = ['armeabi-v7a': 1, 'arm64-v8a': 2, 'x86': 3, 'x86_64': 4]
+    def densityVersionCodes = ['ldpi': 1, 'mdpi': 2, 'hdpi': 3, 'xhdpi': 4, 'xxhdpi': 5, 'xxxhdpi': 6]
+    android.applicationVariants.all { variant ->
+        variant.outputs.each { output ->
+            def baseVersionCode = 19 // Current versionCode 20from defaultConfig
+            def abiName = output.getFilter(com.android.build.OutputFile.ABI)
+            def densityName = output.getFilter(com.android.build.OutputFile.DENSITY)
+            
+            def versionCode 20= baseVersionCode * 100 // Base multiplier
+            
+            if (abiName != null) {
+                versionCode 20+= abiVersionCodes.get(abiName) * 10
+            }
+            
+            if (densityName != null) {
+                versionCode 20+= densityVersionCodes.get(densityName)
+            }
+            
+            output.versionCodeOverride = versionCode
+        }
     }
     signingConfigs {
         debug {

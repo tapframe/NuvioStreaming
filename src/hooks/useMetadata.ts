@@ -834,11 +834,19 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
                     type: localized.type,
                     originCountry: localized.origin_country,
                     originalLanguage: localized.original_language,
-                    createdBy: localized.created_by,
+                    createdBy: localized.created_by?.map(creator => ({
+                      id: creator.id,
+                      name: creator.name,
+                      profile_path: creator.profile_path || undefined
+                    })),
                   };
                   const productionInfo = Array.isArray(localized.networks)
                     ? localized.networks
-                        .map((n: any) => ({ id: n?.id, name: n?.name, logo: tmdbSvc.getImageUrl(n?.logo_path, 'w185') }))
+                        .map((n: any) => ({ 
+                          id: n?.id, 
+                          name: n?.name, 
+                          logo: tmdbSvc.getImageUrl(n?.logo_path, 'w185') || undefined 
+                        }))
                         .filter((n: any) => n && (n.logo || n.name))
                     : [];
 
@@ -1844,7 +1852,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
                     .map((n: any) => ({
                       id: n?.id,
                       name: n?.name,
-                      logo: tmdbService.getImageUrl(n?.logo_path, 'w185'),
+                      logo: tmdbService.getImageUrl(n?.logo_path, 'w185') || undefined,
                     }))
                     .filter((n: any) => n && (n.logo || n.name))
                 : [];
@@ -1861,7 +1869,11 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
               type: showDetails.type,
               originCountry: showDetails.origin_country,
               originalLanguage: showDetails.original_language,
-              createdBy: showDetails.created_by,
+              createdBy: showDetails.created_by?.map(creator => ({
+                id: creator.id,
+                name: creator.name,
+                profile_path: creator.profile_path || undefined
+              })),
             };
 
             // Update metadata with TV details

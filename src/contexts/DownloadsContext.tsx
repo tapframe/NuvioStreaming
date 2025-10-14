@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { notificationService } from '../services/notificationService';
 
@@ -135,7 +135,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     downloadsRef.current = downloads;
   }, [downloads]);
   // Keep active resumables in memory (not persisted)
-  const resumablesRef = useRef<Map<string, FileSystem.DownloadResumable>>(new Map());
+  const resumablesRef = useRef<Map<string, any>>(new Map());
   const lastBytesRef = useRef<Map<string, { bytes: number; time: number }>>(new Map());
 
   // Persist and restore
@@ -245,7 +245,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       console.log(`[DownloadsContext] Creating new resumable for download: ${id}`);
       // Only create new resumable if none exists (should be rare for resume operations)
 
-      const progressCallback: FileSystem.DownloadProgressCallback = (data) => {
+      const progressCallback = (data: any) => {
         const { totalBytesWritten, totalBytesExpectedToWrite } = data;
         const now = Date.now();
         const last = lastBytesRef.current.get(id);
@@ -385,7 +385,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
 
     // Create file path - use a simple unique identifier with extension from HEAD request
-    const baseDir = FileSystem.documentDirectory || FileSystem.cacheDirectory || FileSystem.documentDirectory;
+    const baseDir = (FileSystem as any).documentDirectory || (FileSystem as any).cacheDirectory || '/tmp/';
     const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
     const extension = await getExtensionFromHeaders(input.url, input.headers);
     const fileUri = extension ? `${baseDir}downloads/${uniqueId}.${extension}` : `${baseDir}downloads/${uniqueId}`;
@@ -424,7 +424,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     setDownloads(prev => [newItem, ...prev]);
 
-    const progressCallback: FileSystem.DownloadProgressCallback = (data) => {
+    const progressCallback = (data: any) => {
       const { totalBytesWritten, totalBytesExpectedToWrite } = data;
       const now = Date.now();
       const last = lastBytesRef.current.get(compoundId);

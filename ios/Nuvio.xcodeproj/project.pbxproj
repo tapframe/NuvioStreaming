@@ -25,9 +25,10 @@
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = Nuvio/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Nuvio/Info.plist; sourceTree = "<group>"; };
 		2DDA95A7458A78E817D9496D /* libPods-Nuvio.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Nuvio.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		49055D6E250FAFA21141FE49 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = Nuvio/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		49055D6E250FAFA21141FE49 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = Nuvio/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		6E0017E5203955A430ABF21B /* Pods-Nuvio.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Nuvio.release.xcconfig"; path = "Target Support Files/Pods-Nuvio/Pods-Nuvio.release.xcconfig"; sourceTree = "<group>"; };
 		6E007C0BAC8C453623E81663 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-Nuvio/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		73BB213C2E9EEAC700EC03F8 /* NuvioRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = NuvioRelease.entitlements; path = Nuvio/NuvioRelease.entitlements; sourceTree = "<group>"; };
 		9FBA88F02E86ECD700892850 /* KSPlayerManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KSPlayerManager.m; sourceTree = "<group>"; };
 		9FBA88F12E86ECD700892850 /* KSPlayerModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KSPlayerModule.swift; sourceTree = "<group>"; };
 		9FBA88F22E86ECD700892850 /* KSPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KSPlayerView.swift; sourceTree = "<group>"; };
@@ -55,6 +56,7 @@
 		13B07FAE1A68108700A75B9A /* Nuvio */ = {
 			isa = PBXGroup;
 			children = (
+				73BB213C2E9EEAC700EC03F8 /* NuvioRelease.entitlements */,
 				F11748412D0307B40044C1D9 /* AppDelegate.swift */,
 				F11748442D0722820044C1D9 /* Nuvio-Bridging-Header.h */,
 				9FBA88F02E86ECD700892850 /* KSPlayerManager.m */,
@@ -132,7 +134,6 @@
 				BD6015E69A4861CCBD3C1D39 /* Pods-Nuvio.debug.xcconfig */,
 				6E0017E5203955A430ABF21B /* Pods-Nuvio.release.xcconfig */,
 			);
-			name = Pods;
 			path = Pods;
 			sourceTree = "<group>";
 		};
@@ -440,6 +441,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Nuvio/Nuvio.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = NLXTHANK2N;
 				ENABLE_BITCODE = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
@@ -458,7 +460,7 @@
 					"-lc++",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
-				PRODUCT_BUNDLE_IDENTIFIER = com.nuvio.app;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.nuvio.app";
 				PRODUCT_NAME = "Nuvio";
 				SWIFT_OBJC_BRIDGING_HEADER = "Nuvio/Nuvio-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -474,8 +476,9 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = Nuvio/Nuvio.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Nuvio/NuvioRelease.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = NLXTHANK2N;
 				INFOPLIST_FILE = Nuvio/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -489,7 +492,7 @@
 					"-lc++",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
-				PRODUCT_BUNDLE_IDENTIFIER = com.nuvio.app;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.nuvio.app";
 				PRODUCT_NAME = "Nuvio";
 				SWIFT_OBJC_BRIDGING_HEADER = "Nuvio/Nuvio-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
