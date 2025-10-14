@@ -339,6 +339,7 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
           isLoading && styles.streamCardLoading,
           isDebrid && styles.streamCardHighlighted
         ]}
+        onPress={onPress}
         onLongPress={handleLongPress}
         disabled={isLoading}
         activeOpacity={0.7}
