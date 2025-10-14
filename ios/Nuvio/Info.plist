@@ -59,6 +59,8 @@
     <string>Allow $(PRODUCT_NAME) to access your local network</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>This app does not require microphone access.</string>
+    <key>RCTNewArchEnabled</key>
+    <true/>
     <key>RCTRootViewBackgroundColor</key>
     <integer>4278322180</integer>
     <key>UIBackgroundModes</key>
