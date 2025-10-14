@@ -924,24 +924,26 @@ const MetadataScreen: React.FC = () => {
                 />
               )}
 
-              {/* Production info row — shown after cast for movies */}
-              {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length === 0 && metadata?.networks && metadata.networks.length > 0 && (
+              {/* Production info row — only render companies with logos */}
+              {shouldLoadSecondaryData &&
+                Object.keys(groupedEpisodes).length === 0 &&
+                metadata?.networks && Array.isArray(metadata.networks) &&
+                metadata.networks.some((n: any) => !!n?.logo) && (
                 <Animated.View style={[styles.productionContainer, productionSectionAnimatedStyle]}>
                   <Text style={styles.productionHeader}>Production</Text>
                   <View style={styles.productionRow}>
-                    {metadata.networks.slice(0, 6).map((net) => (
-                      <View key={String(net.id || net.name)} style={styles.productionChip}>
-                        {net.logo ? (
+                    {metadata.networks
+                      .filter((net: any) => !!net?.logo)
+                      .slice(0, 6)
+                      .map((net: any) => (
+                        <View key={String(net.id || net.name)} style={styles.productionChip}>
                           <FastImage
                             source={{ uri: net.logo }}
                             style={styles.productionLogo}
                             resizeMode={FastImage.resizeMode.contain}
                           />
-                        ) : (
-                          <Text style={styles.productionText}>{net.name}</Text>
-                        )}
-                      </View>
-                    ))}
+                        </View>
+                      ))}
                   </View>
                 </Animated.View>
               )}

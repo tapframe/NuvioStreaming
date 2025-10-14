@@ -95,7 +95,8 @@ const DownloadItemComponent: React.FC<{
   item: DownloadItem;
   onPress: (item: DownloadItem) => void;
   onAction: (item: DownloadItem, action: 'pause' | 'resume' | 'cancel' | 'retry') => void;
-}> = React.memo(({ item, onPress, onAction }) => {
+  onRequestRemove: (item: DownloadItem) => void;
+}> = React.memo(({ item, onPress, onAction, onRequestRemove }) => {
   const { currentTheme } = useTheme();
   const [posterUrl, setPosterUrl] = useState<string | null>(item.posterUrl || null);
 
@@ -323,16 +324,7 @@ const DownloadItemComponent: React.FC<{
         
         <TouchableOpacity
           style={[styles.actionButton, { backgroundColor: currentTheme.colors.elevation2 }]}
-          onPress={() => {
-            Alert.alert(
-              'Remove Download',
-              'Are you sure you want to remove this download?',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Remove', style: 'destructive', onPress: () => onAction(item, 'cancel') },
-              ]
-            );
-          }}
+          onPress={() => onRequestRemove(item)}
           activeOpacity={0.7}
         >
           <MaterialCommunityIcons
@@ -355,6 +347,8 @@ const DownloadsScreen: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'downloading' | 'completed' | 'paused'>('all');
   const [showHelpAlert, setShowHelpAlert] = useState(false);
+  const [showRemoveAlert, setShowRemoveAlert] = useState(false);
+  const [pendingRemoveItem, setPendingRemoveItem] = useState<DownloadItem | null>(null);
 
   // Animation values
   const headerOpacity = useSharedValue(1);
@@ -449,6 +443,11 @@ const DownloadsScreen: React.FC = () => {
     if (action === 'cancel') cancelDownload(item.id);
   }, [pauseDownload, resumeDownload, cancelDownload]);
 
+  const handleRequestRemove = useCallback((item: DownloadItem) => {
+    setPendingRemoveItem(item);
+    setShowRemoveAlert(true);
+  }, []);
+
   const handleFilterPress = useCallback((filter: 'all' | 'downloading' | 'completed' | 'paused') => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedFilter(filter);
@@ -533,7 +532,9 @@ const DownloadsScreen: React.FC = () => {
         styles.header,
         {
           backgroundColor: currentTheme.colors.darkBackground,
-          paddingTop: safeAreaTop + 16,
+          paddingTop: (Platform.OS === 'android' 
+            ? (StatusBar.currentHeight || 0) + 26 
+            : safeAreaTop + 15) + (isTablet ? 64 : 0),
           borderBottomColor: currentTheme.colors.border,
         },
         headerStyle,
@@ -577,6 +578,7 @@ const DownloadsScreen: React.FC = () => {
               item={item}
               onPress={handleDownloadPress}
               onAction={handleDownloadAction}
+              onRequestRemove={handleRequestRemove}
             />
           )}
           style={{ backgroundColor: currentTheme.colors.darkBackground }}
@@ -615,6 +617,18 @@ const DownloadsScreen: React.FC = () => {
         message="• Files smaller than 1MB are typically M3U8 streaming playlists and cannot be downloaded for offline viewing. These only work with online streaming and contain links to video segments, not the actual video content."
         onClose={() => setShowHelpAlert(false)}
       />
+
+      {/* Remove Download Confirmation */}
+      <CustomAlert
+        visible={showRemoveAlert}
+        title="Remove Download"
+        message={pendingRemoveItem ? `Remove \"${pendingRemoveItem.title}\"${pendingRemoveItem.type === 'series' && pendingRemoveItem.season && pendingRemoveItem.episode ? ` S${String(pendingRemoveItem.season).padStart(2,'0')}E${String(pendingRemoveItem.episode).padStart(2,'0')}` : ''}?` : 'Remove this download?'}
+        actions={[
+          { label: 'Cancel', onPress: () => setShowRemoveAlert(false) },
+          { label: 'Remove', onPress: () => { if (pendingRemoveItem) { cancelDownload(pendingRemoveItem.id); } setShowRemoveAlert(false); setPendingRemoveItem(null); }, style: { } },
+        ]}
+        onClose={() => { setShowRemoveAlert(false); setPendingRemoveItem(null); }}
+      />
     </View>
   );
 };
@@ -624,19 +638,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: isTablet ? 24 : 20,
+    paddingHorizontal: isTablet ? 24 : Math.max(1, width * 0.05),
     paddingBottom: isTablet ? 20 : 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerTitleRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
     marginBottom: isTablet ? 20 : 16,
+    paddingBottom: 8,
   },
   headerTitle: {
-    fontSize: isTablet ? 36 : 32,
-    fontWeight: '700',
+    fontSize: isTablet ? 36 : Math.min(32, width * 0.08),
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
   helpButton: {
     padding: 8,
@@ -671,7 +687,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   listContainer: {
-    padding: isTablet ? 24 : 20,
+    paddingHorizontal: 0,
     paddingTop: 8,
     paddingBottom: isTablet ? 120 : 100, // Extra padding for tablet bottom nav
   },
@@ -687,6 +703,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
+    marginHorizontal: 0,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
   },
   posterContainer: {
     width: POSTER_WIDTH,

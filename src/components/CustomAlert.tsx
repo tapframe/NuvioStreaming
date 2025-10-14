@@ -15,6 +15,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useTheme } from '../contexts/ThemeContext';
+import { Portal, Dialog, Button } from 'react-native-paper';
 
 interface CustomAlertProps {
   visible: boolean;
@@ -75,27 +76,29 @@ export const CustomAlert = ({
     }
   }, [onClose]);
 
-  // Don't render anything if not visible
-  if (!visible) {
-    return null;
-  }
-
-  // Use different rendering approach for Android to avoid Modal issues
-  if (Platform.OS === 'android') {
-    return (
+  // Use Portal with Modal for proper rendering and animations
+  return (
+    <Portal>
       <Modal
         visible={visible}
         transparent
-        animationType="fade"
+        animationType="none"
         onRequestClose={onClose}
-        statusBarTranslucent={false}
+        statusBarTranslucent={true}
         hardwareAccelerated={true}
       >
-        <View style={[styles.overlay, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
+        <Animated.View 
+          style={[
+            styles.overlay, 
+            { backgroundColor: 'rgba(0,0,0,0.6)' },
+            overlayStyle
+          ]}
+        >
           <Pressable style={styles.overlayPressable} onPress={onClose} />
           <View style={styles.centered}>
-            <View style={[
+            <Animated.View style={[
               styles.alertContainer,
+              alertStyle,
               {
                 backgroundColor: themeColors.darkBackground,
                 borderColor: themeColors.primary,
@@ -105,12 +108,12 @@ export const CustomAlert = ({
               <Text style={[styles.title, { color: themeColors.highEmphasis }]}>
                 {title}
               </Text>
-              
+
               {/* Message */}
               <Text style={[styles.message, { color: themeColors.mediumEmphasis }]}>
                 {message}
               </Text>
-              
+
               {/* Actions */}
               <View style={styles.actionsRow}>
                 {actions.map((action, idx) => {
@@ -120,7 +123,7 @@ export const CustomAlert = ({
                       key={action.label}
                       style={[
                         styles.actionButton,
-                        isPrimary 
+                        isPrimary
                           ? { ...styles.primaryButton, backgroundColor: themeColors.primary }
                           : styles.secondaryButton,
                         action.style
@@ -130,7 +133,7 @@ export const CustomAlert = ({
                     >
                       <Text style={[
                         styles.actionText,
-                        isPrimary 
+                        isPrimary
                           ? { color: themeColors.white }
                           : { color: themeColors.primary }
                       ]}>
@@ -140,82 +143,17 @@ export const CustomAlert = ({
                   );
                 })}
               </View>
-            </View>
+            </Animated.View>
           </View>
-        </View>
+        </Animated.View>
       </Modal>
-    );
-  }
-
-  // iOS version with animations
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-      presentationStyle="overFullScreen"
-    >
-      <Animated.View style={[styles.overlay, { backgroundColor: 'rgba(0,0,0,0.6)' }, overlayStyle]}>
-        <Pressable style={styles.overlayPressable} onPress={onClose} />
-        <View style={styles.centered}>
-          <Animated.View style={[
-            styles.alertContainer,
-            alertStyle,
-            {
-              backgroundColor: themeColors.darkBackground,
-              borderColor: themeColors.primary,
-            }
-          ]}>
-            {/* Title */}
-            <Text style={[styles.title, { color: themeColors.highEmphasis }]}>
-              {title}
-            </Text>
-
-            {/* Message */}
-            <Text style={[styles.message, { color: themeColors.mediumEmphasis }]}>
-              {message}
-            </Text>
-
-            {/* Actions */}
-            <View style={styles.actionsRow}>
-              {actions.map((action, idx) => {
-                const isPrimary = idx === actions.length - 1;
-                return (
-                  <TouchableOpacity
-                    key={action.label}
-                    style={[
-                      styles.actionButton,
-                      isPrimary
-                        ? { ...styles.primaryButton, backgroundColor: themeColors.primary }
-                        : styles.secondaryButton,
-                      action.style
-                    ]}
-                    onPress={() => handleActionPress(action)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[
-                      styles.actionText,
-                      isPrimary
-                        ? { color: themeColors.white }
-                        : { color: themeColors.primary }
-                    ]}>
-                      {action.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </Animated.View>
-        </View>
-      </Animated.View>
-    </Modal>
+    </Portal>
   );
 };
 
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
   },

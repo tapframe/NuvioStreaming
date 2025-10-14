@@ -81,19 +81,10 @@ export const useMetadataAssets = (
     forcedLogoRefreshDone.current = false;
     logoRefreshCounter.current = 0;
     
-    // Force logo refresh on preference change
-    if (metadata?.logo) {
-      const currentLogoIsExternal = isTmdbUrl(metadata.logo);
-      const currentLogoIsTmdb = isTmdbUrl(metadata.logo);
-      const preferenceIsMetahub = settings.logoSourcePreference === 'metahub';
-
-      // Always clear logo on preference change to force proper refresh
-      setMetadata((prevMetadata: any) => ({
-        ...prevMetadata!,
-        logo: undefined
-      }));
-    }
-  }, [settings.logoSourcePreference, setMetadata]);
+    // Mark that we need to refetch logo but DON'T clear it yet
+    // This prevents text from showing during the transition
+    logoFetchInProgress.current = false;
+  }, [settings.logoSourcePreference]);
 
   // Original reset logo load error effect
   useEffect(() => {
@@ -119,8 +110,10 @@ export const useMetadataAssets = (
 
     // If enrichment is disabled, use addon logo and don't fetch from external sources
     if (!settings.enrichMetadataWithTMDB) {
-      // If we have an addon logo, use it and don't fetch external logos
+      // If we have an addon logo, preload it immediately for instant display
       if (metadata?.logo && !isTmdbUrl(metadata.logo)) {
+        // Preload addon logo for instant display
+        FastImage.preload([{ uri: metadata.logo }]);
         // This is an addon logo, keep it
         return;
       }
@@ -128,11 +121,17 @@ export const useMetadataAssets = (
       return;
     }
 
+    // When TMDB enrichment is ON, remove addon logos immediately
+    // We don't want to show addon logos briefly before TMDB logos load
+    if (settings.enrichMetadataWithTMDB && currentLogoUrl && !isTmdbUrl(currentLogoUrl)) {
+      // Clear addon logo when enrichment is enabled
+      setMetadata((prevMetadata: any) => ({ ...prevMetadata!, logo: undefined }));
+      shouldFetchLogo = true;
+    }
     // Determine if we need to fetch a new logo (only when enrichment is enabled)
-    if (!currentLogoUrl) {
+    else if (!currentLogoUrl) {
       shouldFetchLogo = true;
     } else {
-      const isCurrentLogoExternal = isTmdbUrl(currentLogoUrl);
       const isCurrentLogoTmdb = isTmdbUrl(currentLogoUrl);
       
       if (logoPreference === 'tmdb' && !isCurrentLogoTmdb) {
@@ -145,10 +144,8 @@ export const useMetadataAssets = (
       logoFetchInProgress.current = true;
       
       const fetchLogo = async () => {
-        // Clear existing logo before fetching new one to avoid briefly showing wrong logo
-        if (shouldFetchLogo) {
-          setMetadata((prevMetadata: any) => ({ ...prevMetadata!, logo: undefined }));
-        }
+        // Store the original logo to restore if needed
+        const originalLogoUrl = currentLogoUrl;
         
         try {
           const preferredLanguage = settings.tmdbLanguagePreference || 'en';
@@ -198,32 +195,37 @@ export const useMetadataAssets = (
                 }
 
                 if (logoUrl) {
-                  // Preload the image
-                  FastImage.preload([{ uri: logoUrl }]);
+                  // Preload the image before setting it
+                  await FastImage.preload([{ uri: logoUrl }]);
 
+                  // Only update if we got a valid logo
                   setMetadata((prevMetadata: any) => ({ ...prevMetadata!, logo: logoUrl }));
                 } else {
-                  // TMDB logo not found, try to restore addon logo if it exists
-                  if (currentLogoUrl && !isTmdbUrl(currentLogoUrl)) {
-                    if (__DEV__) console.log('[useMetadataAssets] Restoring addon logo after TMDB logo not found');
-                    setMetadata((prevMetadata: any) => ({ ...prevMetadata!, logo: currentLogoUrl }));
-                  } else if (__DEV__) {
-                    console.log('[useMetadataAssets] No logo found for TMDB ID:', tmdbId);
+                  // TMDB logo not found
+                  // When enrichment is ON, don't fallback to addon logos - show text instead
+                  if (__DEV__) {
+                    console.log('[useMetadataAssets] No TMDB logo found for ID:', tmdbId);
                   }
+                  // Keep logo as undefined to show text title
                 }
               } catch (error) {
-                // TMDB logo fetch failed, try to restore addon logo if it exists
-                if (currentLogoUrl && !isTmdbUrl(currentLogoUrl)) {
-                  if (__DEV__) console.log('[useMetadataAssets] Restoring addon logo after TMDB fetch error');
-                  setMetadata((prevMetadata: any) => ({ ...prevMetadata!, logo: currentLogoUrl }));
-                } else if (__DEV__) {
+                // TMDB logo fetch failed
+                // When enrichment is ON, don't fallback to addon logos - show text instead
+                if (__DEV__) {
                   console.error('[useMetadataAssets] Logo fetch error:', error);
                 }
+                // Keep logo as undefined to show text title
               }
+            } else {
+              // No TMDB ID found
+              // When enrichment is ON, don't use addon logos - show text instead
+              if (__DEV__) console.log('[useMetadataAssets] No TMDB ID found, will show text title');
+              // Keep logo as undefined to show text title
             }
           }
         } catch (error) {
-          // Handle error silently
+          // Handle error silently, keep existing logo
+          if (__DEV__) console.error('[useMetadataAssets] Unexpected error in logo fetch:', error);
         } finally {
           logoFetchInProgress.current = false;
         }

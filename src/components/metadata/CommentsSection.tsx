@@ -640,7 +640,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
       <View style={styles.emptyContainer}>
         <MaterialIcons name="chat-bubble-outline" size={48} color={currentTheme.colors.mediumEmphasis} />
         <Text style={[styles.emptyText, { color: currentTheme.colors.mediumEmphasis }]}>
-          {error ? 'Comments unavailable' : 'No comments yet'}
+          {error ? 'Comments unavailable' : 'No comments on Trakt yet'}
         </Text>
         <Text style={[styles.emptySubtext, { color: currentTheme.colors.disabled }]}>
           {error
@@ -729,13 +729,13 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
         </View>
       )}
 
-      {loading && comments.length === 0 && renderSkeletons()}
+      {loading && Array.isArray(comments) && comments.length === 0 && renderSkeletons()}
 
-      {(!loading && comments.length === 0 && hasLoadedOnce && !error) && (
+      {(!loading && Array.isArray(comments) && comments.length === 0 && hasLoadedOnce && !error) && (
         renderEmpty()
       )}
 
-      {comments.length > 0 && (
+      {Array.isArray(comments) && comments.length > 0 && (
         <Animated.FlatList
           horizontal
           showsHorizontalScrollIndicator={false}

@@ -49,6 +49,7 @@ import { isMkvStream } from '../utils/mkvDetection';
 import CustomAlert from '../components/CustomAlert';
 import { Toast } from 'toastify-react-native';
 import { useDownloads } from '../contexts/DownloadsContext';
+import { PaperProvider } from 'react-native-paper';
 
 const TMDB_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tmdb.new.logo.svg/512px-Tmdb.new.logo.svg.png?20200406190906';
 const HDR_ICON = 'https://uxwing.com/wp-content/themes/uxwing/download/video-photography-multimedia/hdr-icon.png';
@@ -291,6 +292,16 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
     try {
       const url = stream.url;
       if (!url) return;
+      // Prevent duplicate downloads for the same exact URL
+      try {
+        const downloadsModule = require('../contexts/DownloadsContext');
+        if (downloadsModule && downloadsModule.isDownloadingUrl && downloadsModule.isDownloadingUrl(url)) {
+          showAlert('Already Downloading', 'This download has already started for this exact link.');
+          return;
+        }
+      } catch {}
+      // Show immediate feedback on both platforms
+      showAlert('Starting Download', 'Download will be started.');
       const parent: any = stream as any;
       const inferredTitle = parentTitle || stream.name || stream.title || parent.metaName || 'Content';
       const inferredType: 'movie' | 'series' = parentType || (parent.kind === 'series' || parent.type === 'series' ? 'series' : 'movie');
@@ -1951,6 +1962,7 @@ export const StreamsScreen = () => {
 
 
   return (
+    <PaperProvider>
     <View style={styles.container}>
       <StatusBar
         translucent
@@ -2248,16 +2260,15 @@ export const StreamsScreen = () => {
           </View>
         )}
       </View>
-      {Platform.OS === 'ios' && (
-        <CustomAlert
-          visible={alertVisible}
-          title={alertTitle}
-          message={alertMessage}
-          actions={alertActions}
-          onClose={() => setAlertVisible(false)}
-        />
-      )}
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        actions={alertActions}
+        onClose={() => setAlertVisible(false)}
+      />
     </View>
+    </PaperProvider>
   );
 };
 

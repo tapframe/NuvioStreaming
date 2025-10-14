@@ -1501,10 +1501,10 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
           pointerEvents="none"
         />
         <View style={[styles.heroContent, isTablet && { maxWidth: 800, alignSelf: 'center' }]}>
-          {/* Optimized Title/Logo */}
+          {/* Optimized Title/Logo - Show logo immediately when available */}
           <Animated.View style={[styles.logoContainer, titleCardAnimatedStyle]}>
             <Animated.View style={[styles.titleLogoContainer, logoAnimatedStyle]}>
-              {shouldLoadSecondaryData && logoUri && !logoLoadError ? (
+              {logoUri && !logoLoadError ? (
                 <Image
                   source={{ uri: logoUri }}
                   style={isTablet ? styles.tabletTitleLogo : styles.titleLogo}

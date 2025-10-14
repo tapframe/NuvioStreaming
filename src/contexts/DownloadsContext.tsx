@@ -58,6 +58,7 @@ type DownloadsContextValue = {
   resumeDownload: (id: string) => Promise<void>;
   cancelDownload: (id: string) => Promise<void>;
   removeDownload: (id: string) => Promise<void>;
+  isDownloadingUrl: (url: string) => boolean;
 };
 
 const DownloadsContext = createContext<DownloadsContextValue | undefined>(undefined);
@@ -114,6 +115,17 @@ function isDownloadableUrl(url: string): boolean {
   
   // Return true if it's NOT a streaming format (m3u8 or DASH)
   return !isStreamingFormat;
+}
+
+function hashString(input: string): string {
+  let hash = 0;
+  for (let i = 0; i < input.length; i++) {
+    const chr = input.charCodeAt(i);
+    hash = (hash << 5) - hash + chr;
+    hash |= 0; // Convert to 32bit integer
+  }
+  // Convert to unsigned and hex
+  return (hash >>> 0).toString(16);
 }
 
 export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -351,13 +363,15 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
 
     const contentId = input.id;
-    // Compose per-episode id for series
-    const compoundId = input.type === 'series' && input.season && input.episode
+    // Create unique ID per URL - allows same episode/movie from different sources
+    const urlHash = hashString(input.url);
+    const baseId = input.type === 'series' && input.season && input.episode
       ? `${contentId}:S${input.season}E${input.episode}`
       : contentId;
+    const compoundId = `${baseId}:${urlHash}`;
 
-    // If already exists, handle based on status
-    const existing = downloadsRef.current.find(d => d.id === compoundId);
+    // Check if this exact URL is already being downloaded
+    const existing = downloadsRef.current.find(d => d.sourceUrl === input.url);
     if (existing) {
       if (existing.status === 'completed') {
         return; // Already completed, do nothing
@@ -365,7 +379,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         return; // Already downloading, do nothing
       } else if (existing.status === 'paused' || existing.status === 'error') {
         // Resume the paused or errored download instead of starting new one
-        await resumeDownload(compoundId);
+        await resumeDownload(existing.id);
         return;
       }
     }
@@ -555,6 +569,9 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     resumeDownload,
     cancelDownload,
     removeDownload,
+    isDownloadingUrl: (url: string) => {
+      return downloadsRef.current.some(d => d.sourceUrl === url && (d.status === 'queued' || d.status === 'downloading' || d.status === 'paused'));
+    },
   }), [downloads, startDownload, pauseDownload, resumeDownload, cancelDownload, removeDownload]);
 
   return (
