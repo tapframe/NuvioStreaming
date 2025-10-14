@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, Entypo, Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 // Replaced FastImage with standard Image for logos
 import { BlurView as ExpoBlurView } from 'expo-blur';
@@ -285,8 +285,8 @@ const ActionButtons = memo(({
         ) : (
           <View style={styles.androidFallbackBlur} />
         )}
-        <MaterialIcons
-          name={inLibrary ? 'bookmark' : 'bookmark-border'}
+        <Feather
+          name="bookmark"
           size={isTablet ? 28 : 24}
           color={currentTheme.colors.white}
         />
@@ -1451,8 +1451,8 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
               borderRadius: 20,
             }}
           >
-            <MaterialIcons
-              name={trailerMuted ? 'volume-off' : 'volume-up'}
+            <Entypo
+              name={trailerMuted ? 'sound-mute' : 'sound'}
               size={24}
               color="white"
             />

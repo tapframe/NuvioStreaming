@@ -8,7 +8,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { BlurView as ExpoBlurView } from 'expo-blur';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, Feather } from '@expo/vector-icons';
 import FastImage from '@d11/react-native-fast-image';
 import Animated, {
   useAnimatedStyle,
@@ -115,11 +115,7 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
               onPress={handleToggleLibrary}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <MaterialIcons 
-                name={inLibrary ? 'bookmark' : 'bookmark-border'} 
-                size={22} 
-                color={currentTheme.colors.highEmphasis}
-              />
+              <Feather name="bookmark" size={22} color={currentTheme.colors.highEmphasis} />
             </TouchableOpacity>
           </Animated.View>
         </ExpoBlurView>
@@ -164,11 +160,7 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
               onPress={handleToggleLibrary}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <MaterialIcons 
-                name={inLibrary ? 'bookmark' : 'bookmark-border'} 
-                size={22} 
-                color={currentTheme.colors.highEmphasis}
-              />
+              <Feather name="bookmark" size={22} color={currentTheme.colors.highEmphasis} />
             </TouchableOpacity>
           </Animated.View>
         </View>

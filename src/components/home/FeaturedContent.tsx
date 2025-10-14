@@ -16,7 +16,7 @@ import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { LinearGradient } from 'expo-linear-gradient';
 import FastImage from '@d11/react-native-fast-image';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, Feather } from '@expo/vector-icons';
 import Animated, {
   FadeIn,
   useAnimatedStyle,
@@ -518,11 +518,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
               onPress={handleSaveToLibrary}
               activeOpacity={0.7}
             >
-              <MaterialIcons
-                name={isSaved ? "bookmark" : "bookmark-border"}
-                size={20}
-                color={currentTheme.colors.white}
-              />
+              <Feather name="bookmark" size={20} color={currentTheme.colors.white} />
               <Text style={[styles.tabletSecondaryButtonText as TextStyle, { color: currentTheme.colors.white }]}>
                 {isSaved ? "Saved" : "My List"}
               </Text>
@@ -628,11 +624,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
                     onPress={handleSaveToLibrary}
                     activeOpacity={0.7}
                   >
-                    <MaterialIcons
-                      name={isSaved ? "bookmark" : "bookmark-border"}
-                      size={24}
-                      color={currentTheme.colors.white}
-                    />
+                    <Feather name="bookmark" size={24} color={currentTheme.colors.white} />
                     <Text style={[styles.myListButtonText as TextStyle, { color: currentTheme.colors.white }]}>
                       {isSaved ? "Saved" : "Save"}
                     </Text>

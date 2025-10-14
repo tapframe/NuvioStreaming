@@ -22,7 +22,7 @@ import {
 import { FlashList } from '@shopify/flash-list';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, Feather } from '@expo/vector-icons';
 import FastImage from '@d11/react-native-fast-image';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -961,8 +961,8 @@ const LibraryScreen = () => {
                   onPress={() => navigation.navigate('Calendar')}
                   activeOpacity={0.7}
                 >
-                  <MaterialIcons 
-                    name="event" 
+                  <Feather 
+                    name="calendar" 
                     size={24} 
                     color={currentTheme.colors.white} 
                   />

@@ -20,7 +20,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { catalogService, StreamingContent, GroupedSearchResults, AddonSearchResults } from '../services/catalogService';
 import FastImage from '@d11/react-native-fast-image';
 import debounce from 'lodash/debounce';
@@ -579,7 +579,7 @@ const SearchScreen = () => {
           {/* Bookmark and watched icons top right, bookmark to the left of watched */}
           {inLibrary && (
             <View style={[styles.libraryBadge, { position: 'absolute', top: 8, right: 36, backgroundColor: 'transparent', zIndex: 2 }] }>
-              <MaterialIcons name="bookmark" size={16} color={currentTheme.colors.white} />
+              <Feather name="bookmark" size={16} color={currentTheme.colors.white} />
             </View>
           )}
           {watched && (

@@ -7,7 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PaperProvider, MD3DarkTheme, MD3LightTheme, adaptNavigationTheme } from 'react-native-paper';
 import type { MD3Theme } from 'react-native-paper';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, Feather, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { colors } from '../styles/colors';
@@ -352,17 +352,14 @@ export const CustomNavigationDarkTheme: Theme = {
   fonts,
 };
 
-type IconNameType = 'home' | 'home-outline' | 'compass' | 'compass-outline' | 
-                   'play-box-multiple' | 'play-box-multiple-outline' | 
-                   'puzzle' | 'puzzle-outline' | 
-                   'cog' | 'cog-outline' | 'feature-search' | 'feature-search-outline' |
-                   'magnify' | 'heart' | 'heart-outline' | 'download' | 'download-outline';
+type IconNameType = string;
 
 // Add TabIcon component
-const TabIcon = React.memo(({ focused, color, iconName }: { 
+const TabIcon = React.memo(({ focused, color, iconName, iconLibrary = 'material' }: { 
   focused: boolean; 
   color: string; 
   iconName: IconNameType;
+  iconLibrary?: 'material' | 'feather' | 'ionicons';
 }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -375,8 +372,11 @@ const TabIcon = React.memo(({ focused, color, iconName }: {
     }).start();
   }, [focused]);
 
-  // Use outline variant when available, but keep single-form icons (like 'magnify') the same
+  // Use outline variant when available for Material icons; Feather has single-form icons
   const finalIconName = (() => {
+    if (iconLibrary === 'feather') {
+      return iconName;
+    }
     if (iconName === 'magnify') return 'magnify';
     return focused ? iconName : `${iconName}-outline` as IconNameType;
   })();
@@ -387,11 +387,25 @@ const TabIcon = React.memo(({ focused, color, iconName }: {
       justifyContent: 'center',
       transform: [{ scale: scaleAnim }]
     }}>
-      <MaterialCommunityIcons 
-        name={finalIconName}
-        size={24} 
-        color={color} 
-      />
+      {iconLibrary === 'feather' ? (
+        <Feather 
+          name={finalIconName as any}
+          size={24} 
+          color={color} 
+        />
+      ) : iconLibrary === 'ionicons' ? (
+        <Ionicons 
+          name={finalIconName as any}
+          size={24}
+          color={color}
+        />
+      ) : (
+        <MaterialCommunityIcons 
+          name={finalIconName as any}
+          size={24} 
+          color={color} 
+        />
+      )}
     </Animated.View>
   );
 });
@@ -698,21 +712,27 @@ const MainTabs = () => {
               };
 
               let iconName: IconNameType = 'home';
+              let iconLibrary: 'material' | 'feather' | 'ionicons' = 'material';
               switch (route.name) {
                 case 'Home':
                   iconName = 'home';
+                  iconLibrary = 'feather';
                   break;
                 case 'Library':
-                  iconName = 'heart';
+                  iconName = 'library';
+                  iconLibrary = 'ionicons';
                   break;
                 case 'Search':
-                  iconName = 'magnify';
+                  iconName = 'search';
+                  iconLibrary = 'feather';
                   break;
                 case 'Downloads':
                   iconName = 'download';
+                  iconLibrary = 'feather';
                   break;
                 case 'Settings':
-                  iconName = 'cog';
+                  iconName = 'settings';
+                  iconLibrary = 'feather';
                   break;
               }
 
@@ -732,6 +752,7 @@ const MainTabs = () => {
                     focused={isFocused} 
                     color={isFocused ? currentTheme.colors.primary : currentTheme.colors.white} 
                     iconName={iconName}
+                    iconLibrary={iconLibrary}
                   />
                   <Text
                     style={{

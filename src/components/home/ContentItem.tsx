@@ -3,7 +3,7 @@ import { Toast } from 'toastify-react-native';
 import { DeviceEventEmitter } from 'react-native';
 import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Platform, Text, Animated, Share } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useSettings } from '../../hooks/useSettings';
 import { catalogService, StreamingContent } from '../../services/catalogService';
@@ -279,7 +279,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
             )}
             {inLibrary && (
               <View style={styles.libraryBadge}>
-                <MaterialIcons name="bookmark" size={16} color={currentTheme.colors.white} />
+                <Feather name="bookmark" size={16} color={currentTheme.colors.white} />
               </View>
             )}
           </View>

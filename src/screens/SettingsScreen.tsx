@@ -18,7 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import FastImage from '@d11/react-native-fast-image';
-import { MaterialIcons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import { useSettings, DEFAULT_SETTINGS } from '../hooks/useSettings';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -33,6 +33,8 @@ import { getDisplayedAppVersion } from '../utils/version';
 import CustomAlert from '../components/CustomAlert';
 import PluginIcon from '../components/icons/PluginIcon';
 import TraktIcon from '../components/icons/TraktIcon';
+import TMDBIcon from '../components/icons/TMDBIcon';
+import MDBListIcon from '../components/icons/MDBListIcon';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -41,17 +43,17 @@ const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
 // Settings categories for tablet sidebar
 const SETTINGS_CATEGORIES = [
-  { id: 'account', title: 'Account', icon: 'account-circle' as keyof typeof MaterialIcons.glyphMap },
-  { id: 'content', title: 'Content & Discovery', icon: 'explore' as keyof typeof MaterialIcons.glyphMap },
-  { id: 'appearance', title: 'Appearance', icon: 'palette' as keyof typeof MaterialIcons.glyphMap },
-  { id: 'integrations', title: 'Integrations', icon: 'extension' as keyof typeof MaterialIcons.glyphMap },
-  { id: 'ai', title: 'AI Assistant', icon: 'smart-toy' as keyof typeof MaterialIcons.glyphMap },
-  { id: 'playback', title: 'Playback', icon: 'play-circle-outline' as keyof typeof MaterialIcons.glyphMap },
-  { id: 'backup', title: 'Backup & Restore', icon: 'save' as keyof typeof MaterialIcons.glyphMap },
-  { id: 'updates', title: 'Updates', icon: 'system-update' as keyof typeof MaterialIcons.glyphMap },
-  { id: 'about', title: 'About', icon: 'info-outline' as keyof typeof MaterialIcons.glyphMap },
-  { id: 'developer', title: 'Developer', icon: 'code' as keyof typeof MaterialIcons.glyphMap },
-  { id: 'cache', title: 'Cache', icon: 'cached' as keyof typeof MaterialIcons.glyphMap },
+  { id: 'account', title: 'Account', icon: 'user' as string },
+  { id: 'content', title: 'Content & Discovery', icon: 'compass' as string },
+  { id: 'appearance', title: 'Appearance', icon: 'sliders' as string },
+  { id: 'integrations', title: 'Integrations', icon: 'layers' as string },
+  { id: 'ai', title: 'AI Assistant', icon: 'cpu' as string },
+  { id: 'playback', title: 'Playback', icon: 'play-circle' as string },
+  { id: 'backup', title: 'Backup & Restore', icon: 'archive' as string },
+  { id: 'updates', title: 'Updates', icon: 'refresh-ccw' as string },
+  { id: 'about', title: 'About', icon: 'info' as string },
+  { id: 'developer', title: 'Developer', icon: 'code' as string },
+  { id: 'cache', title: 'Cache', icon: 'database' as string },
 ];
 
 // Card component with minimalistic style
@@ -94,7 +96,7 @@ const SettingsCard: React.FC<SettingsCardProps> = ({ children, title, isTablet =
 interface SettingItemProps {
   title: string;
   description?: string;
-  icon?: keyof typeof MaterialIcons.glyphMap;
+  icon?: string;
   customIcon?: React.ReactNode;
   renderControl?: () => React.ReactNode;
   isLast?: boolean;
@@ -139,8 +141,8 @@ const SettingItem: React.FC<SettingItemProps> = ({
         {customIcon ? (
           customIcon
         ) : (
-          <MaterialIcons 
-            name={icon!} 
+          <Feather 
+            name={icon! as any} 
             size={isTablet ? 24 : 20} 
             color={currentTheme.colors.primary} 
           />
@@ -216,8 +218,8 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, c
             ]}
             onPress={() => onCategorySelect(category.id)}
           >
-            <MaterialIcons
-              name={category.icon}
+            <Feather
+              name={category.icon as any}
               size={22}
               color={
                 selectedCategory === category.id 
@@ -415,7 +417,7 @@ const SettingsScreen: React.FC = () => {
   );
 
   const ChevronRight = () => (
-    <MaterialIcons 
+    <Feather 
       name="chevron-right" 
       size={isTablet ? 24 : 20} 
       color={currentTheme.colors.mediumEmphasis}
@@ -454,7 +456,7 @@ const SettingsScreen: React.FC = () => {
             <SettingItem
               title="Addons"
               description={`${addonCount} installed`}
-              icon="extension"
+              icon="layers"
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('Addons')}
               isTablet={isTablet}
@@ -470,7 +472,7 @@ const SettingsScreen: React.FC = () => {
             <SettingItem
               title="Catalogs"
               description={`${catalogCount} active`}
-              icon="view-list"
+              icon="list"
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('CatalogSettings')}
               isTablet={isTablet}
@@ -493,7 +495,7 @@ const SettingsScreen: React.FC = () => {
             <SettingItem
               title="Theme"
               description={currentTheme.name}
-              icon="palette"
+              icon="sliders"
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('ThemeSettings')}
               isTablet={isTablet}
@@ -501,7 +503,7 @@ const SettingsScreen: React.FC = () => {
             <SettingItem
               title="Episode Layout"
               description={settings?.episodeLayoutStyle === 'horizontal' ? 'Horizontal' : 'Vertical'}
-              icon="view-module"
+              icon="grid"
               renderControl={() => (
                 <CustomSwitch
                   value={settings?.episodeLayoutStyle === 'horizontal'}
@@ -520,7 +522,7 @@ const SettingsScreen: React.FC = () => {
             <SettingItem
               title="MDBList"
               description={mdblistKeySet ? "Connected" : "Enable to add ratings & reviews"}
-              icon="star"
+              customIcon={<MDBListIcon size={isTablet ? 24 : 20} colorPrimary={currentTheme.colors.primary} colorSecondary={currentTheme.colors.white} />}
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('MDBListSettings')}
               isTablet={isTablet}
@@ -528,7 +530,7 @@ const SettingsScreen: React.FC = () => {
             <SettingItem
               title="TMDB"
               description="Metadata & logo source provider"
-              icon="movie"
+              customIcon={<TMDBIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('TMDBSettings')}
               isLast={true}
@@ -543,7 +545,7 @@ const SettingsScreen: React.FC = () => {
             <SettingItem
               title="OpenRouter API"
               description={openRouterKeySet ? "Connected" : "Add your API key to enable AI chat"}
-              icon="smart-toy"
+              icon="cpu"
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('AISettings')}
               isLast={true}
@@ -561,7 +563,7 @@ const SettingsScreen: React.FC = () => {
                 ? (settings?.preferredPlayer === 'internal' ? 'Built-in' : settings?.preferredPlayer?.toUpperCase() || 'Built-in')
                 : (settings?.useExternalPlayer ? 'External' : 'Built-in')
               }
-              icon="play-circle-outline"
+              icon="play-circle"
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('PlayerSettings')}
               isTablet={isTablet}
@@ -569,7 +571,7 @@ const SettingsScreen: React.FC = () => {
             <SettingItem
               title="Show Trailers"
               description="Display trailers in hero section"
-              icon="movie"
+              icon="film"
               renderControl={() => (
                 <Switch
                   value={settings?.showTrailers ?? true}
@@ -597,7 +599,7 @@ const SettingsScreen: React.FC = () => {
             <SettingItem
               title="Notifications"
               description="Episode reminders"
-              icon="notifications-none"
+              icon="bell"
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('NotificationSettings')}
               isLast={true}
@@ -618,7 +620,7 @@ const SettingsScreen: React.FC = () => {
             />
             <SettingItem
               title="Report Issue"
-              icon="bug-report"
+              icon="alert-triangle"
               onPress={() => Sentry.showFeedbackWidget()}
               renderControl={ChevronRight}
               isTablet={isTablet}
@@ -626,7 +628,7 @@ const SettingsScreen: React.FC = () => {
             <SettingItem
               title="Version"
               description={getDisplayedAppVersion()}
-              icon="info-outline"
+              icon="info"
               isLast={true}
               isTablet={isTablet}
             />
@@ -638,14 +640,14 @@ const SettingsScreen: React.FC = () => {
           <SettingsCard title="DEVELOPER" isTablet={isTablet}>
             <SettingItem
               title="Test Onboarding"
-              icon="play-circle-outline"
+              icon="play-circle"
               onPress={() => navigation.navigate('Onboarding')}
               renderControl={ChevronRight}
               isTablet={isTablet}
             />
             <SettingItem
               title="Reset Onboarding"
-              icon="refresh"
+              icon="refresh-ccw"
               onPress={async () => {
                 try {
                   await AsyncStorage.removeItem('hasCompletedOnboarding');
@@ -659,7 +661,7 @@ const SettingsScreen: React.FC = () => {
             />
             <SettingItem
               title="Clear All Data"
-              icon="delete-forever"
+              icon="trash-2"
               onPress={() => {
                 openAlert(
                   'Clear All Data',
@@ -691,7 +693,7 @@ const SettingsScreen: React.FC = () => {
           <SettingsCard title="CACHE MANAGEMENT" isTablet={isTablet}>
             <SettingItem
               title="Clear MDBList Cache"
-              icon="cached"
+              icon="database"
               onPress={handleClearMDBListCache}
               isLast={true}
               isTablet={isTablet}
@@ -705,7 +707,7 @@ const SettingsScreen: React.FC = () => {
             <SettingItem
               title="Backup & Restore"
               description="Create and restore app backups"
-              icon="backup"
+              icon="archive"
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('Backup')}
               isLast={true}
@@ -720,7 +722,7 @@ const SettingsScreen: React.FC = () => {
             <SettingItem
               title="App Updates"
               description="Check for updates and manage app version"
-              icon="system-update"
+              icon="refresh-ccw"
               renderControl={ChevronRight}
               badge={Platform.OS === 'android' && hasUpdateBadge ? 1 : undefined}
               onPress={async () => {
