@@ -31,6 +31,14 @@
       ],
       "versions": [
         {
+          "version": "1.2.5",
+          "buildVersion": "20",
+          "date": "2025-10-15",
+          "localizedDescription": "# Version 1.2.5 – Update Notes\n\n### New Additions\n- Introduced **Liquid Glass Theme** for **iOS/iPadOS 16 and above**\n  - Devices running iOS/iPadOS 16+ will now use the new Liquid Glass theme across the app\n  - Older iOS versions will automatically fall back to the default theme\n\n### Improvements\n- Major **dependency updates** across the project\n- Improved **iOS player performance**\n- Optimized **metadata screen** rendering and responsiveness\n- Various **backend improvements** for smoother operations\n\n### General\n- Overall stability and performance improvements",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/1.2.5/Stable_1-2-5.ipa",
+          "size": 25700000
+        },
+        {
           "version": "1.2.4",
           "buildVersion": "19",
           "date": "2025-10-12",
