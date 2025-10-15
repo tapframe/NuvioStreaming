@@ -67,7 +67,6 @@ interface HeroSectionProps {
   metadata: any;
   bannerImage: string | null;
   loadingBanner: boolean;
-  logoLoadError: boolean;
   scrollY: SharedValue<number>;
   heroHeight: SharedValue<number>;
   heroOpacity: SharedValue<number>;
@@ -93,7 +92,6 @@ interface HeroSectionProps {
   navigation: any;
   getPlayButtonText: () => string;
   setBannerImage: (bannerImage: string | null) => void;
-  setLogoLoadError: (error: boolean) => void;
   groupedEpisodes?: { [seasonNumber: number]: any[] };
   dynamicBackgroundColor?: string;
   handleBack: () => void;
@@ -772,7 +770,6 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   metadata,
   bannerImage,
   loadingBanner,
-  logoLoadError,
   scrollY,
   heroHeight,
   heroOpacity,
@@ -790,7 +787,6 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   navigation,
   getPlayButtonText,
   setBannerImage,
-  setLogoLoadError,
   groupedEpisodes,
   dynamicBackgroundColor,
   handleBack,
@@ -942,6 +938,36 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   const logoUri = useMemo(() => {
     return metadata?.logo as string | undefined;
   }, [metadata?.logo]);
+
+  // Stable logo state management - prevent flickering between logo and text
+  const [stableLogoUri, setStableLogoUri] = useState<string | null>(null);
+  const [logoHasLoadedSuccessfully, setLogoHasLoadedSuccessfully] = useState(false);
+
+  // Update stable logo URI when metadata logo changes
+  useEffect(() => {
+    if (metadata?.logo && metadata.logo !== stableLogoUri) {
+      setStableLogoUri(metadata.logo);
+      setLogoHasLoadedSuccessfully(false); // Reset for new logo
+    } else if (!metadata?.logo && stableLogoUri) {
+      // Clear logo if metadata no longer has one
+      setStableLogoUri(null);
+      setLogoHasLoadedSuccessfully(false);
+    }
+  }, [metadata?.logo, stableLogoUri]);
+
+  // Handle logo load success - once loaded successfully, keep it stable
+  const handleLogoLoad = useCallback(() => {
+    setLogoHasLoadedSuccessfully(true);
+  }, []);
+
+  // Handle logo load error - only set error if logo hasn't loaded successfully before
+  const handleLogoError = useCallback(() => {
+    if (!logoHasLoadedSuccessfully) {
+      // Only remove logo if it never loaded successfully
+      setStableLogoUri(null);
+    }
+    // If logo loaded successfully before, keep showing it even if it fails later
+  }, [logoHasLoadedSuccessfully]);
   
   // Performance optimization: Lazy loading setup
   useEffect(() => {
@@ -1548,14 +1574,13 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
           {/* Optimized Title/Logo - Show logo immediately when available */}
           <Animated.View style={[styles.logoContainer, titleCardAnimatedStyle]}>
             <Animated.View style={[styles.titleLogoContainer, logoAnimatedStyle]}>
-              {logoUri && !logoLoadError ? (
+              {stableLogoUri ? (
                 <Image
-                  source={{ uri: logoUri }}
+                  source={{ uri: stableLogoUri }}
                   style={isTablet ? styles.tabletTitleLogo : styles.titleLogo}
                   resizeMode={'contain'}
-                  onError={() => {
-                    runOnJS(setLogoLoadError)(true);
-                  }}
+                  onLoad={handleLogoLoad}
+                  onError={handleLogoError}
                 />
               ) : (
                 <Text style={[isTablet ? styles.tabletHeroTitle : styles.heroTitle, { color: themeColors.highEmphasis }]}>

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import {
   View,
   Text,
@@ -16,11 +16,17 @@ const { width, height } = Dimensions.get('window');
 
 interface MetadataLoadingScreenProps {
   type?: 'movie' | 'series';
+  onExitComplete?: () => void;
 }
 
-export const MetadataLoadingScreen: React.FC<MetadataLoadingScreenProps> = ({ 
-  type = 'movie' 
-}) => {
+export interface MetadataLoadingScreenRef {
+  exit: () => void;
+}
+
+export const MetadataLoadingScreen = forwardRef<MetadataLoadingScreenRef, MetadataLoadingScreenProps>(({
+  type = 'movie',
+  onExitComplete
+}, ref) => {
   const { currentTheme } = useTheme();
   
   // Animation values - removed fadeAnim since parent handles transitions
@@ -31,6 +37,39 @@ export const MetadataLoadingScreen: React.FC<MetadataLoadingScreenProps> = ({
   const sceneOpacity = useRef(new Animated.Value(0)).current;
   const sceneScale = useRef(new Animated.Value(0.95)).current;
   const sceneTranslateY = useRef(new Animated.Value(8)).current;
+
+  // Exit animation function
+  const exit = () => {
+    const exitAnimation = Animated.parallel([
+      Animated.timing(sceneOpacity, {
+        toValue: 0,
+        duration: 200,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
+        useNativeDriver: true,
+      }),
+      Animated.timing(sceneScale, {
+        toValue: 0.95,
+        duration: 200,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
+        useNativeDriver: true,
+      }),
+      Animated.timing(sceneTranslateY, {
+        toValue: 8,
+        duration: 200,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
+        useNativeDriver: true,
+      }),
+    ]);
+
+    exitAnimation.start(() => {
+      onExitComplete?.();
+    });
+  };
+
+  // Expose exit method through ref
+  useImperativeHandle(ref, () => ({
+    exit,
+  }));
 
   useEffect(() => {
     // Scene entrance animation (matching tab navigator)
@@ -61,13 +100,15 @@ export const MetadataLoadingScreen: React.FC<MetadataLoadingScreenProps> = ({
     const pulseAnimation = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1200,
+          toValue: 0.8,
+          duration: 2500,
+          easing: Easing.bezier(0.4, 0, 0.2, 1),
           useNativeDriver: true,
         }),
         Animated.timing(pulseAnim, {
-          toValue: 0.3,
-          duration: 1200,
+          toValue: 0.4,
+          duration: 2500,
+          easing: Easing.bezier(0.4, 0, 0.2, 1),
           useNativeDriver: true,
         }),
       ])
@@ -77,7 +118,8 @@ export const MetadataLoadingScreen: React.FC<MetadataLoadingScreenProps> = ({
     const shimmerAnimation = Animated.loop(
       Animated.timing(shimmerAnim, {
         toValue: 1,
-        duration: 1500,
+        duration: 2500,
+        easing: Easing.inOut(Easing.ease),
         useNativeDriver: true,
       })
     );
@@ -264,7 +306,7 @@ export const MetadataLoadingScreen: React.FC<MetadataLoadingScreenProps> = ({
       </Animated.View>
     </SafeAreaView>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

@@ -81,7 +81,7 @@ def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBu
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
-apply from: new File(["node", "--print", "require('path').dirname(require.resolve('@sentry/react-native/package.json'))"].execute().text.trim(), "sentry.gradle")
+// apply from: new File(["node", "--print", "require('path').dirname(require.resolve('@sentry/react-native/package.json'))"].execute().text.trim(), "sentry.gradle")
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -100,41 +100,32 @@ android {
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
 
-    // Split APKs by architecture and density for smaller downloads
+    // Split APKs by architecture only for smaller downloads
     splits {
         abi {
             enable true
             reset()
-            include "arm64-v8a", "armeabi-v7a", "x86", "x86_64"
-            universalApk true // Generate universal APK as well
+            include 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
+            universalApk true
         }
         density {
-            enable true
-            reset()
-            include "ldpi", "mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"
-            universalApk true // Generate universal APK as well
+            enable false
         }
     }
 
     // Generate unique version codes for each split APK
     def abiVersionCodes = ['armeabi-v7a': 1, 'arm64-v8a': 2, 'x86': 3, 'x86_64': 4]
-    def densityVersionCodes = ['ldpi': 1, 'mdpi': 2, 'hdpi': 3, 'xhdpi': 4, 'xxhdpi': 5, 'xxxhdpi': 6]
-    android.applicationVariants.all { variant ->
+    applicationVariants.all { variant ->
         variant.outputs.each { output ->
-            def baseVersionCode = 19 // Current versionCode 20from defaultConfig
+            def baseVersionCode = 20 // Current versionCode from defaultConfig
             def abiName = output.getFilter(com.android.build.OutputFile.ABI)
-            def densityName = output.getFilter(com.android.build.OutputFile.DENSITY)
-            
-            def versionCode 20= baseVersionCode * 100 // Base multiplier
-            
+
+            def versionCode = baseVersionCode * 100 // Base multiplier
+
             if (abiName != null) {
-                versionCode 20+= abiVersionCodes.get(abiName) * 10
+                versionCode += abiVersionCodes.get(abiName)
             }
-            
-            if (densityName != null) {
-                versionCode 20+= densityVersionCodes.get(densityName)
-            }
-            
+
             output.versionCodeOverride = versionCode
         }
     }
