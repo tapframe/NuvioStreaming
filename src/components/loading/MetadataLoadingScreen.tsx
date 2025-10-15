@@ -29,8 +29,7 @@ export const MetadataLoadingScreen = forwardRef<MetadataLoadingScreenRef, Metada
 }, ref) => {
   const { currentTheme } = useTheme();
   
-  // Animation values - removed fadeAnim since parent handles transitions
-  const shimmerAnim = useRef(new Animated.Value(0)).current;
+  // Animation values - shimmer removed
   
   // Scene transition animation values (matching tab navigator)
   const sceneOpacity = useRef(new Animated.Value(0)).current;
@@ -95,28 +94,14 @@ export const MetadataLoadingScreen = forwardRef<MetadataLoadingScreenRef, Metada
 
     sceneAnimation.start();
 
-    // Shimmer effect for skeleton elements
-    const shimmerAnimation = Animated.loop(
-      Animated.timing(shimmerAnim, {
-        toValue: 1,
-        duration: 2500,
-        easing: Easing.inOut(Easing.ease),
-        useNativeDriver: true,
-      })
-    );
-
-    shimmerAnimation.start();
+    // Shimmer effect removed
 
     return () => {
       sceneAnimation.stop();
-      shimmerAnimation.stop();
     };
   }, []);
 
-  const shimmerTranslateX = shimmerAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-width, width],
-  });
+  // Shimmer translate removed
 
   const SkeletonElement = ({ 
     width: elementWidth, 
@@ -143,23 +128,7 @@ export const MetadataLoadingScreen = forwardRef<MetadataLoadingScreenRef, Metada
       style
     ]}>
       {/* Pulsating overlay removed */}
-      <Animated.View style={[
-        StyleSheet.absoluteFill,
-        {
-          transform: [{ translateX: shimmerTranslateX }],
-        }
-      ]}>
-        <LinearGradient
-          colors={[
-            'transparent',
-            currentTheme.colors.white + '20',
-            'transparent'
-          ]}
-          style={StyleSheet.absoluteFill}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-        />
-      </Animated.View>
+      {/* Shimmer overlay removed */}
     </View>
   );
 

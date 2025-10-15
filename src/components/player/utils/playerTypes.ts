@@ -52,8 +52,8 @@ export interface TextTrack {
 }
 
 // Define the possible resize modes - force to stretch for absolute full screen
-export type ResizeModeType = 'contain' | 'cover' | 'fill' | 'none' | 'stretch';
-export const resizeModes: ResizeModeType[] = ['stretch']; // Force stretch mode for absolute full screen
+export type ResizeModeType = 'contain' | 'cover' | 'none';
+export const resizeModes: ResizeModeType[] = ['cover']; // Force cover mode for absolute full screen
 
 // Add VLC specific interface for their event structure
 export interface VlcMediaEvent {

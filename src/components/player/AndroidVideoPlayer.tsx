@@ -49,7 +49,6 @@ const getVideoResizeMode = (resizeMode: ResizeModeType) => {
   switch (resizeMode) {
     case 'contain': return 'contain';
     case 'cover': return 'cover';
-    case 'stretch': return 'stretch';
     case 'none': return 'contain';
     default: return 'contain';
   }
@@ -87,7 +86,7 @@ const AndroidVideoPlayer: React.FC = () => {
   }, [route.params]);
   // TEMP: force React Native Video for testing (disable VLC)
   const TEMP_FORCE_RNV = false;
-  const TEMP_FORCE_VLC = false;
+  const TEMP_FORCE_VLC = true;
   const useVLC = Platform.OS === 'android' && !TEMP_FORCE_RNV && (TEMP_FORCE_VLC || forceVlc);
 
   // Log player selection
@@ -381,13 +380,8 @@ const AndroidVideoPlayer: React.FC = () => {
 
   // Memoize zoom factor calculations to prevent expensive recalculations
   const zoomFactor = useMemo(() => {
-    if (resizeMode === 'cover' && videoAspectRatio && screenDimensions.width > 0 && screenDimensions.height > 0) {
-      const screenAspect = screenDimensions.width / screenDimensions.height;
-      return Math.max(screenAspect / videoAspectRatio, videoAspectRatio / screenAspect);
-    } else if (resizeMode === 'none') {
-      return 1;
-    }
-    return 1; // Default for other modes
+    // Zoom disabled
+    return 1;
   }, [resizeMode, videoAspectRatio, screenDimensions.width, screenDimensions.height]);
   const [customVideoStyles, setCustomVideoStyles] = useState<any>({});
   const [zoomScale, setZoomScale] = useState(1);
@@ -683,21 +677,13 @@ const AndroidVideoPlayer: React.FC = () => {
 
 
   const onPinchGestureEvent = (event: PinchGestureHandlerGestureEvent) => {
-    const { scale } = event.nativeEvent;
-    const newScale = Math.max(1, Math.min(lastZoomScale * scale, 1.1));
-    setZoomScale(newScale);
-    if (DEBUG_MODE) {
-      if (__DEV__) logger.log(`[AndroidVideoPlayer] Center Zoom: ${newScale.toFixed(2)}x`);
-    }
+    // Zoom disabled
+    return;
   };
 
   const onPinchHandlerStateChange = (event: PinchGestureHandlerGestureEvent) => {
-    if (event.nativeEvent.state === State.END) {
-      setLastZoomScale(zoomScale);
-      if (DEBUG_MODE) {
-        if (__DEV__) logger.log(`[AndroidVideoPlayer] Pinch ended - saved scale: ${zoomScale.toFixed(2)}x`);
-      }
-    }
+    // Zoom disabled
+    return;
   };
 
   // Volume gesture handler (right side of screen) - optimized with debouncing
@@ -1625,10 +1611,10 @@ const AndroidVideoPlayer: React.FC = () => {
     // Android: exclude 'contain' for both VLC and RN Video (not well supported)
     let resizeModes: ResizeModeType[];
     if (Platform.OS === 'ios') {
-      resizeModes = ['cover', 'fill'];
+      resizeModes = ['contain', 'cover'];
     } else {
-      // Android: both VLC and RN Video skip 'contain' mode
-      resizeModes = ['cover', 'fill', 'none'];
+      // On Android with VLC backend, only 'none' (original) and 'cover' (client-side crop)
+      resizeModes = useVLC ? ['none', 'cover'] : ['contain', 'cover', 'none'];
     }
 
     const currentIndex = resizeModes.indexOf(resizeMode);
@@ -3320,8 +3306,6 @@ const AndroidVideoPlayer: React.FC = () => {
                 style={{ flex: 1 }}
                 activeOpacity={1}
                 onPress={toggleControls}
-                onLongPress={resetZoom}
-                delayLongPress={300}
               >
                 {useVLC && !forceVlcRemount ? (
                   <VlcVideoPlayer
@@ -3362,7 +3346,7 @@ const AndroidVideoPlayer: React.FC = () => {
                 ) : (
                   <Video
                       ref={videoRef}
-                  style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
+                  style={[styles.video, customVideoStyles]}
                   source={{ 
                     uri: currentStreamUrl, 
                     headers: headers || getStreamHeaders(), 

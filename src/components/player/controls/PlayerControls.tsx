@@ -169,15 +169,15 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
           <View style={styles.bottomControls}>
             {/* Bottom Buttons Row */}
             <View style={styles.bottomButtons}>
-              {/* Fill/Cover Button - Updated to show fill/cover modes */}
+              {/* Aspect Ratio Button - uses official resize modes */}
               <TouchableOpacity style={styles.bottomButton} onPress={cycleAspectRatio}>
                 <Ionicons name="resize" size={20} color="white" />
                 <Text style={[styles.bottomButtonText, { fontSize: 14, textAlign: 'center' }]}>
-                  {currentResizeMode ? 
-                    (currentResizeMode === 'none' ? 'Original' : 
-                     currentResizeMode.charAt(0).toUpperCase() + currentResizeMode.slice(1)) :
-                    (zoomScale === 1.1 ? 'Fill' : 'Cover')
-                  }
+                  {currentResizeMode
+                    ? (currentResizeMode === 'none'
+                        ? 'Original'
+                        : currentResizeMode.charAt(0).toUpperCase() + currentResizeMode.slice(1))
+                    : 'Contain'}
                 </Text>
               </TouchableOpacity>
 

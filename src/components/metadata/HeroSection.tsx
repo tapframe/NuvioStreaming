@@ -627,10 +627,9 @@ const WatchProgressDisplay = memo(({
     ],
   }));
 
-  if (!progressData) return null;
-  
-  // Hide watch progress when trailer is playing AND unmuted AND trailer is ready
-  if (isTrailerPlaying && !trailerMuted && trailerReady) return null;
+  // Determine visibility; if not visible, don't render to avoid fixed blank space
+  const isVisible = !!progressData && !(isTrailerPlaying && !trailerMuted && trailerReady);
+  if (!isVisible) return null;
 
   const isCompleted = progressData.isWatched || progressData.progressPercent >= 85;
 
@@ -816,7 +815,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   const trailerVideoRef = useRef<any>(null);
   const imageOpacity = useSharedValue(1);
   const imageLoadOpacity = useSharedValue(0);
-  const shimmerOpacity = useSharedValue(0.3);
+  // Shimmer overlay removed
   const trailerOpacity = useSharedValue(0);
   const thumbnailOpacity = useSharedValue(1);
   // Scroll-based pause/resume control
@@ -940,24 +939,56 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   }, [metadata?.logo]);
 
   // Stable logo state management - prevent flickering between logo and text
-  const [stableLogoUri, setStableLogoUri] = useState<string | null>(null);
+  const [stableLogoUri, setStableLogoUri] = useState<string | null>(metadata?.logo || null);
   const [logoHasLoadedSuccessfully, setLogoHasLoadedSuccessfully] = useState(false);
+  // Smooth fade-in for logo when it finishes loading
+  const logoLoadOpacity = useSharedValue(0);
+  // Grace delay before showing text fallback to avoid flashing when logo arrives late
+  const [shouldShowTextFallback, setShouldShowTextFallback] = useState<boolean>(!metadata?.logo);
+  const logoWaitTimerRef = useRef<any>(null);
 
   // Update stable logo URI when metadata logo changes
   useEffect(() => {
+    // Reset text fallback and timers on logo updates
+    if (logoWaitTimerRef.current) {
+      try { clearTimeout(logoWaitTimerRef.current); } catch (_e) {}
+      logoWaitTimerRef.current = null;
+    }
+
     if (metadata?.logo && metadata.logo !== stableLogoUri) {
       setStableLogoUri(metadata.logo);
       setLogoHasLoadedSuccessfully(false); // Reset for new logo
+      logoLoadOpacity.value = 0; // reset fade for new logo
+      setShouldShowTextFallback(false);
     } else if (!metadata?.logo && stableLogoUri) {
       // Clear logo if metadata no longer has one
       setStableLogoUri(null);
       setLogoHasLoadedSuccessfully(false);
+      // Start a short grace period before showing text fallback
+      setShouldShowTextFallback(false);
+      logoWaitTimerRef.current = setTimeout(() => {
+        setShouldShowTextFallback(true);
+      }, 600);
+    } else if (!metadata?.logo && !stableLogoUri) {
+      // No logo currently; wait briefly before showing text to avoid flash
+      setShouldShowTextFallback(false);
+      logoWaitTimerRef.current = setTimeout(() => {
+        setShouldShowTextFallback(true);
+      }, 600);
     }
+    return () => {
+      if (logoWaitTimerRef.current) {
+        try { clearTimeout(logoWaitTimerRef.current); } catch (_e) {}
+        logoWaitTimerRef.current = null;
+      }
+    };
   }, [metadata?.logo, stableLogoUri]);
 
   // Handle logo load success - once loaded successfully, keep it stable
   const handleLogoLoad = useCallback(() => {
     setLogoHasLoadedSuccessfully(true);
+    // Fade in smoothly once the image reports loaded
+    logoLoadOpacity.value = withTiming(1, { duration: 300 });
   }, []);
 
   // Handle logo load error - only set error if logo hasn't loaded successfully before
@@ -1053,22 +1084,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     };
   }, [metadata?.name, metadata?.year, tmdbId, settings?.showTrailers, isFocused]);
 
-  // Optimized shimmer animation for loading state
-  useEffect(() => {
-    if (!shouldLoadSecondaryData) return;
-    
-    if (!imageLoaded && imageSource) {
-      // Start shimmer animation
-      shimmerOpacity.value = withRepeat(
-        withTiming(0.8, { duration: 1200 }),
-        -1,
-        true
-      );
-    } else {
-      // Stop shimmer when loaded
-      shimmerOpacity.value = withTiming(0.3, { duration: 300 });
-    }
-  }, [imageLoaded, imageSource, shouldLoadSecondaryData]);
+  // Shimmer animation removed
   
   // Optimized loading state reset when image source changes
   useEffect(() => {
@@ -1127,6 +1143,11 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       ]
     };
   }, [watchProgress]);
+
+  // Logo fade style applies only to the image to avoid affecting layout
+  const logoFadeStyle = useAnimatedStyle(() => ({
+    opacity: logoLoadOpacity.value,
+  }));
 
   const watchProgressAnimatedStyle = useAnimatedStyle(() => ({
     opacity: watchProgressOpacity.value,
@@ -1350,7 +1371,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       try {
         imageOpacity.value = 1;
         imageLoadOpacity.value = 0;
-        shimmerOpacity.value = 0.3;
+        // shimmer removed
         trailerOpacity.value = 0;
         thumbnailOpacity.value = 1;
         actionButtonsOpacity.value = 1;
@@ -1368,7 +1389,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       
       interactionComplete.current = false;
     };
-  }, [imageOpacity, imageLoadOpacity, shimmerOpacity, trailerOpacity, thumbnailOpacity, actionButtonsOpacity, titleCardTranslateY, genreOpacity, watchProgressOpacity, buttonsOpacity, buttonsTranslateY, logoOpacity, heroOpacity, heroHeight]);
+  }, [imageOpacity, imageLoadOpacity, trailerOpacity, thumbnailOpacity, actionButtonsOpacity, titleCardTranslateY, genreOpacity, watchProgressOpacity, buttonsOpacity, buttonsTranslateY, logoOpacity, heroOpacity, heroHeight]);
 
   // Disabled performance monitoring to reduce CPU overhead in production
   // useEffect(() => {
@@ -1391,19 +1412,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       {/* Optimized Background */}
       <View style={[styles.absoluteFill, { backgroundColor: themeColors.black }]} />
       
-      {/* Optimized shimmer loading effect */}
-      {shouldLoadSecondaryData && (trailerLoading || ((imageSource && !imageLoaded) || loadingBanner)) && (
-        <Animated.View style={[styles.absoluteFill, {
-          opacity: shimmerOpacity,
-        }]}>
-          <LinearGradient
-            colors={['#111', '#222', '#111']}
-            style={styles.absoluteFill}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          />
-        </Animated.View>
-      )}
+      {/* Shimmer loading effect removed */}
       
       {/* Background thumbnail image - always rendered when available */}
       {shouldLoadSecondaryData && imageSource && !loadingBanner && (
@@ -1574,18 +1583,21 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
           {/* Optimized Title/Logo - Show logo immediately when available */}
           <Animated.View style={[styles.logoContainer, titleCardAnimatedStyle]}>
             <Animated.View style={[styles.titleLogoContainer, logoAnimatedStyle]}>
-              {stableLogoUri ? (
-                <Image
-                  source={{ uri: stableLogoUri }}
-                  style={isTablet ? styles.tabletTitleLogo : styles.titleLogo}
+              {metadata?.logo ? (
+                <Animated.Image
+                  source={{ uri: stableLogoUri || (metadata?.logo as string) }}
+                  style={[isTablet ? styles.tabletTitleLogo : styles.titleLogo, logoFadeStyle]}
                   resizeMode={'contain'}
                   onLoad={handleLogoLoad}
                   onError={handleLogoError}
                 />
-              ) : (
-                <Text style={[isTablet ? styles.tabletHeroTitle : styles.heroTitle, { color: themeColors.highEmphasis }]}>
+              ) : shouldShowTextFallback ? (
+                <Text style={[isTablet ? styles.tabletHeroTitle : styles.heroTitle, { color: themeColors.highEmphasis }]}> 
                   {metadata.name}
                 </Text>
+              ) : (
+                // Reserve space to prevent layout jump while waiting briefly for logo
+                <View style={isTablet ? styles.tabletTitleLogo : styles.titleLogo} />
               )}
             </Animated.View>
           </Animated.View>
@@ -1602,7 +1614,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
             trailerReady={trailerReady}
           />
 
-          {/* Optimized genre display with lazy loading */}
+          {/* Optimized genre display with lazy loading; no fixed blank space */}
           {shouldLoadSecondaryData && genreElements && (
             <Animated.View style={[isTablet ? styles.tabletGenreContainer : styles.genreContainer, genreAnimatedStyle]}>
               {genreElements}

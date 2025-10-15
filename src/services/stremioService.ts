@@ -182,6 +182,7 @@ class StremioService {
   private readonly DEFAULT_PAGE_SIZE = 50;
   private initialized: boolean = false;
   private initializationPromise: Promise<void> | null = null;
+  private catalogHasMore: Map<string, boolean> = new Map();
 
   private constructor() {
     // Start initialization but don't wait for it
@@ -734,71 +735,66 @@ class StremioService {
   }
 
   async getCatalog(manifest: Manifest, type: string, id: string, page = 1, filters: CatalogFilter[] = []): Promise<Meta[]> {
-    // Special handling for Cinemeta
-    if (manifest.id === 'com.linvo.cinemeta') {
-      const baseUrl = 'https://v3-cinemeta.strem.io';
-      const encodedId = encodeURIComponent(id);
-      let url = `${baseUrl}/catalog/${type}/${encodedId}.json`;
-      
-      // Add paging
-      url += `?skip=${(page - 1) * this.DEFAULT_PAGE_SIZE}`;
-      
-      // Add filters
-      if (filters.length > 0) {
-        filters.forEach(filter => {
-          if (filter.value) {
-            url += `&${encodeURIComponent(filter.title)}=${encodeURIComponent(filter.value)}`;
-          }
-        });
-      }
-      
-      const response = await this.retryRequest(async () => {
-        return await axios.get(url);
-      });
-      
-      if (response.data && response.data.metas && Array.isArray(response.data.metas)) {
-        return response.data.metas;
-      }
-      return [];
-    }
+    // Build URLs (path-style skip and query-style skip) and try both for broad addon support
+    const encodedId = encodeURIComponent(id);
+    const pageSkip = (page - 1) * this.DEFAULT_PAGE_SIZE;
+    const filterQuery = (filters || [])
+      .filter(f => f && f.value)
+      .map(f => `&${encodeURIComponent(f.title)}=${encodeURIComponent(f.value!)}`)
+      .join('');
     
-    // For other addons
+    // For all addons
     if (!manifest.url) {
       throw new Error('Addon URL is missing');
     }
     
     try {
       const { baseUrl, queryParams } = this.getAddonBaseURL(manifest.url);
+      // Candidate 1: Path-style skip URL: /catalog/{type}/{id}/skip={N}.json
+      const urlPathStyle = `${baseUrl}/catalog/${type}/${encodedId}/skip=${pageSkip}.json${queryParams ? `?${queryParams}` : ''}`;
+      // Add filters to path style (append with & or ? based on presence of queryParams)
+      const urlPathWithFilters = urlPathStyle + (urlPathStyle.includes('?') ? filterQuery : (filterQuery ? `?${filterQuery.slice(1)}` : ''));
+      try { logger.log('[StremioService] getCatalog URL (path-style)', { url: urlPathWithFilters, page, pageSize: this.DEFAULT_PAGE_SIZE, type, id, filters, manifest: manifest.id }); } catch {}
 
-      // Build the catalog URL
-      const encodedId = encodeURIComponent(id);
-      let url = `${baseUrl}/catalog/${type}/${encodedId}.json`;
-      
-      // Add paging
-      url += `?skip=${(page - 1) * this.DEFAULT_PAGE_SIZE}`;
-      
-      // Add filters
-      if (filters.length > 0) {
-        filters.forEach(filter => {
-          if (filter.value) {
-            url += `&${encodeURIComponent(filter.title)}=${encodeURIComponent(filter.value)}`;
-          }
-        });
+      // Candidate 2: Query-style skip URL: /catalog/{type}/{id}.json?skip={N}&limit={PAGE_SIZE}
+      let urlQueryStyle = `${baseUrl}/catalog/${type}/${encodedId}.json?skip=${pageSkip}&limit=${this.DEFAULT_PAGE_SIZE}`;
+      if (queryParams) urlQueryStyle += `&${queryParams}`;
+      urlQueryStyle += filterQuery;
+      try { logger.log('[StremioService] getCatalog URL (query-style)', { url: urlQueryStyle, page, pageSize: this.DEFAULT_PAGE_SIZE, type, id, filters, manifest: manifest.id }); } catch {}
+
+      // Try path-style first, then fallback to query-style
+      let response;
+      try {
+        response = await this.retryRequest(async () => axios.get(urlPathWithFilters));
+      } catch (e) {
+        try {
+          response = await this.retryRequest(async () => axios.get(urlQueryStyle));
+        } catch (e2) {
+          throw e2;
+        }
       }
-      
-      
-      const response = await this.retryRequest(async () => {
-        return await axios.get(url);
-      });
-      
-      if (response.data && response.data.metas && Array.isArray(response.data.metas)) {
-        return response.data.metas;
+
+      if (response && response.data) {
+        const hasMore = typeof response.data.hasMore === 'boolean' ? response.data.hasMore : undefined;
+        try {
+          const key = `${manifest.id}|${type}|${id}`;
+          if (typeof hasMore === 'boolean') this.catalogHasMore.set(key, hasMore);
+          logger.log('[StremioService] getCatalog response meta', { hasMore, count: Array.isArray(response.data.metas) ? response.data.metas.length : 0 });
+        } catch {}
+        if (response.data.metas && Array.isArray(response.data.metas)) {
+          return response.data.metas;
+        }
       }
       return [];
     } catch (error) {
       logger.error(`Failed to fetch catalog from ${manifest.name}:`, error);
       throw error;
     }
+  }
+
+  public getCatalogHasMore(manifestId: string, type: string, id: string): boolean | undefined {
+    const key = `${manifestId}|${type}|${id}`;
+    return this.catalogHasMore.get(key);
   }
 
   async getMetaDetails(type: string, id: string, preferredAddonId?: string): Promise<MetaDetails | null> {

@@ -17,7 +17,7 @@ interface VlcVideoPlayerProps {
   source: string;
   volume: number;
   zoomScale: number;
-  resizeMode: 'contain' | 'cover' | 'fill' | 'stretch' | 'none';
+  resizeMode: 'contain' | 'cover' | 'none';
   onLoad: (data: any) => void;
   onProgress: (data: any) => void;
   onSeek: (data: any) => void;
@@ -63,6 +63,7 @@ const VlcVideoPlayer = forwardRef<VlcPlayerRef, VlcVideoPlayerProps>(({
   const vlcRef = useRef<any>(null);
   const [vlcActive, setVlcActive] = useState(true);
   const [duration, setDuration] = useState<number>(0);
+  const [videoAspectRatio, setVideoAspectRatio] = useState<number | null>(null);
 
   // Expose imperative methods to parent component
   useImperativeHandle(ref, () => ({
@@ -99,18 +100,20 @@ const VlcVideoPlayer = forwardRef<VlcPlayerRef, VlcVideoPlayerProps>(({
   const screenDimensions = Dimensions.get('screen');
 
   const vlcAspectRatio = useMemo(() => {
-    // For VLC, we handle aspect ratio through custom zoom for cover mode
-    // Only force aspect for fill mode (stretch to fit)
-    if (resizeMode === 'fill') {
-      const sw = screenDimensions.width || 0;
-      const sh = screenDimensions.height || 0;
-      if (sw > 0 && sh > 0) {
-        return toVlcRatio(sw, sh);
-      }
-    }
-    // For cover/contain/none: let VLC preserve natural aspect, we handle zoom separately
+    // For VLC, no forced aspect ratio - let it preserve natural aspect
     return undefined;
   }, [resizeMode, screenDimensions.width, screenDimensions.height, toVlcRatio]);
+
+  const clientScale = useMemo(() => {
+    if (!videoAspectRatio || screenDimensions.width <= 0 || screenDimensions.height <= 0) {
+      return 1;
+    }
+    if (resizeMode === 'cover') {
+      const screenAR = screenDimensions.width / screenDimensions.height;
+      return Math.max(screenAR / videoAspectRatio, videoAspectRatio / screenAR);
+    }
+    return 1;
+  }, [resizeMode, videoAspectRatio, screenDimensions.width, screenDimensions.height]);
 
   // VLC options for better playback
   const vlcOptions = useMemo(() => {
@@ -144,6 +147,10 @@ const VlcVideoPlayer = forwardRef<VlcPlayerRef, VlcVideoPlayerProps>(({
       const height = info?.height || 0;
       setDuration(lenSec);
       onLoad({ duration: lenSec, naturalSize: width && height ? { width, height } : undefined });
+
+      if (width > 0 && height > 0) {
+        setVideoAspectRatio(width / height);
+      }
 
       // Restore playback position after remount (workaround for surface detach)
       if (restoreTime !== undefined && restoreTime !== null && restoreTime > 0) {
@@ -304,36 +311,49 @@ const VlcVideoPlayer = forwardRef<VlcPlayerRef, VlcVideoPlayerProps>(({
   }
 
   return (
-    <LibVlcPlayerViewComponent
-      ref={vlcRef}
+    <View
       style={{
         position: 'absolute',
         top: 0,
         left: 0,
         width: screenDimensions.width,
         height: screenDimensions.height,
-        transform: [{ scale: zoomScale }]
+        overflow: 'hidden'
       }}
-      // Force remount when surfaces are recreated
-      key={key || 'vlc-default'}
-      source={processedSource}
-      aspectRatio={vlcAspectRatio}
-      options={vlcOptions}
-      tracks={vlcTracks}
-      volume={Math.round(Math.max(0, Math.min(1, volume)) * 100)}
-      mute={false}
-      repeat={false}
-      rate={1}
-      autoplay={false}
-      onFirstPlay={handleFirstPlay}
-      onPositionChanged={handlePositionChanged}
-      onPlaying={handlePlaying}
-      onPaused={handlePaused}
-      onEndReached={handleEndReached}
-      onEncounteredError={handleEncounteredError}
-      onBackground={handleBackground}
-      onESAdded={handleESAdded}
-    />
+    >
+      <LibVlcPlayerViewComponent
+        ref={vlcRef}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: screenDimensions.width,
+          height: screenDimensions.height,
+          transform: [{ scale: clientScale }]
+        }}
+        // Force remount when surfaces are recreated
+        key={key || 'vlc-default'}
+        source={processedSource}
+        aspectRatio={vlcAspectRatio}
+        // Let VLC auto-fit the video to the view to prevent flicker on mode changes
+        scale={0}
+        options={vlcOptions}
+        tracks={vlcTracks}
+        volume={Math.round(Math.max(0, Math.min(1, volume)) * 100)}
+        mute={false}
+        repeat={false}
+        rate={1}
+        autoplay={false}
+        onFirstPlay={handleFirstPlay}
+        onPositionChanged={handlePositionChanged}
+        onPlaying={handlePlaying}
+        onPaused={handlePaused}
+        onEndReached={handleEndReached}
+        onEncounteredError={handleEncounteredError}
+        onBackground={handleBackground}
+        onESAdded={handleESAdded}
+      />
+    </View>
   );
 });
 

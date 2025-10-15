@@ -105,6 +105,8 @@ const MetadataScreen: React.FC = () => {
   const [revealedSpoilers, setRevealedSpoilers] = useState<Set<string>>(new Set());
   const loadingScreenRef = useRef<MetadataLoadingScreenRef>(null);
   const [loadingScreenExited, setLoadingScreenExited] = useState(false);
+  // Delay flag to show sections 800ms after cast is rendered (if present)
+  const [postCastDelayDone, setPostCastDelayDone] = useState(false);
 
 
   // Debug state changes
@@ -161,26 +163,48 @@ const MetadataScreen: React.FC = () => {
     const hasNetworks = metadata?.networks && metadata.networks.length > 0;
     const hasDescription = !!metadata?.description;
     const isSeries = Object.keys(groupedEpisodes).length > 0;
-    // Defer showing until cast (if any) has finished fetching to avoid layout jump
-    const shouldShow = shouldLoadSecondaryData && !loadingCast && hasNetworks && hasDescription && isSeries;
+    // Defer showing until cast (if any) has finished fetching and 800ms delay elapsed
+    const shouldShow = shouldLoadSecondaryData && postCastDelayDone && hasNetworks && hasDescription && isSeries;
 
     if (shouldShow && networkSectionOpacity.value === 0) {
       networkSectionOpacity.value = withTiming(1, { duration: 400 });
     }
-  }, [metadata?.networks, metadata?.description, Object.keys(groupedEpisodes).length, shouldLoadSecondaryData, loadingCast, networkSectionOpacity]);
+  }, [metadata?.networks, metadata?.description, Object.keys(groupedEpisodes).length, shouldLoadSecondaryData, postCastDelayDone, networkSectionOpacity]);
 
   // Animate production section when data becomes available (for movies)
   useEffect(() => {
     const hasNetworks = metadata?.networks && metadata.networks.length > 0;
     const hasDescription = !!metadata?.description;
     const isMovie = Object.keys(groupedEpisodes).length === 0;
-    // Defer showing until cast (if any) has finished fetching to avoid layout jump
-    const shouldShow = shouldLoadSecondaryData && !loadingCast && hasNetworks && hasDescription && isMovie;
+    // Defer showing until cast (if any) has finished fetching and 800ms delay elapsed
+    const shouldShow = shouldLoadSecondaryData && postCastDelayDone && hasNetworks && hasDescription && isMovie;
 
     if (shouldShow && productionSectionOpacity.value === 0) {
       productionSectionOpacity.value = withTiming(1, { duration: 400 });
     }
-  }, [metadata?.networks, metadata?.description, Object.keys(groupedEpisodes).length, shouldLoadSecondaryData, loadingCast, productionSectionOpacity]);
+  }, [metadata?.networks, metadata?.description, Object.keys(groupedEpisodes).length, shouldLoadSecondaryData, postCastDelayDone, productionSectionOpacity]);
+
+  // Manage 800ms delay after cast finishes loading (only if cast is present)
+  useEffect(() => {
+    if (!shouldLoadSecondaryData) {
+      setPostCastDelayDone(false);
+      return;
+    }
+
+    if (!loadingCast) {
+      if (cast && cast.length > 0) {
+        setPostCastDelayDone(false);
+        const t = setTimeout(() => setPostCastDelayDone(true), 800);
+        return () => clearTimeout(t);
+      } else {
+        // If no cast present, no need to delay
+        setPostCastDelayDone(true);
+      }
+    } else {
+      // Reset while cast is loading
+      setPostCastDelayDone(false);
+    }
+  }, [loadingCast, cast.length, shouldLoadSecondaryData]);
 
   // Optimized hooks with memoization and conditional loading
   const watchProgressData = useWatchProgress(id, Object.keys(groupedEpisodes).length > 0 ? 'series' : type as 'movie' | 'series', episodeId, episodes);
