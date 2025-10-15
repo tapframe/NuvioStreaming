@@ -167,6 +167,11 @@ class KSPlayerView: UIView {
         let options = KSOptions()
         // Disable native player remote control center integration; use RN controls
         options.registerRemoteControll = false
+        // Reduce prebuffer to speed up start/seeks; keep a modest upper cap
+        options.preferredForwardBufferDuration = 0.5
+        options.maxBufferDuration = 10.0
+        // Enable "second open" to relax startup/seek buffering thresholds
+        options.isSecondOpen = true
         
         // Configure audio for proper dialogue mixing using FFmpeg's pan filter
         // This approach uses standard audio engineering practices for multi-channel downmixing
