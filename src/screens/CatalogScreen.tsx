@@ -21,6 +21,21 @@ import { useTheme } from '../contexts/ThemeContext';
 import FastImage from '@d11/react-native-fast-image';
 import { BlurView } from 'expo-blur';
 import { MaterialIcons } from '@expo/vector-icons';
+
+// Optional iOS Glass effect (expo-glass-effect) with safe fallback for CatalogScreen
+let GlassViewComp: any = null;
+let liquidGlassAvailable = false;
+if (Platform.OS === 'ios') {
+  try {
+    // Dynamically require so app still runs if the package isn't installed yet
+    const glass = require('expo-glass-effect');
+    GlassViewComp = glass.GlassView;
+    liquidGlassAvailable = typeof glass.isLiquidGlassAvailable === 'function' ? glass.isLiquidGlassAvailable() : false;
+  } catch {
+    GlassViewComp = null;
+    liquidGlassAvailable = false;
+  }
+}
 import { logger } from '../utils/logger';
 import { useCustomCatalogNames } from '../hooks/useCustomCatalogNames';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -629,17 +644,31 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
         {type === 'movie' && nowPlayingMovies.has(item.id) && (
           Platform.OS === 'ios' ? (
             <View style={styles.badgeBlur}>
-              <BlurView intensity={40} tint={isDarkMode ? 'dark' : 'light'} style={{ borderRadius: 10 }}>
-                <View style={styles.badgeContent}>
-                  <MaterialIcons
-                    name="theaters"
-                    size={12}
-                    color={colors.white}
-                    style={{ marginRight: 4 }}
-                  />
-                  <Text style={styles.badgeText}>In Theaters</Text>
-                </View>
-              </BlurView>
+              {GlassViewComp && liquidGlassAvailable ? (
+                <GlassViewComp style={{ borderRadius: 10 }} glassEffectStyle="regular">
+                  <View style={styles.badgeContent}>
+                    <MaterialIcons
+                      name="theaters"
+                      size={12}
+                      color={colors.white}
+                      style={{ marginRight: 4 }}
+                    />
+                    <Text style={styles.badgeText}>In Theaters</Text>
+                  </View>
+                </GlassViewComp>
+              ) : (
+                <BlurView intensity={40} tint={isDarkMode ? 'dark' : 'light'} style={{ borderRadius: 10 }}>
+                  <View style={styles.badgeContent}>
+                    <MaterialIcons
+                      name="theaters"
+                      size={12}
+                      color={colors.white}
+                      style={{ marginRight: 4 }}
+                    />
+                    <Text style={styles.badgeText}>In Theaters</Text>
+                  </View>
+                </BlurView>
+              )}
             </View>
           ) : (
             <View style={styles.badgeContainer}>

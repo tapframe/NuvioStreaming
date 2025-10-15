@@ -18,6 +18,21 @@ import { useTheme } from '../contexts/ThemeContext';
 import ToastManager from 'toastify-react-native';
 import { PostHogProvider } from 'posthog-react-native';
 
+// Optional iOS Glass effect (expo-glass-effect) with safe fallback
+let GlassViewComp: any = null;
+let liquidGlassAvailable = false;
+if (Platform.OS === 'ios') {
+  try {
+    // Dynamically require so app still runs if the package isn't installed yet
+    const glass = require('expo-glass-effect');
+    GlassViewComp = glass.GlassView;
+    liquidGlassAvailable = typeof glass.isLiquidGlassAvailable === 'function' ? glass.isLiquidGlassAvailable() : false;
+  } catch {
+    GlassViewComp = null;
+    liquidGlassAvailable = false;
+  }
+}
+
 // Import screens with their proper types
 import HomeScreen from '../screens/HomeScreen';
 import LibraryScreen from '../screens/LibraryScreen';
@@ -572,18 +587,32 @@ const MainTabs = () => {
             backgroundColor: isIosTablet ? 'transparent' : 'rgba(0,0,0,0.7)'
           }}>
             {isIosTablet && (
-              <BlurView
-                tint="dark"
-                intensity={75}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  borderRadius: 28,
-                }}
-              />
+              GlassViewComp && liquidGlassAvailable ? (
+                <GlassViewComp
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    borderRadius: 28,
+                  }}
+                  glassEffectStyle="clear"
+                />
+              ) : (
+                <BlurView
+                  tint="dark"
+                  intensity={75}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    borderRadius: 28,
+                  }}
+                />
+              )
             )}
             {props.state.routes.map((route, index) => {
               const { options } = props.descriptors[route.key];
@@ -648,21 +677,32 @@ const MainTabs = () => {
         overflow: 'hidden',
       }}>
         {Platform.OS === 'ios' ? (
-          <BlurView
-            tint="dark"
-            intensity={75}
-            style={{
-              position: 'absolute',
-              height: '100%',
-              width: '100%',
-              borderTopColor: currentTheme.colors.border,
-              borderTopWidth: 0.5,
-              shadowColor: currentTheme.colors.black,
-              shadowOffset: { width: 0, height: -2 },
-              shadowOpacity: 0.1,
-              shadowRadius: 3,
-            }}
-          />
+          GlassViewComp && liquidGlassAvailable ? (
+            <GlassViewComp
+              style={{
+                position: 'absolute',
+                height: '100%',
+                width: '100%',
+              }}
+              glassEffectStyle="clear"
+            />
+          ) : (
+            <BlurView
+              tint="dark"
+              intensity={75}
+              style={{
+                position: 'absolute',
+                height: '100%',
+                width: '100%',
+                borderTopColor: currentTheme.colors.border,
+                borderTopWidth: 0.5,
+                shadowColor: currentTheme.colors.black,
+                shadowOffset: { width: 0, height: -2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 3,
+              }}
+            />
+          )
         ) : (
           <LinearGradient
             colors={[

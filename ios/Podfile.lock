@@ -223,6 +223,8 @@ PODS:
     - ExpoModulesCore
   - ExpoFont (14.0.9):
     - ExpoModulesCore
+  - ExpoGlassEffect (0.1.4):
+    - ExpoModulesCore
   - ExpoHaptics (15.0.7):
     - ExpoModulesCore
   - ExpoKeepAwake (15.0.7):
@@ -2652,6 +2654,7 @@ DEPENDENCIES:
   - ExpoDocumentPicker (from `../node_modules/expo-document-picker/ios`)
   - ExpoFileSystem (from `../node_modules/expo-file-system/ios`)
   - ExpoFont (from `../node_modules/expo-font/ios`)
+  - ExpoGlassEffect (from `../node_modules/expo-glass-effect/ios`)
   - ExpoHaptics (from `../node_modules/expo-haptics/ios`)
   - ExpoKeepAwake (from `../node_modules/expo-keep-awake/ios`)
   - ExpoLibVlcPlayer (from `../node_modules/expo-libvlc-player/ios`)
@@ -2813,6 +2816,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-file-system/ios"
   ExpoFont:
     :path: "../node_modules/expo-font/ios"
+  ExpoGlassEffect:
+    :path: "../node_modules/expo-glass-effect/ios"
   ExpoHaptics:
     :path: "../node_modules/expo-haptics/ios"
   ExpoKeepAwake:
@@ -3061,6 +3066,7 @@ SPEC CHECKSUMS:
   ExpoDocumentPicker: 2200eefc2817f19315fa18f0147e0b80ece86926
   ExpoFileSystem: b79eadbda7b7f285f378f95f959cc9313a1c9c61
   ExpoFont: cf9d90ec1d3b97c4f513211905724c8171f82961
+  ExpoGlassEffect: 744bf0c58c26a1b0212dff92856be07b98d01d8c
   ExpoHaptics: 807476b0c39e9d82b7270349d6487928ce32df84
   ExpoKeepAwake: 1a2e820692e933c94a565ec3fbbe38ac31658ffe
   ExpoLibVlcPlayer: dce3d0b5847838cd5f8c5f3c3aa1bc55c92e911d

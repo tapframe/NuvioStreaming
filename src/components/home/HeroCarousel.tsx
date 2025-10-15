@@ -4,6 +4,21 @@ import Animated, { FadeIn, FadeOut, Easing, useSharedValue, withTiming, useAnima
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import FastImage from '@d11/react-native-fast-image';
+
+// Optional iOS Glass effect (expo-glass-effect) with safe fallback for HeroCarousel
+let GlassViewComp: any = null;
+let liquidGlassAvailable = false;
+if (Platform.OS === 'ios') {
+  try {
+    // Dynamically require so app still runs if the package isn't installed yet
+    const glass = require('expo-glass-effect');
+    GlassViewComp = glass.GlassView;
+    liquidGlassAvailable = typeof glass.isLiquidGlassAvailable === 'function' ? glass.isLiquidGlassAvailable() : false;
+  } catch {
+    GlassViewComp = null;
+    liquidGlassAvailable = false;
+  }
+}
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -179,11 +194,18 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
                 style={styles.backgroundImage as any}
                 resizeMode={FastImage.resizeMode.cover}
               />
-              <BlurView
-                style={styles.backgroundImage as any}
-                intensity={30}
-                tint="dark"
-              />
+              {Platform.OS === 'ios' && GlassViewComp && liquidGlassAvailable ? (
+                <GlassViewComp
+                  style={styles.backgroundImage as any}
+                  glassEffectStyle="regular"
+                />
+              ) : (
+                <BlurView
+                  style={styles.backgroundImage as any}
+                  intensity={30}
+                  tint="dark"
+                />
+              )}
             </>
           )}
           <LinearGradient

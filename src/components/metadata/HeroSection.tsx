@@ -17,6 +17,21 @@ import { LinearGradient } from 'expo-linear-gradient';
 // Replaced FastImage with standard Image for logos
 import { BlurView as ExpoBlurView } from 'expo-blur';
 import { BlurView as CommunityBlurView } from '@react-native-community/blur';
+
+// Optional iOS Glass effect (expo-glass-effect) with safe fallback for HeroSection
+let GlassViewComp: any = null;
+let liquidGlassAvailable = false;
+if (Platform.OS === 'ios') {
+  try {
+    // Dynamically require so app still runs if the package isn't installed yet
+    const glass = require('expo-glass-effect');
+    GlassViewComp = glass.GlassView;
+    liquidGlassAvailable = typeof glass.isLiquidGlassAvailable === 'function' ? glass.isLiquidGlassAvailable() : false;
+  } catch {
+    GlassViewComp = null;
+    liquidGlassAvailable = false;
+  }
+}
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import Animated, {
   useAnimatedStyle,
@@ -282,7 +297,14 @@ const ActionButtons = memo(({
         activeOpacity={0.85}
       >
         {Platform.OS === 'ios' ? (
-          <ExpoBlurView intensity={80} style={styles.blurBackground} tint="dark" />
+          GlassViewComp && liquidGlassAvailable ? (
+            <GlassViewComp
+              style={styles.blurBackground}
+              glassEffectStyle="regular"
+            />
+          ) : (
+            <ExpoBlurView intensity={80} style={styles.blurBackground} tint="dark" />
+          )
         ) : (
           <View style={styles.androidFallbackBlur} />
         )}
@@ -325,7 +347,14 @@ const ActionButtons = memo(({
         activeOpacity={0.85}
       >
         {Platform.OS === 'ios' ? (
-          <ExpoBlurView intensity={80} style={styles.blurBackgroundRound} tint="dark" />
+          GlassViewComp && liquidGlassAvailable ? (
+            <GlassViewComp
+              style={styles.blurBackgroundRound}
+              glassEffectStyle="regular"
+            />
+          ) : (
+            <ExpoBlurView intensity={80} style={styles.blurBackgroundRound} tint="dark" />
+          )
         ) : (
           <View style={styles.androidFallbackBlurRound} />
         )}
@@ -344,7 +373,14 @@ const ActionButtons = memo(({
           activeOpacity={0.85}
         >
           {Platform.OS === 'ios' ? (
-            <ExpoBlurView intensity={80} style={styles.blurBackgroundRound} tint="dark" />
+            GlassViewComp && liquidGlassAvailable ? (
+              <GlassViewComp
+                style={styles.blurBackgroundRound}
+                glassEffectStyle="regular"
+              />
+            ) : (
+              <ExpoBlurView intensity={80} style={styles.blurBackgroundRound} tint="dark" />
+            )
           ) : (
             <View style={styles.androidFallbackBlurRound} />
           )}
@@ -605,7 +641,14 @@ const WatchProgressDisplay = memo(({
       {/* Glass morphism background with entrance animation */}
       <Animated.View style={[isTablet ? styles.tabletProgressGlassBackground : styles.progressGlassBackground, progressBoxAnimatedStyle]}>
         {Platform.OS === 'ios' ? (
-          <ExpoBlurView intensity={20} style={styles.blurBackground} tint="dark" />
+          GlassViewComp && liquidGlassAvailable ? (
+            <GlassViewComp
+              style={styles.blurBackground}
+              glassEffectStyle="regular"
+            />
+          ) : (
+            <ExpoBlurView intensity={20} style={styles.blurBackground} tint="dark" />
+          )
         ) : (
           <View style={styles.androidProgressBlur} />
         )}

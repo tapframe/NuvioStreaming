@@ -30,6 +30,21 @@ import { logger } from '../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlurView as ExpoBlurView } from 'expo-blur';
 import CustomAlert from '../components/CustomAlert';
+
+// Optional iOS Glass effect (expo-glass-effect) with safe fallback for AddonsScreen
+let GlassViewComp: any = null;
+let liquidGlassAvailable = false;
+if (Platform.OS === 'ios') {
+  try {
+    // Dynamically require so app still runs if the package isn't installed yet
+    const glass = require('expo-glass-effect');
+    GlassViewComp = glass.GlassView;
+    liquidGlassAvailable = typeof glass.isLiquidGlassAvailable === 'function' ? glass.isLiquidGlassAvailable() : false;
+  } catch {
+    GlassViewComp = null;
+    liquidGlassAvailable = false;
+  }
+}
 // Removed community blur and expo-constants for Android overlay
 import axios from 'axios';
 import { useTheme } from '../contexts/ThemeContext';
@@ -1391,7 +1406,11 @@ const AddonsScreen = () => {
       >
         <View style={styles.modalContainer}>
           {Platform.OS === 'ios' ? (
-            <ExpoBlurView intensity={80} style={styles.blurOverlay} tint="dark" />
+            GlassViewComp && liquidGlassAvailable ? (
+              <GlassViewComp style={styles.blurOverlay} glassEffectStyle="regular" />
+            ) : (
+              <ExpoBlurView intensity={80} style={styles.blurOverlay} tint="dark" />
+            )
           ) : (
             // Android: use solid themed background instead of semi-transparent overlay
             <View style={[styles.androidBlurContainer, { backgroundColor: colors.darkBackground }]} />

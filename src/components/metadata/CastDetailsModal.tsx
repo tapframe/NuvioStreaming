@@ -11,6 +11,21 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import FastImage from '@d11/react-native-fast-image';
+
+// Optional iOS Glass effect (expo-glass-effect) with safe fallback for CastDetailsModal
+let GlassViewComp: any = null;
+let liquidGlassAvailable = false;
+if (Platform.OS === 'ios') {
+  try {
+    // Dynamically require so app still runs if the package isn't installed yet
+    const glass = require('expo-glass-effect');
+    GlassViewComp = glass.GlassView;
+    liquidGlassAvailable = typeof glass.isLiquidGlassAvailable === 'function' ? glass.isLiquidGlassAvailable() : false;
+  } catch {
+    GlassViewComp = null;
+    liquidGlassAvailable = false;
+  }
+}
 import Animated, {
   FadeIn,
   FadeOut,
@@ -189,17 +204,30 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
         ]}
       >
         {Platform.OS === 'ios' ? (
-          <BlurView
-            intensity={100}
-            tint="dark"
-            style={{
-              width: '100%',
-              height: '100%',
-              backgroundColor: 'rgba(20, 20, 20, 0.8)',
-            }}
-          >
-            {renderContent()}
-          </BlurView>
+          GlassViewComp && liquidGlassAvailable ? (
+            <GlassViewComp
+              style={{
+                width: '100%',
+                height: '100%',
+                backgroundColor: 'rgba(20, 20, 20, 0.8)',
+              }}
+              glassEffectStyle="regular"
+            >
+              {renderContent()}
+            </GlassViewComp>
+          ) : (
+            <BlurView
+              intensity={100}
+              tint="dark"
+              style={{
+                width: '100%',
+                height: '100%',
+                backgroundColor: 'rgba(20, 20, 20, 0.8)',
+              }}
+            >
+              {renderContent()}
+            </BlurView>
+          )
         ) : (
           renderContent()
         )}

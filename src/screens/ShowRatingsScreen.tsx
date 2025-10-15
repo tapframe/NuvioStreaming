@@ -13,6 +13,21 @@ import {
 import FastImage from '@d11/react-native-fast-image';
 import { BlurView } from 'expo-blur';
 import { useTheme } from '../contexts/ThemeContext';
+
+// Optional iOS Glass effect (expo-glass-effect) with safe fallback for ShowRatingsScreen
+let GlassViewComp: any = null;
+let liquidGlassAvailable = false;
+if (Platform.OS === 'ios') {
+  try {
+    // Dynamically require so app still runs if the package isn't installed yet
+    const glass = require('expo-glass-effect');
+    GlassViewComp = glass.GlassView;
+    liquidGlassAvailable = typeof glass.isLiquidGlassAvailable === 'function' ? glass.isLiquidGlassAvailable() : false;
+  } catch {
+    GlassViewComp = null;
+    liquidGlassAvailable = false;
+  }
+}
 import { TMDBService, TMDBShow as Show, TMDBSeason, TMDBEpisode } from '../services/tmdbService';
 import { RouteProp } from '@react-navigation/native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
@@ -367,11 +382,18 @@ const ShowRatingsScreen = ({ route }: Props) => {
   return (
     <View style={[styles.container, { backgroundColor: Platform.OS === 'ios' ? 'transparent' : colors.black }]}>
       {Platform.OS === 'ios' && (
-        <BlurView
-          style={StyleSheet.absoluteFill}
-          tint="dark"
-          intensity={60}
-        />
+        GlassViewComp && liquidGlassAvailable ? (
+          <GlassViewComp
+            style={StyleSheet.absoluteFill}
+            glassEffectStyle="regular"
+          />
+        ) : (
+          <BlurView
+            style={StyleSheet.absoluteFill}
+            tint="dark"
+            intensity={60}
+          />
+        )
       )}
       <StatusBar
         translucent

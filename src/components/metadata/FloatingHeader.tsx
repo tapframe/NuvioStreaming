@@ -9,6 +9,21 @@ import {
 } from 'react-native';
 import { BlurView as ExpoBlurView } from 'expo-blur';
 import { MaterialIcons, Feather } from '@expo/vector-icons';
+
+// Optional iOS Glass effect (expo-glass-effect) with safe fallback for FloatingHeader
+let GlassViewComp: any = null;
+let liquidGlassAvailable = false;
+if (Platform.OS === 'ios') {
+  try {
+    // Dynamically require so app still runs if the package isn't installed yet
+    const glass = require('expo-glass-effect');
+    GlassViewComp = glass.GlassView;
+    liquidGlassAvailable = typeof glass.isLiquidGlassAvailable === 'function' ? glass.isLiquidGlassAvailable() : false;
+  } catch {
+    GlassViewComp = null;
+    liquidGlassAvailable = false;
+  }
+}
 import FastImage from '@d11/react-native-fast-image';
 import Animated, {
   useAnimatedStyle,
@@ -77,49 +92,94 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
   return (
     <Animated.View style={[styles.floatingHeader, headerAnimatedStyle]} pointerEvents={isHeaderInteractive ? 'auto' : 'none'}>
       {Platform.OS === 'ios' ? (
-        <ExpoBlurView
-          intensity={50}
-          tint="dark"
-          style={[styles.blurContainer, { paddingTop: Math.max(safeAreaTop * 0.8, safeAreaTop - 6) }]}
-        >
-          <Animated.View style={[styles.floatingHeaderContent, headerElementsStyle]}>
-            <TouchableOpacity 
-              style={styles.backButton} 
-              onPress={handleBack}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <MaterialIcons 
-                name="arrow-back" 
-                size={24} 
-                color={currentTheme.colors.highEmphasis}
-              />
-            </TouchableOpacity>
-            
-            <View style={styles.headerTitleContainer}>
-              {metadata.logo && !logoLoadError ? (
-                <FastImage
-                  source={{ uri: metadata.logo }}
-                  style={styles.floatingHeaderLogo}
-                  resizeMode={FastImage.resizeMode.contain}
-                  onError={() => {
-                    logger.warn(`[FloatingHeader] Logo failed to load: ${metadata.logo}`);
-                    setLogoLoadError(true);
-                  }}
+        GlassViewComp && liquidGlassAvailable ? (
+          <GlassViewComp
+            style={[styles.blurContainer, { paddingTop: Math.max(safeAreaTop * 0.8, safeAreaTop - 6) }]}
+            glassEffectStyle="regular"
+          >
+            <Animated.View style={[styles.floatingHeaderContent, headerElementsStyle]}>
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={handleBack}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <MaterialIcons
+                  name="arrow-back"
+                  size={24}
+                  color={currentTheme.colors.highEmphasis}
                 />
-              ) : (
-                <Text style={[styles.floatingHeaderTitle, { color: currentTheme.colors.highEmphasis }]} numberOfLines={1}>{metadata.name}</Text>
-              )}
-            </View>
-            
-            <TouchableOpacity 
-              style={styles.headerActionButton}
-              onPress={handleToggleLibrary}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Feather name="bookmark" size={22} color={currentTheme.colors.highEmphasis} />
-            </TouchableOpacity>
-          </Animated.View>
-        </ExpoBlurView>
+              </TouchableOpacity>
+
+              <View style={styles.headerTitleContainer}>
+                {metadata.logo && !logoLoadError ? (
+                  <FastImage
+                    source={{ uri: metadata.logo }}
+                    style={styles.floatingHeaderLogo}
+                    resizeMode={FastImage.resizeMode.contain}
+                    onError={() => {
+                      logger.warn(`[FloatingHeader] Logo failed to load: ${metadata.logo}`);
+                      setLogoLoadError(true);
+                    }}
+                  />
+                ) : (
+                  <Text style={[styles.floatingHeaderTitle, { color: currentTheme.colors.highEmphasis }]} numberOfLines={1}>{metadata.name}</Text>
+                )}
+              </View>
+
+              <TouchableOpacity
+                style={styles.headerActionButton}
+                onPress={handleToggleLibrary}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Feather name="bookmark" size={22} color={currentTheme.colors.highEmphasis} />
+              </TouchableOpacity>
+            </Animated.View>
+          </GlassViewComp>
+        ) : (
+          <ExpoBlurView
+            intensity={50}
+            tint="dark"
+            style={[styles.blurContainer, { paddingTop: Math.max(safeAreaTop * 0.8, safeAreaTop - 6) }]}
+          >
+            <Animated.View style={[styles.floatingHeaderContent, headerElementsStyle]}>
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={handleBack}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <MaterialIcons
+                  name="arrow-back"
+                  size={24}
+                  color={currentTheme.colors.highEmphasis}
+                />
+              </TouchableOpacity>
+
+              <View style={styles.headerTitleContainer}>
+                {metadata.logo && !logoLoadError ? (
+                  <FastImage
+                    source={{ uri: metadata.logo }}
+                    style={styles.floatingHeaderLogo}
+                    resizeMode={FastImage.resizeMode.contain}
+                    onError={() => {
+                      logger.warn(`[FloatingHeader] Logo failed to load: ${metadata.logo}`);
+                      setLogoLoadError(true);
+                    }}
+                  />
+                ) : (
+                  <Text style={[styles.floatingHeaderTitle, { color: currentTheme.colors.highEmphasis }]} numberOfLines={1}>{metadata.name}</Text>
+                )}
+              </View>
+
+              <TouchableOpacity
+                style={styles.headerActionButton}
+                onPress={handleToggleLibrary}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Feather name="bookmark" size={22} color={currentTheme.colors.highEmphasis} />
+              </TouchableOpacity>
+            </Animated.View>
+          </ExpoBlurView>
+        )
       ) : (
         <View
           style={[
