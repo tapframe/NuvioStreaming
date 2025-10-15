@@ -16,7 +16,7 @@
   <p align="center">
     A modern media hub built with React Native and Expo
     <br />
-    Addon ecosystem • Cross‑platform • Offline metadata & sync
+    Stremio Addon ecosystem • Cross‑platform • Offline metadata & sync
     <br />
     <br />
     <a href="#getting-started"><strong>Get Started »</strong></a>
