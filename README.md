@@ -90,6 +90,7 @@ npx expo start
 ### Build
 
 ```bash
+npx expo prebuild
 npx expo run:android  # Android
 npx expo run:ios      # iOS
 ```
