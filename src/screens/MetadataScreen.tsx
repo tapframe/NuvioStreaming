@@ -161,24 +161,26 @@ const MetadataScreen: React.FC = () => {
     const hasNetworks = metadata?.networks && metadata.networks.length > 0;
     const hasDescription = !!metadata?.description;
     const isSeries = Object.keys(groupedEpisodes).length > 0;
-    const shouldShow = shouldLoadSecondaryData && hasNetworks && hasDescription && isSeries;
+    // Defer showing until cast (if any) has finished fetching to avoid layout jump
+    const shouldShow = shouldLoadSecondaryData && !loadingCast && hasNetworks && hasDescription && isSeries;
 
     if (shouldShow && networkSectionOpacity.value === 0) {
       networkSectionOpacity.value = withTiming(1, { duration: 400 });
     }
-  }, [metadata?.networks, metadata?.description, Object.keys(groupedEpisodes).length, shouldLoadSecondaryData, networkSectionOpacity]);
+  }, [metadata?.networks, metadata?.description, Object.keys(groupedEpisodes).length, shouldLoadSecondaryData, loadingCast, networkSectionOpacity]);
 
   // Animate production section when data becomes available (for movies)
   useEffect(() => {
     const hasNetworks = metadata?.networks && metadata.networks.length > 0;
     const hasDescription = !!metadata?.description;
     const isMovie = Object.keys(groupedEpisodes).length === 0;
-    const shouldShow = shouldLoadSecondaryData && hasNetworks && hasDescription && isMovie;
+    // Defer showing until cast (if any) has finished fetching to avoid layout jump
+    const shouldShow = shouldLoadSecondaryData && !loadingCast && hasNetworks && hasDescription && isMovie;
 
     if (shouldShow && productionSectionOpacity.value === 0) {
       productionSectionOpacity.value = withTiming(1, { duration: 400 });
     }
-  }, [metadata?.networks, metadata?.description, Object.keys(groupedEpisodes).length, shouldLoadSecondaryData, productionSectionOpacity]);
+  }, [metadata?.networks, metadata?.description, Object.keys(groupedEpisodes).length, shouldLoadSecondaryData, loadingCast, productionSectionOpacity]);
 
   // Optimized hooks with memoization and conditional loading
   const watchProgressData = useWatchProgress(id, Object.keys(groupedEpisodes).length > 0 ? 'series' : type as 'movie' | 'series', episodeId, episodes);

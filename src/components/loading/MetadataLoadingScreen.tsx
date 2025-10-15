@@ -30,7 +30,6 @@ export const MetadataLoadingScreen = forwardRef<MetadataLoadingScreenRef, Metada
   const { currentTheme } = useTheme();
   
   // Animation values - removed fadeAnim since parent handles transitions
-  const pulseAnim = useRef(new Animated.Value(0.3)).current;
   const shimmerAnim = useRef(new Animated.Value(0)).current;
   
   // Scene transition animation values (matching tab navigator)
@@ -96,24 +95,6 @@ export const MetadataLoadingScreen = forwardRef<MetadataLoadingScreenRef, Metada
 
     sceneAnimation.start();
 
-    // Continuous pulse animation for skeleton elements
-    const pulseAnimation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 0.8,
-          duration: 2500,
-          easing: Easing.bezier(0.4, 0, 0.2, 1),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 0.4,
-          duration: 2500,
-          easing: Easing.bezier(0.4, 0, 0.2, 1),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-
     // Shimmer effect for skeleton elements
     const shimmerAnimation = Animated.loop(
       Animated.timing(shimmerAnim, {
@@ -124,12 +105,10 @@ export const MetadataLoadingScreen = forwardRef<MetadataLoadingScreenRef, Metada
       })
     );
 
-    pulseAnimation.start();
     shimmerAnimation.start();
 
     return () => {
       sceneAnimation.stop();
-      pulseAnimation.stop();
       shimmerAnimation.stop();
     };
   }, []);
@@ -163,13 +142,7 @@ export const MetadataLoadingScreen = forwardRef<MetadataLoadingScreenRef, Metada
       },
       style
     ]}>
-      <Animated.View style={[
-        StyleSheet.absoluteFill,
-        {
-          opacity: pulseAnim,
-          backgroundColor: currentTheme.colors.primary + '20',
-        }
-      ]} />
+      {/* Pulsating overlay removed */}
       <Animated.View style={[
         StyleSheet.absoluteFill,
         {
