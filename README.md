@@ -36,10 +36,6 @@
   <ol>
     <li>
       <a href="#about-the-project">About The Project</a>
-      <ul>
-        <li><a href="#key-features">Key Features</a></li>
-        <li><a href="#built-with">Built With</a></li>
-      </ul>
     </li>
     <li><a href="#demo">Screenshots</a></li>
     <li>
@@ -49,12 +45,12 @@
         <li><a href="#build">Build</a></li>
       </ul>
     </li>
-    <li><a href="#usage-notes">Usage Notes</a></li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#support">Support</a></li>
     <li><a href="#license">License</a></li>
     <li><a href="#contact">Contact</a></li>
     <li><a href="#acknowledgments">Acknowledgments</a></li>
+    <li><a href="#built-with">Built With</a></li>
   </ol>
   </details>
 
@@ -63,24 +59,7 @@
 
 Nuvio Media Hub is a cross‑platform app for managing, discovering, and streaming your media via a flexible addon ecosystem. Built with React Native + Expo, it integrates providers and sync services while keeping a simple, fast UI.
 
-### Key Features
-
-* **🌐 Addon Ecosystem** – Integrate multiple providers and services
-* **⚡ Fast & Modern UI** – React Native + Expo with optimized navigation
-* **📱 Cross‑Platform** – iOS, Android, and Web (Expo) support
-* **🔐 Privacy‑First** – No bundled content; you control sources via addons
-* **🗂️ Library Sync** – Keep metadata and progress in sync across devices
-* **🧩 Extensible** – Community addons, customizations, and theme support
-
-### Built With
-
-<p align="left">
-  <a href="https://skillicons.dev">
-    <img src="https://skillicons.dev/icons?i=react,typescript,nodejs,expo,github,githubactions&theme=light&perline=6" />
-  </a>
-  <br/>
-  React Native • Expo • TypeScript
-  </p>
+ 
 
 <!-- DEMO / SCREENSHOTS -->
 ## Demo
@@ -103,6 +82,8 @@ Follow the steps below to run the app locally.
 git clone https://github.com/tapframe/NuvioStreaming.git
 cd NuvioStreaming
 npm install
+# If you hit peer dependency conflicts:
+# npm install --legacy-peer-deps
 npx expo start
 ```
 
@@ -128,13 +109,7 @@ npx expo run:ios      # iOS
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## Usage Notes
-
-* Nuvio ships without built‑in content. Install addons to access sources.
-* Some providers may require accounts, API keys, or region access.
-* Performance depends on device and provider; enable caching where available.
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+ 
 
 ## Contributing
 
@@ -180,6 +155,18 @@ Distributed under the GNU GPLv3 License. See `LICENSE` for more information.
 * Community contributors and testers
 
 **Disclaimer:** This application functions as a media hub with addon/plugin support. It does not contain any built‑in content or host media content. Content access is only available through user‑installed plugins and addons. Any legal concerns should be directed to the specific websites providing the content.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Built With
+
+<p align="left">
+  <a href="https://skillicons.dev">
+    <img src="https://skillicons.dev/icons?i=react,typescript,nodejs,expo,github,githubactions&theme=light&perline=6" />
+  </a>
+  <br/>
+  React Native • Expo • TypeScript
+  </p>
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
