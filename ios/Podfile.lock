@@ -1707,6 +1707,53 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - react-native-bottom-tabs (0.12.2):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - react-native-bottom-tabs/common (= 0.12.2)
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - SwiftUIIntrospect (~> 1.0)
+    - Yoga
+  - react-native-bottom-tabs/common (0.12.2):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - SwiftUIIntrospect (~> 1.0)
+    - Yoga
   - react-native-device-brightness (1.2.7):
     - React
   - react-native-get-random-values (1.11.0):
@@ -2631,6 +2678,7 @@ PODS:
     - libwebp (~> 1.0)
     - SDWebImage/Core (~> 5.17)
   - Sentry/HybridSDK (8.56.1)
+  - SwiftUIIntrospect (1.3.0)
   - Yoga (0.0.0)
 
 DEPENDENCIES:
@@ -2712,6 +2760,7 @@ DEPENDENCIES:
   - React-Mapbuffer (from `../node_modules/react-native/ReactCommon`)
   - React-microtasksnativemodule (from `../node_modules/react-native/ReactCommon/react/nativemodule/microtasks`)
   - "react-native-blur (from `../node_modules/@react-native-community/blur`)"
+  - react-native-bottom-tabs (from `../node_modules/react-native-bottom-tabs`)
   - "react-native-device-brightness (from `../node_modules/@adrianso/react-native-device-brightness`)"
   - react-native-get-random-values (from `../node_modules/react-native-get-random-values`)
   - "react-native-netinfo (from `../node_modules/@react-native-community/netinfo`)"
@@ -2773,6 +2822,7 @@ SPEC REPOS:
     - SDWebImageAVIFCoder
     - SDWebImageWebPCoder
     - Sentry
+    - SwiftUIIntrospect
 
 EXTERNAL SOURCES:
   DisplayCriteria:
@@ -2934,6 +2984,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/react/nativemodule/microtasks"
   react-native-blur:
     :path: "../node_modules/@react-native-community/blur"
+  react-native-bottom-tabs:
+    :path: "../node_modules/react-native-bottom-tabs"
   react-native-device-brightness:
     :path: "../node_modules/@adrianso/react-native-device-brightness"
   react-native-get-random-values:
@@ -3129,6 +3181,7 @@ SPEC CHECKSUMS:
   React-Mapbuffer: fbe1da882a187e5898bdf125e1cc6e603d27ecae
   React-microtasksnativemodule: 76905804171d8ccbe69329fc84c57eb7934add7f
   react-native-blur: 1b00ef07fe0efdc0c40b37139a5268ccad73c72d
+  react-native-bottom-tabs: e37c9d1565b1ee48c4c0e4b4fa4b804775f82dfa
   react-native-device-brightness: 1a997350d060c3df9f303b1df84a4f7c5cbeb924
   react-native-get-random-values: d16467cf726c618e9c7a8c3c39c31faa2244bbba
   react-native-netinfo: cec9c4e86083cb5b6aba0e0711f563e2fbbff187
@@ -3180,6 +3233,7 @@ SPEC CHECKSUMS:
   SDWebImageAVIFCoder: afe194a084e851f70228e4be35ef651df0fc5c57
   SDWebImageWebPCoder: e38c0a70396191361d60c092933e22c20d5b1380
   Sentry: b3ec44d01708fce73f99b544beb57e890eca4406
+  SwiftUIIntrospect: fee9aa07293ee280373a591e1824e8ddc869ba5d
   Yoga: 051f086b5ccf465ff2ed38a2cf5a558ae01aaaa1
 
 PODFILE CHECKSUM: 1db7b3713ca6ad8568e4bdf6b72b92b72ee8199d

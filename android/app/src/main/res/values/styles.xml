@@ -1,5 +1,5 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-  <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+  <style name="AppTheme" parent="Theme.Material3.DayNight.NoActionBar">
     <item name="android:enforceNavigationBarContrast" tools:targetApi="29">true</item>
     <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
     <item name="colorPrimary">@color/colorPrimary</item>

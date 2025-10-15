@@ -814,6 +814,78 @@ const MainTabs = () => {
     );
   };
   
+  // iOS: Use native bottom tabs (@bottom-tabs/react-navigation)
+  if (Platform.OS === 'ios') {
+    // Dynamically require to avoid impacting Android bundle
+    const { createNativeBottomTabNavigator } = require('@bottom-tabs/react-navigation');
+    const IOSTab = createNativeBottomTabNavigator();
+
+    return (
+      <View style={{ flex: 1, backgroundColor: currentTheme.colors.darkBackground }}>
+        <StatusBar
+          translucent
+          barStyle="light-content"
+          backgroundColor="transparent"
+        />
+        <IOSTab.Navigator
+          // Native tab bar handles its own visuals; keep options minimal
+          screenOptions={{
+            headerShown: false,
+            tabBarActiveTintColor: currentTheme.colors.primary,
+            tabBarInactiveTintColor: currentTheme.colors.white,
+            translucent: true,
+            // Prefer native lazy/freeze when available; still pass for parity
+            lazy: true,
+            freezeOnBlur: true,
+          }}
+        >
+          <IOSTab.Screen
+            name="Home"
+            component={HomeScreen}
+            options={{
+              title: 'Home',
+              tabBarIcon: () => ({ sfSymbol: 'house' }),
+            }}
+          />
+          <IOSTab.Screen
+            name="Library"
+            component={LibraryScreen}
+            options={{
+              title: 'Library',
+              tabBarIcon: () => ({ sfSymbol: 'heart' }),
+            }}
+          />
+          <IOSTab.Screen
+            name="Search"
+            component={SearchScreen}
+            options={{
+              title: 'Search',
+              tabBarIcon: () => ({ sfSymbol: 'magnifyingglass' }),
+            }}
+          />
+          {appSettings?.enableDownloads !== false && (
+            <IOSTab.Screen
+              name="Downloads"
+              component={DownloadsScreen}
+              options={{
+                title: 'Downloads',
+                tabBarIcon: () => ({ sfSymbol: 'arrow.down.circle' }),
+              }}
+            />
+          )}
+          <IOSTab.Screen
+            name="Settings"
+            component={SettingsScreen}
+            options={{
+              title: 'Settings',
+              tabBarIcon: () => ({ sfSymbol: 'gear' }),
+            }}
+          />
+        </IOSTab.Navigator>
+      </View>
+    );
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: currentTheme.colors.darkBackground }}>
       {/* Common StatusBar for all tabs */}

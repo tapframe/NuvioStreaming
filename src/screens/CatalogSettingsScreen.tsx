@@ -668,35 +668,40 @@ const CatalogSettingsScreen = () => {
         {Platform.OS === 'ios' ? (
           <Pressable style={styles.modalOverlay} onPress={() => setIsRenameModalVisible(false)}>
             {GlassViewComp && liquidGlassAvailable ? (
-              <GlassViewComp
-                style={styles.modalContent}
-                glassEffectStyle="regular"
-              >
-            ) : (
-              <BlurView
-                style={styles.modalContent}
-                intensity={90}
-                tint="default"
-              >
-            )}
-              <Pressable onPress={(e) => e.stopPropagation()}> 
-                <Text style={styles.modalTitle}>Rename Catalog</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  value={currentRenameValue}
-                  onChangeText={setCurrentRenameValue}
-                  placeholder="Enter new catalog name"
-                  placeholderTextColor={colors.mediumGray}
-                  autoFocus={true}
-                />
-                <View style={styles.modalButtons}>
-                  <Button title="Cancel" onPress={() => setIsRenameModalVisible(false)} color={colors.mediumGray} />
-                  <Button title="Save" onPress={handleSaveRename} color={colors.primary} />
-                </View>
-              </Pressable>
-            {GlassViewComp && liquidGlassAvailable ? (
+              <GlassViewComp style={styles.modalContent} glassEffectStyle="regular">
+                <Pressable onPress={(e) => e.stopPropagation()}>
+                  <Text style={styles.modalTitle}>Rename Catalog</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    value={currentRenameValue}
+                    onChangeText={setCurrentRenameValue}
+                    placeholder="Enter new catalog name"
+                    placeholderTextColor={colors.mediumGray}
+                    autoFocus={true}
+                  />
+                  <View style={styles.modalButtons}>
+                    <Button title="Cancel" onPress={() => setIsRenameModalVisible(false)} color={colors.mediumGray} />
+                    <Button title="Save" onPress={handleSaveRename} color={colors.primary} />
+                  </View>
+                </Pressable>
               </GlassViewComp>
             ) : (
+              <BlurView style={styles.modalContent} intensity={90} tint="default">
+                <Pressable onPress={(e) => e.stopPropagation()}>
+                  <Text style={styles.modalTitle}>Rename Catalog</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    value={currentRenameValue}
+                    onChangeText={setCurrentRenameValue}
+                    placeholder="Enter new catalog name"
+                    placeholderTextColor={colors.mediumGray}
+                    autoFocus={true}
+                  />
+                  <View style={styles.modalButtons}>
+                    <Button title="Cancel" onPress={() => setIsRenameModalVisible(false)} color={colors.mediumGray} />
+                    <Button title="Save" onPress={handleSaveRename} color={colors.primary} />
+                  </View>
+                </Pressable>
               </BlurView>
             )}
           </Pressable>

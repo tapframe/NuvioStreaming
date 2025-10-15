@@ -86,7 +86,8 @@
           "localNetworkPermission": "Allow $(PRODUCT_NAME) to access your local network",
           "supportsBackgroundPlayback": true
         }
-      ]
+      ],
+      "react-native-bottom-tabs"
     ],
     "updates": {
       "enabled": true,

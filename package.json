@@ -11,6 +11,7 @@
   "dependencies": {
     "@adrianso/react-native-device-brightness": "^1.2.7",
     "@backpackapp-io/react-native-toast": "^0.14.0",
+    "@bottom-tabs/react-navigation": "^0.12.2",
     "@d11/react-native-fast-image": "^8.8.0",
     "@expo/env": "^2.0.7",
     "@expo/metro-runtime": "~6.1.2",
@@ -66,6 +67,7 @@
     "posthog-react-native": "^4.4.0",
     "react": "19.1.0",
     "react-native": "0.81.4",
+    "react-native-bottom-tabs": "^0.12.2",
     "react-native-gesture-handler": "~2.28.0",
     "react-native-get-random-values": "^1.11.0",
     "react-native-image-colors": "^2.5.0",
