@@ -306,8 +306,8 @@ const ActionButtons = memo(({
         ) : (
           <View style={styles.androidFallbackBlur} />
         )}
-        <Feather
-          name="bookmark"
+        <MaterialIcons
+          name={inLibrary ? "bookmark" : "bookmark-outline"}
           size={isTablet ? 28 : 24}
           color={currentTheme.colors.white}
         />

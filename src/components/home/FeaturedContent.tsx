@@ -518,7 +518,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
               onPress={handleSaveToLibrary}
               activeOpacity={0.7}
             >
-              <Feather name="bookmark" size={20} color={currentTheme.colors.white} />
+              <MaterialIcons name={isSaved ? "bookmark" : "bookmark-outline"} size={20} color={currentTheme.colors.white} />
               <Text style={[styles.tabletSecondaryButtonText as TextStyle, { color: currentTheme.colors.white }]}>
                 {isSaved ? "Saved" : "My List"}
               </Text>
@@ -624,7 +624,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
                     onPress={handleSaveToLibrary}
                     activeOpacity={0.7}
                   >
-                    <Feather name="bookmark" size={24} color={currentTheme.colors.white} />
+                    <MaterialIcons name={isSaved ? "bookmark" : "bookmark-outline"} size={24} color={currentTheme.colors.white} />
                     <Text style={[styles.myListButtonText as TextStyle, { color: currentTheme.colors.white }]}>
                       {isSaved ? "Saved" : "Save"}
                     </Text>

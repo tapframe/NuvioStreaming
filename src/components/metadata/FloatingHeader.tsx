@@ -131,7 +131,7 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
                 onPress={handleToggleLibrary}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Feather name="bookmark" size={22} color={currentTheme.colors.highEmphasis} />
+                <MaterialIcons name={inLibrary ? "bookmark" : "bookmark-outline"} size={22} color={currentTheme.colors.highEmphasis} />
               </TouchableOpacity>
             </Animated.View>
           </GlassViewComp>
@@ -175,7 +175,7 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
                 onPress={handleToggleLibrary}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Feather name="bookmark" size={22} color={currentTheme.colors.highEmphasis} />
+                <MaterialIcons name={inLibrary ? "bookmark" : "bookmark-outline"} size={22} color={currentTheme.colors.highEmphasis} />
               </TouchableOpacity>
             </Animated.View>
           </ExpoBlurView>
@@ -221,7 +221,7 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
               onPress={handleToggleLibrary}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Feather name="bookmark" size={22} color={currentTheme.colors.highEmphasis} />
+              <MaterialIcons name={inLibrary ? "bookmark" : "bookmark-outline"} size={22} color={currentTheme.colors.highEmphasis} />
             </TouchableOpacity>
           </Animated.View>
         </View>
