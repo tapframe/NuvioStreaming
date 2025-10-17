@@ -318,6 +318,65 @@ export class TrailerService {
   }
 
   /**
+   * Fetches trailer directly from a known YouTube URL
+   * @param youtubeUrl - The YouTube URL to process
+   * @param title - Optional title for logging/caching
+   * @param year - Optional year for logging/caching
+   * @returns Promise<string | null> - The direct streaming URL or null if failed
+   */
+  static async getTrailerFromYouTubeUrl(youtubeUrl: string, title?: string, year?: string): Promise<string | null> {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.TIMEOUT);
+
+      const params = new URLSearchParams();
+      params.append('youtube_url', youtubeUrl);
+      if (title) params.append('title', title);
+      if (year) params.append('year', year.toString());
+
+      const url = `${this.ENV_LOCAL_BASE}${this.ENV_LOCAL_TRAILER_PATH}?${params.toString()}`;
+      logger.info('TrailerService', `Fetching trailer directly from YouTube URL: ${youtubeUrl}`);
+      logger.info('TrailerService', `Direct trailer request URL: ${url}`);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Nuvio/1.0',
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      logger.info('TrailerService', `Direct trailer response: status=${response.status} ok=${response.ok}`);
+
+      if (!response.ok) {
+        logger.warn('TrailerService', `Direct trailer failed: ${response.status} ${response.statusText}`);
+        return null;
+      }
+
+      const data = await response.json();
+
+      if (!data.url || !this.isValidTrailerUrl(data.url)) {
+        logger.warn('TrailerService', `Invalid trailer URL from direct fetch: ${data.url}`);
+        return null;
+      }
+
+      logger.info('TrailerService', `Successfully got direct trailer: ${String(data.url).substring(0, 80)}...`);
+      return data.url;
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        logger.warn('TrailerService', `Direct trailer request timed out after ${this.TIMEOUT}ms`);
+      } else {
+        const msg = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+        logger.error('TrailerService', `Error in direct trailer fetch: ${msg}`);
+      }
+      return null;
+    }
+  }
+
+  /**
    * Switch between local server and XPrime API
    * @param useLocal - true for local server, false for XPrime
    */
