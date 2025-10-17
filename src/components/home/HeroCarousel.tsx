@@ -55,6 +55,12 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   // Optimized: update background as soon as scroll starts, without waiting for momentum end
   const scrollX = useSharedValue(0);
   const interval = CARD_WIDTH + 16;
+  
+  // Reset scroll position when component mounts/remounts
+  useEffect(() => {
+    scrollX.value = 0;
+  }, []);
+  
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
       scrollX.value = event.contentOffset.x;
@@ -114,9 +120,9 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
     const translateX = scrollX.value;
     const progress = Math.abs(translateX) / (data.length * (CARD_WIDTH + 16));
     
-    // Subtle scale animation for the entire container
-    const scale = 1 - progress * 0.02;
-    const clampedScale = Math.max(0.98, Math.min(1, scale));
+    // Very subtle scale animation for the entire container
+    const scale = 1 - progress * 0.01;
+    const clampedScale = Math.max(0.99, Math.min(1, scale));
     
     return {
       transform: [{ scale: clampedScale }],
@@ -299,14 +305,17 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
           decelerationRate="fast"
           contentContainerStyle={contentPadding}
           onScroll={scrollHandler}
-          scrollEventThrottle={16}
+          scrollEventThrottle={8}
           disableIntervalMomentum
           initialNumToRender={3}
           windowSize={5}
-          maxToRenderPerBatch={3}
-          updateCellsBatchingPeriod={100}
+          maxToRenderPerBatch={2}
+          updateCellsBatchingPeriod={50}
           removeClippedSubviews={false}
           getItemLayout={getItemLayout}
+          pagingEnabled={false}
+          bounces={false}
+          overScrollMode="never"
           renderItem={({ item, index }) => (
             <Animated.View 
               style={{ width: CARD_WIDTH + 16 }}
@@ -348,6 +357,12 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
   const bannerOpacity = useSharedValue(0);
   const logoOpacity = useSharedValue(0);
   
+  // Reset animations when component mounts/remounts
+  useEffect(() => {
+    bannerOpacity.value = 0;
+    logoOpacity.value = 0;
+  }, [item.id]);
+  
   const inputRange = [
     (index - 1) * (CARD_WIDTH + 16),
     index * (CARD_WIDTH + 16),
@@ -388,8 +403,8 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
     const cardOffset = index * (CARD_WIDTH + 16);
     const distance = translateX - cardOffset;
     
-    // Subtle parallax effect for banner
-    const parallaxOffset = distance * 0.1;
+    // Reduced parallax effect to prevent displacement
+    const parallaxOffset = distance * 0.05;
     
     return {
       transform: [{ translateX: parallaxOffset }],
@@ -401,8 +416,8 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
     const cardOffset = index * (CARD_WIDTH + 16);
     const distance = translateX - cardOffset;
     
-    // Reverse parallax for info section
-    const parallaxOffset = -distance * 0.05;
+    // Minimal parallax for info section to prevent displacement
+    const parallaxOffset = -distance * 0.02;
     
     return {
       transform: [{ translateY: parallaxOffset }],
@@ -411,13 +426,19 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
   
   useEffect(() => {
     if (bannerLoaded) {
-      bannerOpacity.value = withTiming(1, { duration: 300, easing: Easing.out(Easing.cubic) });
+      bannerOpacity.value = withTiming(1, { 
+        duration: 250, 
+        easing: Easing.out(Easing.ease) 
+      });
     }
   }, [bannerLoaded]);
   
   useEffect(() => {
     if (logoLoaded) {
-      logoOpacity.value = withTiming(1, { duration: 400, easing: Easing.out(Easing.cubic) });
+      logoOpacity.value = withTiming(1, { 
+        duration: 300, 
+        easing: Easing.out(Easing.ease) 
+      });
     }
   }, [logoLoaded]);
 
