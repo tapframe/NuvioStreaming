@@ -10,8 +10,8 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useTrailer } from '../../contexts/TrailerContext';
 import { logger } from '../../utils/logger';
 import TrailerService from '../../services/trailerService';
 import Video, { VideoRef, OnLoadData, OnProgressData } from 'react-native-video';
@@ -62,11 +62,13 @@ const TrailerModal: React.FC<TrailerModalProps> = memo(({
   contentTitle
 }) => {
   const { currentTheme } = useTheme();
+  const { pauseTrailer, resumeTrailer } = useTrailer();
   const videoRef = React.useRef<VideoRef>(null);
   const [trailerUrl, setTrailerUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Load trailer when modal opens or trailer changes
   useEffect(() => {
@@ -78,15 +80,25 @@ const TrailerModal: React.FC<TrailerModalProps> = memo(({
       setLoading(false);
       setError(null);
       setIsPlaying(false);
+      setRetryCount(0);
     }
   }, [visible, trailer]);
 
   const loadTrailer = useCallback(async () => {
     if (!trailer) return;
 
+    // Pause hero section trailer when modal opens
+    try {
+      pauseTrailer();
+      logger.info('TrailerModal', 'Paused hero section trailer');
+    } catch (error) {
+      logger.warn('TrailerModal', 'Error pausing hero trailer:', error);
+    }
+
     setLoading(true);
     setError(null);
     setTrailerUrl(null);
+    setRetryCount(0); // Reset retry count when starting fresh load
 
     try {
       const youtubeUrl = `https://www.youtube.com/watch?v=${trailer.key}`;
@@ -110,6 +122,7 @@ const TrailerModal: React.FC<TrailerModalProps> = memo(({
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load trailer';
       setError(errorMessage);
+      setLoading(false);
       logger.error('TrailerModal', 'Error loading trailer:', err);
 
       Alert.alert(
@@ -117,20 +130,61 @@ const TrailerModal: React.FC<TrailerModalProps> = memo(({
         'This trailer could not be loaded at this time. Please try again later.',
         [{ text: 'OK', style: 'default' }]
       );
-    } finally {
-      setLoading(false);
     }
-  }, [trailer, contentTitle]);
+  }, [trailer, contentTitle, pauseTrailer]);
 
   const handleClose = useCallback(() => {
     setIsPlaying(false);
+    
+    // Resume hero section trailer when modal closes
+    try {
+      resumeTrailer();
+      logger.info('TrailerModal', 'Resumed hero section trailer');
+    } catch (error) {
+      logger.warn('TrailerModal', 'Error resuming hero trailer:', error);
+    }
+    
     onClose();
-  }, [onClose]);
+  }, [onClose, resumeTrailer]);
 
   const handleTrailerError = useCallback(() => {
     setError('Failed to play trailer');
     setIsPlaying(false);
   }, []);
+
+  // Handle video playback errors with retry logic
+  const handleVideoError = useCallback((error: any) => {
+    logger.error('TrailerModal', 'Video error:', error);
+
+    // Check if this is a permission/network error that might benefit from retry
+    const errorCode = error?.error?.code;
+    const isRetryableError = errorCode === -1102 || errorCode === -1009 || errorCode === -1005;
+
+    if (isRetryableError && retryCount < 2) {
+      // Silent retry - increment count and try again
+      logger.info('TrailerModal', `Retrying video load (attempt ${retryCount + 1}/2)`);
+      setRetryCount(prev => prev + 1);
+
+      // Small delay before retry to avoid rapid-fire attempts
+      setTimeout(() => {
+        if (videoRef.current) {
+          // Force video to reload by changing the source briefly
+          setTrailerUrl(null);
+          setTimeout(() => {
+            if (trailerUrl) {
+              setTrailerUrl(trailerUrl);
+            }
+          }, 100);
+        }
+      }, 1000);
+      return;
+    }
+
+    // After 2 retries or for non-retryable errors, show the error
+    logger.error('TrailerModal', 'Video error after retries or non-retryable:', error);
+    setError('Unable to play trailer. Please try again.');
+    setLoading(false);
+  }, [retryCount, trailerUrl]);
 
   const handleTrailerEnd = useCallback(() => {
     setIsPlaying(false);
@@ -158,13 +212,6 @@ const TrailerModal: React.FC<TrailerModalProps> = memo(({
           {/* Enhanced Header */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
-              <View style={[styles.headerIconContainer, { backgroundColor: currentTheme.colors.primary + '20' }]}>
-                <MaterialIcons
-                  name="play-circle-fill"
-                  size={20}
-                  color={currentTheme.colors.primary}
-                />
-              </View>
               <View style={styles.headerTextContainer}>
                 <Text
                   style={[styles.title, { color: currentTheme.colors.highEmphasis }]}
@@ -184,11 +231,9 @@ const TrailerModal: React.FC<TrailerModalProps> = memo(({
               style={[styles.closeButton, { backgroundColor: 'rgba(255,255,255,0.1)' }]}
               hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}
             >
-              <MaterialIcons
-                name="close"
-                size={20}
-                color={currentTheme.colors.highEmphasis}
-              />
+              <Text style={[styles.closeButtonText, { color: currentTheme.colors.highEmphasis }]}>
+                Close
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -205,11 +250,6 @@ const TrailerModal: React.FC<TrailerModalProps> = memo(({
 
             {error && !loading && (
               <View style={styles.errorContainer}>
-                <MaterialIcons
-                  name="error-outline"
-                  size={48}
-                  color={currentTheme.colors.error || '#FF6B6B'}
-                />
                 <Text style={[styles.errorText, { color: currentTheme.colors.textMuted }]}>
                   {error}
                 </Text>
@@ -222,7 +262,8 @@ const TrailerModal: React.FC<TrailerModalProps> = memo(({
               </View>
             )}
 
-            {trailerUrl && !loading && !error && (
+            {/* Render the Video as soon as we have a URL; keep spinner overlay until onLoad */}
+            {trailerUrl && !error && (
               <View style={styles.playerWrapper}>
                 <Video
                   ref={videoRef}
@@ -238,11 +279,11 @@ const TrailerModal: React.FC<TrailerModalProps> = memo(({
                   ignoreSilentSwitch="ignore"
                   onLoad={(data: OnLoadData) => {
                     logger.info('TrailerModal', 'Trailer loaded successfully', data);
+                    setLoading(false);
+                    setError(null);
+                    setIsPlaying(true);
                   }}
-                  onError={(error) => {
-                    logger.error('TrailerModal', 'Video error:', error);
-                    handleTrailerError();
-                  }}
+                  onError={handleVideoError}
                   onEnd={() => {
                     logger.info('TrailerModal', 'Trailer ended');
                     handleTrailerEnd();
@@ -252,6 +293,7 @@ const TrailerModal: React.FC<TrailerModalProps> = memo(({
                   }}
                   onLoadStart={() => {
                     logger.info('TrailerModal', 'Video load started');
+                    setLoading(true);
                   }}
                   onReadyForDisplay={() => {
                     logger.info('TrailerModal', 'Video ready for display');
@@ -264,11 +306,6 @@ const TrailerModal: React.FC<TrailerModalProps> = memo(({
           {/* Enhanced Footer */}
           <View style={styles.footer}>
             <View style={styles.footerContent}>
-              <MaterialIcons
-                name="movie"
-                size={16}
-                color={currentTheme.colors.textMuted}
-              />
               <Text style={[styles.footerText, { color: currentTheme.colors.textMuted }]}>
                 {contentTitle}
               </Text>
@@ -317,14 +354,6 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: 'row',
     flex: 1,
-    gap: 12,
-  },
-  headerIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   headerTextContainer: {
     flex: 1,
@@ -347,11 +376,15 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   closeButton: {
-    width: 32,
-    height: 32,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  closeButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   playerContainer: {
     aspectRatio: 16 / 9,
@@ -420,7 +453,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    gap: 6,
   },
   footerText: {
     fontSize: 13,

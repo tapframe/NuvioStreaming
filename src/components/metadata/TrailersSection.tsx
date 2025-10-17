@@ -1,4 +1,4 @@
-import React, { useState, useEffect, memo } from 'react';
+import React, { useState, useEffect, useCallback, memo, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,9 +14,12 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import FastImage from '@d11/react-native-fast-image';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useSettings } from '../../hooks/useSettings';
+import { useTrailer } from '../../contexts/TrailerContext';
 import { logger } from '../../utils/logger';
 import TrailerService from '../../services/trailerService';
 import TrailerModal from './TrailerModal';
+import Animated, { useSharedValue, withTiming, withDelay, useAnimatedStyle } from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -50,6 +53,8 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
   contentTitle
 }) => {
   const { currentTheme } = useTheme();
+  const { settings } = useSettings();
+  const { pauseTrailer } = useTrailer();
   const [trailers, setTrailers] = useState<CategorizedTrailers>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,10 +62,71 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('Trailer');
   const [dropdownVisible, setDropdownVisible] = useState(false);
+  const [backendAvailable, setBackendAvailable] = useState<boolean | null>(null);
+
+  // Smooth reveal animation after trailers are fetched
+  const sectionOpacitySV = useSharedValue(0);
+  const sectionTranslateYSV = useSharedValue(8);
+  const hasAnimatedRef = useRef(false);
+
+  const sectionAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: sectionOpacitySV.value,
+    transform: [{ translateY: sectionTranslateYSV.value }],
+  }));
+
+  // Reset animation state before a new fetch starts
+  const resetSectionAnimation = useCallback(() => {
+    hasAnimatedRef.current = false;
+    sectionOpacitySV.value = 0;
+    sectionTranslateYSV.value = 8;
+  }, [sectionOpacitySV, sectionTranslateYSV]);
+
+  // Trigger animation once, 500ms after trailers are available
+  const triggerSectionAnimation = useCallback(() => {
+    if (hasAnimatedRef.current) return;
+    hasAnimatedRef.current = true;
+    sectionOpacitySV.value = withDelay(500, withTiming(1, { duration: 400 }));
+    sectionTranslateYSV.value = withDelay(500, withTiming(0, { duration: 400 }));
+  }, [sectionOpacitySV, sectionTranslateYSV]);
+
+  // Check if trailer service backend is available
+  const checkBackendAvailability = useCallback(async (): Promise<boolean> => {
+    try {
+      const serverStatus = TrailerService.getServerStatus();
+      const healthUrl = `${serverStatus.localUrl.replace('/trailer', '/health')}`;
+
+      const response = await fetch(healthUrl, {
+        method: 'GET',
+        signal: AbortSignal.timeout(3000), // 3 second timeout
+      });
+      const isAvailable = response.ok;
+      logger.info('TrailersSection', `Backend availability check: ${isAvailable ? 'AVAILABLE' : 'UNAVAILABLE'}`);
+      return isAvailable;
+    } catch (error) {
+      logger.warn('TrailersSection', 'Backend availability check failed:', error);
+      return false;
+    }
+  }, []);
 
   // Fetch trailers from TMDB
   useEffect(() => {
     if (!tmdbId) return;
+
+    const initializeTrailers = async () => {
+      resetSectionAnimation();
+      // First check if backend is available
+      const available = await checkBackendAvailability();
+      setBackendAvailable(available);
+
+      if (!available) {
+        logger.warn('TrailersSection', 'Trailer service backend is not available - skipping trailer loading');
+        setLoading(false);
+        return;
+      }
+
+      // Backend is available, proceed with fetching trailers
+      await fetchTrailers();
+    };
 
     const fetchTrailers = async () => {
       setLoading(true);
@@ -76,8 +142,14 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
 
         const basicResponse = await fetch(basicEndpoint);
         if (!basicResponse.ok) {
-          logger.error('TrailersSection', `TMDB ID ${tmdbId} not found: ${basicResponse.status}`);
-          setError(`Content not found (TMDB ID: ${tmdbId})`);
+          if (basicResponse.status === 404) {
+            // 404 on basic endpoint means TMDB ID doesn't exist - this is normal
+            logger.info('TrailersSection', `TMDB ID ${tmdbId} not found in TMDB (404) - skipping trailers`);
+            setTrailers({}); // Empty trailers - section won't render
+            return;
+          }
+          logger.error('TrailersSection', `TMDB basic endpoint failed: ${basicResponse.status} ${basicResponse.statusText}`);
+          setError(`Failed to verify content: ${basicResponse.status}`);
           return;
         }
 
@@ -112,6 +184,8 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
         } else {
           logger.info('TrailersSection', `Categorized ${totalVideos} videos into ${Object.keys(categorized).length} categories`);
           setTrailers(categorized);
+          // Trigger smooth reveal after 1.5s since we have content
+          triggerSectionAnimation();
 
           // Auto-select the first available category, preferring "Trailer"
           const availableCategories = Object.keys(categorized);
@@ -128,8 +202,8 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
       }
     };
 
-    fetchTrailers();
-  }, [tmdbId, type]);
+    initializeTrailers();
+  }, [tmdbId, type, checkBackendAvailability]);
 
   // Categorize trailers by type
   const categorizeTrailers = (videos: any[]): CategorizedTrailers => {
@@ -145,18 +219,53 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
       categories[category].push(video);
     });
 
-    // Sort within each category by published date (newest first)
+    // Sort within each category: official trailers first, then by published date (newest first)
     Object.keys(categories).forEach(category => {
-      categories[category].sort((a, b) =>
-        new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
-      );
+      categories[category].sort((a, b) => {
+        // Official trailers come first
+        if (a.official && !b.official) return -1;
+        if (!a.official && b.official) return 1;
+
+        // If both are official or both are not, sort by published date (newest first)
+        return new Date(b.published_at).getTime() - new Date(a.published_at).getTime();
+      });
     });
 
-    return categories;
+    // Sort categories: "Trailer" category first, then categories with official trailers, then alphabetically
+    const sortedCategories = Object.keys(categories).sort((a, b) => {
+      // "Trailer" category always comes first
+      if (a === 'Trailer') return -1;
+      if (b === 'Trailer') return 1;
+
+      const aHasOfficial = categories[a].some(trailer => trailer.official);
+      const bHasOfficial = categories[b].some(trailer => trailer.official);
+
+      // Categories with official trailers come first (after Trailer)
+      if (aHasOfficial && !bHasOfficial) return -1;
+      if (!aHasOfficial && bHasOfficial) return 1;
+
+      // If both have or don't have official trailers, sort alphabetically
+      return a.localeCompare(b);
+    });
+
+    // Create new object with sorted categories
+    const sortedCategoriesObj: CategorizedTrailers = {};
+    sortedCategories.forEach(category => {
+      sortedCategoriesObj[category] = categories[category];
+    });
+
+    return sortedCategoriesObj;
   };
 
   // Handle trailer selection
   const handleTrailerPress = (trailer: TrailerVideo) => {
+    // Pause hero section trailer when modal opens
+    try {
+      pauseTrailer();
+    } catch (error) {
+      logger.warn('TrailersSection', 'Error pausing hero trailer:', error);
+    }
+    
     setSelectedTrailer(trailer);
     setModalVisible(true);
   };
@@ -165,6 +274,8 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
   const handleModalClose = () => {
     setModalVisible(false);
     setSelectedTrailer(null);
+    // Note: Hero trailer will resume automatically when modal closes
+    // The HeroSection component handles resuming based on scroll position
   };
 
   // Handle category selection
@@ -228,42 +339,22 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
     return null; // Don't show if no TMDB ID
   }
 
+  // Don't render if backend availability is still being checked or backend is unavailable
+  if (backendAvailable === null || backendAvailable === false) {
+    return null;
+  }
+
+  // Don't render if TMDB enrichment is disabled
+  if (!settings?.enrichMetadataWithTMDB) {
+    return null;
+  }
+
   if (loading) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <MaterialIcons name="movie" size={20} color={currentTheme.colors.primary} />
-          <Text style={[styles.headerTitle, { color: currentTheme.colors.highEmphasis }]}>
-            Trailers
-          </Text>
-        </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="small" color={currentTheme.colors.primary} />
-          <Text style={[styles.loadingText, { color: currentTheme.colors.textMuted }]}>
-            Loading trailers...
-          </Text>
-        </View>
-      </View>
-    );
+    return null;
   }
 
   if (error) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <MaterialIcons name="movie" size={20} color={currentTheme.colors.primary} />
-          <Text style={[styles.headerTitle, { color: currentTheme.colors.highEmphasis }]}>
-            Trailers
-          </Text>
-        </View>
-        <View style={styles.errorContainer}>
-          <MaterialIcons name="error-outline" size={24} color={currentTheme.colors.error || '#FF6B6B'} />
-          <Text style={[styles.errorText, { color: currentTheme.colors.textMuted }]}>
-            {error}
-          </Text>
-        </View>
-      </View>
-    );
+    return null;
   }
 
   const trailerCategories = Object.keys(trailers);
@@ -293,7 +384,7 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
   }
 
   return (
-    <View style={styles.container}>
+    <Animated.View style={[styles.container, sectionAnimatedStyle]}>
       {/* Enhanced Header with Category Selector */}
       <View style={styles.header}>
         <Text style={[styles.headerTitle, { color: currentTheme.colors.highEmphasis }]}>
@@ -303,7 +394,7 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
         {/* Category Selector - Right Aligned */}
         {trailerCategories.length > 0 && selectedCategory && (
           <TouchableOpacity
-            style={[styles.categorySelector, { borderColor: currentTheme.colors.primary + '40' }]}
+            style={[styles.categorySelector, { borderColor: 'rgba(255,255,255,0.6)' }]}
             onPress={toggleDropdown}
             activeOpacity={0.8}
           >
@@ -317,7 +408,7 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
             <MaterialIcons
               name={dropdownVisible ? "expand-less" : "expand-more"}
               size={18}
-              color={currentTheme.colors.primary}
+              color="rgba(255,255,255,0.7)"
             />
           </TouchableOpacity>
         )}
@@ -342,11 +433,7 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
             {trailerCategories.map(category => (
               <TouchableOpacity
                 key={category}
-                style={[
-                  styles.dropdownItem,
-                  selectedCategory === category && styles.dropdownItemSelected,
-                  selectedCategory === category && { backgroundColor: currentTheme.colors.primary + '10' }
-                ]}
+                style={styles.dropdownItem}
                 onPress={() => handleCategorySelect(category)}
                 activeOpacity={0.7}
               >
@@ -360,24 +447,16 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
                       color={currentTheme.colors.primary}
                     />
                   </View>
-                  <Text style={[
-                    styles.dropdownItemText,
-                    { color: currentTheme.colors.highEmphasis },
-                    selectedCategory === category && { color: currentTheme.colors.primary, fontWeight: '600' }
-                  ]}>
+                    <Text style={[
+                      styles.dropdownItemText,
+                      { color: currentTheme.colors.highEmphasis }
+                    ]}>
                     {formatTrailerType(category)}
                   </Text>
                   <Text style={[styles.dropdownItemCount, { color: currentTheme.colors.textMuted }]}>
                     {trailers[category].length}
                   </Text>
                 </View>
-                {selectedCategory === category && (
-                  <MaterialIcons
-                    name="check"
-                    size={20}
-                    color={currentTheme.colors.primary}
-                  />
-                )}
               </TouchableOpacity>
             ))}
           </View>
@@ -457,7 +536,7 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
         trailer={selectedTrailer}
         contentTitle={contentTitle}
       />
-    </View>
+    </Animated.View>
   );
 });
 
@@ -471,8 +550,9 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
+    justifyContent: 'flex-start',
+    marginBottom: 0,
+    gap: 12,
   },
   headerTitle: {
     fontSize: 20,
@@ -526,9 +606,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.05)',
-  },
-  dropdownItemSelected: {
-    borderBottomColor: 'transparent',
   },
   dropdownItemContent: {
     flexDirection: 'row',
