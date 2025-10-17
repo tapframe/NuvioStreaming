@@ -1153,15 +1153,32 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     opacity: watchProgressOpacity.value,
   }), []);
 
-  // Enhanced backdrop with smooth loading animation
+  // Enhanced backdrop with smooth loading animation and dynamic parallax effect
   const backdropImageStyle = useAnimatedStyle(() => {
     'worklet';
-    const scale = 1 + (scrollY.value * 0.0001); // Micro scale effect
+    const scrollYValue = scrollY.value;
+    
+    // Dynamic scale based on scroll direction and position
+    let scale = 1;
+    if (scrollYValue < 0) {
+      // Scrolling up - zoom in to fill blank area
+      scale = 1 + Math.abs(scrollYValue) * 0.002; // More aggressive zoom when scrolling up
+    } else {
+      // Scrolling down - subtle scale effect
+      scale = 1 + scrollYValue * 0.0001;
+    }
+    
+    // Cap the scale to prevent excessive zoom
+    scale = Math.min(scale, 1.3); // Allow up to 30% zoom
+    
+    // Parallax effect - move image slower than scroll
+    const parallaxOffset = scrollYValue * 0.3; // 30% of scroll speed
     
     return {
       opacity: imageOpacity.value * imageLoadOpacity.value,
       transform: [
-        { scale: Math.min(scale, SCALE_FACTOR) }    // Cap scale
+        { scale: scale },
+        { translateY: parallaxOffset }
       ],
     };
   }, []);
@@ -1188,6 +1205,34 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   const genreAnimatedStyle = useAnimatedStyle(() => ({
     opacity: genreOpacity.value
   }), []);
+
+  // Trailer parallax effect - moves slower than scroll for depth with dynamic zoom
+  const trailerParallaxStyle = useAnimatedStyle(() => {
+    'worklet';
+    const scrollYValue = scrollY.value;
+    
+    // Dynamic scale for trailer based on scroll direction
+    let scale = 1;
+    if (scrollYValue < 0) {
+      // Scrolling up - zoom in to fill blank area
+      scale = 1 + Math.abs(scrollYValue) * 0.0015; // Slightly less aggressive than background
+    } else {
+      // Scrolling down - subtle scale effect
+      scale = 1 + scrollYValue * 0.0001;
+    }
+    
+    // Cap the scale to prevent excessive zoom
+    scale = Math.min(scale, 1.25); // Allow up to 25% zoom for trailer
+    
+    const parallaxOffset = scrollYValue * 0.2; // 20% of scroll speed for trailer
+    
+    return {
+      transform: [
+        { scale: scale },
+        { translateY: parallaxOffset }
+      ],
+    };
+  }, []);
 
   // Optimized genre rendering with lazy loading and memory management
   const genreElements = useMemo(() => {
@@ -1414,7 +1459,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       
       {/* Shimmer loading effect removed */}
       
-      {/* Background thumbnail image - always rendered when available */}
+      {/* Background thumbnail image - always rendered when available with parallax */}
       {shouldLoadSecondaryData && imageSource && !loadingBanner && (
         <Animated.View style={[styles.absoluteFill, {
           opacity: thumbnailOpacity
@@ -1445,11 +1490,11 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
         </View>
       )}
       
-      {/* Visible trailer player - rendered on top with fade transition */}
+      {/* Visible trailer player - rendered on top with fade transition and parallax */}
       {shouldLoadSecondaryData && settings?.showTrailers && trailerUrl && !trailerLoading && !trailerError && trailerPreloaded && (
         <Animated.View style={[styles.absoluteFill, {
           opacity: trailerOpacity
-        }]}>
+        }, trailerParallaxStyle]}>
           <TrailerPlayer
               key={`visible-${trailerUrl}`}
               ref={trailerVideoRef}
