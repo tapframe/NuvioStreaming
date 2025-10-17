@@ -211,6 +211,9 @@ const MetadataScreen: React.FC = () => {
   const watchProgressData = useWatchProgress(id, Object.keys(groupedEpisodes).length > 0 ? 'series' : type as 'movie' | 'series', episodeId, episodes);
   const assetData = useMetadataAssets(metadata, id, type, imdbId, settings, setMetadata);
   const animations = useMetadataAnimations(safeAreaTop, watchProgressData.watchProgress);
+
+  // Stable logo URI from HeroSection
+  const [stableLogoUri, setStableLogoUri] = React.useState<string | null>(null);
   
   // Extract dominant color from hero image for dynamic background
   const heroImageUri = useMemo(() => {
@@ -870,7 +873,7 @@ const MetadataScreen: React.FC = () => {
       {metadata && (
         <>
           {/* Floating Header - Optimized */}
-          <FloatingHeader 
+          <FloatingHeader
             metadata={metadata}
             logoLoadError={assetData.logoLoadError}
             handleBack={handleBack}
@@ -881,6 +884,7 @@ const MetadataScreen: React.FC = () => {
             headerElementsOpacity={animations.headerElementsOpacity}
             safeAreaTop={safeAreaTop}
             setLogoLoadError={assetData.setLogoLoadError}
+            stableLogoUri={stableLogoUri}
           />
 
           <Animated.ScrollView
@@ -908,6 +912,7 @@ const MetadataScreen: React.FC = () => {
               watchProgressOpacity={animations.watchProgressOpacity}
               watchProgressWidth={animations.watchProgressWidth}
               watchProgress={watchProgressData.watchProgress}
+              onStableLogoUriChange={setStableLogoUri}
               type={Object.keys(groupedEpisodes).length > 0 ? 'series' : type as 'movie' | 'series'}
               getEpisodeDetails={watchProgressData.getEpisodeDetails}
               handleShowStreams={handleShowStreams}

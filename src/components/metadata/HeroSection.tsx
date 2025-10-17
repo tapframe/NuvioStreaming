@@ -83,6 +83,7 @@ interface HeroSectionProps {
     traktSynced?: boolean;
     traktProgress?: number;
   } | null;
+  onStableLogoUriChange?: (logoUri: string | null) => void;
   type: 'movie' | 'series';
   getEpisodeDetails: (episodeId: string) => { seasonNumber: string; episodeNumber: string; episodeName: string } | null;
   handleShowStreams: () => void;
@@ -777,6 +778,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   buttonsTranslateY,
   watchProgressOpacity,
   watchProgress,
+  onStableLogoUriChange,
   type,
   getEpisodeDetails,
   handleShowStreams,
@@ -966,12 +968,14 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
 
     if (metadata?.logo && metadata.logo !== stableLogoUri) {
       setStableLogoUri(metadata.logo);
+      onStableLogoUriChange?.(metadata.logo);
       setLogoHasLoadedSuccessfully(false); // Reset for new logo
       logoLoadOpacity.value = 0; // reset fade for new logo
       setShouldShowTextFallback(false);
     } else if (!metadata?.logo && stableLogoUri) {
       // Clear logo if metadata no longer has one
       setStableLogoUri(null);
+      onStableLogoUriChange?.(null);
       setLogoHasLoadedSuccessfully(false);
       // Start a short grace period before showing text fallback
       setShouldShowTextFallback(false);
