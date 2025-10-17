@@ -1,6 +1,9 @@
 import { TMDBEpisode } from '../services/tmdbService';
 import { StreamingContent } from '../services/catalogService';
 
+// Re-export StreamingContent for convenience
+export { StreamingContent };
+
 // Types for route params
 export type RouteParams = {
   id: string;

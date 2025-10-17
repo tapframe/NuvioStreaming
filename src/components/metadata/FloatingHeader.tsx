@@ -204,10 +204,10 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
             
             <View style={styles.headerTitleContainer}>
               {metadata.logo && !logoLoadError ? (
-                <FastImage
+                <Image
                   source={{ uri: metadata.logo }}
                   style={styles.floatingHeaderLogo}
-                  resizeMode={FastImage.resizeMode.contain}
+                  resizeMode="contain"
                   onError={() => {
                     logger.warn(`[FloatingHeader] Logo failed to load: ${metadata.logo}`);
                     setLogoLoadError(true);
