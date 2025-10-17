@@ -33,6 +33,8 @@ interface TrailerVideo {
   type: string;
   official: boolean;
   published_at: string;
+  seasonNumber: number | null;
+  displayName?: string;
 }
 
 interface TrailersSectionProps {
@@ -153,28 +155,93 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
           return;
         }
 
-        const videosEndpoint = type === 'movie'
-          ? `https://api.themoviedb.org/3/movie/${tmdbId}/videos?api_key=d131017ccc6e5462a81c9304d21476de&language=en-US`
-          : `https://api.themoviedb.org/3/tv/${tmdbId}/videos?api_key=d131017ccc6e5462a81c9304d21476de&language=en-US`;
+        let allVideos: any[] = [];
 
-        logger.info('TrailersSection', `Fetching videos from: ${videosEndpoint}`);
+        if (type === 'movie') {
+          // For movies, just fetch the main videos endpoint
+          const videosEndpoint = `https://api.themoviedb.org/3/movie/${tmdbId}/videos?api_key=d131017ccc6e5462a81c9304d21476de&language=en-US`;
 
-        const response = await fetch(videosEndpoint);
-        if (!response.ok) {
-          // 404 is normal - means no videos exist for this content
-          if (response.status === 404) {
-            logger.info('TrailersSection', `No videos found for TMDB ID ${tmdbId} (404 response)`);
-            setTrailers({}); // Empty trailers - section won't render
-            return;
+          logger.info('TrailersSection', `Fetching movie videos from: ${videosEndpoint}`);
+
+          const response = await fetch(videosEndpoint);
+          if (!response.ok) {
+            // 404 is normal - means no videos exist for this content
+            if (response.status === 404) {
+              logger.info('TrailersSection', `No videos found for movie TMDB ID ${tmdbId} (404 response)`);
+              setTrailers({}); // Empty trailers - section won't render
+              return;
+            }
+            logger.error('TrailersSection', `Videos endpoint failed: ${response.status} ${response.statusText}`);
+            throw new Error(`Failed to fetch trailers: ${response.status}`);
           }
-          logger.error('TrailersSection', `Videos endpoint failed: ${response.status} ${response.statusText}`);
-          throw new Error(`Failed to fetch trailers: ${response.status}`);
+
+          const data = await response.json();
+          allVideos = data.results || [];
+          logger.info('TrailersSection', `Received ${allVideos.length} videos for movie TMDB ID ${tmdbId}`);
+        } else {
+          // For TV shows, fetch both main TV videos and season-specific videos
+          logger.info('TrailersSection', `Fetching TV show videos and season trailers for TMDB ID ${tmdbId}`);
+
+          // Get TV show details to know how many seasons there are
+          const tvDetailsResponse = await fetch(basicEndpoint);
+          const tvDetails = await tvDetailsResponse.json();
+          const numberOfSeasons = tvDetails.number_of_seasons || 0;
+
+          logger.info('TrailersSection', `TV show has ${numberOfSeasons} seasons`);
+
+          // Fetch main TV show videos
+          const tvVideosEndpoint = `https://api.themoviedb.org/3/tv/${tmdbId}/videos?api_key=d131017ccc6e5462a81c9304d21476de&language=en-US`;
+          const tvResponse = await fetch(tvVideosEndpoint);
+
+          if (tvResponse.ok) {
+            const tvData = await tvResponse.json();
+            // Add season info to main TV videos
+            const mainVideos = (tvData.results || []).map((video: any) => ({
+              ...video,
+              seasonNumber: null as number | null, // null indicates main TV show videos
+              displayName: video.name
+            }));
+            allVideos.push(...mainVideos);
+            logger.info('TrailersSection', `Received ${mainVideos.length} main TV videos`);
+          }
+
+          // Fetch videos from each season (skip season 0 which is specials)
+          const seasonPromises = [];
+          for (let seasonNum = 1; seasonNum <= numberOfSeasons; seasonNum++) {
+            seasonPromises.push(
+              fetch(`https://api.themoviedb.org/3/tv/${tmdbId}/season/${seasonNum}/videos?api_key=d131017ccc6e5462a81c9304d21476de&language=en-US`)
+                .then(res => res.json())
+                .then(data => ({
+                  seasonNumber: seasonNum,
+                  videos: data.results || []
+                }))
+                .catch(err => {
+                  logger.warn('TrailersSection', `Failed to fetch season ${seasonNum} videos:`, err);
+                  return { seasonNumber: seasonNum, videos: [] };
+                })
+            );
+          }
+
+          const seasonResults = await Promise.all(seasonPromises);
+
+          // Add season videos to the collection
+          seasonResults.forEach(result => {
+            if (result.videos.length > 0) {
+              const seasonVideos = result.videos.map((video: any) => ({
+                ...video,
+                seasonNumber: result.seasonNumber as number | null,
+                displayName: `Season ${result.seasonNumber} - ${video.name}`
+              }));
+              allVideos.push(...seasonVideos);
+              logger.info('TrailersSection', `Season ${result.seasonNumber}: ${result.videos.length} videos`);
+            }
+          });
+
+          const totalSeasonVideos = seasonResults.reduce((sum, result) => sum + result.videos.length, 0);
+          logger.info('TrailersSection', `Total videos collected: ${allVideos.length} (main: ${allVideos.filter(v => v.seasonNumber === null).length}, seasons: ${totalSeasonVideos})`);
         }
 
-        const data = await response.json();
-        logger.info('TrailersSection', `Received ${data.results?.length || 0} videos for TMDB ID ${tmdbId}`);
-
-        const categorized = categorizeTrailers(data.results || []);
+        const categorized = categorizeTrailers(allVideos);
         const totalVideos = Object.values(categorized).reduce((sum, videos) => sum + videos.length, 0);
 
         if (totalVideos === 0) {
@@ -219,10 +286,21 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
       categories[category].push(video);
     });
 
-    // Sort within each category: official trailers first, then by published date (newest first)
+    // Sort within each category: season trailers first (newest seasons), then main series, official first, then by date
     Object.keys(categories).forEach(category => {
       categories[category].sort((a, b) => {
-        // Official trailers come first
+        // Season trailers come before main series trailers
+        if (a.seasonNumber !== null && b.seasonNumber === null) return -1;
+        if (a.seasonNumber === null && b.seasonNumber !== null) return 1;
+
+        // If both have season numbers, sort by season number (newest seasons first)
+        if (a.seasonNumber !== null && b.seasonNumber !== null) {
+          if (a.seasonNumber !== b.seasonNumber) {
+            return b.seasonNumber - a.seasonNumber; // Higher season numbers first
+          }
+        }
+
+        // Official trailers come first within the same season/main series group
         if (a.official && !b.official) return -1;
         if (!a.official && b.official) return 1;
 
@@ -506,7 +584,7 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
                     style={[styles.trailerTitle, { color: currentTheme.colors.highEmphasis }]}
                     numberOfLines={2}
                   >
-                    {trailer.name}
+                    {trailer.displayName || trailer.name}
                   </Text>
                   <Text style={[styles.trailerMeta, { color: currentTheme.colors.textMuted }]}>
                     {new Date(trailer.published_at).getFullYear()}
