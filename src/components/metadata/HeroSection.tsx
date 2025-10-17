@@ -1158,18 +1158,21 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     'worklet';
     const scrollYValue = scrollY.value;
     
+    // Default zoom factor
+    const defaultZoom = 1.1; // 10% zoom by default
+    
     // Dynamic scale based on scroll direction and position
-    let scale = 1;
+    let scale = defaultZoom;
     if (scrollYValue < 0) {
       // Scrolling up - zoom in to fill blank area
-      scale = 1 + Math.abs(scrollYValue) * 0.002; // More aggressive zoom when scrolling up
+      scale = defaultZoom + Math.abs(scrollYValue) * 0.002; // More aggressive zoom when scrolling up
     } else {
       // Scrolling down - subtle scale effect
-      scale = 1 + scrollYValue * 0.0001;
+      scale = defaultZoom + scrollYValue * 0.0001;
     }
     
     // Cap the scale to prevent excessive zoom
-    scale = Math.min(scale, 1.3); // Allow up to 30% zoom
+    scale = Math.min(scale, 1.4); // Allow up to 40% zoom (including default)
     
     // Parallax effect - move image slower than scroll
     const parallaxOffset = scrollYValue * 0.3; // 30% of scroll speed
@@ -1453,20 +1456,21 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
 
 
   return (
-    <Animated.View style={[styles.heroSection, heroAnimatedStyle]}>
-      {/* Optimized Background */}
-      <View style={[styles.absoluteFill, { backgroundColor: themeColors.black }]} />
+    <View style={styles.heroWrapper}>
+      <Animated.View style={[styles.heroSection, heroAnimatedStyle]}>
+        {/* Optimized Background */}
+        <View style={[styles.absoluteFill, { backgroundColor: themeColors.black }]} />
       
       {/* Shimmer loading effect removed */}
       
       {/* Background thumbnail image - always rendered when available with parallax */}
       {shouldLoadSecondaryData && imageSource && !loadingBanner && (
-        <Animated.View style={[styles.absoluteFill, {
+        <Animated.View style={[styles.thumbnailContainer, {
           opacity: thumbnailOpacity
         }]}>
           <Animated.Image 
             source={{ uri: imageSource }}
-            style={[styles.absoluteFill, backdropImageStyle]}
+            style={[styles.thumbnailImage, backdropImageStyle]}
             resizeMode="cover"
             onError={handleImageError}
             onLoad={handleImageLoad}
@@ -1686,19 +1690,40 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
           />
         </View>
       </LinearGradient>
-    </Animated.View>
+      </Animated.View>
+    </View>
   );
 });
 
 // Ultra-optimized styles
 const styles = StyleSheet.create({
+  heroWrapper: {
+    width: '100%',
+    marginTop: -150, // Extend wrapper 150px above to accommodate thumbnail overflow
+    paddingTop: 150, // Add padding to maintain proper positioning
+    overflow: 'hidden', // This will clip the thumbnail overflow when scrolling
+  },
   heroSection: {
     width: '100%',
     backgroundColor: '#000',
-    overflow: 'hidden',
+    overflow: 'visible', // Allow thumbnail to extend within the wrapper
   },
 
   absoluteFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  thumbnailContainer: {
+    position: 'absolute',
+    top: 0, // Now positioned at the top of the wrapper (which extends 150px above)
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  thumbnailImage: {
     position: 'absolute',
     top: 0,
     left: 0,
