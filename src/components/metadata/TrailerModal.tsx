@@ -19,6 +19,24 @@ import TrailerPlayer from '../video/TrailerPlayer';
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
 
+// Helper function to format trailer type
+const formatTrailerType = (type: string): string => {
+  switch (type) {
+    case 'Trailer':
+      return 'Official Trailer';
+    case 'Teaser':
+      return 'Teaser';
+    case 'Clip':
+      return 'Clip';
+    case 'Featurette':
+      return 'Featurette';
+    case 'Behind the Scenes':
+      return 'Behind the Scenes';
+    default:
+      return type;
+  }
+};
+
 interface TrailerVideo {
   id: string;
   key: string;
@@ -136,40 +154,41 @@ const TrailerModal: React.FC<TrailerModalProps> = memo(({
           maxHeight: modalHeight,
           backgroundColor: currentTheme.colors.background
         }]}>
-          {/* Header */}
+          {/* Enhanced Header */}
           <View style={styles.header}>
-            <View style={styles.titleContainer}>
-              <MaterialIcons
-                name="movie"
-                size={20}
-                color={currentTheme.colors.primary}
-              />
-              <Text
-                style={[styles.title, { color: currentTheme.colors.highEmphasis }]}
-                numberOfLines={1}
-              >
-                {trailer.name}
-              </Text>
+            <View style={styles.headerLeft}>
+              <View style={[styles.headerIconContainer, { backgroundColor: currentTheme.colors.primary + '20' }]}>
+                <MaterialIcons
+                  name="play-circle-fill"
+                  size={20}
+                  color={currentTheme.colors.primary}
+                />
+              </View>
+              <View style={styles.headerTextContainer}>
+                <Text
+                  style={[styles.title, { color: currentTheme.colors.highEmphasis }]}
+                  numberOfLines={2}
+                >
+                  {trailer.name}
+                </Text>
+                <View style={styles.headerMeta}>
+                  <Text style={[styles.meta, { color: currentTheme.colors.textMuted }]}>
+                    {formatTrailerType(trailer.type)} • {new Date(trailer.published_at).getFullYear()}
+                  </Text>
+                </View>
+              </View>
             </View>
             <TouchableOpacity
               onPress={handleClose}
-              style={styles.closeButton}
+              style={[styles.closeButton, { backgroundColor: 'rgba(255,255,255,0.1)' }]}
               hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}
             >
               <MaterialIcons
                 name="close"
-                size={24}
+                size={20}
                 color={currentTheme.colors.highEmphasis}
               />
             </TouchableOpacity>
-          </View>
-
-          {/* Trailer Info */}
-          <View style={styles.infoContainer}>
-            <Text style={[styles.meta, { color: currentTheme.colors.textMuted }]}>
-              {trailer.type} • {new Date(trailer.published_at).getFullYear()}
-              {trailer.official && ' • Official'}
-            </Text>
           </View>
 
           {/* Player Container */}
@@ -223,11 +242,23 @@ const TrailerModal: React.FC<TrailerModalProps> = memo(({
             )}
           </View>
 
-          {/* Footer */}
+          {/* Enhanced Footer */}
           <View style={styles.footer}>
-            <Text style={[styles.footerText, { color: currentTheme.colors.textMuted }]}>
-              {contentTitle}
-            </Text>
+            <View style={styles.footerContent}>
+              <MaterialIcons
+                name="movie"
+                size={16}
+                color={currentTheme.colors.textMuted}
+              />
+              <Text style={[styles.footerText, { color: currentTheme.colors.textMuted }]}>
+                {contentTitle}
+              </Text>
+            </View>
+            <View style={styles.footerMeta}>
+              <Text style={[styles.footerMetaText, { color: currentTheme.colors.textMuted }]}>
+                {trailer.size}p HD
+              </Text>
+            </View>
           </View>
         </View>
       </View>
@@ -238,50 +269,70 @@ const TrailerModal: React.FC<TrailerModalProps> = memo(({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.9)',
+    backgroundColor: 'rgba(0,0,0,0.92)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modal: {
-    borderRadius: 16,
+    borderRadius: 20,
     overflow: 'hidden',
-    elevation: 10,
+    elevation: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
+
+  // Enhanced Header Styles
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 18,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
+    borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  titleContainer: {
+  headerLeft: {
     flexDirection: 'row',
-    alignItems: 'center',
     flex: 1,
-    gap: 8,
+    gap: 12,
+  },
+  headerIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTextContainer: {
+    flex: 1,
+    gap: 4,
   },
   title: {
     fontSize: 16,
-    fontWeight: '600',
-    flex: 1,
+    fontWeight: '700',
+    lineHeight: 20,
+    color: '#fff',
   },
-  closeButton: {
-    padding: 4,
-    marginLeft: 8,
-  },
-  infoContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
+  headerMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   meta: {
     fontSize: 12,
-    opacity: 0.8,
+    opacity: 0.7,
+    fontWeight: '500',
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   playerContainer: {
     aspectRatio: 16 / 9,
@@ -336,16 +387,34 @@ const styles = StyleSheet.create({
   player: {
     flex: 1,
   },
+  // Enhanced Footer Styles
   footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 16,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
+    borderTopColor: 'rgba(255,255,255,0.08)',
+  },
+  footerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 6,
   },
   footerText: {
-    fontSize: 12,
+    fontSize: 13,
+    fontWeight: '500',
+    opacity: 0.8,
+  },
+  footerMeta: {
+    alignItems: 'flex-end',
+  },
+  footerMetaText: {
+    fontSize: 11,
     opacity: 0.6,
-    textAlign: 'center',
+    fontWeight: '500',
   },
 });
 

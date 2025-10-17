@@ -8,6 +8,8 @@ import {
   Dimensions,
   Alert,
   Platform,
+  ScrollView,
+  Modal,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import FastImage from '@d11/react-native-fast-image';
@@ -53,6 +55,8 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
   const [error, setError] = useState<string | null>(null);
   const [selectedTrailer, setSelectedTrailer] = useState<TrailerVideo | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('Trailer');
+  const [dropdownVisible, setDropdownVisible] = useState(false);
 
   // Fetch trailers from TMDB
   useEffect(() => {
@@ -104,9 +108,16 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
         if (totalVideos === 0) {
           logger.info('TrailersSection', `No videos found for TMDB ID ${tmdbId} - this is normal`);
           setTrailers({}); // No trailers available
+          setSelectedCategory(''); // No category selected
         } else {
           logger.info('TrailersSection', `Categorized ${totalVideos} videos into ${Object.keys(categorized).length} categories`);
           setTrailers(categorized);
+
+          // Auto-select the first available category, preferring "Trailer"
+          const availableCategories = Object.keys(categorized);
+          const preferredCategory = availableCategories.includes('Trailer') ? 'Trailer' :
+                                   availableCategories.includes('Teaser') ? 'Teaser' : availableCategories[0];
+          setSelectedCategory(preferredCategory);
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load trailers';
@@ -154,6 +165,17 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
   const handleModalClose = () => {
     setModalVisible(false);
     setSelectedTrailer(null);
+  };
+
+  // Handle category selection
+  const handleCategorySelect = (category: string) => {
+    setSelectedCategory(category);
+    setDropdownVisible(false);
+  };
+
+  // Toggle dropdown
+  const toggleDropdown = () => {
+    setDropdownVisible(!dropdownVisible);
   };
 
   // Get thumbnail URL for YouTube video
@@ -272,73 +294,161 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
 
   return (
     <View style={styles.container}>
+      {/* Enhanced Header with Category Selector */}
       <View style={styles.header}>
-        <MaterialIcons name="movie" size={20} color={currentTheme.colors.primary} />
         <Text style={[styles.headerTitle, { color: currentTheme.colors.highEmphasis }]}>
-          Trailers
+          Trailers & Videos
         </Text>
-      </View>
 
-      {trailerCategories.map(category => (
-        <View key={category} style={styles.categoryContainer}>
-          <View style={styles.categoryHeader}>
+        {/* Category Selector - Right Aligned */}
+        {trailerCategories.length > 0 && selectedCategory && (
+          <TouchableOpacity
+            style={[styles.categorySelector, { borderColor: currentTheme.colors.primary + '40' }]}
+            onPress={toggleDropdown}
+            activeOpacity={0.8}
+          >
+            <Text
+              style={[styles.categorySelectorText, { color: currentTheme.colors.highEmphasis }]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {formatTrailerType(selectedCategory)}
+            </Text>
             <MaterialIcons
-              name={getTrailerTypeIcon(category) as any}
-              size={16}
+              name={dropdownVisible ? "expand-less" : "expand-more"}
+              size={18}
               color={currentTheme.colors.primary}
             />
-            <Text style={[styles.categoryTitle, { color: currentTheme.colors.highEmphasis }]}>
-              {formatTrailerType(category)}
-            </Text>
-            <Text style={[styles.categoryCount, { color: currentTheme.colors.textMuted }]}>
-              {trailers[category].length}
-            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Category Dropdown Modal */}
+      <Modal
+        visible={dropdownVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setDropdownVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.dropdownOverlay}
+          activeOpacity={1}
+          onPress={() => setDropdownVisible(false)}
+        >
+          <View style={[styles.dropdownContainer, {
+            backgroundColor: currentTheme.colors.background,
+            borderColor: currentTheme.colors.primary + '20'
+          }]}>
+            {trailerCategories.map(category => (
+              <TouchableOpacity
+                key={category}
+                style={[
+                  styles.dropdownItem,
+                  selectedCategory === category && styles.dropdownItemSelected,
+                  selectedCategory === category && { backgroundColor: currentTheme.colors.primary + '10' }
+                ]}
+                onPress={() => handleCategorySelect(category)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.dropdownItemContent}>
+                  <View style={[styles.categoryIconContainer, {
+                    backgroundColor: currentTheme.colors.primary + '15'
+                  }]}>
+                    <MaterialIcons
+                      name={getTrailerTypeIcon(category) as any}
+                      size={14}
+                      color={currentTheme.colors.primary}
+                    />
+                  </View>
+                  <Text style={[
+                    styles.dropdownItemText,
+                    { color: currentTheme.colors.highEmphasis },
+                    selectedCategory === category && { color: currentTheme.colors.primary, fontWeight: '600' }
+                  ]}>
+                    {formatTrailerType(category)}
+                  </Text>
+                  <Text style={[styles.dropdownItemCount, { color: currentTheme.colors.textMuted }]}>
+                    {trailers[category].length}
+                  </Text>
+                </View>
+                {selectedCategory === category && (
+                  <MaterialIcons
+                    name="check"
+                    size={20}
+                    color={currentTheme.colors.primary}
+                  />
+                )}
+              </TouchableOpacity>
+            ))}
           </View>
+        </TouchableOpacity>
+      </Modal>
 
-          <View style={styles.trailersGrid}>
-            {trailers[category].map(trailer => {
-
-              return (
-                <TouchableOpacity
-                  key={trailer.id}
-                  style={styles.trailerCard}
-                  onPress={() => handleTrailerPress(trailer)}
-                  activeOpacity={0.8}
-                >
-                  <View style={styles.thumbnailContainer}>
+      {/* Selected Category Trailers */}
+      {selectedCategory && trailers[selectedCategory] && (
+        <View style={styles.selectedCategoryContent}>
+          {/* Trailers Horizontal Scroll */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.trailersScrollContent}
+            style={styles.trailersScrollView}
+            decelerationRate="fast"
+              snapToInterval={isTablet ? 212 : 182} // card width + gap for smooth scrolling
+            snapToAlignment="start"
+          >
+            {trailers[selectedCategory].map((trailer, index) => (
+              <TouchableOpacity
+                key={trailer.id}
+                style={styles.trailerCard}
+                onPress={() => handleTrailerPress(trailer)}
+                activeOpacity={0.9}
+              >
+                  {/* Thumbnail with Gradient Overlay */}
+                  <View style={styles.thumbnailWrapper}>
                     <FastImage
                       source={{ uri: getYouTubeThumbnail(trailer.key, 'hq') }}
                       style={styles.thumbnail}
                       resizeMode={FastImage.resizeMode.cover}
                     />
-                    <View style={styles.playOverlay}>
-                    <MaterialIcons name="play-arrow" size={32} color="#fff" />
-                  </View>
-                    <View style={styles.durationBadge}>
-                      <Text style={styles.durationText}>
+                    {/* Subtle Gradient Overlay */}
+                    <View style={styles.thumbnailGradient} />
+                    {/* Quality Badge */}
+                    <View style={styles.qualityBadge}>
+                      <Text style={styles.qualityText}>
                         {trailer.size}p
                       </Text>
                     </View>
                   </View>
 
-                  <View style={styles.trailerInfo}>
-                    <Text
-                      style={[styles.trailerTitle, { color: currentTheme.colors.highEmphasis }]}
-                      numberOfLines={2}
-                    >
-                      {trailer.name}
-                    </Text>
-                    <Text style={[styles.trailerMeta, { color: currentTheme.colors.textMuted }]}>
-                      {new Date(trailer.published_at).getFullYear()}
-                      {trailer.official && ' • Official'}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+                {/* Trailer Info */}
+                <View style={styles.trailerInfo}>
+                  <Text
+                    style={[styles.trailerTitle, { color: currentTheme.colors.highEmphasis }]}
+                    numberOfLines={2}
+                  >
+                    {trailer.name}
+                  </Text>
+                  <Text style={[styles.trailerMeta, { color: currentTheme.colors.textMuted }]}>
+                    {new Date(trailer.published_at).getFullYear()}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+            {/* Scroll Indicator - shows when there are more items to scroll */}
+            {trailers[selectedCategory].length > (isTablet ? 4 : 3) && (
+              <View style={styles.scrollIndicator}>
+                <MaterialIcons
+                  name="chevron-right"
+                  size={20}
+                  color={currentTheme.colors.textMuted}
+                  style={{ opacity: 0.6 }}
+                />
+              </View>
+            )}
+          </ScrollView>
         </View>
-      ))}
+      )}
 
       {/* Trailer Modal */}
       <TrailerModal
@@ -357,19 +467,214 @@ const styles = StyleSheet.create({
     marginTop: 24,
     marginBottom: 16,
   },
+  // Enhanced Header Styles
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
-    gap: 8,
+    justifyContent: 'space-between',
+    marginBottom: 20,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    opacity: 0.9,
+    letterSpacing: 0.5,
   },
+
+  // Category Selector Styles
+  categorySelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    gap: 6,
+    maxWidth: 160, // Limit maximum width to prevent overflow
+  },
+  categorySelectorText: {
+    fontSize: 12,
+    fontWeight: '600',
+    maxWidth: 120, // Limit text width
+  },
+
+  // Dropdown Styles
+  dropdownOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  dropdownContainer: {
+    width: '100%',
+    maxWidth: 320,
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  dropdownItemSelected: {
+    borderBottomColor: 'transparent',
+  },
+  dropdownItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  dropdownItemText: {
+    fontSize: 16,
+    flex: 1,
+  },
+  dropdownItemCount: {
+    fontSize: 12,
+    opacity: 0.7,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    minWidth: 24,
+    textAlign: 'center',
+  },
+
+  // Selected Category Content
+  selectedCategoryContent: {
+    marginTop: 16,
+  },
+
+  // Category Section Styles
+  categorySection: {
+    gap: 12,
+    position: 'relative', // For scroll indicator positioning
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  categoryTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  categoryIconContainer: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  categoryBadge: {
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    minWidth: 24,
+    alignItems: 'center',
+  },
+  categoryBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  // Trailers Scroll View
+  trailersScrollView: {
+    marginHorizontal: -4, // Compensate for padding
+  },
+  trailersScrollContent: {
+    paddingHorizontal: 4, // Restore padding for first/last items
+    gap: 12,
+    paddingRight: 20, // Extra padding at end for scroll indicator
+  },
+
+  // Enhanced Trailer Card Styles
+  trailerCard: {
+    width: isTablet ? 200 : 170,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+
+  // Thumbnail Styles
+  thumbnailWrapper: {
+    position: 'relative',
+    aspectRatio: 16 / 9,
+  },
+  thumbnail: {
+    width: '100%',
+    height: '100%',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+  },
+  thumbnailGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+  },
+
+
+  // Badges
+  qualityBadge: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  qualityText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+
+  // Trailer Info Styles
+  trailerInfo: {
+    padding: 12,
+  },
+  trailerTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 16,
+    marginBottom: 4,
+  },
+  trailerMeta: {
+    fontSize: 10,
+    opacity: 0.7,
+    fontWeight: '500',
+  },
+
+  // Loading and Error States
   loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -391,89 +696,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.7,
   },
-  categoryContainer: {
-    marginBottom: 24,
-  },
-  categoryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 8,
-  },
-  categoryTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    flex: 1,
-  },
-  categoryCount: {
-    fontSize: 12,
-    opacity: 0.6,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  trailersGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  trailerCard: {
-    width: isTablet ? (width - 32 - 24) / 3 : (width - 32 - 12) / 2,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    overflow: 'hidden',
-  },
-  thumbnailContainer: {
-    position: 'relative',
-    aspectRatio: 16 / 9,
-  },
-  thumbnail: {
-    width: '100%',
-    height: '100%',
-  },
-  playOverlay: {
+
+  // Scroll Indicator
+  scrollIndicator: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    right: 4,
+    top: '50%',
+    transform: [{ translateY: -10 }],
+    width: 24,
+    height: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 12,
   },
-  durationBadge: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  durationText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  trailerInfo: {
-    padding: 12,
-  },
-  trailerTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    lineHeight: 16,
-    marginBottom: 4,
-  },
-  trailerMeta: {
-    fontSize: 11,
-    opacity: 0.7,
-  },
+
+  // No Trailers State
   noTrailersContainer: {
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 24,
   },
   noTrailersText: {
     fontSize: 14,
