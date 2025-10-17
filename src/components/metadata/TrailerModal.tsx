@@ -14,7 +14,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { logger } from '../../utils/logger';
 import TrailerService from '../../services/trailerService';
-import TrailerPlayer from '../video/TrailerPlayer';
+import Video, { VideoRef, OnLoadData, OnProgressData } from 'react-native-video';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -62,6 +62,7 @@ const TrailerModal: React.FC<TrailerModalProps> = memo(({
   contentTitle
 }) => {
   const { currentTheme } = useTheme();
+  const videoRef = React.useRef<VideoRef>(null);
   const [trailerUrl, setTrailerUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -223,19 +224,37 @@ const TrailerModal: React.FC<TrailerModalProps> = memo(({
 
             {trailerUrl && !loading && !error && (
               <View style={styles.playerWrapper}>
-                <TrailerPlayer
-                  trailerUrl={trailerUrl}
-                  autoPlay={isPlaying}
-                  muted={false} // Allow sound in modal
+                <Video
+                  ref={videoRef}
+                  source={{ uri: trailerUrl }}
                   style={styles.player}
-                  hideLoadingSpinner={true}
-                  onLoad={() => logger.info('TrailerModal', 'Trailer loaded successfully')}
-                  onError={handleTrailerError}
-                  onEnd={handleTrailerEnd}
-                  onPlaybackStatusUpdate={(status) => {
-                    if (status.isLoaded && !isPlaying) {
-                      setIsPlaying(true);
-                    }
+                  controls={true}
+                  paused={!isPlaying}
+                  resizeMode="contain"
+                  volume={1.0}
+                  rate={1.0}
+                  playInBackground={false}
+                  playWhenInactive={false}
+                  ignoreSilentSwitch="ignore"
+                  onLoad={(data: OnLoadData) => {
+                    logger.info('TrailerModal', 'Trailer loaded successfully', data);
+                  }}
+                  onError={(error) => {
+                    logger.error('TrailerModal', 'Video error:', error);
+                    handleTrailerError();
+                  }}
+                  onEnd={() => {
+                    logger.info('TrailerModal', 'Trailer ended');
+                    handleTrailerEnd();
+                  }}
+                  onProgress={(data: OnProgressData) => {
+                    // Handle progress if needed
+                  }}
+                  onLoadStart={() => {
+                    logger.info('TrailerModal', 'Video load started');
+                  }}
+                  onReadyForDisplay={() => {
+                    logger.info('TrailerModal', 'Video ready for display');
                   }}
                 />
               </View>
