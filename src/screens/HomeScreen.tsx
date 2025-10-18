@@ -29,7 +29,7 @@ import { Stream } from '../types/metadata';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import FastImage from '@d11/react-native-fast-image';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn, Layout } from 'react-native-reanimated';
 import { PanGestureHandler } from 'react-native-gesture-handler';
 import {
   Gesture,
@@ -653,12 +653,12 @@ const HomeScreen = () => {
   const renderListItem = useCallback(({ item }: { item: HomeScreenListItem; index: number }) => {
     switch (item.type) {
       case 'thisWeek':
-        return <Animated.View>{memoizedThisWeekSection}</Animated.View>;
+        return <Animated.View layout={Layout.springify().damping(15).stiffness(150)}>{memoizedThisWeekSection}</Animated.View>;
       case 'continueWatching':
         return null; // Moved to ListHeaderComponent to avoid remounts on scroll
       case 'catalog':
         return (
-          <Animated.View>
+          <Animated.View layout={Layout.springify().damping(15).stiffness(150)}>
             <CatalogSection catalog={item.catalog} />
           </Animated.View>
         );
@@ -701,7 +701,7 @@ const HomeScreen = () => {
           </Animated.View>
         );
       case 'welcome':
-        return <Animated.View><FirstTimeWelcome /></Animated.View>;
+        return <Animated.View layout={Layout.springify().damping(15).stiffness(150)}><FirstTimeWelcome /></Animated.View>;
       default:
         return null;
     }

@@ -18,7 +18,7 @@ import { useTraktContext } from '../../contexts/TraktContext';
 import { useLibrary } from '../../hooks/useLibrary';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { parseISO, isThisWeek, format, isAfter, isBefore } from 'date-fns';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn, Layout } from 'react-native-reanimated';
 import { useCalendarData } from '../../hooks/useCalendarData';
 import { memoryManager } from '../../utils/memoryManager';
 import { tmdbService } from '../../services/tmdbService';
@@ -185,7 +185,11 @@ export const ThisWeekSection = React.memo(() => {
   };
   
   return (
-    <Animated.View style={styles.container} entering={FadeIn.duration(350)}>
+    <Animated.View 
+      style={styles.container} 
+      entering={FadeIn.duration(350)}
+      layout={Layout.springify().damping(15).stiffness(150)}
+    >
       <View style={styles.header}>
         <View style={styles.titleContainer}>
         <Text style={[styles.title, { color: currentTheme.colors.text }]}>This Week</Text>
