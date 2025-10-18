@@ -148,15 +148,29 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
 
         {/* Center Controls (Play/Pause, Skip) */}
         <View style={styles.controls}>
+          {/* Left Skip Button */}
           <TouchableOpacity onPress={() => skip(-10)} style={styles.skipButton}>
-            <Ionicons name="play-back" size={24} color="white" />
+            <View style={{ transform: [{ rotate: '-90deg' }] }}>
+              <Ionicons name="reload-outline" size={28} color="white" />
+            </View>
             <Text style={styles.skipText}>10</Text>
           </TouchableOpacity>
+
+          {/* Play/Pause Button */}
           <TouchableOpacity onPress={togglePlayback} style={styles.playButton}>
-            <Ionicons name={paused ? "play" : "pause"} size={40} color="white" />
+            <Ionicons 
+              name={paused ? "play" : "pause"} 
+              size={46} 
+              color="white" 
+              style={{ opacity: 0.9 }}
+            />
           </TouchableOpacity>
+
+          {/* Right Skip Button */}
           <TouchableOpacity onPress={() => skip(10)} style={styles.skipButton}>
-            <Ionicons name="play-forward" size={24} color="white" />
+            <View style={{ transform: [{ rotate: '90deg' }] }}>
+              <Ionicons name="reload-outline" size={28} color="white" />
+            </View>
             <Text style={styles.skipText}>10</Text>
           </TouchableOpacity>
         </View>
