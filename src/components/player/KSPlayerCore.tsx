@@ -110,7 +110,7 @@ const KSPlayerCore: React.FC = () => {
   const [selectedAudioTrack, setSelectedAudioTrack] = useState<number | null>(null);
   const [textTracks, setTextTracks] = useState<TextTrack[]>([]);
   const [selectedTextTrack, setSelectedTextTrack] = useState<number>(-1);
-  const [resizeMode, setResizeMode] = useState<ResizeModeType>('stretch');
+  const [resizeMode, setResizeMode] = useState<ResizeModeType>('contain');
   const [buffered, setBuffered] = useState(0);
   const [seekPosition, setSeekPosition] = useState<number | null>(null);
   const ksPlayerRef = useRef<KSPlayerRef>(null);

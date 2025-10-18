@@ -4,8 +4,6 @@ import { Platform } from 'react-native';
 import { logger } from '../utils/logger';
 import { Stream } from '../types/streams';
 import { cacheService } from './cacheService';
-import { localScraperCacheService } from './localScraperCacheService';
-import { hybridCacheService } from './hybridCacheService';
 import CryptoJS from 'crypto-js';
 
 // Types for local scrapers
@@ -862,86 +860,44 @@ class LocalScraperService {
     }
   }
 
-  // Execute scrapers for streams with caching
+  // Execute scrapers for streams
   async getStreams(type: string, tmdbId: string, season?: number, episode?: number, callback?: ScraperCallback): Promise<void> {
     await this.ensureInitialized();
-    
+
     // Get available scrapers from manifest (respects manifestEnabled)
     const availableScrapers = await this.getAvailableScrapers();
     const enabledScrapers = availableScrapers
-      .filter(scraper => 
-        scraper.enabled && 
-        scraper.manifestEnabled !== false && 
+      .filter(scraper =>
+        scraper.enabled &&
+        scraper.manifestEnabled !== false &&
         scraper.supportedTypes.includes(type as 'movie' | 'tv')
       );
-    
+
     if (enabledScrapers.length === 0) {
       logger.log('[LocalScraperService] No enabled scrapers found for type:', type);
       return;
     }
 
-    // Get current user settings for enabled scrapers
-    const userSettings = await this.getUserScraperSettings();
-
-    // Check cache for existing results (hybrid: global first, then local)
-    const { validResults, expiredScrapers, allExpired, source } = await hybridCacheService.getCachedResults(type, tmdbId, season, episode, userSettings);
-    
-    // Immediately return cached results for valid scrapers
-    if (validResults.length > 0) {
-      logger.log(`[LocalScraperService] Returning ${validResults.length} cached results for ${type}:${tmdbId} (source: ${source})`);
-      
-      for (const cachedResult of validResults) {
-        if (cachedResult.success && cachedResult.streams.length > 0) {
-          // Streams are already in the correct format, just pass them through
-          if (callback) {
-            callback(cachedResult.streams, cachedResult.scraperId, cachedResult.scraperName, null);
-          }
-        } else if (callback) {
-          // Return error for failed cached results
-          const error = cachedResult.error ? new Error(cachedResult.error) : new Error('Scraper failed');
-          callback(null, cachedResult.scraperId, cachedResult.scraperName, error);
-        }
-      }
-    }
-
-    // Determine which scrapers need to be re-run
-    const scrapersToRerun = enabledScrapers.filter(scraper => {
-      const hasValidResult = validResults.some(r => r.scraperId === scraper.id);
-      const isExpired = expiredScrapers.includes(scraper.id);
-      const hasFailedResult = validResults.some(r => r.scraperId === scraper.id && (!r.success || r.streams.length === 0));
-      
-      return !hasValidResult || isExpired || hasFailedResult;
-    });
-
-    if (scrapersToRerun.length === 0) {
-      logger.log('[LocalScraperService] All scrapers have valid cached results');
-      return;
-    }
-
-    logger.log(`[LocalScraperService] Re-running ${scrapersToRerun.length} scrapers for ${type}:${tmdbId}`, {
-      totalEnabled: enabledScrapers.length,
-      expired: expiredScrapers.length,
-      failed: validResults.filter(r => !r.success || r.streams.length === 0).length,
-      notCached: enabledScrapers.length - validResults.length,
-      scrapersToRerun: scrapersToRerun.map(s => s.name)
+    logger.log(`[LocalScraperService] Executing ${enabledScrapers.length} scrapers for ${type}:${tmdbId}`, {
+      scrapers: enabledScrapers.map(s => s.name)
     });
 
     // Generate a lightweight request id for tracing
     const requestId = `rs_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
 
-    // Execute only scrapers that need to be re-run
-    for (const scraper of scrapersToRerun) {
-      this.executeScraperWithCaching(scraper, type, tmdbId, season, episode, callback, requestId);
+    // Execute all enabled scrapers
+    for (const scraper of enabledScrapers) {
+      this.executeScraper(scraper, type, tmdbId, season, episode, callback, requestId);
     }
   }
 
-  // Execute individual scraper with caching
-  private async executeScraperWithCaching(
-    scraper: ScraperInfo, 
-    type: string, 
-    tmdbId: string, 
-    season?: number, 
-    episode?: number, 
+  // Execute individual scraper
+  private async executeScraper(
+    scraper: ScraperInfo,
+    type: string,
+    tmdbId: string,
+    season?: number,
+    episode?: number,
     callback?: ScraperCallback,
     requestId?: string
   ): Promise<void> {
@@ -950,10 +906,10 @@ class LocalScraperService {
       if (!code) {
         throw new Error(`No code found for scraper ${scraper.id}`);
       }
-      
+
       // Load per-scraper settings
       const scraperSettings = await this.getScraperSettings(scraper.id);
-      
+
       // Build single-flight key
       const flightKey = `${scraper.id}|${type}|${tmdbId}|${season ?? ''}|${episode ?? ''}`;
 
@@ -980,60 +936,23 @@ class LocalScraperService {
       }
 
       const results = await promise;
-      
+
       // Convert results to Nuvio Stream format
       const streams = this.convertToStreams(results, scraper);
-      
-      // Cache the successful result (hybrid: both local and global)
-      await hybridCacheService.cacheScraperResult(
-        type,
-        tmdbId,
-        scraper.id,
-        scraper.name,
-        streams,
-        null,
-        season,
-        episode
-      );
-      
+
       if (callback) {
         callback(streams, scraper.id, scraper.name, null);
       }
-      
+
     } catch (error) {
       logger.error('[LocalScraperService] Scraper', scraper.name, 'failed:', error);
-      
-      // Cache the failed result (hybrid: both local and global)
-      await hybridCacheService.cacheScraperResult(
-        type,
-        tmdbId,
-        scraper.id,
-        scraper.name,
-        null,
-        error as Error,
-        season,
-        episode
-      );
-      
+
       if (callback) {
         callback(null, scraper.id, scraper.name, error as Error);
       }
     }
   }
 
-  // Execute individual scraper (legacy method - kept for compatibility)
-  private async executeScraper(
-    scraper: ScraperInfo, 
-    type: string, 
-    tmdbId: string, 
-    season?: number, 
-    episode?: number, 
-    callback?: ScraperCallback,
-    requestId?: string
-  ): Promise<void> {
-    // Delegate to the caching version
-    return this.executeScraperWithCaching(scraper, type, tmdbId, season, episode, callback, requestId);
-  }
 
   // Execute scraper code in sandboxed environment
   private async executeSandboxed(code: string, params: any): Promise<LocalScraperResult[]> {
@@ -1161,7 +1080,7 @@ class LocalScraperService {
                 ...options.headers
               },
               data: options.body,
-              timeout: 60000,
+              timeout: 120000, // Increased to 2 minutes for complex scrapers
               validateStatus: () => true // Don't throw on HTTP error status codes
             };
             
@@ -1201,7 +1120,7 @@ class LocalScraperService {
         },
         // Add axios for HTTP requests
         axios: axios.create({
-          timeout: 30000,
+          timeout: 120000, // Increased to 2 minutes for complex scrapers
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
           }
@@ -1217,27 +1136,29 @@ class LocalScraperService {
         SCRAPER_ID: params?.scraperId
       };
       
-      // Execute the scraper code without timeout
+      // Execute the scraper code with 1 minute timeout
+      const SCRAPER_EXECUTION_TIMEOUT_MS = 60000; // 1 minute
+
       const executionPromise = new Promise<LocalScraperResult[]>((resolve, reject) => {
         try {
           // Create function from code
           const func = new Function('sandbox', 'params', 'PRIMARY_KEY', 'TMDB_API_KEY', `
             const { console, setTimeout, clearTimeout, Promise, JSON, Date, Math, parseInt, parseFloat, encodeURIComponent, decodeURIComponent, require, axios, fetch, module, exports, global, URL_VALIDATION_ENABLED, SCRAPER_SETTINGS, SCRAPER_ID } = sandbox;
-            
+
             // Inject MovieBox constants into global scope
             global.PRIMARY_KEY = PRIMARY_KEY;
             global.TMDB_API_KEY = TMDB_API_KEY;
             window.PRIMARY_KEY = PRIMARY_KEY;
             window.TMDB_API_KEY = TMDB_API_KEY;
-            
+
             // Expose per-scraper context to plugin globals
             global.SCRAPER_SETTINGS = SCRAPER_SETTINGS;
             global.SCRAPER_ID = SCRAPER_ID;
             window.SCRAPER_SETTINGS = SCRAPER_SETTINGS;
             window.SCRAPER_ID = SCRAPER_ID;
-            
+
             ${code}
-            
+
             // Call the main function (assuming it's exported)
             if (typeof getStreams === 'function') {
               return getStreams(params.tmdbId, params.mediaType, params.season, params.episode);
@@ -1249,9 +1170,9 @@ class LocalScraperService {
               throw new Error('No getStreams function found in scraper');
             }
           `);
-          
+
           const result = func(sandbox, params, MOVIEBOX_PRIMARY_KEY, MOVIEBOX_TMDB_API_KEY);
-          
+
           // Handle both sync and async results
           if (result && typeof result.then === 'function') {
             result.then(resolve).catch(reject);
@@ -1262,8 +1183,14 @@ class LocalScraperService {
           reject(error);
         }
       });
-      
-      return await executionPromise;
+
+      // Apply 1-minute timeout to prevent hanging scrapers
+      return await Promise.race([
+        executionPromise,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`Scraper execution timed out after ${SCRAPER_EXECUTION_TIMEOUT_MS}ms`)), SCRAPER_EXECUTION_TIMEOUT_MS)
+        )
+      ]);
       
     } catch (error) {
       logger.error('[LocalScraperService] Sandbox execution failed:', error);
@@ -1365,6 +1292,19 @@ class LocalScraperService {
   // Check if local scrapers are available
   async hasScrapers(): Promise<boolean> {
     await this.ensureInitialized();
+    
+    // Get user settings to check if local scrapers are enabled
+    const userSettings = await this.getUserScraperSettings();
+    if (!userSettings.enableLocalScrapers) {
+      return false;
+    }
+    
+    // Check if there are any enabled scrapers based on user settings
+    if (userSettings.enabledScrapers && userSettings.enabledScrapers.size > 0) {
+      return true;
+    }
+    
+    // Fallback: check if any scrapers are enabled in the internal state
     return Array.from(this.installedScrapers.values()).some(scraper => scraper.enabled);
   }
 
@@ -1384,8 +1324,11 @@ class LocalScraperService {
         };
       }
 
-      // Get user settings from AsyncStorage
-      const settingsData = await AsyncStorage.getItem('app_settings');
+      // Get user settings from AsyncStorage (scoped with fallback)
+      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      const scopedSettingsJson = await AsyncStorage.getItem(`@user:${scope}:app_settings`);
+      const legacySettingsJson = await AsyncStorage.getItem('app_settings');
+      const settingsData = scopedSettingsJson || legacySettingsJson;
       const settings = settingsData ? JSON.parse(settingsData) : {};
 
       // Get enabled scrapers based on current user settings
@@ -1408,32 +1351,6 @@ class LocalScraperService {
     }
   }
 
-  // Cache management methods (hybrid: local + global)
-  async clearScraperCache(): Promise<void> {
-    await hybridCacheService.clearAllCache();
-    logger.log('[LocalScraperService] Cleared all scraper cache (local + global)');
-  }
-
-  async invalidateScraperCache(scraperId: string): Promise<void> {
-    await hybridCacheService.invalidateScraper(scraperId);
-    logger.log('[LocalScraperService] Invalidated cache for scraper:', scraperId);
-  }
-
-  async invalidateContentCache(type: string, tmdbId: string, season?: number, episode?: number): Promise<void> {
-    await hybridCacheService.invalidateContent(type, tmdbId, season, episode);
-    logger.log('[LocalScraperService] Invalidated cache for content:', `${type}:${tmdbId}`);
-  }
-
-  async getCacheStats(): Promise<{
-    local: {
-      totalEntries: number;
-      totalSize: number;
-      oldestEntry: number | null;
-      newestEntry: number | null;
-    };
-  }> {
-    return await hybridCacheService.getCacheStats();
-  }
 }
 
 export const localScraperService = LocalScraperService.getInstance();

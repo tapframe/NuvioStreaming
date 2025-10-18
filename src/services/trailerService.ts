@@ -7,10 +7,16 @@ export interface TrailerData {
 }
 
 export class TrailerService {
-  private static readonly XPRIME_URL = 'https://db.xprime.tv/trailers';
-  private static readonly LOCAL_SERVER_URL = 'http://192.168.1.11:3001/trailer';
-  private static readonly AUTO_SEARCH_URL = 'http://192.168.1.11:3001/search-trailer';
-  private static readonly TIMEOUT = 10000; // 10 seconds
+  // Environment-configurable values (Expo public env)
+  private static readonly ENV_LOCAL_BASE = process.env.EXPO_PUBLIC_TRAILER_LOCAL_BASE || 'http://46.62.173.157:3001';
+  private static readonly ENV_LOCAL_TRAILER_PATH = process.env.EXPO_PUBLIC_TRAILER_LOCAL_TRAILER_PATH || '/trailer';
+  private static readonly ENV_LOCAL_SEARCH_PATH = process.env.EXPO_PUBLIC_TRAILER_LOCAL_SEARCH_PATH || '/search-trailer';
+  private static readonly ENV_XPRIME_URL = process.env.EXPO_PUBLIC_XPRIME_URL || 'https://db.xprime.tv/trailers';
+
+  private static readonly XPRIME_URL = TrailerService.ENV_XPRIME_URL;
+  private static readonly LOCAL_SERVER_URL = `${TrailerService.ENV_LOCAL_BASE}${TrailerService.ENV_LOCAL_TRAILER_PATH}`;
+  private static readonly AUTO_SEARCH_URL = `${TrailerService.ENV_LOCAL_BASE}${TrailerService.ENV_LOCAL_SEARCH_PATH}`;
+  private static readonly TIMEOUT = 20000; // 20 seconds
   private static readonly USE_LOCAL_SERVER = true; // Toggle between local and XPrime
 
   /**
@@ -22,10 +28,12 @@ export class TrailerService {
    * @returns Promise<string | null> - The trailer URL or null if not found
    */
   static async getTrailerUrl(title: string, year: number, tmdbId?: string, type?: 'movie' | 'tv'): Promise<string | null> {
+    logger.info('TrailerService', `getTrailerUrl requested: title="${title}", year=${year}, tmdbId=${tmdbId || 'n/a'}, type=${type || 'n/a'}, useLocal=${this.USE_LOCAL_SERVER}`);
     if (this.USE_LOCAL_SERVER) {
       // Try local server first, fallback to XPrime if it fails
       const localResult = await this.getTrailerFromLocalServer(title, year, tmdbId, type);
       if (localResult) {
+        logger.info('TrailerService', 'Returning trailer URL from local server');
         return localResult;
       }
       
@@ -46,6 +54,7 @@ export class TrailerService {
    */
   private static async getTrailerFromLocalServer(title: string, year: number, tmdbId?: string, type?: 'movie' | 'tv'): Promise<string | null> {
     try {
+      const startTime = Date.now();
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.TIMEOUT);
 
@@ -65,6 +74,8 @@ export class TrailerService {
       }
 
       const url = `${this.AUTO_SEARCH_URL}?${params.toString()}`;
+      logger.info('TrailerService', `Local server request URL: ${url}`);
+      logger.info('TrailerService', `Local server timeout set to ${this.TIMEOUT}ms`);
       
       const response = await fetch(url, {
         method: 'GET',
@@ -77,25 +88,55 @@ export class TrailerService {
 
       clearTimeout(timeoutId);
 
+      const elapsed = Date.now() - startTime;
+      const contentType = response.headers.get('content-type') || 'unknown';
+      logger.info('TrailerService', `Local server response: status=${response.status} ok=${response.ok} content-type=${contentType} elapsedMs=${elapsed}`);
+
+      // Read body as text first so we can log it even on non-200s
+      let rawText = '';
+      try {
+        rawText = await response.text();
+        if (rawText) {
+          const preview = rawText.length > 200 ? `${rawText.slice(0, 200)}...` : rawText;
+          logger.info('TrailerService', `Local server body preview: ${preview}`);
+        } else {
+          logger.info('TrailerService', 'Local server body is empty');
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+        logger.warn('TrailerService', `Failed reading local server body text: ${msg}`);
+      }
+
       if (!response.ok) {
         logger.warn('TrailerService', `Auto-search failed: ${response.status} ${response.statusText}`);
         return null;
       }
 
-      const data = await response.json();
+      // Attempt to parse JSON from the raw text
+      let data: any = null;
+      try {
+        data = rawText ? JSON.parse(rawText) : null;
+        const keys = typeof data === 'object' && data !== null ? Object.keys(data).join(',') : typeof data;
+        logger.info('TrailerService', `Local server JSON parsed. Keys/Type: ${keys}`);
+      } catch (e) {
+        const msg = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+        logger.warn('TrailerService', `Failed to parse local server JSON: ${msg}`);
+        return null;
+      }
       
       if (!data.url || !this.isValidTrailerUrl(data.url)) {
         logger.warn('TrailerService', `Invalid trailer URL from auto-search: ${data.url}`);
         return null;
       }
 
-      logger.info('TrailerService', `Successfully found trailer: ${data.url.substring(0, 50)}...`);
+      logger.info('TrailerService', `Successfully found trailer: ${String(data.url).substring(0, 80)}...`);
       return data.url;
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        logger.warn('TrailerService', 'Auto-search request timed out');
+        logger.warn('TrailerService', `Auto-search request timed out after ${this.TIMEOUT}ms`);
       } else {
-        logger.error('TrailerService', 'Error in auto-search:', error);
+        const msg = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+        logger.error('TrailerService', `Error in auto-search: ${msg}`);
       }
       return null; // Return null to trigger XPrime fallback
     }
@@ -115,6 +156,8 @@ export class TrailerService {
       const url = `${this.XPRIME_URL}?title=${encodeURIComponent(title)}&year=${year}`;
       
       logger.info('TrailerService', `Fetching trailer from XPrime for: ${title} (${year})`);
+      logger.info('TrailerService', `XPrime request URL: ${url}`);
+      logger.info('TrailerService', `XPrime timeout set to ${this.TIMEOUT}ms`);
       
       const response = await fetch(url, {
         method: 'GET',
@@ -127,12 +170,14 @@ export class TrailerService {
 
       clearTimeout(timeoutId);
 
+      logger.info('TrailerService', `XPrime response: status=${response.status} ok=${response.ok}`);
       if (!response.ok) {
         logger.warn('TrailerService', `XPrime failed: ${response.status} ${response.statusText}`);
         return null;
       }
 
       const trailerUrl = await response.text();
+      logger.info('TrailerService', `XPrime raw URL length: ${trailerUrl ? trailerUrl.length : 0}`);
       
       if (!trailerUrl || !this.isValidTrailerUrl(trailerUrl.trim())) {
         logger.warn('TrailerService', `Invalid trailer URL from XPrime: ${trailerUrl}`);
@@ -145,9 +190,10 @@ export class TrailerService {
       return cleanUrl;
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        logger.warn('TrailerService', 'XPrime request timed out');
+        logger.warn('TrailerService', `XPrime request timed out after ${this.TIMEOUT}ms`);
       } else {
-        logger.error('TrailerService', 'Error fetching from XPrime:', error);
+        const msg = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+        logger.error('TrailerService', `Error fetching from XPrime: ${msg}`);
       }
       return null;
     }
@@ -218,16 +264,21 @@ export class TrailerService {
       if (url.includes('M3U')) {
         // Try to get M3U without encryption first, then with encryption
         const baseUrl = url.split('?')[0];
-        return `${baseUrl}?formats=M3U+none,M3U+appleHlsEncryption`;
+        const best = `${baseUrl}?formats=M3U+none,M3U+appleHlsEncryption`;
+        logger.info('TrailerService', `Optimized format URL from M3U: ${best.substring(0, 80)}...`);
+        return best;
       }
       // Fallback to MP4 if available
       if (url.includes('MPEG4')) {
         const baseUrl = url.split('?')[0];
-        return `${baseUrl}?formats=MPEG4`;
+        const best = `${baseUrl}?formats=MPEG4`;
+        logger.info('TrailerService', `Optimized format URL from MPEG4: ${best.substring(0, 80)}...`);
+        return best;
       }
     }
     
     // Return the original URL if no format optimization is needed
+    logger.info('TrailerService', 'No format optimization applied');
     return url;
   }
 
@@ -238,7 +289,9 @@ export class TrailerService {
    * @returns Promise<boolean> - True if trailer is available
    */
   static async isTrailerAvailable(title: string, year: number): Promise<boolean> {
+    logger.info('TrailerService', `Checking trailer availability for: ${title} (${year})`);
     const trailerUrl = await this.getTrailerUrl(title, year);
+    logger.info('TrailerService', `Trailer availability for ${title} (${year}): ${trailerUrl ? 'available' : 'not available'}`);
     return trailerUrl !== null;
   }
 
@@ -249,9 +302,11 @@ export class TrailerService {
    * @returns Promise<TrailerData | null> - Trailer data or null if not found
    */
   static async getTrailerData(title: string, year: number): Promise<TrailerData | null> {
+    logger.info('TrailerService', `getTrailerData for: ${title} (${year})`);
     const url = await this.getTrailerUrl(title, year);
     
     if (!url) {
+      logger.info('TrailerService', 'No trailer URL found for getTrailerData');
       return null;
     }
 
@@ -260,6 +315,65 @@ export class TrailerService {
       title,
       year
     };
+  }
+
+  /**
+   * Fetches trailer directly from a known YouTube URL
+   * @param youtubeUrl - The YouTube URL to process
+   * @param title - Optional title for logging/caching
+   * @param year - Optional year for logging/caching
+   * @returns Promise<string | null> - The direct streaming URL or null if failed
+   */
+  static async getTrailerFromYouTubeUrl(youtubeUrl: string, title?: string, year?: string): Promise<string | null> {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.TIMEOUT);
+
+      const params = new URLSearchParams();
+      params.append('youtube_url', youtubeUrl);
+      if (title) params.append('title', title);
+      if (year) params.append('year', year.toString());
+
+      const url = `${this.ENV_LOCAL_BASE}${this.ENV_LOCAL_TRAILER_PATH}?${params.toString()}`;
+      logger.info('TrailerService', `Fetching trailer directly from YouTube URL: ${youtubeUrl}`);
+      logger.info('TrailerService', `Direct trailer request URL: ${url}`);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Nuvio/1.0',
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      logger.info('TrailerService', `Direct trailer response: status=${response.status} ok=${response.ok}`);
+
+      if (!response.ok) {
+        logger.warn('TrailerService', `Direct trailer failed: ${response.status} ${response.statusText}`);
+        return null;
+      }
+
+      const data = await response.json();
+
+      if (!data.url || !this.isValidTrailerUrl(data.url)) {
+        logger.warn('TrailerService', `Invalid trailer URL from direct fetch: ${data.url}`);
+        return null;
+      }
+
+      logger.info('TrailerService', `Successfully got direct trailer: ${String(data.url).substring(0, 80)}...`);
+      return data.url;
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        logger.warn('TrailerService', `Direct trailer request timed out after ${this.TIMEOUT}ms`);
+      } else {
+        const msg = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+        logger.error('TrailerService', `Error in direct trailer fetch: ${msg}`);
+      }
+      return null;
+    }
   }
 
   /**
@@ -292,6 +406,7 @@ export class TrailerService {
     localServer: { status: 'online' | 'offline'; responseTime?: number };
     xprimeServer: { status: 'online' | 'offline'; responseTime?: number };
   }> {
+    logger.info('TrailerService', 'Testing servers (local and XPrime)');
     const results: {
       localServer: { status: 'online' | 'offline'; responseTime?: number };
       xprimeServer: { status: 'online' | 'offline'; responseTime?: number };
@@ -312,9 +427,11 @@ export class TrailerService {
           status: 'online', 
           responseTime: Date.now() - startTime 
         };
+        logger.info('TrailerService', `Local server online. Response time: ${results.localServer.responseTime}ms`);
       }
     } catch (error) {
-      logger.warn('TrailerService', 'Local server test failed:', error);
+      const msg = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+      logger.warn('TrailerService', `Local server test failed: ${msg}`);
     }
 
     // Test XPrime server
@@ -329,11 +446,14 @@ export class TrailerService {
           status: 'online', 
           responseTime: Date.now() - startTime 
         };
+        logger.info('TrailerService', `XPrime server online. Response time: ${results.xprimeServer.responseTime}ms`);
       }
     } catch (error) {
-      logger.warn('TrailerService', 'XPrime server test failed:', error);
+      const msg = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+      logger.warn('TrailerService', `XPrime server test failed: ${msg}`);
     }
 
+    logger.info('TrailerService', `Server test results -> local: ${results.localServer.status}, xprime: ${results.xprimeServer.status}`);
     return results;
   }
 }

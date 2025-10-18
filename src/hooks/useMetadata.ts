@@ -107,28 +107,6 @@ interface UseMetadataReturn {
   imdbId: string | null;
   scraperStatuses: ScraperStatus[];
   activeFetchingScrapers: string[];
-  clearScraperCache: () => Promise<void>;
-  invalidateScraperCache: (scraperId: string) => Promise<void>;
-  invalidateContentCache: (type: string, tmdbId: string, season?: number, episode?: number) => Promise<void>;
-  getScraperCacheStats: () => Promise<{
-    local: {
-      totalEntries: number;
-      totalSize: number;
-      oldestEntry: number | null;
-      newestEntry: number | null;
-    };
-    global: {
-      totalEntries: number;
-      totalSize: number;
-      oldestEntry: number | null;
-      newestEntry: number | null;
-      hitRate: number;
-    };
-    combined: {
-      totalEntries: number;
-      hitRate: number;
-    };
-  }>;
 }
 
 export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadataReturn => {
@@ -287,9 +265,9 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
               // Optimize streams before storing
               const optimizedStreams = optimizeStreams(streams);
               streamCountRef.current += optimizedStreams.length;
-              
+
               if (__DEV__) logger.log(`📊 [${logPrefix}:${sourceName}] Optimized ${streams.length} → ${optimizedStreams.length} streams, total: ${streamCountRef.current}`);
-              
+
               // Use debounced update to prevent rapid state changes
               debouncedStreamUpdate(() => {
                 const updateState = (prevState: GroupedStreams): GroupedStreams => {
@@ -302,7 +280,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
                     }
                   };
                 };
-                
+
                 // Track response order for addons
                 setAddonResponseOrder(prevOrder => {
                   if (!prevOrder.includes(addonId)) {
@@ -310,7 +288,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
                   }
                   return prevOrder;
                 });
-                
+
                 if (isEpisode) {
                   setEpisodeStreams(updateState);
                   setLoadingEpisodeStreams(false);
@@ -320,7 +298,38 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
                 }
               });
             } else {
-               if (__DEV__) logger.log(`🤷 [${logPrefix}:${sourceName}] No streams found for addon ${addonName} (${addonId})`);
+              // Even providers with no streams should be added to the streams object
+              // This ensures streamsEmpty becomes false and UI shows available streams progressively
+              if (__DEV__) logger.log(`🤷 [${logPrefix}:${sourceName}] No streams found for addon ${addonName} (${addonId})`);
+
+              debouncedStreamUpdate(() => {
+                const updateState = (prevState: GroupedStreams): GroupedStreams => {
+                  if (__DEV__) logger.log(`🔄 [${logPrefix}:${sourceName}] Adding empty provider ${addonName} (${addonId}) to state`);
+                  return {
+                    ...prevState,
+                    [addonId]: {
+                      addonName: addonName,
+                      streams: [] // Empty array for providers with no streams
+                    }
+                  };
+                };
+
+                // Track response order for addons
+                setAddonResponseOrder(prevOrder => {
+                  if (!prevOrder.includes(addonId)) {
+                    return [...prevOrder, addonId];
+                  }
+                  return prevOrder;
+                });
+
+                if (isEpisode) {
+                  setEpisodeStreams(updateState);
+                  setLoadingEpisodeStreams(false);
+                } else {
+                  setGroupedStreams(updateState);
+                  setLoadingStreams(false);
+                }
+              });
             }
           } else {
             // Handle case where callback provides null streams without error (e.g., empty results)
@@ -1974,36 +1983,6 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     };
   }, [cleanupStreams]);
 
-  // Cache management methods
-  const clearScraperCache = useCallback(async () => {
-    await localScraperService.clearScraperCache();
-  }, []);
-
-  const invalidateScraperCache = useCallback(async (scraperId: string) => {
-    await localScraperService.invalidateScraperCache(scraperId);
-  }, []);
-
-  const invalidateContentCache = useCallback(async (type: string, tmdbId: string, season?: number, episode?: number) => {
-    await localScraperService.invalidateContentCache(type, tmdbId, season, episode);
-  }, []);
-
-  const getScraperCacheStats = useCallback(async () => {
-    const localStats = await localScraperService.getCacheStats();
-    return {
-      local: localStats.local,
-      global: {
-        totalEntries: 0,
-        totalSize: 0,
-        oldestEntry: null,
-        newestEntry: null,
-        hitRate: 0
-      },
-      combined: {
-        totalEntries: localStats.local.totalEntries,
-        hitRate: 0
-      }
-    };
-  }, []);
 
   return {
     metadata,
@@ -2038,9 +2017,5 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     imdbId,
     scraperStatuses,
     activeFetchingScrapers,
-    clearScraperCache,
-    invalidateScraperCache,
-    invalidateContentCache,
-    getScraperCacheStats,
   };
 };

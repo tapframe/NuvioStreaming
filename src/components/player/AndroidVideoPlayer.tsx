@@ -86,7 +86,7 @@ const AndroidVideoPlayer: React.FC = () => {
   }, [route.params]);
   // TEMP: force React Native Video for testing (disable VLC)
   const TEMP_FORCE_RNV = false;
-  const TEMP_FORCE_VLC = true;
+  const TEMP_FORCE_VLC = false;
   const useVLC = Platform.OS === 'android' && !TEMP_FORCE_RNV && (TEMP_FORCE_VLC || forceVlc);
 
   // Log player selection
@@ -1614,7 +1614,7 @@ const AndroidVideoPlayer: React.FC = () => {
       resizeModes = ['contain', 'cover'];
     } else {
       // On Android with VLC backend, only 'none' (original) and 'cover' (client-side crop)
-      resizeModes = useVLC ? ['none', 'cover'] : ['contain', 'cover', 'none'];
+      resizeModes = useVLC ? ['none', 'cover'] : ['cover', 'none'];
     }
 
     const currentIndex = resizeModes.indexOf(resizeMode);

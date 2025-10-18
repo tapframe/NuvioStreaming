@@ -409,17 +409,7 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
           </View>
         </View>
         
-        <TouchableOpacity
-          style={styles.streamAction}
-          onPress={() => onPress()}
-          activeOpacity={0.7}
-        >
-          <MaterialIcons
-            name="play-arrow"
-            size={22}
-            color={theme.colors.white}
-          />
-        </TouchableOpacity>
+        
         {settings?.enableDownloads !== false && (
           <TouchableOpacity
             style={[styles.streamAction, { marginLeft: 8, backgroundColor: theme.colors.elevation2 }]}

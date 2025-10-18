@@ -20,6 +20,7 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useTrailer } from '../../contexts/TrailerContext';
 import { logger } from '../../utils/logger';
 
 const { width, height } = Dimensions.get('window');
@@ -57,6 +58,7 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
   hideControls = false,
 }, ref) => {
   const { currentTheme } = useTheme();
+  const { isTrailerPlaying: globalTrailerPlaying } = useTrailer();
   const videoRef = useRef<VideoRef>(null);
   
   const [isLoading, setIsLoading] = useState(true);
@@ -145,6 +147,22 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
       setIsPlaying(autoPlay);
     }
   }, [autoPlay, isComponentMounted]);
+
+  // Respond to global trailer state changes (e.g., when modal opens)
+  useEffect(() => {
+    if (isComponentMounted) {
+      // If global trailer is paused, pause this trailer too
+      if (!globalTrailerPlaying && isPlaying) {
+        logger.info('TrailerPlayer', 'Global trailer paused - pausing this trailer');
+        setIsPlaying(false);
+      }
+      // If global trailer is resumed and autoPlay is enabled, resume this trailer
+      else if (globalTrailerPlaying && !isPlaying && autoPlay) {
+        logger.info('TrailerPlayer', 'Global trailer resumed - resuming this trailer');
+        setIsPlaying(true);
+      }
+    }
+  }, [globalTrailerPlaying, isPlaying, autoPlay, isComponentMounted]);
 
   const showControlsWithTimeout = useCallback(() => {
     if (!isComponentMounted) return;

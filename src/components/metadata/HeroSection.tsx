@@ -83,6 +83,7 @@ interface HeroSectionProps {
     traktSynced?: boolean;
     traktProgress?: number;
   } | null;
+  onStableLogoUriChange?: (logoUri: string | null) => void;
   type: 'movie' | 'series';
   getEpisodeDetails: (episodeId: string) => { seasonNumber: string; episodeNumber: string; episodeName: string } | null;
   handleShowStreams: () => void;
@@ -777,6 +778,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   buttonsTranslateY,
   watchProgressOpacity,
   watchProgress,
+  onStableLogoUriChange,
   type,
   getEpisodeDetails,
   handleShowStreams,
@@ -832,13 +834,22 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   const titleCardTranslateY = useSharedValue(0);
   const genreOpacity = useSharedValue(1);
   
-  // Performance optimization: Cache theme colors
+  // Ultra-optimized theme colors with stable references
   const themeColors = useMemo(() => ({
     black: currentTheme.colors.black,
     darkBackground: currentTheme.colors.darkBackground,
     highEmphasis: currentTheme.colors.highEmphasis,
     text: currentTheme.colors.text
   }), [currentTheme.colors.black, currentTheme.colors.darkBackground, currentTheme.colors.highEmphasis, currentTheme.colors.text]);
+
+  // Pre-calculated style objects for better performance
+  const staticStyles = useMemo(() => ({
+    heroWrapper: styles.heroWrapper,
+    heroSection: styles.heroSection,
+    absoluteFill: styles.absoluteFill,
+    thumbnailContainer: styles.thumbnailContainer,
+    thumbnailImage: styles.thumbnailImage,
+  }), []);
 
   // Handle trailer preload completion
   const handleTrailerPreloaded = useCallback(() => {
@@ -957,12 +968,14 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
 
     if (metadata?.logo && metadata.logo !== stableLogoUri) {
       setStableLogoUri(metadata.logo);
+      onStableLogoUriChange?.(metadata.logo);
       setLogoHasLoadedSuccessfully(false); // Reset for new logo
       logoLoadOpacity.value = 0; // reset fade for new logo
       setShouldShowTextFallback(false);
     } else if (!metadata?.logo && stableLogoUri) {
       // Clear logo if metadata no longer has one
       setStableLogoUri(null);
+      onStableLogoUriChange?.(null);
       setLogoHasLoadedSuccessfully(false);
       // Start a short grace period before showing text fallback
       setShouldShowTextFallback(false);
@@ -1153,15 +1166,31 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     opacity: watchProgressOpacity.value,
   }), []);
 
-  // Enhanced backdrop with smooth loading animation
+  // Ultra-optimized backdrop with cached calculations and minimal worklet overhead
   const backdropImageStyle = useAnimatedStyle(() => {
     'worklet';
-    const scale = 1 + (scrollY.value * 0.0001); // Micro scale effect
+    const scrollYValue = scrollY.value;
+    
+    // Pre-calculated constants for better performance
+    const DEFAULT_ZOOM = 1.1;
+    const SCROLL_UP_MULTIPLIER = 0.002;
+    const SCROLL_DOWN_MULTIPLIER = 0.0001;
+    const MAX_SCALE = 1.4;
+    const PARALLAX_FACTOR = 0.3;
+    
+    // Optimized scale calculation with minimal branching
+    const scrollUpScale = DEFAULT_ZOOM + Math.abs(scrollYValue) * SCROLL_UP_MULTIPLIER;
+    const scrollDownScale = DEFAULT_ZOOM + scrollYValue * SCROLL_DOWN_MULTIPLIER;
+    const scale = Math.min(scrollYValue < 0 ? scrollUpScale : scrollDownScale, MAX_SCALE);
+    
+    // Single parallax calculation
+    const parallaxOffset = scrollYValue * PARALLAX_FACTOR;
     
     return {
       opacity: imageOpacity.value * imageLoadOpacity.value,
       transform: [
-        { scale: Math.min(scale, SCALE_FACTOR) }    // Cap scale
+        { scale },
+        { translateY: parallaxOffset }
       ],
     };
   }, []);
@@ -1188,6 +1217,34 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   const genreAnimatedStyle = useAnimatedStyle(() => ({
     opacity: genreOpacity.value
   }), []);
+
+  // Ultra-optimized trailer parallax with cached calculations
+  const trailerParallaxStyle = useAnimatedStyle(() => {
+    'worklet';
+    const scrollYValue = scrollY.value;
+    
+    // Pre-calculated constants for better performance
+    const DEFAULT_ZOOM = 1.0;
+    const SCROLL_UP_MULTIPLIER = 0.0015;
+    const SCROLL_DOWN_MULTIPLIER = 0.0001;
+    const MAX_SCALE = 1.25;
+    const PARALLAX_FACTOR = 0.2;
+    
+    // Optimized scale calculation with minimal branching
+    const scrollUpScale = DEFAULT_ZOOM + Math.abs(scrollYValue) * SCROLL_UP_MULTIPLIER;
+    const scrollDownScale = DEFAULT_ZOOM + scrollYValue * SCROLL_DOWN_MULTIPLIER;
+    const scale = Math.min(scrollYValue < 0 ? scrollUpScale : scrollDownScale, MAX_SCALE);
+    
+    // Single parallax calculation
+    const parallaxOffset = scrollYValue * PARALLAX_FACTOR;
+    
+    return {
+      transform: [
+        { scale },
+        { translateY: parallaxOffset }
+      ],
+    };
+  }, []);
 
   // Optimized genre rendering with lazy loading and memory management
   const genreElements = useMemo(() => {
@@ -1336,27 +1393,31 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     }
   }, [isFocused, setTrailerPlaying]);
 
-  // Pause/resume trailer based on scroll with hysteresis and guard
+  // Ultra-optimized scroll-based pause/resume with cached calculations
   useDerivedValue(() => {
     'worklet';
     try {
       if (!scrollGuardEnabledSV.value || isFocusedSV.value === 0) return;
-      const pauseThreshold = heroHeight.value * 0.7;   // pause when beyond 70%
-      const resumeThreshold = heroHeight.value * 0.4;  // resume when back within 40%
-
+      
+      // Pre-calculate thresholds for better performance
+      const pauseThreshold = heroHeight.value * 0.7;
+      const resumeThreshold = heroHeight.value * 0.4;
       const y = scrollY.value;
+      const isPlaying = isPlayingSV.value === 1;
+      const isPausedByScroll = pausedByScrollSV.value === 1;
 
-      if (y > pauseThreshold && isPlayingSV.value === 1 && pausedByScrollSV.value === 0) {
+      // Optimized pause/resume logic with minimal branching
+      if (y > pauseThreshold && isPlaying && !isPausedByScroll) {
         pausedByScrollSV.value = 1;
         runOnJS(setTrailerPlaying)(false);
         isPlayingSV.value = 0;
-      } else if (y < resumeThreshold && pausedByScrollSV.value === 1) {
+      } else if (y < resumeThreshold && isPausedByScroll) {
         pausedByScrollSV.value = 0;
         runOnJS(setTrailerPlaying)(true);
         isPlayingSV.value = 1;
       }
     } catch (e) {
-      // no-op
+      // Silent error handling for performance
     }
   });
 
@@ -1408,20 +1469,21 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
 
 
   return (
-    <Animated.View style={[styles.heroSection, heroAnimatedStyle]}>
-      {/* Optimized Background */}
-      <View style={[styles.absoluteFill, { backgroundColor: themeColors.black }]} />
+    <View style={staticStyles.heroWrapper}>
+      <Animated.View style={[staticStyles.heroSection, heroAnimatedStyle]}>
+        {/* Optimized Background */}
+        <View style={[staticStyles.absoluteFill, { backgroundColor: themeColors.black }]} />
       
       {/* Shimmer loading effect removed */}
       
-      {/* Background thumbnail image - always rendered when available */}
+      {/* Background thumbnail image - always rendered when available with parallax */}
       {shouldLoadSecondaryData && imageSource && !loadingBanner && (
-        <Animated.View style={[styles.absoluteFill, {
+        <Animated.View style={[staticStyles.thumbnailContainer, {
           opacity: thumbnailOpacity
         }]}>
           <Animated.Image 
             source={{ uri: imageSource }}
-            style={[styles.absoluteFill, backdropImageStyle]}
+            style={[staticStyles.thumbnailImage, backdropImageStyle]}
             resizeMode="cover"
             onError={handleImageError}
             onLoad={handleImageLoad}
@@ -1431,13 +1493,13 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       
       {/* Hidden preload trailer player - loads in background */}
       {shouldLoadSecondaryData && settings?.showTrailers && trailerUrl && !trailerLoading && !trailerError && !trailerPreloaded && (
-        <View style={[styles.absoluteFill, { opacity: 0, pointerEvents: 'none' }]}>
+        <View style={[staticStyles.absoluteFill, { opacity: 0, pointerEvents: 'none' }]}>
           <TrailerPlayer
             key={`preload-${trailerUrl}`}
             trailerUrl={trailerUrl}
             autoPlay={false}
             muted={true}
-            style={styles.absoluteFill}
+            style={staticStyles.absoluteFill}
             hideLoadingSpinner={true}
             onLoad={handleTrailerPreloaded}
             onError={handleTrailerError}
@@ -1445,18 +1507,18 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
         </View>
       )}
       
-      {/* Visible trailer player - rendered on top with fade transition */}
+      {/* Visible trailer player - rendered on top with fade transition and parallax */}
       {shouldLoadSecondaryData && settings?.showTrailers && trailerUrl && !trailerLoading && !trailerError && trailerPreloaded && (
-        <Animated.View style={[styles.absoluteFill, {
+        <Animated.View style={[staticStyles.absoluteFill, {
           opacity: trailerOpacity
-        }]}>
+        }, trailerParallaxStyle]}>
           <TrailerPlayer
               key={`visible-${trailerUrl}`}
               ref={trailerVideoRef}
               trailerUrl={trailerUrl}
               autoPlay={globalTrailerPlaying}
               muted={trailerMuted}
-              style={styles.absoluteFill}
+              style={staticStyles.absoluteFill}
               hideLoadingSpinner={true}
               hideControls={true}
               onFullscreenToggle={handleFullscreenToggle}
@@ -1641,19 +1703,40 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
           />
         </View>
       </LinearGradient>
-    </Animated.View>
+      </Animated.View>
+    </View>
   );
 });
 
 // Ultra-optimized styles
 const styles = StyleSheet.create({
+  heroWrapper: {
+    width: '100%',
+    marginTop: -150, // Extend wrapper 150px above to accommodate thumbnail overflow
+    paddingTop: 150, // Add padding to maintain proper positioning
+    overflow: 'hidden', // This will clip the thumbnail overflow when scrolling
+  },
   heroSection: {
     width: '100%',
     backgroundColor: '#000',
-    overflow: 'hidden',
+    overflow: 'visible', // Allow thumbnail to extend within the wrapper
   },
 
   absoluteFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  thumbnailContainer: {
+    position: 'absolute',
+    top: 0, // Now positioned at the top of the wrapper (which extends 150px above)
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  thumbnailImage: {
     position: 'absolute',
     top: 0,
     left: 0,

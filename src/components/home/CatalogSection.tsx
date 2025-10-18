@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, Dimensions } from 'react-native';
-import { FlashList } from '@shopify/flash-list';
+import { LegendList } from '@legendapp/list';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -98,7 +98,7 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
         </TouchableOpacity>
       </View>
       
-      <FlashList
+      <LegendList
         data={catalog.items}
         renderItem={renderContentItem}
         keyExtractor={keyExtractor}
@@ -108,8 +108,8 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
         ItemSeparatorComponent={ItemSeparator}
         onEndReachedThreshold={0.7}
         onEndReached={() => {}}
-        scrollEventThrottle={64}
-        removeClippedSubviews={true}
+        recycleItems={true}
+        maintainVisibleContentPosition
       />
     </Animated.View>
   );

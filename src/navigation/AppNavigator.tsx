@@ -672,7 +672,7 @@ const MainTabs = () => {
         bottom: 0, 
         left: 0, 
         right: 0,
-        height: 85,
+        height: 85 + insets.bottom,
         backgroundColor: 'transparent',
         overflow: 'hidden',
       }}>
@@ -722,7 +722,7 @@ const MainTabs = () => {
         <View
           style={{
             height: '100%',
-            paddingBottom: 20,
+            paddingBottom: 20 + insets.bottom,
             paddingTop: 12,
             backgroundColor: 'transparent',
           }}
@@ -819,6 +819,7 @@ const MainTabs = () => {
     // Dynamically require to avoid impacting Android bundle
     const { createNativeBottomTabNavigator } = require('@bottom-tabs/react-navigation');
     const IOSTab = createNativeBottomTabNavigator();
+    const downloadsEnabled = appSettings?.enableDownloads !== false;
 
     return (
       <View style={{ flex: 1, backgroundColor: currentTheme.colors.darkBackground }}>
@@ -828,6 +829,8 @@ const MainTabs = () => {
           backgroundColor="transparent"
         />
         <IOSTab.Navigator
+          key={`ios-tabs-${downloadsEnabled ? 'with-dl' : 'no-dl'}`}
+          initialRouteName="Home"
           // Native tab bar handles its own visuals; keep options minimal
           screenOptions={{
             headerShown: false,
@@ -863,7 +866,7 @@ const MainTabs = () => {
               tabBarIcon: () => ({ sfSymbol: 'magnifyingglass' }),
             }}
           />
-          {appSettings?.enableDownloads !== false && (
+          {downloadsEnabled && (
             <IOSTab.Screen
               name="Downloads"
               component={DownloadsScreen}

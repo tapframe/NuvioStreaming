@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Platform,
   Dimensions,
+  Image,
 } from 'react-native';
 import { BlurView as ExpoBlurView } from 'expo-blur';
 import { MaterialIcons, Feather } from '@expo/vector-icons';
@@ -24,7 +25,6 @@ if (Platform.OS === 'ios') {
     liquidGlassAvailable = false;
   }
 }
-import FastImage from '@d11/react-native-fast-image';
 import Animated, {
   useAnimatedStyle,
   interpolate,
@@ -49,6 +49,7 @@ interface FloatingHeaderProps {
   headerElementsOpacity: SharedValue<number>;
   safeAreaTop: number;
   setLogoLoadError: (error: boolean) => void;
+  stableLogoUri?: string | null;
 }
 
 const FloatingHeader: React.FC<FloatingHeaderProps> = ({
@@ -62,6 +63,7 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
   headerElementsOpacity,
   safeAreaTop,
   setLogoLoadError,
+  stableLogoUri,
 }) => {
   const { currentTheme } = useTheme();
   const [isHeaderInteractive, setIsHeaderInteractive] = React.useState(false);
@@ -111,13 +113,13 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
               </TouchableOpacity>
 
               <View style={styles.headerTitleContainer}>
-                {metadata.logo && !logoLoadError ? (
-                  <FastImage
-                    source={{ uri: metadata.logo }}
+                {(stableLogoUri || metadata.logo) && !logoLoadError ? (
+                  <Image
+                    source={{ uri: stableLogoUri || metadata.logo }}
                     style={styles.floatingHeaderLogo}
-                    resizeMode={FastImage.resizeMode.contain}
+                    resizeMode="contain"
                     onError={() => {
-                      logger.warn(`[FloatingHeader] Logo failed to load: ${metadata.logo}`);
+                      logger.warn(`[FloatingHeader] Logo failed to load: ${stableLogoUri || metadata.logo}`);
                       setLogoLoadError(true);
                     }}
                   />
@@ -155,13 +157,13 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
               </TouchableOpacity>
 
               <View style={styles.headerTitleContainer}>
-                {metadata.logo && !logoLoadError ? (
-                  <FastImage
-                    source={{ uri: metadata.logo }}
+                {(stableLogoUri || metadata.logo) && !logoLoadError ? (
+                  <Image
+                    source={{ uri: stableLogoUri || metadata.logo }}
                     style={styles.floatingHeaderLogo}
-                    resizeMode={FastImage.resizeMode.contain}
+                    resizeMode="contain"
                     onError={() => {
-                      logger.warn(`[FloatingHeader] Logo failed to load: ${metadata.logo}`);
+                      logger.warn(`[FloatingHeader] Logo failed to load: ${stableLogoUri || metadata.logo}`);
                       setLogoLoadError(true);
                     }}
                   />
@@ -202,10 +204,10 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
             
             <View style={styles.headerTitleContainer}>
               {metadata.logo && !logoLoadError ? (
-                <FastImage
+                <Image
                   source={{ uri: metadata.logo }}
                   style={styles.floatingHeaderLogo}
-                  resizeMode={FastImage.resizeMode.contain}
+                  resizeMode="contain"
                   onError={() => {
                     logger.warn(`[FloatingHeader] Logo failed to load: ${metadata.logo}`);
                     setLogoLoadError(true);
