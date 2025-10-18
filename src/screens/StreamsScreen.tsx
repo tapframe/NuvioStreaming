@@ -1288,7 +1288,8 @@ export const StreamsScreen = () => {
                   `vidhub://${streamUrl}`
                 ];
                 break;
-              case 'infuse_livecontainer': {
+                
+              case 'infuse_livecontainer':
                 const infuseUrls = [
                   `infuse://x-callback-url/play?url=${streamUrl}`,
                   `infuse://play?url=${streamUrl}`,
@@ -1299,7 +1300,7 @@ export const StreamsScreen = () => {
                   return `livecontainer://open-web-page?url=${encoded}`;
                 });
                 break;
-              }
+              
               default:
                 // If no matching player or the setting is somehow invalid, use internal player
                 navigateToPlayer(stream);
