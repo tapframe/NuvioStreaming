@@ -127,6 +127,12 @@ const PlayerSettingsScreen: React.FC = () => {
         description: 'Open streams in VidHub player',
         icon: 'ondemand-video',
       },
+      {
+        id: 'infuse_livecontainer',
+        title: 'Infuse Livecontainer',
+        description: 'Open streams in Infuse player LiveContainer',
+        icon: 'smart-display',
+      },
     ] : [
       {
         id: 'external',
