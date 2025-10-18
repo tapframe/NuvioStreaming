@@ -310,11 +310,6 @@ const TrailerModal: React.FC<TrailerModalProps> = memo(({
                 {contentTitle}
               </Text>
             </View>
-            <View style={styles.footerMeta}>
-              <Text style={[styles.footerMetaText, { color: currentTheme.colors.textMuted }]}>
-                {trailer.size}p HD
-              </Text>
-            </View>
           </View>
         </View>
       </View>

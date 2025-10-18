@@ -570,12 +570,6 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
                     />
                     {/* Subtle Gradient Overlay */}
                     <View style={styles.thumbnailGradient} />
-                    {/* Quality Badge */}
-                    <View style={styles.qualityBadge}>
-                      <Text style={styles.qualityText}>
-                        {trailer.size}p
-                      </Text>
-                    </View>
                   </View>
 
                 {/* Trailer Info */}
@@ -797,21 +791,6 @@ const styles = StyleSheet.create({
   },
 
 
-  // Badges
-  qualityBadge: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  qualityText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '600',
-  },
 
   // Trailer Info Styles
   trailerInfo: {

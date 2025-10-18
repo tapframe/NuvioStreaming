@@ -1,0 +1,1467 @@
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/.transforms/cde462de23ae0e930ed29ed683a0d845/results.bin b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/.transforms/cde462de23ae0e930ed29ed683a0d845/results.bin
+new file mode 100644
+index 0000000..0d259dd
+--- /dev/null
++++ b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/.transforms/cde462de23ae0e930ed29ed683a0d845/results.bin
+@@ -0,0 +1 @@
++o/classes
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/.transforms/cde462de23ae0e930ed29ed683a0d845/transformed/classes/classes_dex/classes.dex b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/.transforms/cde462de23ae0e930ed29ed683a0d845/transformed/classes/classes_dex/classes.dex
+new file mode 100644
+index 0000000..f27c56f
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/.transforms/cde462de23ae0e930ed29ed683a0d845/transformed/classes/classes_dex/classes.dex differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/generated/source/buildConfig/debug/com/brentvatne/react/BuildConfig.java b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/generated/source/buildConfig/debug/com/brentvatne/react/BuildConfig.java
+new file mode 100644
+index 0000000..b26a50e
+--- /dev/null
++++ b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/generated/source/buildConfig/debug/com/brentvatne/react/BuildConfig.java
+@@ -0,0 +1,22 @@
++/**
++ * Automatically generated file. DO NOT MODIFY
++ */
++package com.brentvatne.react;
++
++public final class BuildConfig {
++  public static final boolean DEBUG = Boolean.parseBoolean("true");
++  public static final String LIBRARY_PACKAGE_NAME = "com.brentvatne.react";
++  public static final String BUILD_TYPE = "debug";
++  // Field from default config.
++  public static final boolean IS_NEW_ARCHITECTURE_ENABLED = true;
++  // Field from default config.
++  public static final boolean USE_EXOPLAYER_DASH = true;
++  // Field from default config.
++  public static final boolean USE_EXOPLAYER_HLS = true;
++  // Field from default config.
++  public static final boolean USE_EXOPLAYER_IMA = false;
++  // Field from default config.
++  public static final boolean USE_EXOPLAYER_RTSP = false;
++  // Field from default config.
++  public static final boolean USE_EXOPLAYER_SMOOTH_STREAMING = true;
++}
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/aapt_friendly_merged_manifests/debug/processDebugManifest/aapt/AndroidManifest.xml b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/aapt_friendly_merged_manifests/debug/processDebugManifest/aapt/AndroidManifest.xml
+new file mode 100644
+index 0000000..728c5a9
+--- /dev/null
++++ b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/aapt_friendly_merged_manifests/debug/processDebugManifest/aapt/AndroidManifest.xml
+@@ -0,0 +1,7 @@
++<?xml version="1.0" encoding="utf-8"?>
++<manifest xmlns:android="http://schemas.android.com/apk/res/android"
++    package="com.brentvatne.react" >
++
++    <uses-sdk android:minSdkVersion="24" />
++
++</manifest>
+\ No newline at end of file
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/aapt_friendly_merged_manifests/debug/processDebugManifest/aapt/output-metadata.json b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/aapt_friendly_merged_manifests/debug/processDebugManifest/aapt/output-metadata.json
+new file mode 100644
+index 0000000..247891c
+--- /dev/null
++++ b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/aapt_friendly_merged_manifests/debug/processDebugManifest/aapt/output-metadata.json
+@@ -0,0 +1,18 @@
++{
++  "version": 3,
++  "artifactType": {
++    "type": "AAPT_FRIENDLY_MERGED_MANIFESTS",
++    "kind": "Directory"
++  },
++  "applicationId": "com.brentvatne.react",
++  "variantName": "debug",
++  "elements": [
++    {
++      "type": "SINGLE",
++      "filters": [],
++      "attributes": [],
++      "outputFile": "AndroidManifest.xml"
++    }
++  ],
++  "elementType": "File"
++}
+\ No newline at end of file
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/aar_main_jar/debug/syncDebugLibJars/classes.jar b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/aar_main_jar/debug/syncDebugLibJars/classes.jar
+new file mode 100644
+index 0000000..1f4ce80
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/aar_main_jar/debug/syncDebugLibJars/classes.jar differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/aar_metadata/debug/writeDebugAarMetadata/aar-metadata.properties b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/aar_metadata/debug/writeDebugAarMetadata/aar-metadata.properties
+new file mode 100644
+index 0000000..1211b1e
+--- /dev/null
++++ b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/aar_metadata/debug/writeDebugAarMetadata/aar-metadata.properties
+@@ -0,0 +1,6 @@
++aarFormatVersion=1.0
++aarMetadataVersion=1.0
++minCompileSdk=1
++minCompileSdkExtension=0
++minAndroidGradlePluginVersion=1.0.0
++coreLibraryDesugaringEnabled=false
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/annotation_processor_list/debug/javaPreCompileDebug/annotationProcessors.json b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/annotation_processor_list/debug/javaPreCompileDebug/annotationProcessors.json
+new file mode 100644
+index 0000000..9e26dfe
+--- /dev/null
++++ b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/annotation_processor_list/debug/javaPreCompileDebug/annotationProcessors.json
+@@ -0,0 +1 @@
++{}
+\ No newline at end of file
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/annotations_typedef_file/debug/extractDebugAnnotations/typedefs.txt b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/annotations_typedef_file/debug/extractDebugAnnotations/typedefs.txt
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/compile_library_classes_jar/debug/bundleLibCompileToJarDebug/classes.jar b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/compile_library_classes_jar/debug/bundleLibCompileToJarDebug/classes.jar
+new file mode 100644
+index 0000000..9ec2b04
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/compile_library_classes_jar/debug/bundleLibCompileToJarDebug/classes.jar differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/compile_r_class_jar/debug/generateDebugRFile/R.jar b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/compile_r_class_jar/debug/generateDebugRFile/R.jar
+new file mode 100644
+index 0000000..0889def
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/compile_r_class_jar/debug/generateDebugRFile/R.jar differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/compile_symbol_list/debug/generateDebugRFile/R.txt b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/compile_symbol_list/debug/generateDebugRFile/R.txt
+new file mode 100644
+index 0000000..b5a67e1
+--- /dev/null
++++ b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/compile_symbol_list/debug/generateDebugRFile/R.txt
+@@ -0,0 +1,44 @@
++int color player_overlay_color 0x0
++int color red 0x0
++int color silver_gray 0x0
++int color white 0x0
++int dimen controller_wrapper_padding_top 0x0
++int dimen full_screen_margin 0x0
++int dimen full_screen_size 0x0
++int dimen live_wrapper_margin_top 0x0
++int dimen position_duration_horizontal_padding 0x0
++int dimen position_duration_text_size 0x0
++int dimen position_duration_width 0x0
++int dimen seekBar_height 0x0
++int dimen seekBar_wrapper_margin_top 0x0
++int drawable circle 0x0
++int id exo_duration 0x0
++int id exo_ffwd 0x0
++int id exo_fullscreen 0x0
++int id exo_live_container 0x0
++int id exo_live_icon 0x0
++int id exo_live_label 0x0
++int id exo_next 0x0
++int id exo_pause 0x0
++int id exo_play 0x0
++int id exo_play_pause_container 0x0
++int id exo_position 0x0
++int id exo_prev 0x0
++int id exo_progress 0x0
++int id exo_rew 0x0
++int id exo_settings 0x0
++int layout exo_legacy_player_control_view 0x0
++int string error_drm_not_supported 0x0
++int string error_drm_unknown 0x0
++int string error_drm_unsupported_scheme 0x0
++int string error_instantiating_decoder 0x0
++int string error_no_decoder 0x0
++int string error_no_secure_decoder 0x0
++int string error_querying_decoders 0x0
++int string media_playback_notification_text 0x0
++int string media_playback_notification_title 0x0
++int string playback_speed 0x0
++int string select_playback_speed 0x0
++int string settings 0x0
++int string unrecognized_media_format 0x0
++int style ExoMediaButton_FullScreen 0x0
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/compiled_local_resources/debug/compileDebugLibraryResources/out/drawable_circle.xml.flat b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/compiled_local_resources/debug/compileDebugLibraryResources/out/drawable_circle.xml.flat
+new file mode 100644
+index 0000000..e62758d
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/compiled_local_resources/debug/compileDebugLibraryResources/out/drawable_circle.xml.flat differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/compiled_local_resources/debug/compileDebugLibraryResources/out/layout_exo_legacy_player_control_view.xml.flat b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/compiled_local_resources/debug/compileDebugLibraryResources/out/layout_exo_legacy_player_control_view.xml.flat
+new file mode 100644
+index 0000000..bb5b5f9
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/compiled_local_resources/debug/compileDebugLibraryResources/out/layout_exo_legacy_player_control_view.xml.flat differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/incremental/debug-mergeJavaRes/merge-state b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/incremental/debug-mergeJavaRes/merge-state
+new file mode 100644
+index 0000000..441a1d2
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/incremental/debug-mergeJavaRes/merge-state differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/incremental/debug/packageDebugResources/compile-file-map.properties b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/incremental/debug/packageDebugResources/compile-file-map.properties
+new file mode 100644
+index 0000000..842471c
+--- /dev/null
++++ b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/incremental/debug/packageDebugResources/compile-file-map.properties
+@@ -0,0 +1,3 @@
++#Thu Oct 16 20:19:39 IST 2025
++com.brentvatne.react.react-native-video-main-6\:/drawable/circle.xml=/Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/packaged_res/debug/packageDebugResources/drawable/circle.xml
++com.brentvatne.react.react-native-video-main-6\:/layout/exo_legacy_player_control_view.xml=/Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/packaged_res/debug/packageDebugResources/layout/exo_legacy_player_control_view.xml
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/incremental/debug/packageDebugResources/merged.dir/values/values.xml b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/incremental/debug/packageDebugResources/merged.dir/values/values.xml
+new file mode 100644
+index 0000000..e8dd9e4
+--- /dev/null
++++ b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/incremental/debug/packageDebugResources/merged.dir/values/values.xml
+@@ -0,0 +1,33 @@
++<?xml version="1.0" encoding="utf-8"?>
++<resources xmlns:ns1="urn:oasis:names:tc:xliff:document:1.2" xmlns:ns2="http://schemas.android.com/tools">
++    <color name="player_overlay_color">#00000000</color>
++    <color name="red">#FF0000</color>
++    <color name="silver_gray">#FFBEBEBE</color>
++    <color name="white">#FFFFFF</color>
++    <dimen name="controller_wrapper_padding_top">4dp</dimen>
++    <dimen name="full_screen_margin">4dp</dimen>
++    <dimen name="full_screen_size">30dp</dimen>
++    <dimen name="live_wrapper_margin_top">12dp</dimen>
++    <dimen name="position_duration_horizontal_padding">4dp</dimen>
++    <dimen name="position_duration_text_size">14sp</dimen>
++    <dimen name="position_duration_width">50dp</dimen>
++    <dimen name="seekBar_height">26dp</dimen>
++    <dimen name="seekBar_wrapper_margin_top">4dp</dimen>
++    <string name="error_drm_not_supported">Protected content not supported on API levels below 18</string>
++    <string name="error_drm_unknown">An unknown DRM error occurred</string>
++    <string name="error_drm_unsupported_scheme">This device does not support the required DRM scheme</string>
++    <string name="error_instantiating_decoder">Unable to instantiate decoder <ns1:g id="decoder_name">%1$s</ns1:g></string>
++    <string name="error_no_decoder">This device does not provide a decoder for <ns1:g id="mime_type">%1$s</ns1:g></string>
++    <string name="error_no_secure_decoder">This device does not provide a secure decoder for <ns1:g id="mime_type">%1$s</ns1:g></string>
++    <string name="error_querying_decoders">Unable to query device decoders</string>
++    <string name="media_playback_notification_text">Preparing playback</string>
++    <string name="media_playback_notification_title">Media playback</string>
++    <string name="playback_speed">Playback Speed</string>
++    <string name="select_playback_speed">Select Playback Speed</string>
++    <string name="settings">Settings</string>
++    <string name="unrecognized_media_format">Unrecognized media format</string>
++    <style name="ExoMediaButton.FullScreen" ns2:ignore="PrivateResource">
++        <item name="android:src">@drawable/exo_icon_fullscreen_enter</item>
++        <item name="android:contentDescription">@string/exo_controls_fullscreen_enter_description</item>
++    </style>
++</resources>
+\ No newline at end of file
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/incremental/debug/packageDebugResources/merger.xml b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/incremental/debug/packageDebugResources/merger.xml
+new file mode 100644
+index 0000000..55ffc6b
+--- /dev/null
++++ b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/incremental/debug/packageDebugResources/merger.xml
+@@ -0,0 +1,5 @@
++<?xml version="1.0" encoding="utf-8"?>
++<merger version="3" xmlns:ns1="http://schemas.android.com/tools" xmlns:ns2="urn:oasis:names:tc:xliff:document:1.2"><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="main$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/src/main/res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="main" generated-set="main$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/src/main/res"><file name="circle" path="/Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/src/main/res/drawable/circle.xml" qualifiers="" type="drawable"/><file name="exo_legacy_player_control_view" path="/Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/src/main/res/layout/exo_legacy_player_control_view.xml" qualifiers="" type="layout"/><file path="/Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/src/main/res/values/colors.xml" qualifiers=""><color name="silver_gray">#FFBEBEBE</color><color name="player_overlay_color">#00000000</color><color name="white">#FFFFFF</color><color name="red">#FF0000</color></file><file path="/Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/src/main/res/values/dimens.xml" qualifiers=""><dimen name="controller_wrapper_padding_top">4dp</dimen><dimen name="seekBar_wrapper_margin_top">4dp</dimen><dimen name="live_wrapper_margin_top">12dp</dimen><dimen name="position_duration_horizontal_padding">4dp</dimen><dimen name="full_screen_margin">4dp</dimen><dimen name="position_duration_width">50dp</dimen><dimen name="seekBar_height">26dp</dimen><dimen name="full_screen_size">30dp</dimen><dimen name="position_duration_text_size">14sp</dimen></file><file path="/Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/src/main/res/values/styles.xml" qualifiers=""><style name="ExoMediaButton.FullScreen" ns1:ignore="PrivateResource">
++        <item name="android:src">@drawable/exo_icon_fullscreen_enter</item>
++        <item name="android:contentDescription">@string/exo_controls_fullscreen_enter_description</item>
++    </style></file><file path="/Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/src/main/res/values/strings.xml" qualifiers=""><string name="error_no_decoder">This device does not provide a decoder for <ns2:g id="mime_type">%1$s</ns2:g></string><string name="error_no_secure_decoder">This device does not provide a secure decoder for <ns2:g id="mime_type">%1$s</ns2:g></string><string name="error_querying_decoders">Unable to query device decoders</string><string name="error_instantiating_decoder">Unable to instantiate decoder <ns2:g id="decoder_name">%1$s</ns2:g></string><string name="error_drm_not_supported">Protected content not supported on API levels below 18</string><string name="unrecognized_media_format">Unrecognized media format</string><string name="error_drm_unsupported_scheme">This device does not support the required DRM scheme</string><string name="error_drm_unknown">An unknown DRM error occurred</string><string name="settings">Settings</string><string name="playback_speed">Playback Speed</string><string name="select_playback_speed">Select Playback Speed</string><string name="media_playback_notification_title">Media playback</string><string name="media_playback_notification_text">Preparing playback</string></file></source></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="debug$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/src/debug/res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="debug" generated-set="debug$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/src/debug/res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="generated$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/generated/res/resValues/debug"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="generated" generated-set="generated$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/generated/res/resValues/debug"/></dataSet><mergedItems/></merger>
+\ No newline at end of file
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/incremental/mergeDebugAssets/merger.xml b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/incremental/mergeDebugAssets/merger.xml
+new file mode 100644
+index 0000000..8769311
+--- /dev/null
++++ b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/incremental/mergeDebugAssets/merger.xml
+@@ -0,0 +1,2 @@
++<?xml version="1.0" encoding="utf-8"?>
++<merger version="3"><dataSet config="main" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/src/main/assets"/></dataSet><dataSet config="debug" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/src/debug/assets"/></dataSet><dataSet config="generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/shader_assets/debug/compileDebugShaders/out"/></dataSet></merger>
+\ No newline at end of file
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/incremental/mergeDebugJniLibFolders/merger.xml b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/incremental/mergeDebugJniLibFolders/merger.xml
+new file mode 100644
+index 0000000..af687a7
+--- /dev/null
++++ b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/incremental/mergeDebugJniLibFolders/merger.xml
+@@ -0,0 +1,2 @@
++<?xml version="1.0" encoding="utf-8"?>
++<merger version="3"><dataSet config="main" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/src/main/jniLibs"/></dataSet><dataSet config="debug" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/src/debug/jniLibs"/></dataSet></merger>
+\ No newline at end of file
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/incremental/mergeDebugShaders/merger.xml b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/incremental/mergeDebugShaders/merger.xml
+new file mode 100644
+index 0000000..65138a3
+--- /dev/null
++++ b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/incremental/mergeDebugShaders/merger.xml
+@@ -0,0 +1,2 @@
++<?xml version="1.0" encoding="utf-8"?>
++<merger version="3"><dataSet config="main" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/src/main/shaders"/></dataSet><dataSet config="debug" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/src/debug/shaders"/></dataSet></merger>
+\ No newline at end of file
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/java_res/debug/processDebugJavaRes/out/META-INF/react-native-video_debug.kotlin_module b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/java_res/debug/processDebugJavaRes/out/META-INF/react-native-video_debug.kotlin_module
+new file mode 100644
+index 0000000..1698483
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/java_res/debug/processDebugJavaRes/out/META-INF/react-native-video_debug.kotlin_module differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/androidx/media3/exoplayer/ima/ImaAdsLoader$Builder.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/androidx/media3/exoplayer/ima/ImaAdsLoader$Builder.class
+new file mode 100644
+index 0000000..b019110
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/androidx/media3/exoplayer/ima/ImaAdsLoader$Builder.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/androidx/media3/exoplayer/ima/ImaAdsLoader.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/androidx/media3/exoplayer/ima/ImaAdsLoader.class
+new file mode 100644
+index 0000000..5e16e53
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/androidx/media3/exoplayer/ima/ImaAdsLoader.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/androidx/media3/exoplayer/rtsp/RtspMediaSource$Factory.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/androidx/media3/exoplayer/rtsp/RtspMediaSource$Factory.class
+new file mode 100644
+index 0000000..b08faeb
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/androidx/media3/exoplayer/rtsp/RtspMediaSource$Factory.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/androidx/media3/exoplayer/rtsp/RtspMediaSource.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/androidx/media3/exoplayer/rtsp/RtspMediaSource.class
+new file mode 100644
+index 0000000..2f92e20
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/androidx/media3/exoplayer/rtsp/RtspMediaSource.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/brentvatne/exoplayer/ReactExoplayerView$1.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/brentvatne/exoplayer/ReactExoplayerView$1.class
+new file mode 100644
+index 0000000..a1368f5
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/brentvatne/exoplayer/ReactExoplayerView$1.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/brentvatne/exoplayer/ReactExoplayerView$2.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/brentvatne/exoplayer/ReactExoplayerView$2.class
+new file mode 100644
+index 0000000..ec7b745
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/brentvatne/exoplayer/ReactExoplayerView$2.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/brentvatne/exoplayer/ReactExoplayerView$3.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/brentvatne/exoplayer/ReactExoplayerView$3.class
+new file mode 100644
+index 0000000..598654a
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/brentvatne/exoplayer/ReactExoplayerView$3.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/brentvatne/exoplayer/ReactExoplayerView$4.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/brentvatne/exoplayer/ReactExoplayerView$4.class
+new file mode 100644
+index 0000000..803aefe
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/brentvatne/exoplayer/ReactExoplayerView$4.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/brentvatne/exoplayer/ReactExoplayerView$OnAudioFocusChangedListener.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/brentvatne/exoplayer/ReactExoplayerView$OnAudioFocusChangedListener.class
+new file mode 100644
+index 0000000..6ec4ad1
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/brentvatne/exoplayer/ReactExoplayerView$OnAudioFocusChangedListener.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/brentvatne/exoplayer/ReactExoplayerView$RNVLoadControl.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/brentvatne/exoplayer/ReactExoplayerView$RNVLoadControl.class
+new file mode 100644
+index 0000000..22d8796
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/brentvatne/exoplayer/ReactExoplayerView$RNVLoadControl.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/brentvatne/exoplayer/ReactExoplayerView.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/brentvatne/exoplayer/ReactExoplayerView.class
+new file mode 100644
+index 0000000..53eee7f
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/brentvatne/exoplayer/ReactExoplayerView.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/brentvatne/react/BuildConfig.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/brentvatne/react/BuildConfig.class
+new file mode 100644
+index 0000000..4c5c87e
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/brentvatne/react/BuildConfig.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/AdError.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/AdError.class
+new file mode 100644
+index 0000000..0a9b7a7
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/AdError.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/AdErrorEvent$AdErrorListener.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/AdErrorEvent$AdErrorListener.class
+new file mode 100644
+index 0000000..1380a05
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/AdErrorEvent$AdErrorListener.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/AdErrorEvent.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/AdErrorEvent.class
+new file mode 100644
+index 0000000..07ab3fa
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/AdErrorEvent.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/AdEvent$AdEventListener.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/AdEvent$AdEventListener.class
+new file mode 100644
+index 0000000..dbe9984
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/AdEvent$AdEventListener.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/AdEvent.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/AdEvent.class
+new file mode 100644
+index 0000000..88ae34c
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/AdEvent.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/ConcreteImaSdkFactory.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/ConcreteImaSdkFactory.class
+new file mode 100644
+index 0000000..a3184b3
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/ConcreteImaSdkFactory.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/ConcreteImaSdkSettings.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/ConcreteImaSdkSettings.class
+new file mode 100644
+index 0000000..264cd83
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/ConcreteImaSdkSettings.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/ImaSdkFactory.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/ImaSdkFactory.class
+new file mode 100644
+index 0000000..46cea81
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/ImaSdkFactory.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/ImaSdkSettings.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/ImaSdkSettings.class
+new file mode 100644
+index 0000000..a4cef0d
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/google/ads/interactivemedia/v3/api/ImaSdkSettings.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/local_only_symbol_list/debug/parseDebugLocalResources/R-def.txt b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/local_only_symbol_list/debug/parseDebugLocalResources/R-def.txt
+new file mode 100644
+index 0000000..987e479
+--- /dev/null
++++ b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/local_only_symbol_list/debug/parseDebugLocalResources/R-def.txt
+@@ -0,0 +1,46 @@
++R_DEF: Internal format may change without notice
++local
++color player_overlay_color
++color red
++color silver_gray
++color white
++dimen controller_wrapper_padding_top
++dimen full_screen_margin
++dimen full_screen_size
++dimen live_wrapper_margin_top
++dimen position_duration_horizontal_padding
++dimen position_duration_text_size
++dimen position_duration_width
++dimen seekBar_height
++dimen seekBar_wrapper_margin_top
++drawable circle
++id exo_duration
++id exo_ffwd
++id exo_fullscreen
++id exo_live_container
++id exo_live_icon
++id exo_live_label
++id exo_next
++id exo_pause
++id exo_play
++id exo_play_pause_container
++id exo_position
++id exo_prev
++id exo_progress
++id exo_rew
++id exo_settings
++layout exo_legacy_player_control_view
++string error_drm_not_supported
++string error_drm_unknown
++string error_drm_unsupported_scheme
++string error_instantiating_decoder
++string error_no_decoder
++string error_no_secure_decoder
++string error_querying_decoders
++string media_playback_notification_text
++string media_playback_notification_title
++string playback_speed
++string select_playback_speed
++string settings
++string unrecognized_media_format
++style ExoMediaButton.FullScreen
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/manifest_merge_blame_file/debug/processDebugManifest/manifest-merger-blame-debug-report.txt b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/manifest_merge_blame_file/debug/processDebugManifest/manifest-merger-blame-debug-report.txt
+new file mode 100644
+index 0000000..2300097
+--- /dev/null
++++ b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/manifest_merge_blame_file/debug/processDebugManifest/manifest-merger-blame-debug-report.txt
+@@ -0,0 +1,7 @@
++1<?xml version="1.0" encoding="utf-8"?>
++2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
++3    package="com.brentvatne.react" >
++4
++5    <uses-sdk android:minSdkVersion="24" />
++6
++7</manifest>
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/merged_java_res/debug/mergeDebugJavaResource/feature-react-native-video.jar b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/merged_java_res/debug/mergeDebugJavaResource/feature-react-native-video.jar
+new file mode 100644
+index 0000000..87d384d
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/merged_java_res/debug/mergeDebugJavaResource/feature-react-native-video.jar differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml
+new file mode 100644
+index 0000000..728c5a9
+--- /dev/null
++++ b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml
+@@ -0,0 +1,7 @@
++<?xml version="1.0" encoding="utf-8"?>
++<manifest xmlns:android="http://schemas.android.com/apk/res/android"
++    package="com.brentvatne.react" >
++
++    <uses-sdk android:minSdkVersion="24" />
++
++</manifest>
+\ No newline at end of file
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/navigation_json/debug/extractDeepLinksDebug/navigation.json b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/navigation_json/debug/extractDeepLinksDebug/navigation.json
+new file mode 100644
+index 0000000..0637a08
+--- /dev/null
++++ b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/navigation_json/debug/extractDeepLinksDebug/navigation.json
+@@ -0,0 +1 @@
++[]
+\ No newline at end of file
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/nested_resources_validation_report/debug/generateDebugResources/nestedResourcesValidationReport.txt b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/nested_resources_validation_report/debug/generateDebugResources/nestedResourcesValidationReport.txt
+new file mode 100644
+index 0000000..08f4ebe
+--- /dev/null
++++ b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/nested_resources_validation_report/debug/generateDebugResources/nestedResourcesValidationReport.txt
+@@ -0,0 +1 @@
++0 Warning/Error
+\ No newline at end of file
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/packaged_res/debug/packageDebugResources/drawable/circle.xml b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/packaged_res/debug/packageDebugResources/drawable/circle.xml
+new file mode 100644
+index 0000000..9f06d7c
+--- /dev/null
++++ b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/packaged_res/debug/packageDebugResources/drawable/circle.xml
+@@ -0,0 +1,6 @@
++<?xml version="1.0" encoding="utf-8"?>
++<shape xmlns:android="http://schemas.android.com/apk/res/android"
++    android:shape="oval">
++    <solid android:color="@color/red"/>
++    <size android:width="10dp" android:height="10dp"/>
++</shape>
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/packaged_res/debug/packageDebugResources/layout/exo_legacy_player_control_view.xml b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/packaged_res/debug/packageDebugResources/layout/exo_legacy_player_control_view.xml
+new file mode 100644
+index 0000000..e0babc4
+--- /dev/null
++++ b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/packaged_res/debug/packageDebugResources/layout/exo_legacy_player_control_view.xml
+@@ -0,0 +1,120 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="match_parent"
++    android:layoutDirection="ltr"
++    android:background="@color/player_overlay_color"
++    android:orientation="vertical">
++
++    <LinearLayout
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
++        android:orientation="horizontal"
++        android:visibility="gone"
++        android:gravity="center_vertical"
++        android:layout_marginTop="@dimen/live_wrapper_margin_top"
++        android:id="@+id/exo_live_container">
++
++        <ImageView
++            android:id="@+id/exo_live_icon"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:paddingHorizontal="@dimen/position_duration_horizontal_padding"
++            android:src="@drawable/circle" />
++
++        <TextView android:id="@+id/exo_live_label"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:textSize="@dimen/position_duration_text_size"
++            android:textStyle="bold"
++            android:includeFontPadding="false"
++            android:textColor="@color/white"/>
++    </LinearLayout>
++    
++    <View
++        android:layout_width="0dp"
++        android:layout_height="0dp"
++        android:layout_weight="1"
++        />
++
++    <LinearLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:gravity="center"
++        android:paddingTop="@dimen/controller_wrapper_padding_top"
++        android:layout_gravity="bottom"
++        android:orientation="horizontal">
++
++        <ImageButton android:id="@+id/exo_prev"
++            style="@style/ExoMediaButton.Previous"/>
++
++        <ImageButton android:id="@+id/exo_rew"
++            style="@style/ExoMediaButton.Rewind"/>
++        <FrameLayout
++            android:id="@+id/exo_play_pause_container"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:layout_gravity="center">
++            <ImageButton android:id="@+id/exo_play"
++                style="@style/ExoMediaButton.Play"/>
++
++            <ImageButton android:id="@+id/exo_pause"
++                style="@style/ExoMediaButton.Pause"/>
++        </FrameLayout>
++
++        <ImageButton android:id="@+id/exo_ffwd"
++            style="@style/ExoMediaButton.FastForward"/>
++
++        <ImageButton android:id="@+id/exo_next"
++            style="@style/ExoMediaButton.Next"/>
++
++    </LinearLayout>
++
++    <LinearLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="@dimen/seekBar_wrapper_margin_top"
++        android:gravity="center_vertical"
++        android:orientation="horizontal">
++
++        <TextView android:id="@+id/exo_position"
++            android:layout_width="@dimen/position_duration_width"
++            android:layout_height="wrap_content"
++            android:textSize="@dimen/position_duration_text_size"
++            android:textStyle="bold"
++            android:paddingHorizontal="@dimen/position_duration_horizontal_padding"
++            android:includeFontPadding="false"
++            android:textColor="@color/silver_gray"/>
++
++        <androidx.media3.ui.DefaultTimeBar
++            android:id="@+id/exo_progress"
++            android:layout_width="0dp"
++            android:layout_weight="1"
++            android:layout_height="@dimen/seekBar_height"/>
++
++        <TextView android:id="@+id/exo_duration"
++            android:layout_width="@dimen/position_duration_width"
++            android:layout_height="wrap_content"
++            android:textSize="@dimen/position_duration_text_size"
++            android:textStyle="bold"
++            android:paddingHorizontal="@dimen/position_duration_horizontal_padding"
++            android:includeFontPadding="false"
++            android:textColor="@color/silver_gray"/>
++
++        <ImageButton
++            android:id="@+id/exo_settings"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            style="@style/ExoStyledControls.Button.Bottom.Settings"
++            />
++
++        <ImageButton
++            android:id="@+id/exo_fullscreen"
++            style="@style/ExoMediaButton.FullScreen"
++            android:layout_width="@dimen/full_screen_size"
++            android:layout_height="@dimen/full_screen_size"
++            android:layout_margin="@dimen/full_screen_margin"
++            android:scaleType="fitCenter" />
++    </LinearLayout>
++
++</LinearLayout>
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/packaged_res/debug/packageDebugResources/values/values.xml b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/packaged_res/debug/packageDebugResources/values/values.xml
+new file mode 100644
+index 0000000..e8dd9e4
+--- /dev/null
++++ b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/packaged_res/debug/packageDebugResources/values/values.xml
+@@ -0,0 +1,33 @@
++<?xml version="1.0" encoding="utf-8"?>
++<resources xmlns:ns1="urn:oasis:names:tc:xliff:document:1.2" xmlns:ns2="http://schemas.android.com/tools">
++    <color name="player_overlay_color">#00000000</color>
++    <color name="red">#FF0000</color>
++    <color name="silver_gray">#FFBEBEBE</color>
++    <color name="white">#FFFFFF</color>
++    <dimen name="controller_wrapper_padding_top">4dp</dimen>
++    <dimen name="full_screen_margin">4dp</dimen>
++    <dimen name="full_screen_size">30dp</dimen>
++    <dimen name="live_wrapper_margin_top">12dp</dimen>
++    <dimen name="position_duration_horizontal_padding">4dp</dimen>
++    <dimen name="position_duration_text_size">14sp</dimen>
++    <dimen name="position_duration_width">50dp</dimen>
++    <dimen name="seekBar_height">26dp</dimen>
++    <dimen name="seekBar_wrapper_margin_top">4dp</dimen>
++    <string name="error_drm_not_supported">Protected content not supported on API levels below 18</string>
++    <string name="error_drm_unknown">An unknown DRM error occurred</string>
++    <string name="error_drm_unsupported_scheme">This device does not support the required DRM scheme</string>
++    <string name="error_instantiating_decoder">Unable to instantiate decoder <ns1:g id="decoder_name">%1$s</ns1:g></string>
++    <string name="error_no_decoder">This device does not provide a decoder for <ns1:g id="mime_type">%1$s</ns1:g></string>
++    <string name="error_no_secure_decoder">This device does not provide a secure decoder for <ns1:g id="mime_type">%1$s</ns1:g></string>
++    <string name="error_querying_decoders">Unable to query device decoders</string>
++    <string name="media_playback_notification_text">Preparing playback</string>
++    <string name="media_playback_notification_title">Media playback</string>
++    <string name="playback_speed">Playback Speed</string>
++    <string name="select_playback_speed">Select Playback Speed</string>
++    <string name="settings">Settings</string>
++    <string name="unrecognized_media_format">Unrecognized media format</string>
++    <style name="ExoMediaButton.FullScreen" ns2:ignore="PrivateResource">
++        <item name="android:src">@drawable/exo_icon_fullscreen_enter</item>
++        <item name="android:contentDescription">@string/exo_controls_fullscreen_enter_description</item>
++    </style>
++</resources>
+\ No newline at end of file
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar
+new file mode 100644
+index 0000000..e65b062
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/symbol_list_with_package_name/debug/generateDebugRFile/package-aware-r.txt b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/symbol_list_with_package_name/debug/generateDebugRFile/package-aware-r.txt
+new file mode 100644
+index 0000000..1cb95ed
+--- /dev/null
++++ b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/intermediates/symbol_list_with_package_name/debug/generateDebugRFile/package-aware-r.txt
+@@ -0,0 +1,45 @@
++com.brentvatne.react
++color player_overlay_color
++color red
++color silver_gray
++color white
++dimen controller_wrapper_padding_top
++dimen full_screen_margin
++dimen full_screen_size
++dimen live_wrapper_margin_top
++dimen position_duration_horizontal_padding
++dimen position_duration_text_size
++dimen position_duration_width
++dimen seekBar_height
++dimen seekBar_wrapper_margin_top
++drawable circle
++id exo_duration
++id exo_ffwd
++id exo_fullscreen
++id exo_live_container
++id exo_live_icon
++id exo_live_label
++id exo_next
++id exo_pause
++id exo_play
++id exo_play_pause_container
++id exo_position
++id exo_prev
++id exo_progress
++id exo_rew
++id exo_settings
++layout exo_legacy_player_control_view
++string error_drm_not_supported
++string error_drm_unknown
++string error_drm_unsupported_scheme
++string error_instantiating_decoder
++string error_no_decoder
++string error_no_secure_decoder
++string error_querying_decoders
++string media_playback_notification_text
++string media_playback_notification_title
++string playback_speed
++string select_playback_speed
++string settings
++string unrecognized_media_format
++style ExoMediaButton_FullScreen
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab
+new file mode 100644
+index 0000000..7df5bcf
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream
+new file mode 100644
+index 0000000..1a55594
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream.len
+new file mode 100644
+index 0000000..74ddf64
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.len
+new file mode 100644
+index 0000000..41d6c24
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.values.at b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.values.at
+new file mode 100644
+index 0000000..d0eda54
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.values.at differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i
+new file mode 100644
+index 0000000..8a80b7d
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i.len
+new file mode 100644
+index 0000000..131e265
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab
+new file mode 100644
+index 0000000..532458c
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream
+new file mode 100644
+index 0000000..1d1d548
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream.len
+new file mode 100644
+index 0000000..3247724
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.len
+new file mode 100644
+index 0000000..bba171d
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.values.at b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.values.at
+new file mode 100644
+index 0000000..5d6b64a
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.values.at differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i
+new file mode 100644
+index 0000000..045022c
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i.len
+new file mode 100644
+index 0000000..131e265
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab
+new file mode 100644
+index 0000000..8178530
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream
+new file mode 100644
+index 0000000..1d1d548
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream.len
+new file mode 100644
+index 0000000..3247724
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.len
+new file mode 100644
+index 0000000..bba171d
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.values.at b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.values.at
+new file mode 100644
+index 0000000..6a45a65
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.values.at differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i
+new file mode 100644
+index 0000000..045022c
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i.len
+new file mode 100644
+index 0000000..131e265
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab
+new file mode 100644
+index 0000000..496bda2
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.keystream b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.keystream
+new file mode 100644
+index 0000000..a49789c
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.keystream differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.keystream.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.keystream.len
+new file mode 100644
+index 0000000..a3d0573
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.keystream.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.len
+new file mode 100644
+index 0000000..93a595b
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.values.at b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.values.at
+new file mode 100644
+index 0000000..9d91003
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.values.at differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab_i b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab_i
+new file mode 100644
+index 0000000..1598ef3
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab_i differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab_i.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab_i.len
+new file mode 100644
+index 0000000..131e265
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab_i.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab
+new file mode 100644
+index 0000000..c3975e3
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream
+new file mode 100644
+index 0000000..9d05b9a
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream.len
+new file mode 100644
+index 0000000..d3e09af
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.len
+new file mode 100644
+index 0000000..b7d7395
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.values.at b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.values.at
+new file mode 100644
+index 0000000..e3911a1
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.values.at differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i
+new file mode 100644
+index 0000000..af27d9c
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i.len
+new file mode 100644
+index 0000000..131e265
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab
+new file mode 100644
+index 0000000..bdf584a
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.keystream b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.keystream
+new file mode 100644
+index 0000000..a9e6823
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.keystream differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.keystream.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.keystream.len
+new file mode 100644
+index 0000000..de8bf97
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.keystream.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.len
+new file mode 100644
+index 0000000..2a17e6e
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.values.at b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.values.at
+new file mode 100644
+index 0000000..46d6744
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.values.at differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab_i b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab_i
+new file mode 100644
+index 0000000..2073982
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab_i differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab_i.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab_i.len
+new file mode 100644
+index 0000000..131e265
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab_i.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab
+new file mode 100644
+index 0000000..c626f49
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream
+new file mode 100644
+index 0000000..7214377
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream.len
+new file mode 100644
+index 0000000..86b154b
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.len
+new file mode 100644
+index 0000000..882f24f
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.values b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.values
+new file mode 100644
+index 0000000..2ff3eb7
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.values differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.values.at b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.values.at
+new file mode 100644
+index 0000000..af661f7
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.values.at differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.values.s b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.values.s
+new file mode 100644
+index 0000000..b6551b9
+--- /dev/null
++++ b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.values.s
+@@ -0,0 +1 @@
++ор
+\ No newline at end of file
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i
+new file mode 100644
+index 0000000..0cbafa1
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i.len
+new file mode 100644
+index 0000000..131e265
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab
+new file mode 100644
+index 0000000..85d9216
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream
+new file mode 100644
+index 0000000..1a55594
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream.len
+new file mode 100644
+index 0000000..74ddf64
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.len
+new file mode 100644
+index 0000000..41d6c24
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.values.at b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.values.at
+new file mode 100644
+index 0000000..dfc60fb
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.values.at differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i
+new file mode 100644
+index 0000000..8a80b7d
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i.len
+new file mode 100644
+index 0000000..131e265
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab
+new file mode 100644
+index 0000000..95c2c01
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream
+new file mode 100644
+index 0000000..90b21c4
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream.len
+new file mode 100644
+index 0000000..4cb813c
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.len
+new file mode 100644
+index 0000000..385642d
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.values.at b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.values.at
+new file mode 100644
+index 0000000..195d865
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.values.at differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i
+new file mode 100644
+index 0000000..5e4a0c0
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i.len
+new file mode 100644
+index 0000000..131e265
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab
+new file mode 100644
+index 0000000..d98dace
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream
+new file mode 100644
+index 0000000..ae4ac93
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream.len
+new file mode 100644
+index 0000000..6dc1435
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.len
+new file mode 100644
+index 0000000..42df8b9
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.values.at b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.values.at
+new file mode 100644
+index 0000000..bc345c6
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.values.at differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i
+new file mode 100644
+index 0000000..f0c9463
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i.len
+new file mode 100644
+index 0000000..131e265
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/counters.tab b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/counters.tab
+new file mode 100644
+index 0000000..672070d
+--- /dev/null
++++ b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/counters.tab
+@@ -0,0 +1,2 @@
++44
++0
+\ No newline at end of file
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab
+new file mode 100644
+index 0000000..1878d5a
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream
+new file mode 100644
+index 0000000..1a55594
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream.len
+new file mode 100644
+index 0000000..74ddf64
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.len
+new file mode 100644
+index 0000000..41d6c24
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.values.at b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.values.at
+new file mode 100644
+index 0000000..d3fcc7e
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.values.at differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i
+new file mode 100644
+index 0000000..8a80b7d
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i.len
+new file mode 100644
+index 0000000..131e265
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab
+new file mode 100644
+index 0000000..04aeda4
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream
+new file mode 100644
+index 0000000..132a271
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream.len
+new file mode 100644
+index 0000000..79ad34c
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.len
+new file mode 100644
+index 0000000..41d6c24
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.values.at b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.values.at
+new file mode 100644
+index 0000000..c834290
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.values.at differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i
+new file mode 100644
+index 0000000..1601c02
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i.len
+new file mode 100644
+index 0000000..131e265
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab
+new file mode 100644
+index 0000000..5fc703e
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream
+new file mode 100644
+index 0000000..39f4cac
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream.len
+new file mode 100644
+index 0000000..e381b23
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab.len
+new file mode 100644
+index 0000000..35ed991
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab.values.at b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab.values.at
+new file mode 100644
+index 0000000..a262c4a
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab.values.at differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab_i b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab_i
+new file mode 100644
+index 0000000..1bfa622
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab_i differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab_i.len b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab_i.len
+new file mode 100644
+index 0000000..131e265
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/caches-jvm/lookups/lookups.tab_i.len differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/last-build.bin b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/last-build.bin
+new file mode 100644
+index 0000000..1fe138d
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/cacheable/last-build.bin differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/classpath-snapshot/shrunk-classpath-snapshot.bin b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/classpath-snapshot/shrunk-classpath-snapshot.bin
+new file mode 100644
+index 0000000..fb7ec91
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/kotlin/compileDebugKotlin/classpath-snapshot/shrunk-classpath-snapshot.bin differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/outputs/aar/react-native-video-debug.aar b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/outputs/aar/react-native-video-debug.aar
+new file mode 100644
+index 0000000..a704fe4
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/outputs/aar/react-native-video-debug.aar differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/outputs/logs/manifest-merger-debug-report.txt b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/outputs/logs/manifest-merger-debug-report.txt
+new file mode 100644
+index 0000000..a388215
+--- /dev/null
++++ b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/outputs/logs/manifest-merger-debug-report.txt
+@@ -0,0 +1,16 @@
++-- Merging decision tree log ---
++manifest
++ADDED from /Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/src/main/AndroidManifestNew.xml:1:1-2:12
++INJECTED from /Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/src/main/AndroidManifestNew.xml:1:1-2:12
++	package
++		INJECTED from /Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/src/main/AndroidManifestNew.xml
++	xmlns:android
++		ADDED from /Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/src/main/AndroidManifestNew.xml:1:11-69
++uses-sdk
++INJECTED from /Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/src/main/AndroidManifestNew.xml reason: use-sdk injection requested
++INJECTED from /Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/src/main/AndroidManifestNew.xml
++INJECTED from /Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/src/main/AndroidManifestNew.xml
++	android:targetSdkVersion
++		INJECTED from /Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/src/main/AndroidManifestNew.xml
++	android:minSdkVersion
++		INJECTED from /Users/nayifnoushad/Documents/Projects/NuvioStreaming/node_modules/react-native-video/android/src/main/AndroidManifestNew.xml
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/compileDebugJavaWithJavac/previous-compilation-data.bin b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/compileDebugJavaWithJavac/previous-compilation-data.bin
+new file mode 100644
+index 0000000..b63c0e3
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/compileDebugJavaWithJavac/previous-compilation-data.bin differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/META-INF/react-native-video_debug.kotlin_module b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/META-INF/react-native-video_debug.kotlin_module
+new file mode 100644
+index 0000000..1698483
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/META-INF/react-native-video_debug.kotlin_module differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/AdsProps$Companion.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/AdsProps$Companion.class
+new file mode 100644
+index 0000000..2e5d42b
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/AdsProps$Companion.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/AdsProps.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/AdsProps.class
+new file mode 100644
+index 0000000..e2b54bd
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/AdsProps.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/BufferConfig$Companion.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/BufferConfig$Companion.class
+new file mode 100644
+index 0000000..0fbaa90
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/BufferConfig$Companion.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/BufferConfig$Live$Companion.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/BufferConfig$Live$Companion.class
+new file mode 100644
+index 0000000..ce1128e
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/BufferConfig$Live$Companion.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/BufferConfig$Live.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/BufferConfig$Live.class
+new file mode 100644
+index 0000000..2054200
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/BufferConfig$Live.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/BufferConfig.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/BufferConfig.class
+new file mode 100644
+index 0000000..7ef226b
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/BufferConfig.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/BufferingStrategy$BufferingStrategyEnum.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/BufferingStrategy$BufferingStrategyEnum.class
+new file mode 100644
+index 0000000..162566c
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/BufferingStrategy$BufferingStrategyEnum.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/BufferingStrategy$Companion.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/BufferingStrategy$Companion.class
+new file mode 100644
+index 0000000..7477be8
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/BufferingStrategy$Companion.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/BufferingStrategy.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/BufferingStrategy.class
+new file mode 100644
+index 0000000..3516405
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/BufferingStrategy.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/CMCDProps$Companion$WhenMappings.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/CMCDProps$Companion$WhenMappings.class
+new file mode 100644
+index 0000000..5145552
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/CMCDProps$Companion$WhenMappings.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/CMCDProps$Companion.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/CMCDProps$Companion.class
+new file mode 100644
+index 0000000..e813d1a
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/CMCDProps$Companion.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/CMCDProps.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/CMCDProps.class
+new file mode 100644
+index 0000000..e6c0538
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/CMCDProps.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/ControlsConfig$Companion.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/ControlsConfig$Companion.class
+new file mode 100644
+index 0000000..b2e5cfc
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/ControlsConfig$Companion.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/ControlsConfig.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/ControlsConfig.class
+new file mode 100644
+index 0000000..a672b48
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/ControlsConfig.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/DRMProps$Companion.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/DRMProps$Companion.class
+new file mode 100644
+index 0000000..949a5b9
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/DRMProps$Companion.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/DRMProps.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/DRMProps.class
+new file mode 100644
+index 0000000..8e26a44
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/DRMProps.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/ResizeMode$Mode.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/ResizeMode$Mode.class
+new file mode 100644
+index 0000000..8c2948d
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/ResizeMode$Mode.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/ResizeMode.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/ResizeMode.class
+new file mode 100644
+index 0000000..ab7c203
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/ResizeMode.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/SideLoadedTextTrack$Companion.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/SideLoadedTextTrack$Companion.class
+new file mode 100644
+index 0000000..3262de8
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/SideLoadedTextTrack$Companion.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/SideLoadedTextTrack.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/SideLoadedTextTrack.class
+new file mode 100644
+index 0000000..a6b7907
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/SideLoadedTextTrack.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/SideLoadedTextTrackList$Companion.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/SideLoadedTextTrackList$Companion.class
+new file mode 100644
+index 0000000..a41fe7d
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/SideLoadedTextTrackList$Companion.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/SideLoadedTextTrackList.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/SideLoadedTextTrackList.class
+new file mode 100644
+index 0000000..ec0f170
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/SideLoadedTextTrackList.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/Source$Companion.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/Source$Companion.class
+new file mode 100644
+index 0000000..20c7316
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/Source$Companion.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/Source$Metadata$Companion.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/Source$Metadata$Companion.class
+new file mode 100644
+index 0000000..3a83d08
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/Source$Metadata$Companion.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/Source$Metadata.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/Source$Metadata.class
+new file mode 100644
+index 0000000..381c5ea
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/Source$Metadata.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/Source.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/Source.class
+new file mode 100644
+index 0000000..763511c
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/Source.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/SubtitleStyle$Companion.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/SubtitleStyle$Companion.class
+new file mode 100644
+index 0000000..1ef82f1
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/SubtitleStyle$Companion.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/SubtitleStyle.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/SubtitleStyle.class
+new file mode 100644
+index 0000000..4ebb38c
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/SubtitleStyle.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/TimedMetadata.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/TimedMetadata.class
+new file mode 100644
+index 0000000..81dc3f7
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/TimedMetadata.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/Track.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/Track.class
+new file mode 100644
+index 0000000..bf9687d
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/Track.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/VideoTrack.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/VideoTrack.class
+new file mode 100644
+index 0000000..a011166
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/VideoTrack.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/ViewType$ViewType.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/ViewType$ViewType.class
+new file mode 100644
+index 0000000..2dfe0a5
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/ViewType$ViewType.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/ViewType.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/ViewType.class
+new file mode 100644
+index 0000000..24c319c
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/api/ViewType.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/react/EventTypes$Companion.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/react/EventTypes$Companion.class
+new file mode 100644
+index 0000000..7c1c2f6
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/react/EventTypes$Companion.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/react/EventTypes.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/react/EventTypes.class
+new file mode 100644
+index 0000000..68c48f1
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/react/EventTypes.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/react/VideoEventEmitter$EventBuilder.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/react/VideoEventEmitter$EventBuilder.class
+new file mode 100644
+index 0000000..0dceebe
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/react/VideoEventEmitter$EventBuilder.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/react/VideoEventEmitter$VideoCustomEvent.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/react/VideoEventEmitter$VideoCustomEvent.class
+new file mode 100644
+index 0000000..6116962
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/react/VideoEventEmitter$VideoCustomEvent.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/react/VideoEventEmitter.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/react/VideoEventEmitter.class
+new file mode 100644
+index 0000000..1f63a29
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/react/VideoEventEmitter.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/toolbox/DebugLog.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/toolbox/DebugLog.class
+new file mode 100644
+index 0000000..35fd981
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/toolbox/DebugLog.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/toolbox/ReactBridgeUtils.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/toolbox/ReactBridgeUtils.class
+new file mode 100644
+index 0000000..5b3a99d
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/common/toolbox/ReactBridgeUtils.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/AspectRatioFrameLayout$Companion.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/AspectRatioFrameLayout$Companion.class
+new file mode 100644
+index 0000000..e1e118c
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/AspectRatioFrameLayout$Companion.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/AspectRatioFrameLayout.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/AspectRatioFrameLayout.class
+new file mode 100644
+index 0000000..8955650
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/AspectRatioFrameLayout.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/AudioOutput$Companion.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/AudioOutput$Companion.class
+new file mode 100644
+index 0000000..fdbd8c4
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/AudioOutput$Companion.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/AudioOutput.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/AudioOutput.class
+new file mode 100644
+index 0000000..49bd1a1
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/AudioOutput.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/CMCDConfig$createCmcdConfiguration$1.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/CMCDConfig$createCmcdConfiguration$1.class
+new file mode 100644
+index 0000000..1b9ff2b
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/CMCDConfig$createCmcdConfiguration$1.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/CMCDConfig.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/CMCDConfig.class
+new file mode 100644
+index 0000000..24ff469
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/CMCDConfig.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/ConfigurationUtils.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/ConfigurationUtils.class
+new file mode 100644
+index 0000000..8623659
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/ConfigurationUtils.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/DRMManager.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/DRMManager.class
+new file mode 100644
+index 0000000..c054558
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/DRMManager.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/DRMManagerSpec.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/DRMManagerSpec.class
+new file mode 100644
+index 0000000..3ba0b21
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/DRMManagerSpec.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/DataSourceUtil.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/DataSourceUtil.class
+new file mode 100644
+index 0000000..435095f
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/DataSourceUtil.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/DefaultReactExoplayerConfig.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/DefaultReactExoplayerConfig.class
+new file mode 100644
+index 0000000..7d79368
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/DefaultReactExoplayerConfig.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/ExoPlayerView$Companion.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/ExoPlayerView$Companion.class
+new file mode 100644
+index 0000000..345dd50
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/ExoPlayerView$Companion.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/ExoPlayerView$playerListener$1.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/ExoPlayerView$playerListener$1.class
+new file mode 100644
+index 0000000..4dcc80e
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/ExoPlayerView$playerListener$1.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/ExoPlayerView.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/ExoPlayerView.class
+new file mode 100644
+index 0000000..df0ace7
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/ExoPlayerView.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/FullScreenPlayerView$KeepScreenOnUpdater$Companion.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/FullScreenPlayerView$KeepScreenOnUpdater$Companion.class
+new file mode 100644
+index 0000000..8bcae8d
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/FullScreenPlayerView$KeepScreenOnUpdater$Companion.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/FullScreenPlayerView$KeepScreenOnUpdater.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/FullScreenPlayerView$KeepScreenOnUpdater.class
+new file mode 100644
+index 0000000..550135d
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/FullScreenPlayerView$KeepScreenOnUpdater.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/FullScreenPlayerView.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/FullScreenPlayerView.class
+new file mode 100644
+index 0000000..257de83
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/FullScreenPlayerView.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/PictureInPictureUtil.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/PictureInPictureUtil.class
+new file mode 100644
+index 0000000..9e8c1b9
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/PictureInPictureUtil.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/PictureInPictureUtilKt.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/PictureInPictureUtilKt.class
+new file mode 100644
+index 0000000..2c42f4a
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/PictureInPictureUtilKt.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/PlaybackServiceBinder.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/PlaybackServiceBinder.class
+new file mode 100644
+index 0000000..5ae25b4
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/PlaybackServiceBinder.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/RNVExoplayerPlugin$DefaultImpls.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/RNVExoplayerPlugin$DefaultImpls.class
+new file mode 100644
+index 0000000..af3decf
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/RNVExoplayerPlugin$DefaultImpls.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/RNVExoplayerPlugin.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/RNVExoplayerPlugin.class
+new file mode 100644
+index 0000000..9bc6115
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/RNVExoplayerPlugin.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/RNVSimpleCache.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/RNVSimpleCache.class
+new file mode 100644
+index 0000000..659e439
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/RNVSimpleCache.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/ReactExoplayerConfig.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/ReactExoplayerConfig.class
+new file mode 100644
+index 0000000..2456c95
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/ReactExoplayerConfig.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/ReactExoplayerLoadErrorHandlingPolicy.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/ReactExoplayerLoadErrorHandlingPolicy.class
+new file mode 100644
+index 0000000..38ce458
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/ReactExoplayerLoadErrorHandlingPolicy.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/ReactExoplayerViewManager$Companion.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/ReactExoplayerViewManager$Companion.class
+new file mode 100644
+index 0000000..bc906a9
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/ReactExoplayerViewManager$Companion.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/ReactExoplayerViewManager.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/ReactExoplayerViewManager.class
+new file mode 100644
+index 0000000..07bd865
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/ReactExoplayerViewManager.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/VideoPlaybackCallback.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/VideoPlaybackCallback.class
+new file mode 100644
+index 0000000..5e67aa0
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/VideoPlaybackCallback.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/VideoPlaybackService$Companion$COMMAND.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/VideoPlaybackService$Companion$COMMAND.class
+new file mode 100644
+index 0000000..6ba65f2
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/VideoPlaybackService$Companion$COMMAND.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/VideoPlaybackService$Companion$WhenMappings.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/VideoPlaybackService$Companion$WhenMappings.class
+new file mode 100644
+index 0000000..647f782
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/VideoPlaybackService$Companion$WhenMappings.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/VideoPlaybackService$Companion.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/VideoPlaybackService$Companion.class
+new file mode 100644
+index 0000000..0f20e85
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/VideoPlaybackService$Companion.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/VideoPlaybackService.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/VideoPlaybackService.class
+new file mode 100644
+index 0000000..8a576c2
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/exoplayer/VideoPlaybackService.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/react/RNVPlugin.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/react/RNVPlugin.class
+new file mode 100644
+index 0000000..8a59f22
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/react/RNVPlugin.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/react/ReactNativeVideoManager$Companion.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/react/ReactNativeVideoManager$Companion.class
+new file mode 100644
+index 0000000..32d6d1f
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/react/ReactNativeVideoManager$Companion.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/react/ReactNativeVideoManager.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/react/ReactNativeVideoManager.class
+new file mode 100644
+index 0000000..2679ae0
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/react/ReactNativeVideoManager.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/react/ReactVideoPackage.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/react/ReactVideoPackage.class
+new file mode 100644
+index 0000000..2af2d2c
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/react/ReactVideoPackage.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/react/VideoDecoderInfoModule$Companion.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/react/VideoDecoderInfoModule$Companion.class
+new file mode 100644
+index 0000000..d8a4aa3
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/react/VideoDecoderInfoModule$Companion.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/react/VideoDecoderInfoModule.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/react/VideoDecoderInfoModule.class
+new file mode 100644
+index 0000000..8348d9d
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/react/VideoDecoderInfoModule.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/react/VideoManagerModule$Companion.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/react/VideoManagerModule$Companion.class
+new file mode 100644
+index 0000000..435293b
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/react/VideoManagerModule$Companion.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/react/VideoManagerModule.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/react/VideoManagerModule.class
+new file mode 100644
+index 0000000..c28e02b
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/react/VideoManagerModule.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/receiver/AudioBecomingNoisyReceiver.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/receiver/AudioBecomingNoisyReceiver.class
+new file mode 100644
+index 0000000..990ca48
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/receiver/AudioBecomingNoisyReceiver.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/receiver/BecomingNoisyListener$Companion$NO_OP$1.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/receiver/BecomingNoisyListener$Companion$NO_OP$1.class
+new file mode 100644
+index 0000000..07a503b
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/receiver/BecomingNoisyListener$Companion$NO_OP$1.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/receiver/BecomingNoisyListener$Companion.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/receiver/BecomingNoisyListener$Companion.class
+new file mode 100644
+index 0000000..efa3ee3
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/receiver/BecomingNoisyListener$Companion.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/receiver/BecomingNoisyListener.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/receiver/BecomingNoisyListener.class
+new file mode 100644
+index 0000000..75d1cd4
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/receiver/BecomingNoisyListener.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/receiver/PictureInPictureReceiver$Companion.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/receiver/PictureInPictureReceiver$Companion.class
+new file mode 100644
+index 0000000..535aad5
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/receiver/PictureInPictureReceiver$Companion.class differ
+diff --git a/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/receiver/PictureInPictureReceiver.class b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/receiver/PictureInPictureReceiver.class
+new file mode 100644
+index 0000000..0143f64
+Binary files /dev/null and b/node_modules/react-native-video/android/buildOutput_a15d4dee7fc4eda61b91308cbb6a2e72/tmp/kotlin-classes/debug/com/brentvatne/receiver/PictureInPictureReceiver.class differ
+diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java
+index f175dec..87e436a 100644
+--- a/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java
++++ b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java
+@@ -726,7 +726,7 @@ public class ReactExoplayerView extends FrameLayout implements
+ 
+         DefaultRenderersFactory renderersFactory =
+                 new DefaultRenderersFactory(getContext())
+-                        .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
++                        .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+                         .setEnableDecoderFallback(true)
+                         .forceEnableMediaCodecAsynchronousQueueing();
+ 
