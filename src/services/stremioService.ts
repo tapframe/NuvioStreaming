@@ -573,7 +573,6 @@ class StremioService {
       
       await this.saveInstalledAddons();
       await this.saveAddonOrder();
-      try { (require('./SyncService').syncService as any).pushAddons?.(); } catch {}
       // Emit an event that an addon was added
       addonEmitter.emit(ADDON_EVENTS.ADDON_ADDED, manifest.id);
     } else {
@@ -596,7 +595,6 @@ class StremioService {
       // Persist removals before app possibly exits
       await this.saveInstalledAddons();
       await this.saveAddonOrder();
-      try { (require('./SyncService').syncService as any).pushAddons?.(); } catch {}
       // Emit an event that an addon was removed
       addonEmitter.emit(ADDON_EVENTS.ADDON_REMOVED, id);
     }
@@ -1634,11 +1632,9 @@ class StremioService {
     const index = this.addonOrder.indexOf(id);
     if (index > 0) {
       // Swap with the previous item
-      [this.addonOrder[index - 1], this.addonOrder[index]] = 
+      [this.addonOrder[index - 1], this.addonOrder[index]] =
         [this.addonOrder[index], this.addonOrder[index - 1]];
       this.saveAddonOrder();
-      // Immediately push to server to avoid resets on restart
-      try { (require('./SyncService').syncService as any).pushAddons?.(); } catch {}
       // Emit an event that the order has changed
       addonEmitter.emit(ADDON_EVENTS.ORDER_CHANGED);
       return true;
@@ -1650,11 +1646,9 @@ class StremioService {
     const index = this.addonOrder.indexOf(id);
     if (index >= 0 && index < this.addonOrder.length - 1) {
       // Swap with the next item
-      [this.addonOrder[index], this.addonOrder[index + 1]] = 
+      [this.addonOrder[index], this.addonOrder[index + 1]] =
         [this.addonOrder[index + 1], this.addonOrder[index]];
       this.saveAddonOrder();
-      // Immediately push to server to avoid resets on restart
-      try { (require('./SyncService').syncService as any).pushAddons?.(); } catch {}
       // Emit an event that the order has changed
       addonEmitter.emit(ADDON_EVENTS.ORDER_CHANGED);
       return true;
