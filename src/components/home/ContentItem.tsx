@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Toast } from 'toastify-react-native';
 import { DeviceEventEmitter } from 'react-native';
-import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Platform, Text, Animated, Share } from 'react-native';
+import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Platform, Text, Share } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -11,6 +11,7 @@ import { DropUpMenu } from './DropUpMenu';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { storageService } from '../../services/storageService';
 import { TraktService } from '../../services/traktService';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 interface ContentItemProps {
   item: StreamingContent;
@@ -96,7 +97,6 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
   const { currentTheme } = useTheme();
   const { settings, isLoaded } = useSettings();
   const posterRadius = typeof settings.posterBorderRadius === 'number' ? settings.posterBorderRadius : 12;
-  const fadeInOpacity = React.useRef(new Animated.Value(1)).current;
   // Memoize poster width calculation to avoid recalculating on every render
   const posterWidth = React.useMemo(() => {
     switch (settings.posterSize) {
@@ -232,7 +232,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
 
   return (
     <>
-      <Animated.View style={[styles.itemContainer, { width: posterWidth, opacity: fadeInOpacity }]}> 
+      <Animated.View style={[styles.itemContainer, { width: posterWidth }]} entering={FadeIn.duration(300)}> 
         <TouchableOpacity
           style={[styles.contentItem, { width: posterWidth, borderRadius: posterRadius }]}
           activeOpacity={0.7}

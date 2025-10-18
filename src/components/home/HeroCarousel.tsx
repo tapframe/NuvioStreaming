@@ -532,21 +532,20 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
         {/* Static genres positioned absolutely over the card */}
         {item.genres && (
           <View style={styles.genresOverlay as ViewStyle} pointerEvents="none">
-            <Animated.Text
-              entering={FadeIn.duration(400).delay(100)}
-              style={[styles.genres as TextStyle, { color: colors.mediumEmphasis, textAlign: 'center' }, genresAnimatedStyle]}
-              numberOfLines={1}
-            >
-              {item.genres.slice(0, 3).join(' • ')}
-            </Animated.Text>
+            <Animated.View entering={FadeIn.duration(400).delay(100)}>
+              <Animated.Text
+                style={[styles.genres as TextStyle, { color: colors.mediumEmphasis, textAlign: 'center' }, genresAnimatedStyle]}
+                numberOfLines={1}
+              >
+                {item.genres.slice(0, 3).join(' • ')}
+              </Animated.Text>
+            </Animated.View>
           </View>
         )}
         {/* Static action buttons positioned absolutely over the card */}
         <View style={styles.actionsOverlay as ViewStyle} pointerEvents="box-none">
-          <Animated.View
-            entering={FadeIn.duration(500).delay(200)}
-            style={[styles.actions as ViewStyle, actionsAnimatedStyle]}
-          >
+          <Animated.View entering={FadeIn.duration(500).delay(200)}>
+            <Animated.View style={[styles.actions as ViewStyle, actionsAnimatedStyle]}>
             <TouchableOpacity
               style={[styles.playButton as ViewStyle, { backgroundColor: colors.white }]}
               onPress={onPressPlay}
@@ -563,6 +562,7 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
               <MaterialIcons name="info-outline" size={18} color={colors.white} />
               <Text style={[styles.secondaryText as TextStyle, { color: colors.white }]}>Info</Text>
             </TouchableOpacity>
+            </Animated.View>
           </Animated.View>
         </View>
         {/* Static logo positioned absolutely over the card */}

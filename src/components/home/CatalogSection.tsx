@@ -77,7 +77,7 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
   const keyExtractor = useCallback((item: StreamingContent) => `${item.id}-${item.type}`, []);
 
   return (
-    <Animated.View style={styles.catalogContainer} entering={FadeIn.duration(350)}>
+    <Animated.View style={styles.catalogContainer} entering={FadeIn.duration(400)}>
       <View style={styles.catalogHeader}>
         <View style={styles.titleContainer}>
           <Text style={[styles.catalogTitle, { color: currentTheme.colors.text }]} numberOfLines={1}>{catalog.name}</Text>
