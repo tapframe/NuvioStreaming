@@ -1235,13 +1235,16 @@ class StremioService {
           // Execute local scrapers asynchronously with TMDB ID (when available)
           if (tmdbId) {
             localScraperService.getStreams(scraperType, tmdbId, season, episode, (streams, scraperId, scraperName, error) => {
-              if (error) {
-                if (callback) {
+              // Always call callback to ensure UI updates, regardless of result
+              if (callback) {
+                if (error) {
                   callback(null, scraperId, scraperName, error);
-                }
-              } else if (streams && streams.length > 0) {
-                if (callback) {
+                } else if (streams && streams.length > 0) {
                   callback(streams, scraperId, scraperName, null);
+                } else {
+                  // Handle case where scraper completed successfully but returned no streams
+                  // This ensures the scraper is removed from "fetching" state in UI
+                  callback([], scraperId, scraperName, null);
                 }
               }
             });
