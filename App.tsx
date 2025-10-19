@@ -40,6 +40,7 @@ import UpdateService from './src/services/updateService';
 import { memoryMonitorService } from './src/services/memoryMonitorService';
 import { aiService } from './src/services/aiService';
 import { AccountProvider, useAccount } from './src/contexts/AccountContext';
+import { ToastProvider } from './src/contexts/ToastContext';
 
 Sentry.init({
   dsn: 'https://1a58bf436454d346e5852b7bfd3c95e8@o4509536317276160.ingest.de.sentry.io/4509536317734992',
@@ -203,7 +204,9 @@ function App(): React.JSX.Element {
           <TraktProvider>
             <ThemeProvider>
               <TrailerProvider>
-                <ThemedApp />
+                <ToastProvider>
+                  <ThemedApp />
+                </ToastProvider>
               </TrailerProvider>
             </ThemeProvider>
           </TraktProvider>

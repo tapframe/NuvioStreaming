@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Toast } from 'toastify-react-native';
+import { useToast } from '../../contexts/ToastContext';
 import { DeviceEventEmitter } from 'react-native';
 import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Platform, Text, Share } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
@@ -100,6 +100,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
 
   const { currentTheme } = useTheme();
   const { settings, isLoaded } = useSettings();
+  const { showSuccess, showInfo } = useToast();
   const posterRadius = typeof settings.posterBorderRadius === 'number' ? settings.posterBorderRadius : 12;
   // Memoize poster width calculation to avoid recalculating on every render
   const posterWidth = React.useMemo(() => {
@@ -129,10 +130,10 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
       case 'library':
         if (inLibrary) {
           catalogService.removeFromLibrary(item.type, item.id);
-          Toast.info('Removed from Library');
+          showInfo('Removed from Library', 'Removed from your local library');
         } else {
           catalogService.addToLibrary(item);
-          Toast.success('Added to Library');
+          showSuccess('Added to Library', 'Added to your local library');
         }
         break;
       case 'watched': {
@@ -141,7 +142,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
         try {
           await AsyncStorage.setItem(`watched:${item.type}:${item.id}`, targetWatched ? 'true' : 'false');
         } catch {}
-        Toast.info(targetWatched ? 'Marked as Watched' : 'Marked as Unwatched');
+        showInfo(targetWatched ? 'Marked as Watched' : 'Marked as Unwatched', targetWatched ? 'Item marked as watched' : 'Item marked as unwatched');
         setTimeout(() => {
           DeviceEventEmitter.emit('watchedStatusChanged');
         }, 100);
@@ -187,10 +188,10 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
       case 'trakt-watchlist': {
         if (isInWatchlist(item.id, item.type as 'movie' | 'show')) {
           await removeFromWatchlist(item.id, item.type as 'movie' | 'show');
-          Toast.info('Removed from Trakt Watchlist');
+          showInfo('Removed from Watchlist', 'Removed from your Trakt watchlist');
         } else {
           await addToWatchlist(item.id, item.type as 'movie' | 'show');
-          Toast.success('Added to Trakt Watchlist');
+          showSuccess('Added to Watchlist', 'Added to your Trakt watchlist');
         }
         setMenuVisible(false);
         break;
@@ -198,16 +199,16 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
       case 'trakt-collection': {
         if (isInCollection(item.id, item.type as 'movie' | 'show')) {
           await removeFromCollection(item.id, item.type as 'movie' | 'show');
-          Toast.info('Removed from Trakt Collection');
+          showInfo('Removed from Collection', 'Removed from your Trakt collection');
         } else {
           await addToCollection(item.id, item.type as 'movie' | 'show');
-          Toast.success('Added to Trakt Collection');
+          showSuccess('Added to Collection', 'Added to your Trakt collection');
         }
         setMenuVisible(false);
         break;
       }
     }
-  }, [item, inLibrary, isWatched, isInWatchlist, isInCollection, addToWatchlist, removeFromWatchlist, addToCollection, removeFromCollection]);
+  }, [item, inLibrary, isWatched, isInWatchlist, isInCollection, addToWatchlist, removeFromWatchlist, addToCollection, removeFromCollection, showSuccess, showInfo]);
 
   const handleMenuClose = useCallback(() => {
     setMenuVisible(false);
@@ -309,12 +310,12 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
               </View>
             )}
             {isAuthenticated && isInWatchlist(item.id, item.type as 'movie' | 'show') && (
-              <View style={styles.traktWatchlistBadge}>
+              <View style={styles.traktWatchlistIcon}>
                 <MaterialIcons name="playlist-add-check" size={16} color="#E74C3C" />
               </View>
             )}
             {isAuthenticated && isInCollection(item.id, item.type as 'movie' | 'show') && (
-              <View style={styles.traktCollectionBadge}>
+              <View style={styles.traktCollectionIcon}>
                 <MaterialIcons name="video-library" size={16} color="#3498DB" />
               </View>
             )}
@@ -395,21 +396,17 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 4,
   },
-  traktWatchlistBadge: {
+  traktWatchlistIcon: {
     position: 'absolute',
     top: 8,
-    left: 8,
-    backgroundColor: 'rgba(231, 76, 60, 0.9)',
-    borderRadius: 8,
-    padding: 4,
+    right: 8,
+    padding: 2,
   },
-  traktCollectionBadge: {
+  traktCollectionIcon: {
     position: 'absolute',
     top: 8,
-    left: 8,
-    backgroundColor: 'rgba(52, 152, 219, 0.9)',
-    borderRadius: 8,
-    padding: 4,
+    right: 32, // Positioned to the left of watchlist icon
+    padding: 2,
   },
   title: {
     fontSize: 13,

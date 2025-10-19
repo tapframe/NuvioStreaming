@@ -47,6 +47,7 @@ import Animated, {
   SharedValue,
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useToast } from '../../contexts/ToastContext';
 import { useTraktContext } from '../../contexts/TraktContext';
 import { useSettings } from '../../hooks/useSettings';
 import { useTrailer } from '../../contexts/TrailerContext';
@@ -150,6 +151,7 @@ const ActionButtons = memo(({
   onToggleCollection?: () => void;
 }) => {
   const { currentTheme } = useTheme();
+  const { showSaved, showTraktSaved, showRemoved, showTraktRemoved, showSuccess, showInfo } = useToast();
   
   // Performance optimization: Cache theme colors
   const themeColors = useMemo(() => ({
@@ -195,6 +197,51 @@ const ActionButtons = memo(({
       });
     }
   }, [id, navigation, settings.enrichMetadataWithTMDB]);
+
+  // Enhanced save handler that combines local library + Trakt watchlist
+  const handleSaveAction = useCallback(async () => {
+    const wasInLibrary = inLibrary;
+    
+    // Always toggle local library first
+    toggleLibrary();
+    
+    // If authenticated, also toggle Trakt watchlist
+    if (isAuthenticated && onToggleWatchlist) {
+      await onToggleWatchlist();
+    }
+    
+    // Show appropriate toast
+    if (isAuthenticated) {
+      if (wasInLibrary) {
+        showTraktRemoved();
+      } else {
+        showTraktSaved();
+      }
+    } else {
+      if (wasInLibrary) {
+        showRemoved();
+      } else {
+        showSaved();
+      }
+    }
+  }, [toggleLibrary, isAuthenticated, onToggleWatchlist, inLibrary, showSaved, showTraktSaved, showRemoved, showTraktRemoved]);
+
+  // Enhanced collection handler with toast notifications
+  const handleCollectionAction = useCallback(async () => {
+    const wasInCollection = isInCollection;
+    
+    // Toggle collection
+    if (onToggleCollection) {
+      await onToggleCollection();
+    }
+    
+    // Show appropriate toast
+    if (wasInCollection) {
+      showInfo('Removed from Collection', 'Removed from your Trakt collection');
+    } else {
+      showSuccess('Added to Collection', 'Added to your Trakt collection');
+    }
+  }, [onToggleCollection, isInCollection, showSuccess, showInfo]);
 
   // Optimized play button style calculation
   const playButtonStyle = useMemo(() => {
@@ -290,105 +337,83 @@ const ActionButtons = memo(({
 
   return (
     <Animated.View style={[isTablet ? styles.tabletActionButtons : styles.actionButtons, animatedStyle]}>
-      <TouchableOpacity
-        style={[playButtonStyle, isTablet && styles.tabletPlayButton]}
-        onPress={handleShowStreams}
-        activeOpacity={0.85}
-      >
-        <MaterialIcons 
-          name={(() => {
-            if (isWatched) {
-              return type === 'movie' ? 'replay' : 'play-arrow';
-            }
-            return playButtonText === 'Resume' ? 'play-circle-outline' : 'play-arrow';
-          })()} 
-          size={isTablet ? 28 : 24} 
-          color={isWatched && type === 'movie' ? "#fff" : "#000"} 
-        />
-        <Text style={[playButtonTextStyle, isTablet && styles.tabletPlayButtonText]}>{finalPlayButtonText}</Text>
-      </TouchableOpacity>
+      {/* Play Button Row - Only Play button */}
+      <View style={styles.playButtonRow}>
+        <TouchableOpacity
+          style={[playButtonStyle, isTablet && styles.tabletPlayButton]}
+          onPress={handleShowStreams}
+          activeOpacity={0.85}
+        >
+          <MaterialIcons 
+            name={(() => {
+              if (isWatched) {
+                return type === 'movie' ? 'replay' : 'play-arrow';
+              }
+              return playButtonText === 'Resume' ? 'play-circle-outline' : 'play-arrow';
+            })()} 
+            size={isTablet ? 28 : 24} 
+            color={isWatched && type === 'movie' ? "#fff" : "#000"} 
+          />
+          <Text style={[playButtonTextStyle, isTablet && styles.tabletPlayButtonText]}>{finalPlayButtonText}</Text>
+        </TouchableOpacity>
+      </View>
 
-      <TouchableOpacity
-        style={[styles.actionButton, styles.infoButton, isTablet && styles.tabletInfoButton]}
-        onPress={toggleLibrary}
-        activeOpacity={0.85}
-      >
-        {Platform.OS === 'ios' ? (
-          GlassViewComp && liquidGlassAvailable ? (
-            <GlassViewComp
-              style={styles.blurBackground}
-              glassEffectStyle="regular"
-            />
+      {/* Secondary Action Row - All other buttons */}
+      <View style={styles.secondaryActionRow}>
+        {/* Save Button */}
+        <TouchableOpacity
+          style={[styles.actionButton, styles.infoButton, isTablet && styles.tabletInfoButton]}
+          onPress={handleSaveAction}
+          activeOpacity={0.85}
+        >
+          {Platform.OS === 'ios' ? (
+            GlassViewComp && liquidGlassAvailable ? (
+              <GlassViewComp
+                style={styles.blurBackground}
+                glassEffectStyle="regular"
+              />
+            ) : (
+              <ExpoBlurView intensity={80} style={styles.blurBackground} tint="dark" />
+            )
           ) : (
-            <ExpoBlurView intensity={80} style={styles.blurBackground} tint="dark" />
-          )
-        ) : (
-          <View style={styles.androidFallbackBlur} />
-        )}
-        <MaterialIcons
-          name={inLibrary ? "bookmark" : "bookmark-outline"}
-          size={isTablet ? 28 : 24}
-          color={currentTheme.colors.white}
-        />
-        <Text style={[styles.infoButtonText, isTablet && styles.tabletInfoButtonText]}>
-          {inLibrary ? 'Saved' : 'Save'}
-        </Text>
-      </TouchableOpacity>
+            <View style={styles.androidFallbackBlur} />
+          )}
+          <MaterialIcons
+            name={inLibrary ? "bookmark" : "bookmark-outline"}
+            size={isTablet ? 28 : 24}
+            color={inLibrary ? (isAuthenticated && isInWatchlist ? "#E74C3C" : currentTheme.colors.white) : currentTheme.colors.white}
+          />
+          <Text style={[styles.infoButtonText, isTablet && styles.tabletInfoButtonText]}>
+            {inLibrary ? 'Saved' : 'Save'}
+          </Text>
+        </TouchableOpacity>
 
-      {/* AI Chat Button */}
-      {aiChatEnabled && (
-      <TouchableOpacity
-        style={[styles.iconButton, isTablet && styles.tabletIconButton]}
-        onPress={() => {
-          // Extract episode info if it's a series
-          let episodeData = null;
-          if (type === 'series' && watchProgress?.episodeId) {
-            const parts = watchProgress.episodeId.split(':');
-            if (parts.length >= 3) {
-              episodeData = {
-                seasonNumber: parseInt(parts[1], 10),
-                episodeNumber: parseInt(parts[2], 10)
-              };
-            }
-          }
-
-          navigation.navigate('AIChat', {
-            contentId: id,
-            contentType: type,
-            episodeId: episodeData ? watchProgress.episodeId : undefined,
-            seasonNumber: episodeData?.seasonNumber,
-            episodeNumber: episodeData?.episodeNumber,
-            title: metadata?.name || metadata?.title || 'Unknown'
-          });
-        }}
-        activeOpacity={0.85}
-      >
-        {Platform.OS === 'ios' ? (
-          GlassViewComp && liquidGlassAvailable ? (
-            <GlassViewComp
-              style={styles.blurBackgroundRound}
-              glassEffectStyle="regular"
-            />
-          ) : (
-            <ExpoBlurView intensity={80} style={styles.blurBackgroundRound} tint="dark" />
-          )
-        ) : (
-          <View style={styles.androidFallbackBlurRound} />
-        )}
-        <MaterialIcons 
-          name="smart-toy" 
-          size={isTablet ? 28 : 24} 
-          color={currentTheme.colors.white}
-        />
-      </TouchableOpacity>
-      )}
-
-      {/* Trakt Action Buttons */}
-      {isAuthenticated && (
-        <>
+        {/* AI Chat Button */}
+        {aiChatEnabled && (
           <TouchableOpacity
-            style={[styles.actionButton, styles.traktButton, isTablet && styles.tabletTraktButton]}
-            onPress={onToggleWatchlist}
+            style={[styles.iconButton, isTablet && styles.tabletIconButton]}
+            onPress={() => {
+              // Extract episode info if it's a series
+              let episodeData = null;
+              if (type === 'series' && watchProgress?.episodeId) {
+                const parts = watchProgress.episodeId.split(':');
+                if (parts.length >= 3) {
+                  episodeData = {
+                    seasonNumber: parseInt(parts[1], 10),
+                    episodeNumber: parseInt(parts[2], 10)
+                  };
+                }
+              }
+
+              navigation.navigate('AIChat', {
+                contentId: id,
+                contentType: type,
+                episodeId: episodeData ? watchProgress.episodeId : undefined,
+                seasonNumber: episodeData?.seasonNumber,
+                episodeNumber: episodeData?.episodeNumber,
+                title: metadata?.name || metadata?.title || 'Unknown'
+              });
+            }}
             activeOpacity={0.85}
           >
             {Platform.OS === 'ios' ? (
@@ -404,15 +429,18 @@ const ActionButtons = memo(({
               <View style={styles.androidFallbackBlurRound} />
             )}
             <MaterialIcons 
-              name={isInWatchlist ? "playlist-add-check" : "playlist-add"} 
+              name="smart-toy" 
               size={isTablet ? 28 : 24} 
-              color={isInWatchlist ? "#E74C3C" : currentTheme.colors.white}
+              color={currentTheme.colors.white}
             />
           </TouchableOpacity>
+        )}
 
+        {/* Trakt Collection Button */}
+        {isAuthenticated && (
           <TouchableOpacity
-            style={[styles.actionButton, styles.traktButton, isTablet && styles.tabletTraktButton]}
-            onPress={onToggleCollection}
+            style={[styles.iconButton, isTablet && styles.tabletIconButton]}
+            onPress={handleCollectionAction}
             activeOpacity={0.85}
           >
             {Platform.OS === 'ios' ? (
@@ -433,34 +461,35 @@ const ActionButtons = memo(({
               color={isInCollection ? "#3498DB" : currentTheme.colors.white}
             />
           </TouchableOpacity>
-        </>
-      )}
+        )}
 
-      {type === 'series' && (
-        <TouchableOpacity
-          style={[styles.iconButton, isTablet && styles.tabletIconButton]}
-          onPress={handleRatingsPress}
-          activeOpacity={0.85}
-        >
-          {Platform.OS === 'ios' ? (
-            GlassViewComp && liquidGlassAvailable ? (
-              <GlassViewComp
-                style={styles.blurBackgroundRound}
-                glassEffectStyle="regular"
-              />
+        {/* Ratings Button (for series) */}
+        {type === 'series' && (
+          <TouchableOpacity
+            style={[styles.iconButton, isTablet && styles.tabletIconButton]}
+            onPress={handleRatingsPress}
+            activeOpacity={0.85}
+          >
+            {Platform.OS === 'ios' ? (
+              GlassViewComp && liquidGlassAvailable ? (
+                <GlassViewComp
+                  style={styles.blurBackgroundRound}
+                  glassEffectStyle="regular"
+                />
+              ) : (
+                <ExpoBlurView intensity={80} style={styles.blurBackgroundRound} tint="dark" />
+              )
             ) : (
-              <ExpoBlurView intensity={80} style={styles.blurBackgroundRound} tint="dark" />
-            )
-          ) : (
-            <View style={styles.androidFallbackBlurRound} />
-          )}
-          <MaterialIcons 
-            name="assessment" 
-            size={isTablet ? 28 : 24} 
-            color={currentTheme.colors.white}
-          />
-        </TouchableOpacity>
-      )}
+              <View style={styles.androidFallbackBlurRound} />
+            )}
+            <MaterialIcons 
+              name="assessment" 
+              size={isTablet ? 28 : 24} 
+              color={currentTheme.colors.white}
+            />
+          </TouchableOpacity>
+        )}
+      </View>
     </Animated.View>
   );
 });
@@ -1928,14 +1957,35 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   actionButtons: {
-    flexDirection: 'row',
-    gap: 8,
+    flexDirection: 'column',
+    gap: 12,
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
     position: 'relative',
     maxWidth: isTablet ? 600 : '100%',
     alignSelf: 'center',
+  },
+  primaryActionRow: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  playButtonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  secondaryActionRow: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    flexWrap: 'wrap',
   },
   actionButton: {
     flexDirection: 'row',
@@ -2267,7 +2317,7 @@ const styles = StyleSheet.create({
   
   // Tablet-specific styles
   tabletActionButtons: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     gap: 16,
     alignItems: 'center',
     justifyContent: 'center',

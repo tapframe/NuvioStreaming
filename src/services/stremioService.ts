@@ -1015,7 +1015,6 @@ class StremioService {
 
       // Filter episodes to only include those within our date range
       // This is done immediately after fetching to reduce memory footprint
-      logger.log(`[StremioService] Filtering ${metadata.videos.length} episodes for ${id}, date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
 
       const filteredEpisodes = metadata.videos
         .filter(video => {
@@ -1025,13 +1024,11 @@ class StremioService {
           }
           const releaseDate = new Date(video.released);
           const inRange = releaseDate >= startDate && releaseDate <= endDate;
-          logger.log(`[StremioService] Episode ${video.id}: released=${video.released}, inRange=${inRange}`);
           return inRange;
         })
         .sort((a, b) => new Date(a.released).getTime() - new Date(b.released).getTime())
         .slice(0, maxEpisodes); // Limit number of episodes to prevent memory overflow
 
-      logger.log(`[StremioService] After filtering: ${filteredEpisodes.length} episodes remain`);
 
       return {
         seriesName: metadata.name,

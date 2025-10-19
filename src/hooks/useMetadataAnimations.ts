@@ -40,7 +40,7 @@ export const useMetadataAnimations = (safeAreaTop: number, watchProgress: any) =
   // Combined hero animations 
   const heroOpacity = useSharedValue(1);
   const heroScale = useSharedValue(1); // Start at 1 for Android compatibility
-  const heroHeightValue = useSharedValue(height * 0.5);
+  const heroHeightValue = useSharedValue(height * 0.55);
   
   // Combined UI element animations
   const uiElementsOpacity = useSharedValue(1);

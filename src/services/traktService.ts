@@ -1212,10 +1212,10 @@ export class TraktService {
 
       // Try multiple search approaches
       const searchUrls = [
-        `${TRAKT_API_URL}/search/${type === 'show' ? 'shows' : type}?id_type=imdb&id=${cleanImdbId}`,
-        `${TRAKT_API_URL}/search/${type === 'show' ? 'shows' : type}?query=${encodeURIComponent(cleanImdbId)}&id_type=imdb`,
+        `${TRAKT_API_URL}/search/${type === 'show' ? 'show' : type}?id_type=imdb&id=${cleanImdbId}`,
+        `${TRAKT_API_URL}/search/${type === 'show' ? 'show' : type}?query=${encodeURIComponent(cleanImdbId)}&id_type=imdb`,
         // Also try with the full tt-prefixed ID in case the API accepts it
-        `${TRAKT_API_URL}/search/${type === 'show' ? 'shows' : type}?id_type=imdb&id=tt${cleanImdbId}`
+        `${TRAKT_API_URL}/search/${type === 'show' ? 'show' : type}?id_type=imdb&id=tt${cleanImdbId}`
       ];
 
       for (const searchUrl of searchUrls) {
@@ -2339,7 +2339,7 @@ export class TraktService {
     try {
       logger.log(`[TraktService] Searching Trakt for ${type} with TMDB ID: ${tmdbId}`);
 
-      const response = await fetch(`${TRAKT_API_URL}/search/${type === 'show' ? 'shows' : type}?id_type=tmdb&id=${tmdbId}`, {
+      const response = await fetch(`${TRAKT_API_URL}/search/${type === 'show' ? 'show' : type}?id_type=tmdb&id=${tmdbId}`, {
         headers: {
           'Content-Type': 'application/json',
           'trakt-api-version': '2',

@@ -206,12 +206,6 @@ export const useCalendarData = (): UseCalendarDataReturn => {
                       season_poster_path: tmdbEpisode.season_poster_path || null
                     };
 
-                    // Debug log for episodes
-                    if (episode.releaseDate) {
-                      logger.log(`[CalendarData] Episode with date: ${episode.seriesName} - ${episode.title} (${episode.releaseDate})`);
-                    } else {
-                      logger.log(`[CalendarData] Episode without date: ${episode.seriesName} - ${episode.title}`);
-                    }
 
                     return episode;
                   });
