@@ -83,6 +83,46 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
         return 16; // phone
     }
   }, [deviceType]);
+
+  // Match ThisWeekSection card sizing for horizontal episode cards
+  const horizontalCardWidth = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return Math.min(deviceWidth * 0.25, 400);
+      case 'largeTablet':
+        return Math.min(deviceWidth * 0.35, 350);
+      case 'tablet':
+        return Math.min(deviceWidth * 0.46, 300);
+      default:
+        return width * 0.75;
+    }
+  }, [deviceType, deviceWidth, width]);
+
+  const horizontalCardHeight = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 280;
+      case 'largeTablet':
+        return 250;
+      case 'tablet':
+        return 220;
+      default:
+        return 180;
+    }
+  }, [deviceType]);
+
+  const horizontalItemSpacing = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 20;
+      case 'largeTablet':
+        return 18;
+      case 'tablet':
+        return 16;
+      default:
+        return 16;
+    }
+  }, [deviceType]);
   
   // Enhanced season poster sizing
   const seasonPosterWidth = useMemo(() => {
@@ -730,6 +770,20 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               <MaterialIcons name="check" size={isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12} color={currentTheme.colors.white} />
             </View>
           )}
+          {(!progress || progressPercent === 0) && (
+            <View style={{
+              position: 'absolute',
+              top: 8,
+              left: 8,
+              width: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20,
+              height: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20,
+              borderRadius: isTV ? 12 : isLargeTablet ? 11 : isTablet ? 10 : 10,
+              borderWidth: 2,
+              borderStyle: 'dashed',
+              borderColor: currentTheme.colors.textMuted,
+              opacity: 0.85,
+            }} />
+          )}
         </View>
 
         <View style={[
@@ -874,7 +928,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
           styles.episodeCardHorizontal,
           {
             borderRadius: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
-            height: isTV ? 280 : isLargeTablet ? 260 : isTablet ? 240 : 200,
+            height: horizontalCardHeight,
             elevation: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 8,
             shadowOpacity: isTV ? 0.4 : isLargeTablet ? 0.35 : isTablet ? 0.3 : 0.3,
             shadowRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 8
@@ -882,7 +936,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
           // Gradient border styling
           { 
             borderWidth: 1,
-            borderColor: 'transparent',
+            borderColor: 'rgba(255,255,255,0.12)',
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 4 },
           }
@@ -890,32 +944,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
         onPress={() => onSelectEpisode(episode)}
         activeOpacity={0.85}
       >
-        {/* Gradient Border Container */}
-        <View style={{
-          position: 'absolute',
-          top: -1,
-          left: -1,
-          right: -1,
-          bottom: -1,
-          borderRadius: 17,
-          zIndex: -1,
-        }}>
-          <LinearGradient
-            colors={[
-              '#ffffff80', // White with 50% opacity
-              '#ffffff40', // White with 25% opacity  
-              '#ffffff20', // White with 12% opacity
-              '#ffffff40', // White with 25% opacity
-              '#ffffff80', // White with 50% opacity
-            ]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={{
-              flex: 1,
-              borderRadius: 17,
-            }}
-          />
-        </View>
+        {/* Solid outline replaces gradient border */}
 
         {/* Background Image */}
         <FastImage
@@ -1057,6 +1086,20 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               <MaterialIcons name="check" size={isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16} color="#fff" />
             </View>
           )}
+          {(!progress || progressPercent === 0) && (
+            <View style={{
+              position: 'absolute',
+              top: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12,
+              left: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12,
+              width: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 24 : 24,
+              height: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 24 : 24,
+              borderRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12,
+              borderWidth: 2,
+              borderStyle: 'dashed',
+              borderColor: currentTheme.colors.textMuted,
+              opacity: 0.9,
+            }} />
+          )}
           
         </LinearGradient>
       </TouchableOpacity>
@@ -1115,8 +1158,8 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                   style={[
                     styles.episodeCardWrapperHorizontal,
                     {
-                      width: isTV ? width * 0.45 : isLargeTablet ? width * 0.4 : isTablet ? width * 0.4 : width * 0.75,
-                      marginRight: isTV ? 24 : isLargeTablet ? 20 : isTablet ? 20 : 16
+                      width: horizontalCardWidth,
+                      marginRight: horizontalItemSpacing
                     }
                   ]}
                 >
@@ -1138,11 +1181,10 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               maxToRenderPerBatch={5}
               windowSize={5}
               getItemLayout={(data, index) => {
-                const cardWidth = isTV ? width * 0.45 : isLargeTablet ? width * 0.4 : isTablet ? width * 0.4 : width * 0.75;
-                const margin = isTV ? 24 : isLargeTablet ? 20 : isTablet ? 20 : 16;
+                const length = horizontalCardWidth + horizontalItemSpacing;
                 return {
-                  length: cardWidth + margin,
-                  offset: (cardWidth + margin) * index,
+                  length,
+                  offset: length * index,
                   index,
                 };
               }}

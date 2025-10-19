@@ -837,41 +837,66 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
 
   const renderSkeletons = useCallback(() => {
     const placeholders = [0, 1, 2];
+    // Responsive skeleton sizes to match CompactCommentCard
+    const skWidth = isTV ? 360 : isLargeTablet ? 320 : isTablet ? 300 : 280;
+    const skHeight = isTV ? 200 : isLargeTablet ? 185 : isTablet ? 175 : 170;
+    const skPad = isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12;
+    const gap = isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12;
+    const headLineWidth = isTV ? 160 : isLargeTablet ? 140 : isTablet ? 130 : 120;
+    const ratingWidth = isTV ? 100 : isLargeTablet ? 90 : isTablet ? 85 : 80;
+    const statWidth = isTV ? 44 : isLargeTablet ? 40 : isTablet ? 38 : 36;
+    const badgeW = isTV ? 60 : isLargeTablet ? 56 : isTablet ? 52 : 50;
+    const badgeH = isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12;
+
     return (
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.horizontalList, { paddingRight: gap }]}>
         {placeholders.map((i) => (
-          <View key={`skeleton-${i}`} style={[styles.compactCard, { backgroundColor: currentTheme.colors.card, borderColor: currentTheme.colors.border }]}>
+          <View
+            key={`skeleton-${i}`}
+            style={[
+              styles.compactCard,
+              {
+                backgroundColor: currentTheme.colors.card,
+                borderColor: currentTheme.colors.border,
+                width: skWidth,
+                height: skHeight,
+                marginRight: gap,
+                padding: skPad,
+                borderRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12,
+              },
+            ]}
+          >
             <View style={styles.skeletonTraktContainer}>
-              <View style={[styles.skeletonDot]} />
+              <View style={[styles.skeletonDot, { width: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16, height: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16, borderRadius: isTV ? 10 : isLargeTablet ? 9 : 8 }]} />
             </View>
 
-            <View style={styles.compactHeader}>
-              <View style={[styles.skeletonLine, { width: 120 }]} />
-              <View style={[styles.miniVipBadge, styles.skeletonBadge]} />
+            <View style={[styles.compactHeader, { marginBottom: isTV ? 10 : isLargeTablet ? 8 : isTablet ? 8 : 8 }]}>
+              <View style={[styles.skeletonLine, { width: headLineWidth, height: isTV ? 14 : 12 }]} />
+              <View style={[styles.miniVipBadge, styles.skeletonBadge, { width: isTV ? 36 : isLargeTablet ? 32 : isTablet ? 28 : 24, height: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12, borderRadius: isTV ? 10 : isLargeTablet ? 9 : 8 }]} />
             </View>
 
-            <View style={styles.compactRating}>
-              <View style={[styles.skeletonLine, { width: 80, height: 10 }]} />
+            <View style={[styles.compactRating, { marginBottom: isTV ? 10 : isLargeTablet ? 8 : isTablet ? 8 : 8 }]}>
+              <View style={[styles.skeletonLine, { width: ratingWidth, height: isTV ? 12 : 10 }]} />
             </View>
 
-            <View style={styles.commentContainer}>
-              <View style={[styles.skeletonLine, { width: '95%' }]} />
-              <View style={[styles.skeletonLine, { width: '90%', marginTop: 6 }]} />
-              <View style={[styles.skeletonLine, { width: '70%', marginTop: 6 }]} />
+            <View style={[styles.commentContainer, { marginBottom: isTV ? 10 : isLargeTablet ? 8 : isTablet ? 8 : 8 }]}>
+              <View style={[styles.skeletonLine, { width: '95%', height: isTV ? 14 : 12 }]} />
+              <View style={[styles.skeletonLine, { width: '90%', height: isTV ? 14 : 12, marginTop: 6 }]} />
+              <View style={[styles.skeletonLine, { width: '70%', height: isTV ? 14 : 12, marginTop: 6 }]} />
             </View>
 
-            <View style={styles.compactMeta}>
-              <View style={[styles.skeletonBadge, { width: 50, height: 12, borderRadius: 6 }]} />
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <View style={[styles.skeletonLine, { width: 36, height: 10 }]} />
-                <View style={[styles.skeletonLine, { width: 36, height: 10 }]} />
+            <View style={[styles.compactMeta, { paddingTop: isTV ? 8 : isLargeTablet ? 6 : isTablet ? 6 : 6 }]}>
+              <View style={[styles.skeletonBadge, { width: badgeW, height: badgeH, borderRadius: Math.min(6, badgeH / 2) }]} />
+              <View style={{ flexDirection: 'row', gap }}>
+                <View style={[styles.skeletonLine, { width: statWidth, height: isTV ? 12 : 10 }]} />
+                <View style={[styles.skeletonLine, { width: statWidth, height: isTV ? 12 : 10 }]} />
               </View>
             </View>
           </View>
         ))}
       </ScrollView>
     );
-  }, [currentTheme]);
+  }, [currentTheme, isTV, isLargeTablet, isTablet]);
 
   // Don't show section if not authenticated, if comments are disabled in settings, or if still checking authentication
   // Only show when authentication is definitively true and settings allow it
