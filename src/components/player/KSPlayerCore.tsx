@@ -94,13 +94,20 @@ const KSPlayerCore: React.FC = () => {
   const screenData = Dimensions.get('screen');
   const [screenDimensions, setScreenDimensions] = useState(screenData);
 
-  // iPad-specific fullscreen handling
+  // iPad/macOS-specific fullscreen handling
   const isIPad = Platform.OS === 'ios' && (screenData.width > 1000 || screenData.height > 1000);
-  const shouldUseFullscreen = isIPad;
+  const isMacOS = Platform.OS === 'ios' && Platform.isPad === true;
+  const shouldUseFullscreen = isIPad || isMacOS;
 
   // Use window dimensions for iPad instead of screen dimensions
   const windowData = Dimensions.get('window');
   const effectiveDimensions = shouldUseFullscreen ? windowData : screenData;
+  
+  // Helper to get appropriate dimensions for gesture areas and overlays
+  const getDimensions = () => ({
+    width: shouldUseFullscreen ? windowData.width : screenDimensions.width,
+    height: shouldUseFullscreen ? windowData.height : screenDimensions.height,
+  });
 
   const [paused, setPaused] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -2419,7 +2426,7 @@ const KSPlayerCore: React.FC = () => {
     <View style={[
       styles.container,
       shouldUseFullscreen ? {
-        // iPad fullscreen: use flex layout instead of absolute positioning
+        // iPad/macOS fullscreen: use flex layout instead of absolute positioning
         flex: 1,
         width: '100%',
         height: '100%',
@@ -2438,8 +2445,8 @@ const KSPlayerCore: React.FC = () => {
           {
             opacity: backgroundFadeAnim,
             zIndex: shouldHideOpeningOverlay ? -1 : 3000,
-            width: screenDimensions.width,
-            height: screenDimensions.height,
+            width: shouldUseFullscreen ? '100%' : screenDimensions.width,
+            height: shouldUseFullscreen ? '100%' : screenDimensions.height,
           }
         ]}
         pointerEvents={shouldHideOpeningOverlay ? 'none' : 'auto'}
@@ -2448,8 +2455,8 @@ const KSPlayerCore: React.FC = () => {
           <Animated.View style={[
               StyleSheet.absoluteFill,
               {
-                width: screenDimensions.width,
-                height: screenDimensions.height,
+                width: shouldUseFullscreen ? '100%' : screenDimensions.width,
+                height: shouldUseFullscreen ? '100%' : screenDimensions.height,
                 opacity: backdropImageOpacityAnim
               }
             ]}>
@@ -2514,8 +2521,8 @@ const KSPlayerCore: React.FC = () => {
           style={[
             styles.sourceChangeOverlay,
             {
-              width: screenDimensions.width,
-              height: screenDimensions.height,
+              width: shouldUseFullscreen ? '100%' : screenDimensions.width,
+              height: shouldUseFullscreen ? '100%' : screenDimensions.height,
               opacity: fadeAnim,
             }
           ]}
@@ -2535,8 +2542,8 @@ const KSPlayerCore: React.FC = () => {
           {
             opacity: DISABLE_OPENING_OVERLAY ? 1 : openingFadeAnim,
             transform: DISABLE_OPENING_OVERLAY ? [] : [{ scale: openingScaleAnim }],
-            width: screenDimensions.width,
-            height: screenDimensions.height,
+            width: shouldUseFullscreen ? '100%' : screenDimensions.width,
+            height: shouldUseFullscreen ? '100%' : screenDimensions.height,
           }
         ]}
       >
@@ -2556,10 +2563,10 @@ const KSPlayerCore: React.FC = () => {
           >
             <View style={{
               position: 'absolute',
-              top: screenDimensions.height * 0.15, // Back to original margin
+              top: getDimensions().height * 0.15, // Back to original margin
               left: 0,
-              width: screenDimensions.width * 0.4, // Back to larger area (40% of screen)
-              height: screenDimensions.height * 0.7, // Back to larger middle portion (70% of screen)
+              width: getDimensions().width * 0.4, // Back to larger area (40% of screen)
+              height: getDimensions().height * 0.7, // Back to larger middle portion (70% of screen)
               zIndex: 10, // Higher z-index to capture gestures
             }} />
           </TapGestureHandler>
@@ -2581,10 +2588,10 @@ const KSPlayerCore: React.FC = () => {
           >
             <View style={{
               position: 'absolute',
-              top: screenDimensions.height * 0.15, // Back to original margin
+              top: getDimensions().height * 0.15, // Back to original margin
               right: 0,
-              width: screenDimensions.width * 0.4, // Back to larger area (40% of screen)
-              height: screenDimensions.height * 0.7, // Back to larger middle portion (70% of screen)
+              width: getDimensions().width * 0.4, // Back to larger area (40% of screen)
+              height: getDimensions().height * 0.7, // Back to larger middle portion (70% of screen)
               zIndex: 10, // Higher z-index to capture gestures
             }} />
           </TapGestureHandler>
@@ -2613,18 +2620,18 @@ const KSPlayerCore: React.FC = () => {
         >
           <View style={{
             position: 'absolute',
-            top: screenDimensions.height * 0.15,
-            left: screenDimensions.width * 0.4, // Start after left gesture area
-            width: screenDimensions.width * 0.2, // Center area (20% of screen)
-            height: screenDimensions.height * 0.7,
+            top: getDimensions().height * 0.15,
+            left: getDimensions().width * 0.4, // Start after left gesture area
+            width: getDimensions().width * 0.2, // Center area (20% of screen)
+            height: getDimensions().height * 0.7,
             zIndex: 5, // Lower z-index, controls use box-none to allow touches through
           }} />
         </TapGestureHandler>
 
         <View
           style={[styles.videoContainer, {
-            width: screenDimensions.width,
-            height: screenDimensions.height,
+            width: shouldUseFullscreen ? '100%' : screenDimensions.width,
+            height: shouldUseFullscreen ? '100%' : screenDimensions.height,
           }]}
         >
 
@@ -2637,8 +2644,8 @@ const KSPlayerCore: React.FC = () => {
               position: 'absolute',
               top: 0,
               left: 0,
-              width: screenDimensions.width,
-              height: screenDimensions.height,
+              width: getDimensions().width,
+              height: getDimensions().height,
             }}>
               <TouchableOpacity
                 style={{ flex: 1 }}
@@ -2727,7 +2734,7 @@ const KSPlayerCore: React.FC = () => {
                 }}
               >
                 {/* Strong horizontal fade from left side */}
-                <View style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: screenDimensions.width * 0.7 }}>
+                <View style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: getDimensions().width * 0.7 }}>
                   <LinearGradient
                     start={{ x: 0, y: 0.5 }}
                     end={{ x: 1, y: 0.5 }}
@@ -3085,8 +3092,8 @@ const KSPlayerCore: React.FC = () => {
             <Animated.View
               style={{
                 position: 'absolute',
-                left: screenDimensions.width / 2 - 60,
-                top: screenDimensions.height / 2 - 60,
+                left: getDimensions().width / 2 - 60,
+                top: getDimensions().height / 2 - 60,
                 opacity: volumeOverlayOpacity,
                 zIndex: 1000,
               }}
@@ -3182,8 +3189,8 @@ const KSPlayerCore: React.FC = () => {
             <Animated.View
               style={{
                 position: 'absolute',
-                left: screenDimensions.width / 2 - 60,
-                top: screenDimensions.height / 2 - 60,
+                left: getDimensions().width / 2 - 60,
+                top: getDimensions().height / 2 - 60,
                 opacity: brightnessOverlayOpacity,
                 zIndex: 1000,
               }}
