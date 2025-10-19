@@ -23,21 +23,39 @@ interface ContentItemProps {
 
 const { width } = Dimensions.get('window');
 
+// Enhanced responsive breakpoints
+const BREAKPOINTS = {
+  phone: 0,
+  tablet: 768,
+  largeTablet: 1024,
+  tv: 1440,
+};
+
+const getDeviceType = (screenWidth: number) => {
+  if (screenWidth >= BREAKPOINTS.tv) return 'tv';
+  if (screenWidth >= BREAKPOINTS.largeTablet) return 'largeTablet';
+  if (screenWidth >= BREAKPOINTS.tablet) return 'tablet';
+  return 'phone';
+};
+
 // Dynamic poster calculation based on screen width - show 1/4 of next poster
 const calculatePosterLayout = (screenWidth: number) => {
-  // Detect if device is a tablet (width >= 768px is common tablet breakpoint)
-  const isTablet = screenWidth >= 768;
-
-  const MIN_POSTER_WIDTH = isTablet ? 140 : 100; // Bigger minimum for tablets
-  const MAX_POSTER_WIDTH = isTablet ? 180 : 130; // Bigger maximum for tablets
-  const LEFT_PADDING = 16; // Left padding
-  const SPACING = 8; // Space between posters
+  const deviceType = getDeviceType(screenWidth);
+  
+  // Responsive sizing based on device type
+  const MIN_POSTER_WIDTH = deviceType === 'tv' ? 180 : deviceType === 'largeTablet' ? 160 : deviceType === 'tablet' ? 140 : 100;
+  const MAX_POSTER_WIDTH = deviceType === 'tv' ? 220 : deviceType === 'largeTablet' ? 200 : deviceType === 'tablet' ? 180 : 130;
+  const LEFT_PADDING = deviceType === 'tv' ? 32 : deviceType === 'largeTablet' ? 28 : deviceType === 'tablet' ? 24 : 16;
+  const SPACING = deviceType === 'tv' ? 12 : deviceType === 'largeTablet' ? 10 : deviceType === 'tablet' ? 8 : 8;
 
   // Calculate available width for posters (reserve space for left padding)
   const availableWidth = screenWidth - LEFT_PADDING;
 
   // Try different numbers of full posters to find the best fit
-  let bestLayout = { numFullPosters: 3, posterWidth: isTablet ? 160 : 120 };
+  let bestLayout = { 
+    numFullPosters: 3, 
+    posterWidth: deviceType === 'tv' ? 200 : deviceType === 'largeTablet' ? 180 : deviceType === 'tablet' ? 160 : 120 
+  };
 
   for (let n = 3; n <= 6; n++) {
     // Calculate poster width needed for N full posters + 0.25 partial poster
@@ -104,15 +122,18 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
   const posterRadius = typeof settings.posterBorderRadius === 'number' ? settings.posterBorderRadius : 12;
   // Memoize poster width calculation to avoid recalculating on every render
   const posterWidth = React.useMemo(() => {
+    const deviceType = getDeviceType(width);
+    const sizeMultiplier = deviceType === 'tv' ? 1.2 : deviceType === 'largeTablet' ? 1.1 : deviceType === 'tablet' ? 1.0 : 0.9;
+    
     switch (settings.posterSize) {
       case 'small':
-        return Math.max(100, Math.min(POSTER_WIDTH - 10, POSTER_WIDTH));
+        return Math.max(100, Math.min(POSTER_WIDTH - 10, POSTER_WIDTH)) * sizeMultiplier;
       case 'large':
-        return Math.min(POSTER_WIDTH + 20, POSTER_WIDTH + 30);
+        return Math.min(POSTER_WIDTH + 20, POSTER_WIDTH + 30) * sizeMultiplier;
       default:
-        return POSTER_WIDTH;
+        return POSTER_WIDTH * sizeMultiplier;
     }
-  }, [settings.posterSize]);
+  }, [settings.posterSize, width]);
 
   // Intersection observer simulation for lazy loading
   const itemRef = useRef<View>(null);
@@ -322,7 +343,16 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
           </View>
         </TouchableOpacity>
         {settings.showPosterTitles && (
-          <Text style={[styles.title, { color: currentTheme.colors.text }]} numberOfLines={2}>
+          <Text 
+            style={[
+              styles.title, 
+              { 
+                color: currentTheme.colors.text,
+                fontSize: getDeviceType(width) === 'tv' ? 16 : getDeviceType(width) === 'largeTablet' ? 15 : getDeviceType(width) === 'tablet' ? 14 : 13
+              }
+            ]} 
+            numberOfLines={2}
+          >
             {item.name}
           </Text>
         )}
@@ -409,7 +439,7 @@ const styles = StyleSheet.create({
     padding: 2,
   },
   title: {
-    fontSize: 13,
+    fontSize: 13, // Will be overridden responsively
     fontWeight: '500',
     marginTop: 4,
     textAlign: 'center',
