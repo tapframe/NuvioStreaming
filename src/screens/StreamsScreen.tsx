@@ -1299,7 +1299,7 @@ export const StreamsScreen = () => {
                 ];
                 externalPlayerUrls = infuseUrls.map(infuseUrl => {
                   const encoded = Buffer.from(infuseUrl).toString('base64');
-                  return `livecontainer://open-web-page?url=${encoded}`;
+                  return `livecontainer://open-url?url=${encoded}`;
                 });
                 break;
               
