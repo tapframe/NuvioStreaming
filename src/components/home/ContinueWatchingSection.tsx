@@ -726,10 +726,9 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   }
 
   return (
-    <Animated.View 
-      style={styles.container} 
+    <Animated.View
+      style={styles.container}
       entering={FadeIn.duration(350)}
-      layout={Layout.springify().damping(15).stiffness(150)}
     >
       <View style={styles.header}>
         <View style={styles.titleContainer}>
