@@ -35,7 +35,7 @@ export interface AppSettings {
   enableBackgroundPlayback: boolean;
   cacheLimit: number;
   useExternalPlayer: boolean;
-  preferredPlayer: 'internal' | 'vlc' | 'infuse' | 'outplayer' | 'vidhub' | 'external';
+  preferredPlayer: 'internal' | 'vlc' | 'infuse' | 'outplayer' | 'vidhub' | 'infuse_livecontainer' | 'external';
   showHeroSection: boolean;
   featuredContentSource: 'tmdb' | 'catalogs';
   heroStyle: 'legacy' | 'carousel';
