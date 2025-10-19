@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Image, Animated } from 'react-native';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator, Image, Animated, Dimensions } from 'react-native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useMDBListRatings } from '../../hooks/useMDBListRatings';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -12,6 +12,14 @@ import RottenTomatoesIcon from '../../../assets/rating-icons/RottenTomatoes.svg'
 import TMDBIcon from '../../../assets/rating-icons/tmdb.svg';
 import TraktIcon from '../../../assets/rating-icons/trakt.svg';
 import AudienceScoreIcon from '../../../assets/rating-icons/audienscore.png';
+
+// Enhanced responsive breakpoints for Ratings Section
+const BREAKPOINTS = {
+  phone: 0,
+  tablet: 768,
+  largeTablet: 1024,
+  tv: 1440,
+};
 
 export const RATING_PROVIDERS = {
   imdb: {
@@ -55,6 +63,50 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
   const [isMDBEnabled, setIsMDBEnabled] = useState(true);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const { currentTheme } = useTheme();
+
+  // Responsive device type
+  const deviceWidth = Dimensions.get('window').width;
+  const getDeviceType = useCallback(() => {
+    if (deviceWidth >= BREAKPOINTS.tv) return 'tv';
+    if (deviceWidth >= BREAKPOINTS.largeTablet) return 'largeTablet';
+    if (deviceWidth >= BREAKPOINTS.tablet) return 'tablet';
+    return 'phone';
+  }, [deviceWidth]);
+
+  const deviceType = getDeviceType();
+  const isTablet = deviceType === 'tablet';
+  const isLargeTablet = deviceType === 'largeTablet';
+  const isTV = deviceType === 'tv';
+
+  const horizontalPadding = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 32;
+      case 'largeTablet':
+        return 28;
+      case 'tablet':
+        return 24;
+      default:
+        return 16;
+    }
+  }, [deviceType]);
+
+  const iconSize = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 20;
+      case 'largeTablet':
+        return 18;
+      case 'tablet':
+        return 16;
+      default:
+        return 16;
+    }
+  }, [deviceType]);
+
+  const textSize = useMemo(() => (isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14), [isTV, isLargeTablet, isTablet]);
+  const itemSpacing = useMemo(() => (isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12), [isTV, isLargeTablet, isTablet]);
+  const iconTextGap = useMemo(() => (isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 4), [isTV, isLargeTablet, isTablet]);
 
   useEffect(() => {
     loadProviderSettings();
@@ -164,6 +216,7 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
       style={[
         styles.container,
         {
+          paddingHorizontal: horizontalPadding,
           opacity: fadeAnim,
           transform: [{
             translateY: fadeAnim.interpolate({
@@ -180,22 +233,22 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
           const displayValue = config.transform(parseFloat(value as string));
           
           return (
-            <View key={source} style={styles.compactRatingItem}>
+            <View key={source} style={[styles.compactRatingItem, { marginRight: itemSpacing }]}>
               {config.isImage ? (
                 <Image 
                   source={config.icon as any}
-                  style={styles.compactRatingIcon}
+                  style={[styles.compactRatingIcon, { width: iconSize, height: iconSize, marginRight: iconTextGap }]}
                   resizeMode="contain"
                 />
               ) : (
-                <View style={styles.compactSvgContainer}>
+                <View style={[styles.compactSvgContainer, { marginRight: iconTextGap }]}>
                   {React.createElement(config.icon as any, {
-                    width: 16,
-                    height: 16,
+                    width: iconSize,
+                    height: iconSize,
                   })}
                 </View>
               )}
-              <Text style={[styles.compactRatingValue, { color: config.color }]}>
+              <Text style={[styles.compactRatingValue, { color: config.color, fontSize: textSize }]}>
                 {displayValue}
               </Text>
             </View>
@@ -210,7 +263,6 @@ const styles = StyleSheet.create({
   container: {
     marginTop: 2,
     marginBottom: 8,
-    paddingHorizontal: 16,
   },
   loadingContainer: {
     height: 40,

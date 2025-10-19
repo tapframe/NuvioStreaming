@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, useWindowDimensions, useColorScheme, FlatList } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -14,6 +14,14 @@ import Animated, { FadeIn, FadeOut, SlideInRight, SlideOutLeft } from 'react-nat
 import { TraktService } from '../../services/traktService';
 import { logger } from '../../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Enhanced responsive breakpoints for Seasons Section
+const BREAKPOINTS = {
+  phone: 0,
+  tablet: 768,
+  largeTablet: 1024,
+  tv: 1440,
+};
 
 interface SeriesContentProps {
   episodes: Episode[];
@@ -42,8 +50,80 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   const { currentTheme } = useTheme();
   const { settings } = useSettings();
   const { width } = useWindowDimensions();
-  const isTablet = width > 768;
   const isDarkMode = useColorScheme() === 'dark';
+  
+  // Enhanced responsive sizing for tablets and TV screens
+  const deviceWidth = Dimensions.get('window').width;
+  const deviceHeight = Dimensions.get('window').height;
+  
+  // Determine device type based on width
+  const getDeviceType = useCallback(() => {
+    if (deviceWidth >= BREAKPOINTS.tv) return 'tv';
+    if (deviceWidth >= BREAKPOINTS.largeTablet) return 'largeTablet';
+    if (deviceWidth >= BREAKPOINTS.tablet) return 'tablet';
+    return 'phone';
+  }, [deviceWidth]);
+  
+  const deviceType = getDeviceType();
+  const isTablet = deviceType === 'tablet';
+  const isLargeTablet = deviceType === 'largeTablet';
+  const isTV = deviceType === 'tv';
+  const isLargeScreen = isTablet || isLargeTablet || isTV;
+  
+  // Enhanced spacing and padding for seasons section
+  const horizontalPadding = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 32;
+      case 'largeTablet':
+        return 28;
+      case 'tablet':
+        return 24;
+      default:
+        return 16; // phone
+    }
+  }, [deviceType]);
+  
+  // Enhanced season poster sizing
+  const seasonPosterWidth = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 140;
+      case 'largeTablet':
+        return 130;
+      case 'tablet':
+        return 120;
+      default:
+        return 100; // phone
+    }
+  }, [deviceType]);
+  
+  const seasonPosterHeight = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 210;
+      case 'largeTablet':
+        return 195;
+      case 'tablet':
+        return 180;
+      default:
+        return 150; // phone
+    }
+  }, [deviceType]);
+  
+  const seasonButtonSpacing = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 20;
+      case 'largeTablet':
+        return 18;
+      case 'tablet':
+        return 16;
+      default:
+        return 16; // phone
+    }
+  }, [deviceType]);
+  
   const [episodeProgress, setEpisodeProgress] = useState<{ [key: string]: { currentTime: number; duration: number; lastUpdated: number } }>({});
   // Delay item entering animations to avoid FlashList initial layout glitches
   const [enableItemAnimations, setEnableItemAnimations] = useState(false);
@@ -342,12 +422,22 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
     const seasons = Object.keys(groupedEpisodes).map(Number).sort((a, b) => a - b);
     
     return (
-      <View style={[styles.seasonSelectorWrapper, isTablet && styles.seasonSelectorWrapperTablet]}>
-        <View style={styles.seasonSelectorHeader}>
+      <View style={[
+        styles.seasonSelectorWrapper,
+        { paddingHorizontal: horizontalPadding }
+      ]}>
+        <View style={[
+          styles.seasonSelectorHeader,
+          {
+            marginBottom: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
+          }
+        ]}>
           <Text style={[
             styles.seasonSelectorTitle,
-            isTablet && styles.seasonSelectorTitleTablet,
-            { color: currentTheme.colors.highEmphasis }
+            { 
+              color: currentTheme.colors.highEmphasis,
+              fontSize: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 18
+            }
           ]}>Seasons</Text>
           
           {/* Dropdown Toggle Button */}
@@ -360,7 +450,10 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                   : currentTheme.colors.elevation3,
                 borderColor: seasonViewMode === 'posters' 
                   ? 'rgba(255,255,255,0.2)' 
-                  : 'rgba(255,255,255,0.3)'
+                  : 'rgba(255,255,255,0.3)',
+                paddingHorizontal: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
+                paddingVertical: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 4,
+                borderRadius: isTV ? 10 : isLargeTablet ? 8 : isTablet ? 6 : 6
               }
             ]}
             onPress={() => {
@@ -375,7 +468,8 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               { 
                 color: seasonViewMode === 'posters' 
                   ? currentTheme.colors.mediumEmphasis 
-                  : currentTheme.colors.highEmphasis
+                  : currentTheme.colors.highEmphasis,
+                fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 12
               }
             ]}>
               {seasonViewMode === 'posters' ? 'Posters' : 'Text'}
@@ -389,7 +483,12 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
           horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.seasonSelectorContainer}
-          contentContainerStyle={[styles.seasonSelectorContent, isTablet && styles.seasonSelectorContentTablet]}
+          contentContainerStyle={[
+            styles.seasonSelectorContent,
+            {
+              paddingBottom: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8
+            }
+          ]}
           initialNumToRender={5}
           maxToRenderPerBatch={5}
           windowSize={3}
@@ -416,7 +515,13 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                   <TouchableOpacity
                     style={[
                       styles.seasonTextButton,
-                      isTablet && styles.seasonTextButtonTablet,
+                      {
+                        marginRight: seasonButtonSpacing,
+                        width: isTV ? 150 : isLargeTablet ? 140 : isTablet ? 130 : 110,
+                        paddingVertical: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12,
+                        paddingHorizontal: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
+                        borderRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
+                      },
                       selectedSeason === season && styles.selectedSeasonTextButton
                     ]}
                     onPress={() => onSeasonChange(season)}
@@ -448,12 +553,23 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                 <TouchableOpacity
                   style={[
                     styles.seasonButton,
-                    isTablet && styles.seasonButtonTablet,
+                    {
+                      marginRight: seasonButtonSpacing,
+                      width: seasonPosterWidth
+                    },
                     selectedSeason === season && [styles.selectedSeasonButton, { borderColor: currentTheme.colors.primary }]
                   ]}
                   onPress={() => onSeasonChange(season)}
                 >
-                  <View style={[styles.seasonPosterContainer, isTablet && styles.seasonPosterContainerTablet]}>
+                  <View style={[
+                    styles.seasonPosterContainer,
+                    {
+                      width: seasonPosterWidth,
+                      height: seasonPosterHeight,
+                      borderRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 8,
+                      marginBottom: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8
+                    }
+                  ]}>
                     <FastImage
                       source={{ uri: seasonPoster }}
                       style={styles.seasonPoster}
@@ -462,8 +578,10 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                     {selectedSeason === season && (
                       <View style={[
                         styles.selectedSeasonIndicator,
-                        isTablet && styles.selectedSeasonIndicatorTablet,
-                        { backgroundColor: currentTheme.colors.primary }
+                        {
+                          backgroundColor: currentTheme.colors.primary,
+                          height: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 4
+                        }
                       ]} />
                     )}
 
@@ -471,18 +589,19 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                   <Text 
                     style={[
                       styles.seasonButtonText,
-                      isTablet && styles.seasonButtonTextTablet,
-                      { color: currentTheme.colors.mediumEmphasis },
+                      { 
+                        color: currentTheme.colors.mediumEmphasis,
+                        fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 14
+                      },
                       selectedSeason === season && [
                         styles.selectedSeasonButtonText,
-                        isTablet && styles.selectedSeasonButtonTextTablet,
                         { color: currentTheme.colors.primary }
                       ]
                     ]}
                   >
                     Season {season}
                   </Text>
-                                  </TouchableOpacity>
+                </TouchableOpacity>
                 </View>
               );
             }}
@@ -550,22 +669,43 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
         key={episode.id}
         style={[
           styles.episodeCardVertical, 
-          { backgroundColor: currentTheme.colors.elevation2 }
+          { 
+            backgroundColor: currentTheme.colors.elevation2,
+            borderRadius: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
+            marginBottom: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
+            height: isTV ? 200 : isLargeTablet ? 180 : isTablet ? 160 : 120
+          }
         ]}
         onPress={() => onSelectEpisode(episode)}
         activeOpacity={0.7}
       >
         <View style={[
           styles.episodeImageContainer,
-          isTablet && styles.episodeImageContainerTablet
+          {
+            width: isTV ? 200 : isLargeTablet ? 180 : isTablet ? 160 : 120,
+            height: isTV ? 200 : isLargeTablet ? 180 : isTablet ? 160 : 120
+          }
         ]}>
           <FastImage
             source={{ uri: episodeImage }}
             style={styles.episodeImage}
             resizeMode={FastImage.resizeMode.cover}
           />
-          <View style={styles.episodeNumberBadge}>
-            <Text style={styles.episodeNumberText}>{episodeString}</Text>
+          <View style={[
+            styles.episodeNumberBadge,
+            {
+              paddingHorizontal: isTV ? 8 : isLargeTablet ? 7 : isTablet ? 6 : 6,
+              paddingVertical: isTV ? 4 : isLargeTablet ? 3 : isTablet ? 2 : 2,
+              borderRadius: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 4
+            }
+          ]}>
+            <Text style={[
+              styles.episodeNumberText,
+              {
+                fontSize: isTV ? 13 : isLargeTablet ? 12 : isTablet ? 11 : 11,
+                fontWeight: '600'
+              }
+            ]}>{episodeString}</Text>
           </View>
           {showProgress && (
             <View style={styles.progressBarContainer}>
@@ -578,53 +718,98 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
             </View>
           )}
           {progressPercent >= 85 && (
-            <View style={[styles.completedBadge, { backgroundColor: currentTheme.colors.primary }]}>
-              <MaterialIcons name="check" size={12} color={currentTheme.colors.white} />
+            <View style={[
+              styles.completedBadge,
+              {
+                backgroundColor: currentTheme.colors.primary,
+                width: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20,
+                height: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20,
+                borderRadius: isTV ? 12 : isLargeTablet ? 11 : isTablet ? 10 : 10
+              }
+            ]}>
+              <MaterialIcons name="check" size={isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12} color={currentTheme.colors.white} />
             </View>
           )}
         </View>
 
         <View style={[
           styles.episodeInfo,
-          isTablet && styles.episodeInfoTablet
+          {
+            paddingLeft: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 12,
+            flex: 1,
+            justifyContent: 'center'
+          }
         ]}>
           <View style={[
             styles.episodeHeader,
-            isTablet && styles.episodeHeaderTablet
+            {
+              marginBottom: isTV ? 8 : isLargeTablet ? 6 : isTablet ? 6 : 4
+            }
           ]}>
             <Text style={[
               styles.episodeTitle,
-              isTablet && styles.episodeTitleTablet,
-              { color: currentTheme.colors.text }
-            ]} numberOfLines={2}>
+              { 
+                color: currentTheme.colors.text,
+                fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 15,
+                lineHeight: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 18,
+                marginBottom: isTV ? 4 : isLargeTablet ? 3 : isTablet ? 2 : 2
+              }
+            ]} numberOfLines={isLargeScreen ? 3 : 2}>
               {episode.name}
             </Text>
             <View style={[
               styles.episodeMetadata,
-              isTablet && styles.episodeMetadataTablet
+              {
+                gap: isTV ? 8 : isLargeTablet ? 7 : isTablet ? 6 : 4,
+                flexWrap: 'wrap'
+              }
             ]}>
               {effectiveVote > 0 && (
                 <View style={styles.ratingContainer}>
                   <FastImage
                     source={{ uri: TMDB_LOGO }}
-                    style={styles.tmdbLogo}
+                    style={[
+                      styles.tmdbLogo,
+                      {
+                        width: isTV ? 22 : isLargeTablet ? 20 : isTablet ? 20 : 20,
+                        height: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14
+                      }
+                    ]}
                     resizeMode={FastImage.resizeMode.contain}
                   />
-                  <Text style={[styles.ratingText, { color: currentTheme.colors.textMuted }]}>
+                  <Text style={[
+                    styles.ratingText,
+                    {
+                      color: currentTheme.colors.textMuted,
+                      fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 13 : 13
+                    }
+                  ]}>
                     {effectiveVote.toFixed(1)}
                   </Text>
                 </View>
               )}
               {effectiveRuntime && (
                 <View style={styles.runtimeContainer}>
-                  <MaterialIcons name="schedule" size={14} color={currentTheme.colors.textMuted} />
-                  <Text style={[styles.runtimeText, { color: currentTheme.colors.textMuted }]}>
+                  <MaterialIcons name="schedule" size={isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14} color={currentTheme.colors.textMuted} />
+                  <Text style={[
+                    styles.runtimeText,
+                    {
+                      color: currentTheme.colors.textMuted,
+                      fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 13 : 13
+                    }
+                  ]}>
                     {formatRuntime(effectiveRuntime)}
                   </Text>
                 </View>
               )}
               {episode.air_date && (
-                <Text style={[styles.airDateText, { color: currentTheme.colors.textMuted }]}>
+                <Text style={[
+                  styles.airDateText,
+                  {
+                    color: currentTheme.colors.textMuted,
+                    fontSize: isTV ? 13 : isLargeTablet ? 12 : isTablet ? 12 : 12
+                  }
+                ]}>
                   {formatDate(episode.air_date)}
                 </Text>
               )}
@@ -632,9 +817,12 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
           </View>
           <Text style={[
             styles.episodeOverview,
-            isTablet && styles.episodeOverviewTablet,
-            { color: currentTheme.colors.mediumEmphasis }
-          ]} numberOfLines={isTablet ? 3 : 2}>
+            {
+              color: currentTheme.colors.mediumEmphasis,
+              fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 13,
+              lineHeight: isTV ? 22 : isLargeTablet ? 20 : isTablet ? 20 : 18
+            }
+          ]} numberOfLines={isLargeScreen ? 4 : isTablet ? 3 : 2}>
             {episode.overview || 'No description available'}
           </Text>
         </View>
@@ -684,16 +872,19 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
         key={episode.id}
         style={[
           styles.episodeCardHorizontal,
-          isTablet && styles.episodeCardHorizontalTablet,
+          {
+            borderRadius: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
+            height: isTV ? 280 : isLargeTablet ? 260 : isTablet ? 240 : 200,
+            elevation: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 8,
+            shadowOpacity: isTV ? 0.4 : isLargeTablet ? 0.35 : isTablet ? 0.3 : 0.3,
+            shadowRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 8
+          },
           // Gradient border styling
           { 
             borderWidth: 1,
             borderColor: 'transparent',
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.3,
-            shadowRadius: 8,
-            elevation: 12,
           }
         ]}
         onPress={() => onSelectEpisode(episode)}
@@ -746,35 +937,88 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
           style={styles.episodeGradient}
         >
           {/* Content Container */}
-          <View style={[styles.episodeContent, isTablet && styles.episodeContentTablet]}>
+          <View style={[
+            styles.episodeContent,
+            {
+              padding: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 12,
+              paddingBottom: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 16
+            }
+          ]}>
             {/* Episode Number Badge */}
-            <View style={[styles.episodeNumberBadgeHorizontal, isTablet && styles.episodeNumberBadgeHorizontalTablet]}>
-            <Text style={[styles.episodeNumberHorizontal, isTablet && styles.episodeNumberHorizontalTablet]}>{episodeString}</Text>
+            <View style={[
+              styles.episodeNumberBadgeHorizontal,
+              {
+                paddingHorizontal: isTV ? 10 : isLargeTablet ? 8 : isTablet ? 6 : 6,
+                paddingVertical: isTV ? 5 : isLargeTablet ? 4 : isTablet ? 3 : 3,
+                borderRadius: isTV ? 8 : isLargeTablet ? 6 : isTablet ? 4 : 4,
+                marginBottom: isTV ? 10 : isLargeTablet ? 8 : isTablet ? 6 : 6
+              }
+            ]}>
+            <Text style={[
+              styles.episodeNumberHorizontal,
+              {
+                fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 10,
+                fontWeight: isTV ? '700' : isLargeTablet ? '700' : isTablet ? '600' : '600'
+              }
+            ]}>{episodeString}</Text>
             </View>
             
             {/* Episode Title */}
-            <Text style={[styles.episodeTitleHorizontal, isTablet && styles.episodeTitleHorizontalTablet]} numberOfLines={2}>
+            <Text style={[
+              styles.episodeTitleHorizontal,
+              {
+                fontSize: isTV ? 20 : isLargeTablet ? 19 : isTablet ? 18 : 15,
+                fontWeight: isTV ? '800' : isLargeTablet ? '800' : isTablet ? '700' : '700',
+                lineHeight: isTV ? 26 : isLargeTablet ? 24 : isTablet ? 22 : 18,
+                marginBottom: isTV ? 8 : isLargeTablet ? 6 : isTablet ? 4 : 4
+              }
+            ]} numberOfLines={2}>
               {episode.name}
             </Text>
             
             {/* Episode Description */}
-            <Text style={[styles.episodeDescriptionHorizontal, isTablet && styles.episodeDescriptionHorizontalTablet]} numberOfLines={3}>
+            <Text style={[
+              styles.episodeDescriptionHorizontal,
+              {
+                fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 12,
+                lineHeight: isTV ? 22 : isLargeTablet ? 20 : isTablet ? 18 : 16,
+                marginBottom: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
+                opacity: isTV ? 0.95 : isLargeTablet ? 0.9 : isTablet ? 0.9 : 0.9
+              }
+            ]} numberOfLines={isLargeScreen ? 4 : 3}>
               {episode.overview || 'No description available'}
             </Text>
             
             {/* Metadata Row */}
-            <View style={styles.episodeMetadataRowHorizontal}>
+            <View style={[
+              styles.episodeMetadataRowHorizontal,
+              {
+                gap: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8
+              }
+            ]}>
               {episode.runtime && (
                 <View style={styles.runtimeContainerHorizontal}>
-                <Text style={styles.runtimeTextHorizontal}>
+                <Text style={[
+                  styles.runtimeTextHorizontal,
+                  {
+                    fontSize: isTV ? 13 : isLargeTablet ? 12 : isTablet ? 11 : 11,
+                    fontWeight: isTV ? '600' : isLargeTablet ? '500' : isTablet ? '500' : '500'
+                  }
+                ]}>
                   {formatRuntime(episode.runtime)}
                 </Text>
                 </View>
               )}
               {episode.vote_average > 0 && (
                 <View style={styles.ratingContainerHorizontal}>
-                  <MaterialIcons name="star" size={14} color="#FFD700" />
-                  <Text style={styles.ratingTextHorizontal}>
+                  <MaterialIcons name="star" size={isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14} color="#FFD700" />
+                  <Text style={[
+                    styles.ratingTextHorizontal,
+                    {
+                      fontSize: isTV ? 13 : isLargeTablet ? 12 : isTablet ? 11 : 11,
+                      fontWeight: isTV ? '600' : isLargeTablet ? '600' : isTablet ? '600' : '600'
+                    }
+                  ]}>
                     {episode.vote_average.toFixed(1)}
                   </Text>
                 </View>
@@ -799,10 +1043,18 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
           
           {/* Completed Badge */}
           {progressPercent >= 85 && (
-            <View style={[styles.completedBadgeHorizontal, { 
-              backgroundColor: currentTheme.colors.primary,
-            }]}>
-              <MaterialIcons name="check" size={16} color="#fff" />
+            <View style={[
+              styles.completedBadgeHorizontal,
+              { 
+                backgroundColor: currentTheme.colors.primary,
+                width: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 24 : 24,
+                height: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 24 : 24,
+                borderRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12,
+                top: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12,
+                left: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
+              }
+            ]}>
+              <MaterialIcons name="check" size={isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16} color="#fff" />
             </View>
           )}
           
@@ -824,7 +1076,15 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
       <Animated.View 
         entering={FadeIn.duration(300).delay(100)}
       >
-        <Text style={[styles.sectionTitle, { color: currentTheme.colors.highEmphasis }]}>
+        <Text style={[
+          styles.sectionTitle,
+          {
+            color: currentTheme.colors.highEmphasis,
+            fontSize: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20,
+            marginBottom: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
+            paddingHorizontal: horizontalPadding
+          }
+        ]}>
           {currentSeasonEpisodes.length} {currentSeasonEpisodes.length === 1 ? 'Episode' : 'Episodes'}
         </Text>
         
@@ -854,7 +1114,10 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                   entering={enableItemAnimations ? FadeIn.duration(300).delay(100 + index * 30) : undefined as any}
                   style={[
                     styles.episodeCardWrapperHorizontal,
-                    isTablet && styles.episodeCardWrapperHorizontalTablet
+                    {
+                      width: isTV ? width * 0.45 : isLargeTablet ? width * 0.4 : isTablet ? width * 0.4 : width * 0.75,
+                      marginRight: isTV ? 24 : isLargeTablet ? 20 : isTablet ? 20 : 16
+                    }
                   ]}
                 >
                   {renderHorizontalEpisodeCard(episode)}
@@ -863,14 +1126,20 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               keyExtractor={episode => episode.id.toString()}
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={isTablet ? styles.episodeListContentHorizontalTablet : styles.episodeListContentHorizontal}
+              contentContainerStyle={[
+                styles.episodeListContentHorizontal,
+                {
+                  paddingLeft: horizontalPadding,
+                  paddingRight: horizontalPadding
+                }
+              ]}
               removeClippedSubviews
               initialNumToRender={3}
               maxToRenderPerBatch={5}
               windowSize={5}
               getItemLayout={(data, index) => {
-                const cardWidth = isTablet ? width * 0.4 : width * 0.75;
-                const margin = isTablet ? 20 : 16;
+                const cardWidth = isTV ? width * 0.45 : isLargeTablet ? width * 0.4 : isTablet ? width * 0.4 : width * 0.75;
+                const margin = isTV ? 24 : isLargeTablet ? 20 : isTablet ? 20 : 16;
                 return {
                   length: cardWidth + margin,
                   offset: (cardWidth + margin) * index,
@@ -892,7 +1161,13 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                 </Animated.View>
               )}
               keyExtractor={episode => episode.id.toString()}
-              contentContainerStyle={isTablet ? styles.episodeListContentVerticalTablet : styles.episodeListContentVertical}
+              contentContainerStyle={[
+                styles.episodeListContentVertical,
+                {
+                  paddingHorizontal: horizontalPadding,
+                  paddingBottom: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 24 : 8
+                }
+              ]}
               removeClippedSubviews
             />
           )
@@ -936,11 +1211,6 @@ const styles = StyleSheet.create({
   
   // Vertical Layout Styles
   episodeListContentVertical: {
-    paddingBottom: 8,
-    paddingHorizontal: 16,
-  },
-  episodeListContentVerticalTablet: {
-    paddingHorizontal: 16,
     paddingBottom: 8,
   },
   episodeGridVertical: {
@@ -1098,20 +1368,10 @@ const styles = StyleSheet.create({
 
   // Horizontal Layout Styles
   episodeListContentHorizontal: {
-    paddingLeft: 16,
-    paddingRight: 16,
-  },
-  episodeListContentHorizontalTablet: {
-    paddingLeft: 24,
-    paddingRight: 24,
+    // Padding will be added responsively
   },
   episodeCardWrapperHorizontal: {
-    width: Dimensions.get('window').width * 0.75,
-    marginRight: 16,
-  },
-  episodeCardWrapperHorizontalTablet: {
-    width: Dimensions.get('window').width * 0.4,
-    marginRight: 20,
+    // Dimensions will be set responsively
   },
   episodeCardHorizontal: {
     borderRadius: 16,
@@ -1127,13 +1387,6 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: '100%',
     backgroundColor: 'transparent',
-  },
-  episodeCardHorizontalTablet: {
-    height: 260,
-    borderRadius: 20,
-    elevation: 12,
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
   },
   episodeBackgroundImage: {
     width: '100%',
@@ -1273,11 +1526,6 @@ const styles = StyleSheet.create({
   // Season Selector Styles
   seasonSelectorWrapper: {
     marginBottom: 20,
-    paddingHorizontal: 16,
-  },
-  seasonSelectorWrapperTablet: {
-    marginBottom: 24,
-    paddingHorizontal: 24,
   },
   seasonSelectorHeader: {
     flexDirection: 'row',
@@ -1306,32 +1554,14 @@ const styles = StyleSheet.create({
   },
   seasonButton: {
     alignItems: 'center',
-    marginRight: 16,
-    width: 100,
-  },
-  seasonButtonTablet: {
-    alignItems: 'center',
-    marginRight: 20,
-    width: 120,
   },
   selectedSeasonButton: {
     opacity: 1,
   },
   seasonPosterContainer: {
     position: 'relative',
-    width: 100,
-    height: 150,
     borderRadius: 8,
     overflow: 'hidden',
-    marginBottom: 8,
-  },
-  seasonPosterContainerTablet: {
-    position: 'relative',
-    width: 120,
-    height: 180,
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginBottom: 12,
   },
   seasonPoster: {
     width: '100%',
@@ -1382,22 +1612,7 @@ const styles = StyleSheet.create({
   },
   seasonTextButton: {
     alignItems: 'center',
-    marginRight: 16,
-    width: 110,
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: 'transparent',
-  },
-  seasonTextButtonTablet: {
-    alignItems: 'center',
-    marginRight: 20,
-    width: 130,
-    justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    borderRadius: 14,
     backgroundColor: 'transparent',
   },
   selectedSeasonTextButton: {

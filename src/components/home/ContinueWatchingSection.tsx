@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -38,6 +38,14 @@ interface ContinueWatchingItem extends StreamingContent {
 interface ContinueWatchingRef {
   refresh: () => Promise<boolean>;
 }
+
+// Enhanced responsive breakpoints for Continue Watching section
+const BREAKPOINTS = {
+  phone: 0,
+  tablet: 768,
+  largeTablet: 1024,
+  tv: 1440,
+};
 
 // Dynamic poster calculation based on screen width for Continue Watching section
 const calculatePosterLayout = (screenWidth: number) => {
@@ -95,6 +103,78 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const longPressTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Enhanced responsive sizing for tablets and TV screens
+  const deviceWidth = Dimensions.get('window').width;
+  const deviceHeight = Dimensions.get('window').height;
+  
+  // Determine device type based on width
+  const getDeviceType = useCallback(() => {
+    if (deviceWidth >= BREAKPOINTS.tv) return 'tv';
+    if (deviceWidth >= BREAKPOINTS.largeTablet) return 'largeTablet';
+    if (deviceWidth >= BREAKPOINTS.tablet) return 'tablet';
+    return 'phone';
+  }, [deviceWidth]);
+  
+  const deviceType = getDeviceType();
+  const isTablet = deviceType === 'tablet';
+  const isLargeTablet = deviceType === 'largeTablet';
+  const isTV = deviceType === 'tv';
+  const isLargeScreen = isTablet || isLargeTablet || isTV;
+  
+  // Enhanced responsive sizing for continue watching items
+  const computedItemWidth = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 400; // Larger items for TV
+      case 'largeTablet':
+        return 350; // Medium-large items for large tablets
+      case 'tablet':
+        return 320; // Medium items for tablets
+      default:
+        return 280; // Original phone size
+    }
+  }, [deviceType]);
+  
+  const computedItemHeight = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 160; // Taller items for TV
+      case 'largeTablet':
+        return 140; // Medium-tall items for large tablets
+      case 'tablet':
+        return 130; // Medium items for tablets
+      default:
+        return 120; // Original phone height
+    }
+  }, [deviceType]);
+  
+  // Enhanced spacing and padding
+  const horizontalPadding = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 32;
+      case 'largeTablet':
+        return 28;
+      case 'tablet':
+        return 24;
+      default:
+        return 16; // phone
+    }
+  }, [deviceType]);
+  
+  const itemSpacing = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 20;
+      case 'largeTablet':
+        return 18;
+      case 'tablet':
+        return 16;
+      default:
+        return 16; // phone
+    }
+  }, [deviceType]);
 
   // Alert state for CustomAlert
   const [alertVisible, setAlertVisible] = useState(false);
@@ -632,18 +712,28 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   // Memoized render function for continue watching items
   const renderContinueWatchingItem = useCallback(({ item }: { item: ContinueWatchingItem }) => (
     <TouchableOpacity
-      style={[styles.wideContentItem, {
-        backgroundColor: currentTheme.colors.elevation1,
-        borderColor: currentTheme.colors.border,
-        shadowColor: currentTheme.colors.black
-      }]}
+      style={[
+        styles.wideContentItem, 
+        {
+          backgroundColor: currentTheme.colors.elevation1,
+          borderColor: currentTheme.colors.border,
+          shadowColor: currentTheme.colors.black,
+          width: computedItemWidth,
+          height: computedItemHeight
+        }
+      ]}
       activeOpacity={0.8}
       onPress={() => handleContentPress(item.id, item.type)}
       onLongPress={() => handleLongPress(item)}
       delayLongPress={800}
     >
       {/* Poster Image */}
-      <View style={styles.posterContainer}>
+      <View style={[
+        styles.posterContainer,
+        {
+          width: isTV ? 100 : isLargeTablet ? 90 : isTablet ? 85 : 80
+        }
+      ]}>
         <FastImage
           source={{ 
             uri: item.poster || 'https://via.placeholder.com/300x450',
@@ -663,21 +753,42 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       </View>
 
       {/* Content Details */}
-      <View style={styles.contentDetails}>
+      <View style={[
+        styles.contentDetails,
+        {
+          padding: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
+        }
+      ]}>
         <View style={styles.titleRow}>
           {(() => {
             const isUpNext = item.type === 'series' && item.progress === 0;
             return (
               <View style={styles.titleRow}>
                 <Text 
-                  style={[styles.contentTitle, { color: currentTheme.colors.highEmphasis }]}
+                  style={[
+                    styles.contentTitle, 
+                    { 
+                      color: currentTheme.colors.highEmphasis,
+                      fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16
+                    }
+                  ]}
                   numberOfLines={1}
                 >
                   {item.name}
                 </Text>
                 {isUpNext && (
-                <View style={[styles.progressBadge, { backgroundColor: currentTheme.colors.primary }]}>
-                    <Text style={styles.progressText}>Up Next</Text>
+                <View style={[
+                  styles.progressBadge, 
+                  { 
+                    backgroundColor: currentTheme.colors.primary,
+                    paddingHorizontal: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
+                    paddingVertical: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 3
+                  }
+                ]}>
+                    <Text style={[
+                      styles.progressText,
+                      { fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12 }
+                    ]}>Up Next</Text>
                 </View>
                 )}
               </View>
@@ -690,12 +801,24 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
           if (item.type === 'series' && item.season && item.episode) {
             return (
               <View style={styles.episodeRow}>
-                <Text style={[styles.episodeText, { color: currentTheme.colors.mediumEmphasis }]}>
+                <Text style={[
+                  styles.episodeText, 
+                  { 
+                    color: currentTheme.colors.mediumEmphasis,
+                    fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 13
+                  }
+                ]}>
                   Season {item.season}
                 </Text>
                 {item.episodeTitle && (
                   <Text 
-                    style={[styles.episodeTitle, { color: currentTheme.colors.mediumEmphasis }]}
+                    style={[
+                      styles.episodeTitle, 
+                      { 
+                        color: currentTheme.colors.mediumEmphasis,
+                        fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 13 : 12
+                      }
+                    ]}
                     numberOfLines={1}
                   >
                     {item.episodeTitle}
@@ -705,7 +828,13 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
             );
           } else {
             return (
-              <Text style={[styles.yearText, { color: currentTheme.colors.mediumEmphasis }]}>
+              <Text style={[
+                styles.yearText, 
+                { 
+                  color: currentTheme.colors.mediumEmphasis,
+                  fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 13
+                }
+              ]}>
                 {item.year} • {item.type === 'movie' ? 'Movie' : 'Series'}
               </Text>
             );
@@ -715,7 +844,12 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         {/* Progress Bar */}
         {item.progress > 0 && (
           <View style={styles.wideProgressContainer}>
-            <View style={styles.wideProgressTrack}>
+            <View style={[
+              styles.wideProgressTrack,
+              {
+                height: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 4
+              }
+            ]}>
               <View 
                 style={[
                   styles.wideProgressBar, 
@@ -726,20 +860,26 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                 ]} 
               />
             </View>
-            <Text style={[styles.progressLabel, { color: currentTheme.colors.textMuted }]}>
+            <Text style={[
+              styles.progressLabel, 
+              { 
+                color: currentTheme.colors.textMuted,
+                fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 11
+              }
+            ]}>
               {Math.round(item.progress)}% watched
             </Text>
           </View>
         )}
       </View>
     </TouchableOpacity>
-  ), [currentTheme.colors, handleContentPress, handleLongPress, deletingItemId]);
+  ), [currentTheme.colors, handleContentPress, handleLongPress, deletingItemId, computedItemWidth, computedItemHeight, isTV, isLargeTablet, isTablet]);
 
   // Memoized key extractor
   const keyExtractor = useCallback((item: ContinueWatchingItem) => `continue-${item.id}-${item.type}`, []);
 
   // Memoized item separator
-  const ItemSeparator = useCallback(() => <View style={{ width: 16 }} />, []);
+  const ItemSeparator = useCallback(() => <View style={{ width: itemSpacing }} />, [itemSpacing]);
 
   // If no continue watching items, don't render anything
   if (continueWatchingItems.length === 0) {
@@ -751,10 +891,23 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       style={styles.container}
       entering={FadeIn.duration(350)}
     >
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingHorizontal: horizontalPadding }]}>
         <View style={styles.titleContainer}>
-          <Text style={[styles.title, { color: currentTheme.colors.text }]}>Continue Watching</Text>
-          <View style={[styles.titleUnderline, { backgroundColor: currentTheme.colors.primary }]} />
+          <Text style={[
+            styles.title, 
+            { 
+              color: currentTheme.colors.text,
+              fontSize: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 26 : 24
+            }
+          ]}>Continue Watching</Text>
+          <View style={[
+            styles.titleUnderline, 
+            { 
+              backgroundColor: currentTheme.colors.primary,
+              width: isTV ? 50 : isLargeTablet ? 45 : isTablet ? 40 : 40,
+              height: isTV ? 4 : isLargeTablet ? 3.5 : isTablet ? 3 : 3
+            }
+          ]} />
         </View>
       </View>
       
@@ -764,7 +917,13 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         keyExtractor={keyExtractor}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.wideList}
+        contentContainerStyle={[
+          styles.wideList,
+          { 
+            paddingLeft: horizontalPadding, 
+            paddingRight: horizontalPadding 
+          }
+        ]}
         ItemSeparatorComponent={ItemSeparator}
         onEndReachedThreshold={0.7}
         onEndReached={() => {}}
@@ -792,7 +951,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
     marginBottom: 16,
   },
   titleContainer: {
@@ -814,7 +972,6 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   wideList: {
-    paddingHorizontal: 16,
     paddingBottom: 8,
     paddingTop: 4,
   },
