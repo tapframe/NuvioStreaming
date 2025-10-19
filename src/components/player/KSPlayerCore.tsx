@@ -118,6 +118,7 @@ const KSPlayerCore: React.FC = () => {
   const [textTracks, setTextTracks] = useState<TextTrack[]>([]);
   const [selectedTextTrack, setSelectedTextTrack] = useState<number>(-1);
   const [resizeMode, setResizeMode] = useState<ResizeModeType>('contain');
+  const [playerBackend, setPlayerBackend] = useState<string>('');
   const [buffered, setBuffered] = useState(0);
   const [seekPosition, setSeekPosition] = useState<number | null>(null);
   const ksPlayerRef = useRef<KSPlayerRef>(null);
@@ -259,6 +260,10 @@ const KSPlayerCore: React.FC = () => {
   const isMounted = useRef(true);
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null);
   const [isSyncingBeforeClose, setIsSyncingBeforeClose] = useState(false);
+
+  // AirPlay state
+  const [isAirPlayActive, setIsAirPlayActive] = useState<boolean>(false);
+  const [allowsAirPlay, setAllowsAirPlay] = useState<boolean>(true);
 
   // Silent startup-timeout retry state
   const startupRetryCountRef = useRef(0);
@@ -956,6 +961,18 @@ const KSPlayerCore: React.FC = () => {
       safeSetState(() => setBuffered(bufferedTime));
     }
 
+    // Update AirPlay state if available
+    if (event.airPlayState) {
+      const wasAirPlayActive = isAirPlayActive;
+      setIsAirPlayActive(event.airPlayState.isExternalPlaybackActive);
+      setAllowsAirPlay(event.airPlayState.allowsExternalPlayback);
+
+      // Log AirPlay state changes for debugging
+      if (wasAirPlayActive !== event.airPlayState.isExternalPlaybackActive) {
+        if (__DEV__) logger.log(`[VideoPlayer] AirPlay state changed: ${event.airPlayState.isExternalPlaybackActive ? 'ACTIVE' : 'INACTIVE'}`);
+      }
+    }
+
     // Safety: if audio is advancing but onLoad didn't fire, dismiss opening overlay
     if (!isOpeningAnimationComplete) {
       setIsVideoLoaded(true);
@@ -1039,6 +1056,24 @@ const KSPlayerCore: React.FC = () => {
         logger.error('[VideoPlayer] onLoad called with null/undefined data');
         return;
       }
+      // Extract player backend information
+      if (data.playerBackend) {
+        const newPlayerBackend = data.playerBackend;
+        setPlayerBackend(newPlayerBackend);
+        if (DEBUG_MODE) {
+          logger.log(`[VideoPlayer] Player backend: ${newPlayerBackend}`);
+        }
+
+        // Reset AirPlay state if switching to KSMEPlayer (which doesn't support AirPlay)
+        if (newPlayerBackend === 'KSMEPlayer' && (isAirPlayActive || allowsAirPlay)) {
+          setIsAirPlayActive(false);
+          setAllowsAirPlay(false);
+          if (DEBUG_MODE) {
+            logger.log('[VideoPlayer] Reset AirPlay state for KSMEPlayer');
+          }
+        }
+      }
+
       // KSPlayer returns duration in seconds directly
       const videoDuration = data.duration;
       if (DEBUG_MODE) {
@@ -1249,6 +1284,11 @@ const KSPlayerCore: React.FC = () => {
       }
       
       controlsTimeout.current = setTimeout(hideControls, 5000);
+      
+      // Auto-fetch and load English external subtitles if available
+      if (imdbId) {
+        fetchAvailableSubtitles(undefined, true);
+      }
     } catch (error) {
       logger.error('[VideoPlayer] Error in onLoad:', error);
       // Set fallback values to prevent crashes
@@ -2333,6 +2373,27 @@ const KSPlayerCore: React.FC = () => {
     }
   }, [pendingSeek, isPlayerReady, isVideoLoaded, duration]);
 
+  // AirPlay handler
+  const handleAirPlayPress = async () => {
+    if (!ksPlayerRef.current) return;
+    
+    try {
+      // First ensure AirPlay is enabled
+      if (!allowsAirPlay) {
+        ksPlayerRef.current.setAllowsExternalPlayback(true);
+        setAllowsAirPlay(true);
+        logger.log(`[VideoPlayer] AirPlay enabled before showing picker`);
+      }
+      
+      // Show the AirPlay picker
+      ksPlayerRef.current.showAirPlayPicker();
+      
+      logger.log(`[VideoPlayer] AirPlay picker triggered - check console for native logs`);
+    } catch (error) {
+      logger.error('[VideoPlayer] Error showing AirPlay picker:', error);
+    }
+  };
+
   const handleSelectStream = async (newStream: any) => {
     if (newStream.url === currentStreamUrl) {
       setShowSourcesModal(false);
@@ -2665,6 +2726,8 @@ const KSPlayerCore: React.FC = () => {
                   volume={volume / 100}
                   audioTrack={selectedAudioTrack ?? undefined}
                   textTrack={useCustomSubtitles ? -1 : selectedTextTrack}
+                  allowsExternalPlayback={allowsAirPlay}
+                  usesExternalPlaybackWhileExternalScreenIsActive={true}
                   onProgress={handleProgress}
                   onLoad={onLoad}
                   onEnd={onEnd}
@@ -2706,8 +2769,12 @@ const KSPlayerCore: React.FC = () => {
             onSlidingComplete={handleSlidingComplete}
             buffered={buffered}
             formatTime={formatTime}
+            playerBackend={playerBackend}
           cyclePlaybackSpeed={cyclePlaybackSpeed}
           currentPlaybackSpeed={playbackSpeed}
+          isAirPlayActive={isAirPlayActive}
+          allowsAirPlay={allowsAirPlay}
+          onAirPlayPress={handleAirPlayPress}
           />
 
           {showPauseOverlay && (

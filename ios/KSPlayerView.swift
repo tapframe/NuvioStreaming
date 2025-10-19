@@ -8,6 +8,7 @@
 import Foundation
 import KSPlayer
 import React
+import AVKit
 
 @objc(KSPlayerView)
 class KSPlayerView: UIView {
@@ -16,6 +17,8 @@ class KSPlayerView: UIView {
     private var isPaused = false
     private var currentVolume: Float = 1.0
     weak var viewManager: KSPlayerViewManager?
+
+    // AirPlay properties (removed duplicate declarations)
     
     // Event blocks for Fabric
     @objc var onLoad: RCTDirectEventBlock?
@@ -55,6 +58,19 @@ class KSPlayerView: UIView {
     @objc var textTrack: NSNumber = -1 {
         didSet {
             setTextTrack(textTrack.intValue)
+        }
+    }
+    
+    // AirPlay properties
+    @objc var allowsExternalPlayback: Bool = true {
+        didSet {
+            setAllowsExternalPlayback(allowsExternalPlayback)
+        }
+    }
+
+    @objc var usesExternalPlaybackWhileExternalScreenIsActive: Bool = true {
+        didSet {
+            setUsesExternalPlaybackWhileExternalScreenIsActive(usesExternalPlaybackWhileExternalScreenIsActive)
         }
     }
 
@@ -161,6 +177,12 @@ class KSPlayerView: UIView {
         }
 
         setVolume(currentVolume)
+
+        // Ensure AirPlay is properly configured after setting source
+        DispatchQueue.main.async {
+            self.setAllowsExternalPlayback(self.allowsExternalPlayback)
+            self.setUsesExternalPlaybackWhileExternalScreenIsActive(self.usesExternalPlaybackWhileExternalScreenIsActive)
+        }
     }
 
     private func createOptions(with headers: [String: String]) -> KSOptions {
@@ -283,7 +305,7 @@ class KSPlayerView: UIView {
                 print("KSPlayerView: Successfully selected audio track \(trackId)")
 
                 // Verify the selection worked
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     let tracksAfter = player.tracks(mediaType: .audio)
                     for (index, track) in tracksAfter.enumerated() {
                         print("KSPlayerView: After selection - Track \(index) (ID: \(track.trackID)) isEnabled: \(track.isEnabled)")
@@ -399,6 +421,94 @@ class KSPlayerView: UIView {
         ]
     }
 
+    // AirPlay methods
+    func setAllowsExternalPlayback(_ allows: Bool) {
+        print("[KSPlayerView] Setting allowsExternalPlayback: \(allows)")
+        playerView.playerLayer?.player.allowsExternalPlayback = allows
+    }
+
+    func setUsesExternalPlaybackWhileExternalScreenIsActive(_ uses: Bool) {
+        print("[KSPlayerView] Setting usesExternalPlaybackWhileExternalScreenIsActive: \(uses)")
+        playerView.playerLayer?.player.usesExternalPlaybackWhileExternalScreenIsActive = uses
+    }
+
+    func showAirPlayPicker() {
+        print("[KSPlayerView] showAirPlayPicker called")
+
+        DispatchQueue.main.async {
+            // Create a temporary route picker view for triggering AirPlay
+            let routePickerView = AVRoutePickerView()
+            routePickerView.tintColor = .white
+            routePickerView.alpha = 0.01 // Nearly invisible but still interactive
+
+            // Find the current view controller
+            guard let viewController = self.findHostViewController() else {
+                print("[KSPlayerView] Could not find view controller for AirPlay picker")
+                return
+            }
+
+            // Add to the view controller's view temporarily
+            viewController.view.addSubview(routePickerView)
+
+            // Position it off-screen but still in the view hierarchy
+            routePickerView.frame = CGRect(x: -100, y: -100, width: 44, height: 44)
+
+            // Force layout
+            viewController.view.setNeedsLayout()
+            viewController.view.layoutIfNeeded()
+
+            // Wait a bit for the view to be ready, then trigger
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                // Find and trigger the AirPlay button
+                self.triggerAirPlayButton(routePickerView)
+
+                // Clean up after a delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    routePickerView.removeFromSuperview()
+                    print("[KSPlayerView] Cleaned up temporary AirPlay picker")
+                }
+            }
+        }
+    }
+
+    private func triggerAirPlayButton(_ routePickerView: AVRoutePickerView) {
+        // Recursively find the button in the route picker view
+        func findButton(in view: UIView) -> UIButton? {
+            if let button = view as? UIButton {
+                return button
+            }
+            for subview in view.subviews {
+                if let button = findButton(in: subview) {
+                    return button
+                }
+            }
+            return nil
+        }
+
+        if let button = findButton(in: routePickerView) {
+            print("[KSPlayerView] Found AirPlay button, triggering tap")
+            button.sendActions(for: .touchUpInside)
+        } else {
+            print("[KSPlayerView] Could not find AirPlay button in route picker")
+        }
+    }
+    
+    func getAirPlayState() -> [String: Any] {
+        guard let player = playerView.playerLayer?.player else {
+            return [
+                "allowsExternalPlayback": false,
+                "usesExternalPlaybackWhileExternalScreenIsActive": false,
+                "isExternalPlaybackActive": false
+            ]
+        }
+        
+        return [
+            "allowsExternalPlayback": player.allowsExternalPlayback,
+            "usesExternalPlaybackWhileExternalScreenIsActive": player.usesExternalPlaybackWhileExternalScreenIsActive,
+            "isExternalPlaybackActive": player.isExternalPlaybackActive
+        ]
+    }
+
     // Get current player state for React Native
     func getCurrentState() -> [String: Any] {
         guard let player = playerView.playerLayer?.player else {
@@ -419,6 +529,15 @@ extension KSPlayerView: KSPlayerLayerDelegate {
     func player(layer: KSPlayerLayer, state: KSPlayerState) {
         switch state {
         case .readyToPlay:
+            // Ensure AirPlay is properly configured when player is ready
+            layer.player.allowsExternalPlayback = allowsExternalPlayback
+            layer.player.usesExternalPlaybackWhileExternalScreenIsActive = usesExternalPlaybackWhileExternalScreenIsActive
+
+            // Determine player backend type
+            let uriString = currentSource?["uri"] as? String
+            let isMKV = uriString?.lowercased().contains(".mkv") ?? false
+            let playerBackend = isMKV ? "KSMEPlayer" : "KSAVPlayer"
+
             // Send onLoad event to React Native with track information
             let p = layer.player
             let tracks = getAvailableTracks()
@@ -430,7 +549,8 @@ extension KSPlayerView: KSPlayerLayerDelegate {
                     "height": p.naturalSize.height
                 ],
                 "audioTracks": tracks["audioTracks"] ?? [],
-                "textTracks": tracks["textTracks"] ?? []
+                "textTracks": tracks["textTracks"] ?? [],
+                "playerBackend": playerBackend
             ])
         case .buffering:
             sendEvent("onBuffering", ["isBuffering": true])
@@ -453,7 +573,8 @@ extension KSPlayerView: KSPlayerLayerDelegate {
             sendEvent("onProgress", [
                 "currentTime": currentTime,
                 "duration": totalTime,
-                "bufferTime": p.playableTime
+                "bufferTime": p.playableTime,
+                "airPlayState": getAirPlayState()
             ])
         }
     }

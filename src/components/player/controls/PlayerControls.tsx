@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Animated, StyleSheet, Platform, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Feather from 'react-native-vector-icons/Feather';
 import { LinearGradient } from 'expo-linear-gradient';
 import Slider from '@react-native-community/slider';
 import { styles } from '../utils/playerStyles';
@@ -43,6 +44,10 @@ interface PlayerControlsProps {
   buffered: number;
   formatTime: (seconds: number) => string;
   playerBackend?: string;
+  // AirPlay props
+  isAirPlayActive?: boolean;
+  allowsAirPlay?: boolean;
+  onAirPlayPress?: () => void;
 }
 
 export const PlayerControls: React.FC<PlayerControlsProps> = ({
@@ -80,6 +85,9 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   buffered,
   formatTime,
   playerBackend,
+  isAirPlayActive,
+  allowsAirPlay,
+  onAirPlayPress,
 }) => {
   const { currentTheme } = useTheme();
   const deviceWidth = Dimensions.get('window').width;
@@ -246,6 +254,26 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                   <Ionicons name="swap-horizontal" size={20} color="white" />
                   <Text style={styles.bottomButtonText}>
                     Change Source
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {/* AirPlay Button - iOS only, KSAVPlayer only */}
+              {Platform.OS === 'ios' && onAirPlayPress && playerBackend === 'KSAVPlayer' && (
+                <TouchableOpacity
+                  style={styles.bottomButton}
+                  onPress={onAirPlayPress}
+                >
+                  <Feather
+                    name="airplay"
+                    size={20}
+                    color={isAirPlayActive ? currentTheme.colors.primary : "white"}
+                  />
+                  <Text style={[
+                    styles.bottomButtonText,
+                    isAirPlayActive && { color: currentTheme.colors.primary }
+                  ]}>
+                    {allowsAirPlay ? 'AirPlay' : 'AirPlay Off'}
                   </Text>
                 </TouchableOpacity>
               )}

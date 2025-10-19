@@ -16,6 +16,8 @@ RCT_EXPORT_VIEW_PROPERTY(paused, BOOL)
 RCT_EXPORT_VIEW_PROPERTY(volume, NSNumber)
 RCT_EXPORT_VIEW_PROPERTY(audioTrack, NSNumber)
 RCT_EXPORT_VIEW_PROPERTY(textTrack, NSNumber)
+RCT_EXPORT_VIEW_PROPERTY(allowsExternalPlayback, BOOL)
+RCT_EXPORT_VIEW_PROPERTY(usesExternalPlaybackWhileExternalScreenIsActive, BOOL)
 
 // Event properties
 RCT_EXPORT_VIEW_PROPERTY(onLoad, RCTDirectEventBlock)
@@ -32,11 +34,17 @@ RCT_EXTERN_METHOD(setVolume:(nonnull NSNumber *)node volume:(nonnull NSNumber *)
 RCT_EXTERN_METHOD(setAudioTrack:(nonnull NSNumber *)node trackId:(nonnull NSNumber *)trackId)
 RCT_EXTERN_METHOD(setTextTrack:(nonnull NSNumber *)node trackId:(nonnull NSNumber *)trackId)
 RCT_EXTERN_METHOD(getTracks:(nonnull NSNumber *)node resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(setAllowsExternalPlayback:(nonnull NSNumber *)node allows:(BOOL)allows)
+RCT_EXTERN_METHOD(setUsesExternalPlaybackWhileExternalScreenIsActive:(nonnull NSNumber *)node uses:(BOOL)uses)
+RCT_EXTERN_METHOD(getAirPlayState:(nonnull NSNumber *)node resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(showAirPlayPicker:(nonnull NSNumber *)node)
 
 @end
 
 @interface RCT_EXTERN_MODULE(KSPlayerModule, RCTEventEmitter)
 
 RCT_EXTERN_METHOD(getTracks:(nonnull NSNumber *)nodeTag resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(getAirPlayState:(nonnull NSNumber *)nodeTag resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(showAirPlayPicker:(nonnull NSNumber *)nodeTag)
 
 @end

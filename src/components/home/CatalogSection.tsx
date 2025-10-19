@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, Dimensions } from 'react-native';
-import { LegendList } from '@legendapp/list';
+import { FlashList } from '@shopify/flash-list';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -97,6 +97,12 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
   // Memoize the keyExtractor to prevent re-creation
   const keyExtractor = useCallback((item: StreamingContent) => `${item.id}-${item.type}`, []);
 
+  // FlashList v2 optimization: getItemType for better performance
+  const getItemType = useCallback((item: StreamingContent) => {
+    // Return different types based on content for better recycling
+    return item.type === 'movie' ? 'movie' : 'series';
+  }, []);
+
   return (
     <Animated.View
       style={styles.catalogContainer}
@@ -163,10 +169,11 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
         </TouchableOpacity>
       </View>
       
-      <LegendList
+      <FlashList
         data={catalog.items}
         renderItem={renderContentItem}
         keyExtractor={keyExtractor}
+        getItemType={getItemType}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={StyleSheet.flatten([
@@ -179,8 +186,8 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
         ItemSeparatorComponent={ItemSeparator}
         onEndReachedThreshold={0.7}
         onEndReached={() => {}}
-        recycleItems={true}
-        maintainVisibleContentPosition
+        // FlashList v2 optimizations
+        drawDistance={500}
       />
     </Animated.View>
   );

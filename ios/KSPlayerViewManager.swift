@@ -96,4 +96,44 @@ class KSPlayerViewManager: RCTViewManager {
             }
         }
     }
+    
+    // AirPlay methods
+    @objc func setAllowsExternalPlayback(_ node: NSNumber, allows: Bool) {
+        DispatchQueue.main.async {
+            if let view = self.bridge.uiManager.view(forReactTag: node) as? KSPlayerView {
+                view.setAllowsExternalPlayback(allows)
+            }
+        }
+    }
+    
+    @objc func setUsesExternalPlaybackWhileExternalScreenIsActive(_ node: NSNumber, uses: Bool) {
+        DispatchQueue.main.async {
+            if let view = self.bridge.uiManager.view(forReactTag: node) as? KSPlayerView {
+                view.setUsesExternalPlaybackWhileExternalScreenIsActive(uses)
+            }
+        }
+    }
+    
+    @objc func getAirPlayState(_ node: NSNumber, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        DispatchQueue.main.async {
+            if let view = self.bridge.uiManager.view(forReactTag: node) as? KSPlayerView {
+                let airPlayState = view.getAirPlayState()
+                resolve(airPlayState)
+            } else {
+                reject("NO_VIEW", "KSPlayerView not found", nil)
+            }
+        }
+    }
+    
+    @objc func showAirPlayPicker(_ node: NSNumber) {
+        print("[KSPlayerViewManager] showAirPlayPicker called for node: \(node)")
+        DispatchQueue.main.async {
+            if let view = self.bridge.uiManager.view(forReactTag: node) as? KSPlayerView {
+                print("[KSPlayerViewManager] Found KSPlayerView, calling showAirPlayPicker")
+                view.showAirPlayPicker()
+            } else {
+                print("[KSPlayerViewManager] Could not find KSPlayerView for node: \(node)")
+            }
+        }
+    }
 }
