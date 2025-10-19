@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { DeviceEventEmitter } from 'react-native';
 import { Share } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Toast } from 'toastify-react-native';
+import { useToast } from '../contexts/ToastContext';
 import DropUpMenu from '../components/home/DropUpMenu';
 import {
   View,
@@ -208,6 +208,7 @@ const LibraryScreen = () => {
   const [filter, setFilter] = useState<'trakt' | 'movies' | 'series'>('movies');
   const [showTraktContent, setShowTraktContent] = useState(false);
   const [selectedTraktFolder, setSelectedTraktFolder] = useState<string | null>(null);
+  const { showInfo, showError } = useToast();
   // DropUpMenu state
   const [menuVisible, setMenuVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<LibraryItem | null>(null);
@@ -1005,11 +1006,11 @@ const LibraryScreen = () => {
               case 'library': {
               try {
                 await catalogService.removeFromLibrary(selectedItem.type, selectedItem.id);
-                Toast.info('Removed from Library');
+                showInfo('Removed from Library', 'Item removed from your library');
                 setLibraryItems(prev => prev.filter(item => !(item.id === selectedItem.id && item.type === selectedItem.type)));
                 setMenuVisible(false);
               } catch (error) {
-                Toast.error('Failed to update Library');
+                showError('Failed to update Library', 'Unable to remove item from library');
               }
               break;
               }
@@ -1019,7 +1020,7 @@ const LibraryScreen = () => {
                 const key = `watched:${selectedItem.type}:${selectedItem.id}`;
                 const newWatched = !selectedItem.watched;
                 await AsyncStorage.setItem(key, newWatched ? 'true' : 'false');
-                Toast.info(newWatched ? 'Marked as Watched' : 'Marked as Unwatched');
+                showInfo(newWatched ? 'Marked as Watched' : 'Marked as Unwatched', newWatched ? 'Item marked as watched' : 'Item marked as unwatched');
                 // Instantly update local state
                 setLibraryItems(prev => prev.map(item =>
                 item.id === selectedItem.id && item.type === selectedItem.type
@@ -1027,7 +1028,7 @@ const LibraryScreen = () => {
                   : item
                 ));
               } catch (error) {
-                Toast.error('Failed to update watched status');
+                showError('Failed to update watched status', 'Unable to update watched status');
               }
               break;
               }

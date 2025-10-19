@@ -59,7 +59,7 @@ import { useLoading } from '../contexts/LoadingContext';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Toast } from 'toastify-react-native';
+import { useToast } from '../contexts/ToastContext';
 import FirstTimeWelcome from '../components/FirstTimeWelcome';
 import { HeaderVisibility } from '../contexts/HeaderVisibility';
 
@@ -111,6 +111,7 @@ const HomeScreen = () => {
   const continueWatchingRef = useRef<ContinueWatchingRef>(null);
   const { settings } = useSettings();
   const { lastUpdate } = useCatalogContext(); // Add catalog context to listen for addon changes
+  const { showInfo } = useToast();
   const [showHeroSection, setShowHeroSection] = useState(settings.showHeroSection);
   const [featuredContentSource, setFeaturedContentSource] = useState(settings.featuredContentSource);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -351,7 +352,7 @@ const HomeScreen = () => {
           await AsyncStorage.removeItem('showLoginHintToastOnce');
           hideTimer = setTimeout(() => setHintVisible(false), 2000);
           // Also show a global toast for consistency across screens
-          try { Toast.info('You can sign in anytime from Settings → Account', 'bottom'); } catch {}
+          showInfo('Sign In Available', 'You can sign in anytime from Settings → Account');
         }
       } catch {}
     })();

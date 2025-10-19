@@ -47,7 +47,7 @@ import QualityBadge from '../components/metadata/QualityBadge';
 import { logger } from '../utils/logger';
 import { isMkvStream } from '../utils/mkvDetection';
 import CustomAlert from '../components/CustomAlert';
-import { Toast } from 'toastify-react-native';
+import { useToast } from '../contexts/ToastContext';
 import { useDownloads } from '../contexts/DownloadsContext';
 import { PaperProvider } from 'react-native-paper';
 
@@ -227,6 +227,7 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
   const { useSettings } = require('../hooks/useSettings');
   const { settings } = useSettings();
   const { startDownload } = useDownloads();
+  const { showSuccess, showInfo } = useToast();
   
   // Handle long press to copy stream URL to clipboard
   const handleLongPress = useCallback(async () => {
@@ -236,7 +237,7 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
         
         // Use toast for Android, custom alert for iOS
         if (Platform.OS === 'android') {
-          Toast.success('Stream URL copied to clipboard!', 'bottom');
+          showSuccess('URL Copied', 'Stream URL copied to clipboard!');
         } else {
           // iOS uses custom alert
           showAlert('Copied!', 'Stream URL has been copied to clipboard.');
@@ -244,13 +245,13 @@ const StreamCard = memo(({ stream, onPress, index, isLoading, statusMessage, the
       } catch (error) {
         // Fallback: show URL in alert if clipboard fails
         if (Platform.OS === 'android') {
-          Toast.info(`Stream URL: ${stream.url}`, 'bottom');
+          showInfo('Stream URL', `Stream URL: ${stream.url}`);
         } else {
           showAlert('Stream URL', stream.url);
         }
       }
     }
-  }, [stream.url, showAlert]);
+  }, [stream.url, showAlert, showSuccess, showInfo]);
   const styles = React.useMemo(() => createStyles(theme.colors), [theme.colors]);
   
   const streamInfo = useMemo(() => {
@@ -513,6 +514,7 @@ export const StreamsScreen = () => {
   const { currentTheme } = useTheme();
   const { colors } = currentTheme;
   const { pauseTrailer, resumeTrailer } = useTrailer();
+  const { showSuccess, showInfo } = useToast();
 
   // Add refs to prevent excessive updates and duplicate loads
   const isMounted = useRef(true);

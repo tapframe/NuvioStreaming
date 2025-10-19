@@ -29,7 +29,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import FastImage from '@d11/react-native-fast-image';
 import { useDownloads } from '../contexts/DownloadsContext';
 import type { DownloadItem } from '../contexts/DownloadsContext';
-import { Toast } from 'toastify-react-native';
+import { useToast } from '../contexts/ToastContext';
 import CustomAlert from '../components/CustomAlert';
 
 const { height, width } = Dimensions.get('window');
@@ -98,6 +98,7 @@ const DownloadItemComponent: React.FC<{
   onRequestRemove: (item: DownloadItem) => void;
 }> = React.memo(({ item, onPress, onAction, onRequestRemove }) => {
   const { currentTheme } = useTheme();
+  const { showSuccess, showInfo } = useToast();
   const [posterUrl, setPosterUrl] = useState<string | null>(item.posterUrl || null);
 
   // Try to fetch poster if not available
@@ -113,18 +114,18 @@ const DownloadItemComponent: React.FC<{
     if (item.status === 'completed' && item.fileUri) {
       Clipboard.setString(item.fileUri);
       if (Platform.OS === 'android') {
-        Toast.success('Local file path copied to clipboard');
+        showSuccess('Path Copied', 'Local file path copied to clipboard');
       } else {
         Alert.alert('Copied', 'Local file path copied to clipboard');
       }
     } else if (item.status !== 'completed') {
       if (Platform.OS === 'android') {
-        Toast.info('Download is not complete yet');
+        showInfo('Download Incomplete', 'Download is not complete yet');
       } else {
         Alert.alert('Not Available', 'The local file path is available only after the download is complete.');
       }
     }
-  }, [item.status, item.fileUri]);
+  }, [item.status, item.fileUri, showSuccess, showInfo]);
 
   const formatBytes = (bytes?: number) => {
     if (!bytes || bytes <= 0) return '0 B';
@@ -343,6 +344,7 @@ const DownloadsScreen: React.FC = () => {
   const { currentTheme } = useTheme();
   const { top: safeAreaTop } = useSafeAreaInsets();
   const { downloads, pauseDownload, resumeDownload, cancelDownload } = useDownloads();
+  const { showSuccess, showInfo } = useToast();
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'downloading' | 'completed' | 'paused'>('all');
