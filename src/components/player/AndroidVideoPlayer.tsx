@@ -1187,6 +1187,12 @@ const AndroidVideoPlayer: React.FC = () => {
     if (isMounted.current) {
       setSeekTime(null);
       isSeeking.current = false;
+
+      // IMMEDIATE SYNC: Update Trakt progress immediately after seeking
+      if (duration > 0 && data?.currentTime !== undefined) {
+        traktAutosync.handleProgressUpdate(data.currentTime, duration, true); // force=true for immediate sync
+      }
+
       // Resume playback on iOS if we paused for seeking
       if (Platform.OS === 'ios') {
         const shouldResume = wasPlayingBeforeDragRef.current || iosWasPausedDuringSeekRef.current === false || isDragging;

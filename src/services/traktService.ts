@@ -562,7 +562,7 @@ export class TraktService {
   
   // Rate limiting - Optimized for real-time scrobbling
   private lastApiCall: number = 0;
-  private readonly MIN_API_INTERVAL = 1000; // Reduced from 3000ms to 1000ms for real-time updates
+  private readonly MIN_API_INTERVAL = 500; // Reduced to 500ms for faster updates
   private requestQueue: Array<() => Promise<any>> = [];
   private isProcessingQueue: boolean = false;
 
@@ -1740,8 +1740,8 @@ export class TraktService {
       const watchingKey = this.getWatchingKey(contentData);
       const lastSync = this.lastSyncTimes.get(watchingKey) || 0;
       
-      // IMMEDIATE SYNC: Remove debouncing for instant sync, only prevent truly rapid calls (< 300ms)
-      if (!force && (now - lastSync) < 300) {
+      // IMMEDIATE SYNC: Remove debouncing for instant sync, only prevent truly rapid calls (< 100ms)
+      if (!force && (now - lastSync) < 100) {
         return true; // Skip this sync, but return success
       }
 
@@ -1791,13 +1791,12 @@ export class TraktService {
       // Record this stop attempt
       this.lastStopCalls.set(watchingKey, now);
 
-      // Respect higher user threshold by pausing below effective threshold
-      const effectiveThreshold = Math.max(80, this.completionThreshold);
+      // Use pause if below user threshold, stop only when ready to scrobble
+      const useStop = progress >= this.completionThreshold;
       const result = await this.queueRequest(async () => {
-        if (progress < effectiveThreshold) {
-          return await this.pauseWatching(contentData, progress);
-        }
-        return await this.stopWatching(contentData, progress);
+        return useStop 
+          ? await this.stopWatching(contentData, progress)
+          : await this.pauseWatching(contentData, progress);
       });
 
       if (result) {
@@ -1810,7 +1809,8 @@ export class TraktService {
           logger.log(`[TraktService] Marked as scrobbled to prevent restarts: ${watchingKey}`);
         }
 
-        const action = progress >= effectiveThreshold ? 'scrobbled' : 'paused';
+        // Action reflects actual endpoint used based on user threshold
+        const action = progress >= this.completionThreshold ? 'scrobbled' : 'paused';
         logger.log(`[TraktService] Stopped watching ${contentData.type}: ${contentData.title} (${progress.toFixed(1)}% - ${action})`);
 
         return true;
@@ -1889,11 +1889,11 @@ export class TraktService {
 
       this.lastStopCalls.set(watchingKey, Date.now());
 
-      // BYPASS QUEUE: Respect higher user threshold by pausing below effective threshold
-      const effectiveThreshold = Math.max(80, this.completionThreshold);
-      const result = progress < effectiveThreshold
-        ? await this.pauseWatching(contentData, progress)
-        : await this.stopWatching(contentData, progress);
+      // BYPASS QUEUE: Use pause if below user threshold, stop only when ready to scrobble
+      const useStop = progress >= this.completionThreshold;
+      const result = useStop
+        ? await this.stopWatching(contentData, progress)
+        : await this.pauseWatching(contentData, progress);
 
       if (result) {
         this.currentlyWatching.delete(watchingKey);
@@ -1904,7 +1904,8 @@ export class TraktService {
           this.scrobbledTimestamps.set(watchingKey, Date.now());
         }
 
-        const action = progress >= effectiveThreshold ? 'scrobbled' : 'paused';
+        // Action reflects actual endpoint used based on user threshold
+        const action = progress >= this.completionThreshold ? 'scrobbled' : 'paused';
         logger.log(`[TraktService] IMMEDIATE: Stopped watching ${contentData.type}: ${contentData.title} (${progress.toFixed(1)}% - ${action})`);
 
         return true;

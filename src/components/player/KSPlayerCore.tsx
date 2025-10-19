@@ -866,6 +866,9 @@ const KSPlayerCore: React.FC = () => {
         if (DEBUG_MODE) {
           logger.log(`[VideoPlayer] KSPlayer seek completed to ${timeInSeconds.toFixed(2)}s`);
         }
+
+        // IMMEDIATE SYNC: Update Trakt progress immediately after seeking
+        traktAutosync.handleProgressUpdate(timeInSeconds, duration, true); // force=true for immediate sync
       }
     }, 500);
   };
