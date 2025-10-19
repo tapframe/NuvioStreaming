@@ -94,6 +94,12 @@ interface HeroSectionProps {
   getPlayButtonText: () => string;
   setBannerImage: (bannerImage: string | null) => void;
   groupedEpisodes?: { [seasonNumber: number]: any[] };
+  // Trakt integration props
+  isAuthenticated?: boolean;
+  isInWatchlist?: boolean;
+  isInCollection?: boolean;
+  onToggleWatchlist?: () => void;
+  onToggleCollection?: () => void;
   dynamicBackgroundColor?: string;
   handleBack: () => void;
   tmdbId?: number | null;
@@ -114,7 +120,13 @@ const ActionButtons = memo(({
   groupedEpisodes,
   metadata,
   aiChatEnabled,
-  settings
+  settings,
+  // Trakt integration props
+  isAuthenticated,
+  isInWatchlist,
+  isInCollection,
+  onToggleWatchlist,
+  onToggleCollection
 }: {
   handleShowStreams: () => void;
   toggleLibrary: () => void;
@@ -130,6 +142,12 @@ const ActionButtons = memo(({
   metadata: any;
   aiChatEnabled?: boolean;
   settings: any;
+  // Trakt integration props
+  isAuthenticated?: boolean;
+  isInWatchlist?: boolean;
+  isInCollection?: boolean;
+  onToggleWatchlist?: () => void;
+  onToggleCollection?: () => void;
 }) => {
   const { currentTheme } = useTheme();
   
@@ -363,6 +381,59 @@ const ActionButtons = memo(({
           color={currentTheme.colors.white}
         />
       </TouchableOpacity>
+      )}
+
+      {/* Trakt Action Buttons */}
+      {isAuthenticated && (
+        <>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.traktButton, isTablet && styles.tabletTraktButton]}
+            onPress={onToggleWatchlist}
+            activeOpacity={0.85}
+          >
+            {Platform.OS === 'ios' ? (
+              GlassViewComp && liquidGlassAvailable ? (
+                <GlassViewComp
+                  style={styles.blurBackgroundRound}
+                  glassEffectStyle="regular"
+                />
+              ) : (
+                <ExpoBlurView intensity={80} style={styles.blurBackgroundRound} tint="dark" />
+              )
+            ) : (
+              <View style={styles.androidFallbackBlurRound} />
+            )}
+            <MaterialIcons 
+              name={isInWatchlist ? "playlist-add-check" : "playlist-add"} 
+              size={isTablet ? 28 : 24} 
+              color={isInWatchlist ? "#E74C3C" : currentTheme.colors.white}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionButton, styles.traktButton, isTablet && styles.tabletTraktButton]}
+            onPress={onToggleCollection}
+            activeOpacity={0.85}
+          >
+            {Platform.OS === 'ios' ? (
+              GlassViewComp && liquidGlassAvailable ? (
+                <GlassViewComp
+                  style={styles.blurBackgroundRound}
+                  glassEffectStyle="regular"
+                />
+              ) : (
+                <ExpoBlurView intensity={80} style={styles.blurBackgroundRound} tint="dark" />
+              )
+            ) : (
+              <View style={styles.androidFallbackBlurRound} />
+            )}
+            <MaterialIcons 
+              name={isInCollection ? "video-library" : "video-library"} 
+              size={isTablet ? 28 : 24} 
+              color={isInCollection ? "#3498DB" : currentTheme.colors.white}
+            />
+          </TouchableOpacity>
+        </>
       )}
 
       {type === 'series' && (
@@ -792,6 +863,12 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   dynamicBackgroundColor,
   handleBack,
   tmdbId,
+  // Trakt integration props
+  isAuthenticated,
+  isInWatchlist,
+  isInCollection,
+  onToggleWatchlist,
+  onToggleCollection
 }) => {
   const { currentTheme } = useTheme();
   const { isAuthenticated: isTraktAuthenticated } = useTraktContext();
@@ -1700,6 +1777,12 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
             metadata={metadata}
             aiChatEnabled={settings?.aiChatEnabled}
             settings={settings}
+            // Trakt integration props
+            isAuthenticated={isAuthenticated}
+            isInWatchlist={isInWatchlist}
+            isInCollection={isInCollection}
+            onToggleWatchlist={onToggleWatchlist}
+            onToggleCollection={onToggleCollection}
           />
         </View>
       </LinearGradient>
@@ -1877,6 +1960,16 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   iconButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  traktButton: {
     width: 50,
     height: 50,
     borderRadius: 25,
@@ -2206,6 +2299,11 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   tabletIconButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  tabletTraktButton: {
     width: 60,
     height: 60,
     borderRadius: 30,

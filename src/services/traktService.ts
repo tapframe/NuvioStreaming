@@ -1212,10 +1212,10 @@ export class TraktService {
 
       // Try multiple search approaches
       const searchUrls = [
-        `${TRAKT_API_URL}/search/${type}?id_type=imdb&id=${cleanImdbId}`,
-        `${TRAKT_API_URL}/search/${type}?query=${encodeURIComponent(cleanImdbId)}&id_type=imdb`,
+        `${TRAKT_API_URL}/search/${type === 'show' ? 'shows' : type}?id_type=imdb&id=${cleanImdbId}`,
+        `${TRAKT_API_URL}/search/${type === 'show' ? 'shows' : type}?query=${encodeURIComponent(cleanImdbId)}&id_type=imdb`,
         // Also try with the full tt-prefixed ID in case the API accepts it
-        `${TRAKT_API_URL}/search/${type}?id_type=imdb&id=tt${cleanImdbId}`
+        `${TRAKT_API_URL}/search/${type === 'show' ? 'shows' : type}?id_type=imdb&id=tt${cleanImdbId}`
       ];
 
       for (const searchUrl of searchUrls) {
@@ -1240,7 +1240,7 @@ export class TraktService {
           logger.log(`[TraktService] Search response data:`, data);
 
           if (data && data.length > 0) {
-            const traktId = data[0][type]?.ids?.trakt;
+            const traktId = data[0][type === 'show' ? 'show' : type]?.ids?.trakt;
             if (traktId) {
               logger.log(`[TraktService] Found Trakt ID: ${traktId} for IMDb ID: ${cleanImdbId}`);
               return traktId;
@@ -2339,7 +2339,7 @@ export class TraktService {
     try {
       logger.log(`[TraktService] Searching Trakt for ${type} with TMDB ID: ${tmdbId}`);
 
-      const response = await fetch(`${TRAKT_API_URL}/search/${type}?id_type=tmdb&id=${tmdbId}`, {
+      const response = await fetch(`${TRAKT_API_URL}/search/${type === 'show' ? 'shows' : type}?id_type=tmdb&id=${tmdbId}`, {
         headers: {
           'Content-Type': 'application/json',
           'trakt-api-version': '2',
@@ -2356,7 +2356,7 @@ export class TraktService {
       const data = await response.json();
       logger.log(`[TraktService] TMDB search response:`, data);
       if (data && data.length > 0) {
-        const traktId = data[0][type]?.ids?.trakt;
+        const traktId = data[0][type === 'show' ? 'show' : type]?.ids?.trakt;
         if (traktId) {
           logger.log(`[TraktService] Found Trakt ID via TMDB: ${traktId} for TMDB ID: ${tmdbId}`);
           return traktId;
@@ -2460,6 +2460,162 @@ export class TraktService {
     } catch (error) {
       logger.error('[TraktService] Failed to get episode comments:', error);
       return [];
+    }
+  }
+
+  /**
+   * Add content to Trakt watchlist
+   */
+  public async addToWatchlist(imdbId: string, type: 'movie' | 'show'): Promise<boolean> {
+    try {
+      if (!await this.isAuthenticated()) {
+        return false;
+      }
+
+      // Ensure IMDb ID includes the 'tt' prefix
+      const imdbIdWithPrefix = imdbId.startsWith('tt') ? imdbId : `tt${imdbId}`;
+
+      const payload = type === 'movie' 
+        ? { movies: [{ ids: { imdb: imdbIdWithPrefix } }] }
+        : { shows: [{ ids: { imdb: imdbIdWithPrefix } }] };
+
+      await this.apiRequest('/sync/watchlist', 'POST', payload);
+      logger.log(`[TraktService] Added ${type} to watchlist: ${imdbId}`);
+      return true;
+    } catch (error) {
+      logger.error(`[TraktService] Failed to add ${type} to watchlist:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Remove content from Trakt watchlist
+   */
+  public async removeFromWatchlist(imdbId: string, type: 'movie' | 'show'): Promise<boolean> {
+    try {
+      if (!await this.isAuthenticated()) {
+        return false;
+      }
+
+      // Ensure IMDb ID includes the 'tt' prefix
+      const imdbIdWithPrefix = imdbId.startsWith('tt') ? imdbId : `tt${imdbId}`;
+
+      const payload = type === 'movie' 
+        ? { movies: [{ ids: { imdb: imdbIdWithPrefix } }] }
+        : { shows: [{ ids: { imdb: imdbIdWithPrefix } }] };
+
+      await this.apiRequest('/sync/watchlist/remove', 'POST', payload);
+      logger.log(`[TraktService] Removed ${type} from watchlist: ${imdbId}`);
+      return true;
+    } catch (error) {
+      logger.error(`[TraktService] Failed to remove ${type} from watchlist:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Add content to Trakt collection
+   */
+  public async addToCollection(imdbId: string, type: 'movie' | 'show'): Promise<boolean> {
+    try {
+      if (!await this.isAuthenticated()) {
+        return false;
+      }
+
+      // Ensure IMDb ID includes the 'tt' prefix
+      const imdbIdWithPrefix = imdbId.startsWith('tt') ? imdbId : `tt${imdbId}`;
+
+      const payload = type === 'movie' 
+        ? { movies: [{ ids: { imdb: imdbIdWithPrefix } }] }
+        : { shows: [{ ids: { imdb: imdbIdWithPrefix } }] };
+
+      await this.apiRequest('/sync/collection', 'POST', payload);
+      logger.log(`[TraktService] Added ${type} to collection: ${imdbId}`);
+      return true;
+    } catch (error) {
+      logger.error(`[TraktService] Failed to add ${type} to collection:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Remove content from Trakt collection
+   */
+  public async removeFromCollection(imdbId: string, type: 'movie' | 'show'): Promise<boolean> {
+    try {
+      if (!await this.isAuthenticated()) {
+        return false;
+      }
+
+      // Ensure IMDb ID includes the 'tt' prefix
+      const imdbIdWithPrefix = imdbId.startsWith('tt') ? imdbId : `tt${imdbId}`;
+
+      const payload = type === 'movie' 
+        ? { movies: [{ ids: { imdb: imdbIdWithPrefix } }] }
+        : { shows: [{ ids: { imdb: imdbIdWithPrefix } }] };
+
+      await this.apiRequest('/sync/collection/remove', 'POST', payload);
+      logger.log(`[TraktService] Removed ${type} from collection: ${imdbId}`);
+      return true;
+    } catch (error) {
+      logger.error(`[TraktService] Failed to remove ${type} from collection:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if content is in Trakt watchlist
+   */
+  public async isInWatchlist(imdbId: string, type: 'movie' | 'show'): Promise<boolean> {
+    try {
+      if (!await this.isAuthenticated()) {
+        return false;
+      }
+
+      // Ensure IMDb ID includes the 'tt' prefix
+      const imdbIdWithPrefix = imdbId.startsWith('tt') ? imdbId : `tt${imdbId}`;
+
+      const watchlistItems = type === 'movie' 
+        ? await this.getWatchlistMovies()
+        : await this.getWatchlistShows();
+
+      return watchlistItems.some(item => {
+        const itemImdbId = type === 'movie' 
+          ? item.movie?.ids?.imdb 
+          : item.show?.ids?.imdb;
+        return itemImdbId === imdbIdWithPrefix;
+      });
+    } catch (error) {
+      logger.error(`[TraktService] Failed to check if ${type} is in watchlist:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if content is in Trakt collection
+   */
+  public async isInCollection(imdbId: string, type: 'movie' | 'show'): Promise<boolean> {
+    try {
+      if (!await this.isAuthenticated()) {
+        return false;
+      }
+
+      // Ensure IMDb ID includes the 'tt' prefix
+      const imdbIdWithPrefix = imdbId.startsWith('tt') ? imdbId : `tt${imdbId}`;
+
+      const collectionItems = type === 'movie' 
+        ? await this.getCollectionMovies()
+        : await this.getCollectionShows();
+
+      return collectionItems.some(item => {
+        const itemImdbId = type === 'movie' 
+          ? item.movie?.ids?.imdb 
+          : item.show?.ids?.imdb;
+        return itemImdbId === imdbIdWithPrefix;
+      });
+    } catch (error) {
+      logger.error(`[TraktService] Failed to check if ${type} is in collection:`, error);
+      return false;
     }
   }
 

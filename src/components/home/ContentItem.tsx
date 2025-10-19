@@ -11,6 +11,7 @@ import { DropUpMenu } from './DropUpMenu';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { storageService } from '../../services/storageService';
 import { TraktService } from '../../services/traktService';
+import { useTraktContext } from '../../contexts/TraktContext';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 interface ContentItemProps {
@@ -88,6 +89,9 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
   const [menuVisible, setMenuVisible] = useState(false);
   const [isWatched, setIsWatched] = useState(false);
   const [imageError, setImageError] = useState(false);
+
+  // Trakt integration
+  const { isAuthenticated, isInWatchlist, isInCollection, addToWatchlist, removeFromWatchlist, addToCollection, removeFromCollection } = useTraktContext();
 
   useEffect(() => {
     // Reset image error state when item changes, allowing for retry on re-render
@@ -180,8 +184,30 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
         Share.share({ message, url, title: item.name });
         break;
       }
+      case 'trakt-watchlist': {
+        if (isInWatchlist(item.id, item.type as 'movie' | 'show')) {
+          await removeFromWatchlist(item.id, item.type as 'movie' | 'show');
+          Toast.info('Removed from Trakt Watchlist');
+        } else {
+          await addToWatchlist(item.id, item.type as 'movie' | 'show');
+          Toast.success('Added to Trakt Watchlist');
+        }
+        setMenuVisible(false);
+        break;
+      }
+      case 'trakt-collection': {
+        if (isInCollection(item.id, item.type as 'movie' | 'show')) {
+          await removeFromCollection(item.id, item.type as 'movie' | 'show');
+          Toast.info('Removed from Trakt Collection');
+        } else {
+          await addToCollection(item.id, item.type as 'movie' | 'show');
+          Toast.success('Added to Trakt Collection');
+        }
+        setMenuVisible(false);
+        break;
+      }
     }
-  }, [item, inLibrary, isWatched]);
+  }, [item, inLibrary, isWatched, isInWatchlist, isInCollection, addToWatchlist, removeFromWatchlist, addToCollection, removeFromCollection]);
 
   const handleMenuClose = useCallback(() => {
     setMenuVisible(false);
@@ -282,6 +308,16 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
                 <Feather name="bookmark" size={16} color={currentTheme.colors.white} />
               </View>
             )}
+            {isAuthenticated && isInWatchlist(item.id, item.type as 'movie' | 'show') && (
+              <View style={styles.traktWatchlistBadge}>
+                <MaterialIcons name="playlist-add-check" size={16} color="#E74C3C" />
+              </View>
+            )}
+            {isAuthenticated && isInCollection(item.id, item.type as 'movie' | 'show') && (
+              <View style={styles.traktCollectionBadge}>
+                <MaterialIcons name="video-library" size={16} color="#3498DB" />
+              </View>
+            )}
           </View>
         </TouchableOpacity>
         {settings.showPosterTitles && (
@@ -356,6 +392,22 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     left: 8,
+    borderRadius: 8,
+    padding: 4,
+  },
+  traktWatchlistBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: 'rgba(231, 76, 60, 0.9)',
+    borderRadius: 8,
+    padding: 4,
+  },
+  traktCollectionBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: 'rgba(52, 152, 219, 0.9)',
     borderRadius: 8,
     padding: 4,
   },

@@ -30,6 +30,13 @@ interface TraktContextProps {
   markMovieAsWatched: (imdbId: string, watchedAt?: Date) => Promise<boolean>;
   markEpisodeAsWatched: (imdbId: string, season: number, episode: number, watchedAt?: Date) => Promise<boolean>;
   forceSyncTraktProgress?: () => Promise<boolean>;
+  // Trakt content management
+  addToWatchlist: (imdbId: string, type: 'movie' | 'show') => Promise<boolean>;
+  removeFromWatchlist: (imdbId: string, type: 'movie' | 'show') => Promise<boolean>;
+  addToCollection: (imdbId: string, type: 'movie' | 'show') => Promise<boolean>;
+  removeFromCollection: (imdbId: string, type: 'movie' | 'show') => Promise<boolean>;
+  isInWatchlist: (imdbId: string, type: 'movie' | 'show') => boolean;
+  isInCollection: (imdbId: string, type: 'movie' | 'show') => boolean;
 }
 
 const TraktContext = createContext<TraktContextProps | undefined>(undefined);

@@ -17,6 +17,7 @@ import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/nativ
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../contexts/ThemeContext';
+import { useTraktContext } from '../contexts/TraktContext';
 import { useMetadata } from '../hooks/useMetadata';
 import { useDominantColor, preloadDominantColor } from '../hooks/useDominantColor';
 import { CastSection } from '../components/metadata/CastSection';
@@ -85,6 +86,9 @@ const MetadataScreen: React.FC = () => {
   const { currentTheme } = useTheme();
   const { top: safeAreaTop } = useSafeAreaInsets();
   const { pauseTrailer } = useTrailer();
+
+  // Trakt integration
+  const { isAuthenticated, isInWatchlist, isInCollection, addToWatchlist, removeFromWatchlist, addToCollection, removeFromCollection } = useTraktContext();
 
   // Optimized state management - reduced state variables
   const [isContentReady, setIsContentReady] = useState(false);
@@ -923,6 +927,24 @@ const MetadataScreen: React.FC = () => {
               getPlayButtonText={watchProgressData.getPlayButtonText}
               setBannerImage={assetData.setBannerImage}
               groupedEpisodes={groupedEpisodes}
+              // Trakt integration props
+              isAuthenticated={isAuthenticated}
+              isInWatchlist={isInWatchlist(id, type as 'movie' | 'show')}
+              isInCollection={isInCollection(id, type as 'movie' | 'show')}
+              onToggleWatchlist={async () => {
+                if (isInWatchlist(id, type as 'movie' | 'show')) {
+                  await removeFromWatchlist(id, type as 'movie' | 'show');
+                } else {
+                  await addToWatchlist(id, type as 'movie' | 'show');
+                }
+              }}
+              onToggleCollection={async () => {
+                if (isInCollection(id, type as 'movie' | 'show')) {
+                  await removeFromCollection(id, type as 'movie' | 'show');
+                } else {
+                  await addToCollection(id, type as 'movie' | 'show');
+                }
+              }}
               dynamicBackgroundColor={dynamicBackgroundColor}
               handleBack={handleBack}
               tmdbId={tmdbId}
