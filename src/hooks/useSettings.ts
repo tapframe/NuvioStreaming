@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { syncService } from '../services/SyncService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Simple event emitter for settings changes
@@ -230,8 +229,6 @@ export const useSettings = () => {
         settingsEmitter.emit();
       }
 
-      // If authenticated, push settings to server to prevent overwrite on next pull
-      try { syncService.pushSettings(); } catch {}
     } catch (error) {
       if (__DEV__) console.error('Failed to save settings:', error);
     }

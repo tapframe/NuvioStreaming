@@ -573,7 +573,6 @@ class StremioService {
       
       await this.saveInstalledAddons();
       await this.saveAddonOrder();
-      try { (require('./SyncService').syncService as any).pushAddons?.(); } catch {}
       // Emit an event that an addon was added
       addonEmitter.emit(ADDON_EVENTS.ADDON_ADDED, manifest.id);
     } else {
@@ -596,7 +595,6 @@ class StremioService {
       // Persist removals before app possibly exits
       await this.saveInstalledAddons();
       await this.saveAddonOrder();
-      try { (require('./SyncService').syncService as any).pushAddons?.(); } catch {}
       // Emit an event that an addon was removed
       addonEmitter.emit(ADDON_EVENTS.ADDON_REMOVED, id);
     }
@@ -754,13 +752,11 @@ class StremioService {
       const urlPathStyle = `${baseUrl}/catalog/${type}/${encodedId}/skip=${pageSkip}.json${queryParams ? `?${queryParams}` : ''}`;
       // Add filters to path style (append with & or ? based on presence of queryParams)
       const urlPathWithFilters = urlPathStyle + (urlPathStyle.includes('?') ? filterQuery : (filterQuery ? `?${filterQuery.slice(1)}` : ''));
-      try { logger.log('[StremioService] getCatalog URL (path-style)', { url: urlPathWithFilters, page, pageSize: this.DEFAULT_PAGE_SIZE, type, id, filters, manifest: manifest.id }); } catch {}
 
       // Candidate 2: Query-style skip URL: /catalog/{type}/{id}.json?skip={N}&limit={PAGE_SIZE}
       let urlQueryStyle = `${baseUrl}/catalog/${type}/${encodedId}.json?skip=${pageSkip}&limit=${this.DEFAULT_PAGE_SIZE}`;
       if (queryParams) urlQueryStyle += `&${queryParams}`;
       urlQueryStyle += filterQuery;
-      try { logger.log('[StremioService] getCatalog URL (query-style)', { url: urlQueryStyle, page, pageSize: this.DEFAULT_PAGE_SIZE, type, id, filters, manifest: manifest.id }); } catch {}
 
       // Try path-style first, then fallback to query-style
       let response;
@@ -779,7 +775,6 @@ class StremioService {
         try {
           const key = `${manifest.id}|${type}|${id}`;
           if (typeof hasMore === 'boolean') this.catalogHasMore.set(key, hasMore);
-          logger.log('[StremioService] getCatalog response meta', { hasMore, count: Array.isArray(response.data.metas) ? response.data.metas.length : 0 });
         } catch {}
         if (response.data.metas && Array.isArray(response.data.metas)) {
           return response.data.metas;
@@ -798,23 +793,18 @@ class StremioService {
   }
 
   async getMetaDetails(type: string, id: string, preferredAddonId?: string): Promise<MetaDetails | null> {
-    console.log(`🔍 [StremioService] getMetaDetails called:`, { type, id, preferredAddonId });
     try {
       // Validate content ID first
       const isValidId = await this.isValidContentId(type, id);
-      console.log(`🔍 [StremioService] Content ID validation:`, { type, id, isValidId });
       
       if (!isValidId) {
-        console.log(`🔍 [StremioService] Invalid content ID, returning null`);
         return null;
       }
       
       const addons = this.getInstalledAddons();
-      console.log(`🔍 [StremioService] Found ${addons.length} installed addons`);
       
       // If a preferred addon is specified, try it first
       if (preferredAddonId) {
-        console.log(`🔍 [StremioService] Preferred addon specified:`, { preferredAddonId });
         const preferredAddon = addons.find(addon => addon.id === preferredAddonId);
 
         if (preferredAddon && preferredAddon.resources) {
@@ -859,49 +849,26 @@ class StremioService {
             }
           }
           
-          console.log(`🔍 [StremioService] Preferred addon support check:`, { 
-            hasMetaSupport, 
-            supportsIdPrefix, 
-            addonId: preferredAddon.id,
-            addonName: preferredAddon.name,
-            hasDeclaredPrefixes: preferredAddon.idPrefixes && preferredAddon.idPrefixes.length > 0
-          });
           
           // Only require ID prefix compatibility if the addon has declared specific prefixes
           const requiresIdPrefix = preferredAddon.idPrefixes && preferredAddon.idPrefixes.length > 0;
           const isSupported = hasMetaSupport && (!requiresIdPrefix || supportsIdPrefix);
           
           if (isSupported) {
-            console.log(`🔍 [StremioService] Requesting metadata from preferred addon:`, { url });
             try {
               const response = await this.retryRequest(async () => {
                 return await axios.get(url, { timeout: 10000 });
               });
               
-              console.log(`🔍 [StremioService] Preferred addon response:`, { 
-                hasData: !!response.data, 
-                hasMeta: !!response.data?.meta,
-                metaId: response.data?.meta?.id,
-                metaName: response.data?.meta?.name
-              });
               
               if (response.data && response.data.meta) {
-                console.log(`🔍 [StremioService] Successfully got metadata from preferred addon`);
                 return response.data.meta;
               } else {
-                console.log(`🔍 [StremioService] Preferred addon returned no metadata`);
               }
             } catch (error: any) {
-              console.log(`🔍 [StremioService] Preferred addon request failed:`, {
-                errorMessage: error.message,
-                isAxiosError: error.isAxiosError,
-                responseStatus: error.response?.status,
-                responseData: error.response?.data
-              });
               // Continue trying other addons
             }
           } else {
-            console.log(`🔍 [StremioService] Preferred addon doesn't support this content type${requiresIdPrefix ? ' or ID prefix' : ''}`);
           }
         }
       }
@@ -912,40 +879,23 @@ class StremioService {
         'http://v3-cinemeta.strem.io'
       ];
       
-      console.log(`🔍 [StremioService] Trying Cinemeta URLs:`, { cinemetaUrls });
       
       for (const baseUrl of cinemetaUrls) {
         try {
           const encodedId = encodeURIComponent(id);
           const url = `${baseUrl}/meta/${type}/${encodedId}.json`;
           
-          console.log(`🔍 [StremioService] Requesting from Cinemeta:`, { url });
 
           const response = await this.retryRequest(async () => {
             return await axios.get(url, { timeout: 10000 });
           });
           
-          console.log(`🔍 [StremioService] Cinemeta response:`, { 
-            hasData: !!response.data, 
-            hasMeta: !!response.data?.meta,
-            metaId: response.data?.meta?.id,
-            metaName: response.data?.meta?.name
-          });
           
           if (response.data && response.data.meta) {
-            console.log(`🔍 [StremioService] Successfully got metadata from Cinemeta`);
             return response.data.meta;
           } else {
-            console.log(`🔍 [StremioService] Cinemeta returned no metadata`);
           }
         } catch (error: any) {
-          console.log(`🔍 [StremioService] Cinemeta request failed:`, {
-            baseUrl,
-            errorMessage: error.message,
-            isAxiosError: error.isAxiosError,
-            responseStatus: error.response?.status,
-            responseData: error.response?.data
-          });
           continue; // Try next URL
         }
       }
@@ -991,20 +941,12 @@ class StremioService {
         }
         
         // Require meta support, but allow any ID if addon doesn't declare specific prefixes
-        console.log(`🔍 [StremioService] Addon support check:`, { 
-          addonId: addon.id, 
-          addonName: addon.name,
-          hasMetaSupport, 
-          supportsIdPrefix,
-          hasDeclaredPrefixes: addon.idPrefixes && addon.idPrefixes.length > 0
-        });
         
         // Only require ID prefix compatibility if the addon has declared specific prefixes
         const requiresIdPrefix = addon.idPrefixes && addon.idPrefixes.length > 0;
         const isSupported = hasMetaSupport && (!requiresIdPrefix || supportsIdPrefix);
         
         if (!isSupported) {
-          console.log(`🔍 [StremioService] Addon doesn't support this content type${requiresIdPrefix ? ' or ID prefix' : ''}, skipping`);
           continue;
         }
         
@@ -1013,52 +955,23 @@ class StremioService {
           const encodedId = encodeURIComponent(id);
           const url = queryParams ? `${baseUrl}/meta/${type}/${encodedId}.json?${queryParams}` : `${baseUrl}/meta/${type}/${encodedId}.json`;
           
-          console.log(`🔍 [StremioService] Requesting from addon:`, { 
-            addonId: addon.id, 
-            addonName: addon.name, 
-            url 
-          });
 
           const response = await this.retryRequest(async () => {
             return await axios.get(url, { timeout: 10000 });
           });
           
-          console.log(`🔍 [StremioService] Addon response:`, { 
-            addonId: addon.id,
-            hasData: !!response.data, 
-            hasMeta: !!response.data?.meta,
-            metaId: response.data?.meta?.id,
-            metaName: response.data?.meta?.name
-          });
           
           if (response.data && response.data.meta) {
-            console.log(`🔍 [StremioService] Successfully got metadata from addon:`, { addonId: addon.id });
             return response.data.meta;
           } else {
-            console.log(`🔍 [StremioService] Addon returned no metadata:`, { addonId: addon.id });
           }
         } catch (error: any) {
-          console.log(`🔍 [StremioService] Addon request failed:`, {
-            addonId: addon.id,
-            addonName: addon.name,
-            errorMessage: error.message,
-            isAxiosError: error.isAxiosError,
-            responseStatus: error.response?.status,
-            responseData: error.response?.data
-          });
           continue; // Try next addon
         }
       }
       
-      console.log(`🔍 [StremioService] No metadata found from any addon`);
       return null;
     } catch (error) {
-      console.log(`🔍 [StremioService] getMetaDetails caught error:`, {
-        errorMessage: error instanceof Error ? error.message : String(error),
-        isAxiosError: (error as any)?.isAxiosError,
-        responseStatus: (error as any)?.response?.status,
-        responseData: (error as any)?.response?.data
-      });
       logger.error('Error in getMetaDetails:', error);
       return null;
     }
@@ -1102,14 +1015,23 @@ class StremioService {
 
       // Filter episodes to only include those within our date range
       // This is done immediately after fetching to reduce memory footprint
+      logger.log(`[StremioService] Filtering ${metadata.videos.length} episodes for ${id}, date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
+
       const filteredEpisodes = metadata.videos
         .filter(video => {
-          if (!video.released) return false;
+          if (!video.released) {
+            logger.log(`[StremioService] Episode ${video.id} has no release date`);
+            return false;
+          }
           const releaseDate = new Date(video.released);
-          return releaseDate >= startDate && releaseDate <= endDate;
+          const inRange = releaseDate >= startDate && releaseDate <= endDate;
+          logger.log(`[StremioService] Episode ${video.id}: released=${video.released}, inRange=${inRange}`);
+          return inRange;
         })
         .sort((a, b) => new Date(a.released).getTime() - new Date(b.released).getTime())
         .slice(0, maxEpisodes); // Limit number of episodes to prevent memory overflow
+
+      logger.log(`[StremioService] After filtering: ${filteredEpisodes.length} episodes remain`);
 
       return {
         seriesName: metadata.name,
@@ -1634,11 +1556,9 @@ class StremioService {
     const index = this.addonOrder.indexOf(id);
     if (index > 0) {
       // Swap with the previous item
-      [this.addonOrder[index - 1], this.addonOrder[index]] = 
+      [this.addonOrder[index - 1], this.addonOrder[index]] =
         [this.addonOrder[index], this.addonOrder[index - 1]];
       this.saveAddonOrder();
-      // Immediately push to server to avoid resets on restart
-      try { (require('./SyncService').syncService as any).pushAddons?.(); } catch {}
       // Emit an event that the order has changed
       addonEmitter.emit(ADDON_EVENTS.ORDER_CHANGED);
       return true;
@@ -1650,11 +1570,9 @@ class StremioService {
     const index = this.addonOrder.indexOf(id);
     if (index >= 0 && index < this.addonOrder.length - 1) {
       // Swap with the next item
-      [this.addonOrder[index], this.addonOrder[index + 1]] = 
+      [this.addonOrder[index], this.addonOrder[index + 1]] =
         [this.addonOrder[index + 1], this.addonOrder[index]];
       this.saveAddonOrder();
-      // Immediately push to server to avoid resets on restart
-      try { (require('./SyncService').syncService as any).pushAddons?.(); } catch {}
       // Emit an event that the order has changed
       addonEmitter.emit(ADDON_EVENTS.ORDER_CHANGED);
       return true;

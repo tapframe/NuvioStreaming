@@ -29,7 +29,7 @@ import { Stream } from '../types/metadata';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import FastImage from '@d11/react-native-fast-image';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn, Layout } from 'react-native-reanimated';
 import { PanGestureHandler } from 'react-native-gesture-handler';
 import {
   Gesture,
@@ -124,6 +124,16 @@ const HomeScreen = () => {
   const totalCatalogsRef = useRef(0);
       const [visibleCatalogCount, setVisibleCatalogCount] = useState(5); // Reduced for memory
   const insets = useSafeAreaInsets();
+
+  // Stabilize insets to prevent iOS layout shifts
+  const [stableInsetsTop, setStableInsetsTop] = useState(insets.top);
+  useEffect(() => {
+    // Only update insets after initial mount to prevent shifting
+    const timer = setTimeout(() => {
+      setStableInsetsTop(insets.top);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [insets.top]);
   
   const { 
     featuredContent, 
@@ -653,15 +663,11 @@ const HomeScreen = () => {
   const renderListItem = useCallback(({ item }: { item: HomeScreenListItem; index: number }) => {
     switch (item.type) {
       case 'thisWeek':
-        return <Animated.View>{memoizedThisWeekSection}</Animated.View>;
+        return memoizedThisWeekSection;
       case 'continueWatching':
         return null; // Moved to ListHeaderComponent to avoid remounts on scroll
       case 'catalog':
-        return (
-          <Animated.View>
-            <CatalogSection catalog={item.catalog} />
-          </Animated.View>
-        );
+        return <CatalogSection catalog={item.catalog} />;
       case 'placeholder':
         return (
           <Animated.View>
@@ -701,7 +707,7 @@ const HomeScreen = () => {
           </Animated.View>
         );
       case 'welcome':
-        return <Animated.View><FirstTimeWelcome /></Animated.View>;
+        return <FirstTimeWelcome />;
       default:
         return null;
     }
@@ -747,10 +753,10 @@ const HomeScreen = () => {
     }
   }, [toggleHeader]);
 
-  // Memoize content container style
-  const contentContainerStyle = useMemo(() => 
-    StyleSheet.flatten([styles.scrollContent, { paddingTop: insets.top }]),
-    [insets.top]
+  // Memoize content container style - use stable insets to prevent iOS shifting
+  const contentContainerStyle = useMemo(() =>
+    StyleSheet.flatten([styles.scrollContent, { paddingTop: stableInsetsTop }]),
+    [stableInsetsTop]
   );
 
   // Memoize the main content section
@@ -775,7 +781,7 @@ const HomeScreen = () => {
           onEndReached={handleLoadMoreCatalogs}
           onEndReachedThreshold={0.6}
           recycleItems={true}
-          maintainVisibleContentPosition
+          maintainVisibleContentPosition={Platform.OS !== 'ios'} // Disable on iOS to prevent shifting
           onScroll={handleScroll}
         />
         {/* Toasts are rendered globally at root */}
@@ -1342,3 +1348,4 @@ const HomeScreenWithFocusSync = (props: any) => {
 };
 
 export default React.memo(HomeScreenWithFocusSync);
+
