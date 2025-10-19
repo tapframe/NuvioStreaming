@@ -59,25 +59,16 @@ export function useFeaturedContent() {
 
   const loadFeaturedContent = useCallback(async (forceRefresh = false) => {
     const t0 = Date.now();
-    logger.info('[useFeaturedContent] load:start', { forceRefresh, contentSource: 'catalogs', selectedCatalogsCount: (selectedCatalogs || []).length });
     
     // Check if we should use cached data (disabled if DISABLE_CACHE)
     const now = Date.now();
     const cacheAge = now - persistentStore.lastFetchTime;
-    logger.debug('[useFeaturedContent] cache:status', {
-      disabled: DISABLE_CACHE,
-      hasFeatured: Boolean(persistentStore.featuredContent),
-      allCount: persistentStore.allFeaturedContent?.length || 0,
-      cacheAgeMs: cacheAge,
-      timeoutMs: CACHE_TIMEOUT,
-    });
     if (!DISABLE_CACHE) {
       if (!forceRefresh && 
           persistentStore.featuredContent && 
           persistentStore.allFeaturedContent.length > 0 && 
           cacheAge < CACHE_TIMEOUT) {
         // Use cached data
-        logger.info('[useFeaturedContent] cache:use', { duration: `${Date.now() - t0}ms` });
         setFeaturedContent(persistentStore.featuredContent);
         setAllFeaturedContent(persistentStore.allFeaturedContent);
         setLoading(false);
@@ -86,7 +77,6 @@ export function useFeaturedContent() {
       }
     }
 
-    logger.info('[useFeaturedContent] fetch:start', { source: 'catalogs' });
     setLoading(true);
     cleanup();
     abortControllerRef.current = new AbortController();
@@ -99,7 +89,6 @@ export function useFeaturedContent() {
         // Load from installed catalogs
         const tCats = Date.now();
         const catalogs = await catalogService.getHomeCatalogs();
-        logger.info('[useFeaturedContent] catalogs:list', { count: catalogs?.length || 0, duration: `${Date.now() - tCats}ms` });
         
         if (signal.aborted) return;
 
@@ -114,7 +103,6 @@ export function useFeaturedContent() {
                 return selectedCatalogs.includes(catalogId);
               })
             : catalogs; // Use all catalogs if none specifically selected
-          logger.debug('[useFeaturedContent] catalogs:filtered', { filteredCount: filteredCatalogs.length, selectedCount: selectedCatalogs?.length || 0 });
 
           // Flatten all catalog items into a single array, filter out items without posters
           const tFlat = Date.now();
@@ -124,7 +112,6 @@ export function useFeaturedContent() {
               // Remove duplicates based on ID
               index === self.findIndex(t => t.id === item.id)
             );
-          logger.info('[useFeaturedContent] catalogs:items', { total: allItems.length, duration: `${Date.now() - tFlat}ms` });
 
           // Sort by popular, newest, etc. (possibly enhanced later) and take first 10
           const topItems = allItems.sort(() => Math.random() - 0.5).slice(0, 10);
@@ -149,10 +136,8 @@ export function useFeaturedContent() {
               // If enrichment is disabled, use addon logo if available
               if (!settings.enrichMetadataWithTMDB) {
                 if (base.logo && !isTmdbUrl(base.logo)) {
-                  logger.debug('[useFeaturedContent] enrichment disabled, using addon logo', { name: item.name, logo: base.logo });
                   return base;
                 }
-                logger.debug('[useFeaturedContent] enrichment disabled, no addon logo available', { name: item.name });
                 return { ...base, logo: undefined };
               }
 
@@ -172,16 +157,13 @@ export function useFeaturedContent() {
               if (!tmdbId && !imdbId) return base;
               // Try TMDB if we have a TMDB id
               if (tmdbId) {
-                logger.debug('[useFeaturedContent] logo:try:tmdb', { name: item.name, id: item.id, tmdbId, lang: preferredLanguage });
                 const logoUrl = await tmdbService.getContentLogo(item.type === 'series' ? 'tv' : 'movie', tmdbId as string, preferredLanguage);
                 if (logoUrl) {
-                  logger.debug('[useFeaturedContent] logo:tmdb:ok', { name: item.name, id: item.id, url: logoUrl, lang: preferredLanguage });
                   return { ...base, logo: logoUrl };
                 }
               }
               return base;
             } catch (error) {
-              logger.error('[useFeaturedContent] logo:error', { name: item.name, id: item.id, error: String(error) });
               return base;
             }
           };
@@ -197,7 +179,6 @@ export function useFeaturedContent() {
                 logoSource: c.logo ? (isTmdbUrl(String(c.logo)) ? 'tmdb' : 'addon') : 'none',
                 logo: c.logo || undefined,
               }));
-              logger.info('[useFeaturedContent] catalogs:logos:details (enrich=true)', { items: details });
             } catch {}
           } else {
             // When enrichment is disabled, prefer addon-provided logos; if missing, fetch basic meta to pull logo (like HeroSection)
@@ -219,18 +200,15 @@ export function useFeaturedContent() {
 
             // Attempt to fill missing logos from addon meta details for a limited subset
             const candidates = baseItems.filter(i => !i.logo).slice(0, 10);
-            logger.debug('[useFeaturedContent] catalogs:no-enrich:missing-logos', { count: candidates.length });
 
             try {
               const filled = await Promise.allSettled(candidates.map(async (item) => {
                 try {
                   const meta = await catalogService.getBasicContentDetails(item.type, item.id);
                   if (meta?.logo) {
-                    logger.debug('[useFeaturedContent] catalogs:no-enrich:filled-logo', { id: item.id, name: item.name, logo: meta.logo });
                     return { id: item.id, logo: meta.logo } as { id: string; logo: string };
                   }
                 } catch (e) {
-                  logger.warn('[useFeaturedContent] catalogs:no-enrich:fill-failed', { id: item.id, error: String(e) });
                 }
                 return { id: item.id, logo: undefined as any };
               }));
@@ -257,7 +235,6 @@ export function useFeaturedContent() {
                 logoSource: c.logo ? (isTmdbUrl(String(c.logo)) ? 'tmdb' : 'addon') : 'none',
                 logo: c.logo || undefined,
               }));
-              logger.info('[useFeaturedContent] catalogs:logos:details (no-enrich)', { items: details });
             } catch {}
           }
         }
@@ -267,7 +244,6 @@ export function useFeaturedContent() {
 
       // Safety guard: if nothing came back within a reasonable time, stop loading
       if (!formattedContent || formattedContent.length === 0) {
-        logger.warn('[useFeaturedContent] results:empty');
         // Fall back to any cached featured item so UI can render something
         const cachedJson = await AsyncStorage.getItem(STORAGE_KEY).catch(() => null);
         if (cachedJson) {
@@ -277,7 +253,6 @@ export function useFeaturedContent() {
               formattedContent = Array.isArray(parsed.allFeaturedContent) && parsed.allFeaturedContent.length > 0
                 ? parsed.allFeaturedContent
                 : [parsed.featuredContent];
-              logger.info('[useFeaturedContent] fallback:storage', { count: formattedContent.length });
             }
           } catch {}
         }
@@ -295,12 +270,6 @@ export function useFeaturedContent() {
       if (formattedContent.length > 0) {
         persistentStore.featuredContent = formattedContent[0];
         setFeaturedContent(formattedContent[0]);
-        logger.info('[useFeaturedContent] setting featuredContent', {
-          id: formattedContent[0].id,
-          name: formattedContent[0].name,
-          hasLogo: Boolean(formattedContent[0].logo),
-          logo: formattedContent[0].logo
-        });
         currentIndexRef.current = 0;
         // Persist cache for fast startup (skipped when cache disabled)
         if (!DISABLE_CACHE) {
@@ -313,7 +282,6 @@ export function useFeaturedContent() {
                 allFeaturedContent: formattedContent,
               })
             );
-            logger.debug('[useFeaturedContent] cache:written', { firstId: formattedContent[0]?.id });
           } catch {}
         }
       } else {
@@ -326,16 +294,13 @@ export function useFeaturedContent() {
       }
     } catch (error) {
       if (signal.aborted) {
-        logger.info('[useFeaturedContent] fetch:aborted');
       } else {
-        logger.error('[useFeaturedContent] fetch:error', { error: String(error) });
       }
       setFeaturedContent(null);
       setAllFeaturedContent([]);
     } finally {
       if (!signal.aborted) {
         setLoading(false);
-        logger.info('[useFeaturedContent] load:done', { duration: `${Date.now() - t0}ms` });
       }
     }
   }, [cleanup, genreMap, loadingGenres, selectedCatalogs]);
@@ -344,7 +309,6 @@ export function useFeaturedContent() {
   useEffect(() => {
     if (DISABLE_CACHE) {
       // Skip hydration entirely
-      logger.debug('[useFeaturedContent] hydrate:skipped');
       return;
     }
     let cancelled = false;
@@ -364,7 +328,6 @@ export function useFeaturedContent() {
             setFeaturedContent(parsed.featuredContent);
             setAllFeaturedContent(persistentStore.allFeaturedContent);
             setLoading(false);
-            logger.info('[useFeaturedContent] hydrate:storage', { allCount: persistentStore.allFeaturedContent.length });
           }
         }
       } catch {}
@@ -392,7 +355,6 @@ export function useFeaturedContent() {
     
     // Force refresh if settings changed during app restart, but only if we have content
     if (settingsChanged && persistentStore.featuredContent) {
-      logger.info('[useFeaturedContent] settings:changed', { selectedCount: settings.selectedHeroCatalogs?.length || 0 });
       loadFeaturedContent(true);
     }
   }, [settings, loadFeaturedContent]);
@@ -410,11 +372,6 @@ export function useFeaturedContent() {
       const tmdbLangChanged = persistentStore.lastSettings.tmdbLanguagePreference !== nextTmdbLang;
 
       if (catalogsChanged || logoPrefChanged || tmdbLangChanged) {
-        logger.info('[useFeaturedContent] event:settings-changed:immediate-refresh', {
-          catalogsChanged,
-          logoPrefChanged,
-          tmdbLangChanged
-        });
 
         // Update internal state immediately so dependent effects are in sync
         setSelectedCatalogs(nextSelected);
