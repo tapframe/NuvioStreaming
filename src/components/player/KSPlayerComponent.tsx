@@ -16,6 +16,7 @@ interface KSPlayerViewProps {
   usesExternalPlaybackWhileExternalScreenIsActive?: boolean;
   subtitleBottomOffset?: number;
   subtitleFontSize?: number;
+  resizeMode?: 'contain' | 'cover' | 'stretch';
   onLoad?: (data: any) => void;
   onProgress?: (data: any) => void;
   onBuffering?: (data: any) => void;
@@ -52,6 +53,7 @@ export interface KSPlayerProps {
   usesExternalPlaybackWhileExternalScreenIsActive?: boolean;
   subtitleBottomOffset?: number;
   subtitleFontSize?: number;
+  resizeMode?: 'contain' | 'cover' | 'stretch';
   onLoad?: (data: any) => void;
   onProgress?: (data: any) => void;
   onBuffering?: (data: any) => void;
@@ -177,6 +179,7 @@ const KSPlayer = forwardRef<KSPlayerRef, KSPlayerProps>((props, ref) => {
       usesExternalPlaybackWhileExternalScreenIsActive={props.usesExternalPlaybackWhileExternalScreenIsActive}
       subtitleBottomOffset={props.subtitleBottomOffset}
       subtitleFontSize={props.subtitleFontSize}
+      resizeMode={props.resizeMode}
       onLoad={(e: any) => props.onLoad?.(e?.nativeEvent ?? e)}
       onProgress={(e: any) => props.onProgress?.(e?.nativeEvent ?? e)}
       onBuffering={(e: any) => props.onBuffering?.(e?.nativeEvent ?? e)}

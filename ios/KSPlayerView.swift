@@ -91,6 +91,13 @@ class KSPlayerView: UIView {
             updateSubtitleFont(size: size)
         }
     }
+    
+    @objc var resizeMode: NSString = "contain" {
+        didSet {
+            print("KSPlayerView: [PROP SETTER] resizeMode setter called with value: \(resizeMode)")
+            applyVideoGravity()
+        }
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -128,7 +135,10 @@ class KSPlayerView: UIView {
         // KSPlayer's subtitleLabel renders internal subtitles
         playerView.subtitleLabel.isHidden = false
         playerView.subtitleBackView.isHidden = false
-        playerView.bringSubviewToFront(playerView.subtitleBackView)
+        // Move subtitle view to main container for independence from video transformations
+        playerView.subtitleBackView.removeFromSuperview()
+        self.addSubview(playerView.subtitleBackView)
+        self.bringSubviewToFront(playerView.subtitleBackView)
         print("KSPlayerView: [SETUP] Subtitle views made visible")
         print("KSPlayerView: [SETUP] subtitleLabel.isHidden: \(playerView.subtitleLabel.isHidden)")
         print("KSPlayerView: [SETUP] subtitleBackView.isHidden: \(playerView.subtitleBackView.isHidden)")
@@ -149,7 +159,10 @@ class KSPlayerView: UIView {
     private func adjustSubtitlePositioning() {
         // Remove existing constraints for subtitle positioning
         playerView.subtitleBackView.removeFromSuperview()
-        playerView.addSubview(playerView.subtitleBackView)
+        // Add subtitle view to main container (self) instead of playerView to make it independent of video transformations
+        self.addSubview(playerView.subtitleBackView)
+        // Ensure subtitles are always on top of video
+        self.bringSubviewToFront(playerView.subtitleBackView)
         
         // Re-add subtitle label to subtitle back view
         playerView.subtitleBackView.addSubview(playerView.subtitleLabel)
@@ -159,13 +172,14 @@ class KSPlayerView: UIView {
         playerView.subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
         
         // Store the bottom constraint reference for dynamic updates
-        subtitleBottomConstraint = playerView.subtitleBackView.bottomAnchor.constraint(equalTo: playerView.bottomAnchor, constant: -CGFloat(subtitleBottomOffset.floatValue))
+        // Constrain to main container (self) instead of playerView to make subtitles independent of video transformations
+        subtitleBottomConstraint = playerView.subtitleBackView.bottomAnchor.constraint(equalTo: self.bottomAnchor, constant: -CGFloat(subtitleBottomOffset.floatValue))
         
         NSLayoutConstraint.activate([
             // Position subtitles using dynamic offset from React Native
             subtitleBottomConstraint!,
-            playerView.subtitleBackView.centerXAnchor.constraint(equalTo: playerView.centerXAnchor),
-            playerView.subtitleBackView.widthAnchor.constraint(lessThanOrEqualTo: playerView.widthAnchor, constant: -20),
+            playerView.subtitleBackView.centerXAnchor.constraint(equalTo: self.centerXAnchor),
+            playerView.subtitleBackView.widthAnchor.constraint(lessThanOrEqualTo: self.widthAnchor, constant: -20),
             playerView.subtitleBackView.heightAnchor.constraint(lessThanOrEqualToConstant: 100),
             
             // Subtitle label constraints within the back view
@@ -198,6 +212,30 @@ class KSPlayerView: UIView {
                 print("KSPlayerView: [OFFSET UPDATE] No constraint reference found, recreating positioning")
                 self.adjustSubtitlePositioning()
             }
+        }
+    }
+    
+    private func applyVideoGravity() {
+        print("KSPlayerView: [VIDEO GRAVITY] Applying resizeMode: \(resizeMode)")
+        
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            let contentMode: UIViewContentMode
+            switch self.resizeMode.lowercased {
+            case "cover":
+                contentMode = .scaleAspectFill
+            case "stretch":
+                contentMode = .scaleToFill
+            case "contain":
+                contentMode = .scaleAspectFit
+            default:
+                contentMode = .scaleAspectFit
+            }
+            
+            // Set contentMode on the player itself, not the view
+            self.playerView.playerLayer?.player.contentMode = contentMode
+            print("KSPlayerView: [VIDEO GRAVITY] Set player contentMode to: \(contentMode)")
         }
     }
 
@@ -275,6 +313,9 @@ class KSPlayerView: UIView {
         if let playerLayer = playerView.playerLayer {
             playerLayer.delegate = self
             print("KSPlayerView: Delegate set successfully on playerLayer")
+            
+            // Apply video gravity after player is set up
+            applyVideoGravity()
         } else {
             print("KSPlayerView: ERROR - playerLayer is nil, cannot set delegate")
         }
@@ -546,7 +587,11 @@ class KSPlayerView: UIView {
                 } else if trackId == -1 {
                     // Disable all subtitles
                     for track in textTracks { track.isEnabled = false }
-                    print("KSPlayerView: Disabled all text tracks")
+                    // Clear srtControl selection and hide subtitle views
+                    self.playerView.srtControl.selectedSubtitleInfo = nil
+                    self.playerView.subtitleLabel.isHidden = true
+                    self.playerView.subtitleBackView.isHidden = true
+                    print("KSPlayerView: Disabled all text tracks and cleared srtControl selection")
                 } else {
                     print("KSPlayerView: Text track \(trackId) not found. Available track IDs: \(textTracks.map { Int($0.trackID) }), array indices: 0..\(textTracks.count - 1)")
                 }

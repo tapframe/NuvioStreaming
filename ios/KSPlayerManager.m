@@ -20,6 +20,7 @@ RCT_EXPORT_VIEW_PROPERTY(allowsExternalPlayback, BOOL)
 RCT_EXPORT_VIEW_PROPERTY(usesExternalPlaybackWhileExternalScreenIsActive, BOOL)
 RCT_EXPORT_VIEW_PROPERTY(subtitleBottomOffset, NSNumber)
 RCT_EXPORT_VIEW_PROPERTY(subtitleFontSize, NSNumber)
+RCT_EXPORT_VIEW_PROPERTY(resizeMode, NSString)
 
 // Event properties
 RCT_EXPORT_VIEW_PROPERTY(onLoad, RCTDirectEventBlock)

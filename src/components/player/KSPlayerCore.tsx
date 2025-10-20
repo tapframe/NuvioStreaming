@@ -1315,6 +1315,12 @@ const KSPlayerCore: React.FC = () => {
   };
 
   const cycleAspectRatio = () => {
+    // iOS KSPlayer: toggle native resize mode so subtitles remain independent
+    if (Platform.OS === 'ios') {
+      setResizeMode((prev) => (prev === 'cover' ? 'contain' : 'cover'));
+      return;
+    }
+    // Fallback (non‑iOS paths): keep legacy zoom behavior
     const newZoom = zoomScale === 1.1 ? 1 : 1.1;
     setZoomScale(newZoom);
     setZoomTranslateX(0);
@@ -2717,7 +2723,7 @@ const KSPlayerCore: React.FC = () => {
               >
                 <KSPlayerComponent
                   ref={ksPlayerRef}
-                  style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
+                  style={styles.video}
                   source={{
                     uri: currentStreamUrl,
                     headers: headers && Object.keys(headers).length > 0 ? headers : undefined
@@ -2730,6 +2736,7 @@ const KSPlayerCore: React.FC = () => {
                   usesExternalPlaybackWhileExternalScreenIsActive={true}
                   subtitleBottomOffset={subtitleBottomOffset}
                   subtitleFontSize={subtitleSize}
+                  resizeMode={resizeMode === 'none' ? 'contain' : resizeMode}
                   onProgress={handleProgress}
                   onLoad={onLoad}
                   onEnd={onEnd}
@@ -2762,6 +2769,7 @@ const KSPlayerCore: React.FC = () => {
             skip={skip}
             handleClose={handleClose}
             cycleAspectRatio={cycleAspectRatio}
+            currentResizeMode={resizeMode}
             setShowAudioModal={setShowAudioModal}
             setShowSubtitleModal={setShowSubtitleModal}
             isSubtitleModalOpen={showSubtitleModal}
