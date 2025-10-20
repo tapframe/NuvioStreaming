@@ -7,7 +7,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAccount } from '../contexts/AccountContext';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
-import ToastManager, { Toast } from 'toastify-react-native';
+import { useToast } from '../contexts/ToastContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
@@ -19,6 +19,7 @@ const AuthScreen: React.FC = () => {
   const route = useRoute<any>();
   const fromOnboarding = !!route?.params?.fromOnboarding;
   const insets = useSafeAreaInsets();
+  const { showError, showSuccess } = useToast();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -149,7 +150,7 @@ const AuthScreen: React.FC = () => {
     if (mode === 'signup' && signupDisabled) {
       const msg = 'Sign up is currently disabled due to upcoming system changes';
       setError(msg);
-      Toast.error(msg);
+      showError('Sign Up Disabled', 'Sign up is currently disabled due to upcoming system changes');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       return;
     }
@@ -157,21 +158,21 @@ const AuthScreen: React.FC = () => {
     if (!isEmailValid) {
       const msg = 'Enter a valid email address';
       setError(msg);
-      Toast.error(msg);
+      showError('Invalid Email', 'Enter a valid email address');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       return;
     }
     if (!isPasswordValid) {
       const msg = 'Password must be at least 6 characters';
       setError(msg);
-      Toast.error(msg);
+      showError('Password Too Short', 'Password must be at least 6 characters');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       return;
     }
     if (mode === 'signup' && !passwordsMatch) {
       const msg = 'Passwords do not match';
       setError(msg);
-      Toast.error(msg);
+      showError('Passwords Don\'t Match', 'Passwords do not match');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       return;
     }
@@ -180,11 +181,11 @@ const AuthScreen: React.FC = () => {
     const err = mode === 'signin' ? await signIn(email.trim(), password) : await signUp(email.trim(), password);
     if (err) {
       setError(err);
-      Toast.error(err);
+      showError('Authentication Failed', err);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
     } else {
       const msg = mode === 'signin' ? 'Logged in successfully' : 'Sign up successful';
-      Toast.success(msg);
+      showSuccess('Success', msg);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
 
       // Navigate to main tabs after successful authentication

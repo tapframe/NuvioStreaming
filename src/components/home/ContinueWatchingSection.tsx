@@ -108,6 +108,10 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   // Track recently removed items to prevent immediate re-addition
   const recentlyRemovedRef = useRef<Set<string>>(new Set());
   const REMOVAL_IGNORE_DURATION = 10000; // 10 seconds
+  
+  // Track last Trakt sync to prevent excessive API calls
+  const lastTraktSyncRef = useRef<number>(0);
+  const TRAKT_SYNC_COOLDOWN = 5 * 60 * 1000; // 5 minutes between Trakt syncs
 
   // Cache for metadata to avoid redundant API calls
   const metadataCache = useRef<Record<string, { metadata: any; basicContent: StreamingContent | null; timestamp: number }>>({});
@@ -368,6 +372,15 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
           const traktService = TraktService.getInstance();
           const isAuthed = await traktService.isAuthenticated();
           if (!isAuthed) return;
+          
+          // Check Trakt sync cooldown to prevent excessive API calls
+          const now = Date.now();
+          if (now - lastTraktSyncRef.current < TRAKT_SYNC_COOLDOWN) {
+            logger.log(`[TraktSync] Skipping Trakt sync - cooldown active (${Math.round((TRAKT_SYNC_COOLDOWN - (now - lastTraktSyncRef.current)) / 1000)}s remaining)`);
+            return;
+          }
+          
+          lastTraktSyncRef.current = now;
           const historyItems = await traktService.getWatchedEpisodesHistory(1, 200);
           const latestWatchedByShow: Record<string, { season: number; episode: number; watchedAt: number }> = {};
           for (const item of historyItems) {
@@ -384,18 +397,21 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
             }
           }
 
-          const perShowPromises = Object.entries(latestWatchedByShow).map(async ([showId, info]) => {
+          // Collect all valid Trakt items first, then merge as a batch
+          const traktBatch: ContinueWatchingItem[] = [];
+
+          for (const [showId, info] of Object.entries(latestWatchedByShow)) {
             try {
               // Check if this show was recently removed by the user
               const showKey = `series:${showId}`;
               if (recentlyRemovedRef.current.has(showKey)) {
                 logger.log(`🚫 [TraktSync] Skipping recently removed show: ${showKey}`);
-                return;
+                continue;
               }
-              
+
               const nextEpisode = info.episode + 1;
               const cachedData = await getCachedMetadata('series', showId);
-              if (!cachedData?.basicContent) return;
+              if (!cachedData?.basicContent) continue;
               const { metadata, basicContent } = cachedData;
               let nextEpisodeVideo = null;
               if (metadata?.videos && Array.isArray(metadata.videos)) {
@@ -405,18 +421,16 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
               }
               if (nextEpisodeVideo && isEpisodeReleased(nextEpisodeVideo)) {
                 logger.log(`➕ [TraktSync] Adding next episode for ${showId}: S${info.season}E${nextEpisode}`);
-                await mergeBatchIntoState([
-                  {
-                    ...basicContent,
-                    id: showId,
-                    type: 'series',
-                    progress: 0,
-                    lastUpdated: info.watchedAt,
-                    season: info.season,
-                    episode: nextEpisode,
-                    episodeTitle: `Episode ${nextEpisode}`,
-                  } as ContinueWatchingItem,
-                ]);
+                traktBatch.push({
+                  ...basicContent,
+                  id: showId,
+                  type: 'series',
+                  progress: 0,
+                  lastUpdated: info.watchedAt,
+                  season: info.season,
+                  episode: nextEpisode,
+                  episodeTitle: `Episode ${nextEpisode}`,
+                } as ContinueWatchingItem);
               }
 
               // Persist "watched" progress for the episode that Trakt reported (only if not recently removed)
@@ -445,8 +459,12 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
             } catch (err) {
               // Continue with other shows even if one fails
             }
-          });
-          await Promise.allSettled(perShowPromises);
+          }
+
+          // Merge all Trakt items as a single batch to ensure proper sorting
+          if (traktBatch.length > 0) {
+            await mergeBatchIntoState(traktBatch);
+          }
         } catch (err) {
           // Continue even if Trakt history merge fails
         }
@@ -475,7 +493,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       appState.current.match(/inactive|background/) &&
       nextAppState === 'active'
     ) {
-      // App has come to the foreground - trigger a background refresh
+      // App has come to the foreground - force Trakt sync by resetting cooldown
+      lastTraktSyncRef.current = 0; // Reset cooldown to allow immediate Trakt sync
       loadContinueWatching(true);
     }
     appState.current = nextAppState;
@@ -493,9 +512,10 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         clearTimeout(refreshTimerRef.current);
       }
       refreshTimerRef.current = setTimeout(() => {
-        // Trigger a background refresh
+        // Only trigger background refresh for local progress updates, not Trakt sync
+        // This prevents the feedback loop where Trakt sync triggers more progress updates
         loadContinueWatching(true);
-      }, 800); // Shorter debounce for snappier UI without battery impact
+      }, 2000); // Increased debounce to reduce frequency
     };
 
     // Try to set up a custom event listener or use a timer as fallback
@@ -543,7 +563,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   // Expose the refresh function via the ref
   React.useImperativeHandle(ref, () => ({
     refresh: async () => {
-      // Allow manual refresh to show loading indicator
+      // Manual refresh bypasses Trakt cooldown to get fresh data
+      lastTraktSyncRef.current = 0; // Reset cooldown for manual refresh
       await loadContinueWatching(false);
       return true;
     }

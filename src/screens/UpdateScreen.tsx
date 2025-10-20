@@ -11,7 +11,7 @@ import {
   Dimensions,
   Linking
 } from 'react-native';
-import { Toast } from 'toastify-react-native';
+import { useToast } from '../contexts/ToastContext';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -70,6 +70,7 @@ const UpdateScreen: React.FC = () => {
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
   const github = useGithubMajorUpdate();
+  const { showInfo } = useToast();
 
   // CustomAlert state
   const [alertVisible, setAlertVisible] = useState(false);
@@ -152,7 +153,7 @@ const UpdateScreen: React.FC = () => {
     // Also refresh GitHub section on mount (works in dev and prod)
     try { github.refresh(); } catch {}
     if (Platform.OS === 'android') {
-      try { Toast.info('Checking for updates…'); } catch {}
+      showInfo('Checking for Updates', 'Checking for updates…');
     }
   }, []);
 

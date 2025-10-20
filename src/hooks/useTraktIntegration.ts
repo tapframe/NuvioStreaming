@@ -26,6 +26,10 @@ export function useTraktIntegration() {
   const [continueWatching, setContinueWatching] = useState<TraktPlaybackItem[]>([]);
   const [ratedContent, setRatedContent] = useState<TraktRatingItem[]>([]);
   const [lastAuthCheck, setLastAuthCheck] = useState<number>(Date.now());
+  
+  // State for real-time status tracking
+  const [watchlistItems, setWatchlistItems] = useState<Set<string>>(new Set());
+  const [collectionItems, setCollectionItems] = useState<Set<string>>(new Set());
 
   // Check authentication status
   const checkAuthStatus = useCallback(async () => {
@@ -108,6 +112,39 @@ export function useTraktIntegration() {
       setCollectionShows(collectionShows);
       setContinueWatching(continueWatching);
       setRatedContent(ratings);
+      
+      // Populate watchlist and collection sets for quick lookups
+      const newWatchlistItems = new Set<string>();
+      const newCollectionItems = new Set<string>();
+      
+      // Add movies to sets
+      watchlistMovies.forEach(item => {
+        if (item.movie?.ids?.imdb) {
+          newWatchlistItems.add(`movie:${item.movie.ids.imdb}`);
+        }
+      });
+      
+      collectionMovies.forEach(item => {
+        if (item.movie?.ids?.imdb) {
+          newCollectionItems.add(`movie:${item.movie.ids.imdb}`);
+        }
+      });
+      
+      // Add shows to sets
+      watchlistShows.forEach(item => {
+        if (item.show?.ids?.imdb) {
+          newWatchlistItems.add(`show:${item.show.ids.imdb}`);
+        }
+      });
+      
+      collectionShows.forEach(item => {
+        if (item.show?.ids?.imdb) {
+          newCollectionItems.add(`show:${item.show.ids.imdb}`);
+        }
+      });
+      
+      setWatchlistItems(newWatchlistItems);
+      setCollectionItems(newCollectionItems);
     } catch (error) {
       logger.error('[useTraktIntegration] Error loading all collections:', error);
     } finally {
@@ -162,6 +199,105 @@ export function useTraktIntegration() {
       return false;
     }
   }, [isAuthenticated, loadWatchedItems]);
+
+  // Add content to Trakt watchlist
+  const addToWatchlist = useCallback(async (imdbId: string, type: 'movie' | 'show'): Promise<boolean> => {
+    if (!isAuthenticated) return false;
+    
+    try {
+      const success = await traktService.addToWatchlist(imdbId, type);
+      if (success) {
+        // Ensure consistent IMDb ID format (with 'tt' prefix)
+        const normalizedImdbId = imdbId.startsWith('tt') ? imdbId : `tt${imdbId}`;
+        setWatchlistItems(prev => new Set(prev).add(`${type}:${normalizedImdbId}`));
+        // Don't refresh immediately - let the local state handle the UI update
+        // The data will be refreshed on next app focus or manual refresh
+      }
+      return success;
+    } catch (error) {
+      logger.error('[useTraktIntegration] Error adding to watchlist:', error);
+      return false;
+    }
+  }, [isAuthenticated]);
+
+  // Remove content from Trakt watchlist
+  const removeFromWatchlist = useCallback(async (imdbId: string, type: 'movie' | 'show'): Promise<boolean> => {
+    if (!isAuthenticated) return false;
+    
+    try {
+      const success = await traktService.removeFromWatchlist(imdbId, type);
+      if (success) {
+        // Ensure consistent IMDb ID format (with 'tt' prefix)
+        const normalizedImdbId = imdbId.startsWith('tt') ? imdbId : `tt${imdbId}`;
+        setWatchlistItems(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(`${type}:${normalizedImdbId}`);
+          return newSet;
+        });
+        // Don't refresh immediately - let the local state handle the UI update
+      }
+      return success;
+    } catch (error) {
+      logger.error('[useTraktIntegration] Error removing from watchlist:', error);
+      return false;
+    }
+  }, [isAuthenticated]);
+
+  // Add content to Trakt collection
+  const addToCollection = useCallback(async (imdbId: string, type: 'movie' | 'show'): Promise<boolean> => {
+    if (!isAuthenticated) return false;
+    
+    try {
+      const success = await traktService.addToCollection(imdbId, type);
+      if (success) {
+        // Ensure consistent IMDb ID format (with 'tt' prefix)
+        const normalizedImdbId = imdbId.startsWith('tt') ? imdbId : `tt${imdbId}`;
+        setCollectionItems(prev => new Set(prev).add(`${type}:${normalizedImdbId}`));
+        // Don't refresh immediately - let the local state handle the UI update
+      }
+      return success;
+    } catch (error) {
+      logger.error('[useTraktIntegration] Error adding to collection:', error);
+      return false;
+    }
+  }, [isAuthenticated]);
+
+  // Remove content from Trakt collection
+  const removeFromCollection = useCallback(async (imdbId: string, type: 'movie' | 'show'): Promise<boolean> => {
+    if (!isAuthenticated) return false;
+    
+    try {
+      const success = await traktService.removeFromCollection(imdbId, type);
+      if (success) {
+        // Ensure consistent IMDb ID format (with 'tt' prefix)
+        const normalizedImdbId = imdbId.startsWith('tt') ? imdbId : `tt${imdbId}`;
+        setCollectionItems(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(`${type}:${normalizedImdbId}`);
+          return newSet;
+        });
+        // Don't refresh immediately - let the local state handle the UI update
+      }
+      return success;
+    } catch (error) {
+      logger.error('[useTraktIntegration] Error removing from collection:', error);
+      return false;
+    }
+  }, [isAuthenticated]);
+
+  // Check if content is in Trakt watchlist
+  const isInWatchlist = useCallback((imdbId: string, type: 'movie' | 'show'): boolean => {
+    // Ensure consistent IMDb ID format (with 'tt' prefix)
+    const normalizedImdbId = imdbId.startsWith('tt') ? imdbId : `tt${imdbId}`;
+    return watchlistItems.has(`${type}:${normalizedImdbId}`);
+  }, [watchlistItems]);
+
+  // Check if content is in Trakt collection
+  const isInCollection = useCallback((imdbId: string, type: 'movie' | 'show'): boolean => {
+    // Ensure consistent IMDb ID format (with 'tt' prefix)
+    const normalizedImdbId = imdbId.startsWith('tt') ? imdbId : `tt${imdbId}`;
+    return collectionItems.has(`${type}:${normalizedImdbId}`);
+  }, [collectionItems]);
 
   // Mark an episode as watched
   const markEpisodeAsWatched = useCallback(async (
@@ -530,6 +666,13 @@ export function useTraktIntegration() {
     getTraktPlaybackProgress,
     syncAllProgress,
     fetchAndMergeTraktProgress,
-    forceSyncTraktProgress // For manual testing
+    forceSyncTraktProgress, // For manual testing
+    // Trakt content management
+    addToWatchlist,
+    removeFromWatchlist,
+    addToCollection,
+    removeFromCollection,
+    isInWatchlist,
+    isInCollection
   };
 }

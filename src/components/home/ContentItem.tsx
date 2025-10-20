@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Toast } from 'toastify-react-native';
+import { useToast } from '../../contexts/ToastContext';
 import { DeviceEventEmitter } from 'react-native';
 import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Platform, Text, Share } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
@@ -11,6 +11,7 @@ import { DropUpMenu } from './DropUpMenu';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { storageService } from '../../services/storageService';
 import { TraktService } from '../../services/traktService';
+import { useTraktContext } from '../../contexts/TraktContext';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 interface ContentItemProps {
@@ -89,6 +90,9 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
   const [isWatched, setIsWatched] = useState(false);
   const [imageError, setImageError] = useState(false);
 
+  // Trakt integration
+  const { isAuthenticated, isInWatchlist, isInCollection, addToWatchlist, removeFromWatchlist, addToCollection, removeFromCollection } = useTraktContext();
+
   useEffect(() => {
     // Reset image error state when item changes, allowing for retry on re-render
     setImageError(false);
@@ -96,6 +100,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
 
   const { currentTheme } = useTheme();
   const { settings, isLoaded } = useSettings();
+  const { showSuccess, showInfo } = useToast();
   const posterRadius = typeof settings.posterBorderRadius === 'number' ? settings.posterBorderRadius : 12;
   // Memoize poster width calculation to avoid recalculating on every render
   const posterWidth = React.useMemo(() => {
@@ -125,10 +130,10 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
       case 'library':
         if (inLibrary) {
           catalogService.removeFromLibrary(item.type, item.id);
-          Toast.info('Removed from Library');
+          showInfo('Removed from Library', 'Removed from your local library');
         } else {
           catalogService.addToLibrary(item);
-          Toast.success('Added to Library');
+          showSuccess('Added to Library', 'Added to your local library');
         }
         break;
       case 'watched': {
@@ -137,7 +142,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
         try {
           await AsyncStorage.setItem(`watched:${item.type}:${item.id}`, targetWatched ? 'true' : 'false');
         } catch {}
-        Toast.info(targetWatched ? 'Marked as Watched' : 'Marked as Unwatched');
+        showInfo(targetWatched ? 'Marked as Watched' : 'Marked as Unwatched', targetWatched ? 'Item marked as watched' : 'Item marked as unwatched');
         setTimeout(() => {
           DeviceEventEmitter.emit('watchedStatusChanged');
         }, 100);
@@ -180,8 +185,30 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
         Share.share({ message, url, title: item.name });
         break;
       }
+      case 'trakt-watchlist': {
+        if (isInWatchlist(item.id, item.type as 'movie' | 'show')) {
+          await removeFromWatchlist(item.id, item.type as 'movie' | 'show');
+          showInfo('Removed from Watchlist', 'Removed from your Trakt watchlist');
+        } else {
+          await addToWatchlist(item.id, item.type as 'movie' | 'show');
+          showSuccess('Added to Watchlist', 'Added to your Trakt watchlist');
+        }
+        setMenuVisible(false);
+        break;
+      }
+      case 'trakt-collection': {
+        if (isInCollection(item.id, item.type as 'movie' | 'show')) {
+          await removeFromCollection(item.id, item.type as 'movie' | 'show');
+          showInfo('Removed from Collection', 'Removed from your Trakt collection');
+        } else {
+          await addToCollection(item.id, item.type as 'movie' | 'show');
+          showSuccess('Added to Collection', 'Added to your Trakt collection');
+        }
+        setMenuVisible(false);
+        break;
+      }
     }
-  }, [item, inLibrary, isWatched]);
+  }, [item, inLibrary, isWatched, isInWatchlist, isInCollection, addToWatchlist, removeFromWatchlist, addToCollection, removeFromCollection, showSuccess, showInfo]);
 
   const handleMenuClose = useCallback(() => {
     setMenuVisible(false);
@@ -282,6 +309,16 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
                 <Feather name="bookmark" size={16} color={currentTheme.colors.white} />
               </View>
             )}
+            {isAuthenticated && isInWatchlist(item.id, item.type as 'movie' | 'show') && (
+              <View style={styles.traktWatchlistIcon}>
+                <MaterialIcons name="playlist-add-check" size={16} color="#E74C3C" />
+              </View>
+            )}
+            {isAuthenticated && isInCollection(item.id, item.type as 'movie' | 'show') && (
+              <View style={styles.traktCollectionIcon}>
+                <MaterialIcons name="video-library" size={16} color="#3498DB" />
+              </View>
+            )}
           </View>
         </TouchableOpacity>
         {settings.showPosterTitles && (
@@ -358,6 +395,18 @@ const styles = StyleSheet.create({
     left: 8,
     borderRadius: 8,
     padding: 4,
+  },
+  traktWatchlistIcon: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 2,
+  },
+  traktCollectionIcon: {
+    position: 'absolute',
+    top: 8,
+    right: 32, // Positioned to the left of watchlist icon
+    padding: 2,
   },
   title: {
     fontSize: 13,
