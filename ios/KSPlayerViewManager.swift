@@ -12,7 +12,7 @@ import React
 @objc(KSPlayerViewManager)
 class KSPlayerViewManager: RCTViewManager {
     
-    // Not needed for RCTViewManager-based views; events are exported via RCT_EXPORT_VIEW_PROPERTY
+    // Not needed for RCTViewManager-based views; events are exported via Objective-C externs in KSPlayerManager.m
     override func view() -> UIView! {
         let view = KSPlayerView()
         view.viewManager = self

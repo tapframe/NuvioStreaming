@@ -18,6 +18,8 @@ RCT_EXPORT_VIEW_PROPERTY(audioTrack, NSNumber)
 RCT_EXPORT_VIEW_PROPERTY(textTrack, NSNumber)
 RCT_EXPORT_VIEW_PROPERTY(allowsExternalPlayback, BOOL)
 RCT_EXPORT_VIEW_PROPERTY(usesExternalPlaybackWhileExternalScreenIsActive, BOOL)
+RCT_EXPORT_VIEW_PROPERTY(subtitleBottomOffset, NSNumber)
+RCT_EXPORT_VIEW_PROPERTY(subtitleFontSize, NSNumber)
 
 // Event properties
 RCT_EXPORT_VIEW_PROPERTY(onLoad, RCTDirectEventBlock)

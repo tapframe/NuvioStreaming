@@ -2251,7 +2251,7 @@ const KSPlayerCore: React.FC = () => {
           if (typeof saved.subtitleOutlineColor === 'string') setSubtitleOutlineColor(saved.subtitleOutlineColor);
           if (typeof saved.subtitleOutlineWidth === 'number') setSubtitleOutlineWidth(saved.subtitleOutlineWidth);
           if (typeof saved.subtitleAlign === 'string') setSubtitleAlign(saved.subtitleAlign as 'center' | 'left' | 'right');
-          if (typeof saved.subtitleBottomOffset === 'number') setSubtitleBottomOffset(saved.subtitleBottomOffset);
+        if (typeof saved.subtitleBottomOffset === 'number') setSubtitleBottomOffset(saved.subtitleBottomOffset);
           if (typeof saved.subtitleLetterSpacing === 'number') setSubtitleLetterSpacing(saved.subtitleLetterSpacing);
           if (typeof saved.subtitleLineHeightMultiplier === 'number') setSubtitleLineHeightMultiplier(saved.subtitleLineHeightMultiplier);
           if (typeof saved.subtitleOffsetSec === 'number') setSubtitleOffsetSec(saved.subtitleOffsetSec);
@@ -2291,7 +2291,7 @@ const KSPlayerCore: React.FC = () => {
     subtitleOutlineColor,
     subtitleOutlineWidth,
     subtitleAlign,
-    subtitleBottomOffset,
+      subtitleBottomOffset,
     subtitleLetterSpacing,
     subtitleLineHeightMultiplier,
     subtitleOffsetSec,
@@ -2728,6 +2728,8 @@ const KSPlayerCore: React.FC = () => {
                   textTrack={useCustomSubtitles ? -1 : selectedTextTrack}
                   allowsExternalPlayback={allowsAirPlay}
                   usesExternalPlaybackWhileExternalScreenIsActive={true}
+                  subtitleBottomOffset={subtitleBottomOffset}
+                  subtitleFontSize={subtitleSize}
                   onProgress={handleProgress}
                   onLoad={onLoad}
                   onEnd={onEnd}

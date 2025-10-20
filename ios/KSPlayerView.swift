@@ -17,6 +17,9 @@ class KSPlayerView: UIView {
     private var isPaused = false
     private var currentVolume: Float = 1.0
     weak var viewManager: KSPlayerViewManager?
+    
+    // Store constraint references for dynamic updates
+    private var subtitleBottomConstraint: NSLayoutConstraint?
 
     // AirPlay properties (removed duplicate declarations)
     
@@ -73,15 +76,32 @@ class KSPlayerView: UIView {
             setUsesExternalPlaybackWhileExternalScreenIsActive(usesExternalPlaybackWhileExternalScreenIsActive)
         }
     }
+    
+    @objc var subtitleBottomOffset: NSNumber = 60 {
+        didSet {
+            print("KSPlayerView: [PROP SETTER] subtitleBottomOffset setter called with value: \(subtitleBottomOffset.floatValue)")
+            updateSubtitlePositioning()
+        }
+    }
+
+    @objc var subtitleFontSize: NSNumber = 16 {
+        didSet {
+            let size = CGFloat(truncating: subtitleFontSize)
+            print("KSPlayerView: [PROP SETTER] subtitleFontSize setter called with value: \(size)")
+            updateSubtitleFont(size: size)
+        }
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         setupPlayerView()
+        setupCustomSubtitlePositioning()
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         setupPlayerView()
+        setupCustomSubtitlePositioning()
     }
 
     private func setupPlayerView() {
@@ -104,8 +124,81 @@ class KSPlayerView: UIView {
             playerView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
 
+        // Ensure subtitle views are visible and on top
+        // KSPlayer's subtitleLabel renders internal subtitles
+        playerView.subtitleLabel.isHidden = false
+        playerView.subtitleBackView.isHidden = false
+        playerView.bringSubviewToFront(playerView.subtitleBackView)
+        print("KSPlayerView: [SETUP] Subtitle views made visible")
+        print("KSPlayerView: [SETUP] subtitleLabel.isHidden: \(playerView.subtitleLabel.isHidden)")
+        print("KSPlayerView: [SETUP] subtitleBackView.isHidden: \(playerView.subtitleBackView.isHidden)")
+        print("KSPlayerView: [SETUP] subtitleLabel.frame: \(playerView.subtitleLabel.frame)")
+        print("KSPlayerView: [SETUP] subtitleBackView.frame: \(playerView.subtitleBackView.frame)")
+
         // Set up player delegates and callbacks
         setupPlayerCallbacks()
+    }
+    
+    private func setupCustomSubtitlePositioning() {
+        // Wait for the player view to be fully set up before modifying subtitle positioning
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.adjustSubtitlePositioning()
+        }
+    }
+    
+    private func adjustSubtitlePositioning() {
+        // Remove existing constraints for subtitle positioning
+        playerView.subtitleBackView.removeFromSuperview()
+        playerView.addSubview(playerView.subtitleBackView)
+        
+        // Re-add subtitle label to subtitle back view
+        playerView.subtitleBackView.addSubview(playerView.subtitleLabel)
+        
+        // Set up new constraints for better mobile visibility
+        playerView.subtitleBackView.translatesAutoresizingMaskIntoConstraints = false
+        playerView.subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Store the bottom constraint reference for dynamic updates
+        subtitleBottomConstraint = playerView.subtitleBackView.bottomAnchor.constraint(equalTo: playerView.bottomAnchor, constant: -CGFloat(subtitleBottomOffset.floatValue))
+        
+        NSLayoutConstraint.activate([
+            // Position subtitles using dynamic offset from React Native
+            subtitleBottomConstraint!,
+            playerView.subtitleBackView.centerXAnchor.constraint(equalTo: playerView.centerXAnchor),
+            playerView.subtitleBackView.widthAnchor.constraint(lessThanOrEqualTo: playerView.widthAnchor, constant: -20),
+            playerView.subtitleBackView.heightAnchor.constraint(lessThanOrEqualToConstant: 100),
+            
+            // Subtitle label constraints within the back view
+            playerView.subtitleLabel.leadingAnchor.constraint(equalTo: playerView.subtitleBackView.leadingAnchor, constant: 10),
+            playerView.subtitleLabel.trailingAnchor.constraint(equalTo: playerView.subtitleBackView.trailingAnchor, constant: -10),
+            playerView.subtitleLabel.topAnchor.constraint(equalTo: playerView.subtitleBackView.topAnchor, constant: 5),
+            playerView.subtitleLabel.bottomAnchor.constraint(equalTo: playerView.subtitleBackView.bottomAnchor, constant: -5),
+        ])
+        
+        // Ensure subtitle views are initially hidden
+        playerView.subtitleBackView.isHidden = true
+        playerView.subtitleLabel.isHidden = true
+        
+        print("KSPlayerView: Custom subtitle positioning applied - positioned \(subtitleBottomOffset.floatValue)pts from bottom for mobile visibility")
+    }
+    
+    private func updateSubtitlePositioning() {
+        // Update subtitle positioning when offset changes
+        print("KSPlayerView: [OFFSET UPDATE] subtitleBottomOffset changed to: \(subtitleBottomOffset.floatValue)")
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            print("KSPlayerView: [OFFSET UPDATE] Applying new positioning with offset: \(self.subtitleBottomOffset.floatValue)")
+            
+            // Update the existing constraint instead of recreating everything
+            if let bottomConstraint = self.subtitleBottomConstraint {
+                bottomConstraint.constant = -CGFloat(self.subtitleBottomOffset.floatValue)
+                print("KSPlayerView: [OFFSET UPDATE] Updated constraint constant to: \(bottomConstraint.constant)")
+            } else {
+                // Fallback: recreate positioning if constraint reference is missing
+                print("KSPlayerView: [OFFSET UPDATE] No constraint reference found, recreating positioning")
+                self.adjustSubtitlePositioning()
+            }
+        }
     }
 
     private func setupPlayerCallbacks() {
@@ -117,6 +210,18 @@ class KSPlayerView: UIView {
         KSOptions.asynchronousDecompression = false
         KSOptions.secondPlayerType = nil
         #endif
+    }
+
+    private func updateSubtitleFont(size: CGFloat) {
+        // Update KSPlayer subtitle font size via SubtitleModel
+        SubtitleModel.textFontSize = size
+        // Also directly apply to current label for immediate effect
+        playerView.subtitleLabel.font = SubtitleModel.textFont
+        // Re-render current subtitle parts to apply font
+        if let currentTime = playerView.playerLayer?.player.currentPlaybackTime {
+            _ = playerView.srtControl.subtitle(currentTime: currentTime)
+        }
+        print("KSPlayerView: [FONT UPDATE] Applied subtitle font size: \(size)")
     }
 
     func setSource(_ source: NSDictionary) {
@@ -167,7 +272,12 @@ class KSPlayerView: UIView {
         playerView.set(resource: resource)
         
         // Set up delegate after setting the resource
-        playerView.playerLayer?.delegate = self
+        if let playerLayer = playerView.playerLayer {
+            playerLayer.delegate = self
+            print("KSPlayerView: Delegate set successfully on playerLayer")
+        } else {
+            print("KSPlayerView: ERROR - playerLayer is nil, cannot set delegate")
+        }
 
         // Apply current state
         if isPaused {
@@ -343,44 +453,106 @@ class KSPlayerView: UIView {
     }
 
     func setTextTrack(_ trackId: Int) {
-        if let player = playerView.playerLayer?.player {
-            let textTracks = player.tracks(mediaType: .subtitle)
-            print("KSPlayerView: Available text tracks count: \(textTracks.count)")
-            print("KSPlayerView: Requested text track ID: \(trackId)")
-
-            // First try to find track by trackID (proper way)
-            var selectedTrack: MediaPlayerTrack? = nil
-            var trackIndex: Int = -1
-
-            // Try to find by exact trackID match
-            if let track = textTracks.first(where: { Int($0.trackID) == trackId }) {
-                selectedTrack = track
-                trackIndex = textTracks.firstIndex(where: { $0.trackID == track.trackID }) ?? -1
-                print("KSPlayerView: Found text track by trackID \(trackId) at index \(trackIndex)")
+        print("KSPlayerView: [SET TEXT TRACK] Starting setTextTrack with trackId: \(trackId)")
+        
+        // Wait slightly longer than the 1-second delay for subtitle data source connection
+        // This ensures srtControl.addSubtitle(dataSouce:) has been called in VideoPlayerView
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            guard let self = self else { 
+                print("KSPlayerView: [SET TEXT TRACK] self is nil, aborting")
+                return 
             }
-            // Fallback: treat trackId as array index
-            else if trackId >= 0 && trackId < textTracks.count {
-                selectedTrack = textTracks[trackId]
-                trackIndex = trackId
-                print("KSPlayerView: Found text track by array index \(trackId) (fallback)")
-            }
+            
+            print("KSPlayerView: [SET TEXT TRACK] Executing delayed track selection")
+            
+            if let player = self.playerView.playerLayer?.player {
+                let textTracks = player.tracks(mediaType: .subtitle)
+                print("KSPlayerView: Available text tracks count: \(textTracks.count)")
+                print("KSPlayerView: Requested text track ID: \(trackId)")
 
-            if let track = selectedTrack {
-                print("KSPlayerView: Selecting text track \(trackId) (index: \(trackIndex)): '\(track.name)' (ID: \(track.trackID))")
+                // First try to find track by trackID (proper way)
+                var selectedTrack: MediaPlayerTrack? = nil
+                var trackIndex: Int = -1
 
-                // Use KSPlayer's select method which properly handles track selection
-                player.select(track: track)
+                // Try to find by exact trackID match
+                if let track = textTracks.first(where: { Int($0.trackID) == trackId }) {
+                    selectedTrack = track
+                    trackIndex = textTracks.firstIndex(where: { $0.trackID == track.trackID }) ?? -1
+                    print("KSPlayerView: Found text track by trackID \(trackId) at index \(trackIndex)")
+                }
+                // Fallback: treat trackId as array index
+                else if trackId >= 0 && trackId < textTracks.count {
+                    selectedTrack = textTracks[trackId]
+                    trackIndex = trackId
+                    print("KSPlayerView: Found text track by array index \(trackId) (fallback)")
+                }
 
-                print("KSPlayerView: Successfully selected text track \(trackId)")
-            } else if trackId == -1 {
-                // Disable all subtitles
-                for track in textTracks { track.isEnabled = false }
-                print("KSPlayerView: Disabled all text tracks")
+                if let track = selectedTrack {
+                    print("KSPlayerView: Selecting text track \(trackId) (index: \(trackIndex)): '\(track.name)' (ID: \(track.trackID))")
+
+                    // First disable all tracks to ensure only one is active
+                    for t in textTracks {
+                        t.isEnabled = false
+                    }
+                    
+                    // Use KSPlayer's select method which properly handles track selection
+                    player.select(track: track)
+                    
+                    // Sync srtControl with player track selection
+                    // Find the corresponding SubtitleInfo in srtControl and select it
+                    if let matchingSubtitleInfo = self.playerView.srtControl.subtitleInfos.first(where: { subtitleInfo in
+                        // Try to match by name or track ID
+                        subtitleInfo.name.lowercased() == track.name.lowercased() ||
+                        subtitleInfo.subtitleID == String(track.trackID)
+                    }) {
+                        print("KSPlayerView: Found matching SubtitleInfo: \(matchingSubtitleInfo.name) (ID: \(matchingSubtitleInfo.subtitleID))")
+                        self.playerView.srtControl.selectedSubtitleInfo = matchingSubtitleInfo
+                        print("KSPlayerView: Set srtControl.selectedSubtitleInfo to: \(matchingSubtitleInfo.name)")
+                    } else {
+                        print("KSPlayerView: No matching SubtitleInfo found for track '\(track.name)' (ID: \(track.trackID))")
+                        print("KSPlayerView: Available SubtitleInfos:")
+                        for (index, info) in self.playerView.srtControl.subtitleInfos.enumerated() {
+                            print("KSPlayerView:   [\(index)] name='\(info.name)', subtitleID='\(info.subtitleID)'")
+                        }
+                    }
+                    
+                    // Ensure subtitle views are visible after selection
+                    self.playerView.subtitleLabel.isHidden = false
+                    self.playerView.subtitleBackView.isHidden = false
+
+                    // Debug: Check the enabled state of all tracks after selection
+                    print("KSPlayerView: Track states after selection:")
+                    for (index, t) in textTracks.enumerated() {
+                        print("KSPlayerView:   Track \(index): ID=\(t.trackID), Name='\(t.name)', Enabled=\(t.isEnabled)")
+                    }
+
+                    // Verify the selection worked after a delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        let tracksAfter = player.tracks(mediaType: .subtitle)
+                        print("KSPlayerView: Verification after subtitle selection:")
+                        for (index, track) in tracksAfter.enumerated() {
+                            print("KSPlayerView:   Track \(index) (ID: \(track.trackID)) isEnabled: \(track.isEnabled)")
+                        }
+                        
+                        // Also verify srtControl selection
+                        if let selectedInfo = self.playerView.srtControl.selectedSubtitleInfo {
+                            print("KSPlayerView: srtControl.selectedSubtitleInfo: \(selectedInfo.name) (ID: \(selectedInfo.subtitleID))")
+                        } else {
+                            print("KSPlayerView: srtControl.selectedSubtitleInfo is nil")
+                        }
+                    }
+
+                    print("KSPlayerView: Successfully selected text track \(trackId)")
+                } else if trackId == -1 {
+                    // Disable all subtitles
+                    for track in textTracks { track.isEnabled = false }
+                    print("KSPlayerView: Disabled all text tracks")
+                } else {
+                    print("KSPlayerView: Text track \(trackId) not found. Available track IDs: \(textTracks.map { Int($0.trackID) }), array indices: 0..\(textTracks.count - 1)")
+                }
             } else {
-                print("KSPlayerView: Text track \(trackId) not found. Available track IDs: \(textTracks.map { Int($0.trackID) }), array indices: 0..\(textTracks.count - 1)")
+                print("KSPlayerView: No player available for text track selection")
             }
-        } else {
-            print("KSPlayerView: No player available for text track selection")
         }
     }
     
@@ -404,10 +576,27 @@ class KSPlayerView: UIView {
         }
 
         let textTracks = player.tracks(mediaType: .subtitle).enumerated().map { index, track in
+            // Create a better display name for subtitles
+            var displayName = track.name
+            if displayName.isEmpty || displayName == "Unknown" {
+                if let language = track.language, !language.isEmpty && language != "Unknown" {
+                    displayName = language
+                } else if let languageCode = track.languageCode, !languageCode.isEmpty {
+                    displayName = languageCode.uppercased()
+                } else {
+                    displayName = "Subtitle \(index + 1)"
+                }
+            }
+            
+            // Add language info if not already in the name
+            if let language = track.language, !language.isEmpty && language != "Unknown" && !displayName.lowercased().contains(language.lowercased()) {
+                displayName += " (\(language))"
+            }
+            
             return [
                 "id": Int(track.trackID), // Use actual track ID, not array index
                 "index": index, // Keep index for backward compatibility
-                "name": track.name,
+                "name": displayName,
                 "language": track.language ?? "Unknown",
                 "languageCode": track.languageCode ?? "",
                 "isEnabled": track.isEnabled,
@@ -533,6 +722,72 @@ extension KSPlayerView: KSPlayerLayerDelegate {
             layer.player.allowsExternalPlayback = allowsExternalPlayback
             layer.player.usesExternalPlaybackWhileExternalScreenIsActive = usesExternalPlaybackWhileExternalScreenIsActive
 
+            // Debug: Check subtitle data source connection
+            let hasSubtitleDataSource = layer.player.subtitleDataSouce != nil
+            print("KSPlayerView: [READY TO PLAY] subtitle data source available: \(hasSubtitleDataSource)")
+            
+            // Ensure subtitle views are visible
+            playerView.subtitleLabel.isHidden = false
+            playerView.subtitleBackView.isHidden = false
+            print("KSPlayerView: [READY TO PLAY] Verified subtitle views are visible")
+            print("KSPlayerView: [READY TO PLAY] subtitleLabel.isHidden: \(playerView.subtitleLabel.isHidden)")
+            print("KSPlayerView: [READY TO PLAY] subtitleBackView.isHidden: \(playerView.subtitleBackView.isHidden)")
+            print("KSPlayerView: [READY TO PLAY] subtitleLabel.frame: \(playerView.subtitleLabel.frame)")
+            print("KSPlayerView: [READY TO PLAY] subtitleBackView.frame: \(playerView.subtitleBackView.frame)")
+            
+            // Manually connect subtitle data source to srtControl (this is the missing piece!)
+            if let subtitleDataSouce = layer.player.subtitleDataSouce {
+                print("KSPlayerView: [READY TO PLAY] Connecting subtitle data source to srtControl")
+                print("KSPlayerView: [READY TO PLAY] subtitleDataSouce type: \(type(of: subtitleDataSouce))")
+
+                // Check if subtitle data source has any subtitle infos
+                print("KSPlayerView: [READY TO PLAY] subtitleDataSouce has \(subtitleDataSouce.infos.count) subtitle infos")
+
+                for (index, info) in subtitleDataSouce.infos.enumerated() {
+                    print("KSPlayerView: [READY TO PLAY] subtitleDataSouce info[\(index)]: ID=\(info.subtitleID), Name='\(info.name)', Enabled=\(info.isEnabled)")
+                }
+                // Wait 1 second like the original KSPlayer code does
+                DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + 1) { [weak self] in
+                    guard let self = self else { return }
+                    print("KSPlayerView: [READY TO PLAY] About to add subtitle data source to srtControl")
+                    self.playerView.srtControl.addSubtitle(dataSouce: subtitleDataSouce)
+                    print("KSPlayerView: [READY TO PLAY] Subtitle data source connected to srtControl")
+                    print("KSPlayerView: [READY TO PLAY] srtControl.subtitleInfos.count: \(self.playerView.srtControl.subtitleInfos.count)")
+
+                    // Log all subtitle infos
+                    for (index, info) in self.playerView.srtControl.subtitleInfos.enumerated() {
+                        print("KSPlayerView: [READY TO PLAY] SubtitleInfo[\(index)]: name=\(info.name), isEnabled=\(info.isEnabled), subtitleID=\(info.subtitleID)")
+                    }
+                    
+                    // Try to manually trigger subtitle parsing for the current time
+                    let currentTime = self.playerView.playerLayer?.player.currentPlaybackTime ?? 0
+                    print("KSPlayerView: [READY TO PLAY] Current playback time: \(currentTime)")
+                    
+                    // Force subtitle search for current time
+                    let hasSubtitle = self.playerView.srtControl.subtitle(currentTime: currentTime)
+                    print("KSPlayerView: [READY TO PLAY] Manual subtitle search result: \(hasSubtitle)")
+                    print("KSPlayerView: [READY TO PLAY] Parts count after manual search: \(self.playerView.srtControl.parts.count)")
+                    
+                    if let firstPart = self.playerView.srtControl.parts.first {
+                        print("KSPlayerView: [READY TO PLAY] Found subtitle part: start=\(firstPart.start), end=\(firstPart.end), text='\(firstPart.text?.string ?? "nil")'")
+                    }
+                    
+                    // Auto-select first enabled subtitle if none selected
+                    if self.playerView.srtControl.selectedSubtitleInfo == nil {
+                        self.playerView.srtControl.selectedSubtitleInfo = self.playerView.srtControl.subtitleInfos.first { $0.isEnabled }
+                        if let selected = self.playerView.srtControl.selectedSubtitleInfo {
+                            print("KSPlayerView: [READY TO PLAY] Auto-selected subtitle: \(selected.name)")
+                        } else {
+                            print("KSPlayerView: [READY TO PLAY] No enabled subtitle found for auto-selection")
+                        }
+                    } else {
+                        print("KSPlayerView: [READY TO PLAY] Subtitle already selected: \(self.playerView.srtControl.selectedSubtitleInfo?.name ?? "unknown")")
+                    }
+                }
+            } else {
+                print("KSPlayerView: [READY TO PLAY] ERROR: No subtitle data source available")
+            }
+
             // Determine player backend type
             let uriString = currentSource?["uri"] as? String
             let isMKV = uriString?.lowercased().contains(".mkv") ?? false
@@ -567,6 +822,78 @@ extension KSPlayerView: KSPlayerLayerDelegate {
     }
 
     func player(layer: KSPlayerLayer, currentTime: TimeInterval, totalTime: TimeInterval) {
+        // Debug: Confirm delegate method is being called
+        if currentTime.truncatingRemainder(dividingBy: 10.0) < 0.1 {
+            print("KSPlayerView: [DELEGATE CALLED] time=\(currentTime), total=\(totalTime)")
+        }
+        
+        // Manually implement subtitle rendering logic from VideoPlayerView
+        // This is the critical missing piece that was preventing subtitle rendering
+        
+        // Debug: Check srtControl state
+        let subtitleInfoCount = playerView.srtControl.subtitleInfos.count
+        let selectedSubtitle = playerView.srtControl.selectedSubtitleInfo
+        
+        // Always log subtitle state every 10 seconds to see when it gets populated
+        if currentTime.truncatingRemainder(dividingBy: 10.0) < 0.1 {
+            print("KSPlayerView: [SUBTITLE DEBUG] time=\(currentTime.truncatingRemainder(dividingBy: 10.0)), subtitleInfos=\(subtitleInfoCount), selected=\(selectedSubtitle?.name ?? "none")")
+            
+            // Also check if player has subtitle data source
+            let player = layer.player
+            let hasSubtitleDataSource = player.subtitleDataSouce != nil
+            print("KSPlayerView: [SUBTITLE DEBUG] player has subtitle data source: \(hasSubtitleDataSource)")
+            
+            // Log subtitle view states
+            print("KSPlayerView: [SUBTITLE DEBUG] subtitleLabel.isHidden: \(playerView.subtitleLabel.isHidden)")
+            print("KSPlayerView: [SUBTITLE DEBUG] subtitleBackView.isHidden: \(playerView.subtitleBackView.isHidden)")
+            print("KSPlayerView: [SUBTITLE DEBUG] subtitleLabel.text: '\(playerView.subtitleLabel.text ?? "nil")'")
+            print("KSPlayerView: [SUBTITLE DEBUG] subtitleLabel.attributedText: \(playerView.subtitleLabel.attributedText != nil ? "exists" : "nil")")
+            print("KSPlayerView: [SUBTITLE DEBUG] subtitleBackView.image: \(playerView.subtitleBackView.image != nil ? "exists" : "nil")")
+            
+            // Log all subtitle infos
+            for (index, info) in playerView.srtControl.subtitleInfos.enumerated() {
+                print("KSPlayerView: [SUBTITLE DEBUG] SubtitleInfo[\(index)]: name=\(info.name), isEnabled=\(info.isEnabled)")
+            }
+        }
+        
+        let hasSubtitleParts = playerView.srtControl.subtitle(currentTime: currentTime)
+        
+        // Debug: Check subtitle timing every 10 seconds
+        if currentTime.truncatingRemainder(dividingBy: 10.0) < 0.1 && subtitleInfoCount > 0 {
+            print("KSPlayerView: [SUBTITLE TIMING] time=\(currentTime), hasParts=\(hasSubtitleParts), partsCount=\(playerView.srtControl.parts.count)")
+            if let firstPart = playerView.srtControl.parts.first {
+                print("KSPlayerView: [SUBTITLE TIMING] firstPart start=\(firstPart.start), end=\(firstPart.end)")
+                print("KSPlayerView: [SUBTITLE TIMING] firstPart text='\(firstPart.text?.string ?? "nil")'")
+                print("KSPlayerView: [SUBTITLE TIMING] firstPart hasImage=\(firstPart.image != nil)")
+            } else {
+                print("KSPlayerView: [SUBTITLE TIMING] No parts available")
+            }
+        }
+        
+        if hasSubtitleParts {
+            if let part = playerView.srtControl.parts.first {
+                print("KSPlayerView: [SUBTITLE RENDER] time=\(currentTime), text='\(part.text?.string ?? "nil")', hasImage=\(part.image != nil)")
+                playerView.subtitleBackView.image = part.image
+                playerView.subtitleLabel.attributedText = part.text
+                playerView.subtitleBackView.isHidden = false
+                playerView.subtitleLabel.isHidden = false
+                print("KSPlayerView: [SUBTITLE RENDER] Set subtitle text and made views visible")
+                print("KSPlayerView: [SUBTITLE RENDER] subtitleLabel.isHidden after: \(playerView.subtitleLabel.isHidden)")
+                print("KSPlayerView: [SUBTITLE RENDER] subtitleBackView.isHidden after: \(playerView.subtitleBackView.isHidden)")
+            } else {
+                print("KSPlayerView: [SUBTITLE RENDER] hasParts=true but no parts available - hiding views")
+                playerView.subtitleBackView.image = nil
+                playerView.subtitleLabel.attributedText = nil
+                playerView.subtitleBackView.isHidden = true
+                playerView.subtitleLabel.isHidden = true
+            }
+        } else {
+            // Only log this occasionally to avoid spam
+            if currentTime.truncatingRemainder(dividingBy: 30.0) < 0.1 {
+                print("KSPlayerView: [SUBTITLE RENDER] time=\(currentTime), hasParts=false - no subtitle at this time")
+            }
+        }
+        
         let p = layer.player
         // Ensure we have valid duration before sending progress updates
         if totalTime > 0 {

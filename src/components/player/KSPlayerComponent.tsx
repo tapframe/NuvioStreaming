@@ -14,6 +14,8 @@ interface KSPlayerViewProps {
   textTrack?: number;
   allowsExternalPlayback?: boolean;
   usesExternalPlaybackWhileExternalScreenIsActive?: boolean;
+  subtitleBottomOffset?: number;
+  subtitleFontSize?: number;
   onLoad?: (data: any) => void;
   onProgress?: (data: any) => void;
   onBuffering?: (data: any) => void;
@@ -48,6 +50,8 @@ export interface KSPlayerProps {
   textTrack?: number;
   allowsExternalPlayback?: boolean;
   usesExternalPlaybackWhileExternalScreenIsActive?: boolean;
+  subtitleBottomOffset?: number;
+  subtitleFontSize?: number;
   onLoad?: (data: any) => void;
   onProgress?: (data: any) => void;
   onBuffering?: (data: any) => void;
@@ -171,6 +175,8 @@ const KSPlayer = forwardRef<KSPlayerRef, KSPlayerProps>((props, ref) => {
       textTrack={props.textTrack}
       allowsExternalPlayback={props.allowsExternalPlayback}
       usesExternalPlaybackWhileExternalScreenIsActive={props.usesExternalPlaybackWhileExternalScreenIsActive}
+      subtitleBottomOffset={props.subtitleBottomOffset}
+      subtitleFontSize={props.subtitleFontSize}
       onLoad={(e: any) => props.onLoad?.(e?.nativeEvent ?? e)}
       onProgress={(e: any) => props.onProgress?.(e?.nativeEvent ?? e)}
       onBuffering={(e: any) => props.onBuffering?.(e?.nativeEvent ?? e)}
