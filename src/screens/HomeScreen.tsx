@@ -9,6 +9,7 @@ import {
   StatusBar,
   useColorScheme,
   Dimensions,
+  useWindowDimensions,
   ImageBackground,
   ScrollView,
   Platform,
@@ -389,7 +390,10 @@ const HomeScreen = () => {
         
         // Allow free rotation on tablets; lock portrait on phones
         try {
-          const isTabletDevice = Platform.OS === 'ios' ? (Platform as any).isPad === true : isTablet;
+          // Use device physical characteristics, not current orientation
+          const isTabletDevice = Platform.OS === 'ios' 
+            ? (Platform as any).isPad === true 
+            : Math.min(windowWidth, Dimensions.get('screen').height) >= 768;
           if (isTabletDevice) {
             ScreenOrientation.unlockAsync();
           } else {
@@ -616,11 +620,11 @@ const HomeScreen = () => {
   // Stable keyExtractor for FlashList
   const keyExtractor = useCallback((item: HomeScreenListItem) => item.key, []);
 
-  // Memoize device check to avoid repeated Dimensions.get calls
+  // Use reactive window dimensions that update on orientation changes
+  const { width: windowWidth } = useWindowDimensions();
   const isTablet = useMemo(() => {
-    const deviceWidth = Dimensions.get('window').width;
-    return deviceWidth >= 768;
-  }, []);
+    return windowWidth >= 768;
+  }, [windowWidth]);
 
   // Memoize individual section components to prevent re-renders
   const memoizedFeaturedContent = useMemo(() => {
@@ -640,7 +644,7 @@ const HomeScreen = () => {
         loading={featuredLoading}
       />
     );
-  }, [isTablet, settings.heroStyle, showHeroSection, featuredContentSource, featuredContent, allFeaturedContent, isSaved, handleSaveToLibrary, featuredLoading]);
+  }, [isTablet, settings.heroStyle, showHeroSection, featuredContentSource, featuredLoading]);
 
   const memoizedThisWeekSection = useMemo(() => <ThisWeekSection />, []);
   const memoizedContinueWatchingSection = useMemo(() => <ContinueWatchingSection ref={continueWatchingRef} />, []);
