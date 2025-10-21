@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Animated, StyleSheet, Platform, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Feather from 'react-native-vector-icons/Feather';
 import { LinearGradient } from 'expo-linear-gradient';
 import Slider from '@react-native-community/slider';
 import { styles } from '../utils/playerStyles';
@@ -43,6 +44,10 @@ interface PlayerControlsProps {
   buffered: number;
   formatTime: (seconds: number) => string;
   playerBackend?: string;
+  // AirPlay props
+  isAirPlayActive?: boolean;
+  allowsAirPlay?: boolean;
+  onAirPlayPress?: () => void;
 }
 
 export const PlayerControls: React.FC<PlayerControlsProps> = ({
@@ -80,20 +85,42 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   buffered,
   formatTime,
   playerBackend,
+  isAirPlayActive,
+  allowsAirPlay,
+  onAirPlayPress,
 }) => {
   const { currentTheme } = useTheme();
 
-
-  /* Responsive Spacing */
+  /* Responsive Spacing - Merged with tablet support */
   const screenWidth = Dimensions.get('window').width;
-  const buttonSpacing = screenWidth * 0.15;
+  const BREAKPOINTS = { phone: 0, tablet: 768, largeTablet: 1024, tv: 1440 } as const;
+  const getDeviceType = (w: number) => {
+    if (w >= BREAKPOINTS.tv) return 'tv';
+    if (w >= BREAKPOINTS.largeTablet) return 'largeTablet';
+    if (w >= BREAKPOINTS.tablet) return 'tablet';
+    return 'phone';
+  };
+  const deviceType = getDeviceType(screenWidth);
+  const isTablet = deviceType === 'tablet';
+  const isLargeTablet = deviceType === 'largeTablet';
+  const isTV = deviceType === 'tv';
 
-  const playButtonSize = screenWidth * 0.12; // 12% of screen width
-  const playIconSize = playButtonSize * 0.6; // 60% of button size
-  const seekButtonSize = screenWidth * 0.11; // 11% of screen width
-  const seekIconSize = seekButtonSize * 0.75; // 75% of button size
-  const seekNumberSize = seekButtonSize * 0.25; // 25% of button size
-  const arcBorderWidth = seekButtonSize * 0.05; // 5% of button size
+  // Responsive button sizing - combines percentage-based with breakpoint scaling
+  const baseButtonSpacing = screenWidth * 0.15;
+  const buttonSpacing = isTV ? baseButtonSpacing * 1.2 : isLargeTablet ? baseButtonSpacing * 1.1 : isTablet ? baseButtonSpacing : baseButtonSpacing * 0.9;
+
+  const basePlayButtonSize = screenWidth * 0.12;
+  const playButtonSize = isTV ? basePlayButtonSize * 1.2 : isLargeTablet ? basePlayButtonSize * 1.1 : isTablet ? basePlayButtonSize : basePlayButtonSize * 0.9;
+  const playIconSize = playButtonSize * 0.6;
+
+  const baseSeekButtonSize = screenWidth * 0.11;
+  const seekButtonSize = isTV ? baseSeekButtonSize * 1.2 : isLargeTablet ? baseSeekButtonSize * 1.1 : isTablet ? baseSeekButtonSize : baseSeekButtonSize * 0.9;
+  const seekIconSize = seekButtonSize * 0.75;
+  const seekNumberSize = seekButtonSize * 0.25;
+  const arcBorderWidth = seekButtonSize * 0.05;
+
+  // Icon sizes for other controls
+  const closeIconSize = isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 24;
 
   /* Animations - State & Refs */
   const [showBackwardSign, setShowBackwardSign] = React.useState(false);
@@ -228,10 +255,6 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
 
     togglePlayback();
   };
-
-
-
-
   return (
     <Animated.View
       style={[StyleSheet.absoluteFill, { opacity: fadeAnim, zIndex: 20 }]}
@@ -291,13 +314,12 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
               )}
             </View>
             <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-              <Ionicons name="close" size={24} color="white" />
+              <Ionicons name="close" size={closeIconSize} color="white" />
             </TouchableOpacity>
           </View>
         </LinearGradient>
 
-        
-        {/* Center Controls - CloudStream Style */}
+        {/* Center Controls - CloudStream Style with Responsive Sizing */}
         <View style={[styles.controls, { 
           transform: [{ translateY: -(playButtonSize / 2) }] 
         }]}>
@@ -545,6 +567,26 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                   <Ionicons name="swap-horizontal" size={20} color="white" />
                   <Text style={styles.bottomButtonText}>
                     Change Source
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {/* AirPlay Button - iOS only, KSAVPlayer only */}
+              {Platform.OS === 'ios' && onAirPlayPress && playerBackend === 'KSAVPlayer' && (
+                <TouchableOpacity
+                  style={styles.bottomButton}
+                  onPress={onAirPlayPress}
+                >
+                  <Feather
+                    name="airplay"
+                    size={20}
+                    color={isAirPlayActive ? currentTheme.colors.primary : "white"}
+                  />
+                  <Text style={[
+                    styles.bottomButtonText,
+                    isAirPlayActive && { color: currentTheme.colors.primary }
+                  ]}>
+                    {allowsAirPlay ? 'AirPlay' : 'AirPlay Off'}
                   </Text>
                 </TouchableOpacity>
               )}

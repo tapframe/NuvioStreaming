@@ -1588,6 +1588,11 @@ const AndroidVideoPlayer: React.FC = () => {
       }
       
       controlsTimeout.current = setTimeout(hideControls, 5000);
+      
+      // Auto-fetch and load English external subtitles if available
+      if (imdbId) {
+        fetchAvailableSubtitles(undefined, true);
+      }
     } catch (error) {
       logger.error('[AndroidVideoPlayer] Error in onLoad:', error);
       // Set fallback values to prevent crashes

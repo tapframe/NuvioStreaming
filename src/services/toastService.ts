@@ -150,3 +150,4 @@ class ToastService {
 
 export const toastService = ToastService.getInstance();
 export default toastService;
+

@@ -20,32 +20,13 @@ import CustomAlert from '../../components/CustomAlert';
 
 const { width } = Dimensions.get('window');
 
-// Dynamic poster calculation based on screen width for More Like This section
-const calculatePosterLayout = (screenWidth: number) => {
-  const MIN_POSTER_WIDTH = 100; // Slightly smaller for more items in this section
-  const MAX_POSTER_WIDTH = 130; // Maximum poster width
-  const HORIZONTAL_PADDING = 48; // Total horizontal padding/margins
-  
-  // Calculate how many posters can fit (aim for slightly more items than main sections)
-  const availableWidth = screenWidth - HORIZONTAL_PADDING;
-  const maxColumns = Math.floor(availableWidth / MIN_POSTER_WIDTH);
-  
-  // Limit to reasonable number of columns (3-7 for this section)
-  const numColumns = Math.min(Math.max(maxColumns, 3), 7);
-  
-  // Calculate actual poster width
-  const posterWidth = Math.min(availableWidth / numColumns, MAX_POSTER_WIDTH);
-  
-  return {
-    numColumns,
-    posterWidth,
-    spacing: 12 // Space between posters
-  };
-};
-
-const posterLayout = calculatePosterLayout(width);
-const POSTER_WIDTH = posterLayout.posterWidth;
-const POSTER_HEIGHT = POSTER_WIDTH * 1.5;
+// Breakpoints for responsive sizing
+const BREAKPOINTS = {
+  phone: 0,
+  tablet: 768,
+  largeTablet: 1024,
+  tv: 1440,
+} as const;
 
 interface MoreLikeThisSectionProps {
   recommendations: StreamingContent[];
@@ -58,6 +39,48 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
 }) => {
   const { currentTheme } = useTheme();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+
+  // Determine device type
+  const deviceWidth = Dimensions.get('window').width;
+  const getDeviceType = React.useCallback(() => {
+    if (deviceWidth >= BREAKPOINTS.tv) return 'tv';
+    if (deviceWidth >= BREAKPOINTS.largeTablet) return 'largeTablet';
+    if (deviceWidth >= BREAKPOINTS.tablet) return 'tablet';
+    return 'phone';
+  }, [deviceWidth]);
+  const deviceType = getDeviceType();
+  const isTablet = deviceType === 'tablet';
+  const isLargeTablet = deviceType === 'largeTablet';
+  const isTV = deviceType === 'tv';
+
+  // Responsive spacing & sizes
+  const horizontalPadding = React.useMemo(() => {
+    switch (deviceType) {
+      case 'tv': return 32;
+      case 'largeTablet': return 28;
+      case 'tablet': return 24;
+      default: return 16;
+    }
+  }, [deviceType]);
+
+  const itemSpacing = React.useMemo(() => {
+    switch (deviceType) {
+      case 'tv': return 14;
+      case 'largeTablet': return 12;
+      case 'tablet': return 12;
+      default: return 12;
+    }
+  }, [deviceType]);
+
+  const posterWidth = React.useMemo(() => {
+    switch (deviceType) {
+      case 'tv': return 180;
+      case 'largeTablet': return 160;
+      case 'tablet': return 140;
+      default: return 120;
+    }
+  }, [deviceType]);
+  const posterHeight = React.useMemo(() => posterWidth * 1.5, [posterWidth]);
 
   const [alertVisible, setAlertVisible] = React.useState(false);
   const [alertTitle, setAlertTitle] = React.useState('');
@@ -94,15 +117,15 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
 
   const renderItem = ({ item }: { item: StreamingContent }) => (
     <TouchableOpacity 
-      style={styles.itemContainer}
+      style={[styles.itemContainer, { width: posterWidth, marginRight: itemSpacing }]}
       onPress={() => handleItemPress(item)}
     >
       <FastImage
         source={{ uri: item.poster }}
-        style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1 }]}
+        style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, width: posterWidth, height: posterHeight, borderRadius: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 10 : 8 }]}
         resizeMode={FastImage.resizeMode.cover}
       />
-      <Text style={[styles.title, { color: currentTheme.colors.mediumEmphasis }]} numberOfLines={2}>
+      <Text style={[styles.title, { color: currentTheme.colors.mediumEmphasis, fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 13 : 13, lineHeight: isTV ? 20 : 18 }]} numberOfLines={2}>
         {item.name}
       </Text>
     </TouchableOpacity>
@@ -121,15 +144,15 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={[styles.sectionTitle, { color: currentTheme.colors.highEmphasis }]}>More Like This</Text>
+    <View style={[styles.container, { paddingLeft: 0 }] }>
+      <Text style={[styles.sectionTitle, { color: currentTheme.colors.highEmphasis, fontSize: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20, paddingHorizontal: horizontalPadding }]}>More Like This</Text>
       <FlatList
         data={recommendations}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.listContentContainer}
+        contentContainerStyle={[styles.listContentContainer, { paddingHorizontal: horizontalPadding, paddingRight: horizontalPadding + itemSpacing }]}
       />
       <CustomAlert
         visible={alertVisible}
@@ -146,36 +169,30 @@ const styles = StyleSheet.create({
   container: {
     marginTop: 16,
     marginBottom: 16,
-    paddingLeft: 0,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '800',
     marginBottom: 12,
     marginTop: 8,
-    paddingHorizontal: 16,
   },
   listContentContainer: {
-    paddingHorizontal: 16,
-    paddingRight: 32, // Ensure last item has padding
+    paddingRight: 32, // Will be overridden responsively
   },
   itemContainer: {
-    marginRight: 12,
-    width: POSTER_WIDTH,
+    marginRight: 12, // will be overridden responsively
   },
   poster: {
-    width: POSTER_WIDTH,
-    height: POSTER_HEIGHT,
-    borderRadius: 8,
+    borderRadius: 8, // overridden responsively
     marginBottom: 8,
   },
   title: {
-    fontSize: 13,
+    fontSize: 13, // overridden responsively
     fontWeight: '500',
-    lineHeight: 18,
+    lineHeight: 18, // overridden responsively
   },
   loadingContainer: {
-    height: POSTER_HEIGHT + 40, // Approximate height to prevent layout shifts
+    // Approximate height to prevent layout shifts; not used in responsive version
     justifyContent: 'center',
     alignItems: 'center',
   },

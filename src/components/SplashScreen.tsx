@@ -29,7 +29,7 @@ const SplashScreen = ({ onFinish }: SplashScreenProps) => {
   return (
     <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
       <Image
-        source={require('../../assets/splash-icon.png')}
+        source={require('../assets/splash-icon-new.png')}
         style={styles.image}
         resizeMode="contain"
       />

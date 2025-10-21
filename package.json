@@ -91,6 +91,7 @@
     "@types/crypto-js": "^4.2.2",
     "@types/react": "~18.3.12",
     "@types/react-native": "^0.72.8",
+    "@types/react-native-vector-icons": "^6.4.18",
     "babel-plugin-transform-remove-console": "^6.9.4",
     "patch-package": "^8.0.1",
     "react-native-svg-transformer": "^1.5.0",

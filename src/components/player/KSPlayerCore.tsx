@@ -94,13 +94,20 @@ const KSPlayerCore: React.FC = () => {
   const screenData = Dimensions.get('screen');
   const [screenDimensions, setScreenDimensions] = useState(screenData);
 
-  // iPad-specific fullscreen handling
+  // iPad/macOS-specific fullscreen handling
   const isIPad = Platform.OS === 'ios' && (screenData.width > 1000 || screenData.height > 1000);
-  const shouldUseFullscreen = isIPad;
+  const isMacOS = Platform.OS === 'ios' && Platform.isPad === true;
+  const shouldUseFullscreen = isIPad || isMacOS;
 
   // Use window dimensions for iPad instead of screen dimensions
   const windowData = Dimensions.get('window');
   const effectiveDimensions = shouldUseFullscreen ? windowData : screenData;
+  
+  // Helper to get appropriate dimensions for gesture areas and overlays
+  const getDimensions = () => ({
+    width: shouldUseFullscreen ? windowData.width : screenDimensions.width,
+    height: shouldUseFullscreen ? windowData.height : screenDimensions.height,
+  });
 
   const [paused, setPaused] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -111,6 +118,7 @@ const KSPlayerCore: React.FC = () => {
   const [textTracks, setTextTracks] = useState<TextTrack[]>([]);
   const [selectedTextTrack, setSelectedTextTrack] = useState<number>(-1);
   const [resizeMode, setResizeMode] = useState<ResizeModeType>('contain');
+  const [playerBackend, setPlayerBackend] = useState<string>('');
   const [buffered, setBuffered] = useState(0);
   const [seekPosition, setSeekPosition] = useState<number | null>(null);
   const ksPlayerRef = useRef<KSPlayerRef>(null);
@@ -252,6 +260,10 @@ const KSPlayerCore: React.FC = () => {
   const isMounted = useRef(true);
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null);
   const [isSyncingBeforeClose, setIsSyncingBeforeClose] = useState(false);
+
+  // AirPlay state
+  const [isAirPlayActive, setIsAirPlayActive] = useState<boolean>(false);
+  const [allowsAirPlay, setAllowsAirPlay] = useState<boolean>(true);
 
   // Silent startup-timeout retry state
   const startupRetryCountRef = useRef(0);
@@ -949,6 +961,18 @@ const KSPlayerCore: React.FC = () => {
       safeSetState(() => setBuffered(bufferedTime));
     }
 
+    // Update AirPlay state if available
+    if (event.airPlayState) {
+      const wasAirPlayActive = isAirPlayActive;
+      setIsAirPlayActive(event.airPlayState.isExternalPlaybackActive);
+      setAllowsAirPlay(event.airPlayState.allowsExternalPlayback);
+
+      // Log AirPlay state changes for debugging
+      if (wasAirPlayActive !== event.airPlayState.isExternalPlaybackActive) {
+        if (__DEV__) logger.log(`[VideoPlayer] AirPlay state changed: ${event.airPlayState.isExternalPlaybackActive ? 'ACTIVE' : 'INACTIVE'}`);
+      }
+    }
+
     // Safety: if audio is advancing but onLoad didn't fire, dismiss opening overlay
     if (!isOpeningAnimationComplete) {
       setIsVideoLoaded(true);
@@ -1032,6 +1056,24 @@ const KSPlayerCore: React.FC = () => {
         logger.error('[VideoPlayer] onLoad called with null/undefined data');
         return;
       }
+      // Extract player backend information
+      if (data.playerBackend) {
+        const newPlayerBackend = data.playerBackend;
+        setPlayerBackend(newPlayerBackend);
+        if (DEBUG_MODE) {
+          logger.log(`[VideoPlayer] Player backend: ${newPlayerBackend}`);
+        }
+
+        // Reset AirPlay state if switching to KSMEPlayer (which doesn't support AirPlay)
+        if (newPlayerBackend === 'KSMEPlayer' && (isAirPlayActive || allowsAirPlay)) {
+          setIsAirPlayActive(false);
+          setAllowsAirPlay(false);
+          if (DEBUG_MODE) {
+            logger.log('[VideoPlayer] Reset AirPlay state for KSMEPlayer');
+          }
+        }
+      }
+
       // KSPlayer returns duration in seconds directly
       const videoDuration = data.duration;
       if (DEBUG_MODE) {
@@ -1242,6 +1284,11 @@ const KSPlayerCore: React.FC = () => {
       }
       
       controlsTimeout.current = setTimeout(hideControls, 5000);
+      
+      // Auto-fetch and load English external subtitles if available
+      if (imdbId) {
+        fetchAvailableSubtitles(undefined, true);
+      }
     } catch (error) {
       logger.error('[VideoPlayer] Error in onLoad:', error);
       // Set fallback values to prevent crashes
@@ -1268,6 +1315,12 @@ const KSPlayerCore: React.FC = () => {
   };
 
   const cycleAspectRatio = () => {
+    // iOS KSPlayer: toggle native resize mode so subtitles remain independent
+    if (Platform.OS === 'ios') {
+      setResizeMode((prev) => (prev === 'cover' ? 'contain' : 'cover'));
+      return;
+    }
+    // Fallback (non‑iOS paths): keep legacy zoom behavior
     const newZoom = zoomScale === 1.1 ? 1 : 1.1;
     setZoomScale(newZoom);
     setZoomTranslateX(0);
@@ -2204,7 +2257,7 @@ const KSPlayerCore: React.FC = () => {
           if (typeof saved.subtitleOutlineColor === 'string') setSubtitleOutlineColor(saved.subtitleOutlineColor);
           if (typeof saved.subtitleOutlineWidth === 'number') setSubtitleOutlineWidth(saved.subtitleOutlineWidth);
           if (typeof saved.subtitleAlign === 'string') setSubtitleAlign(saved.subtitleAlign as 'center' | 'left' | 'right');
-          if (typeof saved.subtitleBottomOffset === 'number') setSubtitleBottomOffset(saved.subtitleBottomOffset);
+        if (typeof saved.subtitleBottomOffset === 'number') setSubtitleBottomOffset(saved.subtitleBottomOffset);
           if (typeof saved.subtitleLetterSpacing === 'number') setSubtitleLetterSpacing(saved.subtitleLetterSpacing);
           if (typeof saved.subtitleLineHeightMultiplier === 'number') setSubtitleLineHeightMultiplier(saved.subtitleLineHeightMultiplier);
           if (typeof saved.subtitleOffsetSec === 'number') setSubtitleOffsetSec(saved.subtitleOffsetSec);
@@ -2244,7 +2297,7 @@ const KSPlayerCore: React.FC = () => {
     subtitleOutlineColor,
     subtitleOutlineWidth,
     subtitleAlign,
-    subtitleBottomOffset,
+      subtitleBottomOffset,
     subtitleLetterSpacing,
     subtitleLineHeightMultiplier,
     subtitleOffsetSec,
@@ -2325,6 +2378,27 @@ const KSPlayerCore: React.FC = () => {
       }
     }
   }, [pendingSeek, isPlayerReady, isVideoLoaded, duration]);
+
+  // AirPlay handler
+  const handleAirPlayPress = async () => {
+    if (!ksPlayerRef.current) return;
+    
+    try {
+      // First ensure AirPlay is enabled
+      if (!allowsAirPlay) {
+        ksPlayerRef.current.setAllowsExternalPlayback(true);
+        setAllowsAirPlay(true);
+        logger.log(`[VideoPlayer] AirPlay enabled before showing picker`);
+      }
+      
+      // Show the AirPlay picker
+      ksPlayerRef.current.showAirPlayPicker();
+      
+      logger.log(`[VideoPlayer] AirPlay picker triggered - check console for native logs`);
+    } catch (error) {
+      logger.error('[VideoPlayer] Error showing AirPlay picker:', error);
+    }
+  };
 
   const handleSelectStream = async (newStream: any) => {
     if (newStream.url === currentStreamUrl) {
@@ -2419,7 +2493,7 @@ const KSPlayerCore: React.FC = () => {
     <View style={[
       styles.container,
       shouldUseFullscreen ? {
-        // iPad fullscreen: use flex layout instead of absolute positioning
+        // iPad/macOS fullscreen: use flex layout instead of absolute positioning
         flex: 1,
         width: '100%',
         height: '100%',
@@ -2438,8 +2512,8 @@ const KSPlayerCore: React.FC = () => {
           {
             opacity: backgroundFadeAnim,
             zIndex: shouldHideOpeningOverlay ? -1 : 3000,
-            width: screenDimensions.width,
-            height: screenDimensions.height,
+            width: shouldUseFullscreen ? '100%' : screenDimensions.width,
+            height: shouldUseFullscreen ? '100%' : screenDimensions.height,
           }
         ]}
         pointerEvents={shouldHideOpeningOverlay ? 'none' : 'auto'}
@@ -2448,8 +2522,8 @@ const KSPlayerCore: React.FC = () => {
           <Animated.View style={[
               StyleSheet.absoluteFill,
               {
-                width: screenDimensions.width,
-                height: screenDimensions.height,
+                width: shouldUseFullscreen ? '100%' : screenDimensions.width,
+                height: shouldUseFullscreen ? '100%' : screenDimensions.height,
                 opacity: backdropImageOpacityAnim
               }
             ]}>
@@ -2514,8 +2588,8 @@ const KSPlayerCore: React.FC = () => {
           style={[
             styles.sourceChangeOverlay,
             {
-              width: screenDimensions.width,
-              height: screenDimensions.height,
+              width: shouldUseFullscreen ? '100%' : screenDimensions.width,
+              height: shouldUseFullscreen ? '100%' : screenDimensions.height,
               opacity: fadeAnim,
             }
           ]}
@@ -2535,8 +2609,8 @@ const KSPlayerCore: React.FC = () => {
           {
             opacity: DISABLE_OPENING_OVERLAY ? 1 : openingFadeAnim,
             transform: DISABLE_OPENING_OVERLAY ? [] : [{ scale: openingScaleAnim }],
-            width: screenDimensions.width,
-            height: screenDimensions.height,
+            width: shouldUseFullscreen ? '100%' : screenDimensions.width,
+            height: shouldUseFullscreen ? '100%' : screenDimensions.height,
           }
         ]}
       >
@@ -2556,10 +2630,10 @@ const KSPlayerCore: React.FC = () => {
           >
             <View style={{
               position: 'absolute',
-              top: screenDimensions.height * 0.15, // Back to original margin
+              top: getDimensions().height * 0.15, // Back to original margin
               left: 0,
-              width: screenDimensions.width * 0.4, // Back to larger area (40% of screen)
-              height: screenDimensions.height * 0.7, // Back to larger middle portion (70% of screen)
+              width: getDimensions().width * 0.4, // Back to larger area (40% of screen)
+              height: getDimensions().height * 0.7, // Back to larger middle portion (70% of screen)
               zIndex: 10, // Higher z-index to capture gestures
             }} />
           </TapGestureHandler>
@@ -2581,10 +2655,10 @@ const KSPlayerCore: React.FC = () => {
           >
             <View style={{
               position: 'absolute',
-              top: screenDimensions.height * 0.15, // Back to original margin
+              top: getDimensions().height * 0.15, // Back to original margin
               right: 0,
-              width: screenDimensions.width * 0.4, // Back to larger area (40% of screen)
-              height: screenDimensions.height * 0.7, // Back to larger middle portion (70% of screen)
+              width: getDimensions().width * 0.4, // Back to larger area (40% of screen)
+              height: getDimensions().height * 0.7, // Back to larger middle portion (70% of screen)
               zIndex: 10, // Higher z-index to capture gestures
             }} />
           </TapGestureHandler>
@@ -2613,18 +2687,18 @@ const KSPlayerCore: React.FC = () => {
         >
           <View style={{
             position: 'absolute',
-            top: screenDimensions.height * 0.15,
-            left: screenDimensions.width * 0.4, // Start after left gesture area
-            width: screenDimensions.width * 0.2, // Center area (20% of screen)
-            height: screenDimensions.height * 0.7,
+            top: getDimensions().height * 0.15,
+            left: getDimensions().width * 0.4, // Start after left gesture area
+            width: getDimensions().width * 0.2, // Center area (20% of screen)
+            height: getDimensions().height * 0.7,
             zIndex: 5, // Lower z-index, controls use box-none to allow touches through
           }} />
         </TapGestureHandler>
 
         <View
           style={[styles.videoContainer, {
-            width: screenDimensions.width,
-            height: screenDimensions.height,
+            width: shouldUseFullscreen ? '100%' : screenDimensions.width,
+            height: shouldUseFullscreen ? '100%' : screenDimensions.height,
           }]}
         >
 
@@ -2637,8 +2711,8 @@ const KSPlayerCore: React.FC = () => {
               position: 'absolute',
               top: 0,
               left: 0,
-              width: screenDimensions.width,
-              height: screenDimensions.height,
+              width: getDimensions().width,
+              height: getDimensions().height,
             }}>
               <TouchableOpacity
                 style={{ flex: 1 }}
@@ -2649,7 +2723,7 @@ const KSPlayerCore: React.FC = () => {
               >
                 <KSPlayerComponent
                   ref={ksPlayerRef}
-                  style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
+                  style={styles.video}
                   source={{
                     uri: currentStreamUrl,
                     headers: headers && Object.keys(headers).length > 0 ? headers : undefined
@@ -2658,6 +2732,11 @@ const KSPlayerCore: React.FC = () => {
                   volume={volume / 100}
                   audioTrack={selectedAudioTrack ?? undefined}
                   textTrack={useCustomSubtitles ? -1 : selectedTextTrack}
+                  allowsExternalPlayback={allowsAirPlay}
+                  usesExternalPlaybackWhileExternalScreenIsActive={true}
+                  subtitleBottomOffset={subtitleBottomOffset}
+                  subtitleFontSize={subtitleSize}
+                  resizeMode={resizeMode === 'none' ? 'contain' : resizeMode}
                   onProgress={handleProgress}
                   onLoad={onLoad}
                   onEnd={onEnd}
@@ -2690,6 +2769,7 @@ const KSPlayerCore: React.FC = () => {
             skip={skip}
             handleClose={handleClose}
             cycleAspectRatio={cycleAspectRatio}
+            currentResizeMode={resizeMode}
             setShowAudioModal={setShowAudioModal}
             setShowSubtitleModal={setShowSubtitleModal}
             isSubtitleModalOpen={showSubtitleModal}
@@ -2699,8 +2779,12 @@ const KSPlayerCore: React.FC = () => {
             onSlidingComplete={handleSlidingComplete}
             buffered={buffered}
             formatTime={formatTime}
+            playerBackend={playerBackend}
           cyclePlaybackSpeed={cyclePlaybackSpeed}
           currentPlaybackSpeed={playbackSpeed}
+          isAirPlayActive={isAirPlayActive}
+          allowsAirPlay={allowsAirPlay}
+          onAirPlayPress={handleAirPlayPress}
           />
 
           {showPauseOverlay && (
@@ -2727,7 +2811,7 @@ const KSPlayerCore: React.FC = () => {
                 }}
               >
                 {/* Strong horizontal fade from left side */}
-                <View style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: screenDimensions.width * 0.7 }}>
+                <View style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: getDimensions().width * 0.7 }}>
                   <LinearGradient
                     start={{ x: 0, y: 0.5 }}
                     end={{ x: 1, y: 0.5 }}
@@ -3085,8 +3169,8 @@ const KSPlayerCore: React.FC = () => {
             <Animated.View
               style={{
                 position: 'absolute',
-                left: screenDimensions.width / 2 - 60,
-                top: screenDimensions.height / 2 - 60,
+                left: getDimensions().width / 2 - 60,
+                top: getDimensions().height / 2 - 60,
                 opacity: volumeOverlayOpacity,
                 zIndex: 1000,
               }}
@@ -3182,8 +3266,8 @@ const KSPlayerCore: React.FC = () => {
             <Animated.View
               style={{
                 position: 'absolute',
-                left: screenDimensions.width / 2 - 60,
-                top: screenDimensions.height / 2 - 60,
+                left: getDimensions().width / 2 - 60,
+                top: getDimensions().height / 2 - 60,
                 opacity: brightnessOverlayOpacity,
                 zIndex: 1000,
               }}
