@@ -131,11 +131,19 @@ export const styles = StyleSheet.create({
   closeButton: {
     padding: 8,
   },
+  
+  
+  /* CloudStream Style - Center Controls */
   controls: {
     position: 'absolute',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    left: 0,
+    right: 0,
+    top: '50%',
+    transform: [{ translateY: -50 }],
+    paddingHorizontal: 20,
     gap: controlsGap,
     left: 0,
     right: 0,
@@ -143,20 +151,91 @@ export const styles = StyleSheet.create({
     transform: [{ translateY: controlsTranslateY }],
     zIndex: 1000,
   },
+  
+  /* CloudStream Style - Seek Buttons */
+  seekButtonContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  buttonCircle: {
+    position: 'absolute',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  seekNumberContainer: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 50,
+    height: 50,
+  },
+  seekNumber: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '500',
+    opacity: 1,
+    textAlign: 'center',
+    marginLeft: -7, // Adjusted for better centering with icon
+  },
+  
+  /* CloudStream Style - Play Button */
   playButton: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 10,
-  },
-  skipButton: {
     alignItems: 'center',
     justifyContent: 'center',
   },
+  playButtonCircle: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  playIcon: {
+    color: '#FFFFFF',
+    opacity: 1,
+  },
+  
+  /* CloudStream Style - Arc Animations */
+  arcContainer: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+  },
+  arcLeft: {
+    borderWidth: 4,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+    borderTopColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: 'transparent',
+    position: 'absolute',
   skipText: {
     color: 'white',
     fontSize: skipTextFont,
     marginTop: 2,
   },
+  arcRight: {
+    borderWidth: 4,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+    borderTopColor: 'transparent',
+    borderLeftColor: 'transparent',
+    borderBottomColor: 'transparent',
+    position: 'absolute',
+  },
+  playPressCircle: {
+    position: 'absolute',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
+
+
+
+
   bottomControls: {
     gap: 12,
   },
