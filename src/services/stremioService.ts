@@ -339,9 +339,11 @@ class StremioService {
         }
       }
       
-      // Ensure Cinemeta is always installed as a pre-installed addon
+      // Install Cinemeta for new users, but allow existing users to uninstall it
       const cinemetaId = 'com.linvo.cinemeta';
-      if (!this.installedAddons.has(cinemetaId)) {
+      const hasUserRemovedCinemeta = await this.hasUserRemovedAddon(cinemetaId);
+      
+      if (!this.installedAddons.has(cinemetaId) && !hasUserRemovedCinemeta) {
         try {
           const cinemetaManifest = await this.getManifest('https://v3-cinemeta.strem.io/manifest.json');
           this.installedAddons.set(cinemetaId, cinemetaManifest);
@@ -432,8 +434,9 @@ class StremioService {
         this.addonOrder = this.addonOrder.filter(id => this.installedAddons.has(id));
       }
       
-      // Ensure required pre-installed addons are present without forcing their position
-      if (!this.addonOrder.includes(cinemetaId) && this.installedAddons.has(cinemetaId)) {
+      // Add Cinemeta to order only if user hasn't removed it
+      const hasUserRemovedCinemetaOrder = await this.hasUserRemovedAddon(cinemetaId);
+      if (!this.addonOrder.includes(cinemetaId) && this.installedAddons.has(cinemetaId) && !hasUserRemovedCinemetaOrder) {
         this.addonOrder.push(cinemetaId);
       }
       

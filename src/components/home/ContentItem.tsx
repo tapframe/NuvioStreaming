@@ -127,9 +127,11 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
     
     switch (settings.posterSize) {
       case 'small':
-        return Math.max(100, Math.min(POSTER_WIDTH - 10, POSTER_WIDTH)) * sizeMultiplier;
+        return Math.max(90, POSTER_WIDTH - 15) * sizeMultiplier;
+      case 'medium':
+        return Math.max(110, POSTER_WIDTH + 10) * sizeMultiplier;
       case 'large':
-        return Math.min(POSTER_WIDTH + 20, POSTER_WIDTH + 30) * sizeMultiplier;
+        return Math.max(130, POSTER_WIDTH + 25) * sizeMultiplier;
       default:
         return POSTER_WIDTH * sizeMultiplier;
     }
