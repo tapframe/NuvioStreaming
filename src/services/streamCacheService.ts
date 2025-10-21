@@ -92,14 +92,9 @@ class StreamCacheService {
         return null;
       }
 
-      // Validate that the stream URL is still accessible (quick HEAD request)
-      logger.log(`🔍 [StreamCache] Validating stream URL: ${cacheEntry.cachedStream.url}`);
-      const isUrlValid = await this.validateStreamUrl(cacheEntry.cachedStream.url);
-      if (!isUrlValid) {
-        logger.log(`❌ [StreamCache] Stream URL invalid for ${type}:${id}${episodeId ? `:${episodeId}` : ''}`);
-        await this.removeCachedStream(id, type, episodeId);
-        return null;
-      }
+      // Skip URL validation for now - many CDNs block HEAD requests
+      // This was causing valid streams to be rejected
+      logger.log(`🔍 [StreamCache] Skipping URL validation (CDN compatibility)`);
 
       logger.log(`✅ [StreamCache] Using cached stream for ${type}:${id}${episodeId ? `:${episodeId}` : ''}`);
       return cacheEntry.cachedStream;
@@ -131,7 +126,7 @@ class StreamCacheService {
       const cacheKeys = allKeys.filter(key => key.startsWith(CACHE_KEY_PREFIX));
       
       for (const key of cacheKeys) {
-        await storageService.removeItem(key);
+        await AsyncStorage.removeItem(key);
       }
       
       logger.log(`🧹 [StreamCache] Cleared ${cacheKeys.length} cached streams`);
@@ -173,8 +168,8 @@ class StreamCacheService {
    */
   async getCacheInfo(): Promise<{ totalCached: number; expiredCount: number; validCount: number }> {
     try {
-      const allKeys = await storageService.getAllKeys();
-      const cacheKeys = allKeys.filter(key => key.startsWith(CACHE_KEY_PREFIX));
+      const allKeys = await AsyncStorage.getAllKeys();
+      const cacheKeys = allKeys.filter((key: string) => key.startsWith(CACHE_KEY_PREFIX));
       
       let expiredCount = 0;
       let validCount = 0;
@@ -182,7 +177,7 @@ class StreamCacheService {
 
       for (const key of cacheKeys) {
         try {
-          const cachedData = await storageService.getItem(key);
+          const cachedData = await AsyncStorage.getItem(key);
           if (cachedData) {
             const cacheEntry: StreamCacheEntry = JSON.parse(cachedData);
             if (now > cacheEntry.expiresAt) {

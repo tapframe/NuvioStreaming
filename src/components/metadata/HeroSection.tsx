@@ -335,7 +335,7 @@ const ActionButtons = memo(({
     return isWatched ? 'Play' : playButtonText;
   }, [isWatched, playButtonText, type, watchProgress, groupedEpisodes]);
 
-  // Determine if we should show buttons in a single row (Play, Save, and one other button = 3 total)
+  // Determine if we should show buttons in a single row (Play, Save, and optionally one other button)
   const hasAiChat = aiChatEnabled;
   const hasTraktCollection = isAuthenticated;
   const hasRatings = type === 'series';
@@ -343,16 +343,20 @@ const ActionButtons = memo(({
   // Count additional buttons (excluding Play and Save)
   const additionalButtonCount = (hasAiChat ? 1 : 0) + (hasTraktCollection ? 1 : 0) + (hasRatings ? 1 : 0);
   
-  // Show single row when there's exactly 1 additional button (3 total buttons)
-  const shouldShowSingleRow = additionalButtonCount === 1;
+  // Show single row when there are 0 additional buttons (2 total: Play + Save) or 1 additional button (3 total)
+  const shouldShowSingleRow = additionalButtonCount <= 1;
   
   return (
     <Animated.View style={[isTablet ? styles.tabletActionButtons : styles.actionButtons, animatedStyle]}>
       {shouldShowSingleRow ? (
-        /* Single Row Layout - Play, Save, and one other button (3 total) */
+        /* Single Row Layout - Play, Save, and optionally one other button (2-3 total) */
         <View style={styles.singleRowLayout}>
           <TouchableOpacity
-            style={[playButtonStyle, isTablet && styles.tabletPlayButton, styles.singleRowPlayButton]}
+            style={[
+              playButtonStyle, 
+              isTablet && styles.tabletPlayButton, 
+              additionalButtonCount === 0 ? styles.singleRowPlayButtonFullWidth : styles.singleRowPlayButton
+            ]}
             onPress={handleShowStreams}
             activeOpacity={0.85}
           >
@@ -370,7 +374,12 @@ const ActionButtons = memo(({
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.actionButton, styles.infoButton, isTablet && styles.tabletInfoButton, styles.singleRowSaveButton]}
+            style={[
+              styles.actionButton, 
+              styles.infoButton, 
+              isTablet && styles.tabletInfoButton, 
+              additionalButtonCount === 0 ? styles.singleRowSaveButtonFullWidth : styles.singleRowSaveButton
+            ]}
             onPress={handleSaveAction}
             activeOpacity={0.85}
           >
@@ -396,8 +405,8 @@ const ActionButtons = memo(({
             </Text>
           </TouchableOpacity>
 
-          {/* Third Button - AI Chat, Trakt Collection, or Ratings */}
-          {hasAiChat && (
+          {/* Third Button - AI Chat, Trakt Collection, or Ratings (only if available) */}
+          {hasAiChat && additionalButtonCount === 1 && (
             <TouchableOpacity
               style={[styles.iconButton, isTablet && styles.tabletIconButton, styles.singleRowIconButton]}
               onPress={() => {
@@ -444,7 +453,7 @@ const ActionButtons = memo(({
             </TouchableOpacity>
           )}
 
-          {hasTraktCollection && !hasAiChat && (
+          {hasTraktCollection && !hasAiChat && additionalButtonCount === 1 && (
             <TouchableOpacity
               style={[styles.iconButton, isTablet && styles.tabletIconButton, styles.singleRowIconButton]}
               onPress={handleCollectionAction}
@@ -470,7 +479,7 @@ const ActionButtons = memo(({
             </TouchableOpacity>
           )}
 
-          {hasRatings && !hasAiChat && !hasTraktCollection && (
+          {hasRatings && !hasAiChat && !hasTraktCollection && additionalButtonCount === 1 && (
             <TouchableOpacity
               style={[styles.iconButton, isTablet && styles.tabletIconButton, styles.singleRowIconButton]}
               onPress={handleRatingsPress}
@@ -2151,6 +2160,14 @@ const styles = StyleSheet.create({
     height: isTablet ? 50 : 44,
     borderRadius: isTablet ? 25 : 22,
     flex: 0,
+  },
+  singleRowPlayButtonFullWidth: {
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  singleRowSaveButtonFullWidth: {
+    flex: 1,
+    marginHorizontal: 4,
   },
   primaryActionRow: {
     flexDirection: 'row',

@@ -25,6 +25,7 @@ import * as Haptics from 'expo-haptics';
 import { TraktService } from '../../services/traktService';
 import { stremioService } from '../../services/stremioService';
 import { streamCacheService } from '../../services/streamCacheService';
+import { useSettings } from '../../hooks/useSettings';
 import CustomAlert from '../../components/CustomAlert';
 
 // Define interface for continue watching items
@@ -99,6 +100,7 @@ const isEpisodeReleased = (video: any): boolean => {
 const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, ref) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
+  const { settings } = useSettings();
   const [continueWatchingItems, setContinueWatchingItems] = useState<ContinueWatchingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const appState = useRef(AppState.currentState);
@@ -656,6 +658,45 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     try {
       logger.log(`🎬 [ContinueWatching] User clicked on: ${item.name} (${item.type}:${item.id})`);
       
+      // Check if cached streams are enabled in settings
+      if (!settings.useCachedStreams) {
+        logger.log(`📺 [ContinueWatching] Cached streams disabled, navigating to ${settings.openMetadataScreenWhenCacheDisabled ? 'MetadataScreen' : 'StreamsScreen'} for ${item.name}`);
+        
+        // Navigate based on the second setting
+        if (settings.openMetadataScreenWhenCacheDisabled) {
+          // Navigate to MetadataScreen
+          if (item.type === 'series' && item.season && item.episode) {
+            const episodeId = `${item.id}:${item.season}:${item.episode}`;
+            navigation.navigate('Metadata', { 
+              id: item.id, 
+              type: item.type, 
+              episodeId: episodeId 
+            });
+          } else {
+            navigation.navigate('Metadata', { 
+              id: item.id, 
+              type: item.type 
+            });
+          }
+        } else {
+          // Navigate to StreamsScreen
+          if (item.type === 'series' && item.season && item.episode) {
+            const episodeId = `${item.id}:${item.season}:${item.episode}`;
+            navigation.navigate('Streams', { 
+              id: item.id, 
+              type: item.type, 
+              episodeId: episodeId 
+            });
+          } else {
+            navigation.navigate('Streams', { 
+              id: item.id, 
+              type: item.type 
+            });
+          }
+        }
+        return;
+      }
+      
       // Check if we have a cached stream for this content
       const episodeId = item.type === 'series' && item.season && item.episode 
         ? `${item.id}:${item.season}:${item.episode}` 
@@ -730,7 +771,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         });
       }
     }
-  }, [navigation]);
+  }, [navigation, settings.useCachedStreams, settings.openMetadataScreenWhenCacheDisabled]);
 
   // Handle long press to delete (moved before renderContinueWatchingItem)
   const handleLongPress = useCallback((item: ContinueWatchingItem) => {

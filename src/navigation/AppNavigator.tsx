@@ -67,6 +67,7 @@ import AISettingsScreen from '../screens/AISettingsScreen';
 import AIChatScreen from '../screens/AIChatScreen';
 import BackdropGalleryScreen from '../screens/BackdropGalleryScreen';
 import BackupScreen from '../screens/BackupScreen';
+import ContinueWatchingSettingsScreen from '../screens/ContinueWatchingSettingsScreen';
 
 // Stack navigator types
 export type RootStackParamList = {
@@ -173,6 +174,7 @@ export type RootStackParamList = {
     type: 'movie' | 'tv';
     title: string;
   };
+  ContinueWatchingSettings: undefined;
 };
 
 export type RootStackNavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -1254,6 +1256,21 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             <Stack.Screen 
               name="HomeScreenSettings" 
               component={HomeScreenSettings}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="ContinueWatchingSettings" 
+              component={ContinueWatchingSettingsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,

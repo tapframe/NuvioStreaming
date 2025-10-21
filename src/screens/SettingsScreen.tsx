@@ -483,6 +483,14 @@ const SettingsScreen: React.FC = () => {
               icon="home"
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('HomeScreenSettings')}
+              isTablet={isTablet}
+            />
+            <SettingItem
+              title="Continue Watching"
+              description="Cache and playback behavior"
+              icon="play-circle"
+              renderControl={ChevronRight}
+              onPress={() => navigation.navigate('ContinueWatchingSettings')}
               isLast={true}
               isTablet={isTablet}
             />

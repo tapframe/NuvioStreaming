@@ -1556,7 +1556,7 @@ export const StreamsScreen = () => {
     ];
   }, [availableProviders, type, episodeStreams, groupedStreams, settings.streamDisplayMode]);
 
-  const sections = useMemo(() => {
+  const sections: Array<{ title: string; addonId: string; data: Stream[]; isEmptyDueToQualityFilter?: boolean } | null> = useMemo(() => {
     const streams = metadata?.videos && metadata.videos.length > 1 && selectedEpisode ? episodeStreams : groupedStreams;
     const installedAddons = stremioService.getInstalledAddons();
     
@@ -1648,12 +1648,7 @@ export const StreamsScreen = () => {
       const isEmptyDueToQualityFilter = totalOriginalCount > 0 && totalStreamsCount === 0;
 
       if (isEmptyDueToQualityFilter) {
-        return [{
-          title: 'Available Streams',
-          addonId: 'grouped-all',
-          data: [{ isEmptyPlaceholder: true } as any],
-          isEmptyDueToQualityFilter: true
-        }];
+        return []; // Return empty array instead of showing placeholder
       }
 
       // Combine streams: Addons first (unsorted), then sorted plugins
@@ -1780,12 +1775,7 @@ export const StreamsScreen = () => {
         }
 
         if (isEmptyDueToQualityFilter) {
-          return {
-            title: addonName,
-            addonId,
-            data: [{ isEmptyPlaceholder: true } as any],
-            isEmptyDueToQualityFilter
-          };
+          return null; // Return null to exclude this section completely
         }
 
         let processedStreams = filteredStreams;
@@ -1861,7 +1851,7 @@ export const StreamsScreen = () => {
         });
         
         return result;
-      });
+      }).filter(Boolean); // Filter out null values
     }
   }, [selectedProvider, type, episodeStreams, groupedStreams, settings.streamDisplayMode, filterStreamsByQuality, addonResponseOrder, settings.streamSortMode, selectedEpisode, metadata]);
   
@@ -1869,11 +1859,11 @@ export const StreamsScreen = () => {
   React.useEffect(() => {
     console.log('🔍 [StreamsScreen] Final sections:', {
       sectionsCount: sections.length,
-      sections: sections.map(s => ({
-        title: s.title,
-        addonId: s.addonId,
-        dataCount: s.data?.length || 0,
-        isEmptyDueToQualityFilter: s.isEmptyDueToQualityFilter
+      sections: sections.filter(Boolean).map(s => ({
+        title: s!.title,
+        addonId: s!.addonId,
+        dataCount: s!.data?.length || 0,
+        isEmptyDueToQualityFilter: s!.isEmptyDueToQualityFilter
       }))
     });
   }, [sections]);
@@ -2206,15 +2196,15 @@ export const StreamsScreen = () => {
                 scrollEventThrottle: 16,
               })}
             >
-              {sections.map((section, sectionIndex) => (
-                <View key={section.addonId || sectionIndex}>
+              {sections.filter(Boolean).map((section, sectionIndex) => (
+                <View key={section!.addonId || sectionIndex}>
                   {/* Section Header */}
-                  {renderSectionHeader({ section })}
+                  {renderSectionHeader({ section: section! })}
                   
                   {/* Stream Cards using FlatList */}
-                  {section.data && section.data.length > 0 ? (
+                  {section!.data && section!.data.length > 0 ? (
                     <FlatList
-                      data={section.data}
+                      data={section!.data}
                       keyExtractor={(item, index) => {
                         if (item && item.url) {
                           return `${item.url}-${sectionIndex}-${index}`;
@@ -2257,20 +2247,7 @@ export const StreamsScreen = () => {
                         index,
                       })}
                     />
-                  ) : (
-                    // Empty section placeholder
-                    <View style={styles.emptySectionContainer}>
-                      <View style={styles.emptySectionContent}>
-                        <MaterialIcons name="filter-list-off" size={32} color={colors.mediumEmphasis} />
-                        <Text style={[styles.emptySectionTitle, { color: colors.mediumEmphasis }]}>
-                          No streams available
-                        </Text>
-                        <Text style={[styles.emptySectionSubtitle, { color: colors.textMuted }]}>
-                          All streams were filtered by your quality settings
-                        </Text>
-                      </View>
-                    </View>
-                  )}
+                  ) : null}
                 </View>
               ))}
               
@@ -2804,28 +2781,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.mediumEmphasis,
     fontSize: 11,
     fontWeight: '400',
-  },
-  emptySectionContainer: {
-    padding: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 80,
-  },
-  emptySectionContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptySectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  emptySectionSubtitle: {
-    fontSize: 12,
-    marginTop: 4,
-    textAlign: 'center',
-    lineHeight: 16,
   },
 });
 

@@ -82,6 +82,9 @@ export interface AppSettings {
   useTmdbLocalizedMetadata: boolean; // Use TMDB localized metadata (titles, overviews) per tmdbLanguagePreference
   // Trakt integration
   showTraktComments: boolean; // Show Trakt comments in metadata screens
+  // Continue Watching behavior
+  useCachedStreams: boolean; // Enable/disable direct player navigation from Continue Watching cache
+  openMetadataScreenWhenCacheDisabled: boolean; // When cache disabled, open MetadataScreen instead of StreamsScreen
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -137,6 +140,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   useTmdbLocalizedMetadata: false,
   // Trakt integration
   showTraktComments: true, // Show Trakt comments by default when authenticated
+  // Continue Watching behavior
+  useCachedStreams: false, // Enable by default
+  openMetadataScreenWhenCacheDisabled: true, // Default to StreamsScreen when cache disabled
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';
