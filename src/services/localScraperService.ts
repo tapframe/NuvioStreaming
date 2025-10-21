@@ -864,6 +864,30 @@ class LocalScraperService {
   async getStreams(type: string, tmdbId: string, season?: number, episode?: number, callback?: ScraperCallback): Promise<void> {
     await this.ensureInitialized();
 
+    // Check if local scrapers are enabled
+    const userSettings = await this.getUserScraperSettings();
+    if (!userSettings.enableLocalScrapers) {
+      logger.log('[LocalScraperService] Local scrapers are disabled');
+      return;
+    }
+
+    // If no repository is configured, return early
+    if (!this.repositoryUrl) {
+      logger.log('[LocalScraperService] No repository URL configured');
+      return;
+    }
+
+    // If no scrapers are installed, try to refresh repository
+    if (this.installedScrapers.size === 0) {
+      logger.log('[LocalScraperService] No scrapers installed, attempting to refresh repository');
+      try {
+        await this.performRepositoryRefresh();
+      } catch (error) {
+        logger.error('[LocalScraperService] Failed to refresh repository for getStreams:', error);
+        return;
+      }
+    }
+
     // Get available scrapers from manifest (respects manifestEnabled)
     const availableScrapers = await this.getAvailableScrapers();
     const enabledScrapers = availableScrapers
@@ -1297,6 +1321,23 @@ class LocalScraperService {
     const userSettings = await this.getUserScraperSettings();
     if (!userSettings.enableLocalScrapers) {
       return false;
+    }
+    
+    // If no repository is configured, return false
+    if (!this.repositoryUrl) {
+      logger.log('[LocalScraperService] No repository URL configured');
+      return false;
+    }
+    
+    // If no scrapers are installed, try to refresh repository
+    if (this.installedScrapers.size === 0) {
+      logger.log('[LocalScraperService] No scrapers installed, attempting to refresh repository');
+      try {
+        await this.performRepositoryRefresh();
+      } catch (error) {
+        logger.error('[LocalScraperService] Failed to refresh repository for hasScrapers check:', error);
+        return false;
+      }
     }
     
     // Check if there are any enabled scrapers based on user settings

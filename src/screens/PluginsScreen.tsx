@@ -1273,6 +1273,27 @@ const PluginsScreen: React.FC = () => {
 
   const handleToggleLocalScrapers = async (enabled: boolean) => {
     await updateSetting('enableLocalScrapers', enabled);
+    
+    // If enabling local scrapers, refresh repository and reload scrapers
+    if (enabled) {
+      try {
+        setIsRefreshing(true);
+        logger.log('[PluginsScreen] Enabling local scrapers - refreshing repository...');
+        
+        // Refresh repository to ensure scrapers are available
+        await localScraperService.refreshRepository();
+        
+        // Reload scrapers to get the latest state
+        await loadScrapers();
+        
+        logger.log('[PluginsScreen] Local scrapers enabled and repository refreshed');
+      } catch (error) {
+        logger.error('[PluginsScreen] Failed to refresh repository when enabling local scrapers:', error);
+        // Don't show error to user as the toggle still succeeded
+      } finally {
+        setIsRefreshing(false);
+      }
+    }
   };
 
   const handleToggleUrlValidation = async (enabled: boolean) => {

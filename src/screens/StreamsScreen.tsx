@@ -1481,14 +1481,28 @@ export const StreamsScreen = () => {
     const installedAddons = stremioService.getInstalledAddons();
     const streams = metadata?.videos && metadata.videos.length > 1 && selectedEpisode ? episodeStreams : groupedStreams;
     
-    // Make sure we include all providers with streams, not just those in availableProviders
+    // Only include providers that actually have streams
+    const providersWithStreams = Object.keys(streams).filter(key => {
+      const providerData = streams[key];
+      if (!providerData || !providerData.streams) {
+        return false;
+      }
+      
+      // For addons, show them even if they have no streams (they might be loading)
+      const isInstalledAddon = installedAddons.some(addon => addon.id === key);
+      if (isInstalledAddon) {
+        return true;
+      }
+      
+      // For plugins, only show if they have actual streams
+      return providerData.streams.length > 0;
+    });
+    
     const allProviders = new Set([
-      ...availableProviders,
-      ...Object.keys(streams).filter(key => 
-        streams[key] && 
-        streams[key].streams && 
-        streams[key].streams.length > 0
-      )
+      ...Array.from(availableProviders).filter((provider: string) => 
+        streams[provider] && streams[provider].streams && streams[provider].streams.length > 0
+      ),
+      ...providersWithStreams
     ]);
 
     // In grouped mode, separate addons and plugins
@@ -1519,7 +1533,7 @@ export const StreamsScreen = () => {
           filterChips.push({ id: provider, name: installedAddon?.name || provider });
         });
       
-      // Add single grouped plugins chip if there are any plugins
+      // Add single grouped plugins chip if there are any plugins with streams
       if (pluginProviders.length > 0) {
         filterChips.push({ id: 'grouped-plugins', name: localScraperService.getRepositoryName() });
       }
@@ -1772,6 +1786,11 @@ export const StreamsScreen = () => {
             addonName,
             originalCount
           });
+        }
+
+        // Exclude providers with no streams at all
+        if (filteredStreams.length === 0) {
+          return null; // Return null to exclude this section completely
         }
 
         if (isEmptyDueToQualityFilter) {
