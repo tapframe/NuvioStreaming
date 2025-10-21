@@ -10,7 +10,7 @@
     "scheme": "nuvio",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./src/assets/splash-icon-new.png",
       "resizeMode": "contain",
       "backgroundColor": "#020404"
     },

@@ -45,14 +45,33 @@ import { useTheme } from '../contexts/ThemeContext';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
 const { width, height } = Dimensions.get('window');
-const isTablet = width >= 768;
+
+// Enhanced responsive breakpoints
+const BREAKPOINTS = {
+  phone: 0,
+  tablet: 768,
+  largeTablet: 1024,
+  tv: 1440,
+};
+
+const getDeviceType = (deviceWidth: number) => {
+  if (deviceWidth >= BREAKPOINTS.tv) return 'tv';
+  if (deviceWidth >= BREAKPOINTS.largeTablet) return 'largeTablet';
+  if (deviceWidth >= BREAKPOINTS.tablet) return 'tablet';
+  return 'phone';
+};
+
+const deviceType = getDeviceType(width);
+const isTablet = deviceType === 'tablet';
+const isLargeTablet = deviceType === 'largeTablet';
+const isTV = deviceType === 'tv';
 const TAB_BAR_HEIGHT = 85;
 
-// Tablet-optimized poster sizes
-const HORIZONTAL_ITEM_WIDTH = isTablet ? width * 0.18 : width * 0.3;
+// Responsive poster sizes
+const HORIZONTAL_ITEM_WIDTH = isTV ? width * 0.14 : isLargeTablet ? width * 0.16 : isTablet ? width * 0.18 : width * 0.3;
 const HORIZONTAL_POSTER_HEIGHT = HORIZONTAL_ITEM_WIDTH * 1.5;
-const POSTER_WIDTH = isTablet ? 70 : 90;
-const POSTER_HEIGHT = isTablet ? 105 : 135;
+const POSTER_WIDTH = isTV ? 90 : isLargeTablet ? 80 : isTablet ? 70 : 90;
+const POSTER_HEIGHT = POSTER_WIDTH * 1.5;
 const RECENT_SEARCHES_KEY = 'recent_searches';
 const MAX_RECENT_SEARCHES = 10;
 
@@ -597,13 +616,20 @@ const SearchScreen = () => {
           )}
         </View>
         <Text 
-          style={[styles.horizontalItemTitle, { color: currentTheme.colors.white }]}
+          style={[
+            styles.horizontalItemTitle, 
+            { 
+              color: currentTheme.colors.white,
+              fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 14,
+              lineHeight: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 18,
+            }
+          ]}
           numberOfLines={2}
         >
           {item.name}
         </Text>
         {item.year && (
-          <Text style={[styles.yearText, { color: currentTheme.colors.mediumGray }]}> 
+          <Text style={[styles.yearText, { color: currentTheme.colors.mediumGray, fontSize: isTV ? 12 : isLargeTablet ? 11 : isTablet ? 10 : 12 }]}> 
             {item.year}
           </Text>
         )}
@@ -652,8 +678,16 @@ const SearchScreen = () => {
 
         {/* Movies */}
         {movieResults.length > 0 && (
-          <Animated.View style={styles.carouselContainer} entering={FadeIn.duration(300)}>
-            <Text style={[styles.carouselSubtitle, { color: currentTheme.colors.lightGray }]}> 
+          <Animated.View style={[styles.carouselContainer, { marginBottom: isTV ? 40 : isLargeTablet ? 36 : isTablet ? 32 : 24 }]} entering={FadeIn.duration(300)}>
+          <Text style={[
+            styles.carouselSubtitle,
+            { 
+              color: currentTheme.colors.lightGray,
+              fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 14,
+              marginBottom: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 8,
+              paddingHorizontal: isTV ? 24 : isLargeTablet ? 20 : isTablet ? 16 : 16
+            }
+          ]}> 
               Movies ({movieResults.length})
             </Text>
             <FlatList
@@ -678,8 +712,16 @@ const SearchScreen = () => {
 
         {/* TV Shows */}
         {seriesResults.length > 0 && (
-          <Animated.View style={styles.carouselContainer} entering={FadeIn.duration(300)}>
-            <Text style={[styles.carouselSubtitle, { color: currentTheme.colors.lightGray }]}> 
+          <Animated.View style={[styles.carouselContainer, { marginBottom: isTV ? 40 : isLargeTablet ? 36 : isTablet ? 32 : 24 }]} entering={FadeIn.duration(300)}>
+          <Text style={[
+            styles.carouselSubtitle,
+            { 
+              color: currentTheme.colors.lightGray,
+              fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 14,
+              marginBottom: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 8,
+              paddingHorizontal: isTV ? 24 : isLargeTablet ? 20 : isTablet ? 16 : 16
+            }
+          ]}> 
               TV Shows ({seriesResults.length})
             </Text>
             <FlatList
@@ -704,8 +746,16 @@ const SearchScreen = () => {
 
         {/* Other types */}
         {otherResults.length > 0 && (
-          <Animated.View style={styles.carouselContainer} entering={FadeIn.duration(300)}>
-            <Text style={[styles.carouselSubtitle, { color: currentTheme.colors.lightGray }]}> 
+          <Animated.View style={[styles.carouselContainer, { marginBottom: isTV ? 40 : isLargeTablet ? 36 : isTablet ? 32 : 24 }]} entering={FadeIn.duration(300)}>
+          <Text style={[
+            styles.carouselSubtitle,
+            { 
+              color: currentTheme.colors.lightGray,
+              fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 14,
+              marginBottom: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 8,
+              paddingHorizontal: isTV ? 24 : isLargeTablet ? 20 : isTablet ? 16 : 16
+            }
+          ]}> 
               {otherResults[0].type.charAt(0).toUpperCase() + otherResults[0].type.slice(1)} ({otherResults.length})
             </Text>
             <FlatList
@@ -736,7 +786,7 @@ const SearchScreen = () => {
 
   const headerBaseHeight = Platform.OS === 'android' ? 80 : 60;
   // Keep header below floating top navigator on tablets by adding extra offset
-  const tabletNavOffset = isTablet ? 64 : 0;
+  const tabletNavOffset = (isTV || isLargeTablet || isTablet) ? 64 : 0;
   const topSpacing = (Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top) + tabletNavOffset;
   const headerHeight = headerBaseHeight + topSpacing + 60;
 

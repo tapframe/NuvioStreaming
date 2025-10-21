@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import FastImage from '@d11/react-native-fast-image';
@@ -20,6 +21,15 @@ import Animated, {
 import { useTheme } from '../../contexts/ThemeContext';
 import { isMDBListEnabled } from '../../screens/MDBListSettingsScreen';
 import { getAgeRatingColor } from '../../utils/ageRatingColors';
+
+// Enhanced responsive breakpoints for Metadata Details
+const BREAKPOINTS = {
+  phone: 0,
+  tablet: 768,
+  largeTablet: 1024,
+  tv: 1440,
+};
+
 // MetadataSourceSelector removed
 
 interface MetadataDetailsProps {
@@ -44,6 +54,38 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
   const [isFullDescriptionOpen, setIsFullDescriptionOpen] = useState(false);
   const [isMDBEnabled, setIsMDBEnabled] = useState(false);
   const [isTextTruncated, setIsTextTruncated] = useState(false);
+
+  // Enhanced responsive sizing for tablets and TV screens
+  const deviceWidth = Dimensions.get('window').width;
+  const deviceHeight = Dimensions.get('window').height;
+  
+  // Determine device type based on width
+  const getDeviceType = useCallback(() => {
+    if (deviceWidth >= BREAKPOINTS.tv) return 'tv';
+    if (deviceWidth >= BREAKPOINTS.largeTablet) return 'largeTablet';
+    if (deviceWidth >= BREAKPOINTS.tablet) return 'tablet';
+    return 'phone';
+  }, [deviceWidth]);
+  
+  const deviceType = getDeviceType();
+  const isTablet = deviceType === 'tablet';
+  const isLargeTablet = deviceType === 'largeTablet';
+  const isTV = deviceType === 'tv';
+  const isLargeScreen = isTablet || isLargeTablet || isTV;
+  
+  // Enhanced spacing and padding
+  const horizontalPadding = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 32;
+      case 'largeTablet':
+        return 28;
+      case 'tablet':
+        return 24;
+      default:
+        return 16; // phone
+    }
+  }, [deviceType]);
 
   // Animation values for smooth height transition
   const animatedHeight = useSharedValue(0);
@@ -144,12 +186,31 @@ function formatRuntime(runtime: string): string {
       )}
 
       {/* Meta Info */}
-      <View style={[styles.metaInfo, loadingMetadata && styles.dimmed]}>
+      <View style={[
+        styles.metaInfo, 
+        loadingMetadata && styles.dimmed,
+        { 
+          paddingHorizontal: horizontalPadding,
+          gap: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 18
+        }
+      ]}>
         {metadata.year && (
-          <Text style={[styles.metaText, { color: currentTheme.colors.text }]}>{metadata.year}</Text>
+          <Text style={[
+            styles.metaText, 
+            { 
+              color: currentTheme.colors.text,
+              fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 15
+            }
+          ]}>{metadata.year}</Text>
         )}
         {metadata.runtime && (
-          <Text style={[styles.metaText, { color: currentTheme.colors.text }]}>
+          <Text style={[
+            styles.metaText, 
+            { 
+              color: currentTheme.colors.text,
+              fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 15
+            }
+          ]}>
             {formatRuntime(metadata.runtime)}
           </Text>
         )}
@@ -157,17 +218,32 @@ function formatRuntime(runtime: string): string {
           <Text style={[
             styles.metaText,
             styles.premiumOutlinedText,
-            { color: getAgeRatingColor(metadata.certification, type === 'series' ? 'series' : 'movie') }
+            { 
+              color: getAgeRatingColor(metadata.certification, type === 'series' ? 'series' : 'movie'),
+              fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 15
+            }
           ]}>{metadata.certification}</Text>
         )}
         {metadata.imdbRating && !isMDBEnabled && (
           <View style={styles.ratingContainer}>
             <FastImage
               source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/IMDB_Logo_2016.svg/575px-IMDB_Logo_2016.svg.png' }}
-              style={styles.imdbLogo}
+              style={[
+                styles.imdbLogo,
+                {
+                  width: isTV ? 42 : isLargeTablet ? 38 : isTablet ? 35 : 35,
+                  height: isTV ? 22 : isLargeTablet ? 20 : isTablet ? 18 : 18
+                }
+              ]}
               resizeMode={FastImage.resizeMode.contain}
             />
-            <Text style={[styles.ratingText, { color: currentTheme.colors.text }]}>{metadata.imdbRating}</Text>
+            <Text style={[
+              styles.ratingText, 
+              { 
+                color: currentTheme.colors.text,
+                fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 15
+              }
+            ]}>{metadata.imdbRating}</Text>
           </View>
         )}
       </View>
@@ -178,18 +254,62 @@ function formatRuntime(runtime: string): string {
       {/* Creator/Director Info */}
       <Animated.View
         entering={FadeIn.duration(300).delay(100)}
-        style={[styles.creatorContainer, loadingMetadata && styles.dimmed]}
+        style={[
+          styles.creatorContainer, 
+          loadingMetadata && styles.dimmed,
+          { paddingHorizontal: horizontalPadding }
+        ]}
       >
         {metadata.directors && metadata.directors.length > 0 && (
-          <View style={styles.creatorSection}>
-            <Text style={[styles.creatorLabel, { color: currentTheme.colors.white }]}>Director{metadata.directors.length > 1 ? 's' : ''}:</Text>
-            <Text style={[styles.creatorText, { color: currentTheme.colors.mediumEmphasis }]}>{metadata.directors.join(', ')}</Text>
+          <View style={[
+            styles.creatorSection,
+            {
+              height: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20,
+              marginBottom: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 4
+            }
+          ]}>
+            <Text style={[
+              styles.creatorLabel, 
+              { 
+                color: currentTheme.colors.white,
+                fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14,
+                lineHeight: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20
+              }
+            ]}>Director{metadata.directors.length > 1 ? 's' : ''}:</Text>
+            <Text style={[
+              styles.creatorText, 
+              { 
+                color: currentTheme.colors.mediumEmphasis,
+                fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14,
+                lineHeight: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20
+              }
+            ]}>{metadata.directors.join(', ')}</Text>
           </View>
         )}
         {metadata.creators && metadata.creators.length > 0 && (
-          <View style={styles.creatorSection}>
-            <Text style={[styles.creatorLabel, { color: currentTheme.colors.white }]}>Creator{metadata.creators.length > 1 ? 's' : ''}:</Text>
-            <Text style={[styles.creatorText, { color: currentTheme.colors.mediumEmphasis }]}>{metadata.creators.join(', ')}</Text>
+          <View style={[
+            styles.creatorSection,
+            {
+              height: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20,
+              marginBottom: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 4
+            }
+          ]}>
+            <Text style={[
+              styles.creatorLabel, 
+              { 
+                color: currentTheme.colors.white,
+                fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14,
+                lineHeight: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20
+              }
+            ]}>Creator{metadata.creators.length > 1 ? 's' : ''}:</Text>
+            <Text style={[
+              styles.creatorText, 
+              { 
+                color: currentTheme.colors.mediumEmphasis,
+                fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14,
+                lineHeight: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20
+              }
+            ]}>{metadata.creators.join(', ')}</Text>
           </View>
         )}
       </Animated.View>
@@ -197,19 +317,41 @@ function formatRuntime(runtime: string): string {
       {/* Description */}
       {metadata.description && (
         <Animated.View
-          style={[styles.descriptionContainer, loadingMetadata && styles.dimmed]}
+          style={[
+            styles.descriptionContainer, 
+            loadingMetadata && styles.dimmed,
+            { paddingHorizontal: horizontalPadding }
+          ]}
           entering={FadeIn.duration(300)}
         >
           {/* Hidden text elements to measure heights */}
           <Text
-            style={[styles.description, { color: currentTheme.colors.mediumEmphasis, position: 'absolute', opacity: 0 }]}
+            style={[
+              styles.description, 
+              { 
+                color: currentTheme.colors.mediumEmphasis, 
+                position: 'absolute', 
+                opacity: 0,
+                fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 15,
+                lineHeight: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 24
+              }
+            ]}
             numberOfLines={3}
             onLayout={handleCollapsedTextLayout}
           >
             {metadata.description}
           </Text>
           <Text
-            style={[styles.description, { color: currentTheme.colors.mediumEmphasis, position: 'absolute', opacity: 0 }]}
+            style={[
+              styles.description, 
+              { 
+                color: currentTheme.colors.mediumEmphasis, 
+                position: 'absolute', 
+                opacity: 0,
+                fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 15,
+                lineHeight: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 24
+              }
+            ]}
             onLayout={handleExpandedTextLayout}
           >
             {metadata.description}
@@ -222,7 +364,14 @@ function formatRuntime(runtime: string): string {
           >
             <Animated.View style={animatedDescriptionStyle}>
               <Text
-                style={[styles.description, { color: currentTheme.colors.mediumEmphasis }]}
+                style={[
+                  styles.description, 
+                  { 
+                    color: currentTheme.colors.mediumEmphasis,
+                    fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 15,
+                    lineHeight: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 24
+                  }
+                ]}
                 numberOfLines={isFullDescriptionOpen ? undefined : 3}
                 onTextLayout={handleTextLayout}
               >
@@ -230,13 +379,25 @@ function formatRuntime(runtime: string): string {
               </Text>
             </Animated.View>
             {(isTextTruncated || isFullDescriptionOpen) && (
-              <View style={styles.showMoreButton}>
-                <Text style={[styles.showMoreText, { color: currentTheme.colors.textMuted }]}>
+              <View style={[
+                styles.showMoreButton,
+                {
+                  marginTop: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
+                  paddingVertical: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 4
+                }
+              ]}>
+                <Text style={[
+                  styles.showMoreText, 
+                  { 
+                    color: currentTheme.colors.textMuted,
+                    fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14
+                  }
+                ]}>
                   {isFullDescriptionOpen ? 'Show Less' : 'Show More'}
                 </Text>
                 <MaterialIcons
                   name={isFullDescriptionOpen ? "keyboard-arrow-up" : "keyboard-arrow-down"}
-                  size={18}
+                  size={isTV ? 22 : isLargeTablet ? 20 : isTablet ? 18 : 18}
                   color={currentTheme.colors.textMuted}
                 />
               </View>
@@ -267,8 +428,6 @@ const styles = StyleSheet.create({
   metaInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 18,
-    paddingHorizontal: 16,
     marginBottom: 12,
   },
   metaText: {
@@ -303,7 +462,6 @@ const styles = StyleSheet.create({
   },
   creatorContainer: {
     marginBottom: 2,
-    paddingHorizontal: 16,
   },
   creatorSection: {
     flexDirection: 'row',
@@ -324,7 +482,6 @@ const styles = StyleSheet.create({
   },
   descriptionContainer: {
     marginBottom: 16,
-    paddingHorizontal: 16,
   },
   description: {
     fontSize: 15,

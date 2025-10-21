@@ -34,4 +34,26 @@ class KSPlayerModule: RCTEventEmitter {
             }
         }
     }
+    
+    @objc func getAirPlayState(_ nodeTag: NSNumber, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        DispatchQueue.main.async {
+            if let viewManager = self.bridge.module(for: KSPlayerViewManager.self) as? KSPlayerViewManager {
+                viewManager.getAirPlayState(nodeTag, resolve: resolve, reject: reject)
+            } else {
+                reject("NO_VIEW_MANAGER", "KSPlayerViewManager not found", nil)
+            }
+        }
+    }
+    
+    @objc func showAirPlayPicker(_ nodeTag: NSNumber) {
+        print("[KSPlayerModule] showAirPlayPicker called for nodeTag: \(nodeTag)")
+        DispatchQueue.main.async {
+            if let viewManager = self.bridge.module(for: KSPlayerViewManager.self) as? KSPlayerViewManager {
+                print("[KSPlayerModule] Found KSPlayerViewManager, calling showAirPlayPicker")
+                viewManager.showAirPlayPicker(nodeTag)
+            } else {
+                print("[KSPlayerModule] Could not find KSPlayerViewManager")
+            }
+        }
+    }
 }

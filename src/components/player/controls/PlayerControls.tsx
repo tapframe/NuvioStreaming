@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Animated, StyleSheet, Platform, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Feather from 'react-native-vector-icons/Feather';
 import { LinearGradient } from 'expo-linear-gradient';
 import Slider from '@react-native-community/slider';
 import { styles } from '../utils/playerStyles';
@@ -43,6 +44,10 @@ interface PlayerControlsProps {
   buffered: number;
   formatTime: (seconds: number) => string;
   playerBackend?: string;
+  // AirPlay props
+  isAirPlayActive?: boolean;
+  allowsAirPlay?: boolean;
+  onAirPlayPress?: () => void;
 }
 
 export const PlayerControls: React.FC<PlayerControlsProps> = ({
@@ -80,6 +85,9 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   buffered,
   formatTime,
   playerBackend,
+  isAirPlayActive,
+  allowsAirPlay,
+  onAirPlayPress,
 }) => {
   const { currentTheme } = useTheme();
 
@@ -232,6 +240,22 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
 
 
 
+  const deviceWidth = Dimensions.get('window').width;
+  const BREAKPOINTS = { phone: 0, tablet: 768, largeTablet: 1024, tv: 1440 } as const;
+  const getDeviceType = (w: number) => {
+    if (w >= BREAKPOINTS.tv) return 'tv';
+    if (w >= BREAKPOINTS.largeTablet) return 'largeTablet';
+    if (w >= BREAKPOINTS.tablet) return 'tablet';
+    return 'phone';
+  };
+  const deviceType = getDeviceType(deviceWidth);
+  const isTablet = deviceType === 'tablet';
+  const isLargeTablet = deviceType === 'largeTablet';
+  const isTV = deviceType === 'tv';
+
+  const closeIconSize = isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 24;
+  const skipIconSize = isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 24;
+  const playIconSize = isTV ? 56 : isLargeTablet ? 48 : isTablet ? 44 : 40;
   return (
     <Animated.View
       style={[StyleSheet.absoluteFill, { opacity: fadeAnim, zIndex: 20 }]}
@@ -291,7 +315,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
               )}
             </View>
             <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-              <Ionicons name="close" size={24} color="white" />
+              <Ionicons name="close" size={closeIconSize} color="white" />
             </TouchableOpacity>
           </View>
         </LinearGradient>
@@ -469,6 +493,18 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 ]} />
               </Animated.View>
             </Animated.View>
+        {/* Center Controls (Play/Pause, Skip) */}
+        <View style={styles.controls}>
+          <TouchableOpacity onPress={() => skip(-10)} style={styles.skipButton}>
+            <Ionicons name="play-back" size={skipIconSize} color="white" />
+            <Text style={styles.skipText}>10</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={togglePlayback} style={styles.playButton}>
+            <Ionicons name={paused ? "play" : "pause"} size={playIconSize} color="white" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => skip(10)} style={styles.skipButton}>
+            <Ionicons name="play-forward" size={skipIconSize} color="white" />
+            <Text style={styles.skipText}>10</Text>
           </TouchableOpacity>
         </View>
 
@@ -545,6 +581,26 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                   <Ionicons name="swap-horizontal" size={20} color="white" />
                   <Text style={styles.bottomButtonText}>
                     Change Source
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {/* AirPlay Button - iOS only, KSAVPlayer only */}
+              {Platform.OS === 'ios' && onAirPlayPress && playerBackend === 'KSAVPlayer' && (
+                <TouchableOpacity
+                  style={styles.bottomButton}
+                  onPress={onAirPlayPress}
+                >
+                  <Feather
+                    name="airplay"
+                    size={20}
+                    color={isAirPlayActive ? currentTheme.colors.primary : "white"}
+                  />
+                  <Text style={[
+                    styles.bottomButtonText,
+                    isAirPlayActive && { color: currentTheme.colors.primary }
+                  ]}>
+                    {allowsAirPlay ? 'AirPlay' : 'AirPlay Off'}
                   </Text>
                 </TouchableOpacity>
               )}

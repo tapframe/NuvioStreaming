@@ -1,4 +1,38 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Dimensions } from 'react-native';
+
+const deviceWidth = Dimensions.get('window').width;
+const BREAKPOINTS = { phone: 0, tablet: 768, largeTablet: 1024, tv: 1440 } as const;
+const getDeviceType = (w: number) => {
+  if (w >= BREAKPOINTS.tv) return 'tv';
+  if (w >= BREAKPOINTS.largeTablet) return 'largeTablet';
+  if (w >= BREAKPOINTS.tablet) return 'tablet';
+  return 'phone';
+};
+const deviceType = getDeviceType(deviceWidth);
+const isTablet = deviceType === 'tablet';
+const isLargeTablet = deviceType === 'largeTablet';
+const isTV = deviceType === 'tv';
+
+// Scales for larger displays
+const padH = isTV ? 28 : isLargeTablet ? 24 : isTablet ? 20 : 20;
+const padV = isTV ? 24 : isLargeTablet ? 20 : isTablet ? 16 : 16;
+const titleFont = isTV ? 28 : isLargeTablet ? 24 : isTablet ? 22 : 18;
+const episodeInfoFont = isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14;
+const metadataFont = isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12;
+const qualityPadH = isTV ? 10 : isLargeTablet ? 9 : isTablet ? 8 : 8;
+const qualityPadV = isTV ? 4 : isLargeTablet ? 3 : isTablet ? 3 : 2;
+const qualityRadius = isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 4;
+const qualityTextFont = isTV ? 13 : isLargeTablet ? 12 : isTablet ? 11 : 11;
+const controlsGap = isTV ? 56 : isLargeTablet ? 48 : isTablet ? 44 : 40;
+const controlsTranslateY = isTV ? -48 : isLargeTablet ? -42 : isTablet ? -36 : -30;
+const skipTextFont = isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12;
+const sliderBottom = isTV ? 80 : isLargeTablet ? 70 : isTablet ? 65 : 55;
+const progressTouchHeight = isTV ? 48 : isLargeTablet ? 44 : isTablet ? 40 : 40;
+const progressBarHeight = isTV ? 6 : isLargeTablet ? 5 : isTablet ? 5 : 4;
+const progressThumbSize = isTV ? 24 : isLargeTablet ? 20 : isTablet ? 18 : 16;
+const progressThumbTop = isTV ? -10 : isLargeTablet ? -8 : isTablet ? -7 : -6;
+const durationFont = isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12;
+const bottomButtonTextFont = isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 12;
 
 export const styles = StyleSheet.create({
   container: {
@@ -37,14 +71,14 @@ export const styles = StyleSheet.create({
     padding: 0,
   },
   topGradient: {
-    paddingTop: 20,
-    paddingHorizontal: 20,
-    paddingBottom: 10,
+    paddingTop: padV,
+    paddingHorizontal: padH,
+    paddingBottom: Math.max(10, Math.round(padV * 0.6)),
   },
   bottomGradient: {
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingBottom: padV,
+    paddingHorizontal: padH,
+    paddingTop: padV,
   },
   header: {
     flexDirection: 'row',
@@ -57,12 +91,12 @@ export const styles = StyleSheet.create({
   },
   title: {
     color: 'white',
-    fontSize: 18,
+    fontSize: titleFont,
     fontWeight: 'bold',
   },
   episodeInfo: {
     color: 'rgba(255, 255, 255, 0.9)',
-    fontSize: 14,
+    fontSize: episodeInfoFont,
     marginTop: 3,
   },
   metadataRow: {
@@ -73,20 +107,20 @@ export const styles = StyleSheet.create({
   },
   metadataText: {
     color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 12,
+    fontSize: metadataFont,
     marginRight: 8,
   },
   qualityBadge: {
     backgroundColor: 'rgba(229, 9, 20, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
+    paddingHorizontal: qualityPadH,
+    paddingVertical: qualityPadV,
+    borderRadius: qualityRadius,
     marginRight: 8,
     marginBottom: 4,
   },
   qualityText: {
     color: '#E50914',
-    fontSize: 11,
+    fontSize: qualityTextFont,
     fontWeight: 'bold',
   },
   providerText: {
@@ -110,6 +144,11 @@ export const styles = StyleSheet.create({
     top: '50%',
     transform: [{ translateY: -50 }],
     paddingHorizontal: 20,
+    gap: controlsGap,
+    left: 0,
+    right: 0,
+    top: '50%',
+    transform: [{ translateY: controlsTranslateY }],
     zIndex: 1000,
   },
   
@@ -176,6 +215,10 @@ export const styles = StyleSheet.create({
     borderRightColor: 'transparent',
     borderBottomColor: 'transparent',
     position: 'absolute',
+  skipText: {
+    color: 'white',
+    fontSize: skipTextFont,
+    marginTop: 2,
   },
   arcRight: {
     borderWidth: 4,
@@ -198,19 +241,19 @@ export const styles = StyleSheet.create({
   },
   sliderContainer: {
     position: 'absolute',
-    bottom: 55,
+    bottom: sliderBottom,
     left: 0,
     right: 0,
-    paddingHorizontal: 20,
+    paddingHorizontal: padH,
     zIndex: 1000,
   },
   progressTouchArea: {
-    height: 40, // Increased from 30 to give more space for the thumb
+    height: progressTouchHeight, // Increased touch area for larger displays
     justifyContent: 'center',
     width: '100%',
   },
   progressBarContainer: {
-    height: 4,
+    height: progressBarHeight,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 2,
     overflow: 'hidden',
@@ -234,12 +277,12 @@ export const styles = StyleSheet.create({
   },
   progressThumb: {
     position: 'absolute',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: progressThumbSize,
+    height: progressThumbSize,
+    borderRadius: progressThumbSize / 2,
     backgroundColor: '#E50914',
-    top: -6, // Position to center on the progress bar
-    marginLeft: -8, // Center the thumb horizontally
+    top: progressThumbTop, // Position to center on the progress bar
+    marginLeft: -(progressThumbSize / 2), // Center the thumb horizontally
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
@@ -257,7 +300,7 @@ export const styles = StyleSheet.create({
   },
   duration: {
     color: 'white',
-    fontSize: 12,
+    fontSize: durationFont,
     fontWeight: '500',
   },
   bottomButtons: {
@@ -272,7 +315,7 @@ export const styles = StyleSheet.create({
   },
   bottomButtonText: {
     color: 'white',
-    fontSize: 12,
+    fontSize: bottomButtonTextFont,
   },
   modalOverlay: {
     flex: 1,
