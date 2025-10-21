@@ -49,6 +49,7 @@ import { isMkvStream } from '../utils/mkvDetection';
 import CustomAlert from '../components/CustomAlert';
 import { useToast } from '../contexts/ToastContext';
 import { useDownloads } from '../contexts/DownloadsContext';
+import { streamCacheService } from '../services/streamCacheService';
 import { PaperProvider } from 'react-native-paper';
 
 const TMDB_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tmdb.new.logo.svg/512px-Tmdb.new.logo.svg.png?20200406190906';
@@ -1134,6 +1135,26 @@ export const StreamsScreen = () => {
     // Do NOT pre-force VLC. Let ExoPlayer try first; fallback occurs on decoder error in the player.
     let forceVlc = !!options?.forceVlc;
 
+    // Save stream to cache for future use
+    try {
+      const episodeId = (type === 'series' || type === 'other') && selectedEpisode ? selectedEpisode : undefined;
+      const season = (type === 'series' || type === 'other') ? currentEpisode?.season_number : undefined;
+      const episode = (type === 'series' || type === 'other') ? currentEpisode?.episode_number : undefined;
+      const episodeTitle = (type === 'series' || type === 'other') ? currentEpisode?.name : undefined;
+      
+      await streamCacheService.saveStreamToCache(
+        id,
+        type,
+        stream,
+        metadata,
+        episodeId,
+        season,
+        episode,
+        episodeTitle
+      );
+    } catch (error) {
+      logger.warn('[StreamsScreen] Failed to save stream to cache:', error);
+    }
 
     // Show a quick full-screen black overlay to mask rotation flicker
     // by setting a transient state that renders a covering View (implementation already supported by dark backgrounds)

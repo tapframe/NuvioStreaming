@@ -7,7 +7,8 @@ import {
   Dimensions,
   AppState,
   AppStateStatus,
-  ActivityIndicator
+  ActivityIndicator,
+  Platform
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import Animated, { FadeIn, Layout } from 'react-native-reanimated';
@@ -23,6 +24,7 @@ import { logger } from '../../utils/logger';
 import * as Haptics from 'expo-haptics';
 import { TraktService } from '../../services/traktService';
 import { stremioService } from '../../services/stremioService';
+import { streamCacheService } from '../../services/streamCacheService';
 import CustomAlert from '../../components/CustomAlert';
 
 // Define interface for continue watching items
@@ -650,8 +652,84 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     }
   }));
 
-  const handleContentPress = useCallback((id: string, type: string) => {
-    navigation.navigate('Metadata', { id, type });
+  const handleContentPress = useCallback(async (item: ContinueWatchingItem) => {
+    try {
+      logger.log(`🎬 [ContinueWatching] User clicked on: ${item.name} (${item.type}:${item.id})`);
+      
+      // Check if we have a cached stream for this content
+      const episodeId = item.type === 'series' && item.season && item.episode 
+        ? `${item.id}:${item.season}:${item.episode}` 
+        : undefined;
+      
+      logger.log(`🔍 [ContinueWatching] Looking for cached stream with episodeId: ${episodeId || 'none'}`);
+      
+      const cachedStream = await streamCacheService.getCachedStream(item.id, item.type, episodeId);
+      
+      if (cachedStream) {
+        // We have a valid cached stream, navigate directly to player
+        logger.log(`🚀 [ContinueWatching] Using cached stream for ${item.name}`);
+        
+        // Determine the player route based on platform
+        const playerRoute = Platform.OS === 'ios' ? 'PlayerIOS' : 'PlayerAndroid';
+        
+        // Navigate directly to player with cached stream data
+        navigation.navigate(playerRoute as any, {
+          uri: cachedStream.stream.url,
+          title: cachedStream.metadata?.name || item.name,
+          episodeTitle: cachedStream.episodeTitle || (item.type === 'series' ? `Episode ${item.episode}` : undefined),
+          season: cachedStream.season || item.season,
+          episode: cachedStream.episode || item.episode,
+          quality: (cachedStream.stream.title?.match(/(\d+)p/) || [])[1] || undefined,
+          year: cachedStream.metadata?.year || item.year,
+          streamProvider: cachedStream.stream.addonId || cachedStream.stream.addonName || cachedStream.stream.name,
+          streamName: cachedStream.stream.name || cachedStream.stream.title || 'Unnamed Stream',
+          headers: cachedStream.stream.headers || undefined,
+          forceVlc: false,
+          id: item.id,
+          type: item.type,
+          episodeId: episodeId,
+          imdbId: cachedStream.metadata?.imdbId || item.imdb_id,
+          backdrop: cachedStream.metadata?.backdrop || item.banner,
+          videoType: undefined, // Let player auto-detect
+        } as any);
+        
+        return;
+      }
+      
+      // No cached stream or cache failed, navigate to StreamsScreen
+      logger.log(`📺 [ContinueWatching] No cached stream, navigating to StreamsScreen for ${item.name}`);
+      
+      if (item.type === 'series' && item.season && item.episode) {
+        // For series, navigate to the specific episode
+        navigation.navigate('Streams', { 
+          id: item.id, 
+          type: item.type, 
+          episodeId: episodeId 
+        });
+      } else {
+        // For movies or series without specific episode, navigate to main content
+        navigation.navigate('Streams', { 
+          id: item.id, 
+          type: item.type 
+        });
+      }
+    } catch (error) {
+      logger.warn('[ContinueWatching] Error handling content press:', error);
+      // Fallback to StreamsScreen on any error
+      if (item.type === 'series' && item.season && item.episode) {
+        const episodeId = `${item.id}:${item.season}:${item.episode}`;
+        navigation.navigate('Streams', { 
+          id: item.id, 
+          type: item.type, 
+          episodeId: episodeId 
+        });
+      } else {
+        navigation.navigate('Streams', { 
+          id: item.id, 
+          type: item.type 
+        });
+      }
+    }
   }, [navigation]);
 
   // Handle long press to delete (moved before renderContinueWatchingItem)
@@ -723,7 +801,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         }
       ]}
       activeOpacity={0.8}
-      onPress={() => handleContentPress(item.id, item.type)}
+      onPress={() => handleContentPress(item)}
       onLongPress={() => handleLongPress(item)}
       delayLongPress={800}
     >
