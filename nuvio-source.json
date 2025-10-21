@@ -31,6 +31,14 @@
       ],
       "versions": [
         {
+          "version": "1.2.6",
+          "buildVersion": "21",
+          "date": "2025-10-19",
+          "localizedDescription": "# Version 1.2.6 – Update Notes\n\n### New Features\n- **AirPlay Support (iOS):**\n  - Introduced native AirPlay support for compatible playback.\n  - Note: **MKV format not supported** due to iOS restrictions.\n- **Last Streamed Link Caching:**\n  - The last streamed link is now cached for **1 hour** on the stream screen for faster playback.\n- **KSPlayer Internal Subtitle Support (iOS):**\n  - KSPlayer now supports internal subtitles for improved viewing experience.\n\n### PR Merge – Responsive Video Controls by @qarqun\n- **Responsive Sizing:**\n  - All controls now scale dynamically based on screen width for better phone and tablet compatibility.\n- **Play/Pause Animation:**\n  - Smooth crossfade transitions with scale effects for a polished user experience.\n- **Seek Animations:**\n  - Arc sweep animation on seek buttons.\n  - Number slide-out showing +10/-10 seconds.\n  - Touch feedback with semi-transparent circle flash.\n- **Technical Details:**\n  - Button sizes calculated as a percentage of screen width.\n  - All animations use `useNativeDriver` for optimal performance.\n  - Separate animation references to prevent animation conflicts.\n\n### Fixes\n- Fixed an issue where **Cinemeta Addon** reappeared even after removal from the addon screen.\n\n---\n\n## Changelog & Download\n[View on GitHub](https://github.com/tapframe/NuvioStreaming/releases/tag/1.2.6)\n\nSince the VLClib alone is 45 MB, Android APKs tend to be larger.\n\n🌐 [Official Website](https://tapframe.github.io/NuvioStreaming/)",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/1.2.6/Stable_1-2-6.ipa",
+          "size": 25700000
+        },
+        {
           "version": "1.2.5",
           "buildVersion": "20",
           "date": "2025-10-15",
