@@ -18,11 +18,29 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useSettings } from '../hooks/useSettings';
 import { RootStackParamList } from '../navigation/AppNavigator';
 
+// TTL options in milliseconds - organized in rows
+const TTL_OPTIONS = [
+  [
+    { label: '15 min', value: 15 * 60 * 1000 },
+    { label: '30 min', value: 30 * 60 * 1000 },
+    { label: '1 hour', value: 60 * 60 * 1000 },
+  ],
+  [
+    { label: '2 hours', value: 2 * 60 * 60 * 1000 },
+    { label: '6 hours', value: 6 * 60 * 60 * 1000 },
+    { label: '12 hours', value: 12 * 60 * 60 * 1000 },
+  ],
+  [
+    { label: '24 hours', value: 24 * 60 * 60 * 1000 },
+  ],
+];
+
 const ContinueWatchingSettingsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { settings, updateSetting } = useSettings();
   const { currentTheme } = useTheme();
   const colors = currentTheme.colors;
+  const styles = createStyles(colors);
   const [showSavedIndicator, setShowSavedIndicator] = useState(false);
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
@@ -96,7 +114,6 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
       styles.settingItem,
       { 
         borderBottomColor: isLast ? 'transparent' : colors.border,
-        backgroundColor: colors.elevation1 
       }
     ]}>
       <View style={styles.settingContent}>
@@ -111,31 +128,52 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
     </View>
   );
 
-  const SectionHeader = ({ title }: { title: string }) => (
-    <View style={[styles.sectionHeader, { backgroundColor: colors.darkBackground }]}>
-      <Text style={[styles.sectionTitle, { color: colors.highEmphasis }]}>
-        {title}
-      </Text>
-    </View>
-  );
+
+  const TTLPickerItem = ({ option }: { option: { label: string; value: number } }) => {
+    const isSelected = settings.streamCacheTTL === option.value;
+    return (
+      <TouchableOpacity
+        style={[
+          styles.ttlOption,
+          {
+            backgroundColor: isSelected ? colors.primary : colors.elevation1,
+            borderColor: isSelected ? colors.primary : colors.border,
+          }
+        ]}
+        onPress={() => handleUpdateSetting('streamCacheTTL', option.value)}
+        activeOpacity={0.7}
+      >
+        <Text style={[
+          styles.ttlOptionText,
+          { color: isSelected ? colors.white : colors.highEmphasis }
+        ]}>
+          {option.label}
+        </Text>
+        {isSelected && (
+          <MaterialIcons name="check" size={20} color={colors.white} />
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.darkBackground }]}>
       <StatusBar barStyle="light-content" />
       
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.darkBackground }]}>
-        <TouchableOpacity
+      <View style={styles.header}>
+        <TouchableOpacity 
           style={styles.backButton}
           onPress={handleBack}
         >
-          <MaterialIcons name="chevron-left" size={28} color={colors.primary} />
-          <Text style={[styles.backText, { color: colors.primary }]}>Settings</Text>
+          <MaterialIcons name="chevron-left" size={28} color={colors.white} />
+          <Text style={styles.backText}>Settings</Text>
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.highEmphasis }]}>
-          Continue Watching
-        </Text>
       </View>
+      
+      <Text style={styles.headerTitle}>
+        Continue Watching
+      </Text>
 
       {/* Content */}
       <ScrollView 
@@ -143,9 +181,9 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.contentContainer}
       >
-        <SectionHeader title="PLAYBACK BEHAVIOR" />
-        
-        <View style={[styles.settingsCard, { backgroundColor: colors.elevation1 }]}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>PLAYBACK BEHAVIOR</Text>
+          <View style={styles.settingsCard}>
           <SettingItem
             title="Use Cached Streams"
             description="When enabled, clicking Continue Watching items will open the player directly using previously played streams. When disabled, opens a content screen instead."
@@ -162,9 +200,52 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
               isLast={true}
             />
           )}
+          </View>
         </View>
 
-        <View style={[styles.infoCard, { backgroundColor: colors.elevation1 }]}>
+        {settings.useCachedStreams && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>CACHE SETTINGS</Text>
+            <View style={styles.settingsCard}>
+            <View style={[styles.settingItem, { borderBottomWidth: 0, flexDirection: 'column', alignItems: 'flex-start' }]}>
+              <Text style={[styles.settingTitle, { color: colors.highEmphasis, marginBottom: 8 }]}>
+                Stream Cache Duration
+              </Text>
+              <Text style={[styles.settingDescription, { color: colors.mediumEmphasis, marginBottom: 16 }]}>
+                How long to keep cached stream links before they expire
+              </Text>
+              <View style={styles.ttlOptionsContainer}>
+                {TTL_OPTIONS.map((row, rowIndex) => (
+                  <View key={rowIndex} style={styles.ttlRow}>
+                    {row.map((option) => (
+                      <TTLPickerItem key={option.value} option={option} />
+                    ))}
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+          </View>
+        )}
+
+        {settings.useCachedStreams && (
+          <View style={styles.section}>
+            <View style={[styles.warningCard, { borderColor: colors.warning }]}>
+            <View style={styles.warningHeader}>
+              <MaterialIcons name="warning" size={20} color={colors.warning} />
+              <Text style={[styles.warningTitle, { color: colors.warning }]}>
+                Important Note
+              </Text>
+            </View>
+            <Text style={[styles.warningText, { color: colors.mediumEmphasis }]}>
+              Not all stream links may remain active for the full cache duration. Longer cache times may result in expired links. If a cached link fails, the app will fall back to fetching fresh streams.
+            </Text>
+            </View>
+          </View>
+        )}
+
+        <View style={styles.section}>
+          <View style={styles.infoCard}>
           <View style={styles.infoHeader}>
             <MaterialIcons name="info" size={20} color={colors.primary} />
             <Text style={[styles.infoTitle, { color: colors.highEmphasis }]}>
@@ -172,12 +253,24 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
             </Text>
           </View>
           <Text style={[styles.infoText, { color: colors.mediumEmphasis }]}>
-            • Streams are cached for 1 hour after playing{'\n'}
-            • Cached streams are validated before use{'\n'}
-            • If cache is invalid or expired, falls back to content screen{'\n'}
-            • "Use Cached Streams" controls direct player vs screen navigation{'\n'}
-            • "Open Metadata Screen" appears only when cached streams are disabled
+            {settings.useCachedStreams ? (
+              <>
+                • Streams are cached for your selected duration after playing{'\n'}
+                • Cached streams are validated before use{'\n'}
+                • If cache is invalid or expired, falls back to content screen{'\n'}
+                • "Use Cached Streams" controls direct player vs screen navigation{'\n'}
+                • "Open Metadata Screen" appears only when cached streams are disabled
+              </>
+            ) : (
+              <>
+                • When cached streams are disabled, clicking Continue Watching items opens content screens{'\n'}
+                • "Open Metadata Screen" option controls which screen to open{'\n'}
+                • Metadata screen shows content details and allows manual stream selection{'\n'}
+                • Streams screen shows available streams for immediate playback
+              </>
+            )}
           </Text>
+          </View>
         </View>
       </ScrollView>
 
@@ -198,31 +291,35 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+// Create a styles creator function that accepts the theme colors
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: Platform.OS === 'ios' ? 0 : 12,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 8 : 8,
   },
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 16,
+    padding: 8,
   },
   backText: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 4,
+    fontSize: 17,
+    fontWeight: '400',
+    color: colors.primary,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 34,
     fontWeight: '700',
-    flex: 1,
+    color: colors.white,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    paddingTop: 8,
   },
   content: {
     flex: 1,
@@ -230,26 +327,33 @@ const styles = StyleSheet.create({
   contentContainer: {
     paddingBottom: 100,
   },
-  sectionHeader: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: 24,
+  section: {
+    marginBottom: 24,
   },
   sectionTitle: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
+    color: colors.mediumGray,
+    marginHorizontal: 16,
+    marginBottom: 8,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
   settingsCard: {
     marginHorizontal: 16,
+    backgroundColor: colors.elevation2,
     borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
     overflow: 'hidden',
   },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: 1,
   },
@@ -269,8 +373,14 @@ const styles = StyleSheet.create({
   infoCard: {
     marginHorizontal: 16,
     marginTop: 16,
-    padding: 16,
+    backgroundColor: colors.elevation2,
     borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   infoHeader: {
     flexDirection: 'row',
@@ -303,6 +413,58 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  ttlOptionsContainer: {
+    width: '100%',
+    gap: 8,
+  },
+  ttlRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    gap: 8,
+  },
+  ttlOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: 'center',
+    gap: 6,
+  },
+  ttlOptionText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  warningCard: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    backgroundColor: colors.elevation2,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  warningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  warningTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  warningText: {
+    fontSize: 14,
+    lineHeight: 20,
   },
 });
 

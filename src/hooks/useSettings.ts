@@ -85,6 +85,7 @@ export interface AppSettings {
   // Continue Watching behavior
   useCachedStreams: boolean; // Enable/disable direct player navigation from Continue Watching cache
   openMetadataScreenWhenCacheDisabled: boolean; // When cache disabled, open MetadataScreen instead of StreamsScreen
+  streamCacheTTL: number; // Stream cache duration in milliseconds (default: 1 hour)
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -143,6 +144,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   // Continue Watching behavior
   useCachedStreams: false, // Enable by default
   openMetadataScreenWhenCacheDisabled: true, // Default to StreamsScreen when cache disabled
+  streamCacheTTL: 60 * 60 * 1000, // Default: 1 hour in milliseconds
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';

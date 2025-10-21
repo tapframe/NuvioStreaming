@@ -18,7 +18,7 @@ export interface StreamCacheEntry {
   expiresAt: number; // Timestamp when cache expires
 }
 
-const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
+const DEFAULT_CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds (fallback)
 const CACHE_KEY_PREFIX = 'stream_cache_';
 
 class StreamCacheService {
@@ -34,7 +34,8 @@ class StreamCacheService {
     season?: number,
     episode?: number,
     episodeTitle?: string,
-    imdbId?: string
+    imdbId?: string,
+    cacheDuration?: number
   ): Promise<void> {
     try {
       const cacheKey = this.getCacheKey(id, type, episodeId);
@@ -52,16 +53,18 @@ class StreamCacheService {
         url: stream.url
       };
 
+      const ttl = cacheDuration || DEFAULT_CACHE_DURATION;
       const cacheEntry: StreamCacheEntry = {
         cachedStream,
-        expiresAt: now + CACHE_DURATION
+        expiresAt: now + ttl
       };
 
       await AsyncStorage.setItem(cacheKey, JSON.stringify(cacheEntry));
       logger.log(`💾 [StreamCache] Saved stream cache for ${type}:${id}${episodeId ? `:${episodeId}` : ''}`);
       logger.log(`💾 [StreamCache] Cache key: ${cacheKey}`);
       logger.log(`💾 [StreamCache] Stream URL: ${stream.url}`);
-      logger.log(`💾 [StreamCache] Expires at: ${new Date(now + CACHE_DURATION).toISOString()}`);
+      logger.log(`💾 [StreamCache] TTL: ${ttl / 1000 / 60} minutes`);
+      logger.log(`💾 [StreamCache] Expires at: ${new Date(now + ttl).toISOString()}`);
     } catch (error) {
       logger.warn('[StreamCache] Failed to save stream to cache:', error);
     }
