@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Feather from 'react-native-vector-icons/Feather';
 import { LinearGradient } from 'expo-linear-gradient';
 import Slider from '@react-native-community/slider';
-import { styles } from '../utils/playerStyles';
+import { styles } from '../utils/playerStyles'; // Updated styles
 import { getTrackDisplayName } from '../utils/playerUtils';
 import { useTheme } from '../../../contexts/ThemeContext';
 
@@ -94,11 +94,11 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
 
   /* Responsive Spacing */
   const screenWidth = Dimensions.get('window').width;
-  const buttonSpacing = screenWidth * 0.15;
+  const buttonSpacing = screenWidth * 0.10; // Reduced from 15% to 10%
 
-  const playButtonSize = screenWidth * 0.12; // 12% of screen width
-  const playIconSize = playButtonSize * 0.6; // 60% of button size
-  const seekButtonSize = screenWidth * 0.11; // 11% of screen width
+  const playButtonSize = screenWidth * 0.08; // 8% of screen width (reduced from 12%)
+  const playIconSizeCalculated = playButtonSize * 0.6; // 60% of button size
+  const seekButtonSize = screenWidth * 0.07; // 7% of screen width (reduced from 11%)
   const seekIconSize = seekButtonSize * 0.75; // 75% of button size
   const seekNumberSize = seekButtonSize * 0.25; // 25% of button size
   const arcBorderWidth = seekButtonSize * 0.05; // 5% of button size
@@ -253,9 +253,9 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   const isLargeTablet = deviceType === 'largeTablet';
   const isTV = deviceType === 'tv';
 
-  const closeIconSize = isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 24;
-  const skipIconSize = isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 24;
-  const playIconSize = isTV ? 56 : isLargeTablet ? 48 : isTablet ? 44 : 40;
+  const closeIconSize = isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20;
+  const skipIconSize = isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20;
+  const playIconSize = isTV ? 48 : isLargeTablet ? 40 : isTablet ? 36 : 32;
   return (
     <Animated.View
       style={[StyleSheet.absoluteFill, { opacity: fadeAnim, zIndex: 20 }]}
@@ -418,7 +418,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
               }}>
                 <Ionicons 
                   name={paused ? "play" : "pause"} 
-                  size={playIconSize} 
+                  size={playIconSizeCalculated} 
                   color="#FFFFFF"
                 />
               </Animated.View>
@@ -493,18 +493,6 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 ]} />
               </Animated.View>
             </Animated.View>
-        {/* Center Controls (Play/Pause, Skip) */}
-        <View style={styles.controls}>
-          <TouchableOpacity onPress={() => skip(-10)} style={styles.skipButton}>
-            <Ionicons name="play-back" size={skipIconSize} color="white" />
-            <Text style={styles.skipText}>10</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={togglePlayback} style={styles.playButton}>
-            <Ionicons name={paused ? "play" : "pause"} size={playIconSize} color="white" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => skip(10)} style={styles.skipButton}>
-            <Ionicons name="play-forward" size={skipIconSize} color="white" />
-            <Text style={styles.skipText}>10</Text>
           </TouchableOpacity>
         </View>
 

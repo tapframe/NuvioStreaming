@@ -142,13 +142,9 @@ export const styles = StyleSheet.create({
     left: 0,
     right: 0,
     top: '50%',
-    transform: [{ translateY: -50 }],
+    transform: [{ translateY: controlsTranslateY }],
     paddingHorizontal: 20,
     gap: controlsGap,
-    left: 0,
-    right: 0,
-    top: '50%',
-    transform: [{ translateY: controlsTranslateY }],
     zIndex: 1000,
   },
   
@@ -215,10 +211,6 @@ export const styles = StyleSheet.create({
     borderRightColor: 'transparent',
     borderBottomColor: 'transparent',
     position: 'absolute',
-  skipText: {
-    color: 'white',
-    fontSize: skipTextFont,
-    marginTop: 2,
   },
   arcRight: {
     borderWidth: 4,
@@ -1110,5 +1102,16 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 8,
     textAlign: 'center',
+  },
+  // Additional missing styles
+  skipButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+  },
+  skipText: {
+    color: 'white',
+    fontSize: skipTextFont,
+    marginTop: 2,
   },
 }); 
