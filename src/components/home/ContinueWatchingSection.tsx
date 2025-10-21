@@ -729,7 +729,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
           id: item.id,
           type: item.type,
           episodeId: episodeId,
-          imdbId: cachedStream.metadata?.imdbId || item.imdb_id,
+          imdbId: cachedStream.imdbId || cachedStream.metadata?.imdbId || item.imdb_id,
           backdrop: cachedStream.metadata?.backdrop || item.banner,
           videoType: undefined, // Let player auto-detect
         } as any);

@@ -8,6 +8,7 @@ export interface CachedStream {
   season?: number;
   episode?: number;
   episodeTitle?: string;
+  imdbId?: string; // IMDb ID for subtitle fetching
   timestamp: number; // When it was cached
   url: string; // Stream URL for quick validation
 }
@@ -32,7 +33,8 @@ class StreamCacheService {
     episodeId?: string,
     season?: number,
     episode?: number,
-    episodeTitle?: string
+    episodeTitle?: string,
+    imdbId?: string
   ): Promise<void> {
     try {
       const cacheKey = this.getCacheKey(id, type, episodeId);
@@ -45,6 +47,7 @@ class StreamCacheService {
         season,
         episode,
         episodeTitle,
+        imdbId,
         timestamp: now,
         url: stream.url
       };

@@ -1150,7 +1150,8 @@ export const StreamsScreen = () => {
         episodeId,
         season,
         episode,
-        episodeTitle
+        episodeTitle,
+        imdbId || undefined
       );
     } catch (error) {
       logger.warn('[StreamsScreen] Failed to save stream to cache:', error);
