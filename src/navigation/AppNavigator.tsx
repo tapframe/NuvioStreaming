@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { NavigationContainer, DefaultTheme as NavigationDefaultTheme, DarkTheme as NavigationDarkTheme, Theme, NavigationProp } from '@react-navigation/native';
 import { createNativeStackNavigator, NativeStackNavigationOptions, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createBottomTabNavigator, BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -428,11 +428,21 @@ const TabIcon = React.memo(({ focused, color, iconName, iconLibrary = 'material'
 
 // Update the TabScreenWrapper component with fixed layout dimensions
 const TabScreenWrapper: React.FC<{children: React.ReactNode}> = ({ children }) => {
+  const [dimensions, setDimensions] = useState(Dimensions.get('window'));
+  
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setDimensions(window);
+    });
+    
+    return () => subscription?.remove();
+  }, []);
+  
   const isTablet = useMemo(() => {
-    const { width, height } = Dimensions.get('window');
+    const { width, height } = dimensions;
     const smallestDimension = Math.min(width, height);
     return (Platform.OS === 'ios' ? (Platform as any).isPad === true : smallestDimension >= 768);
-  }, []);
+  }, [dimensions]);
   const insets = useSafeAreaInsets();
   // Force consistent status bar settings
   useEffect(() => {
@@ -498,6 +508,15 @@ const MainTabs = () => {
   const { useSettings: useSettingsHook } = require('../hooks/useSettings');
   const { settings: appSettings } = useSettingsHook();
   const [hasUpdateBadge, setHasUpdateBadge] = React.useState(false);
+  const [dimensions, setDimensions] = useState(Dimensions.get('window'));
+  
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setDimensions(window);
+    });
+    
+    return () => subscription?.remove();
+  }, []);
   React.useEffect(() => {
     if (Platform.OS !== 'android') return;
     let mounted = true;
@@ -531,10 +550,10 @@ const MainTabs = () => {
   }, []);
   const { isHomeLoading } = useLoading();
   const isTablet = useMemo(() => {
-    const { width, height } = Dimensions.get('window');
+    const { width, height } = dimensions;
     const smallestDimension = Math.min(width, height);
     return (Platform.OS === 'ios' ? (Platform as any).isPad === true : smallestDimension >= 768);
-  }, []);
+  }, [dimensions]);
   const insets = useSafeAreaInsets();
   const isIosTablet = Platform.OS === 'ios' && isTablet;
   const [hidden, setHidden] = React.useState(HeaderVisibility.isHidden());

@@ -708,10 +708,18 @@ export const StreamsScreen = () => {
       const nextLoading = { ...prevLoading };
       let changed = false;
       expectedProviders.forEach(providerId => {
-        const hasStreams = currentStreamsData[providerId] &&
+        const providerExists = currentStreamsData[providerId];
+        const hasStreams = providerExists &&
                           currentStreamsData[providerId].streams &&
                           currentStreamsData[providerId].streams.length > 0;
-        const value = (loadingStreams || loadingEpisodeStreams) && !hasStreams;
+        
+        // Stop loading if:
+        // 1. Provider exists (completed) and has streams, OR
+        // 2. Provider exists (completed) but has 0 streams, OR  
+        // 3. Overall loading is false
+        const shouldStopLoading = providerExists || !(loadingStreams || loadingEpisodeStreams);
+        const value = !shouldStopLoading;
+        
         if (nextLoading[providerId] !== value) {
           nextLoading[providerId] = value;
           changed = true;
@@ -1489,13 +1497,7 @@ export const StreamsScreen = () => {
         return false;
       }
       
-      // For addons, show them even if they have no streams (they might be loading)
-      const isInstalledAddon = installedAddons.some(addon => addon.id === key);
-      if (isInstalledAddon) {
-        return true;
-      }
-      
-      // For plugins, only show if they have actual streams
+      // Only show providers (addons or plugins) if they have actual streams
       return providerData.streams.length > 0;
     });
     
@@ -1938,7 +1940,8 @@ export const StreamsScreen = () => {
   const streams = metadata?.videos && metadata.videos.length > 1 && selectedEpisode ? episodeStreams : groupedStreams;
 
   // Determine extended loading phases
-  const streamsEmpty = Object.keys(streams).length === 0;
+  const streamsEmpty = Object.keys(streams).length === 0 || 
+    Object.values(streams).every(provider => !provider.streams || provider.streams.length === 0);
   const loadElapsed = streamsLoadStart ? Date.now() - streamsLoadStart : 0;
   const showInitialLoading = streamsEmpty && (streamsLoadStart === null || loadElapsed < 10000);
   const showStillFetching = streamsEmpty && loadElapsed >= 10000;
@@ -2117,7 +2120,7 @@ export const StreamsScreen = () => {
         type === 'movie' && styles.streamsMainContentMovie
       ]}>
         <View style={[styles.filterContainer]}>
-          {Object.keys(streams).length > 0 && (
+          {!streamsEmpty && (
             <ProviderFilter
               selectedProvider={selectedProvider}
               providers={filterItems}

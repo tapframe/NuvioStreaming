@@ -109,8 +109,18 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   const longPressTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Enhanced responsive sizing for tablets and TV screens
-  const deviceWidth = Dimensions.get('window').width;
-  const deviceHeight = Dimensions.get('window').height;
+  const [dimensions, setDimensions] = useState(Dimensions.get('window'));
+  const deviceWidth = dimensions.width;
+  const deviceHeight = dimensions.height;
+  
+  // Listen for dimension changes (orientation changes)
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setDimensions(window);
+    });
+    
+    return () => subscription?.remove();
+  }, []);
   
   // Determine device type based on width
   const getDeviceType = useCallback(() => {
