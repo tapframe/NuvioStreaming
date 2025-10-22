@@ -51,6 +51,18 @@ import { useToast } from '../contexts/ToastContext';
 import { useDownloads } from '../contexts/DownloadsContext';
 import { streamCacheService } from '../services/streamCacheService';
 import { PaperProvider } from 'react-native-paper';
+import { BlurView as ExpoBlurView } from 'expo-blur';
+
+// Lazy-safe community blur import for Android
+let AndroidBlurView: any = null;
+if (Platform.OS === 'android') {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    AndroidBlurView = require('@react-native-community/blur').BlurView;
+  } catch (_) {
+    AndroidBlurView = null;
+  }
+}
 
 const TMDB_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tmdb.new.logo.svg/512px-Tmdb.new.logo.svg.png?20200406190906';
 const HDR_ICON = 'https://uxwing.com/wp-content/themes/uxwing/download/video-photography-multimedia/hdr-icon.png';
@@ -2044,218 +2056,401 @@ export const StreamsScreen = () => {
       )}
 
       {isTablet ? (
-        // TABLET LAYOUT
+        // TABLET LAYOUT - Full Screen Background
         <View style={styles.tabletLayout}>
-          {/* Left Panel: Thumbnail Background */}
+          {/* Full Screen Background */}
+          <AnimatedImage
+            source={episodeImage ? { uri: episodeImage } : bannerImage ? { uri: bannerImage } : metadata?.poster ? { uri: metadata.poster } : undefined}
+            style={styles.tabletFullScreenBackground}
+            contentFit="cover"
+          />
+          <LinearGradient
+            colors={['rgba(0,0,0,0.2)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.6)']}
+            locations={[0, 0.5, 1]}
+            style={styles.tabletFullScreenGradient}
+          />
+          
+          {/* Left Panel: Movie Logo/Episode Info */}
           <View style={styles.tabletLeftPanel}>
-            <AnimatedImage
-              source={episodeImage ? { uri: episodeImage } : bannerImage ? { uri: bannerImage } : metadata?.poster ? { uri: metadata.poster } : undefined}
-              style={styles.tabletLeftPanelBackground}
-              contentFit="cover"
-            />
-            <LinearGradient
-              colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.5)']}
-              style={styles.tabletLeftPanelGradient}
-            >
-              {type === 'movie' && metadata && (
-                <View style={styles.tabletMovieLogoContainer}>
-                  {metadata.logo && !movieLogoError ? (
-                    <FastImage
-                      source={{ uri: metadata.logo }}
-                      style={styles.tabletMovieLogo}
-                      resizeMode={FastImage.resizeMode.contain}
-                      onError={() => setMovieLogoError(true)}
-                    />
-                  ) : (
-                    <Text style={styles.tabletMovieTitle}>{metadata.name}</Text>
-                  )}
-                </View>
-              )}
-              
-              {type === 'series' && currentEpisode && (
-                <View style={styles.tabletEpisodeInfo}>
-                  <Text style={styles.streamsHeroEpisodeNumber}>{currentEpisode.episodeString}</Text>
-                  <Text style={styles.streamsHeroTitle} numberOfLines={2}>{currentEpisode.name}</Text>
-                  {currentEpisode.overview && (
-                    <Text style={styles.streamsHeroOverview} numberOfLines={3}>{currentEpisode.overview}</Text>
-                  )}
-                </View>
-              )}
-            </LinearGradient>
+            {type === 'movie' && metadata && (
+              <View style={styles.tabletMovieLogoContainer}>
+                {metadata.logo && !movieLogoError ? (
+                  <FastImage
+                    source={{ uri: metadata.logo }}
+                    style={styles.tabletMovieLogo}
+                    resizeMode={FastImage.resizeMode.contain}
+                    onError={() => setMovieLogoError(true)}
+                  />
+                ) : (
+                  <Text style={styles.tabletMovieTitle}>{metadata.name}</Text>
+                )}
+              </View>
+            )}
+            
+            {type === 'series' && currentEpisode && (
+              <View style={styles.tabletEpisodeInfo}>
+                <Text style={[styles.streamsHeroEpisodeNumber, styles.tabletEpisodeText]}>{currentEpisode.episodeString}</Text>
+                <Text style={[styles.streamsHeroTitle, styles.tabletEpisodeText]} numberOfLines={2}>{currentEpisode.name}</Text>
+                {currentEpisode.overview && (
+                  <Text style={[styles.streamsHeroOverview, styles.tabletEpisodeText]} numberOfLines={3}>{currentEpisode.overview}</Text>
+                )}
+              </View>
+            )}
           </View>
 
           {/* Right Panel: Streams List */}
           <View style={styles.tabletRightPanel}>
-            <View style={[
-              styles.streamsMainContent,
-              type === 'movie' && styles.streamsMainContentMovie
-            ]}>
-              <View style={[styles.filterContainer]}>
-                {!streamsEmpty && (
-                  <ProviderFilter
-                    selectedProvider={selectedProvider}
-                    providers={filterItems}
-                    onSelect={handleProviderChange}
-                    theme={currentTheme}
-                  />
-                )}
-              </View>
+            {Platform.OS === 'android' && AndroidBlurView ? (
+              <AndroidBlurView 
+                blurAmount={15} 
+                blurRadius={8} 
+                style={[
+                  styles.streamsMainContent,
+                  styles.tabletStreamsContent,
+                  type === 'movie' && styles.streamsMainContentMovie
+                ]}
+              >
+                <View style={styles.tabletBlurContent}>
+                  <View style={[styles.filterContainer]}>
+                    {!streamsEmpty && (
+                      <ProviderFilter
+                        selectedProvider={selectedProvider}
+                        providers={filterItems}
+                        onSelect={handleProviderChange}
+                        theme={currentTheme}
+                      />
+                    )}
+                  </View>
 
-              {/* Active Scrapers Status */}
-              {activeFetchingScrapers.length > 0 && (
-                <View 
-                  style={styles.activeScrapersContainer}
-                >
-                  <Text style={styles.activeScrapersTitle}>Fetching from:</Text>
-                  <View style={styles.activeScrapersRow}>
-                    {activeFetchingScrapers.map((scraperName, index) => (
-                      <PulsingChip key={scraperName} text={scraperName} delay={index * 200} />
-                    ))}
-                  </View>
-                </View>
-              )}
-
-              {/* Update the streams/loading state display logic */}
-              { showNoSourcesError ? (
-                  <View 
-                    style={styles.noStreams}
-                  >
-                    <MaterialIcons name="error-outline" size={48} color={colors.textMuted} />
-                    <Text style={styles.noStreamsText}>No streaming sources available</Text>
-                    <Text style={styles.noStreamsSubText}>
-                      Please add streaming sources in settings
-                    </Text>
-                    <TouchableOpacity
-                      style={styles.addSourcesButton}
-                      onPress={() => navigation.navigate('Addons')}
-                    >
-                      <Text style={styles.addSourcesButtonText}>Add Sources</Text>
-                    </TouchableOpacity>
-                  </View>
-              ) : streamsEmpty ? (
-                showInitialLoading ? (
-                  <View 
-                    style={styles.loadingContainer}
-                  >
-                    <ActivityIndicator size="large" color={colors.primary} />
-                    <Text style={styles.loadingText}>
-                      {isAutoplayWaiting ? 'Finding best stream for autoplay...' : 'Finding available streams...'}
-                    </Text>
-                  </View>
-                ) : showStillFetching ? (
-                  <View 
-                    style={styles.loadingContainer}
-                  >
-                    <MaterialIcons name="hourglass-bottom" size={32} color={colors.primary} />
-                    <Text style={styles.loadingText}>Still fetching streams…</Text>
-                  </View>
-                ) : (
-                  // No streams and not loading = no streams available
-                  <View 
-                    style={styles.noStreams}
-                  >
-                    <MaterialIcons name="error-outline" size={48} color={colors.textMuted} />
-                    <Text style={styles.noStreamsText}>No streams available</Text>
-                  </View>
-                )
-              ) : (
-                // Show streams immediately when available, even if still loading others
-                <View collapsable={false} style={{ flex: 1 }}>
-                  {/* Show autoplay loading overlay if waiting for autoplay */}
-                  {isAutoplayWaiting && !autoplayTriggered && (
+                  {/* Active Scrapers Status */}
+                  {activeFetchingScrapers.length > 0 && (
                     <View 
-                      style={styles.autoplayOverlay}
+                      style={styles.activeScrapersContainer}
                     >
-                      <View style={styles.autoplayIndicator}>
-                        <ActivityIndicator size="small" color={colors.primary} />
-                        <Text style={styles.autoplayText}>Starting best stream...</Text>
+                      <Text style={styles.activeScrapersTitle}>Fetching from:</Text>
+                      <View style={styles.activeScrapersRow}>
+                        {activeFetchingScrapers.map((scraperName, index) => (
+                          <PulsingChip key={scraperName} text={scraperName} delay={index * 200} />
+                        ))}
                       </View>
                     </View>
                   )}
-                  
-                  <ScrollView
-                    style={styles.streamsContent}
-                    contentContainerStyle={[
-                      styles.streamsContainer,
-                      { paddingBottom: insets.bottom + 100 } // Add safe area + extra padding
-                    ]}
-                    showsVerticalScrollIndicator={false}
-                    bounces={true}
-                    overScrollMode="never"
-                    // iOS-specific fixes for navigation transition glitches
-                    {...(Platform.OS === 'ios' && {
-                      // Ensure proper rendering during transitions
-                      removeClippedSubviews: false, // Prevent iOS from clipping views during transitions
-                      // Force hardware acceleration for smoother transitions
-                      scrollEventThrottle: 16,
-                    })}
-                  >
-                    {sections.filter(Boolean).map((section, sectionIndex) => (
-                      <View key={section!.addonId || sectionIndex}>
-                        {/* Section Header */}
-                        {renderSectionHeader({ section: section! })}
+
+                  {/* Update the streams/loading state display logic */}
+                  { showNoSourcesError ? (
+                      <View 
+                        style={styles.noStreams}
+                      >
+                        <MaterialIcons name="error-outline" size={48} color={colors.textMuted} />
+                        <Text style={styles.noStreamsText}>No streaming sources available</Text>
+                        <Text style={styles.noStreamsSubText}>
+                          Please add streaming sources in settings
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.addSourcesButton}
+                          onPress={() => navigation.navigate('Addons')}
+                        >
+                          <Text style={styles.addSourcesButtonText}>Add Sources</Text>
+                        </TouchableOpacity>
+                      </View>
+                  ) : streamsEmpty ? (
+                    showInitialLoading ? (
+                      <View 
+                        style={styles.loadingContainer}
+                      >
+                        <ActivityIndicator size="large" color={colors.primary} />
+                        <Text style={styles.loadingText}>
+                          {isAutoplayWaiting ? 'Finding best stream for autoplay...' : 'Finding available streams...'}
+                        </Text>
+                      </View>
+                    ) : showStillFetching ? (
+                      <View 
+                        style={styles.loadingContainer}
+                      >
+                        <MaterialIcons name="hourglass-bottom" size={32} color={colors.primary} />
+                        <Text style={styles.loadingText}>Still fetching streams…</Text>
+                      </View>
+                    ) : (
+                      // No streams and not loading = no streams available
+                      <View 
+                        style={styles.noStreams}
+                      >
+                        <MaterialIcons name="error-outline" size={48} color={colors.textMuted} />
+                        <Text style={styles.noStreamsText}>No streams available</Text>
+                      </View>
+                    )
+                  ) : (
+                    // Show streams immediately when available, even if still loading others
+                    <View collapsable={false} style={{ flex: 1 }}>
+                      {/* Show autoplay loading overlay if waiting for autoplay */}
+                      {isAutoplayWaiting && !autoplayTriggered && (
+                        <View 
+                          style={styles.autoplayOverlay}
+                        >
+                          <View style={styles.autoplayIndicator}>
+                            <ActivityIndicator size="small" color={colors.primary} />
+                            <Text style={styles.autoplayText}>Starting best stream...</Text>
+                          </View>
+                        </View>
+                      )}
+                      
+                      <ScrollView
+                        style={styles.streamsContent}
+                        contentContainerStyle={[
+                          styles.streamsContainer,
+                          { paddingBottom: insets.bottom + 100 } // Add safe area + extra padding
+                        ]}
+                        showsVerticalScrollIndicator={false}
+                        bounces={true}
+                        overScrollMode="never"
+                        scrollEventThrottle={16}
+                      >
+                        {sections.filter(Boolean).map((section, sectionIndex) => (
+                          <View key={section!.addonId || sectionIndex}>
+                            {/* Section Header */}
+                            {renderSectionHeader({ section: section! })}
+                            
+                            {/* Stream Cards using FlatList */}
+                            {section!.data && section!.data.length > 0 ? (
+                              <FlatList
+                                data={section!.data}
+                                keyExtractor={(item, index) => {
+                                  if (item && item.url) {
+                                    return `${item.url}-${sectionIndex}-${index}`;
+                                  }
+                                  return `empty-${sectionIndex}-${index}`;
+                                }}
+                                renderItem={({ item, index }) => (
+                                  <View>
+                                    <StreamCard
+                                      stream={item}
+                                      onPress={() => handleStreamPress(item)}
+                                      index={index}
+                                      isLoading={false}
+                                      statusMessage={undefined}
+                                      theme={currentTheme}
+                                      showLogos={settings.showScraperLogos}
+                                      scraperLogo={(item.addonId && scraperLogos[item.addonId]) || (item as any).addon ? scraperLogoCache.get((item.addonId || (item as any).addon) as string) || null : null}
+                                      showAlert={(t, m) => openAlert(t, m)}
+                                      parentTitle={metadata?.name}
+                                      parentType={type as 'movie' | 'series'}
+                                      parentSeason={(type === 'series' || type === 'other') ? currentEpisode?.season_number : undefined}
+                                      parentEpisode={(type === 'series' || type === 'other') ? currentEpisode?.episode_number : undefined}
+                                      parentEpisodeTitle={(type === 'series' || type === 'other') ? currentEpisode?.name : undefined}
+                                      parentPosterUrl={episodeImage || metadata?.poster || undefined}
+                                      providerName={streams && Object.keys(streams).find(pid => (streams as any)[pid]?.streams?.includes?.(item))}
+                                      parentId={id}
+                                      parentImdbId={imdbId || undefined}
+                                    />
+                                  </View>
+                                )}
+                                scrollEnabled={false}
+                                initialNumToRender={6}
+                                maxToRenderPerBatch={2}
+                                windowSize={3}
+                                removeClippedSubviews={true}
+                                showsVerticalScrollIndicator={false}
+                                getItemLayout={(data, index) => ({
+                                  length: 78, // Approximate height of StreamCard (68 minHeight + 10 marginBottom)
+                                  offset: 78 * index,
+                                  index,
+                                })}
+                              />
+                            ) : null}
+                          </View>
+                        ))}
                         
-                        {/* Stream Cards using FlatList */}
-                        {section!.data && section!.data.length > 0 ? (
-                          <FlatList
-                            data={section!.data}
-                            keyExtractor={(item, index) => {
-                              if (item && item.url) {
-                                return `${item.url}-${sectionIndex}-${index}`;
-                              }
-                              return `empty-${sectionIndex}-${index}`;
-                            }}
-                            renderItem={({ item, index }) => (
-                              <View>
-                                <StreamCard
-                                  stream={item}
-                                  onPress={() => handleStreamPress(item)}
-                                  index={index}
-                                  isLoading={false}
-                                  statusMessage={undefined}
-                                  theme={currentTheme}
-                                  showLogos={settings.showScraperLogos}
-                                  scraperLogo={(item.addonId && scraperLogos[item.addonId]) || (item as any).addon ? scraperLogoCache.get((item.addonId || (item as any).addon) as string) || null : null}
-                                  showAlert={(t, m) => openAlert(t, m)}
-                                  parentTitle={metadata?.name}
-                                  parentType={type as 'movie' | 'series'}
-                                  parentSeason={(type === 'series' || type === 'other') ? currentEpisode?.season_number : undefined}
-                                  parentEpisode={(type === 'series' || type === 'other') ? currentEpisode?.episode_number : undefined}
-                                  parentEpisodeTitle={(type === 'series' || type === 'other') ? currentEpisode?.name : undefined}
-                                  parentPosterUrl={episodeImage || metadata?.poster || undefined}
-                                  providerName={streams && Object.keys(streams).find(pid => (streams as any)[pid]?.streams?.includes?.(item))}
-                                  parentId={id}
-                                  parentImdbId={imdbId || undefined}
-                                />
-                              </View>
-                            )}
-                            scrollEnabled={false}
-                            initialNumToRender={6}
-                            maxToRenderPerBatch={2}
-                            windowSize={3}
-                            removeClippedSubviews={true}
-                            showsVerticalScrollIndicator={false}
-                            getItemLayout={(data, index) => ({
-                              length: 78, // Approximate height of StreamCard (68 minHeight + 10 marginBottom)
-                              offset: 78 * index,
-                              index,
-                            })}
-                          />
-                        ) : null}
-                      </View>
-                    ))}
-                    
-                    {/* Footer Loading */}
-                    {(loadingStreams || loadingEpisodeStreams) && hasStremioStreamProviders && (
-                      <View style={styles.footerLoading}>
-                        <ActivityIndicator size="small" color={colors.primary} />
-                        <Text style={styles.footerLoadingText}>Loading more sources...</Text>
-                      </View>
-                    )}
-                  </ScrollView>
+                        {/* Footer Loading */}
+                        {(loadingStreams || loadingEpisodeStreams) && hasStremioStreamProviders && (
+                          <View style={styles.footerLoading}>
+                            <ActivityIndicator size="small" color={colors.primary} />
+                            <Text style={styles.footerLoadingText}>Loading more sources...</Text>
+                          </View>
+                        )}
+                      </ScrollView>
+                    </View>
+                  )}
                 </View>
-              )}
-            </View>
+              </AndroidBlurView>
+            ) : (
+              <ExpoBlurView 
+                intensity={80} 
+                tint="dark" 
+                style={[
+                  styles.streamsMainContent,
+                  styles.tabletStreamsContent,
+                  type === 'movie' && styles.streamsMainContentMovie
+                ]}
+              >
+                <View style={styles.tabletBlurContent}>
+                  <View style={[styles.filterContainer]}>
+                    {!streamsEmpty && (
+                      <ProviderFilter
+                        selectedProvider={selectedProvider}
+                        providers={filterItems}
+                        onSelect={handleProviderChange}
+                        theme={currentTheme}
+                      />
+                    )}
+                  </View>
+
+                  {/* Active Scrapers Status */}
+                  {activeFetchingScrapers.length > 0 && (
+                    <View 
+                      style={styles.activeScrapersContainer}
+                    >
+                      <Text style={styles.activeScrapersTitle}>Fetching from:</Text>
+                      <View style={styles.activeScrapersRow}>
+                        {activeFetchingScrapers.map((scraperName, index) => (
+                          <PulsingChip key={scraperName} text={scraperName} delay={index * 200} />
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Update the streams/loading state display logic */}
+                  { showNoSourcesError ? (
+                      <View 
+                        style={styles.noStreams}
+                      >
+                        <MaterialIcons name="error-outline" size={48} color={colors.textMuted} />
+                        <Text style={styles.noStreamsText}>No streaming sources available</Text>
+                        <Text style={styles.noStreamsSubText}>
+                          Please add streaming sources in settings
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.addSourcesButton}
+                          onPress={() => navigation.navigate('Addons')}
+                        >
+                          <Text style={styles.addSourcesButtonText}>Add Sources</Text>
+                        </TouchableOpacity>
+                      </View>
+                  ) : streamsEmpty ? (
+                    showInitialLoading ? (
+                      <View 
+                        style={styles.loadingContainer}
+                      >
+                        <ActivityIndicator size="large" color={colors.primary} />
+                        <Text style={styles.loadingText}>
+                          {isAutoplayWaiting ? 'Finding best stream for autoplay...' : 'Finding available streams...'}
+                        </Text>
+                      </View>
+                    ) : showStillFetching ? (
+                      <View 
+                        style={styles.loadingContainer}
+                      >
+                        <MaterialIcons name="hourglass-bottom" size={32} color={colors.primary} />
+                        <Text style={styles.loadingText}>Still fetching streams…</Text>
+                      </View>
+                    ) : (
+                      // No streams and not loading = no streams available
+                      <View 
+                        style={styles.noStreams}
+                      >
+                        <MaterialIcons name="error-outline" size={48} color={colors.textMuted} />
+                        <Text style={styles.noStreamsText}>No streams available</Text>
+                      </View>
+                    )
+                  ) : (
+                    // Show streams immediately when available, even if still loading others
+                    <View collapsable={false} style={{ flex: 1 }}>
+                      {/* Show autoplay loading overlay if waiting for autoplay */}
+                      {isAutoplayWaiting && !autoplayTriggered && (
+                        <View 
+                          style={styles.autoplayOverlay}
+                        >
+                          <View style={styles.autoplayIndicator}>
+                            <ActivityIndicator size="small" color={colors.primary} />
+                            <Text style={styles.autoplayText}>Starting best stream...</Text>
+                          </View>
+                        </View>
+                      )}
+                      
+                      <ScrollView
+                        style={styles.streamsContent}
+                        contentContainerStyle={[
+                          styles.streamsContainer,
+                          { paddingBottom: insets.bottom + 100 } // Add safe area + extra padding
+                        ]}
+                        showsVerticalScrollIndicator={false}
+                        bounces={true}
+                        overScrollMode="never"
+                        // iOS-specific fixes for navigation transition glitches
+                        {...(Platform.OS === 'ios' && {
+                          // Ensure proper rendering during transitions
+                          removeClippedSubviews: false, // Prevent iOS from clipping views during transitions
+                          // Force hardware acceleration for smoother transitions
+                          scrollEventThrottle: 16,
+                        })}
+                      >
+                        {sections.filter(Boolean).map((section, sectionIndex) => (
+                          <View key={section!.addonId || sectionIndex}>
+                            {/* Section Header */}
+                            {renderSectionHeader({ section: section! })}
+                            
+                            {/* Stream Cards using FlatList */}
+                            {section!.data && section!.data.length > 0 ? (
+                              <FlatList
+                                data={section!.data}
+                                keyExtractor={(item, index) => {
+                                  if (item && item.url) {
+                                    return `${item.url}-${sectionIndex}-${index}`;
+                                  }
+                                  return `empty-${sectionIndex}-${index}`;
+                                }}
+                                renderItem={({ item, index }) => (
+                                  <View>
+                                    <StreamCard
+                                      stream={item}
+                                      onPress={() => handleStreamPress(item)}
+                                      index={index}
+                                      isLoading={false}
+                                      statusMessage={undefined}
+                                      theme={currentTheme}
+                                      showLogos={settings.showScraperLogos}
+                                      scraperLogo={(item.addonId && scraperLogos[item.addonId]) || (item as any).addon ? scraperLogoCache.get((item.addonId || (item as any).addon) as string) || null : null}
+                                      showAlert={(t, m) => openAlert(t, m)}
+                                      parentTitle={metadata?.name}
+                                      parentType={type as 'movie' | 'series'}
+                                      parentSeason={(type === 'series' || type === 'other') ? currentEpisode?.season_number : undefined}
+                                      parentEpisode={(type === 'series' || type === 'other') ? currentEpisode?.episode_number : undefined}
+                                      parentEpisodeTitle={(type === 'series' || type === 'other') ? currentEpisode?.name : undefined}
+                                      parentPosterUrl={episodeImage || metadata?.poster || undefined}
+                                      providerName={streams && Object.keys(streams).find(pid => (streams as any)[pid]?.streams?.includes?.(item))}
+                                      parentId={id}
+                                      parentImdbId={imdbId || undefined}
+                                    />
+                                  </View>
+                                )}
+                                scrollEnabled={false}
+                                initialNumToRender={6}
+                                maxToRenderPerBatch={2}
+                                windowSize={3}
+                                removeClippedSubviews={true}
+                                showsVerticalScrollIndicator={false}
+                                getItemLayout={(data, index) => ({
+                                  length: 78, // Approximate height of StreamCard (68 minHeight + 10 marginBottom)
+                                  offset: 78 * index,
+                                  index,
+                                })}
+                              />
+                            ) : null}
+                          </View>
+                        ))}
+                        
+                        {/* Footer Loading */}
+                        {(loadingStreams || loadingEpisodeStreams) && hasStremioStreamProviders && (
+                          <View style={styles.footerLoading}>
+                            <ActivityIndicator size="small" color={colors.primary} />
+                            <Text style={styles.footerLoadingText}>Loading more sources...</Text>
+                          </View>
+                        )}
+                      </ScrollView>
+                    </View>
+                  )}
+                </View>
+              </ExpoBlurView>
+            )}
           </View>
         </View>
       ) : (
@@ -3043,20 +3238,20 @@ const createStyles = (colors: any) => StyleSheet.create({
   tabletLayout: {
     flex: 1,
     flexDirection: 'row',
+    position: 'relative',
+  },
+  tabletFullScreenBackground: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  tabletFullScreenGradient: {
+    ...StyleSheet.absoluteFillObject,
   },
   tabletLeftPanel: {
     width: '40%',
-    position: 'relative',
-    backgroundColor: colors.black,
-  },
-  tabletLeftPanelBackground: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  tabletLeftPanelGradient: {
-    ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
+    zIndex: 2,
   },
   tabletMovieLogoContainer: {
     width: '80%',
@@ -3074,14 +3269,34 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: '900',
     textAlign: 'center',
     letterSpacing: -0.5,
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   tabletEpisodeInfo: {
     width: '80%',
+  },
+  tabletEpisodeText: {
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   tabletRightPanel: {
     width: '60%',
     flex: 1,
     paddingTop: Platform.OS === 'android' ? 60 : 20,
+    zIndex: 2,
+  },
+  tabletStreamsContent: {
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: 24,
+    margin: 12,
+    overflow: 'hidden', // Ensures content respects rounded corners
+  },
+  tabletBlurContent: {
+    flex: 1,
+    padding: 16,
+    backgroundColor: 'transparent',
   },
   backButtonContainerTablet: {
     zIndex: 3,
