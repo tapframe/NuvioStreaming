@@ -2089,10 +2089,10 @@ export const StreamsScreen = () => {
             
             {type === 'series' && currentEpisode && (
               <View style={styles.tabletEpisodeInfo}>
-                <Text style={[styles.streamsHeroEpisodeNumber, styles.tabletEpisodeText]}>{currentEpisode.episodeString}</Text>
-                <Text style={[styles.streamsHeroTitle, styles.tabletEpisodeText]} numberOfLines={2}>{currentEpisode.name}</Text>
+                <Text style={[styles.streamsHeroEpisodeNumber, styles.tabletEpisodeText, styles.tabletEpisodeNumber]}>{currentEpisode.episodeString}</Text>
+                <Text style={[styles.streamsHeroTitle, styles.tabletEpisodeText, styles.tabletEpisodeTitle]} numberOfLines={2}>{currentEpisode.name}</Text>
                 {currentEpisode.overview && (
-                  <Text style={[styles.streamsHeroOverview, styles.tabletEpisodeText]} numberOfLines={3}>{currentEpisode.overview}</Text>
+                  <Text style={[styles.streamsHeroOverview, styles.tabletEpisodeText, styles.tabletEpisodeOverview]} numberOfLines={4}>{currentEpisode.overview}</Text>
                 )}
               </View>
             )}
@@ -3277,9 +3277,25 @@ const createStyles = (colors: any) => StyleSheet.create({
     width: '80%',
   },
   tabletEpisodeText: {
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowOffset: { width: 0, height: 2 },
+    textShadowColor: 'rgba(0,0,0,1)',
+    textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 4,
+  },
+  tabletEpisodeNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  tabletEpisodeTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    lineHeight: 34,
+  },
+  tabletEpisodeOverview: {
+    fontSize: 16,
+    lineHeight: 24,
+    opacity: 0.95,
   },
   tabletRightPanel: {
     width: '60%',
