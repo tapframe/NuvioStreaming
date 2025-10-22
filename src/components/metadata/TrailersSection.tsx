@@ -155,24 +155,6 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
     sectionTranslateYSV.value = withDelay(500, withTiming(0, { duration: 400 }));
   }, [sectionOpacitySV, sectionTranslateYSV]);
 
-  // Check if trailer service backend is available
-  const checkBackendAvailability = useCallback(async (): Promise<boolean> => {
-    try {
-      const serverStatus = TrailerService.getServerStatus();
-      const healthUrl = `${serverStatus.localUrl.replace('/trailer', '/health')}`;
-
-      const response = await fetch(healthUrl, {
-        method: 'GET',
-        signal: AbortSignal.timeout(3000), // 3 second timeout
-      });
-      const isAvailable = response.ok;
-      logger.info('TrailersSection', `Backend availability check: ${isAvailable ? 'AVAILABLE' : 'UNAVAILABLE'}`);
-      return isAvailable;
-    } catch (error) {
-      logger.warn('TrailersSection', 'Backend availability check failed:', error);
-      return false;
-    }
-  }, []);
 
   // Fetch trailers from TMDB
   useEffect(() => {
@@ -180,17 +162,7 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
 
     const initializeTrailers = async () => {
       resetSectionAnimation();
-      // First check if backend is available
-      const available = await checkBackendAvailability();
-      setBackendAvailable(available);
-
-      if (!available) {
-        logger.warn('TrailersSection', 'Trailer service backend is not available - skipping trailer loading');
-        setLoading(false);
-        return;
-      }
-
-      // Backend is available, proceed with fetching trailers
+      setBackendAvailable(true); // Assume available, let TrailerService handle errors
       await fetchTrailers();
     };
 
@@ -334,7 +306,7 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
     };
 
     initializeTrailers();
-  }, [tmdbId, type, checkBackendAvailability]);
+  }, [tmdbId, type]);
 
   // Categorize trailers by type
   const categorizeTrailers = (videos: any[]): CategorizedTrailers => {

@@ -53,29 +53,31 @@ export class TrailerService {
    * @returns Promise<string | null> - The trailer URL or null if not found
    */
   private static async getTrailerFromLocalServer(title: string, year: number, tmdbId?: string, type?: 'movie' | 'tv'): Promise<string | null> {
+    const startTime = Date.now();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.TIMEOUT);
+
+    // Build URL with parameters
+    const params = new URLSearchParams();
+    
+    // Always send title and year for logging and fallback
+    params.append('title', title);
+    params.append('year', year.toString());
+    
+    if (tmdbId) {
+      params.append('tmdbId', tmdbId);
+      params.append('type', type || 'movie');
+      logger.info('TrailerService', `Using TMDB API for: ${title} (TMDB ID: ${tmdbId})`);
+    } else {
+      logger.info('TrailerService', `Auto-searching trailer for: ${title} (${year})`);
+    }
+
+    const url = `${this.AUTO_SEARCH_URL}?${params.toString()}`;
+    logger.info('TrailerService', `Local server request URL: ${url}`);
+    logger.info('TrailerService', `Local server timeout set to ${this.TIMEOUT}ms`);
+    logger.info('TrailerService', `Making fetch request to: ${url}`);
+    
     try {
-      const startTime = Date.now();
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.TIMEOUT);
-
-      // Build URL with parameters
-      const params = new URLSearchParams();
-      
-      // Always send title and year for logging and fallback
-      params.append('title', title);
-      params.append('year', year.toString());
-      
-      if (tmdbId) {
-        params.append('tmdbId', tmdbId);
-        params.append('type', type || 'movie');
-        logger.info('TrailerService', `Using TMDB API for: ${title} (TMDB ID: ${tmdbId})`);
-      } else {
-        logger.info('TrailerService', `Auto-searching trailer for: ${title} (${year})`);
-      }
-
-      const url = `${this.AUTO_SEARCH_URL}?${params.toString()}`;
-      logger.info('TrailerService', `Local server request URL: ${url}`);
-      logger.info('TrailerService', `Local server timeout set to ${this.TIMEOUT}ms`);
       
       const response = await fetch(url, {
         method: 'GET',
@@ -85,6 +87,8 @@ export class TrailerService {
         },
         signal: controller.signal,
       });
+      
+      logger.info('TrailerService', `Fetch request completed. Response status: ${response.status}`);
 
       clearTimeout(timeoutId);
 
@@ -137,6 +141,12 @@ export class TrailerService {
       } else {
         const msg = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
         logger.error('TrailerService', `Error in auto-search: ${msg}`);
+        logger.error('TrailerService', `Error details:`, {
+          name: (error as any)?.name,
+          message: (error as any)?.message,
+          stack: (error as any)?.stack,
+          url: url
+        });
       }
       return null; // Return null to trigger XPrime fallback
     }

@@ -2140,7 +2140,7 @@ const styles = StyleSheet.create({
   },
   singleRowLayout: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 4,
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
@@ -2163,11 +2163,11 @@ const styles = StyleSheet.create({
   },
   singleRowPlayButtonFullWidth: {
     flex: 1,
-    marginHorizontal: 4,
+    marginHorizontal: 2,
   },
   singleRowSaveButtonFullWidth: {
     flex: 1,
-    marginHorizontal: 4,
+    marginHorizontal: 2,
   },
   primaryActionRow: {
     flexDirection: 'row',
