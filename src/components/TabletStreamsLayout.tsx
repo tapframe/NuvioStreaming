@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BlurView as ExpoBlurView } from 'expo-blur';
+import Animated, { 
+  useSharedValue, 
+  useAnimatedStyle, 
+  withTiming,
+  withDelay,
+  Easing
+} from 'react-native-reanimated';
 
 // Lazy-safe community blur import for Android
 let AndroidBlurView: any = null;
@@ -30,7 +37,6 @@ import { RootStackNavigationProp } from '../navigation/AppNavigator';
 import ProviderFilter from './ProviderFilter';
 import PulsingChip from './PulsingChip';
 import StreamCard from './StreamCard';
-import AnimatedImage from './AnimatedImage';
 
 interface TabletStreamsLayoutProps {
   // Background and content props
@@ -117,6 +123,89 @@ const TabletStreamsLayout: React.FC<TabletStreamsLayoutProps> = ({
   hasStremioStreamProviders,
 }) => {
   const styles = React.useMemo(() => createStyles(colors), [colors]);
+  
+  // Animation values for backdrop entrance
+  const backdropOpacity = useSharedValue(0);
+  const backdropScale = useSharedValue(1.05);
+  const [backdropLoaded, setBackdropLoaded] = useState(false);
+  
+  // Animation values for content panels
+  const leftPanelOpacity = useSharedValue(0);
+  const leftPanelTranslateX = useSharedValue(-30);
+  const rightPanelOpacity = useSharedValue(0);
+  const rightPanelTranslateX = useSharedValue(30);
+  
+  // Get the backdrop source
+  const backdropSource = episodeImage ? { uri: episodeImage } : 
+                        bannerImage ? { uri: bannerImage } : 
+                        metadata?.poster ? { uri: metadata.poster } : undefined;
+  
+  // Animate backdrop when it loads
+  useEffect(() => {
+    if (backdropSource?.uri && backdropLoaded) {
+      backdropOpacity.value = withTiming(1, {
+        duration: 800,
+        easing: Easing.out(Easing.cubic)
+      });
+      backdropScale.value = withTiming(1, {
+        duration: 1000,
+        easing: Easing.out(Easing.cubic)
+      });
+      
+      // Animate content panels with delay after backdrop starts loading
+      leftPanelOpacity.value = withDelay(300, withTiming(1, {
+        duration: 600,
+        easing: Easing.out(Easing.cubic)
+      }));
+      leftPanelTranslateX.value = withDelay(300, withTiming(0, {
+        duration: 600,
+        easing: Easing.out(Easing.cubic)
+      }));
+      
+      rightPanelOpacity.value = withDelay(500, withTiming(1, {
+        duration: 600,
+        easing: Easing.out(Easing.cubic)
+      }));
+      rightPanelTranslateX.value = withDelay(500, withTiming(0, {
+        duration: 600,
+        easing: Easing.out(Easing.cubic)
+      }));
+    }
+  }, [backdropSource?.uri, backdropLoaded]);
+  
+  // Reset animation when source changes
+  useEffect(() => {
+    if (backdropSource?.uri) {
+      backdropOpacity.value = 0;
+      backdropScale.value = 1.05;
+      leftPanelOpacity.value = 0;
+      leftPanelTranslateX.value = -30;
+      rightPanelOpacity.value = 0;
+      rightPanelTranslateX.value = 30;
+      setBackdropLoaded(false);
+    }
+  }, [backdropSource?.uri]);
+  
+  // Animated styles for backdrop
+  const backdropAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: backdropOpacity.value,
+    transform: [{ scale: backdropScale.value }],
+  }));
+  
+  // Animated styles for content panels
+  const leftPanelAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: leftPanelOpacity.value,
+    transform: [{ translateX: leftPanelTranslateX.value }],
+  }));
+  
+  const rightPanelAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: rightPanelOpacity.value,
+    transform: [{ translateX: rightPanelTranslateX.value }],
+  }));
+  
+  const handleBackdropLoad = () => {
+    setBackdropLoaded(true);
+  };
 
   const renderStreamContent = () => {
     if (showNoSourcesError) {
@@ -236,12 +325,15 @@ const TabletStreamsLayout: React.FC<TabletStreamsLayoutProps> = ({
 
   return (
     <View style={styles.tabletLayout}>
-      {/* Full Screen Background */}
-      <AnimatedImage
-        source={episodeImage ? { uri: episodeImage } : bannerImage ? { uri: bannerImage } : metadata?.poster ? { uri: metadata.poster } : undefined}
-        style={styles.tabletFullScreenBackground}
-        contentFit="cover"
-      />
+      {/* Full Screen Background with Entrance Animation */}
+      <Animated.View style={[styles.tabletFullScreenBackground, backdropAnimatedStyle]}>
+        <FastImage
+          source={backdropSource}
+          style={StyleSheet.absoluteFillObject}
+          resizeMode={FastImage.resizeMode.cover}
+          onLoad={handleBackdropLoad}
+        />
+      </Animated.View>
       <LinearGradient
         colors={['rgba(0,0,0,0.2)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.6)']}
         locations={[0, 0.5, 1]}
@@ -249,7 +341,7 @@ const TabletStreamsLayout: React.FC<TabletStreamsLayoutProps> = ({
       />
       
       {/* Left Panel: Movie Logo/Episode Info */}
-      <View style={styles.tabletLeftPanel}>
+      <Animated.View style={[styles.tabletLeftPanel, leftPanelAnimatedStyle]}>
         {type === 'movie' && metadata && (
           <View style={styles.tabletMovieLogoContainer}>
             {metadata.logo && !movieLogoError ? (
@@ -274,61 +366,63 @@ const TabletStreamsLayout: React.FC<TabletStreamsLayoutProps> = ({
             )}
           </View>
         )}
-      </View>
+      </Animated.View>
 
       {/* Right Panel: Streams List */}
-      <View style={styles.tabletRightPanel}>
+      <Animated.View style={[styles.tabletRightPanel, rightPanelAnimatedStyle]}>
         {Platform.OS === 'android' && AndroidBlurView ? (
-          <AndroidBlurView
-            blurAmount={15}
-            blurRadius={8}
-            style={[
-              styles.streamsMainContent,
-              styles.tabletStreamsContent,
-              type === 'movie' && styles.streamsMainContentMovie
-            ]}
-          >
-            <View style={styles.tabletBlurContent}>
-              {/* Always show filter container to prevent layout shift */}
-              <View style={[styles.filterContainer]}>
-                {!streamsEmpty && (
-                  <ProviderFilter
-                    selectedProvider={selectedProvider}
-                    providers={filterItems}
-                    onSelect={handleProviderChange}
-                    theme={currentTheme}
-                  />
-                )}
-              </View>
-
-              {/* Active Scrapers Status */}
-              {activeFetchingScrapers.length > 0 && (
-                <View style={styles.activeScrapersContainer}>
-                  <Text style={styles.activeScrapersTitle}>Fetching from:</Text>
-                  <View style={styles.activeScrapersRow}>
-                    {activeFetchingScrapers.map((scraperName, index) => (
-                      <PulsingChip key={scraperName} text={scraperName} delay={index * 200} />
-                    ))}
-                  </View>
+          <View style={[
+            styles.streamsMainContent,
+            styles.tabletStreamsContent,
+            type === 'movie' && styles.streamsMainContentMovie
+          ]}>
+            <AndroidBlurView
+              blurAmount={15}
+              blurRadius={8}
+              style={styles.androidBlurView}
+            >
+              <View style={styles.tabletBlurContent}>
+                {/* Always show filter container to prevent layout shift */}
+                <View style={[styles.filterContainer]}>
+                  {!streamsEmpty && (
+                    <ProviderFilter
+                      selectedProvider={selectedProvider}
+                      providers={filterItems}
+                      onSelect={handleProviderChange}
+                      theme={currentTheme}
+                    />
+                  )}
                 </View>
-              )}
 
-              {/* Stream content area - always show ScrollView to prevent flash */}
-              <View collapsable={false} style={{ flex: 1 }}>
-                {/* Show autoplay loading overlay if waiting for autoplay */}
-                {isAutoplayWaiting && !autoplayTriggered && (
-                  <View style={styles.autoplayOverlay}>
-                    <View style={styles.autoplayIndicator}>
-                      <ActivityIndicator size="small" color={colors.primary} />
-                      <Text style={styles.autoplayText}>Starting best stream...</Text>
+                {/* Active Scrapers Status */}
+                {activeFetchingScrapers.length > 0 && (
+                  <View style={styles.activeScrapersContainer}>
+                    <Text style={styles.activeScrapersTitle}>Fetching from:</Text>
+                    <View style={styles.activeScrapersRow}>
+                      {activeFetchingScrapers.map((scraperName, index) => (
+                        <PulsingChip key={scraperName} text={scraperName} delay={index * 200} />
+                      ))}
                     </View>
                   </View>
                 )}
 
-                {renderStreamContent()}
+                {/* Stream content area - always show ScrollView to prevent flash */}
+                <View collapsable={false} style={{ flex: 1 }}>
+                  {/* Show autoplay loading overlay if waiting for autoplay */}
+                  {isAutoplayWaiting && !autoplayTriggered && (
+                    <View style={styles.autoplayOverlay}>
+                      <View style={styles.autoplayIndicator}>
+                        <ActivityIndicator size="small" color={colors.primary} />
+                        <Text style={styles.autoplayText}>Starting best stream...</Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {renderStreamContent()}
+                </View>
               </View>
-            </View>
-          </AndroidBlurView>
+            </AndroidBlurView>
+          </View>
         ) : (
           <ExpoBlurView
             intensity={80}
@@ -381,7 +475,7 @@ const TabletStreamsLayout: React.FC<TabletStreamsLayoutProps> = ({
             </View>
           </ExpoBlurView>
         )}
-      </View>
+      </Animated.View>
     </View>
   );
 };
@@ -617,6 +711,10 @@ const createStyles = (colors: any) => StyleSheet.create({
   tabletBlurContent: {
     flex: 1,
     padding: 16,
+    backgroundColor: 'transparent',
+  },
+  androidBlurView: {
+    flex: 1,
     backgroundColor: 'transparent',
   },
 });
