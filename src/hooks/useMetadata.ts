@@ -875,6 +875,13 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         }
 
         // Commit final metadata once and cache it
+        // Clear banner field if TMDB enrichment is enabled to prevent flash
+        if (settings.enrichMetadataWithTMDB) {
+          finalMetadata = {
+            ...finalMetadata,
+            banner: undefined, // Let useMetadataAssets handle banner via TMDB
+          };
+        }
         setMetadata(finalMetadata);
         cacheService.setMetadata(id, type, finalMetadata);
         const isInLib = catalogService.getLibraryItems().some(item => item.id === id);

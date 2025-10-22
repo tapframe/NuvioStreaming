@@ -227,7 +227,7 @@ export const StreamsScreen = () => {
 
   // Get backdrop from metadata assets
   const setMetadataStub = useCallback(() => {}, []);
-  const memoizedSettings = useMemo(() => settings, [settings.logoSourcePreference, settings.tmdbLanguagePreference]);
+  const memoizedSettings = useMemo(() => settings, [settings.logoSourcePreference, settings.tmdbLanguagePreference, settings.enrichMetadataWithTMDB]);
   const { bannerImage } = useMetadataAssets(metadata, id, type, imdbId, memoizedSettings, setMetadataStub);
 
   // Create styles using current theme colors
@@ -1532,8 +1532,9 @@ export const StreamsScreen = () => {
       const path = currentEpisode.still_path || hydratedStill || '';
       return tmdbService.getImageUrl(path, 'original');
     }
-    return metadata?.poster || null;
-  }, [currentEpisode, metadata, episodeThumbnail, tmdbEpisodeOverride?.still_path]);
+    // No poster fallback
+    return null;
+  }, [currentEpisode, metadata, episodeThumbnail, tmdbEpisodeOverride?.still_path, settings.enrichMetadataWithTMDB]);
 
   // Effective TMDB fields for hero (series)
   const effectiveEpisodeVote = useMemo(() => {

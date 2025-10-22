@@ -128,6 +128,7 @@ const TabletStreamsLayout: React.FC<TabletStreamsLayoutProps> = ({
   const backdropOpacity = useSharedValue(0);
   const backdropScale = useSharedValue(1.05);
   const [backdropLoaded, setBackdropLoaded] = useState(false);
+  const [backdropError, setBackdropError] = useState(false);
   
   // Animation values for content panels
   const leftPanelOpacity = useSharedValue(0);
@@ -135,10 +136,46 @@ const TabletStreamsLayout: React.FC<TabletStreamsLayoutProps> = ({
   const rightPanelOpacity = useSharedValue(0);
   const rightPanelTranslateX = useSharedValue(30);
   
-  // Get the backdrop source
-  const backdropSource = episodeImage ? { uri: episodeImage } : 
-                        bannerImage ? { uri: bannerImage } : 
-                        metadata?.poster ? { uri: metadata.poster } : undefined;
+  // Get the backdrop source - prioritize episode thumbnail, then show backdrop, then poster
+  // For episodes without thumbnails, use show's backdrop instead of poster
+  const backdropSource = React.useMemo(() => {
+    // Debug logging
+    if (__DEV__) {
+      console.log('[TabletStreamsLayout] Backdrop source selection:', {
+        episodeImage,
+        bannerImage,
+        metadataPoster: metadata?.poster,
+        episodeImageIsPoster: episodeImage === metadata?.poster,
+        backdropError
+      });
+    }
+    
+    // If episodeImage failed to load, skip it and use backdrop
+    if (backdropError && episodeImage && episodeImage !== metadata?.poster) {
+      if (__DEV__) console.log('[TabletStreamsLayout] Episode thumbnail failed, falling back to backdrop');
+      if (bannerImage) {
+        if (__DEV__) console.log('[TabletStreamsLayout] Using show backdrop (episode failed):', bannerImage);
+        return { uri: bannerImage };
+      }
+    }
+    
+    // If episodeImage exists and is not the same as poster, use it (real episode thumbnail)
+    if (episodeImage && episodeImage !== metadata?.poster && !backdropError) {
+      if (__DEV__) console.log('[TabletStreamsLayout] Using episode thumbnail:', episodeImage);
+      return { uri: episodeImage };
+    }
+    
+    // If episodeImage is the same as poster (fallback case), prioritize backdrop
+    if (bannerImage) {
+      if (__DEV__) console.log('[TabletStreamsLayout] Using show backdrop:', bannerImage);
+      return { uri: bannerImage };
+    }
+    
+    // No fallback to poster images
+    
+    if (__DEV__) console.log('[TabletStreamsLayout] No backdrop source found');
+    return undefined;
+  }, [episodeImage, bannerImage, metadata?.poster, backdropError]);
   
   // Animate backdrop when it loads
   useEffect(() => {
@@ -173,18 +210,17 @@ const TabletStreamsLayout: React.FC<TabletStreamsLayoutProps> = ({
     }
   }, [backdropSource?.uri, backdropLoaded]);
   
-  // Reset animation when source changes
+  // Reset animation when episode changes
   useEffect(() => {
-    if (backdropSource?.uri) {
-      backdropOpacity.value = 0;
-      backdropScale.value = 1.05;
-      leftPanelOpacity.value = 0;
-      leftPanelTranslateX.value = -30;
-      rightPanelOpacity.value = 0;
-      rightPanelTranslateX.value = 30;
-      setBackdropLoaded(false);
-    }
-  }, [backdropSource?.uri]);
+    backdropOpacity.value = 0;
+    backdropScale.value = 1.05;
+    leftPanelOpacity.value = 0;
+    leftPanelTranslateX.value = -30;
+    rightPanelOpacity.value = 0;
+    rightPanelTranslateX.value = 30;
+    setBackdropLoaded(false);
+    setBackdropError(false);
+  }, [episodeImage]);
   
   // Animated styles for backdrop
   const backdropAnimatedStyle = useAnimatedStyle(() => ({
@@ -205,6 +241,12 @@ const TabletStreamsLayout: React.FC<TabletStreamsLayoutProps> = ({
   
   const handleBackdropLoad = () => {
     setBackdropLoaded(true);
+  };
+  
+  const handleBackdropError = () => {
+    if (__DEV__) console.log('[TabletStreamsLayout] Backdrop image failed to load:', backdropSource?.uri);
+    setBackdropError(true);
+    setBackdropLoaded(false);
   };
 
   const renderStreamContent = () => {
@@ -284,7 +326,7 @@ const TabletStreamsLayout: React.FC<TabletStreamsLayoutProps> = ({
                       theme={currentTheme}
                       showLogos={settings.showScraperLogos}
                       scraperLogo={(item.addonId && scraperLogos[item.addonId]) || (item as any).addon ? scraperLogos[(item.addonId || (item as any).addon) as string] || null : null}
-                      showAlert={(t, m) => openAlert(t, m)}
+                      showAlert={(t: string, m: string) => openAlert(t, m)}
                       parentTitle={metadata?.name}
                       parentType={type as 'movie' | 'series'}
                       parentSeason={(type === 'series' || type === 'other') ? currentEpisode?.season_number : undefined}
@@ -332,6 +374,7 @@ const TabletStreamsLayout: React.FC<TabletStreamsLayoutProps> = ({
           style={StyleSheet.absoluteFillObject}
           resizeMode={FastImage.resizeMode.cover}
           onLoad={handleBackdropLoad}
+          onError={handleBackdropError}
         />
       </Animated.View>
       <LinearGradient

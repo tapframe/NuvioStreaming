@@ -251,16 +251,10 @@ export const useMetadataAssets = (
     
     setLoadingBanner(true);
     
-    // Show fallback banner immediately to prevent blank state
-    const fallbackBanner = metadata?.banner || metadata?.poster || null;
-    if (fallbackBanner && !bannerImage) {
-      setBannerImage(fallbackBanner);
-      setBannerSource('default');
-    }
     
     // If enrichment is disabled, use addon banner and don't fetch from external sources
     if (!settings.enrichMetadataWithTMDB) {
-      const addonBanner = metadata?.banner || metadata?.poster || null;
+      const addonBanner = metadata?.banner || null;
       if (addonBanner && addonBanner !== bannerImage) {
         setBannerImage(addonBanner);
         setBannerSource('default');
@@ -316,15 +310,6 @@ export const useMetadataAssets = (
               if (finalBanner) {
                 FastImage.preload([{ uri: finalBanner }]);
               }
-            } 
-            else if (details?.poster_path) {
-              finalBanner = tmdbService.getImageUrl(details.poster_path);
-              bannerSourceType = 'tmdb';
-              
-              // Preload the image
-              if (finalBanner) {
-                FastImage.preload([{ uri: finalBanner }]);
-              }
             }
           } catch (error) {
             // Handle error silently
@@ -332,9 +317,9 @@ export const useMetadataAssets = (
         }
       }
       
-      // Final fallback to metadata
+      // Final fallback to metadata banner only
       if (!finalBanner) {
-        finalBanner = metadata?.banner || metadata?.poster || null;
+        finalBanner = metadata?.banner || null;
         bannerSourceType = 'default';
       }
       
@@ -346,8 +331,8 @@ export const useMetadataAssets = (
       
       forcedBannerRefreshDone.current = true;
     } catch (error) {
-      // Use default banner on error
-      const defaultBanner = metadata?.banner || metadata?.poster || null;
+      // Use default banner on error (only addon banner)
+      const defaultBanner = metadata?.banner || null;
       if (defaultBanner !== bannerImage) {
         setBannerImage(defaultBanner);
         setBannerSource('default');
