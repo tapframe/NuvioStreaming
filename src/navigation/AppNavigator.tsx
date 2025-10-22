@@ -692,7 +692,7 @@ const MainTabs = () => {
         bottom: 0, 
         left: 0, 
         right: 0,
-        height: 85 + insets.bottom,
+        height: Platform.OS === 'android' ? 70 + insets.bottom : 85 + insets.bottom,
         backgroundColor: 'transparent',
         overflow: 'hidden',
       }}>
@@ -742,8 +742,8 @@ const MainTabs = () => {
         <View
           style={{
             height: '100%',
-            paddingBottom: 20 + insets.bottom,
-            paddingTop: 12,
+            paddingBottom: Platform.OS === 'android' ? 15 + insets.bottom : 20 + insets.bottom,
+            paddingTop: Platform.OS === 'android' ? 8 : 12,
             backgroundColor: 'transparent',
           }}
         >
