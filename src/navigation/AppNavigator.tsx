@@ -39,7 +39,6 @@ import SettingsScreen from '../screens/SettingsScreen';
 import DownloadsScreen from '../screens/DownloadsScreen';
 import MetadataScreen from '../screens/MetadataScreen';
 import KSPlayerCore from '../components/player/KSPlayerCore';
-import KSPlayerWithTransition from '../components/player/KSPlayerWithTransition';
 import AndroidVideoPlayer from '../components/player/AndroidVideoPlayer';
 import CatalogScreen from '../screens/CatalogScreen';
 import AddonsScreen from '../screens/AddonsScreen';
@@ -1189,10 +1188,10 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen 
               name="PlayerIOS" 
-              component={KSPlayerWithTransition as any} 
+              component={KSPlayerCore as any} 
               options={{ 
-                animation: 'fade',
-                animationDuration: 300,
+                animation: 'default',
+                animationDuration: 0,
                 // Force fullscreen presentation on iPad
                 presentation: 'fullScreenModal',
                 // Disable gestures during video playback
@@ -1204,7 +1203,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
                 // iPad-specific fullscreen options
                 statusBarHidden: true,
-                statusBarAnimation: 'fade',
+                statusBarAnimation: 'none',
                 // Freeze when blurred to release resources safely
                 freezeOnBlur: true,
               }}
