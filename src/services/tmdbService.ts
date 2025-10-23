@@ -77,6 +77,32 @@ export interface TMDBTrendingResult {
   };
 }
 
+export interface TMDBCollection {
+  id: number;
+  name: string;
+  overview: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  parts: TMDBCollectionPart[];
+}
+
+export interface TMDBCollectionPart {
+  id: number;
+  title: string;
+  overview: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  release_date: string;
+  adult: boolean;
+  video: boolean;
+  vote_average: number;
+  vote_count: number;
+  genre_ids: number[];
+  original_language: string;
+  original_title: string;
+  popularity: number;
+}
+
 export class TMDBService {
   private static instance: TMDBService;
   private static ratingCache: Map<string, number | null> = new Map();
@@ -596,6 +622,41 @@ export class TMDBService {
         params: await this.getParams({
           language,
           append_to_response: 'external_ids,credits,keywords,release_dates,production_companies' // Include release dates and production companies
+        }),
+      });
+      return response.data;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Get collection details by collection ID
+   */
+  async getCollectionDetails(collectionId: number, language: string = 'en'): Promise<TMDBCollection | null> {
+    try {
+      const response = await axios.get(`${BASE_URL}/collection/${collectionId}`, {
+        headers: await this.getHeaders(),
+        params: await this.getParams({
+          language,
+        }),
+      });
+      return response.data;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Get collection images by collection ID
+   */
+  async getCollectionImages(collectionId: number, language: string = 'en'): Promise<any> {
+    try {
+      const response = await axios.get(`${BASE_URL}/collection/${collectionId}/images`, {
+        headers: await this.getHeaders(),
+        params: await this.getParams({
+          language,
+          include_image_language: `${language},en,null`
         }),
       });
       return response.data;

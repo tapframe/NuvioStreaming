@@ -125,6 +125,12 @@ export interface StreamingContent {
     originCountry?: string[];
     tagline?: string;
   };
+  collection?: {
+    id: number;
+    name: string;
+    poster_path?: string;
+    backdrop_path?: string;
+  };
 }
 
 export interface CatalogContent {

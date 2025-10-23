@@ -107,6 +107,8 @@ interface UseMetadataReturn {
   imdbId: string | null;
   scraperStatuses: ScraperStatus[];
   activeFetchingScrapers: string[];
+  collectionMovies: StreamingContent[];
+  loadingCollection: boolean;
 }
 
 export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadataReturn => {
@@ -132,6 +134,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
   const [loadAttempts, setLoadAttempts] = useState(0);
   const [recommendations, setRecommendations] = useState<StreamingContent[]>([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
+  const [collectionMovies, setCollectionMovies] = useState<StreamingContent[]>([]);
+  const [loadingCollection, setLoadingCollection] = useState(false);
   const [imdbId, setImdbId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [availableStreams, setAvailableStreams] = useState<{ [sourceType: string]: Stream }>({});
@@ -1939,6 +1943,94 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
               tmdbId,
               movieDetails: movieDetailsObj
             }));
+
+            // Fetch collection data if movie belongs to a collection
+            if (movieDetails.belongs_to_collection) {
+              setLoadingCollection(true);
+              try {
+                const collectionDetails = await tmdbService.getCollectionDetails(
+                  movieDetails.belongs_to_collection.id,
+                  lang
+                );
+                
+                if (collectionDetails && collectionDetails.parts) {
+                  // Fetch individual movie images to get backdrops with embedded titles/logos
+                  const collectionMoviesData = await Promise.all(
+                    collectionDetails.parts.map(async (part: any, index: number) => {
+                      let movieBackdropUrl = undefined;
+                      
+                      // Try to fetch movie images with language parameter
+                      try {
+                        const movieImages = await tmdbService.getMovieImagesFull(part.id);
+                        if (movieImages && movieImages.backdrops && movieImages.backdrops.length > 0) {
+                          // Filter and sort backdrops by language and quality
+                          const languageBackdrops = movieImages.backdrops
+                            .filter((backdrop: any) => backdrop.aspect_ratio > 1.0) // Landscape orientation
+                            .sort((a: any, b: any) => {
+                              // Prioritize backdrops with the requested language
+                              const aHasLang = a.iso_639_1 === lang;
+                              const bHasLang = b.iso_639_1 === lang;
+                              if (aHasLang && !bHasLang) return -1;
+                              if (!aHasLang && bHasLang) return 1;
+                              
+                              // Then prioritize English if requested language not available
+                              const aIsEn = a.iso_639_1 === 'en';
+                              const bIsEn = b.iso_639_1 === 'en';
+                              if (aIsEn && !bIsEn) return -1;
+                              if (!aIsEn && bIsEn) return 1;
+                              
+                              // Then sort by vote average (quality), then by resolution
+                              if (a.vote_average !== b.vote_average) {
+                                return b.vote_average - a.vote_average;
+                              }
+                              return (b.width * b.height) - (a.width * a.height);
+                            });
+                          
+                          if (languageBackdrops.length > 0) {
+                            movieBackdropUrl = tmdbService.getImageUrl(languageBackdrops[0].file_path, 'original');
+                          }
+                        }
+                      } catch (error) {
+                        if (__DEV__) console.warn('[useMetadata] Failed to fetch movie images for:', part.id, error);
+                      }
+                      
+                      return {
+                        id: `tmdb:${part.id}`,
+                        type: 'movie',
+                        name: part.title,
+                        poster: part.poster_path ? tmdbService.getImageUrl(part.poster_path, 'w500') : 'https://via.placeholder.com/300x450/cccccc/666666?text=No+Image',
+                        banner: movieBackdropUrl || (part.backdrop_path ? tmdbService.getImageUrl(part.backdrop_path, 'original') : undefined),
+                        year: part.release_date ? new Date(part.release_date).getFullYear() : undefined,
+                        description: part.overview,
+                        collection: {
+                          id: collectionDetails.id,
+                          name: collectionDetails.name,
+                          poster_path: collectionDetails.poster_path,
+                          backdrop_path: collectionDetails.backdrop_path
+                        }
+                      };
+                    })
+                  ) as StreamingContent[];
+
+                  setCollectionMovies(collectionMoviesData);
+                  
+                  // Update metadata with collection info
+                  setMetadata((prev: any) => ({
+                    ...prev,
+                    collection: {
+                      id: collectionDetails.id,
+                      name: collectionDetails.name,
+                      poster_path: collectionDetails.poster_path,
+                      backdrop_path: collectionDetails.backdrop_path
+                    }
+                  }));
+                }
+              } catch (error) {
+                if (__DEV__) console.error('[useMetadata] Error fetching collection:', error);
+              } finally {
+                setLoadingCollection(false);
+              }
+            }
           }
         }
 
@@ -2024,5 +2116,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     imdbId,
     scraperStatuses,
     activeFetchingScrapers,
+    collectionMovies,
+    loadingCollection,
   };
 };

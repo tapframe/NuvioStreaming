@@ -28,6 +28,7 @@ import { MoreLikeThisSection } from '../components/metadata/MoreLikeThisSection'
 import { RatingsSection } from '../components/metadata/RatingsSection';
 import { CommentsSection, CommentBottomSheet } from '../components/metadata/CommentsSection';
 import TrailersSection from '../components/metadata/TrailersSection';
+import CollectionSection from '../components/metadata/CollectionSection';
 import { RouteParams, Episode } from '../types/metadata';
 import Animated, {
   useAnimatedStyle,
@@ -182,6 +183,8 @@ const MetadataScreen: React.FC = () => {
     setMetadata,
     imdbId,
     tmdbId,
+    collectionMovies,
+    loadingCollection,
   } = useMetadata({ id, type, addonId });
 
 
@@ -1243,6 +1246,18 @@ const MetadataScreen: React.FC = () => {
                     <MaterialIcons name="chevron-right" size={24} color={currentTheme.colors.highEmphasis} />
                   </TouchableOpacity>
                 </View>
+              )}
+
+              {/* Collection Section - Lazy loaded */}
+              {shouldLoadSecondaryData && 
+                Object.keys(groupedEpisodes).length === 0 && 
+                metadata?.collection && 
+                settings.enrichMetadataWithTMDB && (
+                <CollectionSection
+                  collectionName={metadata.collection.name}
+                  collectionMovies={collectionMovies}
+                  loadingCollection={loadingCollection}
+                />
               )}
 
               {/* Recommendations Section with skeleton when loading - Lazy loaded */}
