@@ -68,6 +68,7 @@ import AIChatScreen from '../screens/AIChatScreen';
 import BackdropGalleryScreen from '../screens/BackdropGalleryScreen';
 import BackupScreen from '../screens/BackupScreen';
 import ContinueWatchingSettingsScreen from '../screens/ContinueWatchingSettingsScreen';
+import ContributorsScreen from '../screens/ContributorsScreen';
 
 // Stack navigator types
 export type RootStackParamList = {
@@ -175,6 +176,7 @@ export type RootStackParamList = {
     title: string;
   };
   ContinueWatchingSettings: undefined;
+  Contributors: undefined;
 };
 
 export type RootStackNavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -1290,6 +1292,21 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             <Stack.Screen 
               name="ContinueWatchingSettings" 
               component={ContinueWatchingSettingsScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="Contributors" 
+              component={ContributorsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,

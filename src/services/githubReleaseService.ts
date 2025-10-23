@@ -59,4 +59,61 @@ export function isAnyUpgrade(current: string, latest: string): boolean {
   return b[2] > a[2];
 }
 
+export async function fetchTotalDownloads(): Promise<number | null> {
+  try {
+    const res = await fetch('https://api.github.com/repos/tapframe/NuvioStreaming/releases', {
+      headers: {
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': `Nuvio/${Platform.OS}`,
+      },
+    });
+    if (!res.ok) return null;
+    const releases = await res.json();
+    
+    let total = 0;
+    releases.forEach((release: any) => {
+      if (release.assets && Array.isArray(release.assets)) {
+        release.assets.forEach((asset: any) => {
+          total += asset.download_count || 0;
+        });
+      }
+    });
+    
+    return total;
+  } catch {
+    return null;
+  }
+}
+
+export interface GitHubContributor {
+  login: string;
+  id: number;
+  avatar_url: string;
+  html_url: string;
+  contributions: number;
+  type: string;
+}
+
+export async function fetchContributors(): Promise<GitHubContributor[] | null> {
+  try {
+    const res = await fetch('https://api.github.com/repos/tapframe/NuvioStreaming/contributors', {
+      headers: {
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': `Nuvio/${Platform.OS}`,
+      },
+    });
+    
+    if (!res.ok) {
+      if (__DEV__) console.error('GitHub API error:', res.status, res.statusText);
+      return null;
+    }
+    
+    const contributors = await res.json();
+    return contributors;
+  } catch (error) {
+    if (__DEV__) console.error('Error fetching contributors:', error);
+    return null;
+  }
+}
+
 

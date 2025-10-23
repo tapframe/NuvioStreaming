@@ -27,6 +27,7 @@ import { useCatalogContext } from '../contexts/CatalogContext';
 import { useTraktContext } from '../contexts/TraktContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { catalogService } from '../services/catalogService';
+import { fetchTotalDownloads } from '../services/githubReleaseService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
 import { getDisplayedAppVersion } from '../utils/version';
@@ -291,6 +292,9 @@ const SettingsScreen: React.FC = () => {
   const [mdblistKeySet, setMdblistKeySet] = useState<boolean>(false);
   const [openRouterKeySet, setOpenRouterKeySet] = useState<boolean>(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState<boolean>(false);
+  const [totalDownloads, setTotalDownloads] = useState<number | null>(null);
+  const [displayDownloads, setDisplayDownloads] = useState<number | null>(null);
+  const [isCountingUp, setIsCountingUp] = useState<boolean>(false);
 
   // Add a useEffect to check Trakt authentication status on focus
   useEffect(() => {
@@ -346,6 +350,13 @@ const SettingsScreen: React.FC = () => {
       // Check OpenRouter API key status
       const openRouterKey = await AsyncStorage.getItem('openrouter_api_key');
       setOpenRouterKeySet(!!openRouterKey);
+
+      // Load GitHub total downloads (initial load only, polling happens in useEffect)
+      const downloads = await fetchTotalDownloads();
+      if (downloads !== null) {
+        setTotalDownloads(downloads);
+        setDisplayDownloads(downloads);
+      }
       
     } catch (error) {
       if (__DEV__) console.error('Error loading settings data:', error);
@@ -365,6 +376,60 @@ const SettingsScreen: React.FC = () => {
 
     return unsubscribe;
   }, [navigation, loadData]);
+
+  // Poll GitHub downloads every 10 seconds when on the About section
+  useEffect(() => {
+    // Only poll when viewing the About section (where downloads counter is shown)
+    const shouldPoll = isTablet ? selectedCategory === 'about' : true;
+    
+    if (!shouldPoll) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const downloads = await fetchTotalDownloads();
+        if (downloads !== null && downloads !== totalDownloads) {
+          setTotalDownloads(downloads);
+        }
+      } catch (error) {
+        if (__DEV__) console.error('Error polling downloads:', error);
+      }
+    }, 3600000); // 3600000 milliseconds (1 hour)
+
+    return () => clearInterval(pollInterval);
+  }, [selectedCategory, isTablet, totalDownloads]);
+
+  // Animate counting up when totalDownloads changes
+  useEffect(() => {
+    if (totalDownloads === null || displayDownloads === null) return;
+    if (totalDownloads === displayDownloads) return;
+
+    setIsCountingUp(true);
+    const start = displayDownloads;
+    const end = totalDownloads;
+    const duration = 2000; // 2 seconds animation
+    const startTime = Date.now();
+
+    const animate = () => {
+      const now = Date.now();
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Ease out quad for smooth deceleration
+      const easeProgress = 1 - Math.pow(1 - progress, 2);
+      const current = Math.floor(start + (end - start) * easeProgress);
+      
+      setDisplayDownloads(current);
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        setDisplayDownloads(end);
+        setIsCountingUp(false);
+      }
+    };
+
+    requestAnimationFrame(animate);
+  }, [totalDownloads]);
 
   const handleResetSettings = useCallback(() => {
     openAlert(
@@ -652,6 +717,14 @@ const SettingsScreen: React.FC = () => {
               title="Version"
               description={getDisplayedAppVersion()}
               icon="info"
+              isTablet={isTablet}
+            />
+            <SettingItem
+              title="Contributors"
+              description="View all contributors"
+              icon="users"
+              renderControl={ChevronRight}
+              onPress={() => navigation.navigate('Contributors')}
               isLast={true}
               isTablet={isTablet}
             />
@@ -803,6 +876,17 @@ const SettingsScreen: React.FC = () => {
               
               {selectedCategory === 'about' && (
                 <>
+                  {displayDownloads !== null && (
+                    <View style={styles.downloadsContainer}>
+                      <Text style={[styles.downloadsNumber, { color: currentTheme.colors.primary }]}>
+                        {displayDownloads.toLocaleString()}
+                      </Text>
+                      <Text style={[styles.downloadsLabel, { color: currentTheme.colors.mediumEmphasis }]}>
+                        downloads and counting
+                      </Text>
+                    </View>
+                  )}
+                  
                   <View style={styles.footer}>
                     <Text style={[styles.footerText, { color: currentTheme.colors.mediumEmphasis }]}> 
                       Made with ❤️ by Tapframe and Friends
@@ -887,6 +971,17 @@ const SettingsScreen: React.FC = () => {
             {renderCategoryContent('about')}
             {renderCategoryContent('developer')}
             {renderCategoryContent('cache')}
+
+            {displayDownloads !== null && (
+              <View style={styles.downloadsContainer}>
+                <Text style={[styles.downloadsNumber, { color: currentTheme.colors.primary }]}>
+                  {displayDownloads.toLocaleString()}
+                </Text>
+                <Text style={[styles.downloadsLabel, { color: currentTheme.colors.mediumEmphasis }]}>
+                  downloads and counting
+                </Text>
+              </View>
+            )}
 
             <View style={styles.footer}>
               <Text style={[styles.footerText, { color: currentTheme.colors.mediumEmphasis }]}>
@@ -1208,6 +1303,24 @@ const styles = StyleSheet.create({
   kofiImage: {
     height: 32,
     width: 150,
+  },
+  downloadsContainer: {
+    marginTop: 20,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  downloadsNumber: {
+    fontSize: 32,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  downloadsLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    opacity: 0.6,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
   },
   loadingSpinner: {
     width: 16,
