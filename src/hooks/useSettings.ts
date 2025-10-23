@@ -86,6 +86,7 @@ export interface AppSettings {
   useCachedStreams: boolean; // Enable/disable direct player navigation from Continue Watching cache
   openMetadataScreenWhenCacheDisabled: boolean; // When cache disabled, open MetadataScreen instead of StreamsScreen
   streamCacheTTL: number; // Stream cache duration in milliseconds (default: 1 hour)
+  enableStreamsBackdrop: boolean; // Enable blurred backdrop background on StreamsScreen mobile
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -145,6 +146,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   useCachedStreams: false, // Enable by default
   openMetadataScreenWhenCacheDisabled: true, // Default to StreamsScreen when cache disabled
   streamCacheTTL: 60 * 60 * 1000, // Default: 1 hour in milliseconds
+  enableStreamsBackdrop: true, // Enable by default (new behavior)
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';

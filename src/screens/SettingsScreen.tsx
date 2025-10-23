@@ -518,9 +518,24 @@ const SettingsScreen: React.FC = () => {
                   onValueChange={(value) => updateSetting('episodeLayoutStyle', value ? 'horizontal' : 'vertical')}
                 />
               )}
-              isLast={true}
+              isLast={isTablet}
               isTablet={isTablet}
             />
+            {!isTablet && (
+              <SettingItem
+                title="Streams Backdrop"
+                description="Show blurred backdrop on mobile streams"
+                icon="image"
+                renderControl={() => (
+                  <CustomSwitch
+                    value={settings?.enableStreamsBackdrop ?? true}
+                    onValueChange={(value) => updateSetting('enableStreamsBackdrop', value)}
+                  />
+                )}
+                isLast={true}
+                isTablet={isTablet}
+              />
+            )}
           </SettingsCard>
         );
 

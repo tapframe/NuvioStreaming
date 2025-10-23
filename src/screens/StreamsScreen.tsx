@@ -50,6 +50,7 @@ import CustomAlert from '../components/CustomAlert';
 import { useToast } from '../contexts/ToastContext';
 import { useDownloads } from '../contexts/DownloadsContext';
 import { streamCacheService } from '../services/streamCacheService';
+import { useDominantColor } from '../hooks/useDominantColor';
 import { PaperProvider } from 'react-native-paper';
 import { BlurView as ExpoBlurView } from 'expo-blur';
 import TabletStreamsLayout from '../components/TabletStreamsLayout';
@@ -1549,6 +1550,48 @@ export const StreamsScreen = () => {
     return r;
   }, [currentEpisode, tmdbEpisodeOverride?.runtime]);
 
+  // Mobile backdrop source selection logic
+  const mobileBackdropSource = useMemo(() => {
+    // For series episodes: prioritize episodeImage, fallback to bannerImage
+    if (type === 'series' || (type === 'other' && selectedEpisode)) {
+      if (episodeImage) {
+        return episodeImage;
+      }
+      if (bannerImage) {
+        return bannerImage;
+      }
+    }
+    
+    // For movies: prioritize bannerImage
+    if (type === 'movie') {
+      if (bannerImage) {
+        return bannerImage;
+      }
+    }
+    
+    // For other types or when no specific image available
+    return bannerImage || episodeImage;
+  }, [type, selectedEpisode, episodeImage, bannerImage]);
+
+  // Backdrop source for color extraction - only episodes, not movies
+  const colorExtractionSource = useMemo(() => {
+    // Only extract colors if backdrop is enabled
+    if (!settings.enableStreamsBackdrop) {
+      return null;
+    }
+    
+    if (type === 'series' || (type === 'other' && selectedEpisode)) {
+      // Only use episodeImage - don't fallback to bannerImage
+      // This ensures we get episode-specific colors, not show-wide colors
+      return episodeImage || null;
+    }
+    // Return null for movies - no color extraction
+    return null;
+  }, [type, selectedEpisode, episodeImage, settings.enableStreamsBackdrop]);
+
+  // Extract dominant color from backdrop for gradient
+  const { dominantColor } = useDominantColor(colorExtractionSource);
+
   // Prefetch hero/backdrop and title logo when StreamsScreen opens
   useEffect(() => {
     const urls: string[] = [];
@@ -1562,6 +1605,33 @@ export const StreamsScreen = () => {
       RNImage.prefetch(u).catch(() => {});
     });
   }, [episodeImage, bannerImage, metadata]);
+
+  // Helper to create gradient colors from dominant color
+  const createGradientColors = useCallback((baseColor: string | null): [string, string, string, string, string] => {
+    if (!baseColor || baseColor === '#1a1a1a') {
+      // Fallback to black gradient with stronger bottom edge
+      return ['rgba(0,0,0,0)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.85)', 'rgba(0,0,0,0.95)'];
+    }
+    
+    // Convert hex to RGB
+    const r = parseInt(baseColor.substr(1, 2), 16);
+    const g = parseInt(baseColor.substr(3, 2), 16);
+    const b = parseInt(baseColor.substr(5, 2), 16);
+    
+    // Create gradient stops with much stronger opacity at bottom
+    return [
+      `rgba(${r},${g},${b},0)`,
+      `rgba(${r},${g},${b},0.3)`,
+      `rgba(${r},${g},${b},0.6)`,
+      `rgba(${r},${g},${b},0.85)`,
+      `rgba(${r},${g},${b},0.95)`,
+    ];
+  }, []);
+
+  const gradientColors = useMemo(() => 
+    createGradientColors(dominantColor), 
+    [dominantColor, createGradientColors]
+  );
 
   const isLoading = metadata?.videos && metadata.videos.length > 1 && selectedEpisode ? loadingEpisodeStreams : loadingStreams;
   const streams = metadata?.videos && metadata.videos.length > 1 && selectedEpisode ? episodeStreams : groupedStreams;
@@ -1695,8 +1765,52 @@ export const StreamsScreen = () => {
       ) : (
         // PHONE LAYOUT (existing structure)
         <>
+          {/* Full Screen Background for Mobile */}
+          {settings.enableStreamsBackdrop ? (
+            <View style={StyleSheet.absoluteFill}>
+              {mobileBackdropSource ? (
+                <AnimatedImage
+                  source={{ uri: mobileBackdropSource }}
+                  style={styles.mobileFullScreenBackground}
+                  contentFit="cover"
+                />
+              ) : (
+                <View style={styles.mobileNoBackdropBackground} />
+              )}
+              {Platform.OS === 'android' && AndroidBlurView ? (
+                <AndroidBlurView
+                  blurAmount={15}
+                  blurRadius={8}
+                  overlayColor={"rgba(0,0,0,0.8)"}
+                  style={StyleSheet.absoluteFill}
+                />
+              ) : (
+                <ExpoBlurView
+                  intensity={60}
+                  tint="dark"
+                  style={StyleSheet.absoluteFill}
+                />
+              )}
+              {/* Dark overlay to reduce brightness */}
+              {Platform.OS === 'ios' && (
+                <View style={[
+                  StyleSheet.absoluteFill,
+                  { backgroundColor: dominantColor && dominantColor !== '#1a1a1a' 
+                    ? `${dominantColor}CC` // Add 80% opacity (CC in hex)
+                    : 'rgba(0,0,0,0.8)' 
+                  }
+                ]} />
+              )}
+            </View>
+          ) : (
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.darkBackground }]} />
+          )}
+
           {type === 'movie' && metadata && (
-            <View style={[styles.movieTitleContainer]}>
+            <View style={[
+              styles.movieTitleContainer,
+              !settings.enableStreamsBackdrop && { backgroundColor: colors.darkBackground }
+            ]}>
               <View style={styles.movieTitleContent}>
                 {metadata.logo && !movieLogoError ? (
                   <FastImage
@@ -1715,7 +1829,10 @@ export const StreamsScreen = () => {
           )}
 
           {metadata?.videos && metadata.videos.length > 1 && selectedEpisode && (
-            <View style={[styles.streamsHeroContainer]}>
+            <View style={[
+              styles.streamsHeroContainer,
+              !settings.enableStreamsBackdrop && { backgroundColor: colors.darkBackground }
+            ]}>
               <View style={StyleSheet.absoluteFill}>
                 <View
                   style={StyleSheet.absoluteFill}
@@ -1725,11 +1842,11 @@ export const StreamsScreen = () => {
                     style={styles.streamsHeroBackground}
                     contentFit="cover"
                   />
-                  <LinearGradient
-                    colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.7)', colors.darkBackground]}
-                    locations={[0, 0.4, 0.6, 0.8, 1]}
-                    style={styles.streamsHeroGradient}
-                  >
+                   <LinearGradient
+                     colors={gradientColors}
+                     locations={[0, 0.4, 0.6, 0.8, 1]}
+                     style={styles.streamsHeroGradient}
+                   >
                     <View style={styles.streamsHeroContent}>
                       {currentEpisode ? (
                         <View style={styles.streamsHeroInfo}>
@@ -1781,9 +1898,29 @@ export const StreamsScreen = () => {
             </View>
           )}
 
+          {/* Gradient overlay to blend hero section with streams container */}
+          {metadata?.videos && metadata.videos.length > 1 && selectedEpisode && settings.enableStreamsBackdrop && (
+            <View style={styles.heroBlendOverlay}>
+              <LinearGradient
+                colors={[
+                  dominantColor && dominantColor !== '#1a1a1a'
+                    ? `rgba(${parseInt(dominantColor.substr(1, 2), 16)},${parseInt(dominantColor.substr(3, 2), 16)},${parseInt(dominantColor.substr(5, 2), 16)},0.95)`
+                    : 'rgba(0,0,0,0.95)',
+                  dominantColor && dominantColor !== '#1a1a1a'
+                    ? `rgba(${parseInt(dominantColor.substr(1, 2), 16)},${parseInt(dominantColor.substr(3, 2), 16)},${parseInt(dominantColor.substr(5, 2), 16)},0.7)`
+                    : 'rgba(0,0,0,0.7)',
+                  'transparent'
+                ]}
+                locations={[0, 0.5, 1]}
+                style={StyleSheet.absoluteFill}
+              />
+            </View>
+          )}
+
           <View style={[
             styles.streamsMainContent,
-            type === 'movie' && styles.streamsMainContentMovie
+            type === 'movie' && styles.streamsMainContentMovie,
+            !settings.enableStreamsBackdrop && { backgroundColor: colors.darkBackground }
           ]}>
             <View style={[styles.filterContainer]}>
               {!streamsEmpty && (
@@ -1969,7 +2106,7 @@ export const StreamsScreen = () => {
 const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.darkBackground,
+    backgroundColor: 'transparent',
     // iOS-specific fixes for navigation transition glitches
     ...(Platform.OS === 'ios' && {
       // Ensure the background is properly rendered during transitions
@@ -2004,7 +2141,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   streamsMainContent: {
     flex: 1,
-    backgroundColor: colors.darkBackground,
+    backgroundColor: 'transparent',
     paddingTop: 12,
     zIndex: 1,
     // iOS-specific fixes for navigation transition glitches
@@ -2225,13 +2362,13 @@ const createStyles = (colors: any) => StyleSheet.create({
     height: 220, // Fixed height to prevent layout shift
     marginBottom: 0,
     position: 'relative',
-    backgroundColor: colors.black,
+    backgroundColor: 'transparent',
     pointerEvents: 'box-none',
   },
   streamsHeroBackground: {
     width: '100%',
     height: '100%',
-    backgroundColor: colors.black,
+    backgroundColor: 'transparent',
   },
   streamsHeroGradient: {
     ...StyleSheet.absoluteFillObject,
@@ -2349,7 +2486,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   movieTitleContainer: {
     width: '100%',
     height: 140,
-    backgroundColor: colors.darkBackground,
+    backgroundColor: 'transparent',
     pointerEvents: 'box-none',
     justifyContent: 'center',
     paddingTop: Platform.OS === 'android' ? 65 : 35,
@@ -2555,6 +2692,24 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   backButtonContainerTablet: {
     zIndex: 3,
+  },
+  mobileFullScreenBackground: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+  },
+  mobileNoBackdropBackground: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.darkBackground,
+  },
+  heroBlendOverlay: {
+    position: 'absolute',
+    top: 220, // Height of hero container
+    left: 0,
+    right: 0,
+    height: 60, // Extend gradient 60px into streams area
+    zIndex: 0,
+    pointerEvents: 'none',
   },
 });
 
