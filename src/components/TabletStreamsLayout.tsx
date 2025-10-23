@@ -177,9 +177,10 @@ const TabletStreamsLayout: React.FC<TabletStreamsLayoutProps> = ({
     return undefined;
   }, [episodeImage, bannerImage, metadata?.poster, backdropError]);
   
-  // Animate backdrop when it loads
+  // Animate backdrop when it loads, or animate content immediately if no backdrop
   useEffect(() => {
     if (backdropSource?.uri && backdropLoaded) {
+      // Animate backdrop first
       backdropOpacity.value = withTiming(1, {
         duration: 800,
         easing: Easing.out(Easing.cubic)
@@ -204,6 +205,25 @@ const TabletStreamsLayout: React.FC<TabletStreamsLayoutProps> = ({
         easing: Easing.out(Easing.cubic)
       }));
       rightPanelTranslateX.value = withDelay(500, withTiming(0, {
+        duration: 600,
+        easing: Easing.out(Easing.cubic)
+      }));
+    } else if (!backdropSource?.uri) {
+      // No backdrop available, animate content panels immediately
+      leftPanelOpacity.value = withTiming(1, {
+        duration: 600,
+        easing: Easing.out(Easing.cubic)
+      });
+      leftPanelTranslateX.value = withTiming(0, {
+        duration: 600,
+        easing: Easing.out(Easing.cubic)
+      });
+      
+      rightPanelOpacity.value = withDelay(200, withTiming(1, {
+        duration: 600,
+        easing: Easing.out(Easing.cubic)
+      }));
+      rightPanelTranslateX.value = withDelay(200, withTiming(0, {
         duration: 600,
         easing: Easing.out(Easing.cubic)
       }));
@@ -368,15 +388,21 @@ const TabletStreamsLayout: React.FC<TabletStreamsLayoutProps> = ({
   return (
     <View style={styles.tabletLayout}>
       {/* Full Screen Background with Entrance Animation */}
-      <Animated.View style={[styles.tabletFullScreenBackground, backdropAnimatedStyle]}>
-        <FastImage
-          source={backdropSource}
-          style={StyleSheet.absoluteFillObject}
-          resizeMode={FastImage.resizeMode.cover}
-          onLoad={handleBackdropLoad}
-          onError={handleBackdropError}
-        />
-      </Animated.View>
+      {backdropSource?.uri ? (
+        <Animated.View style={[styles.tabletFullScreenBackground, backdropAnimatedStyle]}>
+          <FastImage
+            source={backdropSource}
+            style={StyleSheet.absoluteFillObject}
+            resizeMode={FastImage.resizeMode.cover}
+            onLoad={handleBackdropLoad}
+            onError={handleBackdropError}
+          />
+        </Animated.View>
+      ) : (
+        <View style={styles.tabletFullScreenBackground}>
+          <View style={styles.tabletNoBackdropBackground} />
+        </View>
+      )}
       <LinearGradient
         colors={['rgba(0,0,0,0.2)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.6)']}
         locations={[0, 0.5, 1]}
@@ -684,6 +710,10 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   tabletFullScreenBackground: {
     ...StyleSheet.absoluteFillObject,
+  },
+  tabletNoBackdropBackground: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.darkBackground,
   },
   tabletFullScreenGradient: {
     ...StyleSheet.absoluteFillObject,
