@@ -18,6 +18,7 @@ import { useTraktAutosyncSettings } from '../../hooks/useTraktAutosyncSettings';
 import { useMetadata } from '../../hooks/useMetadata';
 import { useSettings } from '../../hooks/useSettings';
 import { usePlayerGestureControls } from '../../hooks/usePlayerGestureControls';
+import { useChromecast } from '../../hooks/useChromecast';
 
 import { 
   DEFAULT_SUBTITLE_SIZE,
@@ -210,6 +211,11 @@ const AndroidVideoPlayer: React.FC = () => {
   const initialSeekTargetRef = useRef<number | null>(null);
   const initialSeekVerifiedRef = useRef(false);
   const isSourceSeekableRef = useRef<boolean | null>(null);
+  
+  // Cast-related state
+  const [isCasting, setIsCasting] = useState(false);
+  const [wasPlayingBeforeCast, setWasPlayingBeforeCast] = useState(false);
+  const [castPositionBeforeConnect, setCastPositionBeforeConnect] = useState(0);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const [isOpeningAnimationComplete, setIsOpeningAnimationComplete] = useState(false);
   const openingFadeAnim = useRef(new Animated.Value(0)).current;
@@ -485,6 +491,125 @@ const AndroidVideoPlayer: React.FC = () => {
   const [currentStreamProvider, setCurrentStreamProvider] = useState<string | undefined>(streamProvider);
   const [currentStreamName, setCurrentStreamName] = useState<string | undefined>(streamName);
   const isMounted = useRef(true);
+  
+  // Initialize Chromecast hook (after all required state variables are declared)
+  const chromecast = useChromecast();
+  
+  // Cast handler functions
+  const handleCastPress = useCallback(() => {
+    if (!chromecast.isCastAvailable) {
+      logger.warn('[AndroidVideoPlayer] Chromecast not available');
+      return;
+    }
+    
+    if (chromecast.isCastConnected) {
+      // Already connected, show picker to disconnect or switch devices
+      chromecast.showCastPicker();
+    } else {
+      // Not connected, show picker to connect
+      chromecast.showCastPicker();
+    }
+  }, [chromecast]);
+
+  const loadMediaToCast = useCallback(async () => {
+    if (!chromecast.isCastConnected || !currentStreamUrl) {
+      return;
+    }
+
+    try {
+      // Determine content type based on stream URL
+      let contentType = 'video/mp4';
+      if (currentStreamUrl.includes('.m3u8') || currentStreamUrl.includes('hls')) {
+        contentType = 'application/x-mpegURL';
+      } else if (currentStreamUrl.includes('.mpd') || currentStreamUrl.includes('dash')) {
+        contentType = 'application/dash+xml';
+      }
+
+      // Prepare metadata
+      const metadata = {
+        title: title,
+        subtitle: episodeTitle || `${season ? `S${season}` : ''}${episode ? `E${episode}` : ''}`,
+        images: backdrop ? [{ url: backdrop }] : undefined,
+        studio: currentStreamProvider || streamProvider || 'Nuvio',
+        type: type === 'series' ? 'series' as const : 'movie' as const,
+      };
+
+      const mediaInfo = {
+        contentUrl: currentStreamUrl,
+        contentType,
+        metadata,
+        streamDuration: duration,
+        startTime: currentTime,
+        customData: {
+          headers: headers,
+          quality: currentQuality || quality,
+          streamProvider: currentStreamProvider || streamProvider,
+        }
+      };
+
+      await chromecast.loadMedia(mediaInfo);
+      
+      // Store state before casting
+      setWasPlayingBeforeCast(!paused);
+      setCastPositionBeforeConnect(currentTime);
+      setIsCasting(true);
+      
+      // Pause local playback
+      setPaused(true);
+      
+      logger.log('[AndroidVideoPlayer] Media loaded to Cast device');
+    } catch (error) {
+      logger.error('[AndroidVideoPlayer] Error loading media to Cast:', error);
+    }
+  }, [chromecast, currentStreamUrl, title, episodeTitle, season, episode, backdrop, currentStreamProvider, streamProvider, type, duration, currentTime, headers, currentQuality, quality, paused]);
+  
+  // Handle Cast connection changes
+  useEffect(() => {
+    if (chromecast.isCastConnected && !isCasting) {
+      // Just connected to Cast device, load media
+      loadMediaToCast();
+    } else if (!chromecast.isCastConnected && isCasting) {
+      // Disconnected from Cast device, resume local playback
+      setIsCasting(false);
+      
+      // Resume local playback at Cast's last position
+      if (chromecast.currentPosition > 0) {
+        setCurrentTime(chromecast.currentPosition);
+        // Seek to the position if video is loaded
+        if (videoRef.current && duration > 0) {
+          videoRef.current.seek(chromecast.currentPosition);
+        }
+      }
+      
+      // Restore playing state if it was playing before casting
+      if (wasPlayingBeforeCast) {
+        setPaused(false);
+      }
+      
+      logger.log('[AndroidVideoPlayer] Resumed local playback after Cast disconnect');
+    }
+  }, [chromecast.isCastConnected, isCasting, loadMediaToCast, chromecast.currentPosition, duration, wasPlayingBeforeCast]);
+
+  // Sync Cast playback state with local state
+  useEffect(() => {
+    if (isCasting && chromecast.isCastConnected) {
+      // Update current time from Cast device
+      if (chromecast.currentPosition !== currentTime) {
+        setCurrentTime(chromecast.currentPosition);
+      }
+      
+      // Update duration from Cast device
+      if (chromecast.duration !== duration && chromecast.duration > 0) {
+        setDuration(chromecast.duration);
+      }
+      
+      // Sync paused state
+      if (chromecast.isPlaying !== !paused) {
+        setPaused(!chromecast.isPlaying);
+      }
+    }
+  }, [isCasting, chromecast.isCastConnected, chromecast.currentPosition, chromecast.duration, chromecast.isPlaying, currentTime, duration, paused]);
+  
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null);
   const [isSyncingBeforeClose, setIsSyncingBeforeClose] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -1589,8 +1714,15 @@ const AndroidVideoPlayer: React.FC = () => {
 
   const skip = useCallback((seconds: number) => {
     const newTime = Math.max(0, Math.min(currentTime + seconds, duration - END_EPSILON));
-    seekToTime(newTime);
-  }, [currentTime, duration]);
+    
+    if (isCasting && chromecast.isCastConnected) {
+      // Forward seek command to Cast device
+      chromecast.seek(newTime);
+    } else {
+      // Local playback
+      seekToTime(newTime);
+    }
+  }, [isCasting, chromecast, currentTime, duration]);
 
   const cycleAspectRatio = useCallback(() => {
     // Prevent rapid successive resize operations
@@ -2480,13 +2612,23 @@ const AndroidVideoPlayer: React.FC = () => {
   };
     
   const togglePlayback = useCallback(() => {
-    const newPausedState = !paused;
-    setPaused(newPausedState);
+    if (isCasting && chromecast.isCastConnected) {
+      // Forward play/pause command to Cast device
+      if (paused) {
+        chromecast.play();
+      } else {
+        chromecast.pause();
+      }
+    } else {
+      // Local playback
+      const newPausedState = !paused;
+      setPaused(newPausedState);
 
-    if (duration > 0) {
-      traktAutosync.handleProgressUpdate(currentTime, duration, true);
+      if (duration > 0) {
+        traktAutosync.handleProgressUpdate(currentTime, duration, true);
+      }
     }
-  }, [paused, currentTime, duration, traktAutosync]);
+  }, [isCasting, chromecast, paused, duration, currentTime, traktAutosync]);
 
   // Handle next episode button press
   const handlePlayNextEpisode = useCallback(async () => {
@@ -3466,7 +3608,11 @@ const AndroidVideoPlayer: React.FC = () => {
             onSlidingComplete={handleSlidingComplete}
             buffered={buffered}
             formatTime={formatTime}
-          playerBackend={useVLC ? 'VLC' : 'ExoPlayer'}
+            playerBackend={useVLC ? 'VLC' : 'ExoPlayer'}
+            // Cast props
+            isCastConnected={chromecast.isCastConnected}
+            castDevice={chromecast.castDevice?.name}
+            onCastPress={handleCastPress}
           />
 
           {showPauseOverlay && (
@@ -4037,6 +4183,55 @@ const AndroidVideoPlayer: React.FC = () => {
                 }}>
                   {Math.round(brightness * 100)}%
                 </Text>
+              </View>
+            </Animated.View>
+          )}
+
+          {/* Cast Error Overlay */}
+          {chromecast.error && (
+            <Animated.View
+              style={{
+                position: 'absolute',
+                top: screenDimensions.height * 0.1,
+                left: screenDimensions.width / 2 - 100,
+                opacity: 1,
+                zIndex: 1000,
+              }}
+            >
+              <View style={{
+                backgroundColor: 'rgba(255, 0, 0, 0.9)',
+                borderRadius: 8,
+                paddingHorizontal: 16,
+                paddingVertical: 8,
+                alignItems: 'center',
+                justifyContent: 'center',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.3,
+                shadowRadius: 4,
+                elevation: 5,
+                maxWidth: 200,
+              }}>
+                <Text style={{
+                  color: '#FFFFFF',
+                  fontSize: 12,
+                  fontWeight: '600',
+                  textAlign: 'center',
+                }}>
+                  Cast Error: {chromecast.error}
+                </Text>
+                <TouchableOpacity
+                  style={{ marginTop: 4 }}
+                  onPress={chromecast.clearError}
+                >
+                  <Text style={{
+                    color: '#FFFFFF',
+                    fontSize: 10,
+                    textDecorationLine: 'underline',
+                  }}>
+                    Dismiss
+                  </Text>
+                </TouchableOpacity>
               </View>
             </Animated.View>
           )}

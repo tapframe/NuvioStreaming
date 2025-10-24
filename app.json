@@ -87,6 +87,14 @@
           "supportsBackgroundPlayback": true
         }
       ],
+      [
+        "react-native-google-cast",
+        {
+          "androidReceiverAppId": "CC1AD845",
+          "iosReceiverAppId": "CC1AD845",
+          "iosStartDiscoveryAfterFirstTapOnCastButton": true
+        }
+      ],
       "react-native-bottom-tabs"
     ],
     "updates": {

@@ -19,6 +19,7 @@ import { useTraktAutosyncSettings } from '../../hooks/useTraktAutosyncSettings';
 import { useMetadata } from '../../hooks/useMetadata';
 import { useSettings } from '../../hooks/useSettings';
 import { usePlayerGestureControls } from '../../hooks/usePlayerGestureControls';
+import { useChromecast } from '../../hooks/useChromecast';
 
 import {
   DEFAULT_SUBTITLE_SIZE,
@@ -267,6 +268,12 @@ const KSPlayerCore: React.FC = () => {
   // AirPlay state
   const [isAirPlayActive, setIsAirPlayActive] = useState<boolean>(false);
   const [allowsAirPlay, setAllowsAirPlay] = useState<boolean>(true);
+
+  // Cast state
+  const chromecast = useChromecast();
+  const [isCasting, setIsCasting] = useState(false);
+  const [wasPlayingBeforeCast, setWasPlayingBeforeCast] = useState(false);
+  const [castPositionBeforeConnect, setCastPositionBeforeConnect] = useState(0);
 
   // Silent startup-timeout retry state
   const startupRetryCountRef = useRef(0);
@@ -1212,7 +1219,12 @@ const KSPlayerCore: React.FC = () => {
 
   const skip = (seconds: number) => {
     const newTime = Math.max(0, Math.min(currentTime + seconds, duration - END_EPSILON));
-    seekToTime(newTime);
+    
+    if (isCasting && chromecast.isCastConnected) {
+      chromecast.seek(newTime);
+    } else {
+      seekToTime(newTime);
+    }
   };
 
   const onAudioTracks = (data: { audioTracks: AudioTrack[] }) => {
@@ -1823,7 +1835,15 @@ const KSPlayerCore: React.FC = () => {
   };
 
   const togglePlayback = () => {
-    setPaused(!paused);
+    if (isCasting && chromecast.isCastConnected) {
+      if (paused) {
+        chromecast.play();
+      } else {
+        chromecast.pause();
+      }
+    } else {
+      setPaused(!paused);
+    }
   };
 
   // Handle next episode button press
@@ -2309,6 +2329,57 @@ const KSPlayerCore: React.FC = () => {
     }
   };
 
+  // Cast handlers
+  const handleCastPress = useCallback(() => {
+    if (!chromecast.isCastAvailable) {
+      logger.warn('[KSPlayerCore] Chromecast not available');
+      return;
+    }
+    chromecast.showCastPicker();
+  }, [chromecast]);
+
+  const loadMediaToCast = useCallback(async () => {
+    if (!chromecast.isCastConnected || !currentStreamUrl) {
+      return;
+    }
+
+    try {
+      let contentType = 'video/mp4';
+      if (currentStreamUrl.includes('.m3u8') || currentStreamUrl.includes('hls')) {
+        contentType = 'application/x-mpegURL';
+      }
+
+      const mediaInfo = {
+        contentUrl: currentStreamUrl,
+        contentType,
+        metadata: {
+          title: title,
+          subtitle: episodeTitle || `${season ? `S${season}` : ''}${episode ? `E${episode}` : ''}`,
+          images: backdrop ? [{ url: backdrop }] : undefined,
+          studio: currentStreamProvider || streamProvider || 'Nuvio',
+        },
+        streamDuration: duration,
+        startTime: currentTime,
+        customData: {
+          headers: headers,
+          quality: currentQuality || quality,
+        }
+      };
+
+      await chromecast.loadMedia(mediaInfo);
+      setWasPlayingBeforeCast(!paused);
+      setCastPositionBeforeConnect(currentTime);
+      setIsCasting(true);
+      setPaused(true);
+      
+      logger.log('[KSPlayerCore] Media loaded to Cast device');
+    } catch (error) {
+      logger.error('[KSPlayerCore] Error loading media to Cast:', error);
+    }
+  }, [chromecast, currentStreamUrl, title, episodeTitle, season, episode, backdrop, 
+      currentStreamProvider, streamProvider, duration, currentTime, headers, 
+      currentQuality, quality, paused]);
+
   const handleSelectStream = async (newStream: any) => {
     if (newStream.url === currentStreamUrl) {
       setShowSourcesModal(false);
@@ -2398,6 +2469,43 @@ const KSPlayerCore: React.FC = () => {
     }
   }, [isVideoLoaded, initialPosition, duration]);
 
+  // Handle Cast connection changes
+  useEffect(() => {
+    if (chromecast.isCastConnected && !isCasting) {
+      loadMediaToCast();
+    } else if (!chromecast.isCastConnected && isCasting) {
+      setIsCasting(false);
+      
+      if (chromecast.currentPosition > 0) {
+        seekToTime(chromecast.currentPosition);
+      }
+      
+      if (wasPlayingBeforeCast) {
+        setPaused(false);
+      }
+      
+      logger.log('[KSPlayerCore] Resumed local playback after Cast disconnect');
+    }
+  }, [chromecast.isCastConnected, isCasting, loadMediaToCast, chromecast.currentPosition, wasPlayingBeforeCast]);
+
+  // Sync Cast playback state
+  useEffect(() => {
+    if (isCasting && chromecast.isCastConnected) {
+      if (chromecast.currentPosition !== currentTime) {
+        setCurrentTime(chromecast.currentPosition);
+      }
+      
+      if (chromecast.duration !== duration && chromecast.duration > 0) {
+        setDuration(chromecast.duration);
+      }
+      
+      if (chromecast.isPlaying !== !paused) {
+        setPaused(!chromecast.isPlaying);
+      }
+    }
+  }, [isCasting, chromecast.isCastConnected, chromecast.currentPosition, 
+      chromecast.duration, chromecast.isPlaying, currentTime, duration, paused]);
+
   return (
     <View style={[
       styles.container,
@@ -2486,6 +2594,34 @@ const KSPlayerCore: React.FC = () => {
             <>
               <ActivityIndicator size="large" color="#E50914" />
             </>
+          )}
+
+
+          {/* Cast Error Overlay */}
+          {chromecast.error && (
+            <View style={{
+              position: 'absolute',
+              top: screenDimensions.height * 0.1,
+              alignSelf: 'center',
+              zIndex: 1000,
+            }}>
+              <View style={{
+                backgroundColor: 'rgba(255, 0, 0, 0.9)',
+                borderRadius: 8,
+                paddingHorizontal: 16,
+                paddingVertical: 8,
+                maxWidth: 200,
+              }}>
+                <Text style={{ color: '#FFFFFF', fontSize: 12, textAlign: 'center' }}>
+                  Cast Error: {chromecast.error}
+                </Text>
+                <TouchableOpacity onPress={chromecast.clearError}>
+                  <Text style={{ color: '#FFFFFF', fontSize: 10, textAlign: 'center', textDecorationLine: 'underline' }}>
+                    Dismiss
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           )}
         </View>
       </Animated.View>
@@ -2696,6 +2832,9 @@ const KSPlayerCore: React.FC = () => {
           isAirPlayActive={isAirPlayActive}
           allowsAirPlay={allowsAirPlay}
           onAirPlayPress={handleAirPlayPress}
+          isCastConnected={chromecast.isCastConnected}
+          castDevice={chromecast.castDevice?.name}
+          onCastPress={handleCastPress}
           />
 
           {showPauseOverlay && (

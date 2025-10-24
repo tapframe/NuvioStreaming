@@ -7,6 +7,7 @@ import Slider from '@react-native-community/slider';
 import { styles } from '../utils/playerStyles'; // Updated styles
 import { getTrackDisplayName } from '../utils/playerUtils';
 import { useTheme } from '../../../contexts/ThemeContext';
+import ChromecastButton from './ChromecastButton';
 
 interface PlayerControlsProps {
   showControls: boolean;
@@ -49,6 +50,10 @@ interface PlayerControlsProps {
   isAirPlayActive?: boolean;
   allowsAirPlay?: boolean;
   onAirPlayPress?: () => void;
+  // Chromecast props
+  isCastConnected?: boolean;
+  castDevice?: string;
+  onCastPress?: () => void;
 }
 
 export const PlayerControls: React.FC<PlayerControlsProps> = ({
@@ -90,6 +95,9 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   isAirPlayActive,
   allowsAirPlay,
   onAirPlayPress,
+  isCastConnected,
+  castDevice,
+  onCastPress,
 }) => {
   const { currentTheme } = useTheme();
 
@@ -317,8 +325,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
               )}
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              {/* AirPlay Button - iOS only, KSAVPlayer only */}
-              {Platform.OS === 'ios' && onAirPlayPress && playerBackend === 'KSAVPlayer' && (
+              {/* AirPlay Button - temporarily hidden */}
+              {false && Platform.OS === 'ios' && onAirPlayPress && playerBackend === 'KSAVPlayer' && (
                 <TouchableOpacity
                   style={{ padding: 8 }}
                   onPress={onAirPlayPress}
@@ -329,6 +337,17 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                     color={isAirPlayActive ? currentTheme.colors.primary : "white"}
                   />
                 </TouchableOpacity>
+              )}
+              
+              {/* Chromecast Button - temporarily hidden */}
+              {false && onCastPress && (
+                <ChromecastButton
+                  size={closeIconSize}
+                  color="white"
+                  activeColor="#E50914"
+                  onPress={onCastPress}
+                  isConnected={isCastConnected}
+                />
               )}
               <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
                 <Ionicons name="close" size={closeIconSize} color="white" />

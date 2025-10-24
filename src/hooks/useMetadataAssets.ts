@@ -185,5 +185,7 @@ export const useMetadataAssets = (
     foundTmdbId,
     setBannerImage,
     bannerSource,
+    logoLoadError: false,
+    setLogoLoadError: () => {},
   };
 }; 

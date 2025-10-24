@@ -1,4 +1,9 @@
 apply plugin: "com.android.application"
+// @generated begin safeExtGet - expo prebuild (DO NOT MODIFY) sync-be4acad6508a6820102c74ab393bd7ab1093e6c0
+def safeExtGet(prop, fallback) {
+  rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
+}
+// @generated end safeExtGet
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
@@ -185,6 +190,9 @@ android {
 }
 
 dependencies {
+// @generated begin react-native-google-cast-dependencies - expo prebuild (DO NOT MODIFY) sync-3822a3c86222e7aca74039b551612aab7e75365d
+    implementation "com.google.android.gms:play-services-cast-framework:${safeExtGet('castFrameworkVersion', '+')}"
+// @generated end react-native-google-cast-dependencies
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 
@@ -214,4 +222,7 @@ dependencies {
 
     // Include only FFmpeg decoder AAR to avoid duplicates with Maven Media3
     implementation files("libs/lib-decoder-ffmpeg-release.aar")
+    
+    // Google Cast SDK
+    implementation "com.google.android.gms:play-services-cast-framework:+"
 }

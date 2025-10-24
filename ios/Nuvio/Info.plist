@@ -54,6 +54,8 @@
     <key>NSBonjourServices</key>
     <array>
       <string>_http._tcp</string>
+      <string>_googlecast._tcp</string>
+      <string>_CC1AD845._googlecast._tcp</string>
     </array>
     <key>NSLocalNetworkUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your local network</string>
