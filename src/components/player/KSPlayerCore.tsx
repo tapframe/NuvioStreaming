@@ -18,6 +18,7 @@ import { useTraktAutosync } from '../../hooks/useTraktAutosync';
 import { useTraktAutosyncSettings } from '../../hooks/useTraktAutosyncSettings';
 import { useMetadata } from '../../hooks/useMetadata';
 import { useSettings } from '../../hooks/useSettings';
+import { usePlayerGestureControls } from '../../hooks/usePlayerGestureControls';
 
 import {
   DEFAULT_SUBTITLE_SIZE,
@@ -125,6 +126,7 @@ const KSPlayerCore: React.FC = () => {
   const ksPlayerRef = useRef<KSPlayerRef>(null);
   const [showAudioModal, setShowAudioModal] = useState(false);
   const [showSubtitleModal, setShowSubtitleModal] = useState(false);
+  const [showSpeedModal, setShowSpeedModal] = useState(false);
   const [initialPosition, setInitialPosition] = useState<number | null>(null);
   const [progressSaveInterval, setProgressSaveInterval] = useState<NodeJS.Timeout | null>(null);
   const [isInitialSeekComplete, setIsInitialSeekComplete] = useState(false);
@@ -297,15 +299,19 @@ const KSPlayerCore: React.FC = () => {
   // Volume and brightness controls
   const [volume, setVolume] = useState(100); // KSPlayer uses 0-100 range
   const [brightness, setBrightness] = useState(1.0);
-  const [showVolumeOverlay, setShowVolumeOverlay] = useState(false);
-  const [showBrightnessOverlay, setShowBrightnessOverlay] = useState(false);
   const [subtitleSettingsLoaded, setSubtitleSettingsLoaded] = useState(false);
-  const volumeOverlayOpacity = useRef(new Animated.Value(0)).current;
-  const brightnessOverlayOpacity = useRef(new Animated.Value(0)).current;
-  const volumeOverlayTimeout = useRef<NodeJS.Timeout | null>(null);
-  const brightnessOverlayTimeout = useRef<NodeJS.Timeout | null>(null);
-  const lastVolumeChange = useRef<number>(0);
-  const lastBrightnessChange = useRef<number>(0);
+
+  // Use reusable gesture controls hook
+  const gestureControls = usePlayerGestureControls({
+    volume,
+    setVolume,
+    brightness,
+    setBrightness,
+    volumeRange: { min: 0, max: 100 }, // KSPlayer uses 0-100
+    volumeSensitivity: 0.006,
+    brightnessSensitivity: 0.004,
+    debugMode: DEBUG_MODE,
+  });
 
   // Get metadata to access logo (only if we have a valid id)
   const shouldLoadMetadata = Boolean(id && type);
@@ -459,104 +465,6 @@ const KSPlayerCore: React.FC = () => {
     setLastZoomScale(targetZoom);
     if (DEBUG_MODE) {
       if (__DEV__) logger.log(`[VideoPlayer] Zoom reset to ${targetZoom}x (16:9: ${is16by9Content})`);
-    }
-  };
-
-  // Volume gesture handler (right side of screen)
-  const onVolumeGestureEvent = async (event: PanGestureHandlerGestureEvent) => {
-    const { translationY, state } = event.nativeEvent;
-    const sensitivity = 0.050; // Higher sensitivity for volume (more responsive than brightness)
-
-    if (state === State.ACTIVE) {
-      const deltaY = -translationY; // Invert for natural feel (up = increase)
-      const volumeChange = deltaY * sensitivity;
-      const newVolume = Math.max(0, Math.min(100, volume + volumeChange));
-
-      if (Math.abs(newVolume - volume) > 0.05) { // Even lower threshold for volume responsiveness
-        setVolume(newVolume);
-        lastVolumeChange.current = Date.now();
-
-        // Show overlay with smoother animation
-        if (!showVolumeOverlay) {
-          setShowVolumeOverlay(true);
-          Animated.spring(volumeOverlayOpacity, {
-            toValue: 1,
-            tension: 100,
-            friction: 8,
-            useNativeDriver: true,
-          }).start();
-        }
-
-        // Clear existing timeout
-        if (volumeOverlayTimeout.current) {
-          clearTimeout(volumeOverlayTimeout.current);
-        }
-
-        // Hide overlay after 1.5 seconds
-        volumeOverlayTimeout.current = setTimeout(() => {
-          Animated.timing(volumeOverlayOpacity, {
-            toValue: 0,
-            duration: 250,
-            useNativeDriver: true,
-          }).start(() => {
-            setShowVolumeOverlay(false);
-          });
-        }, 1500);
-      }
-    }
-  };
-
-  // Brightness gesture handler (left side of screen)
-  const onBrightnessGestureEvent = async (event: PanGestureHandlerGestureEvent) => {
-    const { translationY, state } = event.nativeEvent;
-    const sensitivity = 0.001; // Lower sensitivity for finer brightness control
-
-    if (state === State.ACTIVE) {
-      const deltaY = -translationY; // Invert for natural feel (up = increase)
-      const brightnessChange = deltaY * sensitivity;
-      const newBrightness = Math.max(0, Math.min(1, brightness + brightnessChange));
-
-      if (Math.abs(newBrightness - brightness) > 0.001) { // Much lower threshold for more responsive updates
-        setBrightness(newBrightness);
-        lastBrightnessChange.current = Date.now();
-
-        // Set device brightness using Expo Brightness
-        try {
-          await Brightness.setBrightnessAsync(newBrightness);
-          if (DEBUG_MODE) {
-            logger.log(`[VideoPlayer] Device brightness set to: ${newBrightness}`);
-          }
-        } catch (error) {
-          logger.warn('[VideoPlayer] Error setting device brightness:', error);
-        }
-
-        // Show overlay with smoother animation
-        if (!showBrightnessOverlay) {
-          setShowBrightnessOverlay(true);
-          Animated.spring(brightnessOverlayOpacity, {
-            toValue: 1,
-            tension: 100,
-            friction: 8,
-            useNativeDriver: true,
-          }).start();
-        }
-
-        // Clear existing timeout
-        if (brightnessOverlayTimeout.current) {
-          clearTimeout(brightnessOverlayTimeout.current);
-        }
-
-        // Hide overlay after 1.5 seconds (reduced from 2 seconds)
-        brightnessOverlayTimeout.current = setTimeout(() => {
-          Animated.timing(brightnessOverlayOpacity, {
-            toValue: 0,
-            duration: 250,
-            useNativeDriver: true,
-          }).start(() => {
-            setShowBrightnessOverlay(false);
-          });
-        }, 1500);
-      }
     }
   };
 
@@ -2211,12 +2119,10 @@ const KSPlayerCore: React.FC = () => {
       if (errorTimeoutRef.current) {
         clearTimeout(errorTimeoutRef.current);
       }
-      if (volumeOverlayTimeout.current) {
-        clearTimeout(volumeOverlayTimeout.current);
-      }
-      if (brightnessOverlayTimeout.current) {
-        clearTimeout(brightnessOverlayTimeout.current);
-      }
+      
+      // Cleanup gesture controls
+      gestureControls.cleanup();
+      
       if (startupRetryTimerRef.current) {
         clearTimeout(startupRetryTimerRef.current);
         startupRetryTimerRef.current = null;
@@ -2619,9 +2525,9 @@ const KSPlayerCore: React.FC = () => {
       >
         {/* Combined gesture handler for left side - brightness + tap */}
         <PanGestureHandler
-          onGestureEvent={onBrightnessGestureEvent}
-          activeOffsetY={[-5, 5]}
-          failOffsetX={[-20, 20]}
+          onGestureEvent={gestureControls.onBrightnessGestureEvent}
+          activeOffsetY={[-10, 10]}
+          failOffsetX={[-30, 30]}
           shouldCancelWhenOutside={false}
           simultaneousHandlers={[]}
           maxPointers={1}
@@ -2644,9 +2550,9 @@ const KSPlayerCore: React.FC = () => {
 
         {/* Combined gesture handler for right side - volume + tap */}
         <PanGestureHandler
-          onGestureEvent={onVolumeGestureEvent}
-          activeOffsetY={[-5, 5]}
-          failOffsetX={[-20, 20]}
+          onGestureEvent={gestureControls.onVolumeGestureEvent}
+          activeOffsetY={[-10, 10]}
+          failOffsetX={[-30, 30]}
           shouldCancelWhenOutside={false}
           simultaneousHandlers={[]}
           maxPointers={1}
@@ -2776,6 +2682,7 @@ const KSPlayerCore: React.FC = () => {
             currentResizeMode={resizeMode}
             setShowAudioModal={setShowAudioModal}
             setShowSubtitleModal={setShowSubtitleModal}
+            setShowSpeedModal={setShowSpeedModal}
             isSubtitleModalOpen={showSubtitleModal}
             setShowSourcesModal={setShowSourcesModal}
             onSliderValueChange={handleSliderValueChange}
@@ -3169,13 +3076,13 @@ const KSPlayerCore: React.FC = () => {
           />
 
           {/* Volume Overlay */}
-          {showVolumeOverlay && (
+          {gestureControls.showVolumeOverlay && (
             <Animated.View
               style={{
                 position: 'absolute',
                 left: getDimensions().width / 2 - 60,
                 top: getDimensions().height / 2 - 60,
-                opacity: volumeOverlayOpacity,
+                opacity: gestureControls.volumeOverlayOpacity,
                 zIndex: 1000,
               }}
             >
@@ -3266,13 +3173,13 @@ const KSPlayerCore: React.FC = () => {
           )}
 
           {/* Brightness Overlay */}
-          {showBrightnessOverlay && (
+          {gestureControls.showBrightnessOverlay && (
             <Animated.View
               style={{
                 position: 'absolute',
                 left: getDimensions().width / 2 - 60,
                 top: getDimensions().height / 2 - 60,
-                opacity: brightnessOverlayOpacity,
+                opacity: gestureControls.brightnessOverlayOpacity,
                 zIndex: 1000,
               }}
             >

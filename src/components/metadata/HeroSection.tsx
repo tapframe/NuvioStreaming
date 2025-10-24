@@ -1106,9 +1106,6 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   // Guards to avoid repeated auto-starts
   const startedOnFocusRef = useRef(false);
   const startedOnReadyRef = useRef(false);
-  // Debounced pause/resume flag to avoid blocking scroll
-  const pendingPauseResumeSV = useSharedValue(0); // 0 = no action, 1 = pause, 2 = resume
-  const pauseResumeTimerRef = useRef<any>(null);
   
   // Animation values for trailer unmute effects
   const actionButtonsOpacity = useSharedValue(1);
@@ -1691,7 +1688,6 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   }, [isFocused, setTrailerPlaying]);
 
   // Ultra-optimized scroll-based pause/resume with cached calculations
-  // This worklet only sets flags - actual pause/resume happens asynchronously to avoid blocking scroll
   useDerivedValue(() => {
     'worklet';
     try {
@@ -1704,48 +1700,20 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       const isPlaying = isPlayingSV.value === 1;
       const isPausedByScroll = pausedByScrollSV.value === 1;
 
-      // Set flags for pause/resume - don't execute immediately to keep scroll smooth
+      // Optimized pause/resume logic with minimal branching
       if (y > pauseThreshold && isPlaying && !isPausedByScroll) {
-        pendingPauseResumeSV.value = 1; // Request pause
+        pausedByScrollSV.value = 1;
+        runOnJS(setTrailerPlaying)(false);
+        isPlayingSV.value = 0;
       } else if (y < resumeThreshold && isPausedByScroll) {
-        pendingPauseResumeSV.value = 2; // Request resume
+        pausedByScrollSV.value = 0;
+        runOnJS(setTrailerPlaying)(true);
+        isPlayingSV.value = 1;
       }
     } catch (e) {
       // Silent error handling for performance
     }
   });
-
-  // Debounced pause/resume effect - executes asynchronously to keep scroll smooth
-  useEffect(() => {
-    const checkPendingAction = () => {
-      const pendingAction = pendingPauseResumeSV.value;
-      
-      if (pendingAction === 1) {
-        // Execute pause
-        pausedByScrollSV.value = 1;
-        setTrailerPlaying(false);
-        isPlayingSV.value = 0;
-        pendingPauseResumeSV.value = 0; // Clear flag
-      } else if (pendingAction === 2) {
-        // Execute resume
-        pausedByScrollSV.value = 0;
-        setTrailerPlaying(true);
-        isPlayingSV.value = 1;
-        pendingPauseResumeSV.value = 0; // Clear flag
-      }
-    };
-
-    // Set up a recurring check with small delay to avoid blocking scroll
-    const intervalId = setInterval(checkPendingAction, 100);
-    
-    return () => {
-      clearInterval(intervalId);
-      if (pauseResumeTimerRef.current) {
-        clearTimeout(pauseResumeTimerRef.current);
-        pauseResumeTimerRef.current = null;
-      }
-    };
-  }, [setTrailerPlaying, pendingPauseResumeSV, pausedByScrollSV, isPlayingSV]);
 
   // Memory management and cleanup
   useEffect(() => {

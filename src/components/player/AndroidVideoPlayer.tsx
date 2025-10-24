@@ -17,6 +17,7 @@ import { useTraktAutosync } from '../../hooks/useTraktAutosync';
 import { useTraktAutosyncSettings } from '../../hooks/useTraktAutosyncSettings';
 import { useMetadata } from '../../hooks/useMetadata';
 import { useSettings } from '../../hooks/useSettings';
+import { usePlayerGestureControls } from '../../hooks/usePlayerGestureControls';
 
 import { 
   DEFAULT_SUBTITLE_SIZE,
@@ -278,8 +279,6 @@ const AndroidVideoPlayer: React.FC = () => {
   // Debounce resize operations to prevent rapid successive clicks
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Debounce gesture operations to prevent rapid-fire events
-  const gestureDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
 
 
@@ -375,10 +374,6 @@ const AndroidVideoPlayer: React.FC = () => {
       if (resizeTimeoutRef.current) {
         clearTimeout(resizeTimeoutRef.current);
         resizeTimeoutRef.current = null;
-      }
-      if (gestureDebounceRef.current) {
-        clearTimeout(gestureDebounceRef.current);
-        gestureDebounceRef.current = null;
       }
     };
   }, []);
@@ -576,15 +571,21 @@ const AndroidVideoPlayer: React.FC = () => {
   // Store Android system brightness state to restore on exit/unmount
   const originalSystemBrightnessRef = useRef<number | null>(null);
   const originalSystemBrightnessModeRef = useRef<number | null>(null);
-  const [showVolumeOverlay, setShowVolumeOverlay] = useState(false);
-  const [showBrightnessOverlay, setShowBrightnessOverlay] = useState(false);
   const [subtitleSettingsLoaded, setSubtitleSettingsLoaded] = useState(false);
-  const volumeOverlayOpacity = useRef(new Animated.Value(0)).current;
-  const brightnessOverlayOpacity = useRef(new Animated.Value(0)).current;
-  const volumeOverlayTimeout = useRef<NodeJS.Timeout | null>(null);
-  const brightnessOverlayTimeout = useRef<NodeJS.Timeout | null>(null);
   const lastVolumeChange = useRef<number>(0);
   const lastBrightnessChange = useRef<number>(0);
+
+  // Use reusable gesture controls hook
+  const gestureControls = usePlayerGestureControls({
+    volume,
+    setVolume,
+    brightness,
+    setBrightness,
+    volumeRange: { min: 0, max: 1 },
+    volumeSensitivity: 0.006,
+    brightnessSensitivity: 0.004,
+    debugMode: DEBUG_MODE,
+  });
 
   // iOS startup timing diagnostics
   const loadStartAtRef = useRef<number | null>(null);
@@ -741,124 +742,6 @@ const AndroidVideoPlayer: React.FC = () => {
   const onPinchHandlerStateChange = (event: PinchGestureHandlerGestureEvent) => {
     // Zoom disabled
     return;
-  };
-
-  // Volume gesture handler (right side of screen) - optimized with debouncing
-  const onVolumeGestureEvent = async (event: PanGestureHandlerGestureEvent) => {
-    const { translationY, state } = event.nativeEvent;
-    const sensitivity = 0.002; // Lower sensitivity for gradual volume control on Android
-
-    if (state === State.ACTIVE) {
-      // Debounce rapid gesture events
-      if (gestureDebounceRef.current) {
-        clearTimeout(gestureDebounceRef.current);
-      }
-      
-      gestureDebounceRef.current = setTimeout(() => {
-        const deltaY = -translationY; // Invert for natural feel (up = increase)
-        const volumeChange = deltaY * sensitivity;
-        const newVolume = Math.max(0, Math.min(1, volume + volumeChange));
-
-        if (Math.abs(newVolume - volume) > 0.01) { // Lower threshold for smoother Android volume control
-          setVolume(newVolume);
-          lastVolumeChange.current = Date.now();
-          
-          if (DEBUG_MODE) {
-            logger.log(`[AndroidVideoPlayer] Volume set to: ${newVolume}`);
-          }
-          
-          // Show overlay with smoother animation
-          if (!showVolumeOverlay) {
-            setShowVolumeOverlay(true);
-            Animated.spring(volumeOverlayOpacity, {
-              toValue: 1,
-              tension: 100,
-              friction: 8,
-              useNativeDriver: true,
-            }).start();
-          }
-          
-          // Clear existing timeout
-          if (volumeOverlayTimeout.current) {
-            clearTimeout(volumeOverlayTimeout.current);
-          }
-          
-          // Hide overlay after 1.5 seconds (reduced from 2 seconds)
-          volumeOverlayTimeout.current = setTimeout(() => {
-            Animated.timing(volumeOverlayOpacity, {
-              toValue: 0,
-              duration: 250,
-              useNativeDriver: true,
-            }).start(() => {
-              setShowVolumeOverlay(false);
-            });
-          }, 1500);
-        }
-      }, 16); // ~60fps debouncing
-    }
-  };
-
-  // Brightness gesture handler (left side of screen) - optimized with debouncing
-  const onBrightnessGestureEvent = async (event: PanGestureHandlerGestureEvent) => {
-    const { translationY, state } = event.nativeEvent;
-    const sensitivity = 0.001; // Lower sensitivity for finer brightness control
-
-    if (state === State.ACTIVE) {
-      // Debounce rapid gesture events
-      if (gestureDebounceRef.current) {
-        clearTimeout(gestureDebounceRef.current);
-      }
-      
-      gestureDebounceRef.current = setTimeout(() => {
-        const deltaY = -translationY; // Invert for natural feel (up = increase)
-        const brightnessChange = deltaY * sensitivity;
-        const newBrightness = Math.max(0, Math.min(1, brightness + brightnessChange));
-
-        if (Math.abs(newBrightness - brightness) > 0.001) { // Much lower threshold for more responsive updates
-          setBrightness(newBrightness);
-          lastBrightnessChange.current = Date.now();
-          
-          // Set device brightness using Expo Brightness
-          try {
-            Brightness.setBrightnessAsync(newBrightness).catch((error) => {
-              logger.warn('[AndroidVideoPlayer] Error setting device brightness:', error);
-            });
-            if (DEBUG_MODE) {
-              logger.log(`[AndroidVideoPlayer] Device brightness set to: ${newBrightness}`);
-            }
-          } catch (error) {
-            logger.warn('[AndroidVideoPlayer] Error setting device brightness:', error);
-          }
-          
-          // Show overlay with smoother animation
-          if (!showBrightnessOverlay) {
-            setShowBrightnessOverlay(true);
-            Animated.spring(brightnessOverlayOpacity, {
-              toValue: 1,
-              tension: 100,
-              friction: 8,
-              useNativeDriver: true,
-            }).start();
-          }
-          
-          // Clear existing timeout
-          if (brightnessOverlayTimeout.current) {
-            clearTimeout(brightnessOverlayTimeout.current);
-          }
-          
-          // Hide overlay after 1.5 seconds (reduced from 2 seconds)
-          brightnessOverlayTimeout.current = setTimeout(() => {
-            Animated.timing(brightnessOverlayOpacity, {
-              toValue: 0,
-              duration: 250,
-              useNativeDriver: true,
-            }).start(() => {
-              setShowBrightnessOverlay(false);
-            });
-          }, 1500);
-        }
-      }, 16); // ~60fps debouncing
-    }
   };
 
   // Long press gesture handlers for speed boost
@@ -2902,14 +2785,6 @@ const AndroidVideoPlayer: React.FC = () => {
         clearTimeout(errorTimeoutRef.current);
         errorTimeoutRef.current = null;
       }
-      if (volumeOverlayTimeout.current) {
-        clearTimeout(volumeOverlayTimeout.current);
-        volumeOverlayTimeout.current = null;
-      }
-      if (brightnessOverlayTimeout.current) {
-        clearTimeout(brightnessOverlayTimeout.current);
-        brightnessOverlayTimeout.current = null;
-      }
       if (controlsTimeout.current) {
         clearTimeout(controlsTimeout.current);
         controlsTimeout.current = null;
@@ -2918,14 +2793,13 @@ const AndroidVideoPlayer: React.FC = () => {
         clearTimeout(pauseOverlayTimerRef.current);
         pauseOverlayTimerRef.current = null;
       }
-      if (gestureDebounceRef.current) {
-        clearTimeout(gestureDebounceRef.current);
-        gestureDebounceRef.current = null;
-      }
       if (progressSaveInterval) {
         clearInterval(progressSaveInterval);
         setProgressSaveInterval(null);
       }
+      
+      // Cleanup gesture controls
+      gestureControls.cleanup();
       // Best-effort restore of Android system brightness state on unmount
       if (Platform.OS === 'android') {
         try {
@@ -3323,9 +3197,9 @@ const AndroidVideoPlayer: React.FC = () => {
           simultaneousHandlers={[]}
         >
           <PanGestureHandler
-            onGestureEvent={onBrightnessGestureEvent}
-            activeOffsetY={[-5, 5]}
-            failOffsetX={[-20, 20]}
+            onGestureEvent={gestureControls.onBrightnessGestureEvent}
+            activeOffsetY={[-10, 10]}
+            failOffsetX={[-30, 30]}
             shouldCancelWhenOutside={false}
             simultaneousHandlers={[]}
             maxPointers={1}
@@ -3356,9 +3230,9 @@ const AndroidVideoPlayer: React.FC = () => {
           simultaneousHandlers={[]}
         >
           <PanGestureHandler
-            onGestureEvent={onVolumeGestureEvent}
-            activeOffsetY={[-5, 5]}
-            failOffsetX={[-20, 20]}
+            onGestureEvent={gestureControls.onVolumeGestureEvent}
+            activeOffsetY={[-10, 10]}
+            failOffsetX={[-30, 30]}
             shouldCancelWhenOutside={false}
             simultaneousHandlers={[]}
             maxPointers={1}
@@ -3974,13 +3848,13 @@ const AndroidVideoPlayer: React.FC = () => {
           />
 
           {/* Volume Overlay */}
-          {showVolumeOverlay && (
+          {gestureControls.showVolumeOverlay && (
             <Animated.View
               style={{
                 position: 'absolute',
                 left: screenDimensions.width / 2 - 60,
                 top: screenDimensions.height / 2 - 60,
-                opacity: volumeOverlayOpacity,
+                opacity: gestureControls.volumeOverlayOpacity,
                 zIndex: 1000,
               }}
             >
@@ -4071,13 +3945,13 @@ const AndroidVideoPlayer: React.FC = () => {
           )}
 
           {/* Brightness Overlay */}
-          {showBrightnessOverlay && (
+          {gestureControls.showBrightnessOverlay && (
             <Animated.View
               style={{
                 position: 'absolute',
                 left: screenDimensions.width / 2 - 60,
                 top: screenDimensions.height / 2 - 60,
-                opacity: brightnessOverlayOpacity,
+                opacity: gestureControls.brightnessOverlayOpacity,
                 zIndex: 1000,
               }}
             >
