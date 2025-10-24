@@ -131,6 +131,7 @@ export interface StreamingContent {
     poster_path?: string;
     backdrop_path?: string;
   };
+  addedToLibraryAt?: number; // Timestamp when added to library
 }
 
 export interface CatalogContent {
@@ -853,7 +854,10 @@ class CatalogService {
 
   public async addToLibrary(content: StreamingContent): Promise<void> {
     const key = `${content.type}:${content.id}`;
-    this.library[key] = content;
+    this.library[key] = {
+      ...content,
+      addedToLibraryAt: Date.now() // Add timestamp
+    };
     this.saveLibrary();
     this.notifyLibrarySubscribers();
     try { this.libraryAddListeners.forEach(l => l(content)); } catch {}

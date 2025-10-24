@@ -274,8 +274,16 @@ const LibraryScreen = () => {
       setLoading(true);
       try {
         const items = await catalogService.getLibraryItems();
+        
+        // Sort by date added (most recent first)
+        const sortedItems = items.sort((a, b) => {
+          const timeA = (a as any).addedToLibraryAt || 0;
+          const timeB = (b as any).addedToLibraryAt || 0;
+          return timeB - timeA; // Descending order (newest first)
+        });
+        
         // Load watched status for each item from AsyncStorage
-        const updatedItems = await Promise.all(items.map(async (item) => {
+        const updatedItems = await Promise.all(sortedItems.map(async (item) => {
           // Map StreamingContent to LibraryItem shape
           const libraryItem: LibraryItem = {
             ...item,
@@ -301,8 +309,15 @@ const LibraryScreen = () => {
 
     // Subscribe to library updates
     const unsubscribe = catalogService.subscribeToLibraryUpdates(async (items) => {
+      // Sort by date added (most recent first)
+      const sortedItems = items.sort((a, b) => {
+        const timeA = (a as any).addedToLibraryAt || 0;
+        const timeB = (b as any).addedToLibraryAt || 0;
+        return timeB - timeA; // Descending order (newest first)
+      });
+      
       // Sync watched status on update
-      const updatedItems = await Promise.all(items.map(async (item) => {
+      const updatedItems = await Promise.all(sortedItems.map(async (item) => {
         // Map StreamingContent to LibraryItem shape
         const libraryItem: LibraryItem = {
           ...item,
