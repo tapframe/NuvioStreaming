@@ -253,7 +253,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   if (!hasData) return null;
 
   return (
-    <Animated.View entering={FadeIn.duration(350).easing(Easing.out(Easing.cubic))}>
+    <Animated.View entering={FadeIn.duration(150).easing(Easing.out(Easing.cubic))}>
       <Animated.View style={[styles.container as ViewStyle]}>
         {/* Removed preload images for performance - let FastImage cache handle it naturally */}
           {settings.enableHomeHeroBackground && data[activeIndex] && (

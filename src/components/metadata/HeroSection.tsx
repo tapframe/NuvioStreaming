@@ -1157,12 +1157,28 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   // Auto-start trailer when ready on initial entry if enabled
   useEffect(() => {
     if (trailerReady && settings?.showTrailers && isFocused && !globalTrailerPlaying && !startedOnReadyRef.current) {
-      startedOnReadyRef.current = true;
-      logger.info('HeroSection', 'Trailer ready - auto-starting playback');
-      setTrailerPlaying(true);
-      isPlayingSV.value = 1;
+      // Check scroll position - only auto-start if user hasn't scrolled past the hero section
+      try {
+        const y = (scrollY as any).value || 0;
+        const pauseThreshold = heroHeight.value * 0.7;
+        
+        if (y < pauseThreshold) {
+          startedOnReadyRef.current = true;
+          logger.info('HeroSection', 'Trailer ready - auto-starting playback');
+          setTrailerPlaying(true);
+          isPlayingSV.value = 1;
+        } else {
+          logger.info('HeroSection', 'Trailer ready but user scrolled past - not auto-starting');
+          // Mark as started to prevent retry
+          startedOnReadyRef.current = true;
+        }
+      } catch (_e) {
+        // Fallback if scroll position unavailable - don't auto-start to be safe
+        logger.info('HeroSection', 'Trailer ready but scroll position unavailable - not auto-starting');
+        startedOnReadyRef.current = true;
+      }
     }
-  }, [trailerReady, settings?.showTrailers, isFocused, globalTrailerPlaying, setTrailerPlaying]);
+  }, [trailerReady, settings?.showTrailers, isFocused, globalTrailerPlaying, setTrailerPlaying, scrollY, heroHeight]);
 
   // Handle fullscreen toggle
   const handleFullscreenToggle = useCallback(async () => {

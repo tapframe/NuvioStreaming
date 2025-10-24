@@ -16,6 +16,7 @@ try {
 interface VlcVideoPlayerProps {
   source: string;
   volume: number;
+  playbackSpeed: number;
   zoomScale: number;
   resizeMode: 'contain' | 'cover' | 'none';
   onLoad: (data: any) => void;
@@ -46,6 +47,7 @@ export interface VlcPlayerRef {
 const VlcVideoPlayer = forwardRef<VlcPlayerRef, VlcVideoPlayerProps>(({
   source,
   volume,
+  playbackSpeed,
   zoomScale,
   resizeMode,
   onLoad,
@@ -342,7 +344,7 @@ const VlcVideoPlayer = forwardRef<VlcPlayerRef, VlcVideoPlayerProps>(({
         volume={Math.round(Math.max(0, Math.min(1, volume)) * 100)}
         mute={false}
         repeat={false}
-        rate={1}
+        rate={playbackSpeed}
         autoplay={false}
         onFirstPlay={handleFirstPlay}
         onPositionChanged={handlePositionChanged}

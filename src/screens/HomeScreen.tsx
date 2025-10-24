@@ -631,20 +631,18 @@ const HomeScreen = () => {
     const heroStyleToUse = isTablet ? 'legacy' : settings.heroStyle;
     return heroStyleToUse === 'carousel' ? (
       <HeroCarousel
-        key={`carousel-${featuredContentSource}`}
         items={allFeaturedContent || (featuredContent ? [featuredContent] : [])}
         loading={featuredLoading}
       />
     ) : (
       <FeaturedContent
-        key={`featured-${showHeroSection}-${featuredContentSource}`}
         featuredContent={featuredContent}
         isSaved={isSaved}
         handleSaveToLibrary={handleSaveToLibrary}
         loading={featuredLoading}
       />
     );
-  }, [isTablet, settings.heroStyle, showHeroSection, featuredContentSource, featuredLoading]);
+  }, [isTablet, settings.heroStyle, showHeroSection, featuredContentSource, allFeaturedContent, featuredContent, isSaved, handleSaveToLibrary, featuredLoading]);
 
   const memoizedThisWeekSection = useMemo(() => <ThisWeekSection />, []);
   const memoizedContinueWatchingSection = useMemo(() => <ContinueWatchingSection ref={continueWatchingRef} />, []);

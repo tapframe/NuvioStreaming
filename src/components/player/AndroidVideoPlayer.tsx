@@ -3323,6 +3323,7 @@ const AndroidVideoPlayer: React.FC = () => {
                     ref={vlcPlayerRef}
                     source={processedStreamUrl}
                     volume={volume}
+                    playbackSpeed={playbackSpeed}
                     zoomScale={zoomScale}
                     resizeMode={resizeMode}
                     onLoad={(data) => {
