@@ -7,7 +7,7 @@ export const RESUME_PREF = {
 };
 
 export const SUBTITLE_SIZE_KEY = '@subtitle_size_preference';
-export const DEFAULT_SUBTITLE_SIZE = 50;
+export const DEFAULT_SUBTITLE_SIZE = 30;
 
 // Define the TrackPreferenceType for audio/text tracks
 export type TrackPreferenceType = 'system' | 'disabled' | 'title' | 'language' | 'index';
