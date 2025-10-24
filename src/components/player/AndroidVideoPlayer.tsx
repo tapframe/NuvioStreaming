@@ -5,7 +5,7 @@ import Video, { VideoRef, SelectedTrack, SelectedTrackType, BufferingStrategyTyp
 import FastImage from '@d11/react-native-fast-image';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
-import { PinchGestureHandler, PanGestureHandler, TapGestureHandler, State, PinchGestureHandlerGestureEvent, PanGestureHandlerGestureEvent, TapGestureHandlerGestureEvent } from 'react-native-gesture-handler';
+import { PinchGestureHandler, PanGestureHandler, TapGestureHandler, LongPressGestureHandler, State, PinchGestureHandlerGestureEvent, PanGestureHandlerGestureEvent, TapGestureHandlerGestureEvent, LongPressGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import RNImmersiveMode from 'react-native-immersive-mode';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { storageService } from '../../services/storageService';
@@ -215,6 +215,10 @@ const AndroidVideoPlayer: React.FC = () => {
   const [isBuffering, setIsBuffering] = useState(false);
   const [rnVideoAudioTracks, setRnVideoAudioTracks] = useState<Array<{id: number, name: string, language?: string}>>([]);
   const [rnVideoTextTracks, setRnVideoTextTracks] = useState<Array<{id: number, name: string, language?: string}>>([]);
+
+  // Speed boost state for hold-to-speed-up feature
+  const [isSpeedBoosted, setIsSpeedBoosted] = useState(false);
+  const [originalSpeed, setOriginalSpeed] = useState<number>(1.0);
 
   // Debounce track updates to prevent excessive processing
   const trackUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -804,6 +808,26 @@ const AndroidVideoPlayer: React.FC = () => {
       }, 16); // ~60fps debouncing
     }
   };
+
+  // Long press gesture handlers for speed boost
+  const onLongPressActivated = useCallback(() => {
+    if (!isSpeedBoosted && playbackSpeed !== 2.0) {
+      setOriginalSpeed(playbackSpeed);
+      setPlaybackSpeed(2.0);
+      setIsSpeedBoosted(true);
+      
+      logger.log('[AndroidVideoPlayer] Speed boost activated: 2x');
+    }
+  }, [isSpeedBoosted, playbackSpeed]);
+
+  const onLongPressEnd = useCallback(() => {
+    if (isSpeedBoosted) {
+      setPlaybackSpeed(originalSpeed);
+      setIsSpeedBoosted(false);
+      
+      logger.log('[AndroidVideoPlayer] Speed boost deactivated, restored to:', originalSpeed);
+    }
+  }, [isSpeedBoosted, originalSpeed]);
 
   const resetZoom = () => {
     const targetZoom = is16by9Content ? 1.1 : 1;
@@ -3216,55 +3240,71 @@ const AndroidVideoPlayer: React.FC = () => {
           }
         ]}
       >
-        {/* Combined gesture handler for left side - brightness + tap */}
-        <PanGestureHandler
-          onGestureEvent={onBrightnessGestureEvent}
-          activeOffsetY={[-5, 5]}
-          failOffsetX={[-20, 20]}
+        {/* Combined gesture handler for left side - brightness + tap + long press */}
+        <LongPressGestureHandler
+          onActivated={onLongPressActivated}
+          onEnded={onLongPressEnd}
+          minDurationMs={500}
           shouldCancelWhenOutside={false}
           simultaneousHandlers={[]}
-          maxPointers={1}
         >
-          <TapGestureHandler
-            onActivated={toggleControls}
+          <PanGestureHandler
+            onGestureEvent={onBrightnessGestureEvent}
+            activeOffsetY={[-5, 5]}
+            failOffsetX={[-20, 20]}
             shouldCancelWhenOutside={false}
             simultaneousHandlers={[]}
+            maxPointers={1}
           >
-            <View style={{
-              position: 'absolute',
-              top: screenDimensions.height * 0.15, // Back to original margin
-              left: 0,
-              width: screenDimensions.width * 0.4, // Back to larger area (40% of screen)
-              height: screenDimensions.height * 0.7, // Back to larger middle portion (70% of screen)
-              zIndex: 10, // Higher z-index to capture gestures
-            }} />
-          </TapGestureHandler>
-        </PanGestureHandler>
+            <TapGestureHandler
+              onActivated={toggleControls}
+              shouldCancelWhenOutside={false}
+              simultaneousHandlers={[]}
+            >
+              <View style={{
+                position: 'absolute',
+                top: screenDimensions.height * 0.15, // Back to original margin
+                left: 0,
+                width: screenDimensions.width * 0.4, // Back to larger area (40% of screen)
+                height: screenDimensions.height * 0.7, // Back to larger middle portion (70% of screen)
+                zIndex: 10, // Higher z-index to capture gestures
+              }} />
+            </TapGestureHandler>
+          </PanGestureHandler>
+        </LongPressGestureHandler>
 
-        {/* Combined gesture handler for right side - volume + tap */}
-        <PanGestureHandler
-          onGestureEvent={onVolumeGestureEvent}
-          activeOffsetY={[-5, 5]}
-          failOffsetX={[-20, 20]}
+        {/* Combined gesture handler for right side - volume + tap + long press */}
+        <LongPressGestureHandler
+          onActivated={onLongPressActivated}
+          onEnded={onLongPressEnd}
+          minDurationMs={500}
           shouldCancelWhenOutside={false}
           simultaneousHandlers={[]}
-          maxPointers={1}
         >
-          <TapGestureHandler
-            onActivated={toggleControls}
+          <PanGestureHandler
+            onGestureEvent={onVolumeGestureEvent}
+            activeOffsetY={[-5, 5]}
+            failOffsetX={[-20, 20]}
             shouldCancelWhenOutside={false}
             simultaneousHandlers={[]}
+            maxPointers={1}
           >
-            <View style={{
-              position: 'absolute',
-              top: screenDimensions.height * 0.15, // Back to original margin
-              right: 0,
-              width: screenDimensions.width * 0.4, // Back to larger area (40% of screen)
-              height: screenDimensions.height * 0.7, // Back to larger middle portion (70% of screen)
-              zIndex: 10, // Higher z-index to capture gestures
-            }} />
-          </TapGestureHandler>
-        </PanGestureHandler>
+            <TapGestureHandler
+              onActivated={toggleControls}
+              shouldCancelWhenOutside={false}
+              simultaneousHandlers={[]}
+            >
+              <View style={{
+                position: 'absolute',
+                top: screenDimensions.height * 0.15, // Back to original margin
+                right: 0,
+                width: screenDimensions.width * 0.4, // Back to larger area (40% of screen)
+                height: screenDimensions.height * 0.7, // Back to larger middle portion (70% of screen)
+                zIndex: 10, // Higher z-index to capture gestures
+              }} />
+            </TapGestureHandler>
+          </PanGestureHandler>
+        </LongPressGestureHandler>
 
         {/* Center area tap handler - handles both show and hide */}
         <TapGestureHandler
