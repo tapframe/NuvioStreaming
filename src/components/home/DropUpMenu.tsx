@@ -96,8 +96,8 @@ export const DropUpMenu = ({ visible, onClose, item, onOptionSelect, isSaved: is
   // Robustly determine if the item is in the library (saved)
   const isSaved = typeof isSavedProp === 'boolean' ? isSavedProp : !!item.inLibrary;
   const isWatched = !!isWatchedProp;
-  const inTraktWatchlist = isAuthenticated && isInWatchlist(item.id, item.type);
-  const inTraktCollection = isAuthenticated && isInCollection(item.id, item.type);
+  const inTraktWatchlist = isAuthenticated && isInWatchlist(item.id, item.type as 'movie' | 'show');
+  const inTraktCollection = isAuthenticated && isInCollection(item.id, item.type as 'movie' | 'show');
   
   let menuOptions = [
     {

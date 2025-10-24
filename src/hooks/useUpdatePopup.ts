@@ -74,13 +74,13 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
         // The app will automatically reload with the new version
         console.log('Update installed successfully');
       } else {
-        toastService.showError('Installation Failed', 'Unable to install the update. Please try again later or check your internet connection.');
+        toastService.error('Installation Failed', 'Unable to install the update. Please try again later or check your internet connection.');
         // Show popup again after failed installation
         setShowUpdatePopup(true);
       }
     } catch (error) {
       if (__DEV__) console.error('Error installing update:', error);
-      toastService.showError('Installation Error', 'An error occurred while installing the update. Please try again later.');
+      toastService.error('Installation Error', 'An error occurred while installing the update. Please try again later.');
       // Show popup again after error
       setShowUpdatePopup(true);
     } finally {
