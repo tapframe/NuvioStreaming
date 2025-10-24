@@ -1171,7 +1171,19 @@ class StremioService {
               }
             });
           } else {
-            logger.log('🔧 [getStreams] Local scrapers not executed for this ID/type; continuing with Stremio addons');
+            logger.log('🔧 [getStreams] Local scrapers not executed - no TMDB ID available');
+            // Notify UI that local scrapers won't execute by calling their callbacks
+            try {
+              const installedScrapers = await localScraperService.getInstalledScrapers();
+              const enabledScrapers = installedScrapers.filter(s => s.enabled);
+              enabledScrapers.forEach(scraper => {
+                if (callback) {
+                  callback([], scraper.id, scraper.name, null);
+                }
+              });
+            } catch (error) {
+              logger.warn('🔧 [getStreams] Failed to notify UI about skipped local scrapers:', error);
+            }
           }
         }
       }

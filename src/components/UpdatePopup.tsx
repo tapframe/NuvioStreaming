@@ -79,11 +79,6 @@ const UpdatePopup: React.FC<UpdatePopupProps> = ({
     return null;
   }
 
-  // Completely disable popup on Android
-  if (Platform.OS === 'android') {
-    return null;
-  }
-
   // iOS implementation with full features
   return (
     <Modal

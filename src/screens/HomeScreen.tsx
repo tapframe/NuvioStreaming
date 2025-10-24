@@ -353,7 +353,7 @@ const HomeScreen = () => {
           await AsyncStorage.removeItem('showLoginHintToastOnce');
           hideTimer = setTimeout(() => setHintVisible(false), 2000);
           // Also show a global toast for consistency across screens
-          showInfo('Sign In Available', 'You can sign in anytime from Settings → Account');
+          // showInfo('Sign In Available', 'You can sign in anytime from Settings → Account');
         }
       } catch {}
     })();

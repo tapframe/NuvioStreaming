@@ -28,10 +28,6 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
 
   const checkForUpdates = useCallback(async (forceCheck = false) => {
     try {
-      // Skip update checks on Android to prevent OTA checks
-      if (Platform.OS === 'android') {
-        return;
-      }
 
       // Check if user has dismissed the popup for this version
       const dismissedVersion = await AsyncStorage.getItem(UPDATE_POPUP_STORAGE_KEY);
@@ -119,10 +115,6 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
 
   // Handle startup update check results
   useEffect(() => {
-    // Skip startup update check registration on Android
-    if (Platform.OS === 'android') {
-      return;
-    }
 
     const handleStartupUpdateCheck = (updateInfo: UpdateInfo) => {
       console.log('UpdatePopup: Received startup update check result', updateInfo);
@@ -130,16 +122,7 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
       setHasCheckedOnStartup(true);
 
       if (updateInfo.isAvailable) {
-        if (Platform.OS === 'android') {
-          // Set badge and show a toast
-          (async () => {
-            try { await AsyncStorage.setItem(UPDATE_BADGE_KEY, 'true'); } catch {}
-          })();
-          toastService.showInfo('Update Available', 'Update available — go to Settings → App Updates');
-          setShowUpdatePopup(false);
-        } else {
-          setShowUpdatePopup(true);
-        }
+        setShowUpdatePopup(true);
       }
     };
 
@@ -187,10 +170,6 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
       return; // Already checked on startup
     }
 
-    // Skip auto-check on Android to prevent OTA checks
-    if (Platform.OS === 'android') {
-      return;
-    }
 
     // Add a small delay to ensure the app is fully loaded
     const timer = setTimeout(() => {

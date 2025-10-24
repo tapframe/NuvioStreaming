@@ -864,16 +864,31 @@ class LocalScraperService {
   async getStreams(type: string, tmdbId: string, season?: number, episode?: number, callback?: ScraperCallback): Promise<void> {
     await this.ensureInitialized();
 
+    // Get list of installed scrapers at the beginning for callback invocations
+    const installedScrapers = Array.from(this.installedScrapers.values());
+
+    // Helper function to invoke callback for all installed scrapers with empty results
+    const invokeCallbacksForAllScrapers = (reason: string) => {
+      if (callback && installedScrapers.length > 0) {
+        logger.log(`[LocalScraperService] Invoking callbacks for ${installedScrapers.length} scrapers due to: ${reason}`);
+        installedScrapers.forEach(scraper => {
+          callback([], scraper.id, scraper.name, null);
+        });
+      }
+    };
+
     // Check if local scrapers are enabled
     const userSettings = await this.getUserScraperSettings();
     if (!userSettings.enableLocalScrapers) {
       logger.log('[LocalScraperService] Local scrapers are disabled');
+      invokeCallbacksForAllScrapers('local scrapers disabled');
       return;
     }
 
     // If no repository is configured, return early
     if (!this.repositoryUrl) {
       logger.log('[LocalScraperService] No repository URL configured');
+      invokeCallbacksForAllScrapers('no repository URL configured');
       return;
     }
 
@@ -884,6 +899,7 @@ class LocalScraperService {
         await this.performRepositoryRefresh();
       } catch (error) {
         logger.error('[LocalScraperService] Failed to refresh repository for getStreams:', error);
+        invokeCallbacksForAllScrapers('repository refresh failed');
         return;
       }
     }
@@ -899,6 +915,7 @@ class LocalScraperService {
 
     if (enabledScrapers.length === 0) {
       logger.log('[LocalScraperService] No enabled scrapers found for type:', type);
+      // No callback needed here since this is after filtering - scrapers weren't added to UI yet
       return;
     }
 

@@ -107,10 +107,8 @@ const ThemedApp = () => {
         const onboardingCompleted = await AsyncStorage.getItem('hasCompletedOnboarding');
         setHasCompletedOnboarding(onboardingCompleted === 'true');
         
-        // Initialize update service (skip on Android to prevent update checks)
-        if (Platform.OS !== 'android') {
-          await UpdateService.initialize();
-        }
+        // Initialize update service
+        await UpdateService.initialize();
         
         // Initialize memory monitoring service to prevent OutOfMemoryError
         memoryMonitorService; // Just accessing it starts the monitoring
@@ -170,16 +168,14 @@ const ThemedApp = () => {
               <StatusBar style="light" />
               {!isAppReady && <SplashScreen onFinish={handleSplashComplete} />}
               {shouldShowApp && <AppNavigator initialRouteName={initialRouteName} />}
-              {Platform.OS === 'ios' && (
-                <UpdatePopup
-                  visible={showUpdatePopup}
-                  updateInfo={updateInfo}
-                  onUpdateNow={handleUpdateNow}
-                  onUpdateLater={handleUpdateLater}
-                  onDismiss={handleDismiss}
-                  isInstalling={isInstalling}
-                />
-              )}
+              <UpdatePopup
+                visible={showUpdatePopup}
+                updateInfo={updateInfo}
+                onUpdateNow={handleUpdateNow}
+                onUpdateLater={handleUpdateLater}
+                onDismiss={handleDismiss}
+                isInstalling={isInstalling}
+              />
               <MajorUpdateOverlay
                 visible={githubUpdate.visible}
                 latestTag={githubUpdate.latestTag}
