@@ -131,6 +131,14 @@ export const styles = StyleSheet.create({
   closeButton: {
     padding: 8,
   },
+  topRightButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  topButton: {
+    padding: 8,
+  },
   
   
   /* CloudStream Style - Center Controls */

@@ -2730,6 +2730,7 @@ const KSPlayerCore: React.FC = () => {
                   }}
                   paused={paused}
                   volume={volume / 100}
+                  rate={playbackSpeed}
                   audioTrack={selectedAudioTrack ?? undefined}
                   textTrack={useCustomSubtitles ? -1 : selectedTextTrack}
                   allowsExternalPlayback={allowsAirPlay}

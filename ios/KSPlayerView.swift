@@ -52,6 +52,12 @@ class KSPlayerView: UIView {
         }
     }
     
+    @objc var rate: NSNumber = 1.0 {
+        didSet {
+            setPlaybackRate(rate.floatValue)
+        }
+    }
+    
     @objc var audioTrack: NSNumber = -1 {
         didSet {
             setAudioTrack(audioTrack.intValue)
@@ -400,6 +406,11 @@ class KSPlayerView: UIView {
     func setVolume(_ volume: Float) {
         currentVolume = volume
         playerView.playerLayer?.player.playbackVolume = volume
+    }
+
+    func setPlaybackRate(_ rate: Float) {
+        playerView.playerLayer?.player.playbackRate = rate
+        print("KSPlayerView: Set playback rate to \(rate)x")
     }
 
     func seek(to time: TimeInterval) {

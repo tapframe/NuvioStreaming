@@ -70,6 +70,14 @@ class KSPlayerViewManager: RCTViewManager {
         }
     }
 
+    @objc func setPlaybackRate(_ node: NSNumber, rate: NSNumber) {
+        DispatchQueue.main.async {
+            if let view = self.bridge.uiManager.view(forReactTag: node) as? KSPlayerView {
+                view.setPlaybackRate(Float(truncating: rate))
+            }
+        }
+    }
+
     @objc func setAudioTrack(_ node: NSNumber, trackId: NSNumber) {
         DispatchQueue.main.async {
             if let view = self.bridge.uiManager.view(forReactTag: node) as? KSPlayerView {

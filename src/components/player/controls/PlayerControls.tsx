@@ -314,9 +314,24 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 </View>
               )}
             </View>
-            <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-              <Ionicons name="close" size={closeIconSize} color="white" />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {/* AirPlay Button - iOS only, KSAVPlayer only */}
+              {Platform.OS === 'ios' && onAirPlayPress && playerBackend === 'KSAVPlayer' && (
+                <TouchableOpacity
+                  style={{ padding: 8 }}
+                  onPress={onAirPlayPress}
+                >
+                  <Feather
+                    name="airplay"
+                    size={closeIconSize}
+                    color={isAirPlayActive ? currentTheme.colors.primary : "white"}
+                  />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
+                <Ionicons name="close" size={closeIconSize} color="white" />
+              </TouchableOpacity>
+            </View>
           </View>
         </LinearGradient>
 
@@ -520,7 +535,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 </Text>
               </TouchableOpacity>
 
-              {/* Playback Speed Button - Hidden on iOS */}
+              {/* Playback Speed Button - Temporarily hidden on iOS */}
               {Platform.OS !== 'ios' && (
                 <TouchableOpacity style={styles.bottomButton} onPress={cyclePlaybackSpeed}>
                   <Ionicons name="speedometer" size={20} color="white" />
@@ -569,26 +584,6 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                   <Ionicons name="swap-horizontal" size={20} color="white" />
                   <Text style={styles.bottomButtonText}>
                     Change Source
-                  </Text>
-                </TouchableOpacity>
-              )}
-
-              {/* AirPlay Button - iOS only, KSAVPlayer only */}
-              {Platform.OS === 'ios' && onAirPlayPress && playerBackend === 'KSAVPlayer' && (
-                <TouchableOpacity
-                  style={styles.bottomButton}
-                  onPress={onAirPlayPress}
-                >
-                  <Feather
-                    name="airplay"
-                    size={20}
-                    color={isAirPlayActive ? currentTheme.colors.primary : "white"}
-                  />
-                  <Text style={[
-                    styles.bottomButtonText,
-                    isAirPlayActive && { color: currentTheme.colors.primary }
-                  ]}>
-                    {allowsAirPlay ? 'AirPlay' : 'AirPlay Off'}
                   </Text>
                 </TouchableOpacity>
               )}

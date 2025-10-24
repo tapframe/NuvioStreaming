@@ -10,6 +10,7 @@ interface KSPlayerViewProps {
   source?: KSPlayerSource;
   paused?: boolean;
   volume?: number;
+  rate?: number;
   audioTrack?: number;
   textTrack?: number;
   allowsExternalPlayback?: boolean;
@@ -34,6 +35,7 @@ export interface KSPlayerRef {
   setSource: (source: KSPlayerSource) => void;
   setPaused: (paused: boolean) => void;
   setVolume: (volume: number) => void;
+  setPlaybackRate: (rate: number) => void;
   setAudioTrack: (trackId: number) => void;
   setTextTrack: (trackId: number) => void;
   getTracks: () => Promise<{ audioTracks: any[]; textTracks: any[] }>;
@@ -47,6 +49,7 @@ export interface KSPlayerProps {
   source?: KSPlayerSource;
   paused?: boolean;
   volume?: number;
+  rate?: number;
   audioTrack?: number;
   textTrack?: number;
   allowsExternalPlayback?: boolean;
@@ -98,6 +101,14 @@ const KSPlayer = forwardRef<KSPlayerRef, KSPlayerProps>((props, ref) => {
         // @ts-ignore legacy UIManager commands path for Paper
         const commandId = UIManager.getViewManagerConfig('KSPlayerView').Commands.setVolume;
         UIManager.dispatchViewManagerCommand(node, commandId, [volume]);
+      }
+    },
+    setPlaybackRate: (rate: number) => {
+      if (nativeRef.current) {
+        const node = findNodeHandle(nativeRef.current);
+        // @ts-ignore legacy UIManager commands path for Paper
+        const commandId = UIManager.getViewManagerConfig('KSPlayerView').Commands.setPlaybackRate;
+        UIManager.dispatchViewManagerCommand(node, commandId, [rate]);
       }
     },
     setAudioTrack: (trackId: number) => {
@@ -173,6 +184,7 @@ const KSPlayer = forwardRef<KSPlayerRef, KSPlayerProps>((props, ref) => {
       source={props.source}
       paused={props.paused}
       volume={props.volume}
+      rate={props.rate}
       audioTrack={props.audioTrack}
       textTrack={props.textTrack}
       allowsExternalPlayback={props.allowsExternalPlayback}

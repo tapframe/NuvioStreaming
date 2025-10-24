@@ -18,7 +18,22 @@ export interface BackupData {
     watchProgress: Record<string, any>;
     addons: any[];
     downloads: DownloadItem[];
-    subtitles: any;
+    subtitles: {
+      subtitleSize?: number;
+      subtitleBackground?: boolean;
+      subtitleTextColor?: string;
+      subtitleBgOpacity?: number;
+      subtitleTextShadow?: boolean;
+      subtitleOutline?: boolean;
+      subtitleOutlineColor?: string;
+      subtitleOutlineWidth?: number;
+      subtitleAlign?: 'center' | 'left' | 'right';
+      subtitleBottomOffset?: number;
+      subtitleLetterSpacing?: number;
+      subtitleLineHeightMultiplier?: number;
+      subtitleOffsetSec?: number;
+      [key: string]: any; // Allow for additional subtitle preferences
+    };
     tombstones: Record<string, number>;
     continueWatchingRemoved: Record<string, number>;
     contentDuration: Record<string, number>;
@@ -444,7 +459,18 @@ export class BackupService {
       const scope = await this.getUserScope();
       const scopedKey = `@user:${scope}:@subtitle_settings`;
       const subtitlesJson = await AsyncStorage.getItem(scopedKey);
-      return subtitlesJson ? JSON.parse(subtitlesJson) : {};
+      let subtitleSettings = subtitlesJson ? JSON.parse(subtitlesJson) : {};
+      
+      // Also check for legacy subtitle size preference
+      const legacySubtitleSize = await AsyncStorage.getItem('@subtitle_size_preference');
+      if (legacySubtitleSize && !subtitleSettings.subtitleSize) {
+        const legacySize = parseInt(legacySubtitleSize, 10);
+        if (!Number.isNaN(legacySize) && legacySize > 0) {
+          subtitleSettings.subtitleSize = legacySize;
+        }
+      }
+      
+      return subtitleSettings;
     } catch (error) {
       logger.error('[BackupService] Failed to get subtitle settings:', error);
       return {};
@@ -738,6 +764,12 @@ export class BackupService {
       const scope = await this.getUserScope();
       const scopedKey = `@user:${scope}:@subtitle_settings`;
       await AsyncStorage.setItem(scopedKey, JSON.stringify(subtitles));
+      
+      // Also restore legacy subtitle size preference for backward compatibility
+      if (subtitles && typeof subtitles.subtitleSize === 'number') {
+        await AsyncStorage.setItem('@subtitle_size_preference', subtitles.subtitleSize.toString());
+      }
+      
       logger.info('[BackupService] Subtitle settings restored');
     } catch (error) {
       logger.error('[BackupService] Failed to restore subtitle settings:', error);
