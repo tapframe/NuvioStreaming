@@ -19,7 +19,8 @@ import { useMetadata } from '../../hooks/useMetadata';
 import { useSettings } from '../../hooks/useSettings';
 
 import { 
-  DEFAULT_SUBTITLE_SIZE, 
+  DEFAULT_SUBTITLE_SIZE,
+  getDefaultSubtitleSize,
   AudioTrack,
   TextTrack,
   ResizeModeType, 
@@ -2309,12 +2310,14 @@ const AndroidVideoPlayer: React.FC = () => {
         try { await AsyncStorage.removeItem(SUBTITLE_SIZE_KEY); } catch {}
         return;
       }
-      // If no saved settings, use default
-      setSubtitleSize(DEFAULT_SUBTITLE_SIZE);
+      // If no saved settings, use responsive default
+      const screenWidth = Dimensions.get('window').width;
+      setSubtitleSize(getDefaultSubtitleSize(screenWidth));
     } catch (error) {
       logger.error('[AndroidVideoPlayer] Error loading subtitle size:', error);
-      // Fallback to default on error
-      setSubtitleSize(DEFAULT_SUBTITLE_SIZE);
+      // Fallback to responsive default on error
+      const screenWidth = Dimensions.get('window').width;
+      setSubtitleSize(getDefaultSubtitleSize(screenWidth));
     }
   };
 

@@ -7,6 +7,16 @@ export const RESUME_PREF = {
 };
 
 export const SUBTITLE_SIZE_KEY = '@subtitle_size_preference';
+
+// Helper function to get responsive subtitle size based on screen width
+export const getDefaultSubtitleSize = (screenWidth: number): number => {
+  if (screenWidth >= 1440) return 65; // TV
+  if (screenWidth >= 1024) return 55; // Large tablet
+  if (screenWidth >= 768) return 45;  // Tablet
+  return 30; // Phone
+};
+
+// Keep the constant for backward compatibility, using phone size as base
 export const DEFAULT_SUBTITLE_SIZE = 30;
 
 // Define the TrackPreferenceType for audio/text tracks
