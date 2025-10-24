@@ -325,8 +325,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
               )}
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              {/* AirPlay Button - temporarily hidden */}
-              {false && Platform.OS === 'ios' && onAirPlayPress && playerBackend === 'KSAVPlayer' && (
+              {/* AirPlay Button - iOS only, KSAVPlayer only */}
+              {Platform.OS === 'ios' && onAirPlayPress && playerBackend === 'KSAVPlayer' && (
                 <TouchableOpacity
                   style={{ padding: 8 }}
                   onPress={onAirPlayPress}
@@ -339,8 +339,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 </TouchableOpacity>
               )}
               
-              {/* Chromecast Button - temporarily hidden */}
-              {false && onCastPress && (
+              {/* Chromecast Button - works on both platforms */}
+              {onCastPress && (
                 <ChromecastButton
                   size={closeIconSize}
                   color="white"
