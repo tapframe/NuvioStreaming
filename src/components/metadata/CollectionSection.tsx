@@ -116,6 +116,17 @@ export const CollectionSection: React.FC<CollectionSectionProps> = ({
     }
   };
 
+  // Sort collection movies by year (oldest to newest)
+  const sortedCollectionMovies = React.useMemo(() => {
+    if (!collectionMovies) return [];
+    
+    return [...collectionMovies].sort((a, b) => {
+      const yearA = a.year ? parseInt(a.year.toString()) : 0;
+      const yearB = b.year ? parseInt(b.year.toString()) : 0;
+      return yearA - yearB; // Oldest to newest
+    });
+  }, [collectionMovies]);
+
   const renderItem = ({ item }: { item: StreamingContent }) => (
     <TouchableOpacity 
       style={[styles.itemContainer, { width: backdropWidth, marginRight: itemSpacing }]}
@@ -171,7 +182,7 @@ export const CollectionSection: React.FC<CollectionSectionProps> = ({
         {collectionName}
       </Text>
       <FlatList
-        data={collectionMovies}
+        data={sortedCollectionMovies}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         horizontal
