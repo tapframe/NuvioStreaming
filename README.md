@@ -37,14 +37,9 @@
     <li>
       <a href="#about-the-project">About The Project</a>
     </li>
+    <li><a href="#installation">Installation</a></li>
     <li><a href="#demo">Screenshots</a></li>
-    <li>
-      <a href="#getting-started">Getting Started</a>
-      <ul>
-        <li><a href="#installation">Installation</a></li>
-        <li><a href="#build">Build</a></li>
-      </ul>
-    </li>
+    <li><a href="#getting-started">Getting Started</a></li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#support">Support</a></li>
     <li><a href="#license">License</a></li>
@@ -61,6 +56,26 @@ Nuvio Media Hub is a cross‑platform app for managing, discovering, and streami
 
  
 
+<!-- INSTALLATION -->
+## Installation
+
+### Android
+[![Download APK](https://img.shields.io/badge/Download-APK-green?style=for-the-badge)](https://github.com/tapframe/NuvioStreaming/releases/latest)
+
+Download the latest APK from [GitHub Releases](https://github.com/tapframe/NuvioStreaming/releases/latest)
+
+### iOS
+
+#### AltStore
+<img src="https://upload.wikimedia.org/wikipedia/commons/2/20/AltStore_logo.png" width="24" height="24" align="left"> [![Add to AltStore](https://img.shields.io/badge/Add%20to-AltStore-blue?style=for-the-badge)](https://tinyurl.com/NuvioAltstore)
+
+#### SideStore
+<img src="https://github.com/SideStore/assets/blob/main/icon.png?raw=true" width="24" height="24" align="left"> [![Add to SideStore](https://img.shields.io/badge/Add%20to-SideStore-green?style=for-the-badge)](https://tinyurl.com/NuvioSidestore)
+
+**Manual URL:** `https://raw.githubusercontent.com/tapframe/NuvioStreaming/main/nuvio-source.json`
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
 <!-- DEMO / SCREENSHOTS -->
 ## Demo
 <a id="demo"></a>
@@ -74,9 +89,12 @@ Nuvio Media Hub is a cross‑platform app for managing, discovering, and streami
 <!-- GETTING STARTED -->
 ## Getting Started
 
-Follow the steps below to run the app locally.
+Follow the steps below to run the app locally for development.
 
-### Installation
+### Development Build
+
+<details>
+  <summary>Build from Source</summary>
 
 ```bash
 git clone https://github.com/tapframe/NuvioStreaming.git
@@ -86,21 +104,6 @@ npm install
 # npm install --legacy-peer-deps
 npx expo start
 ```
-
-### iOS App Installation
-
-#### AltStore
-<img src="https://upload.wikimedia.org/wikipedia/commons/2/20/AltStore_logo.png" width="24" height="24" align="left"> [![Add to AltStore](https://img.shields.io/badge/Add%20to-AltStore-blue?style=for-the-badge)](https://tinyurl.com/NuvioAltstore)
-
-#### SideStore
-<img src="https://github.com/SideStore/assets/blob/main/icon.png?raw=true" width="24" height="24" align="left"> [![Add to SideStore](https://img.shields.io/badge/Add%20to-SideStore-green?style=for-the-badge)](https://tinyurl.com/NuvioSidestore)
-
-**Manual URL:** `https://raw.githubusercontent.com/tapframe/NuvioStreaming/main/nuvio-source.json`
-
-### Development Build
-
-<details>
-  <summary>Build from Source</summary>
 
 ```bash
 npx expo prebuild
