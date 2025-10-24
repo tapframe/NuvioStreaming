@@ -30,10 +30,14 @@ import {
   RESUME_PREF,
   SUBTITLE_SIZE_KEY
 } from './utils/playerTypes';
+
+// Speed settings storage key
+const SPEED_SETTINGS_KEY = '@nuvio_speed_settings';
 import { safeDebugLog, parseSRT, DEBUG_MODE, formatTime } from './utils/playerUtils';
 import { styles } from './utils/playerStyles';
 import { SubtitleModals } from './modals/SubtitleModals';
 import { AudioTrackModal } from './modals/AudioTrackModal';
+import SpeedModal from './modals/SpeedModal';
 // Removed ResumeOverlay usage when alwaysResume is enabled
 import PlayerControls from './controls/PlayerControls';
 import CustomSubtitles from './subtitles/CustomSubtitles';
@@ -219,6 +223,54 @@ const AndroidVideoPlayer: React.FC = () => {
   // Speed boost state for hold-to-speed-up feature
   const [isSpeedBoosted, setIsSpeedBoosted] = useState(false);
   const [originalSpeed, setOriginalSpeed] = useState<number>(1.0);
+  const [showSpeedActivatedOverlay, setShowSpeedActivatedOverlay] = useState(false);
+  const speedActivatedOverlayOpacity = useRef(new Animated.Value(0)).current;
+
+  // Speed modal state
+  const [showSpeedModal, setShowSpeedModal] = useState(false);
+  const [holdToSpeedEnabled, setHoldToSpeedEnabled] = useState(true);
+  const [holdToSpeedValue, setHoldToSpeedValue] = useState(2.0);
+
+  // Load speed settings from storage
+  const loadSpeedSettings = useCallback(async () => {
+    try {
+      const saved = await AsyncStorage.getItem(SPEED_SETTINGS_KEY);
+      if (saved) {
+        const settings = JSON.parse(saved);
+        if (typeof settings.holdToSpeedEnabled === 'boolean') {
+          setHoldToSpeedEnabled(settings.holdToSpeedEnabled);
+        }
+        if (typeof settings.holdToSpeedValue === 'number') {
+          setHoldToSpeedValue(settings.holdToSpeedValue);
+        }
+      }
+    } catch (error) {
+      logger.warn('[AndroidVideoPlayer] Error loading speed settings:', error);
+    }
+  }, []);
+
+  // Save speed settings to storage
+  const saveSpeedSettings = useCallback(async () => {
+    try {
+      const settings = {
+        holdToSpeedEnabled,
+        holdToSpeedValue,
+      };
+      await AsyncStorage.setItem(SPEED_SETTINGS_KEY, JSON.stringify(settings));
+    } catch (error) {
+      logger.warn('[AndroidVideoPlayer] Error saving speed settings:', error);
+    }
+  }, [holdToSpeedEnabled, holdToSpeedValue]);
+
+  // Load speed settings on mount
+  useEffect(() => {
+    loadSpeedSettings();
+  }, [loadSpeedSettings]);
+
+  // Save speed settings when they change
+  useEffect(() => {
+    saveSpeedSettings();
+  }, [saveSpeedSettings]);
 
   // Debounce track updates to prevent excessive processing
   const trackUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -811,14 +863,36 @@ const AndroidVideoPlayer: React.FC = () => {
 
   // Long press gesture handlers for speed boost
   const onLongPressActivated = useCallback(() => {
-    if (!isSpeedBoosted && playbackSpeed !== 2.0) {
+    if (!holdToSpeedEnabled) return;
+    
+    if (!isSpeedBoosted && playbackSpeed !== holdToSpeedValue) {
       setOriginalSpeed(playbackSpeed);
-      setPlaybackSpeed(2.0);
+      setPlaybackSpeed(holdToSpeedValue);
       setIsSpeedBoosted(true);
       
-      logger.log('[AndroidVideoPlayer] Speed boost activated: 2x');
+      // Show "Activated" overlay
+      setShowSpeedActivatedOverlay(true);
+      Animated.spring(speedActivatedOverlayOpacity, {
+        toValue: 1,
+        tension: 100,
+        friction: 8,
+        useNativeDriver: true,
+      }).start();
+      
+      // Auto-hide after 2 seconds
+      setTimeout(() => {
+        Animated.timing(speedActivatedOverlayOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }).start(() => {
+          setShowSpeedActivatedOverlay(false);
+        });
+      }, 2000);
+      
+      logger.log(`[AndroidVideoPlayer] Speed boost activated: ${holdToSpeedValue}x`);
     }
-  }, [isSpeedBoosted, playbackSpeed]);
+  }, [isSpeedBoosted, playbackSpeed, holdToSpeedEnabled, holdToSpeedValue, speedActivatedOverlayOpacity]);
 
   const onLongPressEnd = useCallback(() => {
     if (isSpeedBoosted) {
@@ -3510,6 +3584,7 @@ const AndroidVideoPlayer: React.FC = () => {
             currentPlaybackSpeed={playbackSpeed}
             setShowAudioModal={setShowAudioModal}
             setShowSubtitleModal={setShowSubtitleModal}
+            setShowSpeedModal={setShowSpeedModal}
             isSubtitleModalOpen={showSubtitleModal}
             setShowSourcesModal={setShowSourcesModal}
             onSliderValueChange={handleSliderValueChange}
@@ -4092,6 +4167,42 @@ const AndroidVideoPlayer: React.FC = () => {
             </Animated.View>
           )}
 
+          {/* Speed Activated Overlay */}
+          {showSpeedActivatedOverlay && (
+            <Animated.View
+              style={{
+                position: 'absolute',
+                top: screenDimensions.height * 0.1,
+                left: screenDimensions.width / 2 - 40,
+                opacity: speedActivatedOverlayOpacity,
+                zIndex: 1000,
+              }}
+            >
+              <View style={{
+                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                borderRadius: 8,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                alignItems: 'center',
+                justifyContent: 'center',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.3,
+                shadowRadius: 4,
+                elevation: 5,
+              }}>
+                <Text style={{
+                  color: '#FFFFFF',
+                  fontSize: 14,
+                  fontWeight: '600',
+                  letterSpacing: 0.5,
+                }}>
+                  {holdToSpeedValue}x Speed Activated
+                </Text>
+              </View>
+            </Animated.View>
+          )}
+
           {/* Resume overlay removed when AlwaysResume is enabled; overlay component omitted */}
         </View> 
       </Animated.View>
@@ -4149,6 +4260,17 @@ const AndroidVideoPlayer: React.FC = () => {
         setSubtitleLineHeightMultiplier={setSubtitleLineHeightMultiplier}
         subtitleOffsetSec={subtitleOffsetSec}
         setSubtitleOffsetSec={setSubtitleOffsetSec}
+      />
+      
+      <SpeedModal
+        showSpeedModal={showSpeedModal}
+        setShowSpeedModal={setShowSpeedModal}
+        currentSpeed={playbackSpeed}
+        setPlaybackSpeed={setPlaybackSpeed}
+        holdToSpeedEnabled={holdToSpeedEnabled}
+        setHoldToSpeedEnabled={setHoldToSpeedEnabled}
+        holdToSpeedValue={holdToSpeedValue}
+        setHoldToSpeedValue={setHoldToSpeedValue}
       />
       
       <SourcesModal

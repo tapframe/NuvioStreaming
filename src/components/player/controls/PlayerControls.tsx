@@ -35,6 +35,7 @@ interface PlayerControlsProps {
   currentPlaybackSpeed: number;
   setShowAudioModal: (show: boolean) => void;
   setShowSubtitleModal: (show: boolean) => void;
+  setShowSpeedModal: (show: boolean) => void;
   isSubtitleModalOpen?: boolean;
   setShowSourcesModal?: (show: boolean) => void;
   // Slider-specific props
@@ -77,6 +78,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   currentPlaybackSpeed,
   setShowAudioModal,
   setShowSubtitleModal,
+  setShowSpeedModal,
   isSubtitleModalOpen,
   setShowSourcesModal,
   onSliderValueChange,
@@ -537,7 +539,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
 
               {/* Playback Speed Button - Temporarily hidden on iOS */}
               {Platform.OS !== 'ios' && (
-                <TouchableOpacity style={styles.bottomButton} onPress={cyclePlaybackSpeed}>
+                <TouchableOpacity style={styles.bottomButton} onPress={() => setShowSpeedModal(true)}>
                   <Ionicons name="speedometer" size={20} color="white" />
                   <Text style={styles.bottomButtonText}>
                     Speed {currentPlaybackSpeed}x
