@@ -62,13 +62,6 @@ export const useMetadataAssets = (
   // Add source tracking to prevent mixing sources
   const [bannerSource, setBannerSource] = useState<'tmdb' | 'metahub' | 'default' | null>(null);
   
-  // State for logo loading
-  const [logoLoadError, setLogoLoadError] = useState(false);
-  const logoFetchInProgress = useRef<boolean>(false);
-  const logoRefreshCounter = useRef<number>(0);
-  const MAX_LOGO_REFRESHES = 2;
-  const forcedLogoRefreshDone = useRef<boolean>(false);
-  
   // For TMDB ID tracking
   const [foundTmdbId, setFoundTmdbId] = useState<string | null>(null);
   
@@ -78,172 +71,7 @@ export const useMetadataAssets = (
     setBannerImage(null);
     setBannerSource(null);
     forcedBannerRefreshDone.current = false;
-    forcedLogoRefreshDone.current = false;
-    logoRefreshCounter.current = 0;
-    
-    // Mark that we need to refetch logo but DON'T clear it yet
-    // This prevents text from showing during the transition
-    logoFetchInProgress.current = false;
   }, [settings.logoSourcePreference]);
-
-  // Original reset logo load error effect
-  useEffect(() => {
-    setLogoLoadError(false);
-  }, [metadata?.logo]);
-
-  // Optimized logo fetching
-  useEffect(() => {
-    const logoPreference = settings.logoSourcePreference || 'tmdb';
-
-    if (__DEV__) {
-      console.log('[useMetadataAssets] Logo fetch triggered:', {
-        id,
-        type,
-        logoPreference,
-        hasImdbId: !!imdbId,
-        tmdbEnrichmentEnabled: settings.enrichMetadataWithTMDB,
-        logoFetchInProgress: logoFetchInProgress.current
-      });
-    }
-    const currentLogoUrl = metadata?.logo;
-    let shouldFetchLogo = false;
-
-    // If enrichment is disabled, use addon logo and don't fetch from external sources
-    if (!settings.enrichMetadataWithTMDB) {
-      // If we have an addon logo, preload it immediately for instant display
-      if (metadata?.logo && !isTmdbUrl(metadata.logo)) {
-        // Preload addon logo for instant display
-        FastImage.preload([{ uri: metadata.logo }]);
-        // This is an addon logo, keep it
-        return;
-      }
-      // If no addon logo, don't fetch external logos when enrichment is disabled
-      return;
-    }
-
-    // When TMDB enrichment is ON, remove addon logos immediately
-    // We don't want to show addon logos briefly before TMDB logos load
-    if (settings.enrichMetadataWithTMDB && currentLogoUrl && !isTmdbUrl(currentLogoUrl)) {
-      // Clear addon logo when enrichment is enabled
-      setMetadata((prevMetadata: any) => ({ ...prevMetadata!, logo: undefined }));
-      shouldFetchLogo = true;
-    }
-    // Determine if we need to fetch a new logo (only when enrichment is enabled)
-    else if (!currentLogoUrl) {
-      shouldFetchLogo = true;
-    } else {
-      const isCurrentLogoTmdb = isTmdbUrl(currentLogoUrl);
-      
-      if (logoPreference === 'tmdb' && !isCurrentLogoTmdb) {
-        shouldFetchLogo = true;
-      }
-    }
-    
-    // Guard against infinite loops by checking if we're already fetching
-    if (shouldFetchLogo && !logoFetchInProgress.current) {
-      logoFetchInProgress.current = true;
-      
-      const fetchLogo = async () => {
-        // Store the original logo to restore if needed
-        const originalLogoUrl = currentLogoUrl;
-        
-        try {
-          const preferredLanguage = settings.tmdbLanguagePreference || 'en';
-
-          if (logoPreference === 'tmdb') {
-            // TMDB path - optimized flow
-            let tmdbId: string | null = null;
-            let contentType = type === 'series' ? 'tv' : 'movie';
-
-            // Extract or find TMDB ID in one step
-            if (id.startsWith('tmdb:')) {
-              tmdbId = id.split(':')[1];
-            } else if (imdbId && settings.enrichMetadataWithTMDB) {
-              try {
-                const tmdbService = TMDBService.getInstance();
-                const foundId = await tmdbService.findTMDBIdByIMDB(imdbId);
-                if (foundId) {
-                  tmdbId = String(foundId);
-                  setFoundTmdbId(tmdbId); // Save for banner fetching
-                } else if (__DEV__) {
-                  console.log('[useMetadataAssets] Could not find TMDB ID for IMDB:', imdbId);
-                }
-              } catch (error) {
-                if (__DEV__) console.error('[useMetadataAssets] Error finding TMDB ID:', error);
-              }
-            } else {
-              const parsedId = parseInt(id, 10);
-              if (!isNaN(parsedId)) {
-                tmdbId = String(parsedId);
-              }
-            }
-            
-            if (tmdbId) {
-              try {
-                // Direct fetch - avoid multiple service calls
-                const tmdbService = TMDBService.getInstance();
-                const logoUrl = await tmdbService.getContentLogo(contentType as 'tv' | 'movie', tmdbId, preferredLanguage);
-
-                if (__DEV__) {
-                  console.log('[useMetadataAssets] Logo fetch result:', {
-                    contentType,
-                    tmdbId,
-                    preferredLanguage,
-                    logoUrl,
-                    logoPreference
-                  });
-                }
-
-                if (logoUrl) {
-                  // Preload the image before setting it
-                  await FastImage.preload([{ uri: logoUrl }]);
-
-                  // Only update if we got a valid logo
-                  setMetadata((prevMetadata: any) => ({ ...prevMetadata!, logo: logoUrl }));
-                } else {
-                  // TMDB logo not found
-                  // When enrichment is ON, don't fallback to addon logos - show text instead
-                  if (__DEV__) {
-                    console.log('[useMetadataAssets] No TMDB logo found for ID:', tmdbId);
-                  }
-                  // Keep logo as undefined to show text title
-                }
-              } catch (error) {
-                // TMDB logo fetch failed
-                // When enrichment is ON, don't fallback to addon logos - show text instead
-                if (__DEV__) {
-                  console.error('[useMetadataAssets] Logo fetch error:', error);
-                }
-                // Keep logo as undefined to show text title
-              }
-            } else {
-              // No TMDB ID found
-              // When enrichment is ON, don't use addon logos - show text instead
-              if (__DEV__) console.log('[useMetadataAssets] No TMDB ID found, will show text title');
-              // Keep logo as undefined to show text title
-            }
-          }
-        } catch (error) {
-          // Handle error silently, keep existing logo
-          if (__DEV__) console.error('[useMetadataAssets] Unexpected error in logo fetch:', error);
-        } finally {
-          logoFetchInProgress.current = false;
-        }
-      };
-      
-      // Execute fetch without awaiting
-      fetchLogo();
-    }
-  }, [
-    id, 
-    type, 
-    imdbId, 
-    metadata?.logo,
-    settings.logoSourcePreference, 
-    settings.tmdbLanguagePreference,
-    settings.enrichMetadataWithTMDB,
-    setMetadata
-  ]);
 
   // Optimized banner fetching
   const fetchBanner = useCallback(async () => {
@@ -354,9 +182,7 @@ export const useMetadataAssets = (
   return {
     bannerImage,
     loadingBanner,
-    logoLoadError,
     foundTmdbId,
-    setLogoLoadError,
     setBannerImage,
     bannerSource,
   };

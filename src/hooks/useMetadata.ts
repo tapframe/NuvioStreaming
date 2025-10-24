@@ -599,6 +599,17 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
                 logger.error('Failed to fetch credits for movie:', error);
               }
               
+              // Fetch movie logo from TMDB
+              try {
+                const preferredLanguage = settings.tmdbLanguagePreference || 'en';
+                const logoUrl = await tmdbService.getContentLogo('movie', tmdbId, preferredLanguage);
+                formattedMovie.logo = logoUrl || undefined; // TMDB logo or undefined (no addon fallback)
+                if (__DEV__) logger.log(`Successfully fetched logo for movie ${tmdbId} from TMDB`);
+              } catch (error) {
+                logger.error('Failed to fetch logo from TMDB:', error);
+                formattedMovie.logo = undefined; // Error means no logo
+              }
+              
               setMetadata(formattedMovie);
               cacheService.setMetadata(id, type, formattedMovie);
               const isInLib = catalogService.getLibraryItems().some(item => item.id === id);
@@ -664,14 +675,13 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
                 
                 // Fetch TV show logo from TMDB
                 try {
-                  const logoUrl = await tmdbService.getTvShowImages(tmdbId);
-                  if (logoUrl) {
-                    formattedShow.logo = logoUrl;
-                    if (__DEV__) logger.log(`Successfully fetched logo for TV show ${tmdbId} from TMDB`);
-                  }
+                  const preferredLanguage = settings.tmdbLanguagePreference || 'en';
+                  const logoUrl = await tmdbService.getContentLogo('tv', tmdbId, preferredLanguage);
+                  formattedShow.logo = logoUrl || undefined; // TMDB logo or undefined (no addon fallback)
+                  if (__DEV__) logger.log(`Successfully fetched logo for TV show ${tmdbId} from TMDB`);
                 } catch (error) {
                   logger.error('Failed to fetch logo from TMDB:', error);
-                  // Continue with execution, logo is optional
+                  formattedShow.logo = undefined; // Error means no logo
                 }
                 
                 setMetadata(formattedShow);
@@ -876,6 +886,55 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
           }
         } catch (e) {
           if (__DEV__) console.log('[useMetadata] failed to merge localized TMDB text', e);
+        }
+
+        // Centralized logo fetching logic
+        try {
+          if (settings.enrichMetadataWithTMDB) {
+            // Only use TMDB logos when enrichment is ON
+            const tmdbService = TMDBService.getInstance();
+            const preferredLanguage = settings.tmdbLanguagePreference || 'en';
+            const contentType = type === 'series' ? 'tv' : 'movie';
+            
+            // Get TMDB ID
+            let tmdbIdForLogo = null;
+            if (tmdbId) {
+              tmdbIdForLogo = String(tmdbId);
+            } else if (finalMetadata.imdb_id) {
+              const foundId = await tmdbService.findTMDBIdByIMDB(finalMetadata.imdb_id);
+              tmdbIdForLogo = foundId ? String(foundId) : null;
+            }
+            
+            if (tmdbIdForLogo) {
+              const logoUrl = await tmdbService.getContentLogo(contentType, tmdbIdForLogo, preferredLanguage);
+              finalMetadata.logo = logoUrl || undefined; // TMDB logo or undefined (no addon fallback)
+              if (__DEV__) {
+                console.log('[useMetadata] Logo fetch result:', {
+                  contentType,
+                  tmdbIdForLogo,
+                  preferredLanguage,
+                  logoUrl: !!logoUrl,
+                  enrichmentEnabled: true
+                });
+              }
+            } else {
+              finalMetadata.logo = undefined; // No TMDB ID means no logo
+              if (__DEV__) console.log('[useMetadata] No TMDB ID found for logo, will show text title');
+            }
+          } else {
+            // When enrichment is OFF, keep addon logo or undefined
+            finalMetadata.logo = finalMetadata.logo || undefined;
+            if (__DEV__) {
+              console.log('[useMetadata] TMDB enrichment disabled, using addon logo:', {
+                hasAddonLogo: !!finalMetadata.logo,
+                enrichmentEnabled: false
+              });
+            }
+          }
+        } catch (error) {
+          // Handle error silently, keep existing logo behavior
+          if (__DEV__) console.error('[useMetadata] Unexpected error in logo fetch:', error);
+          finalMetadata.logo = undefined;
         }
 
         // Commit final metadata once and cache it

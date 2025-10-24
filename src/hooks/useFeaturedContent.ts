@@ -132,16 +132,14 @@ export function useFeaturedContent() {
               genres: (item as any).genres,
               inLibrary: Boolean((item as any).inLibrary),
             };
+            
             try {
-              // If enrichment is disabled, use addon logo if available
               if (!settings.enrichMetadataWithTMDB) {
-                if (base.logo && !isTmdbUrl(base.logo)) {
-                  return base;
-                }
-                return { ...base, logo: undefined };
+                // When enrichment is OFF, keep addon logo or undefined
+                return { ...base, logo: base.logo || undefined };
               }
 
-              // Only proceed with TMDB enrichment if enrichment is enabled
+              // When enrichment is ON, fetch from TMDB with language preference
               const rawId = String(item.id);
               const isTmdb = rawId.startsWith('tmdb:');
               const isImdb = rawId.startsWith('tt');
@@ -154,17 +152,15 @@ export function useFeaturedContent() {
                 const found = await tmdbService.findTMDBIdByIMDB(imdbId);
                 tmdbId = found ? String(found) : null;
               }
-              if (!tmdbId && !imdbId) return base;
-              // Try TMDB if we have a TMDB id
+              
               if (tmdbId) {
                 const logoUrl = await tmdbService.getContentLogo(item.type === 'series' ? 'tv' : 'movie', tmdbId as string, preferredLanguage);
-                if (logoUrl) {
-                  return { ...base, logo: logoUrl };
-                }
+                return { ...base, logo: logoUrl || undefined }; // TMDB logo or undefined (no addon fallback)
               }
-              return base;
+              
+              return { ...base, logo: undefined }; // No TMDB ID means no logo
             } catch (error) {
-              return base;
+              return { ...base, logo: undefined }; // Error means no logo
             }
           };
 
