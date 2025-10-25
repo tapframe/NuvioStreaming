@@ -1839,7 +1839,7 @@ export const StreamsScreen = () => {
               {Platform.OS === 'android' && AndroidBlurView ? (
                 <AndroidBlurView
                   blurAmount={15}
-                  blurRadius={8}
+                  blurRadius={25}
                   overlayColor={"rgba(0,0,0,0.85)"}
                   style={StyleSheet.absoluteFill}
                 />
