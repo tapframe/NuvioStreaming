@@ -1632,6 +1632,41 @@ export const StreamsScreen = () => {
 
   // Helper to create gradient colors from dominant color
   const createGradientColors = useCallback((baseColor: string | null): [string, string, string, string, string] => {
+    // Always use black gradient when backdrop is enabled
+    if (settings.enableStreamsBackdrop) {
+      return ['rgba(0,0,0,0)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.85)', 'rgba(0,0,0,0.95)'];
+    }
+    
+    // When backdrop is disabled, use theme background gradient
+    const themeBg = colors.darkBackground;
+    
+    // Handle hex color format (e.g., #1a1a1a)
+    if (themeBg.startsWith('#')) {
+      const r = parseInt(themeBg.substr(1, 2), 16);
+      const g = parseInt(themeBg.substr(3, 2), 16);
+      const b = parseInt(themeBg.substr(5, 2), 16);
+      return [
+        `rgba(${r},${g},${b},0)`,
+        `rgba(${r},${g},${b},0.3)`,
+        `rgba(${r},${g},${b},0.6)`,
+        `rgba(${r},${g},${b},0.85)`,
+        `rgba(${r},${g},${b},0.95)`,
+      ];
+    }
+    
+    // Handle rgb color format (e.g., rgb(26, 26, 26))
+    const rgbMatch = themeBg.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    if (rgbMatch) {
+      const [, r, g, b] = rgbMatch;
+      return [
+        `rgba(${r},${g},${b},0)`,
+        `rgba(${r},${g},${b},0.3)`,
+        `rgba(${r},${g},${b},0.6)`,
+        `rgba(${r},${g},${b},0.85)`,
+        `rgba(${r},${g},${b},0.95)`,
+      ];
+    }
+    
     if (!baseColor || baseColor === '#1a1a1a') {
       // Fallback to black gradient with stronger bottom edge
       return ['rgba(0,0,0,0)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.85)', 'rgba(0,0,0,0.95)'];
@@ -1650,7 +1685,7 @@ export const StreamsScreen = () => {
       `rgba(${r},${g},${b},0.85)`,
       `rgba(${r},${g},${b},0.95)`,
     ];
-  }, []);
+  }, [settings.enableStreamsBackdrop, colors.darkBackground]);
 
   const gradientColors = useMemo(() => 
     createGradientColors(dominantColor), 
@@ -1805,7 +1840,7 @@ export const StreamsScreen = () => {
                 <AndroidBlurView
                   blurAmount={15}
                   blurRadius={8}
-                  overlayColor={"rgba(0,0,0,0.8)"}
+                  overlayColor={"rgba(0,0,0,0.85)"}
                   style={StyleSheet.absoluteFill}
                 />
               ) : (
@@ -1819,10 +1854,7 @@ export const StreamsScreen = () => {
               {Platform.OS === 'ios' && (
                 <View style={[
                   StyleSheet.absoluteFill,
-                  { backgroundColor: dominantColor && dominantColor !== '#1a1a1a' 
-                    ? `${dominantColor}CC` // Add 80% opacity (CC in hex)
-                    : 'rgba(0,0,0,0.8)' 
-                  }
+                  { backgroundColor: 'rgba(0,0,0,0.8)' }
                 ]} />
               )}
             </View>
@@ -1923,19 +1955,19 @@ export const StreamsScreen = () => {
           )}
 
           {/* Gradient overlay to blend hero section with streams container */}
-          {metadata?.videos && metadata.videos.length > 1 && selectedEpisode && settings.enableStreamsBackdrop && (
+          {metadata?.videos && metadata.videos.length > 1 && selectedEpisode && (
             <View style={styles.heroBlendOverlay}>
               <LinearGradient
-                colors={[
-                  dominantColor && dominantColor !== '#1a1a1a'
-                    ? `rgba(${parseInt(dominantColor.substr(1, 2), 16)},${parseInt(dominantColor.substr(3, 2), 16)},${parseInt(dominantColor.substr(5, 2), 16)},0.95)`
-                    : 'rgba(0,0,0,0.95)',
-                  dominantColor && dominantColor !== '#1a1a1a'
-                    ? `rgba(${parseInt(dominantColor.substr(1, 2), 16)},${parseInt(dominantColor.substr(3, 2), 16)},${parseInt(dominantColor.substr(5, 2), 16)},0.7)`
-                    : 'rgba(0,0,0,0.7)',
+                colors={settings.enableStreamsBackdrop ? [
+                  'rgba(0,0,0,0.98)',
+                  'rgba(0,0,0,0.85)',
+                  'transparent'
+                ] : [
+                  colors.darkBackground,
+                  colors.darkBackground,
                   'transparent'
                 ]}
-                locations={[0, 0.5, 1]}
+                locations={[0, 0.4, 1]}
                 style={StyleSheet.absoluteFill}
               />
             </View>
@@ -2388,6 +2420,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     position: 'relative',
     backgroundColor: 'transparent',
     pointerEvents: 'box-none',
+    zIndex: 1,
   },
   streamsHeroBackground: {
     width: '100%',
@@ -2728,10 +2761,10 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   heroBlendOverlay: {
     position: 'absolute',
-    top: 220, // Height of hero container
+    top: 140, // Start at ~64% of hero section, giving 80px of blend within hero
     left: 0,
     right: 0,
-    height: 60, // Extend gradient 60px into streams area
+    height: Platform.OS === 'android' ? 150 : 180, // Reduce gradient area on Android
     zIndex: 0,
     pointerEvents: 'none',
   },

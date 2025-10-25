@@ -157,8 +157,21 @@ class CatalogService {
   private libraryRemoveListeners: ((type: string, id: string) => void)[] = [];
 
   private constructor() {
+    this.initializeScope();
     this.loadLibrary();
     this.loadRecentContent();
+  }
+
+  private async initializeScope(): Promise<void> {
+    try {
+      const currentScope = await AsyncStorage.getItem('@user:current');
+      if (!currentScope) {
+        await AsyncStorage.setItem('@user:current', 'local');
+        logger.log('[CatalogService] Initialized @user:current scope to "local"');
+      }
+    } catch (error) {
+      logger.error('[CatalogService] Failed to initialize scope:', error);
+    }
   }
 
   static getInstance(): CatalogService {
@@ -182,9 +195,16 @@ class CatalogService {
       }
       if (storedLibrary) {
         this.library = JSON.parse(storedLibrary);
+        logger.log(`[CatalogService] Library loaded successfully with ${Object.keys(this.library).length} items from scope: ${scope}`);
+      } else {
+        logger.log(`[CatalogService] No library data found for scope: ${scope}`);
+        this.library = {};
       }
+      // Ensure @user:current is set to prevent future scope issues
+      await AsyncStorage.setItem('@user:current', scope);
     } catch (error: any) {
       logger.error('Failed to load library:', error);
+      this.library = {};
     }
   }
 
@@ -192,8 +212,10 @@ class CatalogService {
     try {
       const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
       const scopedKey = `@user:${scope}:stremio-library`;
-      await AsyncStorage.setItem(scopedKey, JSON.stringify(this.library));
-      await AsyncStorage.setItem(this.LEGACY_LIBRARY_KEY, JSON.stringify(this.library));
+      const libraryData = JSON.stringify(this.library);
+      await AsyncStorage.setItem(scopedKey, libraryData);
+      await AsyncStorage.setItem(this.LEGACY_LIBRARY_KEY, libraryData);
+      logger.log(`[CatalogService] Library saved successfully with ${Object.keys(this.library).length} items to scope: ${scope}`);
     } catch (error: any) {
       logger.error('Failed to save library:', error);
     }

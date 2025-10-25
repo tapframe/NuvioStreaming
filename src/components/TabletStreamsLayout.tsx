@@ -208,8 +208,8 @@ const TabletStreamsLayout: React.FC<TabletStreamsLayoutProps> = ({
         duration: 600,
         easing: Easing.out(Easing.cubic)
       }));
-    } else if (!backdropSource?.uri) {
-      // No backdrop available, animate content panels immediately
+    } else if (!backdropSource?.uri || backdropError) {
+      // No backdrop available OR backdrop failed to load - animate content panels immediately
       leftPanelOpacity.value = withTiming(1, {
         duration: 600,
         easing: Easing.out(Easing.cubic)
@@ -228,7 +228,7 @@ const TabletStreamsLayout: React.FC<TabletStreamsLayoutProps> = ({
         easing: Easing.out(Easing.cubic)
       }));
     }
-  }, [backdropSource?.uri, backdropLoaded]);
+  }, [backdropSource?.uri, backdropLoaded, backdropError]);
   
   // Reset animation when episode changes
   useEffect(() => {

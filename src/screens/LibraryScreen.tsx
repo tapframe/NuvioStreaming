@@ -275,8 +275,14 @@ const LibraryScreen = () => {
       try {
         const items = await catalogService.getLibraryItems();
         
+        logger.log(`[LibraryScreen] Loaded ${items.length} library items`);
+        
+        if (items.length === 0) {
+          logger.warn('[LibraryScreen] Library is empty - this might indicate a loading issue');
+        }
+        
         // Sort by date added (most recent first)
-        const sortedItems = items.sort((a, b) => {
+        const sortedItems = [...items].sort((a, b) => {
           const timeA = (a as any).addedToLibraryAt || 0;
           const timeB = (b as any).addedToLibraryAt || 0;
           return timeB - timeA; // Descending order (newest first)
@@ -309,8 +315,10 @@ const LibraryScreen = () => {
 
     // Subscribe to library updates
     const unsubscribe = catalogService.subscribeToLibraryUpdates(async (items) => {
+      logger.log(`[LibraryScreen] Library update received with ${items.length} items`);
+      
       // Sort by date added (most recent first)
-      const sortedItems = items.sort((a, b) => {
+      const sortedItems = [...items].sort((a, b) => {
         const timeA = (a as any).addedToLibraryAt || 0;
         const timeB = (b as any).addedToLibraryAt || 0;
         return timeB - timeA; // Descending order (newest first)
@@ -728,7 +736,7 @@ const LibraryScreen = () => {
     }
 
     // Sort by last watched/added date (most recent first) using raw timestamps
-    return items.sort((a, b) => {
+    return [...items].sort((a, b) => {
       const dateA = a.lastWatched ? new Date(a.lastWatched).getTime() : 0;
       const dateB = b.lastWatched ? new Date(b.lastWatched).getTime() : 0;
       return dateB - dateA;
