@@ -2764,7 +2764,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     top: 140, // Start at ~64% of hero section, giving 80px of blend within hero
     left: 0,
     right: 0,
-    height: Platform.OS === 'android' ? 150 : 180, // Reduce gradient area on Android
+    height: Platform.OS === 'android' ? 95 : 180, // Reduce gradient area on Android
     zIndex: 0,
     pointerEvents: 'none',
   },
