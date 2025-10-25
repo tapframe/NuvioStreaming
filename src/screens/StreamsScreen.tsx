@@ -756,6 +756,30 @@ export const StreamsScreen = () => {
   }, [type, id, currentEpisode?.season_number, currentEpisode?.episode_number]);
 
   const navigateToPlayer = useCallback(async (stream: Stream, options?: { forceVlc?: boolean; headers?: Record<string, string> }) => {
+    // Filter headers for Vidrock - only send essential headers
+    const filterHeadersForVidrock = (headers: Record<string, string> | undefined): Record<string, string> | undefined => {
+      if (!headers) return undefined;
+      
+      // Only keep essential headers for Vidrock
+      const essentialHeaders: Record<string, string> = {};
+      if (headers['User-Agent']) essentialHeaders['User-Agent'] = headers['User-Agent'];
+      if (headers['Referer']) essentialHeaders['Referer'] = headers['Referer'];
+      if (headers['Origin']) essentialHeaders['Origin'] = headers['Origin'];
+      
+      return Object.keys(essentialHeaders).length > 0 ? essentialHeaders : undefined;
+    };
+
+    const finalHeaders = filterHeadersForVidrock(options?.headers || stream.headers);
+    
+    // Add logging here
+    console.log('[StreamsScreen] Navigating to player with headers:', {
+      streamHeaders: stream.headers,
+      optionsHeaders: options?.headers,
+      filteredHeaders: finalHeaders,
+      streamUrl: stream.url,
+      streamName: stream.name || stream.title
+    });
+    
     // Add 50ms delay before navigating to player
     await new Promise(resolve => setTimeout(resolve, 50));
     
@@ -826,8 +850,8 @@ export const StreamsScreen = () => {
       year: metadata?.year,
       streamProvider: streamProvider,
       streamName: streamName,
-      // Always prefer stream.headers; player will use these for requests
-      headers: options?.headers || stream.headers || undefined,
+      // Use filtered headers for Vidrock compatibility
+      headers: finalHeaders,
       // Android will use this to choose VLC path; iOS ignores
       forceVlc,
       id,

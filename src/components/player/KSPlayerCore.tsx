@@ -49,6 +49,13 @@ const KSPlayerCore: React.FC = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'PlayerIOS'>>();
   const { uri, headers, streamProvider } = route.params as any;
 
+  console.log('[KSPlayerCore] Received navigation params:', {
+    uri,
+    headers,
+    headersKeys: headers ? Object.keys(headers) : [],
+    streamProvider
+  });
+
   const navigation = useNavigation<RootStackNavigationProp>();
 
   // KSPlayer is active only on iOS for MKV streams
@@ -199,57 +206,7 @@ const KSPlayerCore: React.FC = () => {
     const nextIdx = (idx + 1) % speedOptions.length;
     setPlaybackSpeed(speedOptions[nextIdx]);
   }, [playbackSpeed, speedOptions]);
-  // Smart URL processing for KSPlayer compatibility
-  const processUrlForKsPlayer = (url: string): string => {
-    try {
-      // Validate URL first
-      const urlObj = new URL(url);
-
-      // Only decode if the URL appears to be double-encoded
-      // Be more conservative - only check for clear double-encoding indicators
-
-      // Check 1: %25 indicates double-encoded % character
-      const hasDoubleEncodedPercent = url.includes('%25');
-
-      // Check 2: Only flag %2F + // if encoded slashes appear in the path/domain part
-      // (not just in query params where they might be legitimate base64/etc)
-      const hasProblematicEncodedSlashes = (() => {
-        const beforeQuery = url.split('?')[0]; // Get URL before query params
-        return beforeQuery.includes('%2F') && beforeQuery.includes('//');
-      })();
-
-      // Check 3: Only flag %3A + :// if colons are encoded in the scheme
-      const hasProblematicEncodedColons = (() => {
-        const schemeEnd = url.indexOf('://');
-        if (schemeEnd === -1) return false;
-        const schemePart = url.substring(0, schemeEnd);
-        return schemePart.includes('%3A');
-      })();
-
-      const hasDoubleEncoding = hasDoubleEncodedPercent ||
-                                hasProblematicEncodedSlashes ||
-                                hasProblematicEncodedColons;
-
-      if (hasDoubleEncoding) {
-        logger.log('[VideoPlayer] Detected double-encoded URL, decoding once');
-        return decodeURIComponent(url);
-      }
-      
-      // For URLs with special characters in query params, ensure proper encoding
-      if (urlObj.search) {
-        const searchParams = new URLSearchParams(urlObj.search);
-        urlObj.search = searchParams.toString();
-        return urlObj.toString();
-      }
-      
-      return url;
-    } catch (e) {
-      logger.warn('[VideoPlayer] URL processing failed, using original:', e);
-      return url;
-    }
-  };
-
-  const [currentStreamUrl, setCurrentStreamUrl] = useState<string>(processUrlForKsPlayer(uri));
+  const [currentStreamUrl, setCurrentStreamUrl] = useState<string>(uri);
   const [isChangingSource, setIsChangingSource] = useState<boolean>(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string>('');
@@ -371,6 +328,15 @@ const KSPlayerCore: React.FC = () => {
       }
     }
   }, [metadata]);
+  
+  // Log video source configuration with headers
+  useEffect(() => {
+    console.log('[KSPlayerCore] Video source configured with:', {
+      uri: currentStreamUrl,
+      hasHeaders: !!(headers && Object.keys(headers).length > 0),
+      headers: headers && Object.keys(headers).length > 0 ? headers : undefined
+    });
+  }, [currentStreamUrl, headers]);
   // Resolve current episode description for series
   const currentEpisodeDescription = (() => {
     try {
@@ -2353,8 +2319,8 @@ const KSPlayerCore: React.FC = () => {
       // Set pending seek state
       setPendingSeek({ position: savedPosition, shouldPlay: wasPlaying });
 
-      // Update the stream URL and details immediately (process URL for KSPlayer)
-      setCurrentStreamUrl(processUrlForKsPlayer(newStream.url));
+      // Update the stream URL and details immediately
+      setCurrentStreamUrl(newStream.url);
       setCurrentQuality(newQuality);
       setCurrentStreamProvider(newProvider);
       setCurrentStreamName(newStreamName);
