@@ -66,22 +66,20 @@ interface TraktFolder {
   id: string;
   name: string;
   icon: keyof typeof MaterialIcons.glyphMap;
-  description: string;
   itemCount: number;
-  gradient: [string, string];
 }
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
 // Compute responsive grid layout (more columns on tablets)
 function getGridLayout(screenWidth: number): { numColumns: number; itemWidth: number } {
-  const horizontalPadding = 24; // matches listContainer padding (approx)
-  const gutter = 16; // space between items (via space-between + marginBottom)
-  let numColumns = 2;
+  const horizontalPadding = 16; // matches listContainer padding (approx)
+  const gutter = 12; // space between items (via space-between + marginBottom)
+  let numColumns = 3;
   if (screenWidth >= 1200) numColumns = 5;
   else if (screenWidth >= 1000) numColumns = 4;
   else if (screenWidth >= 700) numColumns = 3;
-  else numColumns = 2;
+  else numColumns = 3;
   const available = screenWidth - horizontalPadding - (numColumns - 1) * gutter;
   const itemWidth = Math.floor(available / numColumns);
   return { numColumns, itemWidth };
@@ -275,14 +273,8 @@ const LibraryScreen = () => {
       try {
         const items = await catalogService.getLibraryItems();
         
-        logger.log(`[LibraryScreen] Loaded ${items.length} library items`);
-        
-        if (items.length === 0) {
-          logger.warn('[LibraryScreen] Library is empty - this might indicate a loading issue');
-        }
-        
         // Sort by date added (most recent first)
-        const sortedItems = [...items].sort((a, b) => {
+        const sortedItems = items.sort((a, b) => {
           const timeA = (a as any).addedToLibraryAt || 0;
           const timeB = (b as any).addedToLibraryAt || 0;
           return timeB - timeA; // Descending order (newest first)
@@ -315,10 +307,8 @@ const LibraryScreen = () => {
 
     // Subscribe to library updates
     const unsubscribe = catalogService.subscribeToLibraryUpdates(async (items) => {
-      logger.log(`[LibraryScreen] Library update received with ${items.length} items`);
-      
       // Sort by date added (most recent first)
-      const sortedItems = [...items].sort((a, b) => {
+      const sortedItems = items.sort((a, b) => {
         const timeA = (a as any).addedToLibraryAt || 0;
         const timeB = (b as any).addedToLibraryAt || 0;
         return timeB - timeA; // Descending order (newest first)
@@ -370,41 +360,31 @@ const LibraryScreen = () => {
         id: 'watched',
         name: 'Watched',
         icon: 'visibility',
-        description: 'Your watched content',
         itemCount: (watchedMovies?.length || 0) + (watchedShows?.length || 0),
-        gradient: ['#2C3E50', '#34495E']
       },
       {
         id: 'continue-watching',
-        name: 'Continue Watching',
+        name: 'Continue',
         icon: 'play-circle-outline',
-        description: 'Resume your progress',
         itemCount: continueWatching?.length || 0,
-        gradient: ['#2980B9', '#3498DB']
       },
       {
         id: 'watchlist',
         name: 'Watchlist',
         icon: 'bookmark',
-        description: 'Want to watch',
         itemCount: (watchlistMovies?.length || 0) + (watchlistShows?.length || 0),
-        gradient: ['#6C3483', '#9B59B6']
       },
       {
         id: 'collection',
         name: 'Collection',
         icon: 'library-add',
-        description: 'Your collection',
         itemCount: (collectionMovies?.length || 0) + (collectionShows?.length || 0),
-        gradient: ['#1B2631', '#283747']
       },
       {
         id: 'ratings',
         name: 'Rated',
         icon: 'star',
-        description: 'Your ratings',
         itemCount: ratedContent?.length || 0,
-        gradient: ['#5D6D7E', '#85929E']
       }
     ];
 
@@ -462,16 +442,13 @@ const LibraryScreen = () => {
       }}
       activeOpacity={0.7}
     >
-      <View style={[styles.posterContainer, styles.folderContainer, { shadowColor: currentTheme.colors.black }]}>
-        <LinearGradient
-          colors={folder.gradient}
-          style={styles.folderGradient}
-        >
+      <View style={[styles.posterContainer, styles.folderContainer, { shadowColor: currentTheme.colors.black, backgroundColor: currentTheme.colors.elevation1 }]}>
+        <View style={styles.folderGradient}>
           <MaterialIcons 
             name={folder.icon} 
-            size={60} 
+            size={48} 
             color={currentTheme.colors.white} 
-            style={{ marginBottom: 12 }} 
+            style={{ marginBottom: 8 }} 
           />
           <Text style={[styles.folderTitle, { color: currentTheme.colors.white }]}>
             {folder.name}
@@ -479,10 +456,7 @@ const LibraryScreen = () => {
           <Text style={styles.folderCount}>
             {folder.itemCount} items
           </Text>
-          <Text style={styles.folderSubtitle}>
-            {folder.description}
-          </Text>
-        </LinearGradient>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -502,12 +476,9 @@ const LibraryScreen = () => {
       activeOpacity={0.7}
     >
       <View>
-        <View style={[styles.posterContainer, styles.folderContainer, { shadowColor: currentTheme.colors.black }]}>
-          <LinearGradient
-            colors={['#666666', '#444444']}
-            style={styles.folderGradient}
-          >
-            <TraktIcon width={60} height={60} style={{ marginBottom: 12 }} />
+        <View style={[styles.posterContainer, styles.folderContainer, { shadowColor: currentTheme.colors.black, backgroundColor: currentTheme.colors.elevation1 }]}>
+          <View style={styles.folderGradient}>
+            <TraktIcon width={48} height={48} style={{ marginBottom: 8 }} />
             <Text style={[styles.folderTitle, { color: currentTheme.colors.white }]}>
               Trakt
             </Text>
@@ -516,12 +487,7 @@ const LibraryScreen = () => {
                 {traktFolders.length} items
               </Text>
             )}
-            {!traktAuthenticated && (
-              <Text style={styles.folderSubtitle}>
-                Tap to connect
-              </Text>
-            )}
-          </LinearGradient>
+          </View>
         </View>
         <Text style={[styles.cardTitle, { color: currentTheme.colors.white }]}>
           Trakt collections
@@ -736,7 +702,7 @@ const LibraryScreen = () => {
     }
 
     // Sort by last watched/added date (most recent first) using raw timestamps
-    return [...items].sort((a, b) => {
+    return items.sort((a, b) => {
       const dateA = a.lastWatched ? new Date(a.lastWatched).getTime() : 0;
       const dateB = b.lastWatched ? new Date(b.lastWatched).getTime() : 0;
       return dateB - dateA;
@@ -1111,7 +1077,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 32,
     fontWeight: '800',
-    letterSpacing: 0.3,
+    letterSpacing: 0.5,
   },
   filtersContainer: {
     flexDirection: 'row',
@@ -1143,7 +1109,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   listContainer: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     paddingVertical: 16,
     paddingBottom: 90,
   },
@@ -1159,7 +1125,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   itemContainer: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   posterContainer: {
     borderRadius: 12,
@@ -1221,8 +1187,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   cardTitle: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 18,
     marginTop: 8,
     textAlign: 'center',
     paddingHorizontal: 4,
@@ -1303,27 +1270,29 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   folderTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 4,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 6,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
-    letterSpacing: 0.3,
+    letterSpacing: 0.5,
   },
   folderCount: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.7)',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    color: 'rgba(255,255,255,0.8)',
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+    marginBottom: 2,
   },
   folderSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.7)',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.6)',
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+    marginTop: 2,
   },
   backButton: {
     padding: 8,
