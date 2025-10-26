@@ -120,7 +120,6 @@ const ActionButtons = memo(({
   watchProgress,
   groupedEpisodes,
   metadata,
-  aiChatEnabled,
   settings,
   // Trakt integration props
   isAuthenticated,
@@ -141,7 +140,6 @@ const ActionButtons = memo(({
   watchProgress: any;
   groupedEpisodes?: { [seasonNumber: number]: any[] };
   metadata: any;
-  aiChatEnabled?: boolean;
   settings: any;
   // Trakt integration props
   isAuthenticated?: boolean;
@@ -335,27 +333,22 @@ const ActionButtons = memo(({
     return isWatched ? 'Play' : playButtonText;
   }, [isWatched, playButtonText, type, watchProgress, groupedEpisodes]);
 
-  // Determine if we should show buttons in a single row (Play, Save, and optionally one other button)
-  const hasAiChat = aiChatEnabled;
+  // Count additional buttons (excluding Play and Save) - AI Chat no longer counted
   const hasTraktCollection = isAuthenticated;
   const hasRatings = type === 'series';
   
-  // Count additional buttons (excluding Play and Save)
-  const additionalButtonCount = (hasAiChat ? 1 : 0) + (hasTraktCollection ? 1 : 0) + (hasRatings ? 1 : 0);
-  
-  // Show single row when there are 0 additional buttons (2 total: Play + Save) or 1 additional button (3 total)
-  const shouldShowSingleRow = additionalButtonCount <= 1;
+  // Count additional buttons (AI Chat removed - now in top right corner)
+  const additionalButtonCount = (hasTraktCollection ? 1 : 0) + (hasRatings ? 1 : 0);
   
   return (
     <Animated.View style={[isTablet ? styles.tabletActionButtons : styles.actionButtons, animatedStyle]}>
-      {shouldShowSingleRow ? (
-        /* Single Row Layout - Play, Save, and optionally one other button (2-3 total) */
-        <View style={styles.singleRowLayout}>
+      {/* Single Row Layout - Play, Save, and optionally Collection/Ratings */}
+      <View style={styles.singleRowLayout}>
           <TouchableOpacity
             style={[
               playButtonStyle, 
               isTablet && styles.tabletPlayButton, 
-              additionalButtonCount === 0 ? styles.singleRowPlayButtonFullWidth : styles.singleRowPlayButton
+              additionalButtonCount === 0 ? styles.singleRowPlayButtonFullWidth : styles.primaryActionButton
             ]}
             onPress={handleShowStreams}
             activeOpacity={0.85}
@@ -377,8 +370,8 @@ const ActionButtons = memo(({
             style={[
               styles.actionButton, 
               styles.infoButton, 
-              isTablet && styles.tabletInfoButton, 
-              additionalButtonCount === 0 ? styles.singleRowSaveButtonFullWidth : styles.singleRowSaveButton
+              isTablet && styles.tabletInfoButton,
+              additionalButtonCount === 0 ? styles.singleRowSaveButtonFullWidth : styles.primaryActionButton
             ]}
             onPress={handleSaveAction}
             activeOpacity={0.85}
@@ -405,55 +398,8 @@ const ActionButtons = memo(({
             </Text>
           </TouchableOpacity>
 
-          {/* Third Button - AI Chat, Trakt Collection, or Ratings (only if available) */}
-          {hasAiChat && additionalButtonCount === 1 && (
-            <TouchableOpacity
-              style={[styles.iconButton, isTablet && styles.tabletIconButton, styles.singleRowIconButton]}
-              onPress={() => {
-                // Extract episode info if it's a series
-                let episodeData = null;
-                if (type === 'series' && watchProgress?.episodeId) {
-                  const parts = watchProgress.episodeId.split(':');
-                  if (parts.length >= 3) {
-                    episodeData = {
-                      seasonNumber: parseInt(parts[1], 10),
-                      episodeNumber: parseInt(parts[2], 10)
-                    };
-                  }
-                }
-
-                navigation.navigate('AIChat', {
-                  contentId: id,
-                  contentType: type,
-                  episodeId: episodeData ? watchProgress.episodeId : undefined,
-                  seasonNumber: episodeData?.seasonNumber,
-                  episodeNumber: episodeData?.episodeNumber,
-                  title: metadata?.name || metadata?.title || 'Unknown'
-                });
-              }}
-              activeOpacity={0.85}
-            >
-              {Platform.OS === 'ios' ? (
-                GlassViewComp && liquidGlassAvailable ? (
-                  <GlassViewComp
-                    style={styles.blurBackgroundRound}
-                    glassEffectStyle="regular"
-                  />
-                ) : (
-                  <ExpoBlurView intensity={80} style={styles.blurBackgroundRound} tint="dark" />
-                )
-              ) : (
-                <View style={styles.androidFallbackBlurRound} />
-              )}
-              <MaterialIcons 
-                name="smart-toy" 
-                size={isTablet ? 28 : 24} 
-                color={currentTheme.colors.white}
-              />
-            </TouchableOpacity>
-          )}
-
-          {hasTraktCollection && !hasAiChat && additionalButtonCount === 1 && (
+          {/* Trakt Collection Button */}
+          {hasTraktCollection && (
             <TouchableOpacity
               style={[styles.iconButton, isTablet && styles.tabletIconButton, styles.singleRowIconButton]}
               onPress={handleCollectionAction}
@@ -479,7 +425,8 @@ const ActionButtons = memo(({
             </TouchableOpacity>
           )}
 
-          {hasRatings && !hasAiChat && !hasTraktCollection && additionalButtonCount === 1 && (
+          {/* Ratings Button (for series) */}
+          {hasRatings && (
             <TouchableOpacity
               style={[styles.iconButton, isTablet && styles.tabletIconButton, styles.singleRowIconButton]}
               onPress={handleRatingsPress}
@@ -504,164 +451,7 @@ const ActionButtons = memo(({
               />
             </TouchableOpacity>
           )}
-        </View>
-      ) : (
-        <>
-          {/* Play Button Row - Only Play button */}
-          <View style={styles.playButtonRow}>
-            <TouchableOpacity
-              style={[playButtonStyle, isTablet && styles.tabletPlayButton]}
-              onPress={handleShowStreams}
-              activeOpacity={0.85}
-            >
-              <MaterialIcons 
-                name={(() => {
-                  if (isWatched) {
-                    return type === 'movie' ? 'replay' : 'play-arrow';
-                  }
-                  return playButtonText === 'Resume' ? 'play-circle-outline' : 'play-arrow';
-                })()} 
-                size={isTablet ? 28 : 24} 
-                color={isWatched && type === 'movie' ? "#fff" : "#000"} 
-              />
-              <Text style={[playButtonTextStyle, isTablet && styles.tabletPlayButtonText]}>{finalPlayButtonText}</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Secondary Action Row - All other buttons */}
-          <View style={styles.secondaryActionRow}>
-        {/* Save Button */}
-        <TouchableOpacity
-          style={[styles.actionButton, styles.infoButton, isTablet && styles.tabletInfoButton]}
-          onPress={handleSaveAction}
-          activeOpacity={0.85}
-        >
-          {Platform.OS === 'ios' ? (
-            GlassViewComp && liquidGlassAvailable ? (
-              <GlassViewComp
-                style={styles.blurBackground}
-                glassEffectStyle="regular"
-              />
-            ) : (
-              <ExpoBlurView intensity={80} style={styles.blurBackground} tint="dark" />
-            )
-          ) : (
-            <View style={styles.androidFallbackBlur} />
-          )}
-          <MaterialIcons
-            name={inLibrary ? "bookmark" : "bookmark-outline"}
-            size={isTablet ? 28 : 24}
-            color={inLibrary ? (isAuthenticated && isInWatchlist ? "#E74C3C" : currentTheme.colors.white) : currentTheme.colors.white}
-          />
-          <Text style={[styles.infoButtonText, isTablet && styles.tabletInfoButtonText]}>
-            {inLibrary ? 'Saved' : 'Save'}
-          </Text>
-        </TouchableOpacity>
-
-        {/* AI Chat Button */}
-        {aiChatEnabled && (
-          <TouchableOpacity
-            style={[styles.iconButton, isTablet && styles.tabletIconButton]}
-            onPress={() => {
-              // Extract episode info if it's a series
-              let episodeData = null;
-              if (type === 'series' && watchProgress?.episodeId) {
-                const parts = watchProgress.episodeId.split(':');
-                if (parts.length >= 3) {
-                  episodeData = {
-                    seasonNumber: parseInt(parts[1], 10),
-                    episodeNumber: parseInt(parts[2], 10)
-                  };
-                }
-              }
-
-              navigation.navigate('AIChat', {
-                contentId: id,
-                contentType: type,
-                episodeId: episodeData ? watchProgress.episodeId : undefined,
-                seasonNumber: episodeData?.seasonNumber,
-                episodeNumber: episodeData?.episodeNumber,
-                title: metadata?.name || metadata?.title || 'Unknown'
-              });
-            }}
-            activeOpacity={0.85}
-          >
-            {Platform.OS === 'ios' ? (
-              GlassViewComp && liquidGlassAvailable ? (
-                <GlassViewComp
-                  style={styles.blurBackgroundRound}
-                  glassEffectStyle="regular"
-                />
-              ) : (
-                <ExpoBlurView intensity={80} style={styles.blurBackgroundRound} tint="dark" />
-              )
-            ) : (
-              <View style={styles.androidFallbackBlurRound} />
-            )}
-            <MaterialIcons 
-              name="smart-toy" 
-              size={isTablet ? 28 : 24} 
-              color={currentTheme.colors.white}
-            />
-          </TouchableOpacity>
-        )}
-
-        {/* Trakt Collection Button */}
-        {isAuthenticated && (
-          <TouchableOpacity
-            style={[styles.iconButton, isTablet && styles.tabletIconButton]}
-            onPress={handleCollectionAction}
-            activeOpacity={0.85}
-          >
-            {Platform.OS === 'ios' ? (
-              GlassViewComp && liquidGlassAvailable ? (
-                <GlassViewComp
-                  style={styles.blurBackgroundRound}
-                  glassEffectStyle="regular"
-                />
-              ) : (
-                <ExpoBlurView intensity={80} style={styles.blurBackgroundRound} tint="dark" />
-              )
-            ) : (
-              <View style={styles.androidFallbackBlurRound} />
-            )}
-            <MaterialIcons 
-              name={isInCollection ? "video-library" : "video-library"} 
-              size={isTablet ? 28 : 24} 
-              color={isInCollection ? "#3498DB" : currentTheme.colors.white}
-            />
-          </TouchableOpacity>
-        )}
-
-        {/* Ratings Button (for series) */}
-        {type === 'series' && (
-          <TouchableOpacity
-            style={[styles.iconButton, isTablet && styles.tabletIconButton]}
-            onPress={handleRatingsPress}
-            activeOpacity={0.85}
-          >
-            {Platform.OS === 'ios' ? (
-              GlassViewComp && liquidGlassAvailable ? (
-                <GlassViewComp
-                  style={styles.blurBackgroundRound}
-                  glassEffectStyle="regular"
-                />
-              ) : (
-                <ExpoBlurView intensity={80} style={styles.blurBackgroundRound} tint="dark" />
-              )
-            ) : (
-              <View style={styles.androidFallbackBlurRound} />
-            )}
-            <MaterialIcons 
-              name="assessment" 
-              size={isTablet ? 28 : 24} 
-              color={currentTheme.colors.white}
-            />
-          </TouchableOpacity>
-        )}
       </View>
-        </>
-      )}
     </Animated.View>
   );
 });
@@ -1892,6 +1682,95 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
               color="white"
             />
           </TouchableOpacity>
+
+          {/* AI Chat button */}
+          {settings?.aiChatEnabled && (
+            <TouchableOpacity
+              onPress={() => {
+                // Extract episode info if it's a series
+                let episodeData = null;
+                if (type === 'series' && watchProgress && watchProgress.episodeId) {
+                  const parts = watchProgress.episodeId.split(':');
+                  if (parts.length >= 3) {
+                    episodeData = {
+                      seasonNumber: parseInt(parts[1], 10),
+                      episodeNumber: parseInt(parts[2], 10)
+                    };
+                  }
+                }
+
+                navigation.navigate('AIChat', {
+                  contentId: id,
+                  contentType: type,
+                  episodeId: episodeData && watchProgress ? watchProgress.episodeId : undefined,
+                  seasonNumber: episodeData?.seasonNumber,
+                  episodeNumber: episodeData?.episodeNumber,
+                  title: metadata?.name || metadata?.title || 'Unknown'
+                });
+              }}
+              activeOpacity={0.7}
+              onPressIn={(e) => e.stopPropagation()}
+              onPressOut={(e) => e.stopPropagation()}
+              style={{
+                padding: 8,
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                borderRadius: 20,
+              }}
+            >
+              <MaterialIcons
+                name="smart-toy"
+                size={24}
+                color="white"
+              />
+            </TouchableOpacity>
+          )}
+        </Animated.View>
+      )}
+
+      {/* AI Chat button (when trailers are disabled) */}
+      {settings?.aiChatEnabled && !(settings?.showTrailers && trailerReady && trailerUrl) && (
+        <Animated.View style={{
+          position: 'absolute',
+          top: Platform.OS === 'android' ? 40 : 50,
+          right: width >= 768 ? 32 : 16,
+          zIndex: 1000,
+        }}>
+          <TouchableOpacity
+            onPress={() => {
+              // Extract episode info if it's a series
+              let episodeData = null;
+              if (type === 'series' && watchProgress && watchProgress.episodeId) {
+                const parts = watchProgress.episodeId.split(':');
+                if (parts.length >= 3) {
+                  episodeData = {
+                    seasonNumber: parseInt(parts[1], 10),
+                    episodeNumber: parseInt(parts[2], 10)
+                  };
+                }
+              }
+
+              navigation.navigate('AIChat', {
+                contentId: id,
+                contentType: type,
+                episodeId: episodeData && watchProgress ? watchProgress.episodeId : undefined,
+                seasonNumber: episodeData?.seasonNumber,
+                episodeNumber: episodeData?.episodeNumber,
+                title: metadata?.name || metadata?.title || 'Unknown'
+              });
+            }}
+            activeOpacity={0.7}
+            style={{
+              padding: 8,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              borderRadius: 20,
+            }}
+          >
+            <MaterialIcons
+              name="smart-toy"
+              size={24}
+              color="white"
+            />
+          </TouchableOpacity>
         </Animated.View>
       )}
 
@@ -1992,7 +1871,6 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
             watchProgress={watchProgress}
             groupedEpisodes={groupedEpisodes}
             metadata={metadata}
-            aiChatEnabled={settings?.aiChatEnabled}
             settings={settings}
             // Trakt integration props
             isAuthenticated={isAuthenticated}
@@ -2179,11 +2057,9 @@ const styles = StyleSheet.create({
   },
   singleRowPlayButtonFullWidth: {
     flex: 1,
-    marginHorizontal: 2,
   },
   singleRowSaveButtonFullWidth: {
     flex: 1,
-    marginHorizontal: 2,
   },
   primaryActionRow: {
     flexDirection: 'row',
@@ -2191,6 +2067,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
+  },
+  primaryActionButton: {
+    flex: 1,
+    maxWidth: '48%',
   },
   playButtonRow: {
     flexDirection: 'row',
@@ -2213,7 +2093,6 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     paddingHorizontal: 16,
     borderRadius: 26,
-    flex: 1,
   },
   playButton: {
     backgroundColor: '#fff',
