@@ -520,8 +520,11 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
           setTmdbId(cachedScreen.tmdbId);
         }
         // Check if item is in library
-        const isInLib = catalogService.getLibraryItems().some(item => item.id === id);
-        setInLibrary(isInLib);
+        (async () => {
+          const items = await catalogService.getLibraryItems();
+          const isInLib = items.some(item => item.id === id);
+          setInLibrary(isInLib);
+        })();
         setLoading(false);
         return;
       } else {
@@ -612,8 +615,11 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
               
               setMetadata(formattedMovie);
               cacheService.setMetadata(id, type, formattedMovie);
-              const isInLib = catalogService.getLibraryItems().some(item => item.id === id);
-              setInLibrary(isInLib);
+              (async () => {
+                const items = await catalogService.getLibraryItems();
+                const isInLib = items.some(item => item.id === id);
+                setInLibrary(isInLib);
+              })();
               setLoading(false);
               return; 
             }
@@ -691,8 +697,11 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
                 setTmdbId(parseInt(tmdbId));
                 loadSeriesData().catch((error) => { if (__DEV__) console.error(error); });
                 
-                const isInLib = catalogService.getLibraryItems().some(item => item.id === id);
-                setInLibrary(isInLib);
+                (async () => {
+                  const items = await catalogService.getLibraryItems();
+                  const isInLib = items.some(item => item.id === id);
+                  setInLibrary(isInLib);
+                })();
                 setLoading(false);
                 return;
               }
@@ -947,8 +956,11 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         }
         setMetadata(finalMetadata);
         cacheService.setMetadata(id, type, finalMetadata);
-        const isInLib = catalogService.getLibraryItems().some(item => item.id === id);
-        setInLibrary(isInLib);
+        (async () => {
+          const items = await catalogService.getLibraryItems();
+          const isInLib = items.some(item => item.id === id);
+          setInLibrary(isInLib);
+        })();
       } else {
         // Extract the error from the rejected promise
         const reason = (content as any)?.reason;

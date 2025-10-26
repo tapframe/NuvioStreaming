@@ -17,12 +17,16 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
   withTiming,
+  withRepeat,
+  withSequence,
   FadeInDown,
   FadeInUp,
   useAnimatedScrollHandler,
   runOnJS,
   interpolateColor,
   interpolate,
+  Extrapolation,
+  useAnimatedReaction,
 } from 'react-native-reanimated';
 import { useTheme } from '../contexts/ThemeContext';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
@@ -30,6 +34,206 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { mmkvStorage } from '../services/mmkvStorage';
 
 const { width, height } = Dimensions.get('window');
+
+// Animation configuration
+const SPRING_CONFIG = {
+  damping: 15,
+  stiffness: 150,
+  mass: 1,
+};
+
+const SLIDE_TIMING = {
+  duration: 400,
+};
+
+// Animated Button Component
+const AnimatedButton = ({
+  onPress,
+  backgroundColor,
+  text,
+  icon,
+}: {
+  onPress: () => void;
+  backgroundColor: string;
+  text: string;
+  icon: string;
+}) => {
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const handlePressIn = () => {
+    scale.value = withSpring(0.95, SPRING_CONFIG);
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1, SPRING_CONFIG);
+  };
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      activeOpacity={1}
+    >
+      <Animated.View
+        style={[
+          styles.button,
+          styles.nextButton,
+          { backgroundColor },
+          animatedStyle,
+        ]}
+      >
+        <Text style={[styles.buttonText, { color: 'white' }]}>{text}</Text>
+        <MaterialIcons
+          name={icon as any}
+          size={20}
+          color="white"
+          style={styles.buttonIcon}
+        />
+      </Animated.View>
+    </TouchableOpacity>
+  );
+};
+
+// Slide Content Component with animations
+const SlideContent = ({ item, isActive }: { item: OnboardingSlide; isActive: boolean }) => {
+  // Premium icon animations: scale, floating, rotation, and glow
+  const iconScale = useSharedValue(isActive ? 1 : 0.8);
+  const iconOpacity = useSharedValue(isActive ? 1 : 0);
+  const iconTranslateY = useSharedValue(isActive ? 0 : 20);
+  const iconRotation = useSharedValue(0);
+  const glowIntensity = useSharedValue(isActive ? 1 : 0);
+  
+  React.useEffect(() => {
+    if (isActive) {
+      iconScale.value = withSpring(1.1, SPRING_CONFIG);
+      iconOpacity.value = withTiming(1, SLIDE_TIMING);
+      iconTranslateY.value = withSpring(0, SPRING_CONFIG);
+      iconRotation.value = withSpring(0, SPRING_CONFIG);
+      glowIntensity.value = withSpring(1, SPRING_CONFIG);
+    } else {
+      iconScale.value = 0.8;
+      iconOpacity.value = 0;
+      iconTranslateY.value = 20;
+      iconRotation.value = -15;
+      glowIntensity.value = 0;
+    }
+  }, [isActive]);
+
+  const animatedIconStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        { scale: iconScale.value },
+        { translateY: iconTranslateY.value },
+        { rotate: `${iconRotation.value}deg` },
+      ],
+      opacity: iconOpacity.value,
+    };
+  });
+
+  // Premium floating animation for active icon
+  const floatAnim = useSharedValue(0);
+  React.useEffect(() => {
+    if (isActive) {
+      floatAnim.value = withRepeat(
+        withSequence(
+          withTiming(10, { duration: 2500 }),
+          withTiming(-10, { duration: 2500 })
+        ),
+        -1,
+        true
+      );
+    } else {
+      floatAnim.value = 0;
+    }
+  }, [isActive]);
+
+  const floatingIconStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: floatAnim.value }],
+  }));
+
+  // Glow animation with pulse effect
+  const pulseAnim = useSharedValue(1);
+  React.useEffect(() => {
+    if (isActive) {
+      pulseAnim.value = withRepeat(
+        withSequence(
+          withTiming(1.3, { duration: 2000 }),
+          withTiming(1.1, { duration: 2000 })
+        ),
+        -1,
+        true
+      );
+    }
+  }, [isActive]);
+
+  const animatedGlowStyle = useAnimatedStyle(() => ({
+    opacity: glowIntensity.value * 0.5,
+    transform: [{ scale: pulseAnim.value * 1.2 + iconScale.value * 0.3 }],
+  }));
+  
+  return (
+    <View style={styles.slide}>
+      {/* Premium glow effect */}
+      <Animated.View 
+        style={[
+          styles.glowContainer,
+          animatedGlowStyle,
+        ]}
+      >
+        <LinearGradient
+          colors={item.gradient}
+          style={styles.glowCircle}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        />
+      </Animated.View>
+
+      <LinearGradient
+        colors={item.gradient}
+        style={styles.iconContainer}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <Animated.View style={[styles.iconWrapper, animatedIconStyle, floatingIconStyle]}>
+          <MaterialIcons 
+            name={item.icon} 
+            size={95} 
+            color="white" 
+          />
+        </Animated.View>
+      </LinearGradient>
+
+      <Animated.View
+        entering={FadeInUp.delay(300).duration(600)}
+        style={styles.textContainer}
+      >
+        <Animated.Text 
+          entering={FadeInUp.delay(400).duration(500)}
+          style={[styles.title, { color: 'white' }]}
+        >
+          {item.title}
+        </Animated.Text>
+        <Animated.Text 
+          entering={FadeInUp.delay(500).duration(500)}
+          style={[styles.subtitle, { color: 'rgba(255,255,255,0.9)' }]}
+        >
+          {item.subtitle}
+        </Animated.Text>
+        <Animated.Text 
+          entering={FadeInUp.delay(600).duration(500)}
+          style={[styles.description, { color: 'rgba(255,255,255,0.85)' }]}
+        >
+          {item.description}
+        </Animated.Text>
+      </Animated.View>
+    </View>
+  );
+};
 
 interface OnboardingSlide {
   id: string;
@@ -84,30 +288,22 @@ const OnboardingScreen = () => {
   const scrollX = useSharedValue(0);
   const currentSlide = onboardingData[currentIndex];
 
+  // Update progress when index changes
+  React.useEffect(() => {
+    progressValue.value = withSpring(
+      (currentIndex + 1) / onboardingData.length,
+      SPRING_CONFIG
+    );
+  }, [currentIndex]);
+
   const onScroll = useAnimatedScrollHandler({
     onScroll: (event) => {
       scrollX.value = event.contentOffset.x;
     },
   });
 
-  const getAnimatedBackgroundStyle = (slideIndex: number) => {
-    return useAnimatedStyle(() => {
-      const inputRange = [(slideIndex - 1) * width, slideIndex * width, (slideIndex + 1) * width];
-      const opacity = interpolate(
-        scrollX.value,
-        inputRange,
-        [0, 1, 0],
-        'clamp'
-      );
-
-      return {
-        opacity,
-      };
-    });
-  };
-
   const animatedProgressStyle = useAnimatedStyle(() => ({
-    width: withSpring(`${((currentIndex + 1) / onboardingData.length) * 100}%`),
+    width: `${progressValue.value * 100}%`,
   }));
 
   const handleNext = () => {
@@ -147,94 +343,91 @@ const OnboardingScreen = () => {
     const isActive = index === currentIndex;
     
     return (
-      <View style={styles.slide}>
-        <LinearGradient
-          colors={item.gradient}
-          style={styles.iconContainer}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <Animated.View
-            entering={FadeInDown.delay(300).duration(800)}
-            style={styles.iconWrapper}
-          >
-            <MaterialIcons 
-              name={item.icon} 
-              size={80} 
-              color="white" 
-            />
-          </Animated.View>
-        </LinearGradient>
+      <SlideContent 
+        item={item} 
+        isActive={isActive} 
+      />
+    );
+  };
 
-        <Animated.View
-          entering={FadeInUp.delay(500).duration(800)}
-          style={styles.textContainer}
-        >
-          <Text style={[styles.title, { color: 'white' }]}>
-            {item.title}
-          </Text>
-          <Text style={[styles.subtitle, { color: 'rgba(255,255,255,0.9)' }]}>
-            {item.subtitle}
-          </Text>
-          <Text style={[styles.description, { color: 'rgba(255,255,255,0.85)' }]}>
-            {item.description}
-          </Text>
-        </Animated.View>
-      </View>
+  const renderPaginationDot = (index: number) => {
+    const scale = useSharedValue(index === currentIndex ? 1 : 0.8);
+    const opacity = useSharedValue(index === currentIndex ? 1 : 0.4);
+    
+    React.useEffect(() => {
+      scale.value = withSpring(
+        index === currentIndex ? 1.3 : 0.8,
+        SPRING_CONFIG
+      );
+      opacity.value = withTiming(
+        index === currentIndex ? 1 : 0.4,
+        SLIDE_TIMING
+      );
+    }, [currentIndex, index]);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+      transform: [{ scale: scale.value }],
+      opacity: opacity.value,
+    }));
+
+    return (
+      <Animated.View
+        key={index}
+        style={[
+          styles.paginationDot,
+          {
+            backgroundColor: index === currentIndex 
+              ? currentTheme.colors.primary 
+              : currentTheme.colors.elevation2,
+          },
+          animatedStyle,
+        ]}
+      />
     );
   };
 
   const renderPagination = () => (
     <View style={styles.pagination}>
-      {onboardingData.map((_, index) => (
-        <View
-          key={index}
-          style={[
-            styles.paginationDot,
-            {
-              backgroundColor: index === currentIndex 
-                ? currentTheme.colors.primary 
-                : currentTheme.colors.elevation2,
-              opacity: index === currentIndex ? 1 : 0.4,
-            },
-          ]}
-        />
-      ))}
+      {onboardingData.map((_, index) => renderPaginationDot(index))}
     </View>
   );
 
+  // Background slide styles
+  const getBackgroundSlideStyle = (index: number) => {
+    'worklet';
+    return useAnimatedStyle(() => {
+      const inputRange = [(index - 1) * width, index * width, (index + 1) * width];
+      const slideOpacity = interpolate(
+        scrollX.value,
+        inputRange,
+        [0, 1, 0],
+        Extrapolation.CLAMP
+      );
+      
+      return { opacity: slideOpacity };
+    });
+  };
+
   return (
-    <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
-      {/* Layered animated gradient backgrounds */}
-      {onboardingData.map((slide, index) => (
-        <Animated.View key={`bg-${index}`} style={[styles.backgroundPanel, getAnimatedBackgroundStyle(index)]}>
-          <LinearGradient
-            colors={[slide.gradient[0], slide.gradient[1]]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-        </Animated.View>
-      ))}
-      <LinearGradient
-        colors={["rgba(0,0,0,0.2)", "rgba(0,0,0,0.45)"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={styles.overlayPanel}
-      />
-      {/* Decorative gradient blobs that change with current slide */}
-      <LinearGradient
-        colors={[currentSlide.gradient[1], 'transparent']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.blobTopRight}
-      />
-      <LinearGradient
-        colors={[currentSlide.gradient[0], 'transparent']}
-        start={{ x: 1, y: 1 }}
-        end={{ x: 0, y: 0 }}
-        style={styles.blobBottomLeft}
-      />
+    <View style={styles.container}>
+      {/* Animated gradient background that transitions between slides */}
+      <Animated.View style={StyleSheet.absoluteFill}>
+        {onboardingData.map((slide, index) => (
+          <Animated.View 
+            key={`bg-${index}`} 
+            style={[StyleSheet.absoluteFill, getBackgroundSlideStyle(index)]}
+          >
+            <LinearGradient
+              colors={slide.gradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.25)' }]} />
+          </Animated.View>
+        ))}
+      </Animated.View>
+      
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       {/* Content container with status bar padding */}
@@ -282,24 +475,12 @@ const OnboardingScreen = () => {
           {renderPagination()}
 
           <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={[
-                styles.button,
-                styles.nextButton,
-                { backgroundColor: currentTheme.colors.primary }
-              ]}
+            <AnimatedButton
               onPress={handleNext}
-            >
-              <Text style={[styles.buttonText, { color: 'white' }]}>
-                {currentIndex === onboardingData.length - 1 ? 'Get Started' : 'Next'}
-              </Text>
-              <MaterialIcons
-                name={currentIndex === onboardingData.length - 1 ? 'check' : 'arrow-forward'}
-                size={20}
-                color="white"
-                style={styles.buttonIcon}
-              />
-            </TouchableOpacity>
+              backgroundColor={currentTheme.colors.primary}
+              text={currentIndex === onboardingData.length - 1 ? 'Get Started' : 'Next'}
+              icon={currentIndex === onboardingData.length - 1 ? 'check' : 'arrow-forward'}
+            />
           </View>
         </View>
       </View>
@@ -344,87 +525,67 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 40,
   },
-  backgroundPanel: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    borderRadius: 0,
-  },
-  overlayPanel: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    borderRadius: 0,
-  },
   fullScreenContainer: {
     flex: 1,
     paddingTop: Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24,
   },
-  blobTopRight: {
+  glowContainer: {
     position: 'absolute',
-    top: -60,
-    right: -60,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    opacity: 0.35,
-    transform: [{ rotate: '15deg' }],
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    top: '35%',
   },
-  blobBottomLeft: {
-    position: 'absolute',
-    bottom: -70,
-    left: -70,
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    opacity: 0.28,
-    transform: [{ rotate: '-20deg' }],
+  glowCircle: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 100,
+    opacity: 0.4,
   },
   iconContainer: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 60,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 10,
+      height: 15,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 15,
+    shadowOpacity: 0.5,
+    shadowRadius: 25,
+    elevation: 20,
   },
   iconWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 10,
   },
   textContainer: {
     alignItems: 'center',
     paddingHorizontal: 20,
   },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   subtitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   description: {
     fontSize: 16,
     textAlign: 'center',
     lineHeight: 24,
-    maxWidth: 280,
+    maxWidth: 300,
   },
   footer: {
     paddingHorizontal: 20,
@@ -437,10 +598,10 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   paginationDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginHorizontal: 4,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginHorizontal: 6,
   },
   buttonContainer: {
     alignItems: 'center',
@@ -462,9 +623,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
-  nextButton: {
-    // Additional styles for next button can go here
-  },
+  nextButton: {},
   buttonText: {
     fontSize: 16,
     fontWeight: '600',

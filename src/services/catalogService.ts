@@ -155,11 +155,39 @@ class CatalogService {
   private librarySubscribers: ((items: StreamingContent[]) => void)[] = [];
   private libraryAddListeners: ((item: StreamingContent) => void)[] = [];
   private libraryRemoveListeners: ((type: string, id: string) => void)[] = [];
+  private initPromise: Promise<void>;
+  private isInitialized: boolean = false;
 
   private constructor() {
-    this.initializeScope();
-    this.loadLibrary();
-    this.loadRecentContent();
+    this.initPromise = this.initialize();
+  }
+
+  private async initialize(): Promise<void> {
+    logger.log('[CatalogService] Starting initialization...');
+    try {
+      logger.log('[CatalogService] Step 1: Initializing scope...');
+      await this.initializeScope();
+      logger.log('[CatalogService] Step 2: Loading library...');
+      await this.loadLibrary();
+      logger.log('[CatalogService] Step 3: Loading recent content...');
+      await this.loadRecentContent();
+      this.isInitialized = true;
+      logger.log(`[CatalogService] Initialization completed successfully. Library contains ${Object.keys(this.library).length} items.`);
+    } catch (error) {
+      logger.error('[CatalogService] Initialization failed:', error);
+      // Still mark as initialized to prevent blocking forever
+      this.isInitialized = true;
+    }
+  }
+
+  private async ensureInitialized(): Promise<void> {
+    logger.log(`[CatalogService] ensureInitialized() called. isInitialized: ${this.isInitialized}`);
+    try {
+      await this.initPromise;
+      logger.log(`[CatalogService] ensureInitialized() completed. Library ready with ${Object.keys(this.library).length} items.`);
+    } catch (error) {
+      logger.error('[CatalogService] Error waiting for initialization:', error);
+    }
   }
 
   private async initializeScope(): Promise<void> {
@@ -168,6 +196,8 @@ class CatalogService {
       if (!currentScope) {
         await mmkvStorage.setItem('@user:current', 'local');
         logger.log('[CatalogService] Initialized @user:current scope to "local"');
+      } else {
+        logger.log(`[CatalogService] Using existing scope: "${currentScope}"`);
       }
     } catch (error) {
       logger.error('[CatalogService] Failed to initialize scope:', error);
@@ -194,7 +224,29 @@ class CatalogService {
         }
       }
       if (storedLibrary) {
-        this.library = JSON.parse(storedLibrary);
+        const parsedLibrary = JSON.parse(storedLibrary);
+        logger.log(`[CatalogService] Raw library data type: ${Array.isArray(parsedLibrary) ? 'ARRAY' : 'OBJECT'}, keys: ${JSON.stringify(Object.keys(parsedLibrary).slice(0, 5))}`);
+        
+        // Convert array format to object format if needed
+        if (Array.isArray(parsedLibrary)) {
+          logger.log(`[CatalogService] WARNING: Library is stored as ARRAY format. Converting to OBJECT format.`);
+          const libraryObject: Record<string, StreamingContent> = {};
+          for (const item of parsedLibrary) {
+            const key = `${item.type}:${item.id}`;
+            libraryObject[key] = item;
+          }
+          this.library = libraryObject;
+          logger.log(`[CatalogService] Converted ${parsedLibrary.length} items from array to object format`);
+          // Re-save in correct format (don't call ensureInitialized here since we're still initializing)
+          const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
+          const scopedKey = `@user:${scope}:stremio-library`;
+          const libraryData = JSON.stringify(this.library);
+          await mmkvStorage.setItem(scopedKey, libraryData);
+          await mmkvStorage.setItem(this.LEGACY_LIBRARY_KEY, libraryData);
+          logger.log(`[CatalogService] Re-saved library in correct format`);
+        } else {
+          this.library = parsedLibrary;
+        }
         logger.log(`[CatalogService] Library loaded successfully with ${Object.keys(this.library).length} items from scope: ${scope}`);
       } else {
         logger.log(`[CatalogService] No library data found for scope: ${scope}`);
@@ -209,15 +261,25 @@ class CatalogService {
   }
 
   private async saveLibrary(): Promise<void> {
+    // Only wait for initialization if we're not already initializing (avoid circular dependency)
+    if (this.isInitialized) {
+      await this.ensureInitialized();
+    }
     try {
+      const itemCount = Object.keys(this.library).length;
       const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
       const scopedKey = `@user:${scope}:stremio-library`;
       const libraryData = JSON.stringify(this.library);
+      
+      logger.log(`[CatalogService] Saving library with ${itemCount} items to scope: "${scope}" (key: ${scopedKey})`);
+      
       await mmkvStorage.setItem(scopedKey, libraryData);
       await mmkvStorage.setItem(this.LEGACY_LIBRARY_KEY, libraryData);
-      logger.log(`[CatalogService] Library saved successfully with ${Object.keys(this.library).length} items to scope: ${scope}`);
+      
+      logger.log(`[CatalogService] Library saved successfully with ${itemCount} items`);
     } catch (error: any) {
       logger.error('Failed to save library:', error);
+      logger.error(`[CatalogService] Library save failed details - scope: ${(await mmkvStorage.getItem('@user:current')) || 'unknown'}, itemCount: ${Object.keys(this.library).length}`);
     }
   }
 
@@ -856,14 +918,18 @@ class CatalogService {
     };
   }
 
-  public getLibraryItems(): StreamingContent[] {
-    return Object.values(this.library);
+  public async getLibraryItems(): Promise<StreamingContent[]> {
+    logger.log(`[CatalogService] getLibraryItems() called. Library contains ${Object.keys(this.library).length} items`);
+    await this.ensureInitialized();
+    const items = Object.values(this.library);
+    logger.log(`[CatalogService] getLibraryItems() returning ${items.length} items`);
+    return items;
   }
 
   public subscribeToLibraryUpdates(callback: (items: StreamingContent[]) => void): () => void {
     this.librarySubscribers.push(callback);
     // Initial callback with current items
-    callback(this.getLibraryItems());
+    this.getLibraryItems().then(items => callback(items));
     
     // Return unsubscribe function
     return () => {
@@ -875,12 +941,19 @@ class CatalogService {
   }
 
   public async addToLibrary(content: StreamingContent): Promise<void> {
+    logger.log(`[CatalogService] addToLibrary() called for: ${content.type}:${content.id} (${content.name})`);
+    await this.ensureInitialized();
     const key = `${content.type}:${content.id}`;
+    const itemCountBefore = Object.keys(this.library).length;
+    logger.log(`[CatalogService] Adding to library with key: "${key}". Current library keys: [${Object.keys(this.library).length}] items`);
     this.library[key] = {
       ...content,
       addedToLibraryAt: Date.now() // Add timestamp
     };
-    this.saveLibrary();
+    const itemCountAfter = Object.keys(this.library).length;
+    logger.log(`[CatalogService] Library updated: ${itemCountBefore} -> ${itemCountAfter} items. New library keys: [${Object.keys(this.library).slice(0, 5).join(', ')}${Object.keys(this.library).length > 5 ? '...' : ''}]`);
+    await this.saveLibrary();
+    logger.log(`[CatalogService] addToLibrary() completed for: ${content.type}:${content.id}`);
     this.notifyLibrarySubscribers();
     try { this.libraryAddListeners.forEach(l => l(content)); } catch {}
     
@@ -896,9 +969,17 @@ class CatalogService {
   }
 
   public async removeFromLibrary(type: string, id: string): Promise<void> {
+    logger.log(`[CatalogService] removeFromLibrary() called for: ${type}:${id}`);
+    await this.ensureInitialized();
     const key = `${type}:${id}`;
+    const itemCountBefore = Object.keys(this.library).length;
+    const itemExisted = key in this.library;
+    logger.log(`[CatalogService] Removing key: "${key}". Currently library has ${itemCountBefore} items with keys: [${Object.keys(this.library).slice(0, 5).join(', ')}${Object.keys(this.library).length > 5 ? '...' : ''}]`);
     delete this.library[key];
-    this.saveLibrary();
+    const itemCountAfter = Object.keys(this.library).length;
+    logger.log(`[CatalogService] Library updated: ${itemCountBefore} -> ${itemCountAfter} items (existed: ${itemExisted})`);
+    await this.saveLibrary();
+    logger.log(`[CatalogService] removeFromLibrary() completed for: ${type}:${id}`);
     this.notifyLibrarySubscribers();
     try { this.libraryRemoveListeners.forEach(l => l(type, id)); } catch {}
 

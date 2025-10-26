@@ -407,7 +407,7 @@ class NotificationService {
       // logger.log('[NotificationService] Starting comprehensive background sync');
       
       // Get library items
-      const libraryItems = catalogService.getLibraryItems();
+      const libraryItems = await catalogService.getLibraryItems();
       await this.syncNotificationsForLibrary(libraryItems);
       
       // Sync Trakt items if authenticated
