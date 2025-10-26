@@ -218,11 +218,9 @@ const KSPlayerCore: React.FC = () => {
     setPlaybackSpeed(speedOptions[nextIdx]);
   }, [playbackSpeed, speedOptions]);
   const [currentStreamUrl, setCurrentStreamUrl] = useState<string>(uri);
-  const [isChangingSource, setIsChangingSource] = useState<boolean>(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string>('');
   const errorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [pendingSeek, setPendingSeek] = useState<{ position: number; shouldPlay: boolean } | null>(null);
   const [currentQuality, setCurrentQuality] = useState<string | undefined>(quality);
   const [currentStreamProvider, setCurrentStreamProvider] = useState<string | undefined>(streamProvider);
   const [currentStreamName, setCurrentStreamName] = useState<string | undefined>(streamName);
@@ -2305,49 +2303,6 @@ const KSPlayerCore: React.FC = () => {
     setSubtitleBackground(prev => !prev);
   };
 
-  useEffect(() => {
-    if (pendingSeek && isPlayerReady && isVideoLoaded && duration > 0) {
-      logger.log(`[VideoPlayer] Player ready after source change, seeking to position: ${pendingSeek.position}s out of ${duration}s total`);
-
-      if (pendingSeek.position > 0) {
-        const delayTime = Platform.OS === 'android' ? 1500 : 1000;
-
-        setTimeout(() => {
-          if (duration > 0 && pendingSeek) {
-            logger.log(`[VideoPlayer] Executing seek to ${pendingSeek.position}s`);
-
-            seekToTime(pendingSeek.position);
-
-            if (pendingSeek.shouldPlay) {
-              setTimeout(() => {
-                logger.log('[VideoPlayer] Resuming playback after source change seek');
-                setPaused(false);
-              }, 850); // Delay should be slightly more than seekToTime's internal timeout
-            }
-
-            setTimeout(() => {
-              setPendingSeek(null);
-              setIsChangingSource(false);
-            }, 900);
-          }
-        }, delayTime);
-      } else {
-        // No seeking needed, just resume playback if it was playing
-        if (pendingSeek.shouldPlay) {
-          setTimeout(() => {
-            logger.log('[VideoPlayer] No seek needed, just resuming playback');
-            setPaused(false);
-          }, 500);
-        }
-
-        setTimeout(() => {
-          setPendingSeek(null);
-          setIsChangingSource(false);
-        }, 600);
-      }
-    }
-  }, [pendingSeek, isPlayerReady, isVideoLoaded, duration]);
-
   // AirPlay handler
   const handleAirPlayPress = async () => {
     if (!ksPlayerRef.current) return;
@@ -2375,61 +2330,42 @@ const KSPlayerCore: React.FC = () => {
       return;
     }
 
-    // On iOS: All streams use KSPlayer, no need to switch players
-    // Stream switching is handled internally by KSPlayerCore
-
-    setIsChangingSource(true);
     setShowSourcesModal(false);
 
-    try {
-      // Save current state
-      const savedPosition = currentTime;
-      const wasPlaying = !paused;
-
-      logger.log(`[VideoPlayer] Changing source from ${currentStreamUrl} to ${newStream.url}`);
-      logger.log(`[VideoPlayer] Saved position: ${savedPosition}, was playing: ${wasPlaying}`);
-
-      // Extract quality and provider information from the new stream
-      let newQuality = newStream.quality;
-      if (!newQuality && newStream.title) {
-        // Try to extract quality from title (e.g., "1080p", "720p")
-        const qualityMatch = newStream.title.match(/(\d+)p/);
-        newQuality = qualityMatch ? qualityMatch[0] : undefined; // Use [0] to get full match like "1080p"
-      }
-
-      // For provider, try multiple fields
-      const newProvider = newStream.addonName || newStream.name || newStream.addon || 'Unknown';
-
-      // For stream name, prioritize the stream name over title
-      const newStreamName = newStream.name || newStream.title || 'Unknown Stream';
-
-      logger.log(`[VideoPlayer] Stream object:`, newStream);
-      logger.log(`[VideoPlayer] Extracted - Quality: ${newQuality}, Provider: ${newProvider}, Stream Name: ${newStreamName}`);
-      logger.log(`[VideoPlayer] Available fields - quality: ${newStream.quality}, title: ${newStream.title}, addonName: ${newStream.addonName}, name: ${newStream.name}, addon: ${newStream.addon}`);
-
-      // Stop current playback
-      setPaused(true);
-
-      // Set pending seek state
-      setPendingSeek({ position: savedPosition, shouldPlay: wasPlaying });
-
-      // Update the stream URL and details immediately
-      setCurrentStreamUrl(newStream.url);
-      setCurrentQuality(newQuality);
-      setCurrentStreamProvider(newProvider);
-      setCurrentStreamName(newStreamName);
-
-      // Reset player state for new source
-      setCurrentTime(0);
-      setDuration(0);
-      setIsPlayerReady(false);
-      setIsVideoLoaded(false);
-
-    } catch (error) {
-      logger.error('[VideoPlayer] Error changing source:', error);
-      setPendingSeek(null);
-      setIsChangingSource(false);
+    // Extract quality and provider information
+    let newQuality = newStream.quality;
+    if (!newQuality && newStream.title) {
+      const qualityMatch = newStream.title.match(/(\d+)p/);
+      newQuality = qualityMatch ? qualityMatch[0] : undefined;
     }
+
+    const newProvider = newStream.addonName || newStream.name || newStream.addon || 'Unknown';
+    const newStreamName = newStream.name || newStream.title || 'Unknown Stream';
+
+    // Pause current playback
+    setPaused(true);
+
+    // Navigate with replace to reload player with new source
+    setTimeout(() => {
+      navigation.replace('PlayerIOS', {
+        uri: newStream.url,
+        title: title,
+        episodeTitle: episodeTitle,
+        season: season,
+        episode: episode,
+        quality: newQuality,
+        year: year,
+        streamProvider: newProvider,
+        streamName: newStreamName,
+        headers: newStream.headers || undefined,
+        id,
+        type,
+        episodeId,
+        imdbId: imdbId ?? undefined,
+        backdrop: backdrop || undefined,
+        availableStreams: availableStreams,
+      });
+    }, 100);
   };
 
   useEffect(() => {
@@ -2549,27 +2485,6 @@ const KSPlayerCore: React.FC = () => {
           )}
         </View>
       </Animated.View>
-      )}
-
-      {/* Source Change Loading Overlay */}
-      {isChangingSource && (
-        <Animated.View
-          style={[
-            styles.sourceChangeOverlay,
-            {
-              width: shouldUseFullscreen ? '100%' : screenDimensions.width,
-              height: shouldUseFullscreen ? '100%' : screenDimensions.height,
-              opacity: fadeAnim,
-            }
-          ]}
-          pointerEvents="auto"
-        >
-          <View style={styles.sourceChangeContent}>
-            <ActivityIndicator size="large" color="#E50914" />
-            <Text style={styles.sourceChangeText}>Changing source...</Text>
-            <Text style={styles.sourceChangeSubtext}>Please wait while we load the new stream</Text>
-          </View>
-        </Animated.View>
       )}
 
       <Animated.View
@@ -3454,7 +3369,6 @@ const KSPlayerCore: React.FC = () => {
         availableStreams={availableStreams}
         currentStreamUrl={currentStreamUrl}
         onSelectStream={handleSelectStream}
-        isChangingSource={isChangingSource}
       />
       
       {/* Error Modal */}

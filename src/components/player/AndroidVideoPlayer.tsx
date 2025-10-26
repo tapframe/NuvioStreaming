@@ -479,8 +479,6 @@ const AndroidVideoPlayer: React.FC = () => {
   }, [currentStreamUrl, useVLC, processUrlForVLC]);
   // Track a single silent retry per source to avoid loops
   const retryAttemptRef = useRef<number>(0);
-  const [isChangingSource, setIsChangingSource] = useState<boolean>(false);
-  const [pendingSeek, setPendingSeek] = useState<{ position: number; shouldPlay: boolean } | null>(null);
   const [currentQuality, setCurrentQuality] = useState<string | undefined>(quality);
   const [currentStreamProvider, setCurrentStreamProvider] = useState<string | undefined>(streamProvider);
   const [currentStreamName, setCurrentStreamName] = useState<string | undefined>(streamName);
@@ -2941,110 +2939,49 @@ const AndroidVideoPlayer: React.FC = () => {
     setSubtitleBackground(!subtitleBackground);
   };
 
-  useEffect(() => {
-    if (pendingSeek && isPlayerReady && isVideoLoaded && duration > 0) {
-      logger.log(`[AndroidVideoPlayer] Player ready after source change, seeking to position: ${pendingSeek.position}s out of ${duration}s total`);
-      
-      if (pendingSeek.position > 0 && videoRef.current) {
-        const delayTime = 800; // Shorter delay for react-native-video
-        
-        setTimeout(() => {
-          if (videoRef.current && duration > 0 && pendingSeek) {
-            logger.log(`[AndroidVideoPlayer] Executing seek to ${pendingSeek.position}s`);
-            
-            seekToTime(pendingSeek.position);
-            
-            if (pendingSeek.shouldPlay) {
-              setTimeout(() => {
-                logger.log('[AndroidVideoPlayer] Resuming playback after source change seek');
-                setPaused(false);
-              }, 300);
-            }
-            
-            setTimeout(() => {
-              setPendingSeek(null);
-              setIsChangingSource(false);
-            }, 400);
-          }
-        }, delayTime);
-      } else {
-        // No seeking needed, just resume playback if it was playing
-        if (pendingSeek.shouldPlay) {
-          setTimeout(() => {
-            logger.log('[AndroidVideoPlayer] No seek needed, just resuming playback');
-            setPaused(false);
-          }, 300);
-        }
-        
-        setTimeout(() => {
-          setPendingSeek(null);
-          setIsChangingSource(false);
-        }, 400);
-      }
-    }
-  }, [pendingSeek, isPlayerReady, isVideoLoaded, duration]);
-
   const handleSelectStream = async (newStream: any) => {
     if (newStream.url === currentStreamUrl) {
       setShowSourcesModal(false);
       return;
     }
 
-    // Note: iOS now always uses KSPlayer, so this AndroidVideoPlayer should never be used on iOS
-    // This logic is kept for safety in case routing changes
-
-    setIsChangingSource(true);
     setShowSourcesModal(false);
     
-    try {
-      // Save current state
-      const savedPosition = currentTime;
-      const wasPlaying = !paused;
-      
-      logger.log(`[AndroidVideoPlayer] Changing source from ${currentStreamUrl} to ${newStream.url}`);
-      logger.log(`[AndroidVideoPlayer] Saved position: ${savedPosition}, was playing: ${wasPlaying}`);
-      
-      // Extract quality and provider information from the new stream
-      let newQuality = newStream.quality;
-      if (!newQuality && newStream.title) {
-        // Try to extract quality from title (e.g., "1080p", "720p")
-        const qualityMatch = newStream.title.match(/(\d+)p/);
-        newQuality = qualityMatch ? qualityMatch[0] : undefined;
-      }
-      
-      // For provider, try multiple fields
-      const newProvider = newStream.addonName || newStream.name || newStream.addon || 'Unknown';
-      
-      // For stream name, prioritize the stream name over title
-      const newStreamName = newStream.name || newStream.title || 'Unknown Stream';
-      
-      logger.log(`[AndroidVideoPlayer] Stream object:`, newStream);
-      logger.log(`[AndroidVideoPlayer] Extracted - Quality: ${newQuality}, Provider: ${newProvider}, Stream Name: ${newStreamName}`);
-      
-      // Stop current playback
-      setPaused(true);
-      
-      // Set pending seek state
-      setPendingSeek({ position: savedPosition, shouldPlay: wasPlaying });
-      
-      // Update the stream URL and details immediately
-      setCurrentStreamUrl(newStream.url);
-      setCurrentQuality(newQuality);
-      setCurrentStreamProvider(newProvider);
-      setCurrentStreamName(newStreamName);
-      
-      // Reset player state for new source
-      setCurrentTime(0);
-      setDuration(0);
-      setIsPlayerReady(false);
-      setIsVideoLoaded(false);
-      vlcLoadedRef.current = false;
-      
-    } catch (error) {
-      logger.error('[AndroidVideoPlayer] Error changing source:', error);
-      setPendingSeek(null);
-      setIsChangingSource(false);
+    // Extract quality and provider information
+    let newQuality = newStream.quality;
+    if (!newQuality && newStream.title) {
+      const qualityMatch = newStream.title.match(/(\d+)p/);
+      newQuality = qualityMatch ? qualityMatch[0] : undefined;
     }
+    
+    const newProvider = newStream.addonName || newStream.name || newStream.addon || 'Unknown';
+    const newStreamName = newStream.name || newStream.title || 'Unknown Stream';
+    
+    // Pause current playback
+    setPaused(true);
+    
+    // Navigate with replace to reload player with new source
+    setTimeout(() => {
+      (navigation as any).replace('PlayerAndroid', {
+        uri: newStream.url,
+        title: title,
+        episodeTitle: episodeTitle,
+        season: season,
+        episode: episode,
+        quality: newQuality,
+        year: year,
+        streamProvider: newProvider,
+        streamName: newStreamName,
+        headers: newStream.headers || undefined,
+        forceVlc: false,
+        id,
+        type,
+        episodeId,
+        imdbId: imdbId ?? undefined,
+        backdrop: backdrop || undefined,
+        availableStreams: availableStreams,
+      });
+    }, 100);
   };
 
   useEffect(() => {
@@ -3155,27 +3092,6 @@ const AndroidVideoPlayer: React.FC = () => {
           )}
         </View>
       </Animated.View>
-
-      {/* Source Change Loading Overlay */}
-      {isChangingSource && (
-        <Animated.View 
-          style={[
-            styles.sourceChangeOverlay,
-            {
-              width: screenDimensions.width,
-              height: screenDimensions.height,
-              opacity: fadeAnim,
-            }
-          ]}
-          pointerEvents="auto"
-        >
-          <View style={styles.sourceChangeContent}>
-            <ActivityIndicator size="large" color="#E50914" />
-            <Text style={styles.sourceChangeText}>Changing source...</Text>
-            <Text style={styles.sourceChangeSubtext}>Please wait while we load the new stream</Text>
-          </View>
-        </Animated.View>
-      )}
 
       <Animated.View 
         style={[
@@ -4153,7 +4069,6 @@ const AndroidVideoPlayer: React.FC = () => {
         availableStreams={availableStreams}
         currentStreamUrl={currentStreamUrl}
         onSelectStream={handleSelectStream}
-        isChangingSource={isChangingSource}
       />
       
       {/* Error Modal */}

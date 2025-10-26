@@ -862,6 +862,7 @@ const MainTabs = () => {
             // Prefer native lazy/freeze when available; still pass for parity
             lazy: true,
             freezeOnBlur: true,
+            tabBarStyle: { display: 'none' },
           }}
         >
           <IOSTab.Screen
@@ -921,7 +922,7 @@ const MainTabs = () => {
       />
       
       <Tab.Navigator
-        tabBar={renderTabBar}
+        tabBar={() => null}
         screenOptions={({ route, navigation, theme }) => ({
           transitionSpec: {
             animation: 'timing',
