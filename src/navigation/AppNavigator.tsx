@@ -3,6 +3,7 @@ import { NavigationContainer, DefaultTheme as NavigationDefaultTheme, DarkTheme 
 import { createNativeStackNavigator, NativeStackNavigationOptions, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createBottomTabNavigator, BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useColorScheme, Platform, Animated, StatusBar, TouchableOpacity, View, Text, AppState, Easing, Dimensions } from 'react-native';
+import RNImmersiveMode from 'react-native-immersive-mode';
 import { mmkvStorage } from '../services/mmkvStorage';
 import { PaperProvider, MD3DarkTheme, MD3LightTheme, adaptNavigationTheme } from 'react-native-paper';
 import type { MD3Theme } from 'react-native-paper';
@@ -862,7 +863,6 @@ const MainTabs = () => {
             // Prefer native lazy/freeze when available; still pass for parity
             lazy: true,
             freezeOnBlur: true,
-            tabBarStyle: { display: 'none' },
           }}
         >
           <IOSTab.Screen
@@ -922,7 +922,7 @@ const MainTabs = () => {
       />
       
       <Tab.Navigator
-        tabBar={() => null}
+        tabBar={renderTabBar}
         screenOptions={({ route, navigation, theme }) => ({
           transitionSpec: {
             animation: 'timing',
@@ -1059,6 +1059,14 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
   // Handle Android-specific optimizations
   useEffect(() => {
     if (Platform.OS === 'android') {
+      // Hide system navigation bar
+      try {
+        RNImmersiveMode.setBarMode('Bottom');
+        RNImmersiveMode.fullLayout(true);
+      } catch (error) {
+        console.log('Immersive mode error:', error);
+      }
+      
       // Ensure consistent background color for Android
       StatusBar.setBackgroundColor('transparent', true);
       StatusBar.setTranslucent(true);
