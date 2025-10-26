@@ -96,9 +96,9 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
     
     try {
       const episodeId = episode.stremioId || `${metadata.id}:${episode.season_number}:${episode.episode_number}`;
-      const allStreams: { [providerId: string]: { streams: Stream[]; addonName: string } } = {};
       let completedProviders = 0;
       const expectedProviders = new Set<string>();
+      const respondedProviders = new Set<string>();
       
       const installedAddons = stremioService.getInstalledAddons();
       const streamAddons = installedAddons.filter((addon: any) => 
@@ -107,32 +107,41 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
       
       streamAddons.forEach((addon: any) => expectedProviders.add(addon.id));
       
+      logger.log(`[EpisodeStreamsModal] Fetching streams for ${episodeId}, expecting ${expectedProviders.size} providers`);
+      
       await stremioService.getStreams('series', episodeId, (streams: any, addonId: any, addonName: any, error: any) => {
         completedProviders++;
+        respondedProviders.add(addonId);
         
         if (error) {
-          logger.warn(`[EpisodeStreamsModal] Error from ${addonName}:`, error);
+          logger.warn(`[EpisodeStreamsModal] Error from ${addonName || addonId}:`, error);
           setHasErrors(prev => [...prev, `${addonName || addonId}: ${error.message || 'Unknown error'}`]);
-          return;
-        }
-        
-        if (streams && streams.length > 0) {
-          allStreams[addonId] = {
-            streams: streams,
-            addonName: addonName || addonId
-          };
+        } else if (streams && streams.length > 0) {
+          // Update state incrementally for each provider
+          setAvailableStreams(prev => ({
+            ...prev,
+            [addonId]: {
+              streams: streams,
+              addonName: addonName || addonId
+            }
+          }));
+          logger.log(`[EpisodeStreamsModal] Added ${streams.length} streams from ${addonName || addonId}`);
+        } else {
+          logger.log(`[EpisodeStreamsModal] No streams from ${addonName || addonId}`);
         }
         
         if (completedProviders >= expectedProviders.size) {
-          setAvailableStreams(allStreams);
+          logger.log(`[EpisodeStreamsModal] All providers completed. Total providers responded: ${respondedProviders.size}`);
           setIsLoading(false);
         }
       });
       
       // Fallback timeout
       setTimeout(() => {
-        if (Object.keys(allStreams).length === 0 && !isLoading) {
+        if (respondedProviders.size === 0) {
+          logger.warn(`[EpisodeStreamsModal] Timeout: No providers responded`);
           setHasErrors(prev => [...prev, 'Timeout: No providers responded']);
+          setIsLoading(false);
         }
       }, 8000);
       
