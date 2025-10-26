@@ -90,6 +90,7 @@ const TMDBSettingsScreen = () => {
   const [loadingLogos, setLoadingLogos] = useState(true);
   const [previewLanguage, setPreviewLanguage] = useState<string>('');
   const [isPreviewFallback, setIsPreviewFallback] = useState<boolean>(false);
+  const [cacheSize, setCacheSize] = useState<string>('0 KB');
 
   const openAlert = (
     title: string,
@@ -115,10 +116,69 @@ const TMDBSettingsScreen = () => {
   useEffect(() => {
     logger.log('[TMDBSettingsScreen] Component mounted');
     loadSettings();
+    calculateCacheSize();
     return () => {
       logger.log('[TMDBSettingsScreen] Component unmounted');
     };
   }, []);
+
+  const calculateCacheSize = async () => {
+    try {
+      const keys = await mmkvStorage.getAllKeys();
+      const tmdbKeys = keys.filter(key => key.startsWith('tmdb_cache_'));
+      
+      let totalSize = 0;
+      for (const key of tmdbKeys) {
+        const value = mmkvStorage.getString(key);
+        if (value) {
+          totalSize += value.length;
+        }
+      }
+      
+      // Convert to KB/MB
+      let sizeStr = '';
+      if (totalSize < 1024) {
+        sizeStr = `${totalSize} B`;
+      } else if (totalSize < 1024 * 1024) {
+        sizeStr = `${(totalSize / 1024).toFixed(2)} KB`;
+      } else {
+        sizeStr = `${(totalSize / (1024 * 1024)).toFixed(2)} MB`;
+      }
+      
+      setCacheSize(sizeStr);
+    } catch (error) {
+      logger.error('[TMDBSettingsScreen] Error calculating cache size:', error);
+      setCacheSize('Unknown');
+    }
+  };
+
+  const handleClearCache = () => {
+    openAlert(
+      'Clear TMDB Cache',
+      `This will clear all cached TMDB data (${cacheSize}). This may temporarily slow down loading until cache rebuilds.`,
+      [
+        {
+          label: 'Cancel',
+          onPress: () => logger.log('[TMDBSettingsScreen] Clear cache cancelled'),
+        },
+        {
+          label: 'Clear',
+          onPress: async () => {
+            logger.log('[TMDBSettingsScreen] Proceeding with cache clear');
+            try {
+              await tmdbService.clearAllCache();
+              setCacheSize('0 KB');
+              logger.log('[TMDBSettingsScreen] Cache cleared successfully');
+              openAlert('Success', 'TMDB cache cleared successfully.');
+            } catch (error) {
+              logger.error('[TMDBSettingsScreen] Failed to clear cache:', error);
+              openAlert('Error', 'Failed to clear cache.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const loadSettings = async () => {
     logger.log('[TMDBSettingsScreen] Loading settings from storage');
@@ -732,6 +792,35 @@ const TMDBSettingsScreen = () => {
               </Text>
             </View>
           )}
+
+          {/* Cache Management Section */}
+          <View style={styles.divider} />
+          
+          <View style={styles.settingRow}>
+            <View style={styles.settingTextContainer}>
+              <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Cache Size</Text>
+              <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                {cacheSize}
+              </Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: currentTheme.colors.error }]}
+            onPress={handleClearCache}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <MaterialIcons name="delete-outline" size={18} color={currentTheme.colors.white} />
+              <Text style={[styles.buttonText, { color: currentTheme.colors.white, marginLeft: 8 }]}>Clear Cache</Text>
+            </View>
+          </TouchableOpacity>
+
+          <View style={[styles.infoContainer, { marginTop: 12 }]}>
+            <MaterialIcons name="info-outline" size={18} color={currentTheme.colors.primary} />
+            <Text style={[styles.infoText, { color: currentTheme.colors.mediumEmphasis }]}>
+              TMDB responses are cached for 7 days to improve performance
+            </Text>
+          </View>
         </View>
 
         {/* Language Picker Modal */}
