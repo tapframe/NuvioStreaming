@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import FastImage from '@d11/react-native-fast-image';
 import { RootStackParamList, RootStackNavigationProp } from '../../navigation/AppNavigator';
-import { PinchGestureHandler, PanGestureHandler, TapGestureHandler, State, PinchGestureHandlerGestureEvent, PanGestureHandlerGestureEvent, TapGestureHandlerGestureEvent } from 'react-native-gesture-handler';
+import { PinchGestureHandler, PanGestureHandler, TapGestureHandler, LongPressGestureHandler, State, PinchGestureHandlerGestureEvent, PanGestureHandlerGestureEvent, TapGestureHandlerGestureEvent, LongPressGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import RNImmersiveMode from 'react-native-immersive-mode';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { storageService } from '../../services/storageService';
@@ -34,8 +34,12 @@ import {
 } from './utils/playerTypes';
 import { safeDebugLog, parseSRT, DEBUG_MODE, formatTime } from './utils/playerUtils';
 import { styles } from './utils/playerStyles';
+
+// Speed settings storage key
+const SPEED_SETTINGS_KEY = '@nuvio_speed_settings';
 import { SubtitleModals } from './modals/SubtitleModals';
 import { AudioTrackModal } from './modals/AudioTrackModal';
+import { SpeedModal } from './modals/SpeedModal';
 // Removed ResumeOverlay usage when alwaysResume is enabled
 import PlayerControls from './controls/PlayerControls';
 import CustomSubtitles from './subtitles/CustomSubtitles';
@@ -199,8 +203,15 @@ const KSPlayerCore: React.FC = () => {
   const [showSourcesModal, setShowSourcesModal] = useState<boolean>(false);
   const [availableStreams, setAvailableStreams] = useState<{ [providerId: string]: { streams: any[]; addonName: string } }>(passedAvailableStreams || {});
   // Playback speed controls required by PlayerControls
-  const speedOptions = [0.5, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0];
+  const speedOptions = [0.5, 1.0, 1.25, 1.5, 2.0, 2.5];
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
+  // Hold-to-speed-up feature state
+  const [holdToSpeedEnabled, setHoldToSpeedEnabled] = useState(true);
+  const [holdToSpeedValue, setHoldToSpeedValue] = useState(2.0);
+  const [isSpeedBoosted, setIsSpeedBoosted] = useState(false);
+  const [originalSpeed, setOriginalSpeed] = useState<number>(1.0);
+  const [showSpeedActivatedOverlay, setShowSpeedActivatedOverlay] = useState(false);
+  const speedActivatedOverlayOpacity = useRef(new Animated.Value(0)).current;
   const cyclePlaybackSpeed = useCallback(() => {
     const idx = speedOptions.indexOf(playbackSpeed);
     const nextIdx = (idx + 1) % speedOptions.length;
@@ -269,6 +280,47 @@ const KSPlayerCore: React.FC = () => {
     brightnessSensitivity: 0.004,
     debugMode: DEBUG_MODE,
   });
+
+  // Load speed settings from storage
+  const loadSpeedSettings = useCallback(async () => {
+    try {
+      const saved = await mmkvStorage.getItem(SPEED_SETTINGS_KEY);
+      if (saved) {
+        const settings = JSON.parse(saved);
+        if (typeof settings.holdToSpeedEnabled === 'boolean') {
+          setHoldToSpeedEnabled(settings.holdToSpeedEnabled);
+        }
+        if (typeof settings.holdToSpeedValue === 'number') {
+          setHoldToSpeedValue(settings.holdToSpeedValue);
+        }
+      }
+    } catch (error) {
+      logger.warn('[KSPlayerCore] Error loading speed settings:', error);
+    }
+  }, []);
+
+  // Save speed settings to storage
+  const saveSpeedSettings = useCallback(async () => {
+    try {
+      const settings = {
+        holdToSpeedEnabled,
+        holdToSpeedValue,
+      };
+      await mmkvStorage.setItem(SPEED_SETTINGS_KEY, JSON.stringify(settings));
+    } catch (error) {
+      logger.warn('[KSPlayerCore] Error saving speed settings:', error);
+    }
+  }, [holdToSpeedEnabled, holdToSpeedValue]);
+
+  // Load speed settings on mount
+  useEffect(() => {
+    loadSpeedSettings();
+  }, [loadSpeedSettings]);
+
+  // Save speed settings when they change
+  useEffect(() => {
+    saveSpeedSettings();
+  }, [saveSpeedSettings]);
 
   // Get metadata to access logo (only if we have a valid id)
   const shouldLoadMetadata = Boolean(id && type);
@@ -433,6 +485,48 @@ const KSPlayerCore: React.FC = () => {
       if (__DEV__) logger.log(`[VideoPlayer] Zoom reset to ${targetZoom}x (16:9: ${is16by9Content})`);
     }
   };
+
+  // Long press gesture handlers for speed boost
+  const onLongPressActivated = useCallback(() => {
+    if (!holdToSpeedEnabled) return;
+    
+    if (!isSpeedBoosted && playbackSpeed !== holdToSpeedValue) {
+      setOriginalSpeed(playbackSpeed);
+      setPlaybackSpeed(holdToSpeedValue);
+      setIsSpeedBoosted(true);
+      
+      // Show "Activated" overlay
+      setShowSpeedActivatedOverlay(true);
+      Animated.spring(speedActivatedOverlayOpacity, {
+        toValue: 1,
+        tension: 100,
+        friction: 8,
+        useNativeDriver: true,
+      }).start();
+      
+      // Auto-hide after 2 seconds
+      setTimeout(() => {
+        Animated.timing(speedActivatedOverlayOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }).start(() => {
+          setShowSpeedActivatedOverlay(false);
+        });
+      }, 2000);
+      
+      logger.log(`[KSPlayerCore] Speed boost activated: ${holdToSpeedValue}x`);
+    }
+  }, [isSpeedBoosted, playbackSpeed, holdToSpeedEnabled, holdToSpeedValue, speedActivatedOverlayOpacity]);
+
+  const onLongPressEnd = useCallback(() => {
+    if (isSpeedBoosted) {
+      setPlaybackSpeed(originalSpeed);
+      setIsSpeedBoosted(false);
+      
+      logger.log('[KSPlayerCore] Speed boost deactivated, restored to:', originalSpeed);
+    }
+  }, [isSpeedBoosted, originalSpeed]);
 
   useEffect(() => {
     if (videoAspectRatio && effectiveDimensions.width > 0 && effectiveDimensions.height > 0) {
@@ -2489,55 +2583,71 @@ const KSPlayerCore: React.FC = () => {
           }
         ]}
       >
-        {/* Combined gesture handler for left side - brightness + tap */}
-        <PanGestureHandler
-          onGestureEvent={gestureControls.onBrightnessGestureEvent}
-          activeOffsetY={[-10, 10]}
-          failOffsetX={[-30, 30]}
+        {/* Combined gesture handler for left side - brightness + tap + long press */}
+        <LongPressGestureHandler
+          onActivated={onLongPressActivated}
+          onEnded={onLongPressEnd}
+          minDurationMs={500}
           shouldCancelWhenOutside={false}
           simultaneousHandlers={[]}
-          maxPointers={1}
         >
-          <TapGestureHandler
-            onActivated={toggleControls}
+          <PanGestureHandler
+            onGestureEvent={gestureControls.onBrightnessGestureEvent}
+            activeOffsetY={[-10, 10]}
+            failOffsetX={[-30, 30]}
             shouldCancelWhenOutside={false}
             simultaneousHandlers={[]}
+            maxPointers={1}
           >
-            <View style={{
-              position: 'absolute',
-              top: getDimensions().height * 0.15, // Back to original margin
-              left: 0,
-              width: getDimensions().width * 0.4, // Back to larger area (40% of screen)
-              height: getDimensions().height * 0.7, // Back to larger middle portion (70% of screen)
-              zIndex: 10, // Higher z-index to capture gestures
-            }} />
-          </TapGestureHandler>
-        </PanGestureHandler>
+            <TapGestureHandler
+              onActivated={toggleControls}
+              shouldCancelWhenOutside={false}
+              simultaneousHandlers={[]}
+            >
+              <View style={{
+                position: 'absolute',
+                top: getDimensions().height * 0.15, // Back to original margin
+                left: 0,
+                width: getDimensions().width * 0.4, // Back to larger area (40% of screen)
+                height: getDimensions().height * 0.7, // Back to larger middle portion (70% of screen)
+                zIndex: 10, // Higher z-index to capture gestures
+              }} />
+            </TapGestureHandler>
+          </PanGestureHandler>
+        </LongPressGestureHandler>
 
-        {/* Combined gesture handler for right side - volume + tap */}
-        <PanGestureHandler
-          onGestureEvent={gestureControls.onVolumeGestureEvent}
-          activeOffsetY={[-10, 10]}
-          failOffsetX={[-30, 30]}
+        {/* Combined gesture handler for right side - volume + tap + long press */}
+        <LongPressGestureHandler
+          onActivated={onLongPressActivated}
+          onEnded={onLongPressEnd}
+          minDurationMs={500}
           shouldCancelWhenOutside={false}
           simultaneousHandlers={[]}
-          maxPointers={1}
         >
-          <TapGestureHandler
-            onActivated={toggleControls}
+          <PanGestureHandler
+            onGestureEvent={gestureControls.onVolumeGestureEvent}
+            activeOffsetY={[-10, 10]}
+            failOffsetX={[-30, 30]}
             shouldCancelWhenOutside={false}
             simultaneousHandlers={[]}
+            maxPointers={1}
           >
-            <View style={{
-              position: 'absolute',
-              top: getDimensions().height * 0.15, // Back to original margin
-              right: 0,
-              width: getDimensions().width * 0.4, // Back to larger area (40% of screen)
-              height: getDimensions().height * 0.7, // Back to larger middle portion (70% of screen)
-              zIndex: 10, // Higher z-index to capture gestures
-            }} />
-          </TapGestureHandler>
-        </PanGestureHandler>
+            <TapGestureHandler
+              onActivated={toggleControls}
+              shouldCancelWhenOutside={false}
+              simultaneousHandlers={[]}
+            >
+              <View style={{
+                position: 'absolute',
+                top: getDimensions().height * 0.15, // Back to original margin
+                right: 0,
+                width: getDimensions().width * 0.4, // Back to larger area (40% of screen)
+                height: getDimensions().height * 0.7, // Back to larger middle portion (70% of screen)
+                zIndex: 10, // Higher z-index to capture gestures
+              }} />
+            </TapGestureHandler>
+          </PanGestureHandler>
+        </LongPressGestureHandler>
 
         {/* Center area tap handler - handles both show and hide */}
         <TapGestureHandler
@@ -3235,6 +3345,41 @@ const KSPlayerCore: React.FC = () => {
             </Animated.View>
           )}
 
+          {/* Speed Activated Overlay */}
+          {showSpeedActivatedOverlay && (
+            <Animated.View
+              style={{
+                position: 'absolute',
+                top: getDimensions().height * 0.1,
+                left: getDimensions().width / 2 - 40,
+                opacity: speedActivatedOverlayOpacity,
+                zIndex: 1000,
+              }}
+            >
+              <View style={{
+                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                borderRadius: 8,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                alignItems: 'center',
+                justifyContent: 'center',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.3,
+                shadowRadius: 4,
+                elevation: 5,
+              }}>
+                <Text style={{
+                  color: '#FFFFFF',
+                  fontSize: 14,
+                  fontWeight: '600',
+                  letterSpacing: 0.5,
+                }}>
+                  {holdToSpeedValue}x Speed Activated
+                </Text>
+              </View>
+            </Animated.View>
+          )}
 
           {/* Resume overlay removed when AlwaysResume is enabled; overlay component omitted */}
         </View>
@@ -3246,6 +3391,16 @@ const KSPlayerCore: React.FC = () => {
         ksAudioTracks={ksAudioTracks}
         selectedAudioTrack={selectedAudioTrack}
         selectAudioTrack={selectAudioTrack}
+      />
+      <SpeedModal
+        showSpeedModal={showSpeedModal}
+        setShowSpeedModal={setShowSpeedModal}
+        currentSpeed={playbackSpeed}
+        setPlaybackSpeed={setPlaybackSpeed}
+        holdToSpeedEnabled={holdToSpeedEnabled}
+        setHoldToSpeedEnabled={setHoldToSpeedEnabled}
+        holdToSpeedValue={holdToSpeedValue}
+        setHoldToSpeedValue={setHoldToSpeedValue}
       />
       <SubtitleModals
         showSubtitleModal={showSubtitleModal}

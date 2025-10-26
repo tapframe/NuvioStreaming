@@ -45,8 +45,8 @@ export const SpeedModal: React.FC<SpeedModalProps> = ({
     isIos ? 380 : 360
   );
 
-  const speedPresets = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0];
-  const holdSpeedOptions = [1.5, 2.0, 2.5, 3.0];
+  const speedPresets = [0.5, 1.0, 1.5, 2.0, 2.5];
+  const holdSpeedOptions = [1.5, 2.0];
 
   const handleClose = () => {
     setShowSpeedModal(false);
@@ -215,9 +215,8 @@ export const SpeedModal: React.FC<SpeedModalProps> = ({
               </View>
             </View>
 
-            {/* Hold-to-Speed Settings - Android Only */}
-            {Platform.OS === 'android' && (
-              <View style={{ gap: isCompact ? 8 : 12 }}>
+            {/* Hold-to-Speed Settings */}
+            <View style={{ gap: isCompact ? 8 : 12 }}>
                 <View style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: sectionPad }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
                     <MaterialIcons name="touch-app" size={14} color="rgba(255,255,255,0.7)" />
@@ -313,7 +312,6 @@ export const SpeedModal: React.FC<SpeedModalProps> = ({
                   </View>
                 </View>
               </View>
-            )}
           </ScrollView>
         </Animated.View>
       </>

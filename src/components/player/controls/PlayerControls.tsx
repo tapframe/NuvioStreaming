@@ -537,15 +537,13 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 </Text>
               </TouchableOpacity>
 
-              {/* Playback Speed Button - Temporarily hidden on iOS */}
-              {Platform.OS !== 'ios' && (
-                <TouchableOpacity style={styles.bottomButton} onPress={() => setShowSpeedModal(true)}>
-                  <Ionicons name="speedometer" size={20} color="white" />
-                  <Text style={styles.bottomButtonText}>
-                    Speed {currentPlaybackSpeed}x
-                  </Text>
-                </TouchableOpacity>
-              )}
+              {/* Playback Speed Button */}
+              <TouchableOpacity style={styles.bottomButton} onPress={() => setShowSpeedModal(true)}>
+                <Ionicons name="speedometer" size={20} color="white" />
+                <Text style={styles.bottomButtonText}>
+                  Speed {currentPlaybackSpeed}x
+                </Text>
+              </TouchableOpacity>
 
               {/* Audio Button - Updated to use ksAudioTracks */}
               <TouchableOpacity
