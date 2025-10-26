@@ -26,7 +26,7 @@ import FastImage from '@d11/react-native-fast-image';
 import debounce from 'lodash/debounce';
 import { DropUpMenu } from '../components/home/DropUpMenu';
 import { DeviceEventEmitter, Share } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import Animated, { 
   FadeIn, 
   FadeOut, 
@@ -250,7 +250,7 @@ const SearchScreen = () => {
       const found = items.find((libItem: any) => libItem.id === selectedItem.id && libItem.type === selectedItem.type);
       setIsSaved(!!found);
       // Check watched status
-      const val = await AsyncStorage.getItem(`watched:${selectedItem.type}:${selectedItem.id}`);
+      const val = await mmkvStorage.getItem(`watched:${selectedItem.type}:${selectedItem.id}`);
       setIsWatched(val === 'true');
     })();
   }, [selectedItem]);
@@ -349,7 +349,7 @@ const SearchScreen = () => {
 
   const loadRecentSearches = async () => {
     try {
-      const savedSearches = await AsyncStorage.getItem(RECENT_SEARCHES_KEY);
+      const savedSearches = await mmkvStorage.getItem(RECENT_SEARCHES_KEY);
       if (savedSearches) {
         setRecentSearches(JSON.parse(savedSearches));
       }
@@ -367,7 +367,7 @@ const SearchScreen = () => {
       ].slice(0, MAX_RECENT_SEARCHES);
       
         // Save to AsyncStorage
-        AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newRecentSearches));
+        mmkvStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newRecentSearches));
         
         return newRecentSearches;
       });
@@ -533,7 +533,7 @@ const SearchScreen = () => {
                 const newRecentSearches = [...recentSearches];
                 newRecentSearches.splice(index, 1);
                 setRecentSearches(newRecentSearches);
-                AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newRecentSearches));
+                mmkvStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newRecentSearches));
               }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               style={styles.recentSearchDeleteButton}
@@ -558,7 +558,7 @@ const SearchScreen = () => {
     const [watched, setWatched] = React.useState(false);
     React.useEffect(() => {
       const updateWatched = () => {
-        AsyncStorage.getItem(`watched:${item.type}:${item.id}`).then(val => setWatched(val === 'true'));
+        mmkvStorage.getItem(`watched:${item.type}:${item.id}`).then(val => setWatched(val === 'true'));
       };
       updateWatched();
       const sub = DeviceEventEmitter.addListener('watchedStatusChanged', updateWatched);
@@ -977,7 +977,7 @@ const SearchScreen = () => {
                 case 'watched': {
                   const key = `watched:${selectedItem.type}:${selectedItem.id}`;
                   const newWatched = !isWatched;
-                  await AsyncStorage.setItem(key, newWatched ? 'true' : 'false');
+                  await mmkvStorage.setItem(key, newWatched ? 'true' : 'false');
                   setIsWatched(newWatched);
                   break;
                 }

@@ -58,7 +58,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import type { Theme } from '../contexts/ThemeContext';
 import { useLoading } from '../contexts/LoadingContext';
 import * as ScreenOrientation from 'expo-screen-orientation';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useToast } from '../contexts/ToastContext';
 import FirstTimeWelcome from '../components/FirstTimeWelcome';
@@ -155,7 +155,7 @@ const HomeScreen = () => {
     try {
       const [addons, catalogSettingsJson, addonManifests] = await Promise.all([
         catalogService.getAllAddons(),
-        AsyncStorage.getItem(CATALOG_SETTINGS_KEY),
+        mmkvStorage.getItem(CATALOG_SETTINGS_KEY),
         stremioService.getInstalledAddonsAsync()
       ]);
       
@@ -347,10 +347,10 @@ const HomeScreen = () => {
     let hideTimer: any;
     (async () => {
       try {
-        const flag = await AsyncStorage.getItem('showLoginHintToastOnce');
+        const flag = await mmkvStorage.getItem('showLoginHintToastOnce');
         if (flag === 'true') {
           setHintVisible(true);
-          await AsyncStorage.removeItem('showLoginHintToastOnce');
+          await mmkvStorage.removeItem('showLoginHintToastOnce');
           hideTimer = setTimeout(() => setHintVisible(false), 2000);
           // Also show a global toast for consistency across screens
           // showInfo('Sign In Available', 'You can sign in anytime from Settings → Account');

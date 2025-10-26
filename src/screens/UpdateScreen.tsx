@@ -20,7 +20,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import UpdateService from '../services/updateService';
 import CustomAlert from '../components/CustomAlert';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { useGithubMajorUpdate } from '../hooks/useGithubMajorUpdate';
 import { getDisplayedAppVersion } from '../utils/version';
 import { isAnyUpgrade } from '../services/githubReleaseService';
@@ -146,7 +146,7 @@ const UpdateScreen: React.FC = () => {
     if (Platform.OS === 'android') {
       // ensure badge clears when entering this screen
       (async () => {
-        try { await AsyncStorage.removeItem('@update_badge_pending'); } catch {}
+        try { await mmkvStorage.removeItem('@update_badge_pending'); } catch {}
       })();
     }
     checkForUpdates();

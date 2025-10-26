@@ -15,7 +15,7 @@ import {
   Pressable,
   Button,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../contexts/ThemeContext';
 import { stremioService } from '../services/stremioService';
@@ -294,11 +294,11 @@ const CatalogSettingsScreen = () => {
       const availableCatalogs: CatalogSetting[] = [];
       
       // Get saved enable/disable settings
-      const savedSettingsJson = await AsyncStorage.getItem(CATALOG_SETTINGS_KEY);
+      const savedSettingsJson = await mmkvStorage.getItem(CATALOG_SETTINGS_KEY);
       const savedEnabledSettings: { [key: string]: boolean } = savedSettingsJson ? JSON.parse(savedSettingsJson) : {};
 
       // Get saved custom names
-      const savedCustomNamesJson = await AsyncStorage.getItem(CATALOG_CUSTOM_NAMES_KEY);
+      const savedCustomNamesJson = await mmkvStorage.getItem(CATALOG_CUSTOM_NAMES_KEY);
       const savedCustomNames: { [key: string]: string } = savedCustomNamesJson ? JSON.parse(savedCustomNamesJson) : {};
       
       // Process each addon's catalogs
@@ -371,7 +371,7 @@ const CatalogSettingsScreen = () => {
 
       // Load mobile columns preference (phones only)
       try {
-        const pref = await AsyncStorage.getItem(CATALOG_MOBILE_COLUMNS_KEY);
+        const pref = await mmkvStorage.getItem(CATALOG_MOBILE_COLUMNS_KEY);
         if (pref === '2') setMobileColumns(2);
         else if (pref === '3') setMobileColumns(3);
         else setMobileColumns('auto');
@@ -395,7 +395,7 @@ const CatalogSettingsScreen = () => {
         const key = `${setting.addonId}:${setting.type}:${setting.catalogId}`;
         settingsObj[key] = setting.enabled;
       });
-      await AsyncStorage.setItem(CATALOG_SETTINGS_KEY, JSON.stringify(settingsObj));
+      await mmkvStorage.setItem(CATALOG_SETTINGS_KEY, JSON.stringify(settingsObj));
       
       // Small delay to ensure AsyncStorage has fully persisted before triggering refresh
       setTimeout(() => {
@@ -461,7 +461,7 @@ const CatalogSettingsScreen = () => {
     const settingKey = `${catalogToRename.addonId}:${catalogToRename.type}:${catalogToRename.catalogId}`;
     
     try {
-      const savedCustomNamesJson = await AsyncStorage.getItem(CATALOG_CUSTOM_NAMES_KEY);
+      const savedCustomNamesJson = await mmkvStorage.getItem(CATALOG_CUSTOM_NAMES_KEY);
       const customNames: { [key: string]: string } = savedCustomNamesJson ? JSON.parse(savedCustomNamesJson) : {};
       
       const trimmedNewName = currentRenameValue.trim();
@@ -472,7 +472,7 @@ const CatalogSettingsScreen = () => {
         customNames[settingKey] = trimmedNewName;
       }
       
-      await AsyncStorage.setItem(CATALOG_CUSTOM_NAMES_KEY, JSON.stringify(customNames));
+      await mmkvStorage.setItem(CATALOG_CUSTOM_NAMES_KEY, JSON.stringify(customNames));
       // Clear in-memory cache so new name is used immediately
       try { clearCustomNameCache(); } catch {}
 
@@ -550,7 +550,7 @@ const CatalogSettingsScreen = () => {
                   style={[styles.optionChip, mobileColumns === 'auto' && styles.optionChipSelected]}
                   onPress={async () => {
                     try {
-                      await AsyncStorage.setItem(CATALOG_MOBILE_COLUMNS_KEY, 'auto');
+                      await mmkvStorage.setItem(CATALOG_MOBILE_COLUMNS_KEY, 'auto');
                       setMobileColumns('auto');
                     } catch {}
                   }}
@@ -562,7 +562,7 @@ const CatalogSettingsScreen = () => {
                   style={[styles.optionChip, mobileColumns === 2 && styles.optionChipSelected]}
                   onPress={async () => {
                     try {
-                      await AsyncStorage.setItem(CATALOG_MOBILE_COLUMNS_KEY, '2');
+                      await mmkvStorage.setItem(CATALOG_MOBILE_COLUMNS_KEY, '2');
                       setMobileColumns(2);
                     } catch {}
                   }}
@@ -574,7 +574,7 @@ const CatalogSettingsScreen = () => {
                   style={[styles.optionChip, mobileColumns === 3 && styles.optionChipSelected]}
                   onPress={async () => {
                     try {
-                      await AsyncStorage.setItem(CATALOG_MOBILE_COLUMNS_KEY, '3');
+                      await mmkvStorage.setItem(CATALOG_MOBILE_COLUMNS_KEY, '3');
                       setMobileColumns(3);
                     } catch {}
                   }}

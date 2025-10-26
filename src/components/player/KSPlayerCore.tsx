@@ -9,7 +9,7 @@ import RNImmersiveMode from 'react-native-immersive-mode';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { storageService } from '../../services/storageService';
 import { logger } from '../../utils/logger';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../../services/mmkvStorage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Slider from '@react-native-community/slider';
@@ -1616,7 +1616,7 @@ const KSPlayerCore: React.FC = () => {
         return;
       }
       // One-time migrate legacy key if present
-      const legacy = await AsyncStorage.getItem(SUBTITLE_SIZE_KEY);
+      const legacy = await mmkvStorage.getItem(SUBTITLE_SIZE_KEY);
       if (legacy) {
         const migrated = parseInt(legacy, 10);
         if (!Number.isNaN(migrated) && migrated > 0) {
@@ -1626,7 +1626,7 @@ const KSPlayerCore: React.FC = () => {
             await storageService.saveSubtitleSettings(merged);
           } catch {}
         }
-        try { await AsyncStorage.removeItem(SUBTITLE_SIZE_KEY); } catch {}
+        try { await mmkvStorage.removeItem(SUBTITLE_SIZE_KEY); } catch {}
         return;
       }
       // If no saved settings, use responsive default

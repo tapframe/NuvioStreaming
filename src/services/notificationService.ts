@@ -1,6 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { Platform, AppState, AppStateStatus } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from './mmkvStorage';
 import { parseISO, differenceInHours, isToday, addDays, isAfter, startOfToday } from 'date-fns';
 import { stremioService } from './stremioService';
 import { catalogService } from './catalogService';
@@ -101,7 +101,7 @@ class NotificationService {
 
   private async loadSettings(): Promise<void> {
     try {
-      const storedSettings = await AsyncStorage.getItem(NOTIFICATION_SETTINGS_KEY);
+      const storedSettings = await mmkvStorage.getItem(NOTIFICATION_SETTINGS_KEY);
       
       if (storedSettings) {
         this.settings = { ...DEFAULT_NOTIFICATION_SETTINGS, ...JSON.parse(storedSettings) };
@@ -113,7 +113,7 @@ class NotificationService {
 
   private async saveSettings(): Promise<void> {
     try {
-      await AsyncStorage.setItem(NOTIFICATION_SETTINGS_KEY, JSON.stringify(this.settings));
+      await mmkvStorage.setItem(NOTIFICATION_SETTINGS_KEY, JSON.stringify(this.settings));
     } catch (error) {
       logger.error('Error saving notification settings:', error);
     }
@@ -121,7 +121,7 @@ class NotificationService {
 
   private async loadScheduledNotifications(): Promise<void> {
     try {
-      const storedNotifications = await AsyncStorage.getItem(NOTIFICATION_STORAGE_KEY);
+      const storedNotifications = await mmkvStorage.getItem(NOTIFICATION_STORAGE_KEY);
       
       if (storedNotifications) {
         this.scheduledNotifications = JSON.parse(storedNotifications);
@@ -133,7 +133,7 @@ class NotificationService {
 
   private async saveScheduledNotifications(): Promise<void> {
     try {
-      await AsyncStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(this.scheduledNotifications));
+      await mmkvStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(this.scheduledNotifications));
     } catch (error) {
       logger.error('Error saving scheduled notifications:', error);
     }

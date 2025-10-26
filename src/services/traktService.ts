@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from './mmkvStorage';
 import { AppState, AppStateStatus } from 'react-native';
 import { logger } from '../utils/logger';
 
@@ -599,7 +599,7 @@ export class TraktService {
    */
   private async loadCompletionThreshold(): Promise<void> {
     try {
-      const thresholdStr = await AsyncStorage.getItem('@trakt_completion_threshold');
+      const thresholdStr = await mmkvStorage.getItem('@trakt_completion_threshold');
       if (thresholdStr) {
         const threshold = parseInt(thresholdStr, 10);
         if (!isNaN(threshold) && threshold >= 50 && threshold <= 100) {
@@ -681,9 +681,9 @@ export class TraktService {
 
     try {
       const [accessToken, refreshToken, tokenExpiry] = await Promise.all([
-        AsyncStorage.getItem(TRAKT_ACCESS_TOKEN_KEY),
-        AsyncStorage.getItem(TRAKT_REFRESH_TOKEN_KEY),
-        AsyncStorage.getItem(TRAKT_TOKEN_EXPIRY_KEY)
+        mmkvStorage.getItem(TRAKT_ACCESS_TOKEN_KEY),
+        mmkvStorage.getItem(TRAKT_REFRESH_TOKEN_KEY),
+        mmkvStorage.getItem(TRAKT_TOKEN_EXPIRY_KEY)
       ]);
 
       this.accessToken = accessToken;
@@ -810,7 +810,7 @@ export class TraktService {
     this.tokenExpiry = Date.now() + (expiresIn * 1000);
 
     try {
-      await AsyncStorage.multiSet([
+      await mmkvStorage.multiSet([
         [TRAKT_ACCESS_TOKEN_KEY, accessToken],
         [TRAKT_REFRESH_TOKEN_KEY, refreshToken],
         [TRAKT_TOKEN_EXPIRY_KEY, this.tokenExpiry.toString()]
@@ -833,7 +833,7 @@ export class TraktService {
       this.refreshToken = null;
       this.tokenExpiry = 0;
 
-      await AsyncStorage.multiRemove([
+      await mmkvStorage.multiRemove([
         TRAKT_ACCESS_TOKEN_KEY,
         TRAKT_REFRESH_TOKEN_KEY,
         TRAKT_TOKEN_EXPIRY_KEY

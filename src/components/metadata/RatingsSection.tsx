@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { View, Text, StyleSheet, ActivityIndicator, Image, Animated, Dimensions } from 'react-native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useMDBListRatings } from '../../hooks/useMDBListRatings';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../../services/mmkvStorage';
 import { isMDBListEnabled, RATING_PROVIDERS_STORAGE_KEY } from '../../screens/MDBListSettingsScreen';
 
 // Import SVG icons
@@ -124,7 +124,7 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
 
   const loadProviderSettings = async () => {
     try {
-      const savedSettings = await AsyncStorage.getItem(RATING_PROVIDERS_STORAGE_KEY);
+      const savedSettings = await mmkvStorage.getItem(RATING_PROVIDERS_STORAGE_KEY);
       if (savedSettings) {
         setEnabledProviders(JSON.parse(savedSettings));
       } else {

@@ -3,7 +3,7 @@ import { logger } from '../utils/logger';
 import { TMDBService } from '../services/tmdbService';
 import { isTmdbUrl } from '../utils/logoUtils';
 import FastImage from '@d11/react-native-fast-image';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 
 // Cache for image availability checks
 const imageAvailabilityCache: Record<string, boolean> = {};
@@ -17,7 +17,7 @@ const checkImageAvailability = async (url: string): Promise<boolean> => {
   
   // Check AsyncStorage cache
   try {
-    const cachedResult = await AsyncStorage.getItem(`image_available:${url}`);
+    const cachedResult = await mmkvStorage.getItem(`image_available:${url}`);
     if (cachedResult !== null) {
       const isAvailable = cachedResult === 'true';
       imageAvailabilityCache[url] = isAvailable;
@@ -35,7 +35,7 @@ const checkImageAvailability = async (url: string): Promise<boolean> => {
     // Update caches
     imageAvailabilityCache[url] = isAvailable;
     try {
-      await AsyncStorage.setItem(`image_available:${url}`, isAvailable ? 'true' : 'false');
+      await mmkvStorage.setItem(`image_available:${url}`, isAvailable ? 'true' : 'false');
     } catch (error) {
       // Ignore AsyncStorage errors
     }

@@ -18,7 +18,7 @@ import {
 import CustomAlert from '../components/CustomAlert';
 import { useNavigation } from '@react-navigation/native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { useTheme } from '../contexts/ThemeContext';
 import { logger } from '../utils/logger';
 import { RATING_PROVIDERS } from '../components/metadata/RatingsSection';
@@ -31,7 +31,7 @@ const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 // Function to check if MDBList is enabled
 export const isMDBListEnabled = async (): Promise<boolean> => {
   try {
-    const enabledSetting = await AsyncStorage.getItem(MDBLIST_ENABLED_STORAGE_KEY);
+    const enabledSetting = await mmkvStorage.getItem(MDBLIST_ENABLED_STORAGE_KEY);
     return enabledSetting === 'true';
   } catch (error) {
     logger.error('[MDBList] Error checking if MDBList is enabled:', error);
@@ -48,7 +48,7 @@ export const getMDBListAPIKey = async (): Promise<string | null> => {
       return null;
     }
     
-    return await AsyncStorage.getItem(MDBLIST_API_KEY_STORAGE_KEY);
+    return await mmkvStorage.getItem(MDBLIST_API_KEY_STORAGE_KEY);
   } catch (error) {
     logger.error('[MDBList] Error retrieving API key:', error);
     return null;
@@ -388,14 +388,14 @@ const MDBListSettingsScreen = () => {
   const loadMdbListEnabledSetting = async () => {
     logger.log('[MDBListSettingsScreen] Loading MDBList enabled setting');
     try {
-      const savedSetting = await AsyncStorage.getItem(MDBLIST_ENABLED_STORAGE_KEY);
+      const savedSetting = await mmkvStorage.getItem(MDBLIST_ENABLED_STORAGE_KEY);
       if (savedSetting !== null) {
         setIsMdbListEnabled(savedSetting === 'true');
         logger.log('[MDBListSettingsScreen] MDBList enabled setting:', savedSetting === 'true');
       } else {
         // Default to disabled if no setting found
         setIsMdbListEnabled(false);
-        await AsyncStorage.setItem(MDBLIST_ENABLED_STORAGE_KEY, 'false');
+        await mmkvStorage.setItem(MDBLIST_ENABLED_STORAGE_KEY, 'false');
         logger.log('[MDBListSettingsScreen] MDBList enabled setting not found, defaulting to false');
       }
     } catch (error) {
@@ -409,7 +409,7 @@ const MDBListSettingsScreen = () => {
     try {
       const newValue = !isMdbListEnabled;
       setIsMdbListEnabled(newValue);
-      await AsyncStorage.setItem(MDBLIST_ENABLED_STORAGE_KEY, newValue.toString());
+      await mmkvStorage.setItem(MDBLIST_ENABLED_STORAGE_KEY, newValue.toString());
       logger.log('[MDBListSettingsScreen] MDBList enabled set to:', newValue);
     } catch (error) {
       logger.error('[MDBListSettingsScreen] Failed to save MDBList enabled setting:', error);
@@ -419,7 +419,7 @@ const MDBListSettingsScreen = () => {
   const loadApiKey = async () => {
     logger.log('[MDBListSettingsScreen] Loading API key from storage');
     try {
-      const savedKey = await AsyncStorage.getItem(MDBLIST_API_KEY_STORAGE_KEY);
+      const savedKey = await mmkvStorage.getItem(MDBLIST_API_KEY_STORAGE_KEY);
       logger.log('[MDBListSettingsScreen] API key status:', savedKey ? 'Found' : 'Not found');
       if (savedKey) {
         setApiKey(savedKey);
@@ -438,7 +438,7 @@ const MDBListSettingsScreen = () => {
 
   const loadProviderSettings = async () => {
     try {
-      const savedSettings = await AsyncStorage.getItem(RATING_PROVIDERS_STORAGE_KEY);
+      const savedSettings = await mmkvStorage.getItem(RATING_PROVIDERS_STORAGE_KEY);
       if (savedSettings) {
         setEnabledProviders(JSON.parse(savedSettings));
       } else {
@@ -448,7 +448,7 @@ const MDBListSettingsScreen = () => {
           return acc;
         }, {} as Record<string, boolean>);
         setEnabledProviders(defaultSettings);
-        await AsyncStorage.setItem(RATING_PROVIDERS_STORAGE_KEY, JSON.stringify(defaultSettings));
+        await mmkvStorage.setItem(RATING_PROVIDERS_STORAGE_KEY, JSON.stringify(defaultSettings));
       }
     } catch (error) {
       logger.error('[MDBListSettingsScreen] Failed to load provider settings:', error);
@@ -462,7 +462,7 @@ const MDBListSettingsScreen = () => {
         [providerId]: !enabledProviders[providerId]
       };
       setEnabledProviders(newSettings);
-      await AsyncStorage.setItem(RATING_PROVIDERS_STORAGE_KEY, JSON.stringify(newSettings));
+      await mmkvStorage.setItem(RATING_PROVIDERS_STORAGE_KEY, JSON.stringify(newSettings));
     } catch (error) {
       logger.error('[MDBListSettingsScreen] Failed to save provider settings:', error);
     }
@@ -481,7 +481,7 @@ const MDBListSettingsScreen = () => {
       }
 
       logger.log('[MDBListSettingsScreen] Saving API key');
-      await AsyncStorage.setItem(MDBLIST_API_KEY_STORAGE_KEY, trimmedKey);
+      await mmkvStorage.setItem(MDBLIST_API_KEY_STORAGE_KEY, trimmedKey);
       setIsKeySet(true);
       setTestResult({ success: true, message: 'API key saved successfully.' });
       logger.log('[MDBListSettingsScreen] API key saved successfully');
@@ -506,7 +506,7 @@ const MDBListSettingsScreen = () => {
         onPress: async () => {
           logger.log('[MDBListSettingsScreen] Proceeding with API key clear');
           try {
-            await AsyncStorage.removeItem(MDBLIST_API_KEY_STORAGE_KEY);
+            await mmkvStorage.removeItem(MDBLIST_API_KEY_STORAGE_KEY);
             setApiKey('');
             setIsKeySet(false);
             setTestResult(null);

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, TextInput, Text, TouchableOpacity, StyleSheet, ActivityIndicator, SafeAreaView, KeyboardAvoidingView, Platform, Dimensions, Animated, Easing, Keyboard } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
@@ -196,7 +196,7 @@ const AuthScreen: React.FC = () => {
 
   const handleSkipAuth = async () => {
     try {
-      await AsyncStorage.setItem('showLoginHintToastOnce', 'true');
+      await mmkvStorage.setItem('showLoginHintToastOnce', 'true');
     } catch {}
     navigation.reset({ index: 0, routes: [{ name: 'MainTabs' as never }] } as any);
   };

@@ -27,7 +27,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { logger } from '../utils/logger';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { BlurView as ExpoBlurView } from 'expo-blur';
 import CustomAlert from '../components/CustomAlert';
 
@@ -671,7 +671,7 @@ const AddonsScreen = () => {
       });
       
       // Get catalog settings to determine enabled count
-      const catalogSettingsJson = await AsyncStorage.getItem('catalog_settings');
+      const catalogSettingsJson = await mmkvStorage.getItem('catalog_settings');
       if (catalogSettingsJson) {
         const catalogSettings = JSON.parse(catalogSettingsJson);
         const disabledCount = Object.entries(catalogSettings)

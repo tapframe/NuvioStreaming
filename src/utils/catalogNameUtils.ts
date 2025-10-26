@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { logger } from './logger';
 
 const CATALOG_CUSTOM_NAMES_KEY = 'catalog_custom_names';
@@ -17,7 +17,7 @@ async function loadCustomNamesIfNeeded(): Promise<{ [key: string]: string }> {
 
     try {
         logger.info('Loading custom catalog names from storage...');
-        const savedCustomNamesJson = await AsyncStorage.getItem(CATALOG_CUSTOM_NAMES_KEY);
+        const savedCustomNamesJson = await mmkvStorage.getItem(CATALOG_CUSTOM_NAMES_KEY);
         // Assign parsed object or empty object if null/error
         customNamesCache = savedCustomNamesJson ? JSON.parse(savedCustomNamesJson) : {};
         cacheTimestamp = now; // Set timestamp only on successful load

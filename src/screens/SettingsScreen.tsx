@@ -14,7 +14,7 @@ import {
   Linking,
   Clipboard
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import FastImage from '@d11/react-native-fast-image';
@@ -271,7 +271,7 @@ const SettingsScreen: React.FC = () => {
     let mounted = true;
     (async () => {
       try {
-        const flag = await AsyncStorage.getItem('@update_badge_pending');
+        const flag = await mmkvStorage.getItem('@update_badge_pending');
         if (mounted) setHasUpdateBadge(flag === 'true');
       } catch {}
     })();
@@ -329,7 +329,7 @@ const SettingsScreen: React.FC = () => {
       });
       
       // Load saved catalog settings
-      const catalogSettingsJson = await AsyncStorage.getItem('catalog_settings');
+      const catalogSettingsJson = await mmkvStorage.getItem('catalog_settings');
       if (catalogSettingsJson) {
         const catalogSettings = JSON.parse(catalogSettingsJson);
         // Filter out _lastUpdate key and count only explicitly disabled catalogs
@@ -344,11 +344,11 @@ const SettingsScreen: React.FC = () => {
       }
 
       // Check MDBList API key status
-      const mdblistKey = await AsyncStorage.getItem('mdblist_api_key');
+      const mdblistKey = await mmkvStorage.getItem('mdblist_api_key');
       setMdblistKeySet(!!mdblistKey);
 
       // Check OpenRouter API key status
-      const openRouterKey = await AsyncStorage.getItem('openrouter_api_key');
+      const openRouterKey = await mmkvStorage.getItem('openrouter_api_key');
       setOpenRouterKeySet(!!openRouterKey);
 
       // Load GitHub total downloads (initial load only, polling happens in useEffect)
@@ -459,7 +459,7 @@ const SettingsScreen: React.FC = () => {
           label: 'Clear',
           onPress: async () => {
             try {
-              await AsyncStorage.removeItem('mdblist_cache');
+              await mmkvStorage.removeItem('mdblist_cache');
               openAlert('Success', 'MDBList cache has been cleared.');
             } catch (error) {
               openAlert('Error', 'Could not clear MDBList cache.');
@@ -746,7 +746,7 @@ const SettingsScreen: React.FC = () => {
               icon="refresh-ccw"
               onPress={async () => {
                 try {
-                  await AsyncStorage.removeItem('hasCompletedOnboarding');
+                  await mmkvStorage.removeItem('hasCompletedOnboarding');
                   openAlert('Success', 'Onboarding has been reset. Restart the app to see the onboarding flow.');
                 } catch (error) {
                   openAlert('Error', 'Failed to reset onboarding.');
@@ -768,7 +768,7 @@ const SettingsScreen: React.FC = () => {
                       label: 'Clear',
                       onPress: async () => {
                         try {
-                          await AsyncStorage.clear();
+                          await mmkvStorage.clear();
                           openAlert('Success', 'All data cleared. Please restart the app.');
                         } catch (error) {
                           openAlert('Error', 'Failed to clear data.');
@@ -823,7 +823,7 @@ const SettingsScreen: React.FC = () => {
               badge={Platform.OS === 'android' && hasUpdateBadge ? 1 : undefined}
               onPress={async () => {
                 if (Platform.OS === 'android') {
-                  try { await AsyncStorage.removeItem('@update_badge_pending'); } catch {}
+                  try { await mmkvStorage.removeItem('@update_badge_pending'); } catch {}
                   setHasUpdateBadge(false);
                 }
                 navigation.navigate('Update');

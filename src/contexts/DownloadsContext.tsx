@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { notificationService } from '../services/notificationService';
 
 export type DownloadStatus = 'downloading' | 'completed' | 'paused' | 'error' | 'queued';
@@ -142,7 +142,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     (async () => {
       try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
+        const raw = await mmkvStorage.getItem(STORAGE_KEY);
         if (raw) {
           const list = JSON.parse(raw) as Array<Partial<DownloadItem>>;
           // Mark any in-progress as paused on restore (cannot resume across sessions reliably)
@@ -216,7 +216,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, []);
 
   useEffect(() => {
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(downloads)).catch(() => {});
+    mmkvStorage.setItem(STORAGE_KEY, JSON.stringify(downloads)).catch(() => {});
   }, [downloads]);
 
   const updateDownload = useCallback((id: string, updater: (d: DownloadItem) => DownloadItem) => {

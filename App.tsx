@@ -34,13 +34,13 @@ import UpdatePopup from './src/components/UpdatePopup';
 import MajorUpdateOverlay from './src/components/MajorUpdateOverlay';
 import { useGithubMajorUpdate } from './src/hooks/useGithubMajorUpdate';
 import { useUpdatePopup } from './src/hooks/useUpdatePopup';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Sentry from '@sentry/react-native';
 import UpdateService from './src/services/updateService';
 import { memoryMonitorService } from './src/services/memoryMonitorService';
 import { aiService } from './src/services/aiService';
 import { AccountProvider, useAccount } from './src/contexts/AccountContext';
 import { ToastProvider } from './src/contexts/ToastContext';
+import { mmkvStorage } from './src/services/mmkvStorage';
 
 Sentry.init({
   dsn: 'https://1a58bf436454d346e5852b7bfd3c95e8@o4509536317276160.ingest.de.sentry.io/4509536317734992',
@@ -104,7 +104,7 @@ const ThemedApp = () => {
     const initializeApp = async () => {
       try {
         // Check onboarding status
-        const onboardingCompleted = await AsyncStorage.getItem('hasCompletedOnboarding');
+        const onboardingCompleted = await mmkvStorage.getItem('hasCompletedOnboarding');
         setHasCompletedOnboarding(onboardingCompleted === 'true');
         
         // Initialize update service

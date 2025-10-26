@@ -1,5 +1,5 @@
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from './mmkvStorage';
 import { logger } from '../utils/logger';
 import EventEmitter from 'eventemitter3';
 import { localScraperService } from './localScraperService';
@@ -321,11 +321,11 @@ class StremioService {
     if (this.initialized) return;
     
     try {
-      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
       // Prefer scoped storage, but fall back to legacy keys to preserve older installs
-      let storedAddons = await AsyncStorage.getItem(`@user:${scope}:${this.STORAGE_KEY}`);
-      if (!storedAddons) storedAddons = await AsyncStorage.getItem(this.STORAGE_KEY);
-      if (!storedAddons) storedAddons = await AsyncStorage.getItem(`@user:local:${this.STORAGE_KEY}`);
+      let storedAddons = await mmkvStorage.getItem(`@user:${scope}:${this.STORAGE_KEY}`);
+      if (!storedAddons) storedAddons = await mmkvStorage.getItem(this.STORAGE_KEY);
+      if (!storedAddons) storedAddons = await mmkvStorage.getItem(`@user:local:${this.STORAGE_KEY}`);
       
       if (storedAddons) {
         const parsed = JSON.parse(storedAddons);
@@ -425,9 +425,9 @@ class StremioService {
       }
       
       // Load addon order if exists (scoped first, then legacy, then @user:local for migration safety)
-      let storedOrder = await AsyncStorage.getItem(`@user:${scope}:${this.ADDON_ORDER_KEY}`);
-      if (!storedOrder) storedOrder = await AsyncStorage.getItem(this.ADDON_ORDER_KEY);
-      if (!storedOrder) storedOrder = await AsyncStorage.getItem(`@user:local:${this.ADDON_ORDER_KEY}`);
+      let storedOrder = await mmkvStorage.getItem(`@user:${scope}:${this.ADDON_ORDER_KEY}`);
+      if (!storedOrder) storedOrder = await mmkvStorage.getItem(this.ADDON_ORDER_KEY);
+      if (!storedOrder) storedOrder = await mmkvStorage.getItem(`@user:local:${this.ADDON_ORDER_KEY}`);
       if (storedOrder) {
         this.addonOrder = JSON.parse(storedOrder);
         // Filter out any ids that aren't in installedAddons
@@ -507,11 +507,11 @@ class StremioService {
   private async saveInstalledAddons(): Promise<void> {
     try {
       const addonsArray = Array.from(this.installedAddons.values());
-      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
       // Write to both scoped and legacy keys for compatibility
       await Promise.all([
-        AsyncStorage.setItem(`@user:${scope}:${this.STORAGE_KEY}`, JSON.stringify(addonsArray)),
-        AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(addonsArray)),
+        mmkvStorage.setItem(`@user:${scope}:${this.STORAGE_KEY}`, JSON.stringify(addonsArray)),
+        mmkvStorage.setItem(this.STORAGE_KEY, JSON.stringify(addonsArray)),
       ]);
     } catch (error) {
       // Continue even if save fails
@@ -520,11 +520,11 @@ class StremioService {
 
   private async saveAddonOrder(): Promise<void> {
     try {
-      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
       // Write to both scoped and legacy keys for compatibility
       await Promise.all([
-        AsyncStorage.setItem(`@user:${scope}:${this.ADDON_ORDER_KEY}`, JSON.stringify(this.addonOrder)),
-        AsyncStorage.setItem(this.ADDON_ORDER_KEY, JSON.stringify(this.addonOrder)),
+        mmkvStorage.setItem(`@user:${scope}:${this.ADDON_ORDER_KEY}`, JSON.stringify(this.addonOrder)),
+        mmkvStorage.setItem(this.ADDON_ORDER_KEY, JSON.stringify(this.addonOrder)),
       ]);
     } catch (error) {
       // Continue even if save fails
@@ -625,7 +625,7 @@ class StremioService {
   // Check if user has explicitly removed an addon
   async hasUserRemovedAddon(addonId: string): Promise<boolean> {
     try {
-      const removedAddons = await AsyncStorage.getItem('user_removed_addons');
+      const removedAddons = await mmkvStorage.getItem('user_removed_addons');
       if (!removedAddons) return false;
       const removedList = JSON.parse(removedAddons);
       return Array.isArray(removedList) && removedList.includes(addonId);
@@ -637,13 +637,13 @@ class StremioService {
   // Mark an addon as removed by user
   private async markAddonAsRemovedByUser(addonId: string): Promise<void> {
     try {
-      const removedAddons = await AsyncStorage.getItem('user_removed_addons');
+      const removedAddons = await mmkvStorage.getItem('user_removed_addons');
       let removedList = removedAddons ? JSON.parse(removedAddons) : [];
       if (!Array.isArray(removedList)) removedList = [];
       
       if (!removedList.includes(addonId)) {
         removedList.push(addonId);
-        await AsyncStorage.setItem('user_removed_addons', JSON.stringify(removedList));
+        await mmkvStorage.setItem('user_removed_addons', JSON.stringify(removedList));
       }
     } catch (error) {
       // Silently fail - this is not critical functionality
@@ -653,14 +653,14 @@ class StremioService {
   // Remove an addon from the user removed list (allows reinstallation)
   async unmarkAddonAsRemovedByUser(addonId: string): Promise<void> {
     try {
-      const removedAddons = await AsyncStorage.getItem('user_removed_addons');
+      const removedAddons = await mmkvStorage.getItem('user_removed_addons');
       if (!removedAddons) return;
       
       let removedList = JSON.parse(removedAddons);
       if (!Array.isArray(removedList)) return;
       
       const updatedList = removedList.filter(id => id !== addonId);
-      await AsyncStorage.setItem('user_removed_addons', JSON.stringify(updatedList));
+      await mmkvStorage.setItem('user_removed_addons', JSON.stringify(updatedList));
     } catch (error) {
       // Silently fail - this is not critical functionality
     }
@@ -669,7 +669,7 @@ class StremioService {
   // Clean up removed addon from all storage locations
   private async cleanupRemovedAddonFromStorage(addonId: string): Promise<void> {
     try {
-      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
       
       // Remove from all possible addon order storage keys
       const keys = [
@@ -679,12 +679,12 @@ class StremioService {
       ];
       
       for (const key of keys) {
-        const storedOrder = await AsyncStorage.getItem(key);
+        const storedOrder = await mmkvStorage.getItem(key);
         if (storedOrder) {
           const order = JSON.parse(storedOrder);
           if (Array.isArray(order)) {
             const updatedOrder = order.filter(id => id !== addonId);
-            await AsyncStorage.setItem(key, JSON.stringify(updatedOrder));
+            await mmkvStorage.setItem(key, JSON.stringify(updatedOrder));
           }
         }
       }
@@ -1054,9 +1054,9 @@ class StremioService {
     // Check if local scrapers are enabled and execute them first
     try {
       // Load settings from AsyncStorage directly (scoped with fallback)
-      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
-      const settingsJson = (await AsyncStorage.getItem(`@user:${scope}:app_settings`))
-        || (await AsyncStorage.getItem('app_settings'));
+      const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
+      const settingsJson = (await mmkvStorage.getItem(`@user:${scope}:app_settings`))
+        || (await mmkvStorage.getItem('app_settings'));
       const rawSettings = settingsJson ? JSON.parse(settingsJson) : {};
       const settings: AppSettings = { ...DEFAULT_SETTINGS, ...rawSettings };
       

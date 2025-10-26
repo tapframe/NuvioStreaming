@@ -38,7 +38,7 @@ if (Platform.OS === 'ios') {
 }
 import { logger } from '../utils/logger';
 import { useCustomCatalogNames } from '../hooks/useCustomCatalogNames';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { catalogService, DataSource, StreamingContent } from '../services/catalogService';
 import { tmdbService } from '../services/tmdbService';
 
@@ -262,7 +262,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   useEffect(() => {
     (async () => {
       try {
-        const pref = await AsyncStorage.getItem('catalog_mobile_columns');
+        const pref = await mmkvStorage.getItem('catalog_mobile_columns');
         if (pref === '2') setMobileColumnsPref(2);
         else if (pref === '3') setMobileColumnsPref(3);
         else setMobileColumnsPref('auto');

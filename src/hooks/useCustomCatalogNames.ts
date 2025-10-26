@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { logger } from '../utils/logger';
 
 const CATALOG_CUSTOM_NAMES_KEY = 'catalog_custom_names';
@@ -27,7 +27,7 @@ export function useCustomCatalogNames() {
 
     setIsLoading(true);
     try {
-      const savedCustomNamesJson = await AsyncStorage.getItem(CATALOG_CUSTOM_NAMES_KEY);
+      const savedCustomNamesJson = await mmkvStorage.getItem(CATALOG_CUSTOM_NAMES_KEY);
       const loadedNames = savedCustomNamesJson ? JSON.parse(savedCustomNamesJson) : {};
       setCustomNames(loadedNames);
       // Update cache

@@ -14,7 +14,7 @@ import {
   FlatList,
   ActivityIndicator
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import FastImage from '@d11/react-native-fast-image';
@@ -108,8 +108,8 @@ const ContributorsScreen: React.FC = () => {
       // Check cache first (unless refreshing)
       if (!isRefresh) {
         try {
-          const cachedData = await AsyncStorage.getItem('github_contributors');
-          const cacheTimestamp = await AsyncStorage.getItem('github_contributors_timestamp');
+          const cachedData = await mmkvStorage.getItem('github_contributors');
+          const cacheTimestamp = await mmkvStorage.getItem('github_contributors_timestamp');
           const now = Date.now();
           const ONE_HOUR = 60 * 60 * 1000; // 1 hour cache
           
@@ -124,8 +124,8 @@ const ContributorsScreen: React.FC = () => {
                 return;
               } else {
                 // Remove invalid cache
-                await AsyncStorage.removeItem('github_contributors');
-                await AsyncStorage.removeItem('github_contributors_timestamp');
+                await mmkvStorage.removeItem('github_contributors');
+                await mmkvStorage.removeItem('github_contributors_timestamp');
                 if (__DEV__) console.log('Removed invalid contributors cache');
               }
             }
@@ -134,8 +134,8 @@ const ContributorsScreen: React.FC = () => {
           if (__DEV__) console.error('Cache read error:', cacheError);
           // Remove corrupted cache
           try {
-            await AsyncStorage.removeItem('github_contributors');
-            await AsyncStorage.removeItem('github_contributors_timestamp');
+            await mmkvStorage.removeItem('github_contributors');
+            await mmkvStorage.removeItem('github_contributors_timestamp');
           } catch {}
         }
       }
@@ -145,16 +145,16 @@ const ContributorsScreen: React.FC = () => {
         setContributors(data);
         // Only cache valid data
         try {
-          await AsyncStorage.setItem('github_contributors', JSON.stringify(data));
-          await AsyncStorage.setItem('github_contributors_timestamp', Date.now().toString());
+          await mmkvStorage.setItem('github_contributors', JSON.stringify(data));
+          await mmkvStorage.setItem('github_contributors_timestamp', Date.now().toString());
         } catch (cacheError) {
           if (__DEV__) console.error('Cache write error:', cacheError);
         }
       } else {
         // Clear any existing cache if we get invalid data
         try {
-          await AsyncStorage.removeItem('github_contributors');
-          await AsyncStorage.removeItem('github_contributors_timestamp');
+          await mmkvStorage.removeItem('github_contributors');
+          await mmkvStorage.removeItem('github_contributors_timestamp');
         } catch {}
         setError('Unable to load contributors. This might be due to GitHub API rate limits.');
       }
@@ -171,12 +171,12 @@ const ContributorsScreen: React.FC = () => {
     // Clear any invalid cache on mount
     const clearInvalidCache = async () => {
       try {
-        const cachedData = await AsyncStorage.getItem('github_contributors');
+        const cachedData = await mmkvStorage.getItem('github_contributors');
         if (cachedData) {
           const parsedData = JSON.parse(cachedData);
           if (!parsedData || !Array.isArray(parsedData) || parsedData.length === 0) {
-            await AsyncStorage.removeItem('github_contributors');
-            await AsyncStorage.removeItem('github_contributors_timestamp');
+            await mmkvStorage.removeItem('github_contributors');
+            await mmkvStorage.removeItem('github_contributors_timestamp');
             if (__DEV__) console.log('Cleared invalid cache on mount');
           }
         }

@@ -13,7 +13,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import Animated, { FadeIn, FadeOut, SlideInRight, SlideOutLeft } from 'react-native-reanimated';
 import { TraktService } from '../../services/traktService';
 import { logger } from '../../utils/logger';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../../services/mmkvStorage';
 
 // Enhanced responsive breakpoints for Seasons Section
 const BREAKPOINTS = {
@@ -186,7 +186,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   useEffect(() => {
     const loadViewModePreference = async () => {
       try {
-        const savedMode = await AsyncStorage.getItem('global_season_view_mode');
+        const savedMode = await mmkvStorage.getItem('global_season_view_mode');
         if (savedMode === 'text' || savedMode === 'posters') {
           setSeasonViewMode(savedMode);
           if (__DEV__) console.log('[SeriesContent] Loaded global view mode:', savedMode);
@@ -215,7 +215,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   // Update view mode without animations
   const updateViewMode = (newMode: 'posters' | 'text') => {
     setSeasonViewMode(newMode);
-    AsyncStorage.setItem('global_season_view_mode', newMode).catch(error => {
+    mmkvStorage.setItem('global_season_view_mode', newMode).catch((error: any) => {
       if (__DEV__) console.log('[SeriesContent] Error saving global view mode preference:', error);
     });
   };

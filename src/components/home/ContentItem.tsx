@@ -8,7 +8,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useSettings } from '../../hooks/useSettings';
 import { catalogService, StreamingContent } from '../../services/catalogService';
 import { DropUpMenu } from './DropUpMenu';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../../services/mmkvStorage';
 import { storageService } from '../../services/storageService';
 import { TraktService } from '../../services/traktService';
 import { useTraktContext } from '../../contexts/TraktContext';
@@ -97,7 +97,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
     // Load watched state from AsyncStorage when item changes
   useEffect(() => {
     const updateWatched = () => {
-      AsyncStorage.getItem(`watched:${item.type}:${item.id}`).then(val => setIsWatched(val === 'true'));
+      mmkvStorage.getItem(`watched:${item.type}:${item.id}`).then((val: string | null) => setIsWatched(val === 'true'));
     };
     updateWatched();
     const sub = DeviceEventEmitter.addListener('watchedStatusChanged', updateWatched);
@@ -163,7 +163,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
         const targetWatched = !isWatched;
         setIsWatched(targetWatched);
         try {
-          await AsyncStorage.setItem(`watched:${item.type}:${item.id}`, targetWatched ? 'true' : 'false');
+          await mmkvStorage.setItem(`watched:${item.type}:${item.id}`, targetWatched ? 'true' : 'false');
         } catch {}
         showInfo(targetWatched ? 'Marked as Watched' : 'Marked as Unwatched', targetWatched ? 'Item marked as watched' : 'Item marked as unwatched');
         setTimeout(() => {

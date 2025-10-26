@@ -3,7 +3,7 @@ import { NavigationContainer, DefaultTheme as NavigationDefaultTheme, DarkTheme 
 import { createNativeStackNavigator, NativeStackNavigationOptions, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createBottomTabNavigator, BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useColorScheme, Platform, Animated, StatusBar, TouchableOpacity, View, Text, AppState, Easing, Dimensions } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { PaperProvider, MD3DarkTheme, MD3LightTheme, adaptNavigationTheme } from 'react-native-paper';
 import type { MD3Theme } from 'react-native-paper';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
@@ -524,7 +524,7 @@ const MainTabs = () => {
     let mounted = true;
     const load = async () => {
       try {
-        const flag = await AsyncStorage.getItem('@update_badge_pending');
+        const flag = await mmkvStorage.getItem('@update_badge_pending');
         if (mounted) setHasUpdateBadge(flag === 'true');
       } catch {}
     };

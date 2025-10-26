@@ -9,7 +9,7 @@ import { Cast, Episode, GroupedEpisodes, GroupedStreams } from '../types/metadat
 import { TMDBService } from '../services/tmdbService';
 import { logger } from '../utils/logger';
 import { usePersistentSeasons } from './usePersistentSeasons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { Stream } from '../types/metadata';
 import { storageService } from '../services/storageService';
 import { useSettings } from './useSettings';

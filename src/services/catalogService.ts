@@ -1,6 +1,6 @@
 import { stremioService, Meta, Manifest } from './stremioService';
 import { notificationService } from './notificationService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from './mmkvStorage';
 import axios from 'axios';
 import { TMDBService } from './tmdbService';
 import { logger } from '../utils/logger';
@@ -164,9 +164,9 @@ class CatalogService {
 
   private async initializeScope(): Promise<void> {
     try {
-      const currentScope = await AsyncStorage.getItem('@user:current');
+      const currentScope = await mmkvStorage.getItem('@user:current');
       if (!currentScope) {
-        await AsyncStorage.setItem('@user:current', 'local');
+        await mmkvStorage.setItem('@user:current', 'local');
         logger.log('[CatalogService] Initialized @user:current scope to "local"');
       }
     } catch (error) {
@@ -183,14 +183,14 @@ class CatalogService {
 
   private async loadLibrary(): Promise<void> {
     try {
-      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
       const scopedKey = `@user:${scope}:stremio-library`;
-      let storedLibrary = (await AsyncStorage.getItem(scopedKey));
+      let storedLibrary = (await mmkvStorage.getItem(scopedKey));
       if (!storedLibrary) {
         // Fallback: read legacy and migrate into scoped
-        storedLibrary = await AsyncStorage.getItem(this.LEGACY_LIBRARY_KEY);
+        storedLibrary = await mmkvStorage.getItem(this.LEGACY_LIBRARY_KEY);
         if (storedLibrary) {
-          await AsyncStorage.setItem(scopedKey, storedLibrary);
+          await mmkvStorage.setItem(scopedKey, storedLibrary);
         }
       }
       if (storedLibrary) {
@@ -201,7 +201,7 @@ class CatalogService {
         this.library = {};
       }
       // Ensure @user:current is set to prevent future scope issues
-      await AsyncStorage.setItem('@user:current', scope);
+      await mmkvStorage.setItem('@user:current', scope);
     } catch (error: any) {
       logger.error('Failed to load library:', error);
       this.library = {};
@@ -210,11 +210,11 @@ class CatalogService {
 
   private async saveLibrary(): Promise<void> {
     try {
-      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
       const scopedKey = `@user:${scope}:stremio-library`;
       const libraryData = JSON.stringify(this.library);
-      await AsyncStorage.setItem(scopedKey, libraryData);
-      await AsyncStorage.setItem(this.LEGACY_LIBRARY_KEY, libraryData);
+      await mmkvStorage.setItem(scopedKey, libraryData);
+      await mmkvStorage.setItem(this.LEGACY_LIBRARY_KEY, libraryData);
       logger.log(`[CatalogService] Library saved successfully with ${Object.keys(this.library).length} items to scope: ${scope}`);
     } catch (error: any) {
       logger.error('Failed to save library:', error);
@@ -223,7 +223,7 @@ class CatalogService {
 
   private async loadRecentContent(): Promise<void> {
     try {
-      const storedRecentContent = await AsyncStorage.getItem(this.RECENT_CONTENT_KEY);
+      const storedRecentContent = await mmkvStorage.getItem(this.RECENT_CONTENT_KEY);
       if (storedRecentContent) {
         this.recentContent = JSON.parse(storedRecentContent);
       }
@@ -234,7 +234,7 @@ class CatalogService {
 
   private async saveRecentContent(): Promise<void> {
     try {
-      await AsyncStorage.setItem(this.RECENT_CONTENT_KEY, JSON.stringify(this.recentContent));
+      await mmkvStorage.setItem(this.RECENT_CONTENT_KEY, JSON.stringify(this.recentContent));
     } catch (error: any) {
       logger.error('Failed to save recent content:', error);
     }
@@ -265,7 +265,7 @@ class CatalogService {
     const addons = await this.getAllAddons();
     
     // Load enabled/disabled settings
-    const catalogSettingsJson = await AsyncStorage.getItem(CATALOG_SETTINGS_KEY);
+    const catalogSettingsJson = await mmkvStorage.getItem(CATALOG_SETTINGS_KEY);
     const catalogSettings = catalogSettingsJson ? JSON.parse(catalogSettingsJson) : {};
 
     // Create an array of promises for all catalog fetches
@@ -546,7 +546,7 @@ class CatalogService {
    */
   async getDataSourcePreference(): Promise<DataSource> {
     try {
-      const dataSource = await AsyncStorage.getItem(DATA_SOURCE_KEY);
+      const dataSource = await mmkvStorage.getItem(DATA_SOURCE_KEY);
       return dataSource as DataSource || DataSource.STREMIO_ADDONS;
     } catch (error) {
       logger.error('Failed to get data source preference:', error);
@@ -559,7 +559,7 @@ class CatalogService {
    */
   async setDataSourcePreference(dataSource: DataSource): Promise<void> {
     try {
-      await AsyncStorage.setItem(DATA_SOURCE_KEY, dataSource);
+      await mmkvStorage.setItem(DATA_SOURCE_KEY, dataSource);
     } catch (error) {
       logger.error('Failed to set data source preference:', error);
     }

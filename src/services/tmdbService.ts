@@ -1,5 +1,5 @@
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from './mmkvStorage';
 
 // TMDB API configuration
 const DEFAULT_API_KEY = 'd131017ccc6e5462a81c9304d21476de';
@@ -124,8 +124,8 @@ export class TMDBService {
   private async loadApiKey() {
     try {
       const [savedKey, savedUseCustomKey] = await Promise.all([
-        AsyncStorage.getItem(TMDB_API_KEY_STORAGE_KEY),
-        AsyncStorage.getItem(USE_CUSTOM_TMDB_API_KEY)
+        mmkvStorage.getItem(TMDB_API_KEY_STORAGE_KEY),
+        mmkvStorage.getItem(USE_CUSTOM_TMDB_API_KEY)
       ]);
       
       this.useCustomKey = savedUseCustomKey === 'true';

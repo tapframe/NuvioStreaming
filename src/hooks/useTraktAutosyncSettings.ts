@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { useTraktIntegration } from './useTraktIntegration';
 import { logger } from '../utils/logger';
 
@@ -35,9 +35,9 @@ export function useTraktAutosyncSettings() {
     try {
       setIsLoading(true);
       const [enabled, frequency, threshold] = await Promise.all([
-        AsyncStorage.getItem(TRAKT_AUTOSYNC_ENABLED_KEY),
-        AsyncStorage.getItem(TRAKT_SYNC_FREQUENCY_KEY),
-        AsyncStorage.getItem(TRAKT_COMPLETION_THRESHOLD_KEY)
+        mmkvStorage.getItem(TRAKT_AUTOSYNC_ENABLED_KEY),
+        mmkvStorage.getItem(TRAKT_SYNC_FREQUENCY_KEY),
+        mmkvStorage.getItem(TRAKT_COMPLETION_THRESHOLD_KEY)
       ]);
 
       setSettings({
@@ -56,7 +56,7 @@ export function useTraktAutosyncSettings() {
   // Save individual setting
   const saveSetting = useCallback(async (key: string, value: any) => {
     try {
-      await AsyncStorage.setItem(key, JSON.stringify(value));
+      await mmkvStorage.setItem(key, JSON.stringify(value));
     } catch (error) {
       logger.error('[useTraktAutosyncSettings] Error saving setting:', error);
     }

@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from './mmkvStorage';
 import { logger } from '../utils/logger';
 
 export interface CachedStream {
@@ -59,7 +59,7 @@ class StreamCacheService {
         expiresAt: now + ttl
       };
 
-      await AsyncStorage.setItem(cacheKey, JSON.stringify(cacheEntry));
+      await mmkvStorage.setItem(cacheKey, JSON.stringify(cacheEntry));
       logger.log(`💾 [StreamCache] Saved stream cache for ${type}:${id}${episodeId ? `:${episodeId}` : ''}`);
       logger.log(`💾 [StreamCache] Cache key: ${cacheKey}`);
       logger.log(`💾 [StreamCache] Stream URL: ${stream.url}`);
@@ -78,7 +78,7 @@ class StreamCacheService {
       const cacheKey = this.getCacheKey(id, type, episodeId);
       logger.log(`🔍 [StreamCache] Looking for cached stream with key: ${cacheKey}`);
       
-      const cachedData = await AsyncStorage.getItem(cacheKey);
+      const cachedData = await mmkvStorage.getItem(cacheKey);
       
       if (!cachedData) {
         logger.log(`❌ [StreamCache] No cached data found for ${type}:${id}${episodeId ? `:${episodeId}` : ''}`);
@@ -116,7 +116,7 @@ class StreamCacheService {
   async removeCachedStream(id: string, type: string, episodeId?: string): Promise<void> {
     try {
       const cacheKey = this.getCacheKey(id, type, episodeId);
-      await AsyncStorage.removeItem(cacheKey);
+      await mmkvStorage.removeItem(cacheKey);
       logger.log(`🗑️ [StreamCache] Removed cached stream for ${type}:${id}${episodeId ? `:${episodeId}` : ''}`);
     } catch (error) {
       logger.warn('[StreamCache] Failed to remove cached stream:', error);
@@ -128,11 +128,11 @@ class StreamCacheService {
    */
   async clearAllCachedStreams(): Promise<void> {
     try {
-      const allKeys = await AsyncStorage.getAllKeys();
+      const allKeys = await mmkvStorage.getAllKeys();
       const cacheKeys = allKeys.filter(key => key.startsWith(CACHE_KEY_PREFIX));
       
       for (const key of cacheKeys) {
-        await AsyncStorage.removeItem(key);
+        await mmkvStorage.removeItem(key);
       }
       
       logger.log(`🧹 [StreamCache] Cleared ${cacheKeys.length} cached streams`);
@@ -174,7 +174,7 @@ class StreamCacheService {
    */
   async getCacheInfo(): Promise<{ totalCached: number; expiredCount: number; validCount: number }> {
     try {
-      const allKeys = await AsyncStorage.getAllKeys();
+      const allKeys = await mmkvStorage.getAllKeys();
       const cacheKeys = allKeys.filter((key: string) => key.startsWith(CACHE_KEY_PREFIX));
       
       let expiredCount = 0;
@@ -183,7 +183,7 @@ class StreamCacheService {
 
       for (const key of cacheKeys) {
         try {
-          const cachedData = await AsyncStorage.getItem(key);
+          const cachedData = await mmkvStorage.getItem(key);
           if (cachedData) {
             const cacheEntry: StreamCacheEntry = JSON.parse(cachedData);
             if (now > cacheEntry.expiresAt) {

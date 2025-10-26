@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from './mmkvStorage';
 import axios from 'axios';
 import { Platform } from 'react-native';
 import { logger } from '../utils/logger';
@@ -101,13 +101,13 @@ class LocalScraperService {
 
     try {
       // Load repositories
-      const repositoriesData = await AsyncStorage.getItem(this.REPOSITORIES_KEY);
+      const repositoriesData = await mmkvStorage.getItem(this.REPOSITORIES_KEY);
       if (repositoriesData) {
         const repos = JSON.parse(repositoriesData);
         this.repositories = new Map(Object.entries(repos));
       } else {
         // Migrate from old single repository format or create default tapframe repository
-        const storedRepoUrl = await AsyncStorage.getItem(this.REPOSITORY_KEY);
+        const storedRepoUrl = await mmkvStorage.getItem(this.REPOSITORY_KEY);
         if (storedRepoUrl) {
           const defaultRepo: RepositoryInfo = {
             id: 'default',
@@ -127,7 +127,7 @@ class LocalScraperService {
       }
 
       // Load current repository
-      const currentRepoId = await AsyncStorage.getItem('current-repository-id');
+      const currentRepoId = await mmkvStorage.getItem('current-repository-id');
       if (currentRepoId && this.repositories.has(currentRepoId)) {
         this.currentRepositoryId = currentRepoId;
         const currentRepo = this.repositories.get(currentRepoId)!;
@@ -142,7 +142,7 @@ class LocalScraperService {
       }
 
       // Load installed scrapers
-      const storedScrapers = await AsyncStorage.getItem(this.STORAGE_KEY);
+      const storedScrapers = await mmkvStorage.getItem(this.STORAGE_KEY);
       if (storedScrapers) {
         const scrapers: ScraperInfo[] = JSON.parse(storedScrapers);
         const validScrapers: ScraperInfo[] = [];
@@ -194,14 +194,14 @@ class LocalScraperService {
         // Save cleaned scrapers back to storage if any were filtered out
         if (validScrapers.length !== scrapers.length) {
           logger.log('[LocalScraperService] Cleaned up invalid scrapers, saving valid ones');
-          await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(validScrapers));
+          await mmkvStorage.setItem(this.STORAGE_KEY, JSON.stringify(validScrapers));
           
           // Clean up cached code for removed scrapers
           const validScraperIds = new Set(validScrapers.map(s => s.id));
           const removedScrapers = scrapers.filter(s => s.id && !validScraperIds.has(s.id));
           for (const removedScraper of removedScrapers) {
             try {
-              await AsyncStorage.removeItem(`scraper-code-${removedScraper.id}`);
+              await mmkvStorage.removeItem(`scraper-code-${removedScraper.id}`);
               logger.log('[LocalScraperService] Removed cached code for invalid scraper:', removedScraper.id);
             } catch (error) {
               logger.error('[LocalScraperService] Failed to remove cached code for', removedScraper.id, ':', error);
@@ -244,7 +244,7 @@ class LocalScraperService {
   // Set repository URL
   async setRepositoryUrl(url: string): Promise<void> {
     this.repositoryUrl = url;
-    await AsyncStorage.setItem(this.REPOSITORY_KEY, url);
+    await mmkvStorage.setItem(this.REPOSITORY_KEY, url);
     logger.log('[LocalScraperService] Repository URL set to:', url);
   }
 
@@ -328,7 +328,7 @@ class LocalScraperService {
       } else {
         // No repositories left, clear current repository
         this.currentRepositoryId = '';
-        await AsyncStorage.removeItem('current-repository-id');
+        await mmkvStorage.removeItem('current-repository-id');
       }
     }
     
@@ -340,7 +340,7 @@ class LocalScraperService {
     for (const scraperId of scrapersToRemove) {
       this.installedScrapers.delete(scraperId);
       this.scraperCode.delete(scraperId);
-      await AsyncStorage.removeItem(`scraper-code-${scraperId}`);
+      await mmkvStorage.removeItem(`scraper-code-${scraperId}`);
     }
     
     this.repositories.delete(id);
@@ -360,7 +360,7 @@ class LocalScraperService {
     this.repositoryUrl = repo.url;
     this.repositoryName = repo.name;
     
-    await AsyncStorage.setItem('current-repository-id', id);
+    await mmkvStorage.setItem('current-repository-id', id);
     
     // Refresh the repository to get its scrapers
     try {
@@ -450,7 +450,7 @@ class LocalScraperService {
 
   private async saveRepositories(): Promise<void> {
     const reposObject = Object.fromEntries(this.repositories);
-    await AsyncStorage.setItem(this.REPOSITORIES_KEY, JSON.stringify(reposObject));
+    await mmkvStorage.setItem(this.REPOSITORIES_KEY, JSON.stringify(reposObject));
   }
 
 
@@ -504,7 +504,7 @@ class LocalScraperService {
         const scraper = this.installedScrapers.get(scraperId);
         if (scraper && scraper.repositoryId === this.currentRepositoryId) {
           this.scraperCode.delete(scraperId);
-          await AsyncStorage.removeItem(`scraper-code-${scraperId}`);
+          await mmkvStorage.removeItem(`scraper-code-${scraperId}`);
           logger.log('[LocalScraperService] Cleared cached code for scraper:', scraper.name);
         }
       }
@@ -551,7 +551,7 @@ class LocalScraperService {
           this.installedScrapers.delete(scraperId);
           this.scraperCode.delete(scraperId);
           // Remove from AsyncStorage cache
-          await AsyncStorage.removeItem(`scraper-code-${scraperId}`);
+          await mmkvStorage.removeItem(`scraper-code-${scraperId}`);
         }
       }
       
@@ -571,7 +571,7 @@ class LocalScraperService {
             logger.log('[LocalScraperService] Removing platform-incompatible scraper:', scraperInfo.name);
             this.installedScrapers.delete(scraperInfo.id);
             this.scraperCode.delete(scraperInfo.id);
-            await AsyncStorage.removeItem(`scraper-code-${scraperInfo.id}`);
+            await mmkvStorage.removeItem(`scraper-code-${scraperInfo.id}`);
           }
         }
       }
@@ -675,7 +675,7 @@ class LocalScraperService {
   // Cache scraper code locally
   private async cacheScraperCode(scraperId: string, code: string): Promise<void> {
     try {
-      await AsyncStorage.setItem(`scraper-code-${scraperId}`, code);
+      await mmkvStorage.setItem(`scraper-code-${scraperId}`, code);
     } catch (error) {
       logger.error('[LocalScraperService] Failed to cache scraper code:', error);
     }
@@ -685,7 +685,7 @@ class LocalScraperService {
   private async loadScraperCode(): Promise<void> {
     for (const [scraperId] of this.installedScrapers) {
       try {
-        const cachedCode = await AsyncStorage.getItem(`scraper-code-${scraperId}`);
+        const cachedCode = await mmkvStorage.getItem(`scraper-code-${scraperId}`);
         if (cachedCode) {
           this.scraperCode.set(scraperId, cachedCode);
         }
@@ -699,7 +699,7 @@ class LocalScraperService {
   private async saveInstalledScrapers(): Promise<void> {
     try {
       const scrapers = Array.from(this.installedScrapers.values());
-      await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(scrapers));
+      await mmkvStorage.setItem(this.STORAGE_KEY, JSON.stringify(scrapers));
     } catch (error) {
       logger.error('[LocalScraperService] Failed to save scrapers:', error);
     }
@@ -716,7 +716,7 @@ class LocalScraperService {
     await this.ensureInitialized();
     try {
       if (!this.scraperSettingsCache) {
-        const raw = await AsyncStorage.getItem(this.SCRAPER_SETTINGS_KEY);
+        const raw = await mmkvStorage.getItem(this.SCRAPER_SETTINGS_KEY);
         this.scraperSettingsCache = raw ? JSON.parse(raw) : {};
       }
       const cache = this.scraperSettingsCache || {};
@@ -731,13 +731,13 @@ class LocalScraperService {
     await this.ensureInitialized();
     try {
       if (!this.scraperSettingsCache) {
-        const raw = await AsyncStorage.getItem(this.SCRAPER_SETTINGS_KEY);
+        const raw = await mmkvStorage.getItem(this.SCRAPER_SETTINGS_KEY);
         this.scraperSettingsCache = raw ? JSON.parse(raw) : {};
       }
       const cache = this.scraperSettingsCache || {};
       cache[scraperId] = settings || {};
       this.scraperSettingsCache = cache;
-      await AsyncStorage.setItem(this.SCRAPER_SETTINGS_KEY, JSON.stringify(cache));
+      await mmkvStorage.setItem(this.SCRAPER_SETTINGS_KEY, JSON.stringify(cache));
     } catch (error) {
       logger.error('[LocalScraperService] Failed to set scraper settings for', scraperId, error);
     }
@@ -1000,12 +1000,12 @@ class LocalScraperService {
     // This is a simplified sandbox - in production, you'd want more security
     try {
       // Get URL validation setting from AsyncStorage
-      const settingsData = await AsyncStorage.getItem('app_settings');
+      const settingsData = await mmkvStorage.getItem('app_settings');
       const settings = settingsData ? JSON.parse(settingsData) : {};
       const urlValidationEnabled = settings.enableScraperUrlValidation ?? true;
       
       // Load per-scraper settings for this run
-      const allScraperSettingsRaw = await AsyncStorage.getItem(this.SCRAPER_SETTINGS_KEY);
+      const allScraperSettingsRaw = await mmkvStorage.getItem(this.SCRAPER_SETTINGS_KEY);
       const allScraperSettings = allScraperSettingsRaw ? JSON.parse(allScraperSettingsRaw) : {};
       const perScraperSettings = (params && params.scraperId && allScraperSettings[params.scraperId]) ? allScraperSettings[params.scraperId] : (params?.settings || {});
       
@@ -1320,12 +1320,12 @@ class LocalScraperService {
     this.scraperCode.clear();
     
     // Clear from storage
-    await AsyncStorage.removeItem(this.STORAGE_KEY);
+    await mmkvStorage.removeItem(this.STORAGE_KEY);
     
     // Clear cached code
-    const keys = await AsyncStorage.getAllKeys();
+    const keys = await mmkvStorage.getAllKeys();
     const scraperCodeKeys = keys.filter(key => key.startsWith('scraper-code-'));
-    await AsyncStorage.multiRemove(scraperCodeKeys);
+    await mmkvStorage.multiRemove(scraperCodeKeys);
     
     logger.log('[LocalScraperService] All scrapers cleared');
   }
@@ -1383,9 +1383,9 @@ class LocalScraperService {
       }
 
       // Get user settings from AsyncStorage (scoped with fallback)
-      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
-      const scopedSettingsJson = await AsyncStorage.getItem(`@user:${scope}:app_settings`);
-      const legacySettingsJson = await AsyncStorage.getItem('app_settings');
+      const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
+      const scopedSettingsJson = await mmkvStorage.getItem(`@user:${scope}:app_settings`);
+      const legacySettingsJson = await mmkvStorage.getItem('app_settings');
       const settingsData = scopedSettingsJson || legacySettingsJson;
       const settings = settingsData ? JSON.parse(settingsData) : {};
 

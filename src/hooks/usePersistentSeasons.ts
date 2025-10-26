@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { logger } from '../utils/logger';
 
 const SEASONS_STORAGE_KEY = 'selected_seasons';
@@ -27,7 +27,7 @@ export function usePersistentSeasons() {
 
     setIsLoading(true);
     try {
-      const savedSeasonsJson = await AsyncStorage.getItem(SEASONS_STORAGE_KEY);
+      const savedSeasonsJson = await mmkvStorage.getItem(SEASONS_STORAGE_KEY);
       const loadedSeasons = savedSeasonsJson ? JSON.parse(savedSeasonsJson) : {};
       setSelectedSeasons(loadedSeasons);
       // Update cache
@@ -63,7 +63,7 @@ export function usePersistentSeasons() {
       setSelectedSeasons(updatedSeasons);
       
       // Save to AsyncStorage
-      await AsyncStorage.setItem(SEASONS_STORAGE_KEY, JSON.stringify(updatedSeasons));
+      await mmkvStorage.setItem(SEASONS_STORAGE_KEY, JSON.stringify(updatedSeasons));
     } catch (error) {
       logger.error('Failed to save selected season:', error);
     }

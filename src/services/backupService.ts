@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from './mmkvStorage';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
 import { logger } from '../utils/logger';
@@ -373,7 +373,7 @@ export class BackupService {
   // Private helper methods for data collection
   private async getUserScope(): Promise<string> {
     try {
-      const scope = await AsyncStorage.getItem('@user:current');
+      const scope = await mmkvStorage.getItem('@user:current');
       return scope || 'local';
     } catch {
       return 'local';
@@ -384,7 +384,7 @@ export class BackupService {
     try {
       const scope = await this.getUserScope();
       const scopedKey = `@user:${scope}:app_settings`;
-      const settingsJson = await AsyncStorage.getItem(scopedKey);
+      const settingsJson = await mmkvStorage.getItem(scopedKey);
       return settingsJson ? JSON.parse(settingsJson) : DEFAULT_SETTINGS;
     } catch (error) {
       logger.error('[BackupService] Failed to get settings:', error);
@@ -396,7 +396,7 @@ export class BackupService {
     try {
       const scope = await this.getUserScope();
       const scopedKey = `@user:${scope}:stremio-library`;
-      const libraryJson = await AsyncStorage.getItem(scopedKey);
+      const libraryJson = await mmkvStorage.getItem(scopedKey);
       if (libraryJson) {
         const parsed = JSON.parse(libraryJson);
         return Array.isArray(parsed) ? parsed : Object.values(parsed);
@@ -411,14 +411,14 @@ export class BackupService {
   private async getWatchProgress(): Promise<Record<string, any>> {
     try {
       const scope = await this.getUserScope();
-      const allKeys = await AsyncStorage.getAllKeys();
+      const allKeys = await mmkvStorage.getAllKeys();
       const watchProgressKeys = allKeys.filter(key => 
         key.startsWith(`@user:${scope}:@watch_progress:`)
       );
       
       const watchProgress: Record<string, any> = {};
       if (watchProgressKeys.length > 0) {
-        const pairs = await AsyncStorage.multiGet(watchProgressKeys);
+        const pairs = await mmkvStorage.multiGet(watchProgressKeys);
         for (const [key, value] of pairs) {
           if (value) {
             watchProgress[key] = JSON.parse(value);
@@ -436,7 +436,7 @@ export class BackupService {
     try {
       const scope = await this.getUserScope();
       const scopedKey = `@user:${scope}:stremio-addons`;
-      const addonsJson = await AsyncStorage.getItem(scopedKey);
+      const addonsJson = await mmkvStorage.getItem(scopedKey);
       return addonsJson ? JSON.parse(addonsJson) : [];
     } catch (error) {
       logger.error('[BackupService] Failed to get addons:', error);
@@ -446,7 +446,7 @@ export class BackupService {
 
   private async getDownloads(): Promise<DownloadItem[]> {
     try {
-      const downloadsJson = await AsyncStorage.getItem('downloads_state_v1');
+      const downloadsJson = await mmkvStorage.getItem('downloads_state_v1');
       return downloadsJson ? JSON.parse(downloadsJson) : [];
     } catch (error) {
       logger.error('[BackupService] Failed to get downloads:', error);
@@ -458,11 +458,11 @@ export class BackupService {
     try {
       const scope = await this.getUserScope();
       const scopedKey = `@user:${scope}:@subtitle_settings`;
-      const subtitlesJson = await AsyncStorage.getItem(scopedKey);
+      const subtitlesJson = await mmkvStorage.getItem(scopedKey);
       let subtitleSettings = subtitlesJson ? JSON.parse(subtitlesJson) : {};
       
       // Also check for legacy subtitle size preference
-      const legacySubtitleSize = await AsyncStorage.getItem('@subtitle_size_preference');
+      const legacySubtitleSize = await mmkvStorage.getItem('@subtitle_size_preference');
       if (legacySubtitleSize && !subtitleSettings.subtitleSize) {
         const legacySize = parseInt(legacySubtitleSize, 10);
         if (!Number.isNaN(legacySize) && legacySize > 0) {
@@ -481,7 +481,7 @@ export class BackupService {
     try {
       const scope = await this.getUserScope();
       const scopedKey = `@user:${scope}:@wp_tombstones`;
-      const tombstonesJson = await AsyncStorage.getItem(scopedKey);
+      const tombstonesJson = await mmkvStorage.getItem(scopedKey);
       return tombstonesJson ? JSON.parse(tombstonesJson) : {};
     } catch (error) {
       logger.error('[BackupService] Failed to get tombstones:', error);
@@ -493,7 +493,7 @@ export class BackupService {
     try {
       const scope = await this.getUserScope();
       const scopedKey = `@user:${scope}:@continue_watching_removed`;
-      const removedJson = await AsyncStorage.getItem(scopedKey);
+      const removedJson = await mmkvStorage.getItem(scopedKey);
       return removedJson ? JSON.parse(removedJson) : {};
     } catch (error) {
       logger.error('[BackupService] Failed to get continue watching removed:', error);
@@ -504,14 +504,14 @@ export class BackupService {
   private async getContentDuration(): Promise<Record<string, number>> {
     try {
       const scope = await this.getUserScope();
-      const allKeys = await AsyncStorage.getAllKeys();
+      const allKeys = await mmkvStorage.getAllKeys();
       const durationKeys = allKeys.filter(key => 
         key.startsWith(`@user:${scope}:@content_duration:`)
       );
       
       const contentDuration: Record<string, number> = {};
       if (durationKeys.length > 0) {
-        const pairs = await AsyncStorage.multiGet(durationKeys);
+        const pairs = await mmkvStorage.multiGet(durationKeys);
         for (const [key, value] of pairs) {
           if (value) {
             contentDuration[key] = JSON.parse(value);
@@ -527,7 +527,7 @@ export class BackupService {
 
   private async getSyncQueue(): Promise<any[]> {
     try {
-      const syncQueueJson = await AsyncStorage.getItem('@sync_queue');
+      const syncQueueJson = await mmkvStorage.getItem('@sync_queue');
       return syncQueueJson ? JSON.parse(syncQueueJson) : [];
     } catch (error) {
       logger.error('[BackupService] Failed to get sync queue:', error);
@@ -538,7 +538,7 @@ export class BackupService {
   private async getTraktSettings(): Promise<any> {
     try {
       // Get general Trakt settings
-      const traktSettingsJson = await AsyncStorage.getItem('trakt_settings');
+      const traktSettingsJson = await mmkvStorage.getItem('trakt_settings');
       const traktSettings = traktSettingsJson ? JSON.parse(traktSettingsJson) : {};
       
       // Get authentication tokens
@@ -550,12 +550,12 @@ export class BackupService {
         syncFrequency,
         completionThreshold
       ] = await Promise.all([
-        AsyncStorage.getItem('trakt_access_token'),
-        AsyncStorage.getItem('trakt_refresh_token'),
-        AsyncStorage.getItem('trakt_token_expiry'),
-        AsyncStorage.getItem('trakt_autosync_enabled'),
-        AsyncStorage.getItem('trakt_sync_frequency'),
-        AsyncStorage.getItem('trakt_completion_threshold')
+        mmkvStorage.getItem('trakt_access_token'),
+        mmkvStorage.getItem('trakt_refresh_token'),
+        mmkvStorage.getItem('trakt_token_expiry'),
+        mmkvStorage.getItem('trakt_autosync_enabled'),
+        mmkvStorage.getItem('trakt_sync_frequency'),
+        mmkvStorage.getItem('trakt_completion_threshold')
       ]);
       
       return {
@@ -583,21 +583,21 @@ export class BackupService {
   private async getLocalScrapers(): Promise<any> {
     try {
       // Get main scraper configurations
-      const localScrapersJson = await AsyncStorage.getItem('local-scrapers');
+      const localScrapersJson = await mmkvStorage.getItem('local-scrapers');
 
       // Get repository settings
-      const repoUrl = await AsyncStorage.getItem('scraper-repository-url');
-      const repositories = await AsyncStorage.getItem('scraper-repositories');
-      const currentRepo = await AsyncStorage.getItem('current-repository-id');
-      const scraperSettings = await AsyncStorage.getItem('scraper-settings');
+      const repoUrl = await mmkvStorage.getItem('scraper-repository-url');
+      const repositories = await mmkvStorage.getItem('scraper-repositories');
+      const currentRepo = await mmkvStorage.getItem('current-repository-id');
+      const scraperSettings = await mmkvStorage.getItem('scraper-settings');
 
       // Get all scraper code cache keys
-      const allKeys = await AsyncStorage.getAllKeys();
+      const allKeys = await mmkvStorage.getAllKeys();
       const scraperCodeKeys = allKeys.filter(key => key.startsWith('scraper-code-'));
       const scraperCode: Record<string, string> = {};
 
       if (scraperCodeKeys.length > 0) {
-        const codePairs = await AsyncStorage.multiGet(scraperCodeKeys);
+        const codePairs = await mmkvStorage.multiGet(scraperCodeKeys);
         for (const [key, value] of codePairs) {
           if (value) {
             scraperCode[key] = value;
@@ -622,8 +622,8 @@ export class BackupService {
   private async getApiKeys(): Promise<{ mdblistApiKey?: string; openRouterApiKey?: string }> {
     try {
       const [mdblistKey, openRouterKey] = await Promise.all([
-        AsyncStorage.getItem('mdblist_api_key'),
-        AsyncStorage.getItem('openrouter_api_key')
+        mmkvStorage.getItem('mdblist_api_key'),
+        mmkvStorage.getItem('openrouter_api_key')
       ]);
       
       return {
@@ -638,7 +638,7 @@ export class BackupService {
 
   private async getCatalogSettings(): Promise<any> {
     try {
-      const catalogSettingsJson = await AsyncStorage.getItem('catalog_settings');
+      const catalogSettingsJson = await mmkvStorage.getItem('catalog_settings');
       return catalogSettingsJson ? JSON.parse(catalogSettingsJson) : null;
     } catch (error) {
       logger.error('[BackupService] Failed to get catalog settings:', error);
@@ -653,9 +653,9 @@ export class BackupService {
       
       // Try scoped key first, then legacy keys
       const [scopedOrder, legacyOrder, localOrder] = await Promise.all([
-        AsyncStorage.getItem(scopedKey),
-        AsyncStorage.getItem('stremio-addon-order'),
-        AsyncStorage.getItem('@user:local:stremio-addon-order')
+        mmkvStorage.getItem(scopedKey),
+        mmkvStorage.getItem('stremio-addon-order'),
+        mmkvStorage.getItem('@user:local:stremio-addon-order')
       ]);
       
       const orderJson = scopedOrder || legacyOrder || localOrder;
@@ -668,7 +668,7 @@ export class BackupService {
 
   private async getRemovedAddons(): Promise<string[]> {
     try {
-      const removedAddonsJson = await AsyncStorage.getItem('user_removed_addons');
+      const removedAddonsJson = await mmkvStorage.getItem('user_removed_addons');
       return removedAddonsJson ? JSON.parse(removedAddonsJson) : [];
     } catch (error) {
       logger.error('[BackupService] Failed to get removed addons:', error);
@@ -678,7 +678,7 @@ export class BackupService {
 
   private async getGlobalSeasonViewMode(): Promise<string | undefined> {
     try {
-      const mode = await AsyncStorage.getItem('global_season_view_mode');
+      const mode = await mmkvStorage.getItem('global_season_view_mode');
       return mode || undefined;
     } catch (error) {
       logger.error('[BackupService] Failed to get global season view mode:', error);
@@ -688,7 +688,7 @@ export class BackupService {
 
   private async getHasCompletedOnboarding(): Promise<boolean | undefined> {
     try {
-      const value = await AsyncStorage.getItem('hasCompletedOnboarding');
+      const value = await mmkvStorage.getItem('hasCompletedOnboarding');
       return value === 'true' ? true : value === 'false' ? false : undefined;
     } catch (error) {
       logger.error('[BackupService] Failed to get has completed onboarding:', error);
@@ -698,7 +698,7 @@ export class BackupService {
 
   private async getShowLoginHintToastOnce(): Promise<boolean | undefined> {
     try {
-      const value = await AsyncStorage.getItem('showLoginHintToastOnce');
+      const value = await mmkvStorage.getItem('showLoginHintToastOnce');
       return value === 'true' ? true : value === 'false' ? false : undefined;
     } catch (error) {
       logger.error('[BackupService] Failed to get show login hint toast once:', error);
@@ -711,7 +711,7 @@ export class BackupService {
     try {
       const scope = await this.getUserScope();
       const scopedKey = `@user:${scope}:app_settings`;
-      await AsyncStorage.setItem(scopedKey, JSON.stringify(settings));
+      await mmkvStorage.setItem(scopedKey, JSON.stringify(settings));
       logger.info('[BackupService] Settings restored');
     } catch (error) {
       logger.error('[BackupService] Failed to restore settings:', error);
@@ -722,7 +722,7 @@ export class BackupService {
     try {
       const scope = await this.getUserScope();
       const scopedKey = `@user:${scope}:stremio-library`;
-      await AsyncStorage.setItem(scopedKey, JSON.stringify(library));
+      await mmkvStorage.setItem(scopedKey, JSON.stringify(library));
       logger.info('[BackupService] Library restored');
     } catch (error) {
       logger.error('[BackupService] Failed to restore library:', error);
@@ -732,7 +732,7 @@ export class BackupService {
   private async restoreWatchProgress(watchProgress: Record<string, any>): Promise<void> {
     try {
       const pairs: [string, string][] = Object.entries(watchProgress).map(([key, value]) => [key, JSON.stringify(value)]);
-      await AsyncStorage.multiSet(pairs);
+      await mmkvStorage.multiSet(pairs);
       logger.info('[BackupService] Watch progress restored');
     } catch (error) {
       logger.error('[BackupService] Failed to restore watch progress:', error);
@@ -743,7 +743,7 @@ export class BackupService {
     try {
       const scope = await this.getUserScope();
       const scopedKey = `@user:${scope}:stremio-addons`;
-      await AsyncStorage.setItem(scopedKey, JSON.stringify(addons));
+      await mmkvStorage.setItem(scopedKey, JSON.stringify(addons));
       logger.info('[BackupService] Addons restored');
     } catch (error) {
       logger.error('[BackupService] Failed to restore addons:', error);
@@ -752,7 +752,7 @@ export class BackupService {
 
   private async restoreDownloads(downloads: DownloadItem[]): Promise<void> {
     try {
-      await AsyncStorage.setItem('downloads_state_v1', JSON.stringify(downloads));
+      await mmkvStorage.setItem('downloads_state_v1', JSON.stringify(downloads));
       logger.info('[BackupService] Downloads restored');
     } catch (error) {
       logger.error('[BackupService] Failed to restore downloads:', error);
@@ -763,11 +763,11 @@ export class BackupService {
     try {
       const scope = await this.getUserScope();
       const scopedKey = `@user:${scope}:@subtitle_settings`;
-      await AsyncStorage.setItem(scopedKey, JSON.stringify(subtitles));
+      await mmkvStorage.setItem(scopedKey, JSON.stringify(subtitles));
       
       // Also restore legacy subtitle size preference for backward compatibility
       if (subtitles && typeof subtitles.subtitleSize === 'number') {
-        await AsyncStorage.setItem('@subtitle_size_preference', subtitles.subtitleSize.toString());
+        await mmkvStorage.setItem('@subtitle_size_preference', subtitles.subtitleSize.toString());
       }
       
       logger.info('[BackupService] Subtitle settings restored');
@@ -780,7 +780,7 @@ export class BackupService {
     try {
       const scope = await this.getUserScope();
       const scopedKey = `@user:${scope}:@wp_tombstones`;
-      await AsyncStorage.setItem(scopedKey, JSON.stringify(tombstones));
+      await mmkvStorage.setItem(scopedKey, JSON.stringify(tombstones));
       logger.info('[BackupService] Tombstones restored');
     } catch (error) {
       logger.error('[BackupService] Failed to restore tombstones:', error);
@@ -791,7 +791,7 @@ export class BackupService {
     try {
       const scope = await this.getUserScope();
       const scopedKey = `@user:${scope}:@continue_watching_removed`;
-      await AsyncStorage.setItem(scopedKey, JSON.stringify(removed));
+      await mmkvStorage.setItem(scopedKey, JSON.stringify(removed));
       logger.info('[BackupService] Continue watching removed restored');
     } catch (error) {
       logger.error('[BackupService] Failed to restore continue watching removed:', error);
@@ -801,7 +801,7 @@ export class BackupService {
   private async restoreContentDuration(contentDuration: Record<string, number>): Promise<void> {
     try {
       const pairs: [string, string][] = Object.entries(contentDuration).map(([key, value]) => [key, JSON.stringify(value)]);
-      await AsyncStorage.multiSet(pairs);
+      await mmkvStorage.multiSet(pairs);
       logger.info('[BackupService] Content duration restored');
     } catch (error) {
       logger.error('[BackupService] Failed to restore content duration:', error);
@@ -810,7 +810,7 @@ export class BackupService {
 
   private async restoreSyncQueue(syncQueue: any[]): Promise<void> {
     try {
-      await AsyncStorage.setItem('@sync_queue', JSON.stringify(syncQueue));
+      await mmkvStorage.setItem('@sync_queue', JSON.stringify(syncQueue));
       logger.info('[BackupService] Sync queue restored');
     } catch (error) {
       logger.error('[BackupService] Failed to restore sync queue:', error);
@@ -824,22 +824,22 @@ export class BackupService {
         const { authentication, autosync, ...generalSettings } = traktSettings;
         
         // Restore general settings
-        await AsyncStorage.setItem('trakt_settings', JSON.stringify(generalSettings));
+        await mmkvStorage.setItem('trakt_settings', JSON.stringify(generalSettings));
         
         // Restore authentication tokens if available
         if (authentication) {
           const tokenPromises = [];
           
           if (authentication.accessToken) {
-            tokenPromises.push(AsyncStorage.setItem('trakt_access_token', authentication.accessToken));
+            tokenPromises.push(mmkvStorage.setItem('trakt_access_token', authentication.accessToken));
           }
           
           if (authentication.refreshToken) {
-            tokenPromises.push(AsyncStorage.setItem('trakt_refresh_token', authentication.refreshToken));
+            tokenPromises.push(mmkvStorage.setItem('trakt_refresh_token', authentication.refreshToken));
           }
           
           if (authentication.tokenExpiry) {
-            tokenPromises.push(AsyncStorage.setItem('trakt_token_expiry', authentication.tokenExpiry.toString()));
+            tokenPromises.push(mmkvStorage.setItem('trakt_token_expiry', authentication.tokenExpiry.toString()));
           }
           
           await Promise.all(tokenPromises);
@@ -850,15 +850,15 @@ export class BackupService {
           const autosyncPromises = [];
           
           if (autosync.enabled !== undefined) {
-            autosyncPromises.push(AsyncStorage.setItem('trakt_autosync_enabled', JSON.stringify(autosync.enabled)));
+            autosyncPromises.push(mmkvStorage.setItem('trakt_autosync_enabled', JSON.stringify(autosync.enabled)));
           }
           
           if (autosync.frequency !== undefined) {
-            autosyncPromises.push(AsyncStorage.setItem('trakt_sync_frequency', autosync.frequency.toString()));
+            autosyncPromises.push(mmkvStorage.setItem('trakt_sync_frequency', autosync.frequency.toString()));
           }
           
           if (autosync.completionThreshold !== undefined) {
-            autosyncPromises.push(AsyncStorage.setItem('trakt_completion_threshold', autosync.completionThreshold.toString()));
+            autosyncPromises.push(mmkvStorage.setItem('trakt_completion_threshold', autosync.completionThreshold.toString()));
           }
           
           await Promise.all(autosyncPromises);
@@ -875,31 +875,31 @@ export class BackupService {
     try {
       // Restore main scraper configurations
       if (localScrapers.scrapers) {
-        await AsyncStorage.setItem('local-scrapers', JSON.stringify(localScrapers.scrapers));
+        await mmkvStorage.setItem('local-scrapers', JSON.stringify(localScrapers.scrapers));
       }
 
       // Restore repository settings
       if (localScrapers.repositoryUrl) {
-        await AsyncStorage.setItem('scraper-repository-url', localScrapers.repositoryUrl);
+        await mmkvStorage.setItem('scraper-repository-url', localScrapers.repositoryUrl);
       }
 
       if (localScrapers.repositories) {
-        await AsyncStorage.setItem('scraper-repositories', JSON.stringify(localScrapers.repositories));
+        await mmkvStorage.setItem('scraper-repositories', JSON.stringify(localScrapers.repositories));
       }
 
       if (localScrapers.currentRepository) {
-        await AsyncStorage.setItem('current-repository-id', localScrapers.currentRepository);
+        await mmkvStorage.setItem('current-repository-id', localScrapers.currentRepository);
       }
 
       if (localScrapers.scraperSettings) {
-        await AsyncStorage.setItem('scraper-settings', JSON.stringify(localScrapers.scraperSettings));
+        await mmkvStorage.setItem('scraper-settings', JSON.stringify(localScrapers.scraperSettings));
       }
 
       // Restore scraper code cache
       if (localScrapers.scraperCode && typeof localScrapers.scraperCode === 'object') {
         const codePairs: [string, string][] = Object.entries(localScrapers.scraperCode).map(([key, value]) => [key, value as string]);
         if (codePairs.length > 0) {
-          await AsyncStorage.multiSet(codePairs);
+          await mmkvStorage.multiSet(codePairs);
         }
       }
 
@@ -914,11 +914,11 @@ export class BackupService {
       const setPromises: Promise<void>[] = [];
       
       if (apiKeys.mdblistApiKey) {
-        setPromises.push(AsyncStorage.setItem('mdblist_api_key', apiKeys.mdblistApiKey));
+        setPromises.push(mmkvStorage.setItem('mdblist_api_key', apiKeys.mdblistApiKey));
       }
       
       if (apiKeys.openRouterApiKey) {
-        setPromises.push(AsyncStorage.setItem('openrouter_api_key', apiKeys.openRouterApiKey));
+        setPromises.push(mmkvStorage.setItem('openrouter_api_key', apiKeys.openRouterApiKey));
       }
       
       await Promise.all(setPromises);
@@ -930,7 +930,7 @@ export class BackupService {
 
   private async restoreCatalogSettings(catalogSettings: any): Promise<void> {
     try {
-      await AsyncStorage.setItem('catalog_settings', JSON.stringify(catalogSettings));
+      await mmkvStorage.setItem('catalog_settings', JSON.stringify(catalogSettings));
       logger.info('[BackupService] Catalog settings restored');
     } catch (error) {
       logger.error('[BackupService] Failed to restore catalog settings:', error);
@@ -944,8 +944,8 @@ export class BackupService {
       
       // Restore to both scoped and legacy keys for compatibility
       await Promise.all([
-        AsyncStorage.setItem(scopedKey, JSON.stringify(addonOrder)),
-        AsyncStorage.setItem('stremio-addon-order', JSON.stringify(addonOrder))
+        mmkvStorage.setItem(scopedKey, JSON.stringify(addonOrder)),
+        mmkvStorage.setItem('stremio-addon-order', JSON.stringify(addonOrder))
       ]);
       
       logger.info('[BackupService] Addon order restored');
@@ -956,7 +956,7 @@ export class BackupService {
 
   private async restoreRemovedAddons(removedAddons: string[]): Promise<void> {
     try {
-      await AsyncStorage.setItem('user_removed_addons', JSON.stringify(removedAddons));
+      await mmkvStorage.setItem('user_removed_addons', JSON.stringify(removedAddons));
       logger.info('[BackupService] Removed addons restored');
     } catch (error) {
       logger.error('[BackupService] Failed to restore removed addons:', error);
@@ -965,7 +965,7 @@ export class BackupService {
 
   private async restoreGlobalSeasonViewMode(mode: string): Promise<void> {
     try {
-      await AsyncStorage.setItem('global_season_view_mode', mode);
+      await mmkvStorage.setItem('global_season_view_mode', mode);
       logger.info('[BackupService] Global season view mode restored');
     } catch (error) {
       logger.error('[BackupService] Failed to restore global season view mode:', error);
@@ -974,7 +974,7 @@ export class BackupService {
 
   private async restoreHasCompletedOnboarding(value: boolean): Promise<void> {
     try {
-      await AsyncStorage.setItem('hasCompletedOnboarding', value.toString());
+      await mmkvStorage.setItem('hasCompletedOnboarding', value.toString());
       logger.info('[BackupService] Has completed onboarding restored');
     } catch (error) {
       logger.error('[BackupService] Failed to restore has completed onboarding:', error);
@@ -983,7 +983,7 @@ export class BackupService {
 
   private async restoreShowLoginHintToastOnce(value: boolean): Promise<void> {
     try {
-      await AsyncStorage.setItem('showLoginHintToastOnce', value.toString());
+      await mmkvStorage.setItem('showLoginHintToastOnce', value.toString());
       logger.info('[BackupService] Show login hint toast once restored');
     } catch (error) {
       logger.error('[BackupService] Failed to restore show login hint toast once:', error);

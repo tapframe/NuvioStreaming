@@ -27,7 +27,7 @@ import Animated, {
 import { useTheme } from '../contexts/ThemeContext';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 
 const { width, height } = Dimensions.get('window');
 
@@ -125,8 +125,8 @@ const OnboardingScreen = () => {
     // Skip login: proceed to app and show a one-time hint toast
     (async () => {
       try {
-        await AsyncStorage.setItem('hasCompletedOnboarding', 'true');
-        await AsyncStorage.setItem('showLoginHintToastOnce', 'true');
+        await mmkvStorage.setItem('hasCompletedOnboarding', 'true');
+        await mmkvStorage.setItem('showLoginHintToastOnce', 'true');
       } catch {}
       navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
     })();
@@ -134,7 +134,7 @@ const OnboardingScreen = () => {
 
   const handleGetStarted = async () => {
     try {
-      await AsyncStorage.setItem('hasCompletedOnboarding', 'true');
+      await mmkvStorage.setItem('hasCompletedOnboarding', 'true');
       // After onboarding, go directly to main app
       navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
     } catch (error) {

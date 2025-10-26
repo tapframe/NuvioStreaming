@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from './mmkvStorage';
 
 export interface ChatMessage {
   id: string;
@@ -112,7 +112,7 @@ class AIService {
 
   async initialize(): Promise<boolean> {
     try {
-      this.apiKey = await AsyncStorage.getItem('openrouter_api_key');
+      this.apiKey = await mmkvStorage.getItem('openrouter_api_key');
       return !!this.apiKey;
     } catch (error) {
       if (__DEV__) console.error('Failed to initialize AI service:', error);

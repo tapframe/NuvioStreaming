@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { DeviceEventEmitter } from 'react-native';
 import { Share } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { useToast } from '../contexts/ToastContext';
 import DropUpMenu from '../components/home/DropUpMenu';
 import {
@@ -289,7 +289,7 @@ const LibraryScreen = () => {
             traktId: typeof (item as any).traktId === 'number' ? (item as any).traktId : 0,
           };
           const key = `watched:${item.type}:${item.id}`;
-          const watched = await AsyncStorage.getItem(key);
+          const watched = await mmkvStorage.getItem(key);
           return {
             ...libraryItem,
             watched: watched === 'true'
@@ -323,7 +323,7 @@ const LibraryScreen = () => {
           traktId: typeof (item as any).traktId === 'number' ? (item as any).traktId : 0,
         };
         const key = `watched:${item.type}:${item.id}`;
-        const watched = await AsyncStorage.getItem(key);
+        const watched = await mmkvStorage.getItem(key);
         return {
           ...libraryItem,
           watched: watched === 'true'
@@ -1008,7 +1008,7 @@ const LibraryScreen = () => {
                 // Use AsyncStorage to store watched status by key
                 const key = `watched:${selectedItem.type}:${selectedItem.id}`;
                 const newWatched = !selectedItem.watched;
-                await AsyncStorage.setItem(key, newWatched ? 'true' : 'false');
+                await mmkvStorage.setItem(key, newWatched ? 'true' : 'false');
                 showInfo(newWatched ? 'Marked as Watched' : 'Marked as Unwatched', newWatched ? 'Item marked as watched' : 'Item marked as unwatched');
                 // Instantly update local state
                 setLibraryItems(prev => prev.map(item =>

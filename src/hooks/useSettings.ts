@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 
 // Simple event emitter for settings changes
 class SettingsEventEmitter {
@@ -168,11 +168,11 @@ export const useSettings = () => {
 
   const loadSettings = async () => {
     try {
-      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
       const scopedKey = `@user:${scope}:${SETTINGS_STORAGE_KEY}`;
       const [scopedJson, legacyJson] = await Promise.all([
-        AsyncStorage.getItem(scopedKey),
-        AsyncStorage.getItem(SETTINGS_STORAGE_KEY),
+        mmkvStorage.getItem(scopedKey),
+        mmkvStorage.getItem(SETTINGS_STORAGE_KEY),
       ]);
       const parsedScoped = scopedJson ? JSON.parse(scopedJson) : null;
       const parsedLegacy = legacyJson ? JSON.parse(legacyJson) : null;
@@ -182,10 +182,10 @@ export const useSettings = () => {
       // Fallback: scan any existing user-scoped settings if current scope not set yet
       if (!merged) {
         try {
-          const allKeys = await AsyncStorage.getAllKeys();
+          const allKeys = await mmkvStorage.getAllKeys();
           const candidateKeys = (allKeys || []).filter(k => k.endsWith(`:${SETTINGS_STORAGE_KEY}`));
           if (candidateKeys.length > 0) {
-            const pairs = await AsyncStorage.multiGet(candidateKeys);
+            const pairs = await mmkvStorage.multiGet(candidateKeys);
             for (const [, value] of pairs) {
               if (value) {
                 try {
@@ -221,15 +221,15 @@ export const useSettings = () => {
   ) => {
     const newSettings = { ...settings, [key]: value };
     try {
-      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
-      const scopedKey = `@user:${scope}:${SETTINGS_STORAGE_KEY}`;
-      // Write to both scoped key (multi-user aware) and legacy key for backward compatibility
-      await Promise.all([
-        AsyncStorage.setItem(scopedKey, JSON.stringify(newSettings)),
-        AsyncStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings)),
-      ]);
-      // Ensure a current scope exists to avoid future loads missing the chosen scope
-      await AsyncStorage.setItem('@user:current', scope);
+    const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
+    const scopedKey = `@user:${scope}:${SETTINGS_STORAGE_KEY}`;
+    // Write to both scoped key (multi-user aware) and legacy key for backward compatibility
+    await Promise.all([
+      mmkvStorage.setItem(scopedKey, JSON.stringify(newSettings)),
+      mmkvStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings)),
+    ]);
+    // Ensure a current scope exists to avoid future loads missing the chosen scope
+    await mmkvStorage.setItem('@user:current', scope);
       setSettings(newSettings);
       if (__DEV__) console.log(`Setting updated: ${key}`, value);
       

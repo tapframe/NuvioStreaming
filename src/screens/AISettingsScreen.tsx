@@ -14,7 +14,7 @@ import {
   Switch,
 } from 'react-native';
 import CustomAlert from '../components/CustomAlert';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
@@ -80,7 +80,7 @@ const AISettingsScreen: React.FC = () => {
 
   const loadApiKey = async () => {
     try {
-      const savedKey = await AsyncStorage.getItem('openrouter_api_key');
+      const savedKey = await mmkvStorage.getItem('openrouter_api_key');
       if (savedKey) {
         setApiKey(savedKey);
         setIsKeySet(true);
@@ -103,7 +103,7 @@ const AISettingsScreen: React.FC = () => {
 
     setLoading(true);
     try {
-      await AsyncStorage.setItem('openrouter_api_key', apiKey.trim());
+      await mmkvStorage.setItem('openrouter_api_key', apiKey.trim());
       setIsKeySet(true);
       openAlert('Success', 'OpenRouter API key saved successfully!');
     } catch (error) {
@@ -124,7 +124,7 @@ const AISettingsScreen: React.FC = () => {
           label: 'Remove',
           onPress: async () => {
             try {
-              await AsyncStorage.removeItem('openrouter_api_key');
+              await mmkvStorage.removeItem('openrouter_api_key');
               setApiKey('');
               setIsKeySet(false);
               openAlert('Success', 'API key removed successfully');

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Platform } from 'react-native';
 import { toastService } from '../services/toastService';
 import UpdateService, { UpdateInfo } from '../services/updateService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 
 interface UseUpdatePopupReturn {
   showUpdatePopup: boolean;
@@ -30,7 +30,7 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
     try {
 
       // Check if user has dismissed the popup for this version
-      const dismissedVersion = await AsyncStorage.getItem(UPDATE_POPUP_STORAGE_KEY);
+      const dismissedVersion = await mmkvStorage.getItem(UPDATE_POPUP_STORAGE_KEY);
       const currentVersion = updateInfo.manifest?.id;
 
       if (dismissedVersion === currentVersion && !forceCheck) {
@@ -38,7 +38,7 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
       }
 
       // Check if user chose "later" recently (within 6 hours)
-      const updateLaterTimestamp = await AsyncStorage.getItem(UPDATE_LATER_STORAGE_KEY);
+      const updateLaterTimestamp = await mmkvStorage.getItem(UPDATE_LATER_STORAGE_KEY);
       if (updateLaterTimestamp && !forceCheck) {
         const laterTime = parseInt(updateLaterTimestamp);
         const now = Date.now();
@@ -91,7 +91,7 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
   const handleUpdateLater = useCallback(async () => {
     try {
       // Store timestamp when user chose "later"
-      await AsyncStorage.setItem(UPDATE_LATER_STORAGE_KEY, Date.now().toString());
+      await mmkvStorage.setItem(UPDATE_LATER_STORAGE_KEY, Date.now().toString());
       setShowUpdatePopup(false);
     } catch (error) {
       if (__DEV__) console.error('Error storing update later preference:', error);
@@ -104,7 +104,7 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
       // Store the current version ID so we don't show popup again for this version
       const currentVersion = updateInfo.manifest?.id;
       if (currentVersion) {
-        await AsyncStorage.setItem(UPDATE_POPUP_STORAGE_KEY, currentVersion);
+        await mmkvStorage.setItem(UPDATE_POPUP_STORAGE_KEY, currentVersion);
       }
       setShowUpdatePopup(false);
     } catch (error) {
@@ -150,7 +150,7 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
       // Check if user hasn't dismissed this version
       (async () => {
         try {
-          const dismissedVersion = await AsyncStorage.getItem(UPDATE_POPUP_STORAGE_KEY);
+          const dismissedVersion = await mmkvStorage.getItem(UPDATE_POPUP_STORAGE_KEY);
           const currentVersion = updateInfo.manifest?.id;
           
           if (dismissedVersion !== currentVersion) {
@@ -175,7 +175,7 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
     const timer = setTimeout(() => {
       (async () => {
         try {
-          const lastCheckTs = await AsyncStorage.getItem(UPDATE_LAST_CHECK_TS_KEY);
+          const lastCheckTs = await mmkvStorage.getItem(UPDATE_LAST_CHECK_TS_KEY);
           const last = lastCheckTs ? parseInt(lastCheckTs, 10) : 0;
           const now = Date.now();
           const sixHours = 6 * 60 * 60 * 1000; // Reduced from 24 hours
@@ -183,7 +183,7 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
             return; // Throttle: only auto-check once per 6h
           }
           await checkForUpdates();
-          await AsyncStorage.setItem(UPDATE_LAST_CHECK_TS_KEY, String(now));
+          await mmkvStorage.setItem(UPDATE_LAST_CHECK_TS_KEY, String(now));
         } catch {
           // ignore
         }

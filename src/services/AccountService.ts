@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from './mmkvStorage';
 
 export type AuthUser = {
   id: string;
@@ -30,13 +30,13 @@ class AccountService {
   }
 
   async signOut(): Promise<void> {
-    await AsyncStorage.removeItem(USER_DATA_KEY);
-    await AsyncStorage.setItem(USER_SCOPE_KEY, 'local');
+    await mmkvStorage.removeItem(USER_DATA_KEY);
+    await mmkvStorage.setItem(USER_SCOPE_KEY, 'local');
   }
 
   async getCurrentUser(): Promise<AuthUser | null> {
     try {
-      const userData = await AsyncStorage.getItem(USER_DATA_KEY);
+      const userData = await mmkvStorage.getItem(USER_DATA_KEY);
       if (!userData) return null;
       return JSON.parse(userData);
     } catch {
@@ -50,7 +50,7 @@ class AccountService {
       if (!currentUser) return 'Not authenticated';
 
       const updatedUser = { ...currentUser, ...partial };
-      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(updatedUser));
+      await mmkvStorage.setItem(USER_DATA_KEY, JSON.stringify(updatedUser));
       return null;
     } catch {
       return 'Failed to update profile';
@@ -61,8 +61,8 @@ class AccountService {
     const user = await this.getCurrentUser();
     if (user?.id) return user.id;
     // Guest scope
-    const scope = (await AsyncStorage.getItem(USER_SCOPE_KEY)) || 'local';
-    if (!scope) await AsyncStorage.setItem(USER_SCOPE_KEY, 'local');
+    const scope = (await mmkvStorage.getItem(USER_SCOPE_KEY)) || 'local';
+    if (!scope) await mmkvStorage.setItem(USER_SCOPE_KEY, 'local');
     return scope || 'local';
   }
 }

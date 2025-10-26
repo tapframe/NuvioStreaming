@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { AppState } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { StreamingContent, catalogService } from '../services/catalogService';
 import { tmdbService } from '../services/tmdbService';
 import { logger } from '../utils/logger';
@@ -241,7 +241,7 @@ export function useFeaturedContent() {
       // Safety guard: if nothing came back within a reasonable time, stop loading
       if (!formattedContent || formattedContent.length === 0) {
         // Fall back to any cached featured item so UI can render something
-        const cachedJson = await AsyncStorage.getItem(STORAGE_KEY).catch(() => null);
+        const cachedJson = await mmkvStorage.getItem(STORAGE_KEY).catch(() => null);
         if (cachedJson) {
           try {
             const parsed = JSON.parse(cachedJson);
@@ -270,7 +270,7 @@ export function useFeaturedContent() {
         // Persist cache for fast startup (skipped when cache disabled)
         if (!DISABLE_CACHE) {
           try {
-            await AsyncStorage.setItem(
+            await mmkvStorage.setItem(
               STORAGE_KEY,
               JSON.stringify({
                 ts: now,
@@ -285,7 +285,7 @@ export function useFeaturedContent() {
         setFeaturedContent(null);
         // Clear persisted cache on empty (skipped when cache disabled)
         if (!DISABLE_CACHE) {
-          try { await AsyncStorage.removeItem(STORAGE_KEY); } catch {}
+          try { await mmkvStorage.removeItem(STORAGE_KEY); } catch {}
         }
       }
     } catch (error) {
@@ -310,7 +310,7 @@ export function useFeaturedContent() {
     let cancelled = false;
     (async () => {
       try {
-        const json = await AsyncStorage.getItem(STORAGE_KEY);
+        const json = await mmkvStorage.getItem(STORAGE_KEY);
         if (!json) return;
         const parsed = JSON.parse(json);
         if (cancelled) return;

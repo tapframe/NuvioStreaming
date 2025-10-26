@@ -20,7 +20,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import FastImage from '@d11/react-native-fast-image';
 import { tmdbService } from '../services/tmdbService';
 import { useSettings } from '../hooks/useSettings';
@@ -124,8 +124,8 @@ const TMDBSettingsScreen = () => {
     logger.log('[TMDBSettingsScreen] Loading settings from storage');
     try {
       const [savedKey, savedUseCustomKey] = await Promise.all([
-        AsyncStorage.getItem(TMDB_API_KEY_STORAGE_KEY),
-        AsyncStorage.getItem(USE_CUSTOM_TMDB_API_KEY)
+        mmkvStorage.getItem(TMDB_API_KEY_STORAGE_KEY),
+        mmkvStorage.getItem(USE_CUSTOM_TMDB_API_KEY)
       ]);
       
       logger.log('[TMDBSettingsScreen] API key status:', savedKey ? 'Found' : 'Not found');
@@ -164,8 +164,8 @@ const TMDBSettingsScreen = () => {
       // Test the API key to make sure it works
       if (await testApiKey(trimmedKey)) {
         logger.log('[TMDBSettingsScreen] API key test successful, saving key');
-        await AsyncStorage.setItem(TMDB_API_KEY_STORAGE_KEY, trimmedKey);
-        await AsyncStorage.setItem(USE_CUSTOM_TMDB_API_KEY, 'true');
+        await mmkvStorage.setItem(TMDB_API_KEY_STORAGE_KEY, trimmedKey);
+        await mmkvStorage.setItem(USE_CUSTOM_TMDB_API_KEY, 'true');
         setIsKeySet(true);
         setUseCustomKey(true);
         setTestResult({ success: true, message: 'API key verified and saved successfully.' });
@@ -217,8 +217,8 @@ const TMDBSettingsScreen = () => {
           onPress: async () => {
             logger.log('[TMDBSettingsScreen] Proceeding with API key clear');
             try {
-              await AsyncStorage.removeItem(TMDB_API_KEY_STORAGE_KEY);
-              await AsyncStorage.setItem(USE_CUSTOM_TMDB_API_KEY, 'false');
+              await mmkvStorage.removeItem(TMDB_API_KEY_STORAGE_KEY);
+              await mmkvStorage.setItem(USE_CUSTOM_TMDB_API_KEY, 'false');
               setApiKey('');
               setIsKeySet(false);
               setUseCustomKey(false);
@@ -237,7 +237,7 @@ const TMDBSettingsScreen = () => {
   const toggleUseCustomKey = async (value: boolean) => {
     logger.log('[TMDBSettingsScreen] Toggle use custom key:', value);
     try {
-      await AsyncStorage.setItem(USE_CUSTOM_TMDB_API_KEY, value ? 'true' : 'false');
+      await mmkvStorage.setItem(USE_CUSTOM_TMDB_API_KEY, value ? 'true' : 'false');
       setUseCustomKey(value);
       
       if (!value) {
@@ -370,7 +370,7 @@ const TMDBSettingsScreen = () => {
   const handleShowSelect = (show: typeof EXAMPLE_SHOWS[0]) => {
     setSelectedShow(show);
     try {
-      AsyncStorage.setItem('tmdb_settings_selected_show', show.imdbId);
+      mmkvStorage.setItem('tmdb_settings_selected_show', show.imdbId);
     } catch (e) {
       if (__DEV__) console.error('Error saving selected show:', e);
     }
@@ -420,7 +420,7 @@ const TMDBSettingsScreen = () => {
   useEffect(() => {
     const loadSelectedShow = async () => {
       try {
-        const savedShowId = await AsyncStorage.getItem('tmdb_settings_selected_show');
+        const savedShowId = await mmkvStorage.getItem('tmdb_settings_selected_show');
         if (savedShowId) {
           const foundShow = EXAMPLE_SHOWS.find(show => show.imdbId === savedShowId);
           if (foundShow) {

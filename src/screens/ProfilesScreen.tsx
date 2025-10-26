@@ -15,7 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTraktContext } from '../contexts/TraktContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import CustomAlert from '../components/CustomAlert';
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
@@ -60,7 +60,7 @@ const ProfilesScreen: React.FC = () => {
   const loadProfiles = useCallback(async () => {
     try {
       setIsLoading(true);
-      const storedProfiles = await AsyncStorage.getItem(PROFILE_STORAGE_KEY);
+      const storedProfiles = await mmkvStorage.getItem(PROFILE_STORAGE_KEY);
       if (storedProfiles) {
         setProfiles(JSON.parse(storedProfiles));
       } else {
@@ -72,7 +72,7 @@ const ProfilesScreen: React.FC = () => {
           createdAt: new Date().getTime()
         };
         setProfiles([defaultProfile]);
-        await AsyncStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify([defaultProfile]));
+        await mmkvStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify([defaultProfile]));
       }
     } catch (error) {
       if (__DEV__) console.error('Error loading profiles:', error);
@@ -99,7 +99,7 @@ const ProfilesScreen: React.FC = () => {
   // Save profiles to AsyncStorage
   const saveProfiles = useCallback(async (updatedProfiles: Profile[]) => {
     try {
-      await AsyncStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(updatedProfiles));
+      await mmkvStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(updatedProfiles));
     } catch (error) {
       if (__DEV__) console.error('Error saving profiles:', error);
       openAlert('Error', 'Failed to save profiles');

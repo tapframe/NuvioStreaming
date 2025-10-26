@@ -10,7 +10,7 @@ import RNImmersiveMode from 'react-native-immersive-mode';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { storageService } from '../../services/storageService';
 import { logger } from '../../utils/logger';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../../services/mmkvStorage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTraktAutosync } from '../../hooks/useTraktAutosync';
@@ -235,7 +235,7 @@ const AndroidVideoPlayer: React.FC = () => {
   // Load speed settings from storage
   const loadSpeedSettings = useCallback(async () => {
     try {
-      const saved = await AsyncStorage.getItem(SPEED_SETTINGS_KEY);
+      const saved = await mmkvStorage.getItem(SPEED_SETTINGS_KEY);
       if (saved) {
         const settings = JSON.parse(saved);
         if (typeof settings.holdToSpeedEnabled === 'boolean') {
@@ -257,7 +257,7 @@ const AndroidVideoPlayer: React.FC = () => {
         holdToSpeedEnabled,
         holdToSpeedValue,
       };
-      await AsyncStorage.setItem(SPEED_SETTINGS_KEY, JSON.stringify(settings));
+      await mmkvStorage.setItem(SPEED_SETTINGS_KEY, JSON.stringify(settings));
     } catch (error) {
       logger.warn('[AndroidVideoPlayer] Error saving speed settings:', error);
     }
@@ -2278,7 +2278,7 @@ const AndroidVideoPlayer: React.FC = () => {
         return;
       }
       // One-time migrate legacy key if present
-      const legacy = await AsyncStorage.getItem(SUBTITLE_SIZE_KEY);
+      const legacy = await mmkvStorage.getItem(SUBTITLE_SIZE_KEY);
       if (legacy) {
         const migrated = parseInt(legacy, 10);
         if (!Number.isNaN(migrated) && migrated > 0) {
@@ -2288,7 +2288,7 @@ const AndroidVideoPlayer: React.FC = () => {
             await storageService.saveSubtitleSettings(merged);
           } catch {}
         }
-        try { await AsyncStorage.removeItem(SUBTITLE_SIZE_KEY); } catch {}
+        try { await mmkvStorage.removeItem(SUBTITLE_SIZE_KEY); } catch {}
         return;
       }
       // If no saved settings, use responsive default
