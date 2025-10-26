@@ -31,6 +31,14 @@
       ],
       "versions": [
         {
+          "version": "1.2.7",
+          "buildVersion": "22",
+          "date": "2025-10-26",
+          "localizedDescription": "# ⚠️ Important: Backup Before Updating to v1.2.7  \n\nBefore installing this update, **please back up your data** by going to **Settings → Backup** inside the app.  \nThis update replaces the internal storage system. **Old data will not be retrievable** without a backup.  \n\n---\n\n# Nuvio Media Hub – v1.2.7  \n\n## Major Changes\n- Replaced **Async Storage** with **React Native MMKV** for **much faster and more reliable local storage**  \n  > ⚠️ This change resets previous local data unless backed up and restored  \n- Added **Playback Speed Controls** to **KSPlayer** (iOS)  \n- Repositioned **Details Screen Action Buttons** for a cleaner layout  \n- Added **TMDB request caching** for faster performance when revisiting titles  \n- Fixed **Library Screen issue** with adding/removing movies and shows  \n\n---\n\n## Features Previously Released via OTA\n- **Playback controls for Android**  \n- **Library screen layout improvements**  \n- Various **backend bug fixes**  \n\n---\n\n## Recommended\nAll users are **strongly advised to perform a clean install** after updating  \nIf you've created a backup in the old version, restore it after installation using the **Restore** option in settings",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/1.2.7/Stable_1-2-7.ipa",
+          "size": 25700000
+        },
+        {
           "version": "1.2.6",
           "buildVersion": "21",
           "date": "2025-10-19",
