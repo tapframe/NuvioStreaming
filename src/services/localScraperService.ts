@@ -1132,11 +1132,6 @@ class LocalScraperService {
                 hasBody: !!axiosConfig.data
               });
               const response = await axios(axiosConfig);
-              logger.log(`[Sandbox] Axios response received:`, {
-                status: response.status,
-                statusText: response.statusText,
-                dataType: typeof response.data
-              });
               
               return {
                 ok: response.status >= 200 && response.status < 300,

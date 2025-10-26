@@ -44,6 +44,9 @@ import { SpeedModal } from './modals/SpeedModal';
 import PlayerControls from './controls/PlayerControls';
 import CustomSubtitles from './subtitles/CustomSubtitles';
 import { SourcesModal } from './modals/SourcesModal';
+import { EpisodesModal } from './modals/EpisodesModal';
+import { EpisodeStreamsModal } from './modals/EpisodeStreamsModal';
+import { Episode } from '../../types/metadata';
 import axios from 'axios';
 import { stremioService } from '../../services/stremioService';
 import * as Brightness from 'expo-brightness';
@@ -53,12 +56,6 @@ const KSPlayerCore: React.FC = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'PlayerIOS'>>();
   const { uri, headers, streamProvider } = route.params as any;
 
-  console.log('[KSPlayerCore] Received navigation params:', {
-    uri,
-    headers,
-    headersKeys: headers ? Object.keys(headers) : [],
-    streamProvider
-  });
 
   const navigation = useNavigation<RootStackNavigationProp>();
 
@@ -78,7 +75,8 @@ const KSPlayerCore: React.FC = () => {
     episodeId,
     imdbId,
     availableStreams: passedAvailableStreams,
-    backdrop
+    backdrop,
+    groupedEpisodes
   } = route.params;
 
   // Initialize Trakt autosync
@@ -201,6 +199,9 @@ const KSPlayerCore: React.FC = () => {
   const [showSubtitleLanguageModal, setShowSubtitleLanguageModal] = useState<boolean>(false);
   const [isLoadingSubtitleList, setIsLoadingSubtitleList] = useState<boolean>(false);
   const [showSourcesModal, setShowSourcesModal] = useState<boolean>(false);
+  const [showEpisodesModal, setShowEpisodesModal] = useState(false);
+  const [showEpisodeStreamsModal, setShowEpisodeStreamsModal] = useState(false);
+  const [selectedEpisodeForStreams, setSelectedEpisodeForStreams] = useState<Episode | null>(null);
   const [availableStreams, setAvailableStreams] = useState<{ [providerId: string]: { streams: any[]; addonName: string } }>(passedAvailableStreams || {});
   // Playback speed controls required by PlayerControls
   const speedOptions = [0.5, 1.0, 1.25, 1.5, 2.0, 2.5];
@@ -326,7 +327,7 @@ const KSPlayerCore: React.FC = () => {
     id: id || 'placeholder',
     type: type || 'movie'
   });
-  const { metadata, loading: metadataLoading, groupedEpisodes, cast, loadCast } = shouldLoadMetadata ? (metadataResult as any) : { metadata: null, loading: false, groupedEpisodes: {}, cast: [], loadCast: () => {} };
+  const { metadata, loading: metadataLoading, groupedEpisodes: metadataGroupedEpisodes, cast, loadCast } = shouldLoadMetadata ? (metadataResult as any) : { metadata: null, loading: false, groupedEpisodes: {}, cast: [], loadCast: () => {} };
   const { settings } = useSettings();
 
   // Logo animation values
@@ -2368,6 +2369,55 @@ const KSPlayerCore: React.FC = () => {
     }, 100);
   };
 
+  const handleEpisodeSelect = (episode: Episode) => {
+    logger.log('[KSPlayerCore] Episode selected:', episode.name);
+    setSelectedEpisodeForStreams(episode);
+    setShowEpisodesModal(false);
+    setShowEpisodeStreamsModal(true);
+  };
+
+  // Debug: Log when modal state changes
+  useEffect(() => {
+    if (showEpisodesModal) {
+      logger.log('[KSPlayerCore] Episodes modal opened, groupedEpisodes:', groupedEpisodes);
+      logger.log('[KSPlayerCore] type:', type, 'season:', season, 'episode:', episode);
+    }
+  }, [showEpisodesModal, groupedEpisodes, type]);
+
+  const handleEpisodeStreamSelect = async (stream: any) => {
+    if (!selectedEpisodeForStreams) return;
+    
+    setShowEpisodeStreamsModal(false);
+    
+    const newQuality = stream.quality || (stream.title?.match(/(\d+)p/)?.[0]);
+    const newProvider = stream.addonName || stream.name || stream.addon || 'Unknown';
+    const newStreamName = stream.name || stream.title || 'Unknown Stream';
+    
+    setPaused(true);
+    
+    setTimeout(() => {
+      navigation.replace('PlayerIOS', {
+        uri: stream.url,
+        title: title,
+        episodeTitle: selectedEpisodeForStreams.name,
+        season: selectedEpisodeForStreams.season_number,
+        episode: selectedEpisodeForStreams.episode_number,
+        quality: newQuality,
+        year: year,
+        streamProvider: newProvider,
+        streamName: newStreamName,
+        headers: stream.headers || undefined,
+        id,
+        type: 'series',
+        episodeId: selectedEpisodeForStreams.stremioId || `${id}:${selectedEpisodeForStreams.season_number}:${selectedEpisodeForStreams.episode_number}`,
+        imdbId: imdbId ?? undefined,
+        backdrop: backdrop || undefined,
+        availableStreams: {},
+        groupedEpisodes: groupedEpisodes,
+      });
+    }, 100);
+  };
+
   useEffect(() => {
     if (isVideoLoaded && initialPosition && !isInitialSeekComplete && duration > 0) {
       logger.log(`[VideoPlayer] Post-load initial seek to: ${initialPosition}s`);
@@ -2676,6 +2726,7 @@ const KSPlayerCore: React.FC = () => {
             setShowSpeedModal={setShowSpeedModal}
             isSubtitleModalOpen={showSubtitleModal}
             setShowSourcesModal={setShowSourcesModal}
+            setShowEpisodesModal={type === 'series' ? setShowEpisodesModal : undefined}
             onSliderValueChange={handleSliderValueChange}
             onSlidingStart={handleSlidingStart}
             onSlidingComplete={handleSlidingComplete}
@@ -3370,6 +3421,27 @@ const KSPlayerCore: React.FC = () => {
         currentStreamUrl={currentStreamUrl}
         onSelectStream={handleSelectStream}
       />
+
+      {type === 'series' && (
+        <>
+          <EpisodesModal
+            showEpisodesModal={showEpisodesModal}
+            setShowEpisodesModal={setShowEpisodesModal}
+            groupedEpisodes={groupedEpisodes || metadataGroupedEpisodes || {}}
+            currentEpisode={season && episode ? { season, episode } : undefined}
+            metadata={metadata ? { poster: metadata.poster, id: metadata.id } : undefined}
+            onSelectEpisode={handleEpisodeSelect}
+          />
+          
+          <EpisodeStreamsModal
+            visible={showEpisodeStreamsModal}
+            episode={selectedEpisodeForStreams}
+            onClose={() => setShowEpisodeStreamsModal(false)}
+            onSelectStream={handleEpisodeStreamSelect}
+            metadata={metadata ? { id: metadata.id, name: metadata.name } : undefined}
+          />
+        </>
+      )}
       
       {/* Error Modal */}
       <Modal

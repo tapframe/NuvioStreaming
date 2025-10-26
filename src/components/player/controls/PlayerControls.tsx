@@ -38,6 +38,7 @@ interface PlayerControlsProps {
   setShowSpeedModal: (show: boolean) => void;
   isSubtitleModalOpen?: boolean;
   setShowSourcesModal?: (show: boolean) => void;
+  setShowEpisodesModal?: (show: boolean) => void;
   // Slider-specific props
   onSliderValueChange: (value: number) => void;
   onSlidingStart: () => void;
@@ -81,6 +82,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   setShowSpeedModal,
   isSubtitleModalOpen,
   setShowSourcesModal,
+  setShowEpisodesModal,
   onSliderValueChange,
   onSlidingStart,
   onSlidingComplete,
@@ -584,6 +586,19 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                   <Ionicons name="swap-horizontal" size={20} color="white" />
                   <Text style={styles.bottomButtonText}>
                     Change Source
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Episodes Button */}
+              {setShowEpisodesModal && (
+                <TouchableOpacity
+                  style={styles.bottomButton}
+                  onPress={() => setShowEpisodesModal(true)}
+                >
+                  <Ionicons name="list" size={20} color="white" />
+                  <Text style={styles.bottomButtonText}>
+                    Episodes
                   </Text>
                 </TouchableOpacity>
               )}

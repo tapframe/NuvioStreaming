@@ -43,8 +43,11 @@ import SpeedModal from './modals/SpeedModal';
 import PlayerControls from './controls/PlayerControls';
 import CustomSubtitles from './subtitles/CustomSubtitles';
 import { SourcesModal } from './modals/SourcesModal';
+import { EpisodesModal } from './modals/EpisodesModal';
+import { EpisodeStreamsModal } from './modals/EpisodeStreamsModal';
 import VlcVideoPlayer, { VlcPlayerRef } from './VlcVideoPlayer';
 import { stremioService } from '../../services/stremioService';
+import { Episode } from '../../types/metadata';
 import { shouldUseKSPlayer } from '../../utils/playerSelection';
 import axios from 'axios';
 import * as Brightness from 'expo-brightness';
@@ -81,7 +84,8 @@ const AndroidVideoPlayer: React.FC = () => {
     episodeId,
     imdbId,
     availableStreams: passedAvailableStreams,
-    backdrop
+    backdrop,
+    groupedEpisodes
   } = route.params;
 
   // Opt-in flag to use VLC backend
@@ -469,6 +473,9 @@ const AndroidVideoPlayer: React.FC = () => {
   const [showSubtitleLanguageModal, setShowSubtitleLanguageModal] = useState<boolean>(false);
   const [isLoadingSubtitleList, setIsLoadingSubtitleList] = useState<boolean>(false);
   const [showSourcesModal, setShowSourcesModal] = useState<boolean>(false);
+  const [showEpisodesModal, setShowEpisodesModal] = useState(false);
+  const [showEpisodeStreamsModal, setShowEpisodeStreamsModal] = useState(false);
+  const [selectedEpisodeForStreams, setSelectedEpisodeForStreams] = useState<Episode | null>(null);
   const [availableStreams, setAvailableStreams] = useState<{ [providerId: string]: { streams: any[]; addonName: string } }>(passedAvailableStreams || {});
   const [currentStreamUrl, setCurrentStreamUrl] = useState<string>(uri);
   const [currentVideoType, setCurrentVideoType] = useState<string | undefined>(videoType);
@@ -620,7 +627,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const shouldLoadMetadata = Boolean(id && type);
   const metadataResult = useMetadata({ id: id || 'placeholder', type: (type as any) });
   const { settings: appSettings } = useSettings();
-  const { metadata, loading: metadataLoading, groupedEpisodes, cast, loadCast } = shouldLoadMetadata ? (metadataResult as any) : { metadata: null, loading: false, groupedEpisodes: {}, cast: [], loadCast: () => {} };
+  const { metadata, loading: metadataLoading, groupedEpisodes: metadataGroupedEpisodes, cast, loadCast } = shouldLoadMetadata ? (metadataResult as any) : { metadata: null, loading: false, groupedEpisodes: {}, cast: [], loadCast: () => {} };
   
   // Logo animation values
   const logoScaleAnim = useRef(new Animated.Value(0.8)).current;
@@ -2984,6 +2991,56 @@ const AndroidVideoPlayer: React.FC = () => {
     }, 100);
   };
 
+  const handleEpisodeSelect = (episode: Episode) => {
+    logger.log('[AndroidVideoPlayer] Episode selected:', episode.name);
+    setSelectedEpisodeForStreams(episode);
+    setShowEpisodesModal(false);
+    setShowEpisodeStreamsModal(true);
+  };
+
+  // Debug: Log when modal state changes
+  useEffect(() => {
+    if (showEpisodesModal) {
+      logger.log('[AndroidVideoPlayer] Episodes modal opened, groupedEpisodes:', groupedEpisodes);
+      logger.log('[AndroidVideoPlayer] type:', type, 'season:', season, 'episode:', episode);
+    }
+  }, [showEpisodesModal, groupedEpisodes, type]);
+
+  const handleEpisodeStreamSelect = async (stream: any) => {
+    if (!selectedEpisodeForStreams) return;
+    
+    setShowEpisodeStreamsModal(false);
+    
+    const newQuality = stream.quality || (stream.title?.match(/(\d+)p/)?.[0]);
+    const newProvider = stream.addonName || stream.name || stream.addon || 'Unknown';
+    const newStreamName = stream.name || stream.title || 'Unknown Stream';
+    
+    setPaused(true);
+    
+    setTimeout(() => {
+      (navigation as any).replace('PlayerAndroid', {
+        uri: stream.url,
+        title: title,
+        episodeTitle: selectedEpisodeForStreams.name,
+        season: selectedEpisodeForStreams.season_number,
+        episode: selectedEpisodeForStreams.episode_number,
+        quality: newQuality,
+        year: year,
+        streamProvider: newProvider,
+        streamName: newStreamName,
+        headers: stream.headers || undefined,
+        forceVlc: false,
+        id,
+        type: 'series',
+        episodeId: selectedEpisodeForStreams.stremioId || `${id}:${selectedEpisodeForStreams.season_number}:${selectedEpisodeForStreams.episode_number}`,
+        imdbId: imdbId ?? undefined,
+        backdrop: backdrop || undefined,
+        availableStreams: {},
+        groupedEpisodes: groupedEpisodes,
+      });
+    }, 100);
+  };
+
   useEffect(() => {
     if (isVideoLoaded && initialPosition && !isInitialSeekComplete && duration > 0) {
       logger.log(`[AndroidVideoPlayer] Post-load initial seek to: ${initialPosition}s`);
@@ -3377,6 +3434,7 @@ const AndroidVideoPlayer: React.FC = () => {
             setShowSpeedModal={setShowSpeedModal}
             isSubtitleModalOpen={showSubtitleModal}
             setShowSourcesModal={setShowSourcesModal}
+            setShowEpisodesModal={type === 'series' ? setShowEpisodesModal : undefined}
             onSliderValueChange={handleSliderValueChange}
             onSlidingStart={handleSlidingStart}
             onSlidingComplete={handleSlidingComplete}
@@ -4070,6 +4128,27 @@ const AndroidVideoPlayer: React.FC = () => {
         currentStreamUrl={currentStreamUrl}
         onSelectStream={handleSelectStream}
       />
+
+      {type === 'series' && (
+        <>
+          <EpisodesModal
+            showEpisodesModal={showEpisodesModal}
+            setShowEpisodesModal={setShowEpisodesModal}
+            groupedEpisodes={groupedEpisodes || metadataGroupedEpisodes || {}}
+            currentEpisode={season && episode ? { season, episode } : undefined}
+            metadata={metadata ? { poster: metadata.poster, id: metadata.id } : undefined}
+            onSelectEpisode={handleEpisodeSelect}
+          />
+          
+          <EpisodeStreamsModal
+            visible={showEpisodeStreamsModal}
+            episode={selectedEpisodeForStreams}
+            onClose={() => setShowEpisodeStreamsModal(false)}
+            onSelectStream={handleEpisodeStreamSelect}
+            metadata={metadata ? { id: metadata.id, name: metadata.name } : undefined}
+          />
+        </>
+      )}
       
       {/* Error Modal */}
       {isMounted.current && (
