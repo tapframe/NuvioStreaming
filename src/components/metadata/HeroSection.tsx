@@ -1088,14 +1088,23 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     logoLoadOpacity.value = withTiming(1, { duration: 300 });
   }, []);
 
-  // Handle logo load error - only set error if logo hasn't loaded successfully before
+  // Handle logo load error - implement three-level fallback: TMDB logo → addon logo → text
   const handleLogoError = useCallback(() => {
     if (!logoHasLoadedSuccessfully) {
-      // Only remove logo if it never loaded successfully
-      setStableLogoUri(null);
+      // Try addon logo as fallback if TMDB logo fails
+      const addonLogo = (metadata as any)?.addonLogo;
+      if (addonLogo && stableLogoUri !== addonLogo) {
+        // TMDB logo failed, try addon logo
+        setStableLogoUri(addonLogo);
+        setLogoHasLoadedSuccessfully(false); // Reset to allow addon logo to try
+        logoLoadOpacity.value = 0; // Reset fade for new logo attempt
+      } else {
+        // No addon logo available, remove logo to show text
+        setStableLogoUri(null);
+      }
     }
     // If logo loaded successfully before, keep showing it even if it fails later
-  }, [logoHasLoadedSuccessfully]);
+  }, [logoHasLoadedSuccessfully, stableLogoUri, metadata, logoLoadOpacity]);
   
   // Performance optimization: Lazy loading setup
   useEffect(() => {
@@ -1203,9 +1212,13 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     setImageError(true);
     setImageLoaded(false);
     
-    // Fallback to poster if banner fails
-    if (bannerImage !== metadata.banner) {
-      setBannerImage(metadata.banner || metadata.poster);
+    // Three-level fallback: TMDB → addon banner → poster
+    if (bannerImage !== metadata.banner && metadata.banner) {
+      // Try addon banner if not already on it and it exists
+      setBannerImage(metadata.banner);
+    } else if (bannerImage !== metadata.poster && metadata.poster) {
+      // Only use poster if addon banner also failed/missing
+      setBannerImage(metadata.poster);
     }
   }, [shouldLoadSecondaryData, bannerImage, metadata.banner, metadata.poster, setBannerImage]);
 

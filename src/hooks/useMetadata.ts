@@ -813,6 +813,9 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
         // Start with addon metadata
         let finalMetadata = content.value as StreamingContent;
+        
+        // Store addon logo before TMDB enrichment overwrites it
+        const addonLogo = (finalMetadata as any).logo;
 
         // If localization is enabled, merge TMDB localized text (name/overview) before first render
         try {
@@ -947,6 +950,11 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         }
 
         // Commit final metadata once and cache it
+        // Store addon logo as fallback if TMDB enrichment is enabled
+        if (settings.enrichMetadataWithTMDB && addonLogo) {
+          (finalMetadata as any).addonLogo = addonLogo;
+        }
+        
         // Clear banner field if TMDB enrichment is enabled to prevent flash
         if (settings.enrichMetadataWithTMDB) {
           finalMetadata = {
