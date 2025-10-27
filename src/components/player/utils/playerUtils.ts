@@ -171,4 +171,33 @@ export const formatTime = (seconds: number) => {
 export const parseSRT = (srtContent: string): SubtitleCue[] => {
   // Use the new enhanced parser from subtitleParser.ts
   return parseSRTEnhanced(srtContent);
+};
+
+/**
+ * Detect if text contains primarily RTL (right-to-left) characters
+ * Checks for Arabic, Hebrew, Persian, Urdu, and other RTL scripts
+ * Returns true if the majority of non-whitespace characters are RTL
+ */
+export const detectRTL = (text: string): boolean => {
+  if (!text || text.length === 0) return false;
+
+  // RTL character ranges
+  // Arabic: U+0600–U+06FF
+  // Arabic Supplement: U+0750–U+077F
+  // Arabic Extended-A: U+08A0–U+08FF
+  // Arabic Presentation Forms-A: U+FB50–U+FDFF
+  // Arabic Presentation Forms-B: U+FE70–U+FEFF
+  // Hebrew: U+0590–U+05FF
+  // Persian/Urdu use Arabic script (no separate range)
+  const rtlRegex = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+  
+  // Remove whitespace and count characters
+  const nonWhitespace = text.replace(/\s/g, '');
+  if (nonWhitespace.length === 0) return false;
+
+  const rtlCount = (nonWhitespace.match(rtlRegex) || []).length;
+  
+  // Consider RTL if at least 30% of non-whitespace characters are RTL
+  // This handles mixed-language subtitles (e.g., Arabic with English numbers)
+  return rtlCount / nonWhitespace.length >= 0.3;
 }; 
