@@ -217,6 +217,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const isSourceSeekableRef = useRef<boolean | null>(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const [isOpeningAnimationComplete, setIsOpeningAnimationComplete] = useState(false);
+  const [shouldHideOpeningOverlay, setShouldHideOpeningOverlay] = useState(false);
   const openingFadeAnim = useRef(new Animated.Value(0)).current;
   const openingScaleAnim = useRef(new Animated.Value(0.8)).current;
   const backgroundFadeAnim = useRef(new Animated.Value(1)).current;
@@ -977,6 +978,9 @@ const AndroidVideoPlayer: React.FC = () => {
   };
 
   const completeOpeningAnimation = () => {
+    // Stop the pulse animation immediately
+    pulseAnim.stopAnimation();
+    
     Animated.parallel([
       Animated.timing(openingFadeAnim, {
         toValue: 1,
@@ -994,11 +998,12 @@ const AndroidVideoPlayer: React.FC = () => {
         useNativeDriver: true,
       }),
     ]).start(() => {
-      openingScaleAnim.setValue(1);
-      openingFadeAnim.setValue(1);
       setIsOpeningAnimationComplete(true);
-      // Removed the 100ms delay
-      backgroundFadeAnim.setValue(0);
+      
+      // Delay hiding the overlay to allow background fade animation to complete
+      setTimeout(() => {
+        setShouldHideOpeningOverlay(true);
+      }, 450); // Slightly longer than the background fade duration
     });
     
     // Fallback: ensure animation completes even if something goes wrong
@@ -1006,9 +1011,6 @@ const AndroidVideoPlayer: React.FC = () => {
       if (!isOpeningAnimationComplete) {
         if (__DEV__) logger.warn('[AndroidVideoPlayer] Opening animation fallback triggered');
         setIsOpeningAnimationComplete(true);
-        openingScaleAnim.setValue(1);
-        openingFadeAnim.setValue(1);
-        backgroundFadeAnim.setValue(0);
       }
     }, 1000); // 1 second fallback
   };
@@ -3113,17 +3115,17 @@ const AndroidVideoPlayer: React.FC = () => {
       top: 0,
       left: 0,
     }]}> 
+      {!shouldHideOpeningOverlay && (
       <Animated.View 
         style={[
           styles.openingOverlay,
           {
             opacity: backgroundFadeAnim,
-            zIndex: isOpeningAnimationComplete ? -1 : 3000,
+            zIndex: 3000,
             width: screenDimensions.width,
             height: screenDimensions.height,
           }
         ]}
-        pointerEvents={isOpeningAnimationComplete ? 'none' : 'auto'}
       >
         {backdrop && (
           <Animated.View style={[
@@ -3187,13 +3189,14 @@ const AndroidVideoPlayer: React.FC = () => {
           )}
         </View>
       </Animated.View>
+      )}
 
       <Animated.View 
         style={[
           styles.videoPlayerContainer,
           {
             opacity: openingFadeAnim,
-            transform: isOpeningAnimationComplete ? [] : [{ scale: openingScaleAnim }],
+            transform: [{ scale: openingScaleAnim }],
             width: screenDimensions.width,
             height: screenDimensions.height,
           }

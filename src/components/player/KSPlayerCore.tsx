@@ -676,6 +676,9 @@ const KSPlayerCore: React.FC = () => {
   };
 
   const completeOpeningAnimation = () => {
+    // Stop the pulse animation immediately
+    pulseAnim.stopAnimation();
+    
     Animated.parallel([
       Animated.timing(openingFadeAnim, {
         toValue: 1,
@@ -2498,18 +2501,17 @@ const KSPlayerCore: React.FC = () => {
         top: 0,
         left: 0,
       }]}>
-      {!DISABLE_OPENING_OVERLAY && (
+      {!DISABLE_OPENING_OVERLAY && !shouldHideOpeningOverlay && (
       <Animated.View
         style={[
           styles.openingOverlay,
           {
             opacity: backgroundFadeAnim,
-            zIndex: shouldHideOpeningOverlay ? -1 : 3000,
+            zIndex: 3000,
             width: shouldUseFullscreen ? '100%' : screenDimensions.width,
             height: shouldUseFullscreen ? '100%' : screenDimensions.height,
           }
         ]}
-        pointerEvents={shouldHideOpeningOverlay ? 'none' : 'auto'}
       >
         {backdrop && (
           <Animated.View style={[
@@ -2580,7 +2582,7 @@ const KSPlayerCore: React.FC = () => {
           styles.videoPlayerContainer,
           {
             opacity: DISABLE_OPENING_OVERLAY ? 1 : openingFadeAnim,
-            transform: DISABLE_OPENING_OVERLAY ? [] : [{ scale: openingScaleAnim }],
+            transform: DISABLE_OPENING_OVERLAY ? [{ scale: 1 }] : [{ scale: openingScaleAnim }],
             width: shouldUseFullscreen ? '100%' : screenDimensions.width,
             height: shouldUseFullscreen ? '100%' : screenDimensions.height,
           }
