@@ -204,7 +204,7 @@ const KSPlayerCore: React.FC = () => {
   const [selectedEpisodeForStreams, setSelectedEpisodeForStreams] = useState<Episode | null>(null);
   const [availableStreams, setAvailableStreams] = useState<{ [providerId: string]: { streams: any[]; addonName: string } }>(passedAvailableStreams || {});
   // Playback speed controls required by PlayerControls
-  const speedOptions = [0.5, 1.0, 1.25, 1.5, 2.0, 2.5];
+  const speedOptions = [0.5, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0];
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
   // Hold-to-speed-up feature state
   const [holdToSpeedEnabled, setHoldToSpeedEnabled] = useState(true);
