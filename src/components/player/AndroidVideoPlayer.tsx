@@ -39,6 +39,7 @@ import { safeDebugLog, parseSRT, DEBUG_MODE, formatTime } from './utils/playerUt
 import { styles } from './utils/playerStyles';
 import { SubtitleModals } from './modals/SubtitleModals';
 import { AudioTrackModal } from './modals/AudioTrackModal';
+import LoadingOverlay from './modals/LoadingOverlay';
 import SpeedModal from './modals/SpeedModal';
 // Removed ResumeOverlay usage when alwaysResume is enabled
 import PlayerControls from './controls/PlayerControls';
@@ -3115,81 +3116,21 @@ const AndroidVideoPlayer: React.FC = () => {
       top: 0,
       left: 0,
     }]}> 
-      {!shouldHideOpeningOverlay && (
-      <Animated.View 
-        style={[
-          styles.openingOverlay,
-          {
-            opacity: backgroundFadeAnim,
-            zIndex: 3000,
-            width: screenDimensions.width,
-            height: screenDimensions.height,
-          }
-        ]}
-      >
-        {backdrop && (
-          <Animated.View style={[
-              StyleSheet.absoluteFill,
-              {
-                width: screenDimensions.width,
-                height: screenDimensions.height,
-                opacity: backdropImageOpacityAnim
-              }
-            ]}>
-            <Image
-              source={{ uri: backdrop }}
-              style={StyleSheet.absoluteFillObject}
-              resizeMode="cover"
-            />
-          </Animated.View>
-        )}
-        <LinearGradient
-          colors={[
-            'rgba(0,0,0,0.3)',
-            'rgba(0,0,0,0.6)',
-            'rgba(0,0,0,0.8)',
-            'rgba(0,0,0,0.9)'
-          ]}
-          locations={[0, 0.3, 0.7, 1]}
-          style={StyleSheet.absoluteFill}
-        />
-        
-        <TouchableOpacity 
-          style={styles.loadingCloseButton}
-          onPress={handleClose}
-          activeOpacity={0.7}
-        >
-          <MaterialIcons name="close" size={24} color="#ffffff" />
-        </TouchableOpacity>
-        
-        <View style={styles.openingContent}>
-          {hasLogo ? (
-            <>
-            <Animated.View style={{
-              transform: [
-                { scale: Animated.multiply(logoScaleAnim, pulseAnim) }
-              ],
-              opacity: logoOpacityAnim,
-              alignItems: 'center',
-            }}>
-              <FastImage
-                source={{ uri: metadata.logo }}
-                style={{
-                  width: 300,
-                  height: 180,
-                }}
-                resizeMode={FastImage.resizeMode.contain}
-              />
-            </Animated.View>
-            </>
-          ) : (
-            <>
-          <ActivityIndicator size="large" color="#E50914" />
-            </>
-          )}
-        </View>
-      </Animated.View>
-      )}
+      <LoadingOverlay
+        visible={!shouldHideOpeningOverlay}
+        backdrop={backdrop || null}
+        hasLogo={hasLogo}
+        logo={metadata?.logo}
+        backgroundFadeAnim={backgroundFadeAnim}
+        backdropImageOpacityAnim={backdropImageOpacityAnim}
+        logoScaleAnim={logoScaleAnim}
+        logoOpacityAnim={logoOpacityAnim}
+        pulseAnim={pulseAnim}
+        onClose={handleClose}
+        width={screenDimensions.width}
+        height={screenDimensions.height}
+        useFastImage={false}
+      />
 
       <Animated.View 
         style={[

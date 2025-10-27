@@ -46,6 +46,7 @@ import PlayerControls from './controls/PlayerControls';
 import CustomSubtitles from './subtitles/CustomSubtitles';
 import { SourcesModal } from './modals/SourcesModal';
 import { EpisodesModal } from './modals/EpisodesModal';
+import LoadingOverlay from './modals/LoadingOverlay';
 import { EpisodeStreamsModal } from './modals/EpisodeStreamsModal';
 import { Episode } from '../../types/metadata';
 import axios from 'axios';
@@ -2501,80 +2502,22 @@ const KSPlayerCore: React.FC = () => {
         top: 0,
         left: 0,
       }]}>
-      {!DISABLE_OPENING_OVERLAY && !shouldHideOpeningOverlay && (
-      <Animated.View
-        style={[
-          styles.openingOverlay,
-          {
-            opacity: backgroundFadeAnim,
-            zIndex: 3000,
-            width: shouldUseFullscreen ? '100%' : screenDimensions.width,
-            height: shouldUseFullscreen ? '100%' : screenDimensions.height,
-          }
-        ]}
-      >
-        {backdrop && (
-          <Animated.View style={[
-              StyleSheet.absoluteFill,
-              {
-                width: shouldUseFullscreen ? '100%' : screenDimensions.width,
-                height: shouldUseFullscreen ? '100%' : screenDimensions.height,
-                opacity: backdropImageOpacityAnim
-              }
-            ]}>
-            <FastImage
-              source={{ uri: backdrop }}
-              style={StyleSheet.absoluteFillObject}
-              resizeMode={FastImage.resizeMode.cover}
-            />
-          </Animated.View>
-        )}
-        <LinearGradient
-          colors={[
-            'rgba(0,0,0,0.3)',
-            'rgba(0,0,0,0.6)',
-            'rgba(0,0,0,0.8)',
-            'rgba(0,0,0,0.9)'
-          ]}
-          locations={[0, 0.3, 0.7, 1]}
-          style={StyleSheet.absoluteFill}
+      {!DISABLE_OPENING_OVERLAY && (
+        <LoadingOverlay
+          visible={!shouldHideOpeningOverlay}
+          backdrop={backdrop || null}
+          hasLogo={hasLogo}
+          logo={metadata?.logo}
+          backgroundFadeAnim={backgroundFadeAnim}
+          backdropImageOpacityAnim={backdropImageOpacityAnim}
+          logoScaleAnim={logoScaleAnim}
+          logoOpacityAnim={logoOpacityAnim}
+          pulseAnim={pulseAnim}
+          onClose={handleClose}
+          width={shouldUseFullscreen ? effectiveDimensions.width : screenDimensions.width}
+          height={shouldUseFullscreen ? effectiveDimensions.height : screenDimensions.height}
+          useFastImage={true}
         />
-
-        <TouchableOpacity
-          style={styles.loadingCloseButton}
-          onPress={handleClose}
-          activeOpacity={0.7}
-        >
-          <MaterialIcons name="close" size={24} color="#ffffff" />
-        </TouchableOpacity>
-
-        <View style={styles.openingContent}>
-          {hasLogo ? (
-            <>
-            <Animated.View style={{
-              transform: [
-                { scale: Animated.multiply(logoScaleAnim, pulseAnim) }
-              ],
-              opacity: logoOpacityAnim,
-              alignItems: 'center',
-            }}>
-              <FastImage
-                source={{ uri: metadata.logo }}
-                style={{
-                  width: 300,
-                  height: 180,
-                }}
-                resizeMode={FastImage.resizeMode.contain}
-              />
-            </Animated.View>
-            </>
-          ) : (
-            <>
-              <ActivityIndicator size="large" color="#E50914" />
-            </>
-          )}
-        </View>
-      </Animated.View>
       )}
 
       <Animated.View
