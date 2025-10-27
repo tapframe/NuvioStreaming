@@ -67,6 +67,7 @@ export interface Subtitle {
   fps?: number;
   addon?: string;
   addonName?: string;
+  format?: 'srt' | 'vtt' | 'ass' | 'ssa'; // Format hint
 }
 
 export interface Stream {

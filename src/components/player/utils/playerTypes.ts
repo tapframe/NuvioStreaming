@@ -77,10 +77,23 @@ export interface VlcMediaEvent {
   selectedTextTrack?: number;
 }
 
+export interface SubtitleSegment {
+  text: string;
+  italic?: boolean;
+  bold?: boolean;
+  underline?: boolean;
+  color?: string;
+  fontName?: string;
+}
+
 export interface SubtitleCue {
   start: number;
   end: number;
   text: string;
+  // New fields for advanced features
+  formattedSegments?: SubtitleSegment[]; // Rich text with formatting
+  position?: { x?: number; y?: number; align?: string }; // Position tags
+  rawText?: string; // Original text before processing
 }
 
 // Add interface for Wyzie subtitle API response

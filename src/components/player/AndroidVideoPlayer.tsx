@@ -27,6 +27,7 @@ import {
   ResizeModeType, 
   WyzieSubtitle, 
   SubtitleCue,
+  SubtitleSegment,
   RESUME_PREF_KEY,
   RESUME_PREF,
   SUBTITLE_SIZE_KEY
@@ -449,6 +450,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const pinchRef = useRef<PinchGestureHandler>(null);
   const [customSubtitles, setCustomSubtitles] = useState<SubtitleCue[]>([]);
   const [currentSubtitle, setCurrentSubtitle] = useState<string>('');
+  const [currentFormattedSegments, setCurrentFormattedSegments] = useState<SubtitleSegment[][]>([]);
   const [customSubtitleVersion, setCustomSubtitleVersion] = useState<number>(0);
   const [subtitleSize, setSubtitleSize] = useState<number>(DEFAULT_SUBTITLE_SIZE);
   const [subtitleBackground, setSubtitleBackground] = useState<boolean>(false);
@@ -2833,6 +2835,9 @@ const AndroidVideoPlayer: React.FC = () => {
       if (currentSubtitle !== '') {
         setCurrentSubtitle('');
       }
+      if (currentFormattedSegments.length > 0) {
+        setCurrentFormattedSegments([]);
+      }
       return;
     }
     const adjustedTime = currentTime + (subtitleOffsetSec || 0) - 0.2;
@@ -2841,6 +2846,39 @@ const AndroidVideoPlayer: React.FC = () => {
     );
     const newSubtitle = currentCue ? currentCue.text : '';
     setCurrentSubtitle(newSubtitle);
+    
+    // Extract formatted segments from current cue
+    if (currentCue?.formattedSegments) {
+      // Split by newlines to get per-line segments
+      const lines = (currentCue.text || '').split(/\r?\n/);
+      const segmentsPerLine: SubtitleSegment[][] = [];
+      let segmentIndex = 0;
+      
+      for (const line of lines) {
+        const lineSegments: SubtitleSegment[] = [];
+        const words = line.split(/(\s+)/);
+        
+        for (const word of words) {
+          if (word.trim()) {
+            if (segmentIndex < currentCue.formattedSegments.length) {
+              lineSegments.push(currentCue.formattedSegments[segmentIndex]);
+              segmentIndex++;
+            } else {
+              // Fallback if segment count doesn't match
+              lineSegments.push({ text: word });
+            }
+          }
+        }
+        
+        if (lineSegments.length > 0) {
+          segmentsPerLine.push(lineSegments);
+        }
+      }
+      
+      setCurrentFormattedSegments(segmentsPerLine.length > 0 ? segmentsPerLine : []);
+    } else {
+      setCurrentFormattedSegments([]);
+    }
   }, [currentTime, customSubtitles, useCustomSubtitles, subtitleOffsetSec]);
 
   useEffect(() => {
@@ -3817,6 +3855,7 @@ const AndroidVideoPlayer: React.FC = () => {
             bottomOffset={subtitleBottomOffset}
             letterSpacing={subtitleLetterSpacing}
             lineHeightMultiplier={subtitleLineHeightMultiplier}
+            formattedSegments={currentFormattedSegments}
             controlsVisible={showControls}
             controlsFixedOffset={Math.min(Dimensions.get('window').width, Dimensions.get('window').height) >= 768 ? 120 : 100}
           />

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text } from 'react-native';
 import Svg, { Text as SvgText, TSpan } from 'react-native-svg';
 import { styles } from '../utils/playerStyles';
+import { SubtitleSegment } from '../utils/playerTypes';
 
 interface CustomSubtitlesProps {
   useCustomSubtitles: boolean;
@@ -25,6 +26,8 @@ interface CustomSubtitlesProps {
   controlsFixedOffset?: number; // fixed px when controls visible (ignores user offset)
   letterSpacing?: number;
   lineHeightMultiplier?: number; // multiplies subtitleSize
+  // New: support for formatted subtitle segments
+  formattedSegments?: SubtitleSegment[][]; // Segments per line
 }
 
 export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
@@ -47,6 +50,7 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
   controlsFixedOffset,
   letterSpacing = 0,
   lineHeightMultiplier = 1.2,
+  formattedSegments,
 }) => {
   if (!useCustomSubtitles || !currentSubtitle) return null;
   
@@ -76,6 +80,39 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
   const displayFontSize = subtitleSize * inverseScale;
   const displayLineHeight = subtitleSize * lineHeightMultiplier * inverseScale;
   const svgHeight = lines.length * displayLineHeight;
+
+  // Helper to render formatted segments
+  const renderFormattedText = (segments: SubtitleSegment[], lineIndex: number, keyPrefix: string) => {
+    if (!segments || segments.length === 0) return null;
+
+    return (
+      <Text key={`${keyPrefix}-line-${lineIndex}`} style={{
+        color: textColor,
+        fontFamily,
+        textAlign: align,
+        letterSpacing,
+        fontSize: displayFontSize,
+        lineHeight: displayLineHeight,
+      }}>
+        {segments.map((segment, segIdx) => {
+          const segmentStyle: any = {};
+          if (segment.italic) segmentStyle.fontStyle = 'italic';
+          if (segment.bold) segmentStyle.fontWeight = 'bold';
+          if (segment.underline) segmentStyle.textDecorationLine = 'underline';
+          if (segment.color) segmentStyle.color = segment.color;
+
+          // Apply outline/shadow to individual segments if needed
+          const mergedShadowStyle = (textShadow && !useCrispSvgOutline) ? shadowStyle : {};
+
+          return (
+            <Text key={`${keyPrefix}-seg-${segIdx}`} style={[segmentStyle, mergedShadowStyle]}>
+              {segment.text}
+            </Text>
+          );
+        })}
+      </Text>
+    );
+  };
 
   return (
     <View
@@ -157,21 +194,28 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
           </Svg>
         ) : (
           // No outline: use RN Text with (optional) shadow
-          <Text style={[
-            styles.customSubtitleText,
-            {
-              color: textColor,
-              fontFamily,
-              textAlign: align,
-              letterSpacing,
-              fontSize: subtitleSize * inverseScale,
-              lineHeight: subtitleSize * lineHeightMultiplier * inverseScale,
-              transform: [{ scale: inverseScale }],
-            },
-            shadowStyle,
-          ]}>
-            {currentSubtitle}
-          </Text>
+          formattedSegments && formattedSegments.length > 0 ? (
+            // Render formatted segments if available
+            formattedSegments.map((lineSegments, lineIdx) => 
+              renderFormattedText(lineSegments, lineIdx, 'formatted')
+            )
+          ) : (
+            <Text style={[
+              styles.customSubtitleText,
+              {
+                color: textColor,
+                fontFamily,
+                textAlign: align,
+                letterSpacing,
+                fontSize: subtitleSize * inverseScale,
+                lineHeight: subtitleSize * lineHeightMultiplier * inverseScale,
+                transform: [{ scale: inverseScale }],
+              },
+              shadowStyle,
+            ]}>
+              {currentSubtitle}
+            </Text>
+          )
         )}
       </View>
     </View>
