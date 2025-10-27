@@ -472,7 +472,7 @@ public class ReactExoplayerView extends FrameLayout implements
     }
 
     private void showPlaybackSpeedOptions() {
-        String[] speedOptions = {"0.5x", "1.0x", "1.5x", "2.0x"};
+        String[] speedOptions = {"0.5x", "1.0x", "1.5x", "2.0x", "3.0x"};
         AlertDialog.Builder builder = new AlertDialog.Builder(themedReactContext);
         builder.setTitle(R.string.select_playback_speed);
 
@@ -488,6 +488,9 @@ public class ReactExoplayerView extends FrameLayout implements
                     break;
                 case 3:
                     speed = 2.0f;
+                    break;
+                case 4:
+                    speed = 3.0f;
                     break;
                 default:
                     speed = 1.0f;;
