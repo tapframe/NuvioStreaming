@@ -15,6 +15,7 @@ import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { TMDBService } from '../services/tmdbService';
 import { useTheme } from '../contexts/ThemeContext';
+import { useSettings } from '../hooks/useSettings';
 
 const { width } = Dimensions.get('window');
 const BACKDROP_WIDTH = width * 0.9;
@@ -39,6 +40,7 @@ const BackdropGalleryScreen: React.FC = () => {
   const navigation = useNavigation();
   const { tmdbId, type, title } = route.params as RouteParams;
   const { currentTheme } = useTheme();
+  const { settings } = useSettings();
 
   const [backdrops, setBackdrops] = useState<BackdropItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,12 +51,15 @@ const BackdropGalleryScreen: React.FC = () => {
       try {
         setLoading(true);
         const tmdbService = TMDBService.getInstance();
+        
+        // Get language preference
+        const language = settings.useTmdbLocalizedMetadata ? (settings.tmdbLanguagePreference || 'en') : 'en';
 
         let images;
         if (type === 'movie') {
-          images = await tmdbService.getMovieImagesFull(tmdbId);
+          images = await tmdbService.getMovieImagesFull(tmdbId, language);
         } else {
-          images = await tmdbService.getTvShowImagesFull(tmdbId);
+          images = await tmdbService.getTvShowImagesFull(tmdbId, language);
         }
 
         if (__DEV__) {
@@ -83,7 +88,7 @@ const BackdropGalleryScreen: React.FC = () => {
     if (tmdbId) {
       fetchBackdrops();
     }
-  }, [tmdbId, type]);
+  }, [tmdbId, type, settings.useTmdbLocalizedMetadata, settings.tmdbLanguagePreference]);
 
 
 

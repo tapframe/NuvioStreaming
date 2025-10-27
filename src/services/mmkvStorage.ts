@@ -4,6 +4,10 @@ import { logger } from '../utils/logger';
 class MMKVStorage {
   private static instance: MMKVStorage;
   private storage = createMMKV();
+  // In-memory cache for frequently accessed data
+  private cache = new Map<string, { value: any; timestamp: number }>();
+  private readonly CACHE_TTL = 30000; // 30 seconds
+  private readonly MAX_CACHE_SIZE = 100; // Limit cache size to prevent memory issues
 
   private constructor() {}
 
@@ -14,11 +18,56 @@ class MMKVStorage {
     return MMKVStorage.instance;
   }
 
+  // Cache management methods
+  private getCached(key: string): string | null {
+    const cached = this.cache.get(key);
+    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+      return cached.value;
+    }
+    if (cached) {
+      this.cache.delete(key);
+    }
+    return null;
+  }
+
+  private setCached(key: string, value: any): void {
+    // Implement LRU-style eviction if cache is too large
+    if (this.cache.size >= this.MAX_CACHE_SIZE) {
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey) {
+        this.cache.delete(firstKey);
+      }
+    }
+    this.cache.set(key, { value, timestamp: Date.now() });
+  }
+
+  private invalidateCache(key?: string): void {
+    if (key) {
+      this.cache.delete(key);
+    } else {
+      this.cache.clear();
+    }
+  }
+
   // AsyncStorage-compatible API
   async getItem(key: string): Promise<string | null> {
     try {
+      // Check cache first
+      const cached = this.getCached(key);
+      if (cached !== null) {
+        return cached;
+      }
+      
+      // Read from storage
       const value = this.storage.getString(key);
-      return value ?? null;
+      const result = value ?? null;
+      
+      // Cache the result
+      if (result !== null) {
+        this.setCached(key, result);
+      }
+      
+      return result;
     } catch (error) {
       logger.error(`[MMKVStorage] Error getting item ${key}:`, error);
       return null;
@@ -28,6 +77,8 @@ class MMKVStorage {
   async setItem(key: string, value: string): Promise<void> {
     try {
       this.storage.set(key, value);
+      // Update cache immediately
+      this.setCached(key, value);
     } catch (error) {
       logger.error(`[MMKVStorage] Error setting item ${key}:`, error);
     }
@@ -39,6 +90,8 @@ class MMKVStorage {
       if (this.storage.contains(key)) {
         this.storage.remove(key);
       }
+      // Invalidate cache
+      this.invalidateCache(key);
     } catch (error) {
       logger.error(`[MMKVStorage] Error removing item ${key}:`, error);
     }
@@ -71,6 +124,7 @@ class MMKVStorage {
   async clear(): Promise<void> {
     try {
       this.storage.clearAll();
+      this.cache.clear();
     } catch (error) {
       logger.error('[MMKVStorage] Error clearing storage:', error);
     }

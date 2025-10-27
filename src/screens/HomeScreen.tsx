@@ -67,6 +67,11 @@ import { HeaderVisibility } from '../contexts/HeaderVisibility';
 // Constants
 const CATALOG_SETTINGS_KEY = 'catalog_settings';
 
+// In-memory cache for catalog settings to avoid repeated MMKV reads
+let cachedCatalogSettings: Record<string, boolean> | null = null;
+let catalogSettingsCacheTimestamp = 0;
+const CATALOG_SETTINGS_CACHE_TTL = 30000; // 30 seconds
+
 // Define interfaces for our data
 interface Category {
   id: string;
@@ -153,9 +158,24 @@ const HomeScreen = () => {
     setLoadedCatalogCount(0);
     
     try {
-      const [addons, catalogSettingsJson, addonManifests] = await Promise.all([
+      // Check cache first
+      let catalogSettings: Record<string, boolean> = {};
+      const now = Date.now();
+      
+      if (cachedCatalogSettings && (now - catalogSettingsCacheTimestamp) < CATALOG_SETTINGS_CACHE_TTL) {
+        catalogSettings = cachedCatalogSettings;
+      } else {
+        // Load from storage
+        const catalogSettingsJson = await mmkvStorage.getItem(CATALOG_SETTINGS_KEY);
+        catalogSettings = catalogSettingsJson ? JSON.parse(catalogSettingsJson) : {};
+        
+        // Update cache
+        cachedCatalogSettings = catalogSettings;
+        catalogSettingsCacheTimestamp = now;
+      }
+      
+      const [addons, addonManifests] = await Promise.all([
         catalogService.getAllAddons(),
-        mmkvStorage.getItem(CATALOG_SETTINGS_KEY),
         stremioService.getInstalledAddonsAsync()
       ]);
       
@@ -163,8 +183,6 @@ const HomeScreen = () => {
       InteractionManager.runAfterInteractions(() => {
         setHasAddons(addons.length > 0);
       });
-      
-      const catalogSettings = catalogSettingsJson ? JSON.parse(catalogSettingsJson) : {};
       
       // Create placeholder array with proper order and track indices
       let catalogIndex = 0;
@@ -655,6 +673,9 @@ const HomeScreen = () => {
   // Track scroll direction manually for reliable behavior across platforms
   const lastScrollYRef = useRef(0);
   const lastToggleRef = useRef(0);
+  const scrollAnimationFrameRef = useRef<number | null>(null);
+  const isScrollingRef = useRef(false);
+  
   const toggleHeader = useCallback((hide: boolean) => {
     const now = Date.now();
     if (now - lastToggleRef.current < 120) return; // debounce
@@ -739,21 +760,40 @@ const HomeScreen = () => {
     </>
   ), [catalogsLoading, catalogs, loadedCatalogCount, totalCatalogsRef.current, navigation, currentTheme.colors]);
 
-  // Memoize scroll handler to prevent recreating on every render
+  // Memoize scroll handler with requestAnimationFrame throttling for better performance
   const handleScroll = useCallback((event: any) => {
-    const y = event.nativeEvent.contentOffset.y;
-    const dy = y - lastScrollYRef.current;
-    lastScrollYRef.current = y;
-    if (y <= 10) {
-      toggleHeader(false);
-      return;
+    // Persist the event before using requestAnimationFrame to prevent event pooling issues
+    event.persist();
+    
+    // Cancel any pending animation frame
+    if (scrollAnimationFrameRef.current !== null) {
+      cancelAnimationFrame(scrollAnimationFrameRef.current);
     }
-    // Threshold to avoid jitter
-    if (dy > 6) {
-      toggleHeader(true); // scrolling down
-    } else if (dy < -6) {
-      toggleHeader(false); // scrolling up
-    }
+    
+    // Capture scroll values immediately before async operation
+    const scrollY = event.nativeEvent.contentOffset.y;
+    
+    // Use requestAnimationFrame to throttle scroll handling
+    scrollAnimationFrameRef.current = requestAnimationFrame(() => {
+      const y = scrollY;
+      const dy = y - lastScrollYRef.current;
+      lastScrollYRef.current = y;
+      
+      isScrollingRef.current = Math.abs(dy) > 0;
+      
+      if (y <= 10) {
+        toggleHeader(false);
+        return;
+      }
+      // Threshold to avoid jitter
+      if (dy > 6) {
+        toggleHeader(true); // scrolling down
+      } else if (dy < -6) {
+        toggleHeader(false); // scrolling up
+      }
+      
+      scrollAnimationFrameRef.current = null;
+    });
   }, [toggleHeader]);
 
   // Memoize content container style - use stable insets to prevent iOS shifting

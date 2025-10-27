@@ -151,6 +151,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
 
 const SETTINGS_STORAGE_KEY = 'app_settings';
 
+// Singleton settings cache
+let cachedSettings: AppSettings | null = null;
+let settingsCacheTimestamp = 0;
+const SETTINGS_CACHE_TTL = 60000; // 1 minute
+
 export const useSettings = () => {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [isLoaded, setIsLoaded] = useState<boolean>(false);
@@ -168,41 +173,46 @@ export const useSettings = () => {
 
   const loadSettings = async () => {
     try {
+      // Use cached settings if available and fresh
+      const now = Date.now();
+      if (cachedSettings && (now - settingsCacheTimestamp) < SETTINGS_CACHE_TTL) {
+        setSettings(cachedSettings);
+        setIsLoaded(true);
+        return;
+      }
+
       const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
       const scopedKey = `@user:${scope}:${SETTINGS_STORAGE_KEY}`;
+      
+      // Use synchronous MMKV reads for better performance
       const [scopedJson, legacyJson] = await Promise.all([
         mmkvStorage.getItem(scopedKey),
         mmkvStorage.getItem(SETTINGS_STORAGE_KEY),
       ]);
+      
       const parsedScoped = scopedJson ? JSON.parse(scopedJson) : null;
       const parsedLegacy = legacyJson ? JSON.parse(legacyJson) : null;
 
       let merged = parsedScoped || parsedLegacy;
 
-      // Fallback: scan any existing user-scoped settings if current scope not set yet
+      // Simplified fallback - only use getAllKeys if absolutely necessary
       if (!merged) {
-        try {
-          const allKeys = await mmkvStorage.getAllKeys();
-          const candidateKeys = (allKeys || []).filter(k => k.endsWith(`:${SETTINGS_STORAGE_KEY}`));
-          if (candidateKeys.length > 0) {
-            const pairs = await mmkvStorage.multiGet(candidateKeys);
-            for (const [, value] of pairs) {
-              if (value) {
-                try {
-                  const candidate = JSON.parse(value);
-                  if (candidate && typeof candidate === 'object') {
-                    merged = candidate;
-                    break;
-                  }
-                } catch {}
-              }
-            }
-          }
-        } catch {}
+        // Use string search on MMKV storage instead of getAllKeys for performance
+        const scoped = mmkvStorage.getString(scopedKey);
+        if (scoped) {
+          try {
+            merged = JSON.parse(scoped);
+          } catch {}
+        }
       }
 
-      if (merged) setSettings({ ...DEFAULT_SETTINGS, ...merged });
-      else setSettings(DEFAULT_SETTINGS);
+      const finalSettings = merged ? { ...DEFAULT_SETTINGS, ...merged } : DEFAULT_SETTINGS;
+      
+      // Update cache
+      cachedSettings = finalSettings;
+      settingsCacheTimestamp = now;
+      
+      setSettings(finalSettings);
     } catch (error) {
       if (__DEV__) console.error('Failed to load settings:', error);
       // Fallback to default settings on error
@@ -230,6 +240,11 @@ export const useSettings = () => {
     ]);
     // Ensure a current scope exists to avoid future loads missing the chosen scope
     await mmkvStorage.setItem('@user:current', scope);
+      
+      // Update cache
+      cachedSettings = newSettings;
+      settingsCacheTimestamp = Date.now();
+      
       setSettings(newSettings);
       if (__DEV__) console.log(`Setting updated: ${key}`, value);
       

@@ -954,7 +954,15 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             banner: undefined, // Let useMetadataAssets handle banner via TMDB
           };
         }
-        setMetadata(finalMetadata);
+        
+        // Preserve existing collection if it was set by fetchProductionInfo
+        setMetadata((prev) => {
+          const updated = { ...finalMetadata };
+          if (prev?.collection) {
+            updated.collection = prev.collection;
+          }
+          return updated;
+        });
         cacheService.setMetadata(id, type, finalMetadata);
         (async () => {
           const items = await catalogService.getLibraryItems();
@@ -1907,10 +1915,21 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
   // Fetch TMDB networks/production companies when TMDB ID is available and enrichment is enabled
   const productionInfoFetchedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!tmdbId || !settings.enrichMetadataWithTMDB || !metadata) return;
+    if (!tmdbId || !settings.enrichMetadataWithTMDB || !metadata) {
+      return;
+    }
 
     const contentKey = `${type}-${tmdbId}`;
-    if (productionInfoFetchedRef.current === contentKey || (metadata as any).networks) return;
+    if (productionInfoFetchedRef.current === contentKey) {
+      return;
+    }
+    
+    // Only skip if networks are set AND collection is already set (for movies)
+    const hasNetworks = !!(metadata as any).networks;
+    const hasCollection = !!(metadata as any).collection;
+    if (hasNetworks && (type !== 'movie' || hasCollection)) {
+      return;
+    }
 
     const fetchProductionInfo = async () => {
       try {
@@ -2032,7 +2051,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
                       
                       // Try to fetch movie images with language parameter
                       try {
-                        const movieImages = await tmdbService.getMovieImagesFull(part.id);
+                        const movieImages = await tmdbService.getMovieImagesFull(part.id, lang);
                         if (movieImages && movieImages.backdrops && movieImages.backdrops.length > 0) {
                           // Filter and sort backdrops by language and quality
                           const languageBackdrops = movieImages.backdrops
@@ -2105,12 +2124,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
           }
         }
 
-        if (__DEV__) console.log('[useMetadata] Fetched production info via TMDB:', productionInfo);
         if (productionInfo.length > 0) {
-          if (__DEV__) console.log('[useMetadata] Setting production info on metadata', { productionInfoCount: productionInfo.length });
           setMetadata((prev: any) => ({ ...prev, networks: productionInfo }));
-        } else {
-          if (__DEV__) console.log('[useMetadata] No production info found, not setting networks');
         }
       } catch (error) {
         if (__DEV__) console.error('[useMetadata] Failed to fetch production info:', error);

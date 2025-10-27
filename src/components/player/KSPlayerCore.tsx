@@ -3436,7 +3436,10 @@ const KSPlayerCore: React.FC = () => {
           <EpisodeStreamsModal
             visible={showEpisodeStreamsModal}
             episode={selectedEpisodeForStreams}
-            onClose={() => setShowEpisodeStreamsModal(false)}
+            onClose={() => {
+              setShowEpisodeStreamsModal(false);
+              setShowEpisodesModal(true);
+            }}
             onSelectStream={handleEpisodeStreamSelect}
             metadata={metadata ? { id: metadata.id, name: metadata.name } : undefined}
           />

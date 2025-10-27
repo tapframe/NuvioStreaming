@@ -24,6 +24,11 @@ class StorageService {
   private readonly NOTIFICATION_DEBOUNCE_MS = 1000; // 1 second debounce
   private readonly MIN_NOTIFICATION_INTERVAL = 500; // Minimum 500ms between notifications
 
+  // Cache for getAllWatchProgress
+  private watchProgressCache: Record<string, WatchProgress> | null = null;
+  private watchProgressCacheTimestamp = 0;
+  private readonly WATCH_PROGRESS_CACHE_TTL = 5000; // 5 seconds
+
   private constructor() {}
 
   public static getInstance(): StorageService {
@@ -263,6 +268,9 @@ class StorageService {
         : Date.now();
       const updated = { ...progress, lastUpdated: timestamp };
       await mmkvStorage.setItem(key, JSON.stringify(updated));
+      
+      // Invalidate cache
+      this.invalidateWatchProgressCache();
 
       // Notify subscribers; allow forcing immediate notification
       if (options?.forceNotify) {
@@ -349,6 +357,10 @@ class StorageService {
       const key = await this.getWatchProgressKeyScoped(id, type, episodeId);
       await mmkvStorage.removeItem(key);
       await this.addWatchProgressTombstone(id, type, episodeId);
+      
+      // Invalidate cache
+      this.invalidateWatchProgressCache();
+      
       // Notify subscribers
       this.notifyWatchProgressSubscribers();
       // Emit explicit remove event for sync layer
@@ -360,21 +372,39 @@ class StorageService {
 
   public async getAllWatchProgress(): Promise<Record<string, WatchProgress>> {
     try {
+      // Use cache if available and fresh
+      const now = Date.now();
+      if (this.watchProgressCache && (now - this.watchProgressCacheTimestamp) < this.WATCH_PROGRESS_CACHE_TTL) {
+        return this.watchProgressCache;
+      }
+
       const scope = await this.getUserScope();
       const prefix = `@user:${scope}:${this.WATCH_PROGRESS_KEY}`;
       const keys = await mmkvStorage.getAllKeys();
       const watchProgressKeys = keys.filter(key => key.startsWith(prefix));
       const pairs = await mmkvStorage.multiGet(watchProgressKeys);
-      return pairs.reduce((acc, [key, value]) => {
+      
+      const result = pairs.reduce((acc, [key, value]) => {
         if (value) {
           acc[key.replace(prefix, '')] = JSON.parse(value);
         }
         return acc;
       }, {} as Record<string, WatchProgress>);
+      
+      // Update cache
+      this.watchProgressCache = result;
+      this.watchProgressCacheTimestamp = now;
+      
+      return result;
     } catch (error) {
       logger.error('Error getting all watch progress:', error);
       return {};
     }
+  }
+  
+  private invalidateWatchProgressCache(): void {
+    this.watchProgressCache = null;
+    this.watchProgressCacheTimestamp = 0;
   }
 
   /**

@@ -47,11 +47,12 @@ export const EpisodesModal: React.FC<EpisodesModalProps> = ({
     }
   });
 
+  // Initialize season only when modal opens
   useEffect(() => {
-    if (currentEpisode?.season) {
+    if (showEpisodesModal && currentEpisode?.season) {
       setSelectedSeason(currentEpisode.season);
     }
-  }, [currentEpisode]);
+  }, [showEpisodesModal, currentEpisode?.season]);
 
   const loadEpisodesProgress = async () => {
     if (!metadata?.id) return;

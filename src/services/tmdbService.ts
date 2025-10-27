@@ -906,22 +906,27 @@ export class TMDBService {
   /**
    * Get movie images (logos, posters, backdrops) by TMDB ID - returns full images object
    */
-  async getMovieImagesFull(movieId: number | string): Promise<any> {
-    const cacheKey = this.generateCacheKey(`movie_${movieId}_images_full`);
+  async getMovieImagesFull(movieId: number | string, language: string = 'en'): Promise<any> {
+    const cacheKey = this.generateCacheKey(`movie_${movieId}_images_full`, { language });
     
     // Check cache
     const cached = this.getCachedData<any>(cacheKey);
-    if (cached !== null) return cached;
+    if (cached !== null) {
+      return cached;
+    }
 
+    
     try {
       const response = await axios.get(`${BASE_URL}/movie/${movieId}/images`, {
         headers: await this.getHeaders(),
         params: await this.getParams({
-          include_image_language: `en,null`
+          include_image_language: `${language},en,null`
         }),
       });
 
       const data = response.data;
+
+      
       this.setCachedData(cacheKey, data);
       return data;
     } catch (error) {
@@ -1056,8 +1061,8 @@ export class TMDBService {
   /**
    * Get TV show images (logos, posters, backdrops) by TMDB ID - returns full images object
    */
-  async getTvShowImagesFull(showId: number | string): Promise<any> {
-    const cacheKey = this.generateCacheKey(`tv_${showId}_images_full`);
+  async getTvShowImagesFull(showId: number | string, language: string = 'en'): Promise<any> {
+    const cacheKey = this.generateCacheKey(`tv_${showId}_images_full`, { language });
     
     // Check cache
     const cached = this.getCachedData<any>(cacheKey);
@@ -1067,7 +1072,7 @@ export class TMDBService {
       const response = await axios.get(`${BASE_URL}/tv/${showId}/images`, {
         headers: await this.getHeaders(),
         params: await this.getParams({
-          include_image_language: `en,null`
+          include_image_language: `${language},en,null`
         }),
       });
 
