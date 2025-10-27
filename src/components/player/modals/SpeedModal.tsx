@@ -45,8 +45,8 @@ export const SpeedModal: React.FC<SpeedModalProps> = ({
     isIos ? 380 : 360
   );
 
-  const speedPresets = [0.5, 1.0, 1.5, 2.0, 2.5];
-  const holdSpeedOptions = [1.5, 2.0];
+  const speedPresets = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0];
+  const holdSpeedOptions = [1.5, 2.0, 2.5, 3.0];
 
   const handleClose = () => {
     setShowSpeedModal(false);
