@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,21 +9,43 @@ import {
   SafeAreaView,
   StatusBar,
   ScrollView,
+  Switch,
+  Animated,
+  Easing,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
 import * as Updates from 'expo-updates';
 import { useNavigation } from '@react-navigation/native';
-import { backupService, BackupOptions } from '../services/backupService';
+import { backupService } from '../services/backupService';
 import { useTheme } from '../contexts/ThemeContext';
 import { logger } from '../utils/logger';
 import CustomAlert from '../components/CustomAlert';
+import { useBackupOptions } from '../hooks/useBackupOptions';
 
 const BackupScreen: React.FC = () => {
   const { currentTheme } = useTheme();
   const [isLoading, setIsLoading] = useState(false);
   const navigation = useNavigation();
+  const { preferences, updatePreference, getBackupOptions } = useBackupOptions();
+  
+  // Collapsible sections state
+  const [expandedSections, setExpandedSections] = useState({
+    coreData: false,
+    addonsIntegrations: false,
+    settingsPreferences: false,
+  });
+  
+  // Animated values for each section
+  const coreDataAnim = useRef(new Animated.Value(0)).current;
+  const addonsAnim = useRef(new Animated.Value(0)).current;
+  const settingsAnim = useRef(new Animated.Value(0)).current;
+  
+  // Chevron rotation animated values
+  const coreDataChevron = useRef(new Animated.Value(0)).current;
+  const addonsChevron = useRef(new Animated.Value(0)).current;
+  const settingsChevron = useRef(new Animated.Value(0)).current;
 
   // Alert state
   const [alertVisible, setAlertVisible] = useState(false);
@@ -56,6 +78,43 @@ const BackupScreen: React.FC = () => {
     }
   };
 
+  // Toggle section collapse/expand
+  const toggleSection = useCallback((section: 'coreData' | 'addonsIntegrations' | 'settingsPreferences') => {
+    const isExpanded = expandedSections[section];
+    
+    let heightAnim: Animated.Value;
+    let chevronAnim: Animated.Value;
+    
+    if (section === 'coreData') {
+      heightAnim = coreDataAnim;
+      chevronAnim = coreDataChevron;
+    } else if (section === 'addonsIntegrations') {
+      heightAnim = addonsAnim;
+      chevronAnim = addonsChevron;
+    } else {
+      heightAnim = settingsAnim;
+      chevronAnim = settingsChevron;
+    }
+    
+    // Animate height and chevron rotation
+    Animated.parallel([
+      Animated.timing(heightAnim, {
+        toValue: isExpanded ? 0 : 1,
+        duration: 300,
+        useNativeDriver: false, // Required for height
+        easing: Easing.inOut(Easing.ease),
+      }),
+      Animated.timing(chevronAnim, {
+        toValue: isExpanded ? 0 : 1,
+        duration: 300,
+        useNativeDriver: true, // Transforms support native driver
+        easing: Easing.inOut(Easing.ease),
+      }),
+    ]).start();
+    
+    setExpandedSections(prev => ({...prev, [section]: !isExpanded}));
+  }, [expandedSections, coreDataAnim, addonsAnim, settingsAnim, coreDataChevron, addonsChevron, settingsChevron]);
+
   // Create backup
   const handleCreateBackup = useCallback(async () => {
     try {
@@ -64,64 +123,78 @@ const BackupScreen: React.FC = () => {
       const preview = await backupService.getBackupPreview();
       setIsLoading(false);
 
-      // Calculate total without downloads
-      const totalWithoutDownloads = preview.library + preview.watchProgress + preview.addons + preview.scrapers;
+      // Filter based on preferences
+      const items: string[] = [];
+      let total = 0;
+
+      if (preferences.includeLibrary) {
+        items.push(`Library: ${preview.library} items`);
+        total += preview.library;
+      }
+
+      if (preferences.includeWatchProgress) {
+        items.push(`Watch Progress: ${preview.watchProgress} entries`);
+        total += preview.watchProgress;
+      }
+
+      if (preferences.includeAddons) {
+        items.push(`Addons: ${preview.addons} installed`);
+        total += preview.addons;
+      }
+
+      if (preferences.includeLocalScrapers) {
+        items.push(`Plugins: ${preview.scrapers} configurations`);
+        total += preview.scrapers;
+      }
+
+      // Check if no items are selected
+      const message = items.length > 0
+        ? `Backup Contents:\n\n${items.join('\n')}\n\nTotal: ${total} items\n\nThis backup includes your selected app settings, themes, and integration data.`
+        : `No content selected for backup.\n\nPlease enable at least one option in the Backup Options section above.`;
 
       openAlert(
         'Create Backup',
-        `Backup Contents:\n\n` +
-        `Library: ${preview.library} items\n` +
-        `Watch Progress: ${preview.watchProgress} entries\n` +
-        `Addons: ${preview.addons} installed\n` +
-        `Plugins: ${preview.scrapers} configurations\n\n` +
-        `Total: ${totalWithoutDownloads} items\n\n` +
-        `This backup includes all your app settings, themes, and integration data.`,
-        [
-          { label: 'Cancel', onPress: () => {} },
-          {
-            label: 'Create Backup',
-            onPress: async () => {
-              try {
-                setIsLoading(true);
+        message,
+        items.length > 0
+          ? [
+              { label: 'Cancel', onPress: () => {} },
+              {
+                label: 'Create Backup',
+                onPress: async () => {
+                  try {
+                    setIsLoading(true);
 
-                const backupOptions: BackupOptions = {
-                  includeLibrary: true,
-                  includeWatchProgress: true,
-                  includeDownloads: true,
-                  includeAddons: true,
-                  includeSettings: true,
-                  includeTraktData: true,
-                  includeLocalScrapers: true,
-                };
+                    const backupOptions = getBackupOptions();
 
-                const fileUri = await backupService.createBackup(backupOptions);
+                    const fileUri = await backupService.createBackup(backupOptions);
 
-                // Share the backup file
-                if (await Sharing.isAvailableAsync()) {
-                  await Sharing.shareAsync(fileUri, {
-                    mimeType: 'application/json',
-                    dialogTitle: 'Share Nuvio Backup',
-                  });
+                    // Share the backup file
+                    if (await Sharing.isAvailableAsync()) {
+                      await Sharing.shareAsync(fileUri, {
+                        mimeType: 'application/json',
+                        dialogTitle: 'Share Nuvio Backup',
+                      });
+                    }
+
+                    openAlert(
+                      'Backup Created',
+                      'Your backup has been created and is ready to share.',
+                      [{ label: 'OK', onPress: () => {} }]
+                    );
+                  } catch (error) {
+                    logger.error('[BackupScreen] Failed to create backup:', error);
+                    openAlert(
+                      'Backup Failed',
+                      `Failed to create backup: ${error instanceof Error ? error.message : String(error)}`,
+                      [{ label: 'OK', onPress: () => {} }]
+                    );
+                  } finally {
+                    setIsLoading(false);
+                  }
                 }
-
-                openAlert(
-                  'Backup Created',
-                  'Your backup has been created and is ready to share.',
-                  [{ label: 'OK', onPress: () => {} }]
-                );
-              } catch (error) {
-                logger.error('[BackupScreen] Failed to create backup:', error);
-                openAlert(
-                  'Backup Failed',
-                  `Failed to create backup: ${error instanceof Error ? error.message : String(error)}`,
-                  [{ label: 'OK', onPress: () => {} }]
-                );
-              } finally {
-                setIsLoading(false);
               }
-            }
-          }
-        ]
+            ]
+          : [{ label: 'OK', onPress: () => {} }]
       );
     } catch (error) {
       logger.error('[BackupScreen] Failed to get backup preview:', error);
@@ -132,7 +205,7 @@ const BackupScreen: React.FC = () => {
       );
       setIsLoading(false);
     }
-  }, [openAlert]);
+  }, [openAlert, preferences, getBackupOptions]);
 
   // Restore backup
   const handleRestoreBackup = useCallback(async () => {
@@ -162,15 +235,7 @@ const BackupScreen: React.FC = () => {
               try {
                 setIsLoading(true);
 
-                const restoreOptions: BackupOptions = {
-                  includeLibrary: true,
-                  includeWatchProgress: true,
-                  includeDownloads: true,
-                  includeAddons: true,
-                  includeSettings: true,
-                  includeTraktData: true,
-                  includeLocalScrapers: true,
-                };
+                const restoreOptions = getBackupOptions();
 
                 await backupService.restoreBackup(fileUri, restoreOptions);
 
@@ -248,6 +313,181 @@ const BackupScreen: React.FC = () => {
             onClose={() => setAlertVisible(false)}
           />
 
+          {/* Backup Options Section */}
+          <View style={[styles.section, { backgroundColor: currentTheme.colors.elevation1 }]}>
+            <Text style={[styles.sectionTitle, { color: currentTheme.colors.highEmphasis }]}>
+              Backup Options
+            </Text>
+            <Text style={[styles.sectionDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+              Choose what to include in your backups
+            </Text>
+            
+            {/* Core Data Group */}
+            <TouchableOpacity
+              style={styles.sectionHeader}
+              onPress={() => toggleSection('coreData')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.groupLabel, { color: currentTheme.colors.highEmphasis }]}>
+                Core Data
+              </Text>
+              <Animated.View
+                style={{
+                  transform: [{
+                    rotate: coreDataChevron.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['180deg', '0deg']
+                    })
+                  }]
+                }}
+              >
+                <MaterialIcons name="expand-more" size={24} color={currentTheme.colors.highEmphasis} />
+              </Animated.View>
+            </TouchableOpacity>
+            <Animated.View
+              style={{
+                maxHeight: coreDataAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, 2000]
+                }),
+                overflow: 'hidden',
+                opacity: coreDataAnim,
+              }}
+            >
+              <OptionToggle
+                label="Library"
+                description="Your saved movies and TV shows"
+                value={preferences.includeLibrary}
+                onValueChange={(v) => updatePreference('includeLibrary', v)}
+                theme={currentTheme}
+              />
+              <OptionToggle
+                label="Watch Progress"
+                description="Continue watching positions"
+                value={preferences.includeWatchProgress}
+                onValueChange={(v) => updatePreference('includeWatchProgress', v)}
+                theme={currentTheme}
+              />
+            </Animated.View>
+            
+            {/* Addons & Integrations Group */}
+            <TouchableOpacity
+              style={styles.sectionHeader}
+              onPress={() => toggleSection('addonsIntegrations')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.groupLabel, { color: currentTheme.colors.highEmphasis }]}>
+                Addons & Integrations
+              </Text>
+              <Animated.View
+                style={{
+                  transform: [{
+                    rotate: addonsChevron.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['180deg', '0deg']
+                    })
+                  }]
+                }}
+              >
+                <MaterialIcons name="expand-more" size={24} color={currentTheme.colors.highEmphasis} />
+              </Animated.View>
+            </TouchableOpacity>
+            <Animated.View
+              style={{
+                maxHeight: addonsAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, 2000]
+                }),
+                overflow: 'hidden',
+                opacity: addonsAnim,
+              }}
+            >
+              <OptionToggle
+                label="Addons"
+                description="Installed Stremio addons"
+                value={preferences.includeAddons}
+                onValueChange={(v) => updatePreference('includeAddons', v)}
+                theme={currentTheme}
+              />
+              <OptionToggle
+                label="Plugins"
+                description="Custom scraper configurations"
+                value={preferences.includeLocalScrapers}
+                onValueChange={(v) => updatePreference('includeLocalScrapers', v)}
+                theme={currentTheme}
+              />
+              <OptionToggle
+                label="Trakt Integration"
+                description="Sync data and authentication tokens"
+                value={preferences.includeTraktData}
+                onValueChange={(v) => updatePreference('includeTraktData', v)}
+                theme={currentTheme}
+              />
+            </Animated.View>
+            
+            {/* Settings & Preferences Group */}
+            <TouchableOpacity
+              style={styles.sectionHeader}
+              onPress={() => toggleSection('settingsPreferences')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.groupLabel, { color: currentTheme.colors.highEmphasis }]}>
+                Settings & Preferences
+              </Text>
+              <Animated.View
+                style={{
+                  transform: [{
+                    rotate: settingsChevron.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['180deg', '0deg']
+                    })
+                  }]
+                }}
+              >
+                <MaterialIcons name="expand-more" size={24} color={currentTheme.colors.highEmphasis} />
+              </Animated.View>
+            </TouchableOpacity>
+            <Animated.View
+              style={{
+                maxHeight: settingsAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, 2000]
+                }),
+                overflow: 'hidden',
+                opacity: settingsAnim,
+              }}
+            >
+              <OptionToggle
+                label="App Settings"
+                description="Theme, preferences, and configurations"
+                value={preferences.includeSettings}
+                onValueChange={(v) => updatePreference('includeSettings', v)}
+                theme={currentTheme}
+              />
+              <OptionToggle
+                label="User Preferences"
+                description="Addon order and UI settings"
+                value={preferences.includeUserPreferences}
+                onValueChange={(v) => updatePreference('includeUserPreferences', v)}
+                theme={currentTheme}
+              />
+              <OptionToggle
+                label="Catalog Settings"
+                description="Catalog filters and preferences"
+                value={preferences.includeCatalogSettings}
+                onValueChange={(v) => updatePreference('includeCatalogSettings', v)}
+                theme={currentTheme}
+              />
+              <OptionToggle
+                label="API Keys"
+                description="MDBList and OpenRouter keys"
+                value={preferences.includeApiKeys}
+                onValueChange={(v) => updatePreference('includeApiKeys', v)}
+                theme={currentTheme}
+              />
+            </Animated.View>
+          </View>
+
           {/* Backup Actions */}
           <View style={[styles.section, { backgroundColor: currentTheme.colors.elevation1 }]}>
             <Text style={[styles.sectionTitle, { color: currentTheme.colors.highEmphasis }]}>
@@ -297,7 +537,7 @@ const BackupScreen: React.FC = () => {
               About Backups
             </Text>
             <Text style={[styles.infoText, { color: currentTheme.colors.mediumEmphasis }]}>
-              • Backups include all your data: library, watch progress, settings, addons, downloads, and plugins{'\n'}
+              • Customize what gets backed up using the toggles above{'\n'}
               • Backup files are stored locally on your device{'\n'}
               • Share your backup to transfer data between devices{'\n'}
               • Restoring will overwrite your current data
@@ -308,6 +548,33 @@ const BackupScreen: React.FC = () => {
     </SafeAreaView>
   );
 };
+
+interface OptionToggleProps {
+  label: string;
+  description: string;
+  value: boolean;
+  onValueChange: (value: boolean) => void;
+  theme: any;
+}
+
+const OptionToggle: React.FC<OptionToggleProps> = ({ label, description, value, onValueChange, theme }) => (
+  <View style={[styles.optionRow, { borderBottomColor: theme.colors.outline }]}>
+    <View style={styles.optionLeft}>
+      <Text style={[styles.optionLabel, { color: theme.colors.highEmphasis }]}>
+        {label}
+      </Text>
+      <Text style={[styles.optionDescription, { color: theme.colors.mediumEmphasis }]}>
+        {description}
+      </Text>
+    </View>
+    <Switch
+      value={value}
+      onValueChange={onValueChange}
+      trackColor={{ false: theme.colors.outline, true: theme.colors.primary }}
+      thumbColor={value ? '#fff' : '#f4f3f4'}
+    />
+  </View>
+);
 
 const styles = StyleSheet.create({
   container: {
@@ -355,6 +622,42 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 16,
+  },
+  sectionDescription: {
+    fontSize: 14,
+    marginBottom: 16,
+  },
+  groupLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 16,
+    marginBottom: 8,
+    paddingVertical: 8,
+  },
+  optionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  optionLeft: {
+    flex: 1,
+    paddingRight: 16,
+  },
+  optionLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  optionDescription: {
+    fontSize: 13,
+    lineHeight: 16,
   },
   actionButton: {
     flexDirection: 'row',
