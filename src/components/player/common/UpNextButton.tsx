@@ -171,8 +171,8 @@ const UpNextButton: React.FC<UpNextButtonProps> = ({
 
         {/* Bottom overlay text */}
         <LinearGradient
-          colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.5)", "rgba(0,0,0,0.9)"]}
-          locations={[0, 0.4, 1]}
+          colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.65)", "rgba(0,0,0,0.98)"]}
+          locations={[0, 0.5, 1]}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
           style={{
@@ -195,7 +195,7 @@ const UpNextButton: React.FC<UpNextButtonProps> = ({
               {isLoading ? 'Loading next…' : 'Up next'}
             </Text>
           </View>
-          <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '700' }} numberOfLines={1}>
+          <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '700' }} numberOfLines={2}>
             S{nextEpisode.season_number}E{nextEpisode.episode_number}
             {nextEpisode.name ? `: ${nextEpisode.name}` : ''}
           </Text>
