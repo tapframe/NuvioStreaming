@@ -786,13 +786,35 @@ const AndroidVideoPlayer: React.FC = () => {
     }
   }, [isSpeedBoosted, playbackSpeed, holdToSpeedEnabled, holdToSpeedValue, speedActivatedOverlayOpacity]);
 
-  const onLongPressEnd = useCallback(() => {
+  const restoreSpeedSafely = useCallback(() => {
     if (isSpeedBoosted) {
       setPlaybackSpeed(originalSpeed);
       setIsSpeedBoosted(false);
-      
       logger.log('[AndroidVideoPlayer] Speed boost deactivated, restored to:', originalSpeed);
     }
+  }, [isSpeedBoosted, originalSpeed]);
+
+  const onLongPressEnd = useCallback(() => {
+    restoreSpeedSafely();
+  }, [restoreSpeedSafely]);
+
+  const onLongPressStateChange = useCallback((event: LongPressGestureHandlerGestureEvent) => {
+    // Fallback: ensure we restore on cancel/fail transitions as well
+    // @ts-ignore - event.nativeEvent.state uses numeric State enum
+    const state = event?.nativeEvent?.state;
+    if (state === State.CANCELLED || state === State.FAILED || state === State.END) {
+      restoreSpeedSafely();
+    }
+  }, [restoreSpeedSafely]);
+
+  // Safety: if component unmounts while boosted, restore speed
+  useEffect(() => {
+    return () => {
+      if (isSpeedBoosted) {
+        // best-effort restoration on unmount
+        try { setPlaybackSpeed(originalSpeed); } catch {}
+      }
+    };
   }, [isSpeedBoosted, originalSpeed]);
 
   const resetZoom = () => {
@@ -3147,6 +3169,7 @@ const AndroidVideoPlayer: React.FC = () => {
         <LongPressGestureHandler
           onActivated={onLongPressActivated}
           onEnded={onLongPressEnd}
+          onHandlerStateChange={onLongPressStateChange}
           minDurationMs={500}
           shouldCancelWhenOutside={false}
           simultaneousHandlers={[]}
@@ -3180,6 +3203,7 @@ const AndroidVideoPlayer: React.FC = () => {
         <LongPressGestureHandler
           onActivated={onLongPressActivated}
           onEnded={onLongPressEnd}
+          onHandlerStateChange={onLongPressStateChange}
           minDurationMs={500}
           shouldCancelWhenOutside={false}
           simultaneousHandlers={[]}

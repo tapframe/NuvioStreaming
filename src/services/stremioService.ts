@@ -1382,17 +1382,20 @@ class StremioService {
   }
 
   private isDirectStreamingUrl(url?: string): boolean {
-    return Boolean(
-      url && (
-        url.startsWith('http') || 
-        url.startsWith('https')
-      )
-    );
+    if (typeof url !== 'string') return false;
+    return url.startsWith('http://') || url.startsWith('https://');
   }
 
   private getStreamUrl(stream: any): string {
-    if (stream.url) return stream.url;
-    
+    // Prefer plain string URLs; guard against objects or unexpected types
+    if (typeof stream?.url === 'string') {
+      return stream.url;
+    }
+    // Some addons might nest the URL inside an object; try common shape
+    if (stream?.url && typeof stream.url === 'object' && typeof stream.url.url === 'string') {
+      return stream.url.url;
+    }
+
     if (stream.infoHash) {
       const trackers = [
         'udp://tracker.opentrackr.org:1337/announce',

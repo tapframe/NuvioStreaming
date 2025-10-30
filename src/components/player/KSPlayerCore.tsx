@@ -521,13 +521,34 @@ const KSPlayerCore: React.FC = () => {
     }
   }, [isSpeedBoosted, playbackSpeed, holdToSpeedEnabled, holdToSpeedValue, speedActivatedOverlayOpacity]);
 
-  const onLongPressEnd = useCallback(() => {
+  const restoreSpeedSafely = useCallback(() => {
     if (isSpeedBoosted) {
       setPlaybackSpeed(originalSpeed);
       setIsSpeedBoosted(false);
-      
       logger.log('[KSPlayerCore] Speed boost deactivated, restored to:', originalSpeed);
     }
+  }, [isSpeedBoosted, originalSpeed]);
+
+  const onLongPressEnd = useCallback(() => {
+    restoreSpeedSafely();
+  }, [restoreSpeedSafely]);
+
+  const onLongPressStateChange = useCallback((event: LongPressGestureHandlerGestureEvent) => {
+    // Ensure restoration on cancel/fail/end as well
+    // @ts-ignore - numeric State enum
+    const state = event?.nativeEvent?.state;
+    if (state === State.CANCELLED || state === State.FAILED || state === State.END) {
+      restoreSpeedSafely();
+    }
+  }, [restoreSpeedSafely]);
+
+  // Safety: restore speed on unmount if still boosted
+  useEffect(() => {
+    return () => {
+      if (isSpeedBoosted) {
+        try { setPlaybackSpeed(originalSpeed); } catch {}
+      }
+    };
   }, [isSpeedBoosted, originalSpeed]);
 
   useEffect(() => {
@@ -2535,6 +2556,7 @@ const KSPlayerCore: React.FC = () => {
         <LongPressGestureHandler
           onActivated={onLongPressActivated}
           onEnded={onLongPressEnd}
+          onHandlerStateChange={onLongPressStateChange}
           minDurationMs={500}
           shouldCancelWhenOutside={false}
           simultaneousHandlers={[]}
@@ -2568,6 +2590,7 @@ const KSPlayerCore: React.FC = () => {
         <LongPressGestureHandler
           onActivated={onLongPressActivated}
           onEnded={onLongPressEnd}
+          onHandlerStateChange={onLongPressStateChange}
           minDurationMs={500}
           shouldCancelWhenOutside={false}
           simultaneousHandlers={[]}

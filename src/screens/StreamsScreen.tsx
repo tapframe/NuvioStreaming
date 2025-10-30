@@ -871,7 +871,7 @@ export const StreamsScreen = () => {
     try {
       if (stream.url) {
         // Block magnet links - not supported yet
-        if (stream.url.startsWith('magnet:')) {
+        if (typeof stream.url === 'string' && stream.url.startsWith('magnet:')) {
           try {
             openAlert('Not supported', 'Torrent streaming is not supported yet.');
           } catch (_e) {}
@@ -1032,7 +1032,7 @@ export const StreamsScreen = () => {
             if (__DEV__) console.log('Opening stream with Android native app chooser');
             
             // For Android, determine if the URL is a direct http/https URL or a magnet link
-            const isMagnet = stream.url.startsWith('magnet:');
+            const isMagnet = typeof stream.url === 'string' && stream.url.startsWith('magnet:');
             
             if (isMagnet) {
               // For magnet links, open directly which will trigger the torrent app chooser
@@ -1884,7 +1884,7 @@ export const StreamsScreen = () => {
             </View>
           )}
 
-          {metadata?.videos && metadata.videos.length > 1 && selectedEpisode && (
+{currentEpisode && (
             <View style={[
               styles.streamsHeroContainer,
               !settings.enableStreamsBackdrop && { backgroundColor: colors.darkBackground }
