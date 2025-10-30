@@ -46,6 +46,7 @@ import PlayerControls from './controls/PlayerControls';
 import CustomSubtitles from './subtitles/CustomSubtitles';
 import { SourcesModal } from './modals/SourcesModal';
 import { EpisodesModal } from './modals/EpisodesModal';
+import UpNextButton from './common/UpNextButton';
 import { EpisodeStreamsModal } from './modals/EpisodeStreamsModal';
 import VlcVideoPlayer, { VlcPlayerRef } from './VlcVideoPlayer';
 import { stremioService } from '../../services/stremioService';
@@ -611,15 +612,11 @@ const AndroidVideoPlayer: React.FC = () => {
   const metadataOpacity = useRef(new Animated.Value(1)).current;
   const metadataScale = useRef(new Animated.Value(1)).current;
 
-  // Next episode button state
-  const [showNextEpisodeButton, setShowNextEpisodeButton] = useState(false);
+  // Next episode loading state
   const [isLoadingNextEpisode, setIsLoadingNextEpisode] = useState(false);
   const [nextLoadingProvider, setNextLoadingProvider] = useState<string | null>(null);
   const [nextLoadingQuality, setNextLoadingQuality] = useState<string | null>(null);
   const [nextLoadingTitle, setNextLoadingTitle] = useState<string | null>(null);
-
-  const nextEpisodeButtonOpacity = useRef(new Animated.Value(0)).current;
-  const nextEpisodeButtonScale = useRef(new Animated.Value(0.8)).current;
 
   // Cast display state
   const [selectedCastMember, setSelectedCastMember] = useState<any>(null);
@@ -701,30 +698,43 @@ const AndroidVideoPlayer: React.FC = () => {
     }
   }, [type, groupedEpisodes, episodeId, season, episode]);
 
-  // Find next episode for series
+  // Find next episode for series (use groupedEpisodes or fallback to metadataGroupedEpisodes)
   const nextEpisode = useMemo(() => {
     try {
       if ((type as any) !== 'series' || !season || !episode) return null;
-      const allEpisodes = Object.values(groupedEpisodes || {}).flat() as any[];
+      // Prefer groupedEpisodes from route, else metadataGroupedEpisodes
+      const sourceGroups = groupedEpisodes && Object.keys(groupedEpisodes || {}).length > 0
+        ? groupedEpisodes
+        : (metadataGroupedEpisodes || {});
+      const allEpisodes = Object.values(sourceGroups || {}).flat() as any[];
       if (!allEpisodes || allEpisodes.length === 0) return null;
-      
       // First try next episode in same season
       let nextEp = allEpisodes.find((ep: any) => 
         ep.season_number === season && ep.episode_number === episode + 1
       );
-      
       // If not found, try first episode of next season
       if (!nextEp) {
         nextEp = allEpisodes.find((ep: any) => 
           ep.season_number === season + 1 && ep.episode_number === 1
         );
       }
-      
+      if (DEBUG_MODE) {
+        logger.log('[AndroidVideoPlayer] nextEpisode computation', {
+          fromRouteGroups: !!(groupedEpisodes && Object.keys(groupedEpisodes || {}).length),
+          fromMetadataGroups: !!(metadataGroupedEpisodes && Object.keys(metadataGroupedEpisodes || {}).length),
+          allEpisodesCount: allEpisodes?.length || 0,
+          currentSeason: season,
+          currentEpisode: episode,
+          found: !!nextEp,
+          foundId: nextEp?.stremioId || nextEp?.id,
+          foundName: nextEp?.name,
+        });
+      }
       return nextEp;
     } catch {
       return null;
     }
-  }, [type, season, episode, groupedEpisodes]);
+  }, [type, season, episode, groupedEpisodes, metadataGroupedEpisodes]);
   
   // Small offset (in seconds) used to avoid seeking to the *exact* end of the
   // file which triggers the `onEnd` callback and causes playback to restart.
@@ -2744,65 +2754,7 @@ const AndroidVideoPlayer: React.FC = () => {
     };
   }, [paused]);
 
-  // Handle next episode button visibility based on current time and next episode availability
-  useEffect(() => {
-    if ((type as any) !== 'series' || !nextEpisode || duration <= 0) {
-      if (showNextEpisodeButton) {
-        // Hide button with animation
-        Animated.parallel([
-          Animated.timing(nextEpisodeButtonOpacity, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-          Animated.timing(nextEpisodeButtonScale, {
-            toValue: 0.8,
-            duration: 200,
-            useNativeDriver: true,
-          })
-        ]).start(() => {
-          setShowNextEpisodeButton(false);
-        });
-      }
-      return;
-    }
-
-    // Show button when 1 minute (60 seconds) remains
-    const timeRemaining = duration - currentTime;
-    const shouldShowButton = timeRemaining <= 60 && timeRemaining > 10; // Hide in last 10 seconds
-
-    if (shouldShowButton && !showNextEpisodeButton) {
-      setShowNextEpisodeButton(true);
-      Animated.parallel([
-        Animated.timing(nextEpisodeButtonOpacity, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.spring(nextEpisodeButtonScale, {
-          toValue: 1,
-          tension: 100,
-          friction: 8,
-          useNativeDriver: true,
-        })
-      ]).start();
-    } else if (!shouldShowButton && showNextEpisodeButton) {
-      Animated.parallel([
-        Animated.timing(nextEpisodeButtonOpacity, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(nextEpisodeButtonScale, {
-          toValue: 0.8,
-          duration: 200,
-          useNativeDriver: true,
-        })
-      ]).start(() => {
-        setShowNextEpisodeButton(false);
-      });
-    }
-  }, [type, nextEpisode, duration, currentTime, showNextEpisodeButton]);
+  // Up Next visibility handled inside reusable component
 
   useEffect(() => {
     isMounted.current = true;
@@ -3752,59 +3704,22 @@ const AndroidVideoPlayer: React.FC = () => {
             </TouchableOpacity>
           )}
 
-          {/* Next Episode Button */}
-          {showNextEpisodeButton && nextEpisode && (
-            <Animated.View
-              style={{
-                position: 'absolute',
-                bottom: 80 + insets.bottom,
-                right: 8 + insets.right,
-                opacity: nextEpisodeButtonOpacity,
-                transform: [{ scale: nextEpisodeButtonScale }],
-                zIndex: 50,
-              }}
-            >
-              <TouchableOpacity
-                style={{
-                  backgroundColor: 'rgba(255,255,255,0.95)',
-                  borderRadius: 18,
-                  paddingHorizontal: 14,
-                  paddingVertical: 8,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.3,
-                  shadowRadius: 8,
-                  elevation: 8,
-                }}
-                onPress={handlePlayNextEpisode}
-                activeOpacity={0.8}
-              >
-                {isLoadingNextEpisode ? (
-                  <ActivityIndicator size="small" color="#000000" style={{ marginRight: 8 }} />
-                ) : (
-                  <MaterialIcons name="skip-next" size={18} color="#000000" style={{ marginRight: 8 }} />
-                )}
-                <View>
-                  <Text style={{ color: '#000000', fontSize: 11, fontWeight: '700', opacity: 0.8 }}>
-                    {isLoadingNextEpisode ? 'Loading next episode…' : 'Up next'}
-                  </Text>
-                  <Text style={{ color: '#000000', fontSize: 13, fontWeight: '700' }} numberOfLines={1}>
-                    S{nextEpisode.season_number}E{nextEpisode.episode_number}
-                    {nextEpisode.name ? `: ${nextEpisode.name}` : ''}
-                  </Text>
-                  {isLoadingNextEpisode && (
-                    <Text style={{ color: '#333333', fontSize: 11, marginTop: 2 }} numberOfLines={1}>
-                      {nextLoadingProvider ? `${nextLoadingProvider}` : 'Finding source…'}
-                      {nextLoadingQuality ? ` • ${nextLoadingQuality}p` : ''}
-                      {nextLoadingTitle ? ` • ${nextLoadingTitle}` : ''}
-                    </Text>
-                  )}
-                </View>
-              </TouchableOpacity>
-            </Animated.View>
-          )}
+          {/* Next Episode Button (reusable) */}
+          <UpNextButton
+            type={type as any}
+            nextEpisode={nextEpisode as any}
+            currentTime={currentTime}
+            duration={duration}
+            insets={{ top: insets.top, right: insets.right, bottom: insets.bottom, left: insets.left }}
+            isLoading={isLoadingNextEpisode}
+            nextLoadingProvider={nextLoadingProvider}
+            nextLoadingQuality={nextLoadingQuality}
+            nextLoadingTitle={nextLoadingTitle}
+            onPress={handlePlayNextEpisode}
+            metadata={metadata ? { poster: metadata.poster, id: metadata.id } : undefined}
+            controlsVisible={showControls}
+            controlsFixedOffset={Math.min(Dimensions.get('window').width, Dimensions.get('window').height) >= 768 ? 120 : 100}
+          />
           
           <CustomSubtitles
             key={customSubtitleVersion}
