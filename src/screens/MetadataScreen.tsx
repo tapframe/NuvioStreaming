@@ -842,7 +842,7 @@ const MetadataScreen: React.FC = () => {
     return (
       <SafeAreaView
         style={[styles.container, { backgroundColor: dynamicBackgroundColor }]}
-        edges={['bottom']}
+        edges={[]}
       >
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
         <View style={styles.errorContainer}>
@@ -913,7 +913,7 @@ const MetadataScreen: React.FC = () => {
     <Animated.View style={[animatedBackgroundStyle, { flex: 1 }]}>
     <SafeAreaView 
       style={[containerStyle, styles.container]}
-      edges={['bottom']}
+      edges={[]}
     >
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" animated />
       

@@ -1068,15 +1068,31 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             groupedAddonEpisodes[seasonNumber] = [];
           }
           
+          // Resolve image and description dynamically from arbitrary addons
+          const imageCandidate = (
+            video.thumbnail ||
+            video.image ||
+            video.thumb ||
+            (video.images && video.images.still) ||
+            null
+          );
+          const descriptionCandidate = (
+            video.overview ||
+            video.description ||
+            video.plot ||
+            video.synopsis ||
+            ''
+          );
+
           // Convert addon episode format to our Episode interface
           const episode: Episode = {
             id: video.id,
             name: video.name || video.title || `Episode ${episodeNumber}`,
-            overview: video.overview || video.description || '',
+            overview: descriptionCandidate,
             season_number: seasonNumber,
             episode_number: episodeNumber,
             air_date: video.released ? video.released.split('T')[0] : video.firstAired ? video.firstAired.split('T')[0] : '',
-            still_path: video.thumbnail,
+            still_path: imageCandidate,
             vote_average: parseFloat(video.rating) || 0,
             runtime: undefined,
             episodeString: `S${seasonNumber.toString().padStart(2, '0')}E${episodeNumber.toString().padStart(2, '0')}`,

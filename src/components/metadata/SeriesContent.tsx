@@ -338,6 +338,8 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
     const hydrateFromTmdb = async () => {
       try {
         if (!metadata?.id || !selectedSeason) return;
+        // Respect settings: skip TMDB enrichment when disabled
+        if (!settings?.enrichMetadataWithTMDB) return;
         const currentSeasonEpisodes = groupedEpisodes[selectedSeason] || [];
         if (currentSeasonEpisodes.length === 0) return;
 
@@ -375,7 +377,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
     };
 
     hydrateFromTmdb();
-  }, [metadata?.id, selectedSeason, groupedEpisodes]);
+  }, [metadata?.id, selectedSeason, groupedEpisodes, settings?.enrichMetadataWithTMDB]);
 
   // Enable item animations shortly after mount to avoid initial overlap/glitch
   useEffect(() => {
@@ -538,7 +540,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
             // Get season poster URL (needed for both views)
             let seasonPoster = DEFAULT_PLACEHOLDER;
             if (seasonEpisodes[0]?.season_poster_path) {
-              const tmdbUrl = tmdbService.getImageUrl(seasonEpisodes[0].season_poster_path, 'w500');
+              const tmdbUrl = tmdbService.getImageUrl(seasonEpisodes[0].season_poster_path, 'original');
               if (tmdbUrl) seasonPoster = tmdbUrl;
             } else if (metadata?.poster) {
               seasonPoster = metadata.poster;
@@ -653,18 +655,32 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
 
   // Vertical layout episode card (traditional)
   const renderVerticalEpisodeCard = (episode: Episode) => {
-    let episodeImage = EPISODE_PLACEHOLDER;
-    if (episode.still_path) {
-      // Check if still_path is already a full URL
-      if (episode.still_path.startsWith('http')) {
-        episodeImage = episode.still_path;
-      } else {
-        const tmdbUrl = tmdbService.getImageUrl(episode.still_path, 'w500');
-        if (tmdbUrl) episodeImage = tmdbUrl;
+    // Resolve episode image with addon-first logic
+    const resolveEpisodeImage = (): string => {
+      const candidates: Array<string | undefined | null> = [
+        // Add-on common fields
+        (episode as any).thumbnail,
+        (episode as any).image,
+        (episode as any).thumb,
+        (episode as any)?.images?.still,
+        episode.still_path,
+      ];
+
+      for (const cand of candidates) {
+        if (!cand) continue;
+        if (typeof cand === 'string' && (cand.startsWith('http://') || cand.startsWith('https://'))) {
+          return cand;
+        }
+        // TMDB relative paths only when enrichment is enabled
+        if (typeof cand === 'string' && cand.startsWith('/') && settings?.enrichMetadataWithTMDB) {
+          const tmdbUrl = tmdbService.getImageUrl(cand, 'original');
+          if (tmdbUrl) return tmdbUrl;
+        }
       }
-    } else if (metadata?.poster) {
-      episodeImage = metadata.poster;
-    }
+      return metadata?.poster || EPISODE_PLACEHOLDER;
+    };
+
+    let episodeImage = resolveEpisodeImage();
     
     const episodeNumber = typeof episode.episode_number === 'number' ? episode.episode_number.toString() : '';
     const seasonNumber = typeof episode.season_number === 'number' ? episode.season_number.toString() : '';
@@ -695,7 +711,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
     const effectiveVote = (tmdbOverride?.vote_average ?? episode.vote_average) || 0;
     const effectiveRuntime = tmdbOverride?.runtime ?? (episode as any).runtime;
     if (!episode.still_path && tmdbOverride?.still_path) {
-      const tmdbUrl = tmdbService.getImageUrl(tmdbOverride.still_path, 'w500');
+      const tmdbUrl = tmdbService.getImageUrl(tmdbOverride.still_path, 'original');
       if (tmdbUrl) episodeImage = tmdbUrl;
     }
     const progress = episodeProgress[episodeId];
@@ -869,7 +885,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               )}
             </View>
           </View>
-          <Text style={[
+          <Text style={[ 
             styles.episodeOverview,
             {
               color: currentTheme.colors.mediumEmphasis,
@@ -877,7 +893,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               lineHeight: isTV ? 22 : isLargeTablet ? 20 : isTablet ? 20 : 18
             }
           ]} numberOfLines={isLargeScreen ? 4 : isTablet ? 3 : 2}>
-            {episode.overview || 'No description available'}
+            {(episode.overview || (episode as any).description || (episode as any).plot || (episode as any).synopsis || 'No description available')}
           </Text>
         </View>
       </TouchableOpacity>
@@ -886,18 +902,29 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
 
   // Horizontal layout episode card (Netflix-style)
   const renderHorizontalEpisodeCard = (episode: Episode) => {
-    let episodeImage = EPISODE_PLACEHOLDER;
-    if (episode.still_path) {
-      // Check if still_path is already a full URL
-      if (episode.still_path.startsWith('http')) {
-        episodeImage = episode.still_path;
-      } else {
-        const tmdbUrl = tmdbService.getImageUrl(episode.still_path, 'w500');
-        if (tmdbUrl) episodeImage = tmdbUrl;
+    const resolveEpisodeImage = (): string => {
+      const candidates: Array<string | undefined | null> = [
+        (episode as any).thumbnail,
+        (episode as any).image,
+        (episode as any).thumb,
+        (episode as any)?.images?.still,
+        episode.still_path,
+      ];
+
+      for (const cand of candidates) {
+        if (!cand) continue;
+        if (typeof cand === 'string' && (cand.startsWith('http://') || cand.startsWith('https://'))) {
+          return cand;
+        }
+        if (typeof cand === 'string' && cand.startsWith('/') && settings?.enrichMetadataWithTMDB) {
+          const tmdbUrl = tmdbService.getImageUrl(cand, 'original');
+          if (tmdbUrl) return tmdbUrl;
+        }
       }
-    } else if (metadata?.poster) {
-      episodeImage = metadata.poster;
-    }
+      return metadata?.poster || EPISODE_PLACEHOLDER;
+    };
+
+    let episodeImage = resolveEpisodeImage();
     
     const episodeNumber = typeof episode.episode_number === 'number' ? episode.episode_number.toString() : '';
     const seasonNumber = typeof episode.season_number === 'number' ? episode.season_number.toString() : '';
@@ -1006,7 +1033,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
             </Text>
             
             {/* Episode Description */}
-            <Text style={[
+            <Text style={[ 
               styles.episodeDescriptionHorizontal,
               {
                 fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 12,
@@ -1015,7 +1042,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                 opacity: isTV ? 0.95 : isLargeTablet ? 0.9 : isTablet ? 0.9 : 0.9
               }
             ]} numberOfLines={isLargeScreen ? 4 : 3}>
-              {episode.overview || 'No description available'}
+              {(episode.overview || (episode as any).description || (episode as any).plot || (episode as any).synopsis || 'No description available')}
             </Text>
             
             {/* Metadata Row */}
