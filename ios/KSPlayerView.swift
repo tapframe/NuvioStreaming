@@ -253,7 +253,14 @@ class KSPlayerView: UIView {
         KSOptions.hardwareDecode = false
         KSOptions.asynchronousDecompression = false
         KSOptions.secondPlayerType = nil
+        #else
+        // PERFORMANCE OPTIMIZATION: Enable asynchronous decompression globally
+        // This ensures the global default is correct for all player instances
+        KSOptions.asynchronousDecompression = true
+        // Ensure hardware decode is enabled globally
+        KSOptions.hardwareDecode = true
         #endif
+        print("KSPlayerView: [PERF] Global settings: asyncDecomp=\(KSOptions.asynchronousDecompression), hwDecode=\(KSOptions.hardwareDecode)")
     }
 
     private func updateSubtitleFont(size: CGFloat) {
@@ -343,14 +350,44 @@ class KSPlayerView: UIView {
     }
 
     private func createOptions(with headers: [String: String]) -> KSOptions {
-        let options = KSOptions()
+        // Use custom HighPerformanceOptions subclass for frame buffer optimization
+        let options = HighPerformanceOptions()
         // Disable native player remote control center integration; use RN controls
         options.registerRemoteControll = false
-        // Reduce prebuffer to speed up start/seeks; keep a modest upper cap
-        options.preferredForwardBufferDuration = 0.5
-        options.maxBufferDuration = 10.0
-        // Enable "second open" to relax startup/seek buffering thresholds
+        
+        // PERFORMANCE OPTIMIZATION: Optimal buffer durations for high bitrate
+        // Increased buffer prevents stuttering during network hiccups with high bitrate streams
+        options.preferredForwardBufferDuration = 3.0  // Increased from 0.5 for high bitrate stability
+        options.maxBufferDuration = 20.0  // Increased from 10.0 to allow more aggressive buffering
+        
+        // Enable "second open" to relax startup/seek buffering thresholds (already enabled)
         options.isSecondOpen = true
+        
+        // PERFORMANCE OPTIMIZATION: Fast stream analysis for high bitrate content
+        // Reduces startup latency significantly for large high-bitrate streams
+        options.probesize = 50_000_000  // 50MB for faster format detection
+        options.maxAnalyzeDuration = 5_000_000  // 5 seconds in microseconds for faster stream structure analysis
+        
+        // PERFORMANCE OPTIMIZATION: Decoder thread optimization
+        // Use all available CPU cores for parallel decoding
+        options.decoderOptions["threads"] = "0"  // Use all CPU cores instead of "auto"
+        // refcounted_frames already set to "1" in KSOptions init for memory efficiency
+        
+        // PERFORMANCE OPTIMIZATION: Hardware decode explicitly enabled
+        // Ensure VideoToolbox hardware acceleration is always preferred for non-simulator
+        #if targetEnvironment(simulator)
+        options.hardwareDecode = false
+        options.asynchronousDecompression = false
+        #else
+        options.hardwareDecode = true  // Explicitly enable hardware decode
+        // PERFORMANCE OPTIMIZATION: Asynchronous decompression (CRITICAL)
+        // Offloads VideoToolbox decompression to background threads, preventing main thread stalls
+        options.asynchronousDecompression = true
+        #endif
+        
+        // PERFORMANCE OPTIMIZATION: Native HDR processing
+        // Set destination dynamic range based on device capabilities to eliminate unnecessary color conversions
+        options.destinationDynamicRange = getOptimalDynamicRange()
         
         // Configure audio for proper dialogue mixing using FFmpeg's pan filter
         // This approach uses standard audio engineering practices for multi-channel downmixing
@@ -365,12 +402,6 @@ class KSPlayerView: UIView {
         // This provides better spatial audio processing and natural dialogue mixing
         // options.audioFilters.append("surround=ang=45")
         
-        #if targetEnvironment(simulator)
-        options.hardwareDecode = false
-        options.asynchronousDecompression = false
-        #else
-        options.hardwareDecode = KSOptions.hardwareDecode
-        #endif
         if !headers.isEmpty {
             // Clean and validate headers before adding
             var cleanHeaders: [String: String] = [:]
@@ -391,6 +422,9 @@ class KSPlayerView: UIView {
                 }
             }
         }
+        
+        print("KSPlayerView: [PERF] High-performance options configured: asyncDecomp=\(options.asynchronousDecompression), hwDecode=\(options.hardwareDecode), buffer=\(options.preferredForwardBufferDuration)s/\(options.maxBufferDuration)s, HDR=\(options.destinationDynamicRange?.description ?? "auto")")
+        
         return options
     }
 
@@ -767,6 +801,73 @@ class KSPlayerView: UIView {
             "isPlaying": !isPaused,
             "volume": currentVolume
         ]
+    }
+    
+    // MARK: - Performance Optimization Helpers
+    
+    /// Detects device HDR capabilities and returns optimal dynamic range setting
+    /// This prevents unnecessary color space conversion overhead
+    private func getOptimalDynamicRange() -> DynamicRange? {
+        #if canImport(UIKit)
+        let availableHDRModes = AVPlayer.availableHDRModes
+        
+        // If no HDR modes available, use SDR (nil will use content's native range)
+        if availableHDRModes == AVPlayer.HDRMode(rawValue: 0) {
+            return .sdr
+        }
+        
+        // Prefer HDR10 if supported (most common HDR format)
+        if availableHDRModes.contains(.hdr10) {
+            return .hdr10
+        }
+        
+        // Fallback to Dolby Vision if available
+        if availableHDRModes.contains(.dolbyVision) {
+            return .dolbyVision
+        }
+        
+        // Fallback to HLG if available
+        if availableHDRModes.contains(.hlg) {
+            return .hlg
+        }
+        
+        // Default to SDR if no HDR support
+        return .sdr
+        #else
+        // macOS: Check screen capabilities
+        return .sdr
+        #endif
+    }
+}
+
+// MARK: - High Performance KSOptions Subclass
+
+/// Custom KSOptions subclass that overrides frame buffer capacity for high bitrate content
+/// More buffered frames absorb decode spikes and network hiccups without quality loss
+private class HighPerformanceOptions: KSOptions {
+    /// Override to increase frame buffer capacity for high bitrate content
+    /// - Parameters:
+    ///   - fps: Video frame rate
+    ///   - naturalSize: Video resolution
+    ///   - isLive: Whether this is a live stream
+    /// - Returns: Number of frames to buffer
+    override func videoFrameMaxCount(fps: Float, naturalSize: CGSize, isLive: Bool) -> UInt8 {
+        if isLive {
+            // Increased from 4 to 8 for better live stream stability
+            return 8
+        }
+        
+        // For high bitrate VOD: increase buffer based on resolution
+        if naturalSize.width >= 3840 || naturalSize.height >= 2160 {
+            // 4K needs more buffer frames to handle decode spikes
+            return 32
+        } else if naturalSize.width >= 1920 || naturalSize.height >= 1080 {
+            // 1080p benefits from more frames
+            return 24
+        }
+        
+        // Default for lower resolutions
+        return 16
     }
 }
 
