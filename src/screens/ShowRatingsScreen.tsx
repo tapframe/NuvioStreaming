@@ -28,7 +28,7 @@ if (Platform.OS === 'ios') {
     liquidGlassAvailable = false;
   }
 }
-import { TMDBService, TMDBShow as Show, TMDBSeason, TMDBEpisode } from '../services/tmdbService';
+import { TMDBService, TMDBShow as Show, TMDBSeason, TMDBEpisode, IMDbRatings } from '../services/tmdbService';
 import { RouteProp } from '@react-navigation/native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import axios from 'axios';
@@ -78,17 +78,17 @@ const getRatingColor = (rating: number): string => {
 };
 
 // Memoized components
-const RatingCell = memo(({ episode, ratingSource, getTVMazeRating, isCurrentSeason, theme }: {
+const RatingCell = memo(({ episode, ratingSource, getTVMazeRating, getIMDbRating, theme }: {
   episode: TMDBEpisode;
   ratingSource: RatingSource;
   getTVMazeRating: (seasonNumber: number, episodeNumber: number) => number | null;
-  isCurrentSeason: (episode: TMDBEpisode) => boolean;
+  getIMDbRating: (seasonNumber: number, episodeNumber: number) => number | null;
   theme: any;
 }) => {
   const getRatingForSource = useCallback((episode: TMDBEpisode): number | null => {
     switch (ratingSource) {
       case 'imdb':
-        return episode.imdb_rating || null;
+        return getIMDbRating(episode.season_number, episode.episode_number);
       case 'tmdb':
         return episode.vote_average || null;
       case 'tvmaze':
@@ -96,23 +96,25 @@ const RatingCell = memo(({ episode, ratingSource, getTVMazeRating, isCurrentSeas
       default:
         return null;
     }
-  }, [ratingSource, getTVMazeRating]);
+  }, [ratingSource, getTVMazeRating, getIMDbRating]);
 
   const isRatingPotentiallyInaccurate = useCallback((episode: TMDBEpisode): boolean => {
     const rating = getRatingForSource(episode);
     if (!rating) return false;
 
-    if (ratingSource === 'tmdb' && episode.imdb_rating) {
-      const difference = Math.abs(rating - episode.imdb_rating);
-      return difference >= 2;
+    if (ratingSource === 'tmdb') {
+      const imdbRating = getIMDbRating(episode.season_number, episode.episode_number);
+      if (imdbRating) {
+        const difference = Math.abs(rating - imdbRating);
+        return difference >= 2;
+      }
     }
 
     return false;
-  }, [getRatingForSource, ratingSource]);
+  }, [getRatingForSource, ratingSource, getIMDbRating]);
 
   const rating = getRatingForSource(episode);
   const isInaccurate = isRatingPotentiallyInaccurate(episode);
-  const isCurrent = isCurrentSeason(episode);
 
   if (!rating) {
     if (!episode.air_date || new Date(episode.air_date) > new Date()) {
@@ -135,16 +137,15 @@ const RatingCell = memo(({ episode, ratingSource, getTVMazeRating, isCurrentSeas
         styles.ratingCell, 
         { 
           backgroundColor: getRatingColor(rating),
-          opacity: isCurrent ? 0.7 : 1,
         }
       ]}>
         <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
       </Animated.View>
-      {(isInaccurate || isCurrent) && (
+      {isInaccurate && (
         <MaterialIcons 
-          name={isCurrent ? "schedule" : "warning"}
+          name="warning"
           size={12} 
-          color={isCurrent ? theme.colors.primary : theme.colors.warning}
+          color={theme.colors.warning}
           style={styles.warningIcon}
         />
       )}
@@ -160,7 +161,7 @@ const RatingSourceToggle = memo(({ ratingSource, setRatingSource, theme }: {
   <View style={styles.ratingSourceContainer}>
     <Text style={[styles.sectionTitle, { color: theme.colors.white }]}>Rating Source:</Text>
     <View style={styles.ratingSourceButtons}>
-      {['imdb', 'tmdb', 'tvmaze'].map((source) => {
+      {['tmdb', 'imdb', 'tvmaze'].map((source) => {
         const isActive = ratingSource === source;
         return (
           <TouchableOpacity
@@ -217,10 +218,11 @@ const ShowRatingsScreen = ({ route }: Props) => {
   const [show, setShow] = useState<Show | null>(null);
   const [seasons, setSeasons] = useState<TMDBSeason[]>([]);
   const [tvmazeEpisodes, setTvmazeEpisodes] = useState<TVMazeEpisode[]>([]);
+  const [imdbRatings, setImdbRatings] = useState<IMDbRatings>([]);
   const [loading, setLoading] = useState(true);
   const [loadingSeasons, setLoadingSeasons] = useState(false);
   const [loadedSeasons, setLoadedSeasons] = useState<number[]>([]);
-  const [ratingSource, setRatingSource] = useState<RatingSource>('tmdb');
+  const [ratingSource, setRatingSource] = useState<RatingSource>('imdb');
   const [visibleSeasonRange, setVisibleSeasonRange] = useState({ start: 0, end: 8 });
   const [loadingProgress, setLoadingProgress] = useState(0);
   const ratingsCache = useRef<{[key: string]: number | null}>({});
@@ -316,6 +318,12 @@ const ShowRatingsScreen = ({ route }: Props) => {
         if (showData) {
           setShow(showData);
           
+          // Fetch IMDb ratings for all seasons
+          const imdbRatingsData = await tmdb.getIMDbRatings(showId);
+          if (imdbRatingsData) {
+            setImdbRatings(imdbRatingsData);
+          }
+          
           // Get external IDs to fetch TVMaze data
           const externalIds = await tmdb.getShowExternalIds(showId);
           if (externalIds?.imdb_id) {
@@ -347,19 +355,22 @@ const ShowRatingsScreen = ({ route }: Props) => {
     return episode?.rating?.average || null;
   }, [tvmazeEpisodes]);
 
-  const isCurrentSeason = useCallback((episode: TMDBEpisode): boolean => {
-    if (!seasons.length || !episode.air_date) return false;
+  const getIMDbRating = useCallback((seasonNumber: number, episodeNumber: number): number | null => {
+    // Flatten all episodes from all seasons and find the matching one
+    for (const season of imdbRatings) {
+      if (!season.episodes) continue;
+      
+      const episode = season.episodes.find(
+        ep => ep.season_number === seasonNumber && ep.episode_number === episodeNumber
+      );
+      
+      if (episode) {
+        return episode.vote_average || null;
+      }
+    }
     
-    const latestSeasonNumber = Math.max(...seasons.map(s => s.season_number));
-    if (episode.season_number !== latestSeasonNumber) return false;
-    
-    const now = new Date();
-    const airDate = new Date(episode.air_date);
-    const monthsDiff = (now.getFullYear() - airDate.getFullYear()) * 12 + 
-                      (now.getMonth() - airDate.getMonth());
-    
-    return monthsDiff <= 6;
-  }, [seasons]);
+    return null;
+  }, [imdbRatings]);
 
   if (loading) {
     return (
@@ -459,10 +470,6 @@ const ShowRatingsScreen = ({ route }: Props) => {
                       <MaterialIcons name="warning" size={14} color={colors.warning} />
                       <Text style={[styles.warningText, { color: colors.lightGray }]}>Rating differs significantly from IMDb</Text>
                     </View>
-                    <View style={styles.warningLegend}>
-                      <MaterialIcons name="schedule" size={14} color={colors.primary} />
-                      <Text style={[styles.warningText, { color: colors.lightGray }]}>Current season (ratings may change)</Text>
-                    </View>
                   </View>
                 </View>
               </Animated.View>
@@ -535,7 +542,7 @@ const ShowRatingsScreen = ({ route }: Props) => {
                                     episode={season.episodes[episodeIndex]}
                                     ratingSource={ratingSource}
                                     getTVMazeRating={getTVMazeRating}
-                                    isCurrentSeason={isCurrentSeason}
+                                    getIMDbRating={getIMDbRating}
                                     theme={currentTheme}
                                   />
                                 }

@@ -108,6 +108,21 @@ export interface TMDBCollectionPart {
   popularity: number;
 }
 
+// Types for IMDb ratings API responses
+export interface IMDbRatingEpisode {
+  vote_average: number;
+  episode_number: number;
+  name: string;
+  season_number: number;
+  tconst: string;
+}
+
+export interface IMDbRatingSeason {
+  episodes: IMDbRatingEpisode[];
+}
+
+export type IMDbRatings = IMDbRatingSeason[];
+
 export class TMDBService {
   private static instance: TMDBService;
   private static ratingCache: Map<string, number | null> = new Map();
@@ -351,6 +366,7 @@ export class TMDBService {
 
   /**
    * Get IMDb rating for an episode using OMDB API with caching
+   * @deprecated This method is deprecated. Use getIMDbRatings instead for better accuracy and performance.
    */
   async getIMDbRating(showName: string, seasonNumber: number, episodeNumber: number): Promise<number | null> {
     const cacheKey = this.generateRatingCacheKey(showName, seasonNumber, episodeNumber);
@@ -387,7 +403,49 @@ export class TMDBService {
   }
 
   /**
-   * Get season details including all episodes with IMDb ratings
+   * Get IMDb ratings for all seasons and episodes
+   * This replaces the OMDB API approach and provides more accurate ratings
+   */
+  async getIMDbRatings(tmdbId: number): Promise<IMDbRatings | null> {
+    const IMDB_RATINGS_API_BASE_URL = process.env.EXPO_PUBLIC_IMDB_RATINGS_API_BASE_URL;
+    
+    if (!IMDB_RATINGS_API_BASE_URL) {
+      logger.error('[TMDB API] Missing EXPO_PUBLIC_IMDB_RATINGS_API_BASE_URL environment variable');
+      return null;
+    }
+
+    const cacheKey = this.generateCacheKey(`imdb_ratings_${tmdbId}`);
+    
+    // Check cache
+    const cached = this.getCachedData<IMDbRatings>(cacheKey);
+    if (cached !== null) return cached;
+
+    const apiUrl = `${IMDB_RATINGS_API_BASE_URL}/api/shows/${tmdbId}/season-ratings`;
+
+    logger.log(`[TMDB API] 🌐 FETCHING: getIMDbRatings(${tmdbId})`);
+    try {
+      const response = await axios.get(apiUrl, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      const data = response.data;
+      if (data && Array.isArray(data)) {
+        this.setCachedData(cacheKey, data);
+        return data;
+      }
+      
+      return null;
+    } catch (error) {
+      logger.error('[TMDB API] Error fetching IMDb ratings:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get season details including all episodes
+   * Note: IMDb ratings are now fetched separately via getIMDbRatings() for better accuracy
    */
   async getSeasonDetails(tmdbId: number, seasonNumber: number, showName?: string, language: string = 'en-US'): Promise<TMDBSeason | null> {
     const cacheKey = this.generateCacheKey(`tv_${tmdbId}_season_${seasonNumber}`, { language, showName });
@@ -405,42 +463,6 @@ export class TMDBService {
       });
 
       const season = response.data;
-
-      // If show name is provided, fetch IMDb ratings for each episode in batches
-      if (showName) {
-        // Process episodes in batches of 5 to avoid rate limiting
-        const batchSize = 5;
-        const episodes = [...season.episodes];
-        const episodesWithRatings = [];
-
-        for (let i = 0; i < episodes.length; i += batchSize) {
-          const batch = episodes.slice(i, i + batchSize);
-          const batchPromises = batch.map(async (episode: TMDBEpisode) => {
-            const imdbRating = await this.getIMDbRating(
-              showName,
-              episode.season_number,
-              episode.episode_number
-            );
-
-            return {
-              ...episode,
-              imdb_rating: imdbRating
-            };
-          });
-
-          const batchResults = await Promise.all(batchPromises);
-          episodesWithRatings.push(...batchResults);
-        }
-
-        const result = {
-          ...season,
-          episodes: episodesWithRatings,
-        };
-        
-        this.setCachedData(cacheKey, result);
-        return result;
-      }
-
       this.setCachedData(cacheKey, season);
       return season;
     } catch (error) {
