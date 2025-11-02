@@ -117,12 +117,16 @@ export const CollectionSection: React.FC<CollectionSectionProps> = ({
   };
 
   // Sort collection movies by year (oldest to newest)
+  // Upcoming/unreleased movies without a year will be sorted last
   const sortedCollectionMovies = React.useMemo(() => {
     if (!collectionMovies) return [];
     
+    const FUTURE_YEAR_PLACEHOLDER = 9999; // Very large number to sort unreleased movies last
+    
     return [...collectionMovies].sort((a, b) => {
-      const yearA = a.year ? parseInt(a.year.toString()) : 0;
-      const yearB = b.year ? parseInt(b.year.toString()) : 0;
+      // Treat missing years as future year placeholder (sorts last)
+      const yearA = a.year ? parseInt(a.year.toString()) : FUTURE_YEAR_PLACEHOLDER;
+      const yearB = b.year ? parseInt(b.year.toString()) : FUTURE_YEAR_PLACEHOLDER;
       return yearA - yearB; // Oldest to newest
     });
   }, [collectionMovies]);

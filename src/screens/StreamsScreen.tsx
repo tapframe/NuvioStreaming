@@ -1076,15 +1076,10 @@ export const StreamsScreen = () => {
     }
   }, [settings.preferredPlayer, settings.useExternalPlayer, navigateToPlayer]);
 
-  // Ensure portrait when returning to this screen on iOS
+  // Ensure proper rendering when returning to this screen
   useFocusEffect(
     useCallback(() => {
       if (Platform.OS === 'ios') {
-        // Add delay before locking orientation to prevent background glitches
-        const orientationTimer = setTimeout(() => {
-          ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
-        }, 200); // Small delay to let the screen render properly
-        
         // iOS-specific: Force a re-render to prevent background glitches
         // This helps ensure the background is properly rendered when returning from player
         const renderTimer = setTimeout(() => {
@@ -1093,7 +1088,6 @@ export const StreamsScreen = () => {
         }, 100);
         
         return () => {
-          clearTimeout(orientationTimer);
           clearTimeout(renderTimer);
         };
       }

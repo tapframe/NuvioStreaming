@@ -405,19 +405,6 @@ const HomeScreen = () => {
         StatusBar.setBarStyle("light-content");
         StatusBar.setTranslucent(true);
         StatusBar.setBackgroundColor('transparent');
-        
-        // Allow free rotation on tablets; lock portrait on phones
-        try {
-          // Use device physical characteristics, not current orientation
-          const isTabletDevice = Platform.OS === 'ios' 
-            ? (Platform as any).isPad === true 
-            : Math.min(windowWidth, Dimensions.get('screen').height) >= 768;
-          if (isTabletDevice) {
-            ScreenOrientation.unlockAsync();
-          } else {
-            ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-          }
-        } catch {}
 
         // For iOS specifically
         if (Platform.OS === 'ios') {
@@ -426,6 +413,9 @@ const HomeScreen = () => {
       };
       
       statusBarConfig();
+      
+      // Unlock orientation to allow free rotation
+      ScreenOrientation.unlockAsync().catch(() => {});
       
       return () => {
         // Keep translucent when unfocusing to prevent layout shifts
