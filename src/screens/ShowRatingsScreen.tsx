@@ -98,23 +98,7 @@ const RatingCell = memo(({ episode, ratingSource, getTVMazeRating, getIMDbRating
     }
   }, [ratingSource, getTVMazeRating, getIMDbRating]);
 
-  const isRatingPotentiallyInaccurate = useCallback((episode: TMDBEpisode): boolean => {
-    const rating = getRatingForSource(episode);
-    if (!rating) return false;
-
-    if (ratingSource === 'tmdb') {
-      const imdbRating = getIMDbRating(episode.season_number, episode.episode_number);
-      if (imdbRating) {
-        const difference = Math.abs(rating - imdbRating);
-        return difference >= 2;
-      }
-    }
-
-    return false;
-  }, [getRatingForSource, ratingSource, getIMDbRating]);
-
   const rating = getRatingForSource(episode);
-  const isInaccurate = isRatingPotentiallyInaccurate(episode);
 
   if (!rating) {
     if (!episode.air_date || new Date(episode.air_date) > new Date()) {
@@ -141,14 +125,6 @@ const RatingCell = memo(({ episode, ratingSource, getTVMazeRating, getIMDbRating
       ]}>
         <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
       </Animated.View>
-      {isInaccurate && (
-        <MaterialIcons 
-          name="warning"
-          size={12} 
-          color={theme.colors.warning}
-          style={styles.warningIcon}
-        />
-      )}
     </Animated.View>
   );
 });
@@ -464,12 +440,6 @@ const ShowRatingsScreen = ({ route }: Props) => {
                         <Text style={[styles.legendText, { color: colors.lightGray }]}>{item.text}</Text>
                       </View>
                     ))}
-                  </View>
-                  <View style={[styles.warningLegends, { borderTopColor: colors.black + '40' }]}>
-                    <View style={styles.warningLegend}>
-                      <MaterialIcons name="warning" size={14} color={colors.warning} />
-                      <Text style={[styles.warningText, { color: colors.lightGray }]}>Rating differs significantly from IMDb</Text>
-                    </View>
                   </View>
                 </View>
               </Animated.View>

@@ -7,7 +7,7 @@ import { FlashList, FlashListRef } from '@shopify/flash-list';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useSettings } from '../../hooks/useSettings';
 import { Episode } from '../../types/metadata';
-import { tmdbService } from '../../services/tmdbService';
+import { tmdbService, IMDbRatings } from '../../services/tmdbService';
 import { storageService } from '../../services/storageService';
 import { useFocusEffect } from '@react-navigation/native';
 import Animated, { FadeIn, FadeOut, SlideInRight, SlideOutLeft } from 'react-native-reanimated';
@@ -37,6 +37,7 @@ interface SeriesContentProps {
 const DEFAULT_PLACEHOLDER = 'https://via.placeholder.com/300x450/1a1a1a/666666?text=No+Image';
 const EPISODE_PLACEHOLDER = 'https://via.placeholder.com/500x280/1a1a1a/666666?text=No+Preview';
 const TMDB_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tmdb.new.logo.svg/512px-Tmdb.new.logo.svg.png?20200406190906';
+const IMDb_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/IMDB_Logo_2016.svg/575px-IMDB_Logo_2016.svg.png';
 
 export const SeriesContent: React.FC<SeriesContentProps> = ({
   episodes,
@@ -169,6 +170,8 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   const [enableItemAnimations, setEnableItemAnimations] = useState(false);
   // Local TMDB hydration for rating/runtime when addon (Cinemeta) lacks these
   const [tmdbEpisodeOverrides, setTmdbEpisodeOverrides] = useState<{ [epKey: string]: { vote_average?: number; runtime?: number; still_path?: string } }>({});
+  // IMDb ratings for episodes - using a map for O(1) lookups instead of array searches
+  const [imdbRatingsMap, setImdbRatingsMap] = useState<{ [key: string]: number }>({});
   
   // Add state for season view mode (persists for current show across navigation)
   const [seasonViewMode, setSeasonViewMode] = useState<'posters' | 'text'>('posters');
@@ -314,14 +317,13 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
     
     // Scroll to the most recently watched episode if found
     if (mostRecentEpisodeIndex >= 0) {
-      const cardWidth = isTablet ? width * 0.4 + 16 : width * 0.85 + 16;
-      const scrollPosition = mostRecentEpisodeIndex * cardWidth;
-      
       setTimeout(() => {
         if (horizontalEpisodeScrollViewRef.current) {
-          horizontalEpisodeScrollViewRef.current.scrollToOffset({
-            offset: scrollPosition,
-            animated: true
+          // Use scrollToIndex which automatically uses getItemLayout for accurate positioning
+          horizontalEpisodeScrollViewRef.current.scrollToIndex({
+            index: mostRecentEpisodeIndex,
+            animated: true,
+            viewPosition: 0 // Align to start of card for precise positioning
           });
         }
       }, 500); // Delay to ensure the season has loaded
@@ -332,6 +334,68 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
   useEffect(() => {
     loadEpisodesProgress();
   }, [episodes, metadata?.id]);
+
+  // Fetch IMDb ratings for the show
+  useEffect(() => {
+    const fetchIMDbRatings = async () => {
+      try {
+        if (!metadata?.id) {
+          logger.log('[SeriesContent] No metadata.id, skipping IMDb ratings fetch');
+          return;
+        }
+
+        logger.log('[SeriesContent] Starting IMDb ratings fetch for metadata.id:', metadata.id);
+
+        // Resolve TMDB show id
+        let tmdbShowId: number | null = null;
+        if (metadata.id.startsWith('tmdb:')) {
+          tmdbShowId = parseInt(metadata.id.split(':')[1], 10);
+          logger.log('[SeriesContent] Extracted TMDB ID from metadata.id:', tmdbShowId);
+        } else if (metadata.id.startsWith('tt')) {
+          logger.log('[SeriesContent] Found IMDb ID, looking up TMDB ID...');
+          tmdbShowId = await tmdbService.findTMDBIdByIMDB(metadata.id);
+          logger.log('[SeriesContent] TMDB ID lookup result:', tmdbShowId);
+        } else {
+          logger.log('[SeriesContent] metadata.id does not start with tmdb: or tt:', metadata.id);
+        }
+        
+        if (!tmdbShowId) {
+          logger.warn('[SeriesContent] Could not resolve TMDB show ID, skipping IMDb ratings fetch');
+          return;
+        }
+
+        logger.log('[SeriesContent] Fetching IMDb ratings for TMDB ID:', tmdbShowId);
+        // Fetch IMDb ratings for all seasons
+        const ratings = await tmdbService.getIMDbRatings(tmdbShowId);
+        
+        if (ratings) {
+          logger.log('[SeriesContent] IMDb ratings fetched successfully. Seasons:', ratings.length);
+          
+          // Create a lookup map for O(1) access: key format "season:episode" -> rating
+          const ratingsMap: { [key: string]: number } = {};
+          ratings.forEach(season => {
+            if (season.episodes) {
+              season.episodes.forEach(episode => {
+                const key = `${episode.season_number}:${episode.episode_number}`;
+                if (episode.vote_average) {
+                  ratingsMap[key] = episode.vote_average;
+                }
+              });
+            }
+          });
+          
+          logger.log('[SeriesContent] IMDb ratings map created with', Object.keys(ratingsMap).length, 'episodes');
+          setImdbRatingsMap(ratingsMap);
+        } else {
+          logger.warn('[SeriesContent] IMDb ratings fetch returned null/undefined');
+        }
+      } catch (err) {
+        logger.error('[SeriesContent] Failed to fetch IMDb ratings:', err);
+      }
+    };
+
+    fetchIMDbRatings();
+  }, [metadata?.id]);
 
   // Hydrate TMDB rating/runtime for current season episodes if missing
   useEffect(() => {
@@ -653,6 +717,13 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
     );
   };
 
+  // Helper function to get IMDb rating for an episode - O(1) lookup using map
+  const getIMDbRating = useCallback((seasonNumber: number, episodeNumber: number): number | null => {
+    const key = `${seasonNumber}:${episodeNumber}`;
+    const rating = imdbRatingsMap[key];
+    return rating ?? null;
+  }, [imdbRatingsMap]);
+
   // Vertical layout episode card (traditional)
   const renderVerticalEpisodeCard = (episode: Episode) => {
     // Resolve episode image with addon-first logic
@@ -708,7 +779,14 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
     // Get episode progress
     const episodeId = episode.stremioId || `${metadata?.id}:${episode.season_number}:${episode.episode_number}`;
     const tmdbOverride = tmdbEpisodeOverrides[`${metadata?.id}:${episode.season_number}:${episode.episode_number}`];
-    const effectiveVote = (tmdbOverride?.vote_average ?? episode.vote_average) || 0;
+    // Prioritize IMDb rating, fallback to TMDB
+    const imdbRating = getIMDbRating(episode.season_number, episode.episode_number);
+    const tmdbRating = tmdbOverride?.vote_average ?? episode.vote_average;
+    const effectiveVote = imdbRating ?? tmdbRating ?? 0;
+    const isImdbRating = imdbRating !== null;
+    
+    logger.log(`[SeriesContent] Vertical card S${episode.season_number}E${episode.episode_number}: IMDb=${imdbRating}, TMDB=${tmdbRating}, effective=${effectiveVote}, isImdb=${isImdbRating}`);
+    
     const effectiveRuntime = tmdbOverride?.runtime ?? (episode as any).runtime;
     if (!episode.still_path && tmdbOverride?.still_path) {
       const tmdbUrl = tmdbService.getImageUrl(tmdbOverride.still_path, 'original');
@@ -830,34 +908,10 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
             <View style={[
               styles.episodeMetadata,
               {
-                gap: isTV ? 8 : isLargeTablet ? 7 : isTablet ? 6 : 4,
+                gap: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
                 flexWrap: 'wrap'
               }
             ]}>
-              {effectiveVote > 0 && (
-                <View style={styles.ratingContainer}>
-                  <FastImage
-                    source={{ uri: TMDB_LOGO }}
-                    style={[
-                      styles.tmdbLogo,
-                      {
-                        width: isTV ? 22 : isLargeTablet ? 20 : isTablet ? 20 : 20,
-                        height: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14
-                      }
-                    ]}
-                    resizeMode={FastImage.resizeMode.contain}
-                  />
-                  <Text style={[
-                    styles.ratingText,
-                    {
-                      color: currentTheme.colors.textMuted,
-                      fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 13 : 13
-                    }
-                  ]}>
-                    {effectiveVote.toFixed(1)}
-                  </Text>
-                </View>
-              )}
               {effectiveRuntime && (
                 <View style={styles.runtimeContainer}>
                   <MaterialIcons name="schedule" size={isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14} color={currentTheme.colors.textMuted} />
@@ -870,6 +924,58 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
                   ]}>
                     {formatRuntime(effectiveRuntime)}
                   </Text>
+                </View>
+              )}
+              {effectiveVote > 0 && (
+                <View style={styles.ratingContainer}>
+                  {isImdbRating ? (
+                    <>
+                      <FastImage
+                        source={{ uri: IMDb_LOGO }}
+                        style={[
+                          styles.imdbLogo,
+                          {
+                            width: isTV ? 32 : isLargeTablet ? 30 : isTablet ? 28 : 28,
+                            height: isTV ? 17 : isLargeTablet ? 16 : isTablet ? 15 : 15
+                          }
+                        ]}
+                        resizeMode={FastImage.resizeMode.contain}
+                      />
+                      <Text style={[
+                        styles.ratingText,
+                        {
+                          color: '#F5C518',
+                          fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 13 : 13,
+                          fontWeight: '600'
+                        }
+                      ]}>
+                        {effectiveVote.toFixed(1)}
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <FastImage
+                        source={{ uri: TMDB_LOGO }}
+                        style={[
+                          styles.tmdbLogo,
+                          {
+                            width: isTV ? 22 : isLargeTablet ? 20 : isTablet ? 20 : 20,
+                            height: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14
+                          }
+                        ]}
+                        resizeMode={FastImage.resizeMode.contain}
+                      />
+                      <Text style={[
+                        styles.ratingText,
+                        {
+                          color: currentTheme.colors.textMuted,
+                          fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 13 : 13
+                        }
+                      ]}>
+                        {effectiveVote.toFixed(1)}
+                      </Text>
+                    </>
+                  )}
                 </View>
               )}
               {episode.air_date && (
@@ -942,6 +1048,25 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
 
     // Get episode progress
     const episodeId = episode.stremioId || `${metadata?.id}:${episode.season_number}:${episode.episode_number}`;
+    const tmdbOverride = tmdbEpisodeOverrides[`${metadata?.id}:${episode.season_number}:${episode.episode_number}`];
+    // Prioritize IMDb rating, fallback to TMDB
+    const imdbRating = getIMDbRating(episode.season_number, episode.episode_number);
+    const tmdbRating = tmdbOverride?.vote_average ?? episode.vote_average;
+    const effectiveVote = imdbRating ?? tmdbRating ?? 0;
+    const isImdbRating = imdbRating !== null;
+    const effectiveRuntime = tmdbOverride?.runtime ?? (episode as any).runtime;
+    
+    logger.log(`[SeriesContent] Horizontal card S${episode.season_number}E${episode.episode_number}: IMDb=${imdbRating}, TMDB=${tmdbRating}, effective=${effectiveVote}, isImdb=${isImdbRating}`);
+    
+    const formatDate = (dateString: string) => {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    };
+    
     const progress = episodeProgress[episodeId];
     const progressPercent = progress ? (progress.currentTime / progress.duration) * 100 : 0;
     
@@ -1049,35 +1174,76 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
             <View style={[
               styles.episodeMetadataRowHorizontal,
               {
-                gap: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8
+                gap: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
               }
             ]}>
-              {episode.runtime && (
+              {effectiveRuntime && (
                 <View style={styles.runtimeContainerHorizontal}>
-                <Text style={[
-                  styles.runtimeTextHorizontal,
-                  {
-                    fontSize: isTV ? 13 : isLargeTablet ? 12 : isTablet ? 11 : 11,
-                    fontWeight: isTV ? '600' : isLargeTablet ? '500' : isTablet ? '500' : '500'
-                  }
-                ]}>
-                  {formatRuntime(episode.runtime)}
-                </Text>
-                </View>
-              )}
-              {episode.vote_average > 0 && (
-                <View style={styles.ratingContainerHorizontal}>
-                  <MaterialIcons name="star" size={isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14} color="#FFD700" />
+                  <MaterialIcons name="schedule" size={isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14} color={currentTheme.colors.mediumEmphasis} />
                   <Text style={[
-                    styles.ratingTextHorizontal,
+                    styles.runtimeTextHorizontal,
                     {
                       fontSize: isTV ? 13 : isLargeTablet ? 12 : isTablet ? 11 : 11,
-                      fontWeight: isTV ? '600' : isLargeTablet ? '600' : isTablet ? '600' : '600'
+                      fontWeight: isTV ? '600' : isLargeTablet ? '500' : isTablet ? '500' : '500',
+                      color: currentTheme.colors.mediumEmphasis
                     }
                   ]}>
-                    {episode.vote_average.toFixed(1)}
+                    {formatRuntime(effectiveRuntime)}
                   </Text>
                 </View>
+              )}
+              {effectiveVote > 0 && (
+                <View style={styles.ratingContainerHorizontal}>
+                  {isImdbRating ? (
+                    <>
+                      <FastImage
+                        source={{ uri: IMDb_LOGO }}
+                        style={[
+                          styles.imdbLogoHorizontal,
+                          {
+                            width: isTV ? 32 : isLargeTablet ? 30 : isTablet ? 28 : 28,
+                            height: isTV ? 17 : isLargeTablet ? 16 : isTablet ? 15 : 15
+                          }
+                        ]}
+                        resizeMode={FastImage.resizeMode.contain}
+                      />
+                      <Text style={[
+                        styles.ratingTextHorizontal,
+                        {
+                          fontSize: isTV ? 13 : isLargeTablet ? 12 : isTablet ? 11 : 11,
+                          fontWeight: isTV ? '600' : isLargeTablet ? '600' : isTablet ? '600' : '600',
+                          color: '#F5C518'
+                        }
+                      ]}>
+                        {effectiveVote.toFixed(1)}
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <MaterialIcons name="star" size={isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14} color="#FFD700" />
+                      <Text style={[
+                        styles.ratingTextHorizontal,
+                        {
+                          fontSize: isTV ? 13 : isLargeTablet ? 12 : isTablet ? 11 : 11,
+                          fontWeight: isTV ? '600' : isLargeTablet ? '600' : isTablet ? '600' : '600'
+                        }
+                      ]}>
+                        {effectiveVote.toFixed(1)}
+                      </Text>
+                    </>
+                  )}
+                </View>
+              )}
+              {episode.air_date && (
+                <Text style={[
+                  styles.airDateTextHorizontal,
+                  {
+                    color: currentTheme.colors.mediumEmphasis,
+                    fontSize: isTV ? 13 : isLargeTablet ? 12 : isTablet ? 11 : 11
+                  }
+                ]}>
+                  {formatDate(episode.air_date)}
+                </Text>
               )}
             </View>
           </View>
@@ -1207,13 +1373,30 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               initialNumToRender={3}
               maxToRenderPerBatch={5}
               windowSize={5}
+              snapToInterval={horizontalCardWidth + horizontalItemSpacing}
+              snapToAlignment="start"
+              decelerationRate="fast"
               getItemLayout={(data, index) => {
                 const length = horizontalCardWidth + horizontalItemSpacing;
                 return {
                   length,
-                  offset: length * index,
+                  offset: horizontalPadding + (length * index), // Account for left padding
                   index,
                 };
+              }}
+              onScrollToIndexFailed={(info) => {
+                // Fallback if scrollToIndex fails - use scrollToOffset with calculated position
+                const wait = new Promise(resolve => setTimeout(resolve, 500));
+                wait.then(() => {
+                  if (horizontalEpisodeScrollViewRef.current) {
+                    const length = horizontalCardWidth + horizontalItemSpacing;
+                    const offset = horizontalPadding + (length * info.index);
+                    horizontalEpisodeScrollViewRef.current.scrollToOffset({
+                      offset: offset,
+                      animated: true
+                    });
+                  }
+                });
               }}
             />
           ) : (
@@ -1382,6 +1565,10 @@ const styles = StyleSheet.create({
     width: 20,
     height: 14,
   },
+  imdbLogo: {
+    width: 35,
+    height: 18,
+  },
   ratingText: {
     color: '#01b4e4',
     fontSize: 13,
@@ -1549,6 +1736,7 @@ const styles = StyleSheet.create({
   runtimeContainerHorizontal: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
     // chip background removed
   },
   runtimeTextHorizontal: {
@@ -1556,11 +1744,20 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
   },
+  airDateTextHorizontal: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 11,
+    opacity: 0.8,
+  },
   ratingContainerHorizontal: {
     flexDirection: 'row',
     alignItems: 'center',
     // chip background removed
     gap: 2,
+  },
+  imdbLogoHorizontal: {
+    width: 35,
+    height: 18,
   },
   ratingTextHorizontal: {
     color: '#FFD700',

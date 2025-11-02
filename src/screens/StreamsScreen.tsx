@@ -38,7 +38,7 @@ import { useMetadataAssets } from '../hooks/useMetadataAssets';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTrailer } from '../contexts/TrailerContext';
 import { Stream } from '../types/metadata';
-import { tmdbService } from '../services/tmdbService';
+import { tmdbService, IMDbRatings } from '../services/tmdbService';
 import { stremioService } from '../services/stremioService';
 import { localScraperService } from '../services/localScraperService';
 import { VideoPlayerService } from '../services/videoPlayerService';
@@ -73,6 +73,7 @@ if (Platform.OS === 'android') {
 }
 
 const TMDB_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tmdb.new.logo.svg/512px-Tmdb.new.logo.svg.png?20200406190906';
+const IMDb_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/IMDB_Logo_2016.svg/575px-IMDB_Logo_2016.svg.png';
 const HDR_ICON = 'https://uxwing.com/wp-content/themes/uxwing/download/video-photography-multimedia/hdr-icon.png';
 const DOLBY_ICON = 'https://upload.wikimedia.org/wikipedia/en/thumb/3/3f/Dolby_Vision_%28logo%29.svg/512px-Dolby_Vision_%28logo%29.svg.png?20220908042900';
 
@@ -717,6 +718,8 @@ export const StreamsScreen = () => {
 
   // TMDB hydration for series hero (rating/runtime/still)
   const [tmdbEpisodeOverride, setTmdbEpisodeOverride] = useState<{ vote_average?: number; runtime?: number; still_path?: string } | null>(null);
+  // IMDb ratings for episodes - using a map for O(1) lookups
+  const [imdbRatingsMap, setImdbRatingsMap] = useState<{ [key: string]: number }>({});
 
   useEffect(() => {
     const hydrateEpisodeFromTmdb = async () => {
@@ -753,6 +756,49 @@ export const StreamsScreen = () => {
     };
 
     hydrateEpisodeFromTmdb();
+  }, [type, id, currentEpisode?.season_number, currentEpisode?.episode_number]);
+
+  // Fetch IMDb ratings for the show
+  useEffect(() => {
+    const fetchIMDbRatings = async () => {
+      try {
+        if (type !== 'series' && type !== 'other') return;
+        if (!id || !currentEpisode) return;
+
+        // Resolve TMDB show id
+        let tmdbShowId: number | null = null;
+        if (id.startsWith('tmdb:')) {
+          tmdbShowId = parseInt(id.split(':')[1], 10);
+        } else if (id.startsWith('tt')) {
+          tmdbShowId = await tmdbService.findTMDBIdByIMDB(id);
+        }
+        if (!tmdbShowId) return;
+
+        // Fetch IMDb ratings for all seasons
+        const ratings = await tmdbService.getIMDbRatings(tmdbShowId);
+        
+        if (ratings) {
+          // Create a lookup map for O(1) access: key format "season:episode" -> rating
+          const ratingsMap: { [key: string]: number } = {};
+          ratings.forEach(season => {
+            if (season.episodes) {
+              season.episodes.forEach(episode => {
+                const key = `${episode.season_number}:${episode.episode_number}`;
+                if (episode.vote_average) {
+                  ratingsMap[key] = episode.vote_average;
+                }
+              });
+            }
+          });
+          
+          setImdbRatingsMap(ratingsMap);
+        }
+      } catch (err) {
+        logger.error('[StreamsScreen] Failed to fetch IMDb ratings:', err);
+      }
+    };
+
+    fetchIMDbRatings();
   }, [type, id, currentEpisode?.season_number, currentEpisode?.episode_number]);
 
   const navigateToPlayer = useCallback(async (stream: Stream, options?: { forceVlc?: boolean; headers?: Record<string, string> }) => {
@@ -1555,12 +1601,33 @@ export const StreamsScreen = () => {
     return null;
   }, [currentEpisode, metadata, episodeThumbnail, tmdbEpisodeOverride?.still_path, settings.enrichMetadataWithTMDB]);
 
-  // Effective TMDB fields for hero (series)
+  // Helper function to get IMDb rating for an episode - O(1) lookup using map
+  const getIMDbRating = useCallback((seasonNumber: number, episodeNumber: number): number | null => {
+    const key = `${seasonNumber}:${episodeNumber}`;
+    const rating = imdbRatingsMap[key];
+    return rating ?? null;
+  }, [imdbRatingsMap]);
+
+  // Effective rating for hero (series) - prioritize IMDb, fallback to TMDB
   const effectiveEpisodeVote = useMemo(() => {
     if (!currentEpisode) return 0;
+    
+    // Try IMDb rating first
+    const imdbRating = getIMDbRating(currentEpisode.season_number, currentEpisode.episode_number);
+    if (imdbRating !== null) {
+      return imdbRating;
+    }
+    
+    // Fallback to TMDB
     const v = (tmdbEpisodeOverride?.vote_average ?? currentEpisode.vote_average) || 0;
     return typeof v === 'number' ? v : Number(v) || 0;
-  }, [currentEpisode, tmdbEpisodeOverride?.vote_average]);
+  }, [currentEpisode, tmdbEpisodeOverride?.vote_average, getIMDbRating]);
+
+  // Check if current episode has IMDb rating
+  const hasIMDbRating = useMemo(() => {
+    if (!currentEpisode) return false;
+    return getIMDbRating(currentEpisode.season_number, currentEpisode.episode_number) !== null;
+  }, [currentEpisode, getIMDbRating]);
 
   const effectiveEpisodeRuntime = useMemo(() => {
     if (!currentEpisode) return undefined as number | undefined;
@@ -1919,10 +1986,21 @@ export const StreamsScreen = () => {
                             </Text>
                             {effectiveEpisodeVote > 0 && (
                               <View style={styles.streamsHeroRating}>
-                                <FastImage source={{ uri: TMDB_LOGO }} style={styles.tmdbLogo} resizeMode={FastImage.resizeMode.contain} />
-                                <Text style={styles.streamsHeroRatingText}>
-                                  {effectiveEpisodeVote.toFixed(1)}
-                                </Text>
+                                {hasIMDbRating ? (
+                                  <>
+                                    <FastImage source={{ uri: IMDb_LOGO }} style={styles.imdbLogo} resizeMode={FastImage.resizeMode.contain} />
+                                    <Text style={[styles.streamsHeroRatingText, { color: '#F5C518' }]}>
+                                      {effectiveEpisodeVote.toFixed(1)}
+                                    </Text>
+                                  </>
+                                ) : (
+                                  <>
+                                    <FastImage source={{ uri: TMDB_LOGO }} style={styles.tmdbLogo} resizeMode={FastImage.resizeMode.contain} />
+                                    <Text style={styles.streamsHeroRatingText}>
+                                      {effectiveEpisodeVote.toFixed(1)}
+                                    </Text>
+                                  </>
+                                )}
                               </View>
                             )}
                             {!!effectiveEpisodeRuntime && (
@@ -2482,6 +2560,10 @@ const createStyles = (colors: any) => StyleSheet.create({
   tmdbLogo: {
     width: 20,
     height: 14,
+  },
+  imdbLogo: {
+    width: 28,
+    height: 15,
   },
   streamsHeroRatingText: {
     color: colors.highEmphasis,
