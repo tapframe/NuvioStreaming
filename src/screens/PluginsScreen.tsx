@@ -14,6 +14,7 @@ import {
   Modal,
   Dimensions,
   Animated,
+  Image,
 } from 'react-native';
 import CustomAlert from '../components/CustomAlert';
 import FastImage from '@d11/react-native-fast-image';
@@ -1619,11 +1620,19 @@ const PluginsScreen: React.FC = () => {
                 <View key={scraper.id} style={styles.scraperCard}>
                   <View style={styles.scraperCardHeader}>
                         {scraper.logo ? (
-                          <FastImage
-                            source={{ uri: scraper.logo }}
-                            style={styles.scraperLogo}
-                            resizeMode={FastImage.resizeMode.contain}
-                          />
+                          (scraper.logo.toLowerCase().endsWith('.svg') || scraper.logo.toLowerCase().includes('.svg?')) ? (
+                            <Image
+                              source={{ uri: scraper.logo }}
+                              style={styles.scraperLogo}
+                              resizeMode="contain"
+                            />
+                          ) : (
+                            <FastImage
+                              source={{ uri: scraper.logo }}
+                              style={styles.scraperLogo}
+                              resizeMode={FastImage.resizeMode.contain}
+                            />
+                          )
                         ) : (
                       <View style={styles.scraperLogo} />
                     )}

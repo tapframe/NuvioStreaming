@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Platform,
   Clipboard,
+  Image,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import FastImage from '@d11/react-native-fast-image';
@@ -190,11 +191,19 @@ const StreamCard = memo(({
         {/* Scraper Logo */}
         {showLogos && scraperLogo && (
           <View style={styles.scraperLogoContainer}>
-            <FastImage
-              source={{ uri: scraperLogo }}
-              style={styles.scraperLogo}
-              resizeMode={FastImage.resizeMode.contain}
-            />
+            {scraperLogo.toLowerCase().endsWith('.svg') || scraperLogo.toLowerCase().includes('.svg?') ? (
+              <Image
+                source={{ uri: scraperLogo }}
+                style={styles.scraperLogo}
+                resizeMode="contain"
+              />
+            ) : (
+              <FastImage
+                source={{ uri: scraperLogo }}
+                style={styles.scraperLogo}
+                resizeMode={FastImage.resizeMode.contain}
+              />
+            )}
           </View>
         )}
         
