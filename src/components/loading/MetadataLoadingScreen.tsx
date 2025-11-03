@@ -41,19 +41,19 @@ export const MetadataLoadingScreen = forwardRef<MetadataLoadingScreenRef, Metada
     const exitAnimation = Animated.parallel([
       Animated.timing(sceneOpacity, {
         toValue: 0,
-        duration: 200,
+        duration: 100,
         easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
         useNativeDriver: true,
       }),
       Animated.timing(sceneScale, {
         toValue: 0.95,
-        duration: 200,
+        duration: 100,
         easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
         useNativeDriver: true,
       }),
       Animated.timing(sceneTranslateY, {
         toValue: 8,
-        duration: 200,
+        duration: 100,
         easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
         useNativeDriver: true,
       }),
@@ -74,19 +74,19 @@ export const MetadataLoadingScreen = forwardRef<MetadataLoadingScreenRef, Metada
     const sceneAnimation = Animated.parallel([
       Animated.timing(sceneOpacity, {
         toValue: 1,
-        duration: 200,
+        duration: 100,
         easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
         useNativeDriver: true,
       }),
       Animated.timing(sceneScale, {
         toValue: 1,
-        duration: 200,
+        duration: 100,
         easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
         useNativeDriver: true,
       }),
       Animated.timing(sceneTranslateY, {
         toValue: 0,
-        duration: 200,
+        duration: 100,
         easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
         useNativeDriver: true,
       }),

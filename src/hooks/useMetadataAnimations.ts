@@ -65,26 +65,26 @@ export const useMetadataAnimations = (safeAreaTop: number, watchProgress: any) =
       try {
       // Start with slightly reduced values and animate to full visibility
       screenOpacity.value = withTiming(1, { 
-        duration: 250, 
+        duration: 100, 
         easing: easings.fast 
       });
       
       heroOpacity.value = withTiming(1, { 
-        duration: 300, 
+        duration: 100, 
         easing: easings.fast 
       });
       
       heroScale.value = withSpring(1, ultraFastSpring);
       
       uiElementsOpacity.value = withTiming(1, { 
-        duration: 400, 
+        duration: 100, 
         easing: easings.natural 
       });
       
       uiElementsTranslateY.value = withSpring(0, fastSpring);
       
       contentOpacity.value = withTiming(1, { 
-        duration: 350, 
+        duration: 100, 
         easing: easings.fast 
       });
       } catch (error) {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Dimensions } from 'react-native';
 import Svg, { Text as SvgText, TSpan } from 'react-native-svg';
 import { styles } from '../utils/playerStyles';
 import { SubtitleSegment } from '../utils/playerTypes';
@@ -85,6 +85,13 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
   const displayFontSize = subtitleSize * inverseScale;
   const displayLineHeight = subtitleSize * lineHeightMultiplier * inverseScale;
   const svgHeight = lines.length * displayLineHeight;
+  // Estimate text width to keep background from spanning full screen when using SVG
+  const windowWidth = Math.min(Dimensions.get('window').width, Dimensions.get('window').height);
+  const longestLineChars = Math.max(1, ...lines.map(l => l.length));
+  const estimatedContentWidth = Math.min(
+    Math.max(100, Math.ceil(longestLineChars * displayFontSize * 0.6)),
+    Math.max(140, windowWidth - 40)
+  );
 
   // Helper to render formatted segments
   const renderFormattedText = (segments: SubtitleSegment[], lineIndex: number, keyPrefix: string, isRTL?: boolean, customLetterSpacing?: number) => {
@@ -140,14 +147,16 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
           backgroundColor: bgColor,
           position: 'relative',
           alignItems: 'center',
+          alignSelf: 'center',
+          maxWidth: windowWidth - 40,
         }
       ]}>
         {useCrispSvgOutline ? (
           // Crisp outline using react-native-svg (stroke under, fill on top)
           <Svg
-            width={800}
+            width={estimatedContentWidth}
             height={svgHeight}
-            viewBox={`0 0 1000 ${svgHeight}`}
+            viewBox={`0 0 ${estimatedContentWidth} ${svgHeight}`}
             preserveAspectRatio="xMidYMax meet"
           >
             {(() => {
@@ -159,10 +168,10 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
               if (isRTL) {
                 // For RTL, always use 'end' anchor to position from right edge
                 anchor = 'end';
-                x = 1000;
+                x = estimatedContentWidth;
               } else {
                 anchor = align === 'center' ? 'middle' : align === 'left' ? 'start' : 'end';
-                x = align === 'center' ? 500 : (align === 'left' ? 0 : 1000);
+                x = align === 'center' ? (estimatedContentWidth / 2) : (align === 'left' ? 0 : estimatedContentWidth);
               }
               
               const baseFontSize = displayFontSize;

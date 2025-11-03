@@ -188,21 +188,12 @@ const HomeScreen = () => {
       let catalogIndex = 0;
       const catalogQueue: (() => Promise<void>)[] = [];
       
-      // Limit concurrent catalog loading to prevent overwhelming the system
-      const MAX_CONCURRENT_CATALOGS = 1; // Single catalog at a time to minimize heating/memory
-      let activeCatalogLoads = 0;
-      
-      const processCatalogQueue = async () => {
-        while (catalogQueue.length > 0 && activeCatalogLoads < MAX_CONCURRENT_CATALOGS) {
+      // Launch all catalog loaders in parallel
+      const launchAllCatalogs = () => {
+        while (catalogQueue.length > 0) {
           const catalogLoader = catalogQueue.shift();
           if (catalogLoader) {
-            activeCatalogLoads++;
-            catalogLoader().finally(async () => {
-              activeCatalogLoads--;
-              // Yield to event loop to avoid JS thread starvation and reduce heating
-              await new Promise(resolve => setTimeout(resolve, 100));
-              processCatalogQueue(); // Process next in queue
-            });
+            catalogLoader();
           }
         }
       };
@@ -318,8 +309,8 @@ const HomeScreen = () => {
         setCatalogs(new Array(catalogIndex).fill(null));
       });
       
-      // Start processing the catalog queue
-      processCatalogQueue();
+      // Start all catalog requests in parallel
+      launchAllCatalogs();
     } catch (error) {
       if (__DEV__) console.error('[HomeScreen] Error in progressive catalog loading:', error);
       InteractionManager.runAfterInteractions(() => {
