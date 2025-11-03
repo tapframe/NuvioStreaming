@@ -7,6 +7,12 @@ const DEFAULT_API_KEY = 'd131017ccc6e5462a81c9304d21476de';
 const BASE_URL = 'https://api.themoviedb.org/3';
 const TMDB_API_KEY_STORAGE_KEY = 'tmdb_api_key';
 const USE_CUSTOM_TMDB_API_KEY = 'use_custom_tmdb_api_key';
+// Remote cache configuration
+const REMOTE_CACHE_URL = process.env.EXPO_PUBLIC_CACHE_SERVER_URL;
+const USE_REMOTE_CACHE = process.env.EXPO_PUBLIC_USE_REMOTE_CACHE === 'true';
+const REMOTE_CACHE_NAMESPACE = 'tmdb';
+// Allow temporarily disabling local MMKV cache (read/write)
+const DISABLE_LOCAL_CACHE = process.env.EXPO_PUBLIC_DISABLE_LOCAL_CACHE === 'true';
 
 // Cache configuration
 const TMDB_CACHE_PREFIX = 'tmdb_cache_';
@@ -135,6 +141,52 @@ export class TMDBService {
   }
 
   /**
+   * Remote cache helpers
+   */
+  private async remoteGetCachedData<T>(key: string): Promise<T | null> {
+    if (!USE_REMOTE_CACHE || !REMOTE_CACHE_URL) return null;
+    try {
+      const url = `${REMOTE_CACHE_URL}/cache/${REMOTE_CACHE_NAMESPACE}/${encodeURIComponent(key)}`;
+      const response = await axios.get(url, { headers: { 'Content-Type': 'application/json' } });
+      const payload = response.data;
+      if (payload && Object.prototype.hasOwnProperty.call(payload, 'data')) {
+        // Warm local cache for faster subsequent reads (skip if disabled)
+        if (!DISABLE_LOCAL_CACHE) {
+          this.setCachedData(key, payload.data);
+        }
+        logger.log(`[TMDB Remote Cache] ✅ HIT: ${key}`);
+        return payload.data as T;
+      }
+      return null;
+    } catch (_) {
+      logger.log(`[TMDB Remote Cache] ❌ MISS: ${key}`);
+      return null;
+    }
+  }
+
+  private async remoteSetCachedData(key: string, data: any): Promise<void> {
+    if (!USE_REMOTE_CACHE || !REMOTE_CACHE_URL) return;
+    try {
+      const url = `${REMOTE_CACHE_URL}/cache/${REMOTE_CACHE_NAMESPACE}/${encodeURIComponent(key)}`;
+      await axios.put(url, { data, ttlMs: CACHE_TTL_MS }, { headers: { 'Content-Type': 'application/json' } });
+      logger.log(`[TMDB Remote Cache] 💾 STORED: ${key}`);
+    } catch (_) {
+      // best-effort only
+    }
+  }
+
+  private async remoteClearAllCache(): Promise<void> {
+    if (!USE_REMOTE_CACHE || !REMOTE_CACHE_URL) return;
+    try {
+      const url = `${REMOTE_CACHE_URL}/cache/${REMOTE_CACHE_NAMESPACE}/clear`;
+      await axios.post(url, {}, { headers: { 'Content-Type': 'application/json' } });
+      logger.log(`[TMDB Remote Cache] 🗑️ CLEARED namespace ${REMOTE_CACHE_NAMESPACE}`);
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  /**
    * Generate a unique cache key from endpoint and parameters
    */
   private generateCacheKey(endpoint: string, params: any = {}): string {
@@ -154,6 +206,10 @@ export class TMDBService {
    * Retrieve cached data if not expired
    */
   private getCachedData<T>(key: string): T | null {
+    if (DISABLE_LOCAL_CACHE) {
+      logger.log(`[TMDB Cache] 🚫 LOCAL DISABLED: ${key}`);
+      return null;
+    }
     try {
       const cachedStr = mmkvStorage.getString(key);
       if (!cachedStr) {
@@ -180,6 +236,19 @@ export class TMDBService {
     }
   }
 
+  private async getFromCacheOrRemote<T>(key: string): Promise<T | null> {
+    // Local-first: serve from MMKV if present; else try remote and warm local
+    if (!DISABLE_LOCAL_CACHE) {
+      const local = this.getCachedData<T>(key);
+      if (local !== null) return local;
+    }
+    if (USE_REMOTE_CACHE && REMOTE_CACHE_URL) {
+      const remote = await this.remoteGetCachedData<T>(key);
+      if (remote !== null) return remote;
+    }
+    return null;
+  }
+
   /**
    * Store data in cache with timestamp
    * Only called after successful API responses - never caches error responses
@@ -193,12 +262,19 @@ export class TMDBService {
     }
     
     try {
+      if (!DISABLE_LOCAL_CACHE) {
       const cacheEntry = {
         data,
         timestamp: Date.now()
       };
       mmkvStorage.setString(key, JSON.stringify(cacheEntry));
       logger.log(`[TMDB Cache] 💾 STORED: ${key}`);
+      } else {
+        logger.log(`[TMDB Cache] ⛔ LOCAL WRITE SKIPPED: ${key}`);
+      }
+      // Best-effort remote write
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      this.remoteSetCachedData(key, data);
     } catch (error) {
       // Ignore cache errors
     }
@@ -285,8 +361,8 @@ export class TMDBService {
   async searchTVShow(query: string): Promise<TMDBShow[]> {
     const cacheKey = this.generateCacheKey('search_tv', { query });
     
-    // Check cache
-    const cached = this.getCachedData<TMDBShow[]>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<TMDBShow[]>(cacheKey);
     if (cached !== null) return cached;
 
     logger.log(`[TMDB API] 🌐 FETCHING: searchTVShow("${query}")`);
@@ -314,8 +390,8 @@ export class TMDBService {
   async getTVShowDetails(tmdbId: number, language: string = 'en'): Promise<TMDBShow | null> {
     const cacheKey = this.generateCacheKey(`tv_${tmdbId}`, { language });
     
-    // Check cache
-    const cached = this.getCachedData<TMDBShow>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<TMDBShow>(cacheKey);
     if (cached !== null) return cached;
 
     try {
@@ -344,8 +420,8 @@ export class TMDBService {
   ): Promise<{ imdb_id: string | null } | null> {
     const cacheKey = this.generateCacheKey(`tv_${tmdbId}_season_${seasonNumber}_episode_${episodeNumber}_external_ids`);
     
-    // Check cache
-    const cached = this.getCachedData<{ imdb_id: string | null }>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<{ imdb_id: string | null }>(cacheKey);
     if (cached !== null) return cached;
 
     try {
@@ -416,8 +492,8 @@ export class TMDBService {
 
     const cacheKey = this.generateCacheKey(`imdb_ratings_${tmdbId}`);
     
-    // Check cache
-    const cached = this.getCachedData<IMDbRatings>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<IMDbRatings>(cacheKey);
     if (cached !== null) return cached;
 
     const apiUrl = `${IMDB_RATINGS_API_BASE_URL}/api/shows/${tmdbId}/season-ratings`;
@@ -450,8 +526,8 @@ export class TMDBService {
   async getSeasonDetails(tmdbId: number, seasonNumber: number, showName?: string, language: string = 'en-US'): Promise<TMDBSeason | null> {
     const cacheKey = this.generateCacheKey(`tv_${tmdbId}_season_${seasonNumber}`, { language, showName });
     
-    // Check cache
-    const cached = this.getCachedData<TMDBSeason>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<TMDBSeason>(cacheKey);
     if (cached !== null) return cached;
 
     try {
@@ -481,8 +557,8 @@ export class TMDBService {
   ): Promise<TMDBEpisode | null> {
     const cacheKey = this.generateCacheKey(`tv_${tmdbId}_season_${seasonNumber}_episode_${episodeNumber}`, { language });
     
-    // Check cache
-    const cached = this.getCachedData<TMDBEpisode>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<TMDBEpisode>(cacheKey);
     if (cached !== null) return cached;
 
     try {
@@ -528,8 +604,8 @@ export class TMDBService {
   async findTMDBIdByIMDB(imdbId: string): Promise<number | null> {
     const cacheKey = this.generateCacheKey('find_imdb', { imdbId });
     
-    // Check cache
-    const cached = this.getCachedData<number>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<number>(cacheKey);
     if (cached !== null) return cached;
 
     try {
@@ -654,8 +730,8 @@ export class TMDBService {
   async getCredits(tmdbId: number, type: string) {
     const cacheKey = this.generateCacheKey(`${type}_${tmdbId}_credits`);
     
-    // Check cache
-    const cached = this.getCachedData<{ cast: any[]; crew: any[] }>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<{ cast: any[]; crew: any[] }>(cacheKey);
     if (cached !== null) return cached;
 
     try {
@@ -679,8 +755,8 @@ export class TMDBService {
   async getPersonDetails(personId: number) {
     const cacheKey = this.generateCacheKey(`person_${personId}`);
     
-    // Check cache
-    const cached = this.getCachedData<any>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<any>(cacheKey);
     if (cached !== null) return cached;
 
     try {
@@ -704,8 +780,8 @@ export class TMDBService {
   async getPersonMovieCredits(personId: number) {
     const cacheKey = this.generateCacheKey(`person_${personId}_movie_credits`);
     
-    // Check cache
-    const cached = this.getCachedData<any>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<any>(cacheKey);
     if (cached !== null) return cached;
 
     try {
@@ -729,8 +805,8 @@ export class TMDBService {
   async getPersonTvCredits(personId: number) {
     const cacheKey = this.generateCacheKey(`person_${personId}_tv_credits`);
     
-    // Check cache
-    const cached = this.getCachedData<any>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<any>(cacheKey);
     if (cached !== null) return cached;
 
     try {
@@ -754,8 +830,8 @@ export class TMDBService {
   async getPersonCombinedCredits(personId: number) {
     const cacheKey = this.generateCacheKey(`person_${personId}_combined_credits`);
     
-    // Check cache
-    const cached = this.getCachedData<any>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<any>(cacheKey);
     if (cached !== null) return cached;
 
     try {
@@ -779,8 +855,8 @@ export class TMDBService {
   async getShowExternalIds(tmdbId: number): Promise<{ imdb_id: string | null } | null> {
     const cacheKey = this.generateCacheKey(`tv_${tmdbId}_external_ids`);
     
-    // Check cache
-    const cached = this.getCachedData<{ imdb_id: string | null }>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<{ imdb_id: string | null }>(cacheKey);
     if (cached !== null) return cached;
 
     try {
@@ -806,8 +882,8 @@ export class TMDBService {
     
     const cacheKey = this.generateCacheKey(`${type}_${tmdbId}_recommendations`, { language });
     
-    // Check cache
-    const cached = this.getCachedData<any[]>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<any[]>(cacheKey);
     if (cached !== null) return cached;
 
     try {
@@ -826,8 +902,8 @@ export class TMDBService {
   async searchMulti(query: string): Promise<any[]> {
     const cacheKey = this.generateCacheKey('search_multi', { query });
     
-    // Check cache
-    const cached = this.getCachedData<any[]>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<any[]>(cacheKey);
     if (cached !== null) return cached;
 
     try {
@@ -854,8 +930,8 @@ export class TMDBService {
   async getMovieDetails(movieId: string, language: string = 'en'): Promise<any> {
     const cacheKey = this.generateCacheKey(`movie_${movieId}`, { language });
     
-    // Check cache
-    const cached = this.getCachedData<any>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<any>(cacheKey);
     if (cached !== null) return cached;
 
     try {
@@ -880,8 +956,8 @@ export class TMDBService {
   async getCollectionDetails(collectionId: number, language: string = 'en'): Promise<TMDBCollection | null> {
     const cacheKey = this.generateCacheKey(`collection_${collectionId}`, { language });
     
-    // Check cache
-    const cached = this.getCachedData<TMDBCollection>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<TMDBCollection>(cacheKey);
     if (cached !== null) return cached;
 
     try {
@@ -905,8 +981,8 @@ export class TMDBService {
   async getCollectionImages(collectionId: number, language: string = 'en'): Promise<any> {
     const cacheKey = this.generateCacheKey(`collection_${collectionId}_images`, { language });
     
-    // Check cache
-    const cached = this.getCachedData<any>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<any>(cacheKey);
     if (cached !== null) return cached;
 
     try {
@@ -931,8 +1007,8 @@ export class TMDBService {
   async getMovieImagesFull(movieId: number | string, language: string = 'en'): Promise<any> {
     const cacheKey = this.generateCacheKey(`movie_${movieId}_images_full`, { language });
     
-    // Check cache
-    const cached = this.getCachedData<any>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<any>(cacheKey);
     if (cached !== null) {
       return cached;
     }
@@ -1086,8 +1162,8 @@ export class TMDBService {
   async getTvShowImagesFull(showId: number | string, language: string = 'en'): Promise<any> {
     const cacheKey = this.generateCacheKey(`tv_${showId}_images_full`, { language });
     
-    // Check cache
-    const cached = this.getCachedData<any>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<any>(cacheKey);
     if (cached !== null) return cached;
 
     try {
@@ -1112,8 +1188,8 @@ export class TMDBService {
   async getTvShowImages(showId: number | string, preferredLanguage: string = 'en'): Promise<string | null> {
     const cacheKey = this.generateCacheKey(`tv_${showId}_logo`, { preferredLanguage });
     
-    // Check cache
-    const cached = this.getCachedData<string>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<string>(cacheKey);
     if (cached !== null) return cached;
 
     try {
@@ -1330,8 +1406,8 @@ export class TMDBService {
   async getTrending(type: 'movie' | 'tv', timeWindow: 'day' | 'week'): Promise<TMDBTrendingResult[]> {
     const cacheKey = this.generateCacheKey(`trending_${type}_${timeWindow}`);
     
-    // Check cache
-    const cached = this.getCachedData<TMDBTrendingResult[]>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<TMDBTrendingResult[]>(cacheKey);
     if (cached !== null) return cached;
 
     try {
@@ -1379,8 +1455,8 @@ export class TMDBService {
   async getPopular(type: 'movie' | 'tv', page: number = 1): Promise<TMDBTrendingResult[]> {
     const cacheKey = this.generateCacheKey(`popular_${type}`, { page });
     
-    // Check cache
-    const cached = this.getCachedData<TMDBTrendingResult[]>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<TMDBTrendingResult[]>(cacheKey);
     if (cached !== null) return cached;
 
     try {
@@ -1429,8 +1505,8 @@ export class TMDBService {
   async getUpcoming(type: 'movie' | 'tv', page: number = 1): Promise<TMDBTrendingResult[]> {
     const cacheKey = this.generateCacheKey(`upcoming_${type}`, { page });
     
-    // Check cache
-    const cached = this.getCachedData<TMDBTrendingResult[]>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<TMDBTrendingResult[]>(cacheKey);
     if (cached !== null) return cached;
 
     try {
@@ -1482,8 +1558,8 @@ export class TMDBService {
   async getNowPlaying(page: number = 1, region: string = 'US'): Promise<TMDBTrendingResult[]> {
     const cacheKey = this.generateCacheKey('now_playing', { page, region });
     
-    // Check cache
-    const cached = this.getCachedData<TMDBTrendingResult[]>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<TMDBTrendingResult[]>(cacheKey);
     if (cached !== null) return cached;
 
     try {
@@ -1531,8 +1607,8 @@ export class TMDBService {
   async getMovieGenres(): Promise<{ id: number; name: string }[]> {
     const cacheKey = this.generateCacheKey('genres_movie');
     
-    // Check cache
-    const cached = this.getCachedData<{ id: number; name: string }[]>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<{ id: number; name: string }[]>(cacheKey);
     if (cached !== null) return cached;
 
     try {
@@ -1556,8 +1632,8 @@ export class TMDBService {
   async getTvGenres(): Promise<{ id: number; name: string }[]> {
     const cacheKey = this.generateCacheKey('genres_tv');
     
-    // Check cache
-    const cached = this.getCachedData<{ id: number; name: string }[]>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<{ id: number; name: string }[]>(cacheKey);
     if (cached !== null) return cached;
 
     try {
@@ -1584,8 +1660,8 @@ export class TMDBService {
   async discoverByGenre(type: 'movie' | 'tv', genreName: string, page: number = 1): Promise<TMDBTrendingResult[]> {
     const cacheKey = this.generateCacheKey(`discover_${type}`, { genreName, page });
     
-    // Check cache
-    const cached = this.getCachedData<TMDBTrendingResult[]>(cacheKey);
+    // Check cache (local or remote)
+    const cached = await this.getFromCacheOrRemote<TMDBTrendingResult[]>(cacheKey);
     if (cached !== null) return cached;
 
     try {

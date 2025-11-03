@@ -499,6 +499,13 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
 
 
 
+  // Helper function to get IMDb rating for an episode - O(1) lookup using map
+  const getIMDbRating = useCallback((seasonNumber: number, episodeNumber: number): number | null => {
+    const key = `${seasonNumber}:${episodeNumber}`;
+    const rating = imdbRatingsMap[key];
+    return rating ?? null;
+  }, [imdbRatingsMap]);
+
   if (loadingSeasons) {
     return (
       <View style={styles.centeredContainer}>
@@ -716,13 +723,6 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
       </View>
     );
   };
-
-  // Helper function to get IMDb rating for an episode - O(1) lookup using map
-  const getIMDbRating = useCallback((seasonNumber: number, episodeNumber: number): number | null => {
-    const key = `${seasonNumber}:${episodeNumber}`;
-    const rating = imdbRatingsMap[key];
-    return rating ?? null;
-  }, [imdbRatingsMap]);
 
   // Vertical layout episode card (traditional)
   const renderVerticalEpisodeCard = (episode: Episode) => {
@@ -1579,6 +1579,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     // chip background removed
+    minWidth: 52, // reserve space so following items (rating) don't shift
   },
   runtimeText: {
     fontSize: 13,
