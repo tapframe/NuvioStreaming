@@ -56,6 +56,32 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   const scrollX = useSharedValue(0);
   const interval = CARD_WIDTH + 16;
   
+  // Parallel image prefetch: start fetching banners and logos as soon as data arrives
+  const itemsToPreload = useMemo(() => data.slice(0, 8), [data]);
+  useEffect(() => {
+    if (!itemsToPreload.length) return;
+    try {
+      const sources = itemsToPreload.flatMap((it) => {
+        const result: { uri: string; priority?: any }[] = [];
+        const bannerOrPoster = it.banner || it.poster;
+        if (bannerOrPoster) {
+          result.push({ uri: bannerOrPoster, priority: (FastImage as any).priority?.low });
+        }
+        if (it.logo) {
+          result.push({ uri: it.logo, priority: (FastImage as any).priority?.normal });
+        }
+        return result;
+      });
+      // de-duplicate by uri
+      const uniqueSources = Array.from(new Map(sources.map((s) => [s.uri, s])).values());
+      if (uniqueSources.length && (FastImage as any).preload) {
+        (FastImage as any).preload(uniqueSources);
+      }
+    } catch {
+      // no-op: prefetch is best-effort
+    }
+  }, [itemsToPreload]);
+  
   // Comprehensive reset when component mounts/remounts to prevent glitching
   useEffect(() => {
     scrollX.value = 0;

@@ -668,6 +668,8 @@ export const styles = StyleSheet.create({
   customSubtitleWrapper: {
     padding: 10,
     borderRadius: 5,
+    alignSelf: 'center',
+    maxWidth: '90%',
   },
   customSubtitleText: {
     color: 'white',

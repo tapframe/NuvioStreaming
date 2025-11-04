@@ -904,14 +904,24 @@ class LocalScraperService {
       }
     }
 
+    // Normalize media type for plugin compatibility (treat 'series'/'other' as 'tv')
+    const media: 'movie' | 'tv' = (type === 'series' || type === 'other') ? 'tv' : (type as 'movie' | 'tv');
+
     // Get available scrapers from manifest (respects manifestEnabled)
     const availableScrapers = await this.getAvailableScrapers();
     const enabledScrapers = availableScrapers
       .filter(scraper =>
         scraper.enabled &&
         scraper.manifestEnabled !== false &&
-        scraper.supportedTypes.includes(type as 'movie' | 'tv')
+        scraper.supportedTypes.includes(media)
       );
+
+    logger.log(`[LocalScraperService] Media normalized '${type}' -> '${media}'. Enabled scrapers for this media: ${enabledScrapers.length}`);
+    if (enabledScrapers.length > 0) {
+      try {
+        logger.log('[LocalScraperService] Enabled scrapers:', enabledScrapers.map(s => s.name).join(', '));
+      } catch {}
+    }
 
     if (enabledScrapers.length === 0) {
       logger.log('[LocalScraperService] No enabled scrapers found for type:', type);
@@ -919,7 +929,7 @@ class LocalScraperService {
       return;
     }
 
-    logger.log(`[LocalScraperService] Executing ${enabledScrapers.length} scrapers for ${type}:${tmdbId}`, {
+    logger.log(`[LocalScraperService] Executing ${enabledScrapers.length} scrapers for ${media}:${tmdbId}`, {
       scrapers: enabledScrapers.map(s => s.name)
     });
 
@@ -928,7 +938,7 @@ class LocalScraperService {
 
     // Execute all enabled scrapers
     for (const scraper of enabledScrapers) {
-      this.executeScraper(scraper, type, tmdbId, season, episode, callback, requestId);
+      this.executeScraper(scraper, media, tmdbId, season, episode, callback, requestId);
     }
   }
 
