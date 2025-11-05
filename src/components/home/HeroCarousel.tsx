@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import FastImage from '@d11/react-native-fast-image';
 import { Pagination } from 'react-native-reanimated-carousel';
+import { Ionicons } from '@expo/vector-icons';
 
 // Optional iOS Glass effect (expo-glass-effect) with safe fallback for HeroCarousel
 let GlassViewComp: any = null;
@@ -56,6 +57,10 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   const [activeIndex, setActiveIndex] = useState(0);
   const [failedLogoIds, setFailedLogoIds] = useState<Set<string>>(new Set());
   const scrollViewRef = useRef<any>(null);
+  const [flippedMap, setFlippedMap] = useState<Record<string, boolean>>({});
+  const toggleFlipById = useCallback((id: string) => {
+    setFlippedMap((prev) => ({ ...prev, [id]: !prev[id] }));
+  }, []);
 
   // Note: do not early-return before hooks. Loading UI is returned later.
 
@@ -368,6 +373,8 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
               onPressInfo={() => handleNavigateToMetadata(item.id, item.type)}
               scrollX={scrollX}
               index={index}
+              flipped={!!flippedMap[item.id]}
+              onToggleFlip={() => toggleFlipById(item.id)}
             />
           ))}
         </Animated.ScrollView>
@@ -419,9 +426,11 @@ interface CarouselCardProps {
   onPressInfo: () => void;
   scrollX: SharedValue<number>;
   index: number;
+  flipped: boolean;
+  onToggleFlip: () => void;
 }
 
-const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFailed, onLogoError, onPressInfo, scrollX, index }) => {
+const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFailed, onLogoError, onPressInfo, scrollX, index, flipped, onToggleFlip }) => {
   const [bannerLoaded, setBannerLoaded] = useState(false);
   const [logoLoaded, setLogoLoaded] = useState(false);
   
@@ -429,6 +438,7 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
   const logoOpacity = useSharedValue(0);
   const genresOpacity = useSharedValue(0);
   const actionsOpacity = useSharedValue(0);
+  const isFlipped = useSharedValue(flipped ? 1 : 0);
   
   // Reset animations when component mounts/remounts to prevent glitching
   useEffect(() => {
@@ -454,6 +464,32 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
   const logoAnimatedStyle = useAnimatedStyle(() => ({
     opacity: logoOpacity.value,
   }));
+
+  // Flip styles
+  const frontFlipStyle = useAnimatedStyle(() => {
+    const rotate = interpolate(isFlipped.value, [0, 1], [0, 180]);
+    return {
+      transform: [
+        { perspective: 1000 },
+        { rotateY: `${rotate}deg` },
+      ],
+    } as any;
+  });
+
+  const backFlipStyle = useAnimatedStyle(() => {
+    const rotate = interpolate(isFlipped.value, [0, 1], [-180, 0]);
+    return {
+      transform: [
+        { perspective: 1000 },
+        { rotateY: `${rotate}deg` },
+      ],
+    } as any;
+  });
+
+  // Sync animation with prop changes
+  useEffect(() => {
+    isFlipped.value = withTiming(flipped ? 1 : 0, { duration: 300, easing: Easing.out(Easing.cubic) });
+  }, [flipped]);
 
   // ULTRA-OPTIMIZED: Only animate the center card and ±1 neighbors
   // Use a simple distance-based approach instead of reading scrollX.value during render
@@ -568,14 +604,8 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
   }, [logoLoaded]);
 
   return (
-    <View
-      style={{ width: CARD_WIDTH + 16 }}
-    >
-      <TouchableOpacity
-        activeOpacity={0.9}
-        onPress={onPressInfo}
-        style={{ width: CARD_WIDTH, height: CARD_HEIGHT }}
-      >
+    <View style={{ width: CARD_WIDTH + 16 }}>
+      <View style={{ width: CARD_WIDTH, height: CARD_HEIGHT }}>
         <Animated.View style={[
           styles.card,
           cardAnimatedStyle,
@@ -585,71 +615,125 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
             borderColor: 'rgba(255,255,255,0.18)',
           }
         ] as StyleProp<ViewStyle>}>
-          <View style={styles.bannerContainer as ViewStyle}>
-            {!bannerLoaded && (
-              <View style={styles.skeletonBannerFull as ViewStyle} />
-            )}
-            <Animated.View style={[bannerAnimatedStyle, { flex: 1 }]}>
+          {/* FRONT FACE */}
+          <Animated.View style={[styles.flipFace as any, styles.frontFace as any, frontFlipStyle]}>
+            <TouchableOpacity activeOpacity={0.9} onPress={onPressInfo} style={StyleSheet.absoluteFillObject as any}>
+              <View style={styles.bannerContainer as ViewStyle}>
+                {!bannerLoaded && (
+                  <View style={styles.skeletonBannerFull as ViewStyle} />
+                )}
+                <Animated.View style={[bannerAnimatedStyle, { flex: 1 }]}>
+                  <FastImage
+                    source={{
+                      uri: item.banner || item.poster,
+                      priority: FastImage.priority.normal,
+                      cache: FastImage.cacheControl.immutable
+                    }}
+                    style={styles.banner as any}
+                    resizeMode={FastImage.resizeMode.cover}
+                    onLoad={() => setBannerLoaded(true)}
+                  />
+                </Animated.View>
+                <LinearGradient
+                  colors={["transparent", "rgba(0,0,0,0.2)", "rgba(0,0,0,0.6)"]}
+                  locations={[0.4, 0.7, 1]}
+                  style={styles.bannerGradient as ViewStyle}
+                />
+              </View>
+              {item.logo && !logoFailed ? (
+                <View style={styles.logoOverlay as ViewStyle} pointerEvents="none">
+                  <Animated.View style={logoAnimatedStyle}>
+                    <FastImage
+                      source={{
+                        uri: item.logo,
+                        priority: FastImage.priority.high,
+                        cache: FastImage.cacheControl.immutable
+                      }}
+                      style={styles.logo as any}
+                      resizeMode={FastImage.resizeMode.contain}
+                      onLoad={() => setLogoLoaded(true)}
+                      onError={onLogoError}
+                    />
+                  </Animated.View>
+                </View>
+              ) : (
+                <View style={styles.titleOverlay as ViewStyle} pointerEvents="none">
+                  <Animated.View entering={FadeIn.duration(300)}>
+                    <Text style={[styles.title as TextStyle, { color: colors.highEmphasis, textAlign: 'center' }]} numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                  </Animated.View>
+                </View>
+              )}
+              {item.genres && (
+                <View style={styles.genresOverlay as ViewStyle} pointerEvents="none">
+                  <Animated.View entering={FadeIn.duration(400).delay(100)}>
+                    <Animated.Text
+                      style={[styles.genres as TextStyle, { color: colors.mediumEmphasis, textAlign: 'center' }, overlayAnimatedStyle]}
+                      numberOfLines={1}
+                    >
+                      {item.genres.slice(0, 3).join(' • ')}
+                    </Animated.Text>
+                  </Animated.View>
+                </View>
+              )}
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* BACK FACE */}
+          <Animated.View style={[styles.flipFace as any, styles.backFace as any, backFlipStyle]}>
+            <View style={styles.bannerContainer as ViewStyle}>
               <FastImage
-                source={{
-                  uri: item.banner || item.poster,
-                  priority: FastImage.priority.normal,
-                  cache: FastImage.cacheControl.immutable
-                }}
+                source={{ uri: item.banner || item.poster, priority: FastImage.priority.low, cache: FastImage.cacheControl.immutable }}
                 style={styles.banner as any}
                 resizeMode={FastImage.resizeMode.cover}
-                onLoad={() => setBannerLoaded(true)}
               />
-            </Animated.View>
-            <LinearGradient
-              colors={["transparent", "rgba(0,0,0,0.2)", "rgba(0,0,0,0.6)"]}
-              locations={[0.4, 0.7, 1]}
-              style={styles.bannerGradient as ViewStyle}
-            />
+              <LinearGradient
+                colors={["rgba(0,0,0,0.25)", "rgba(0,0,0,0.85)"]}
+                locations={[0.3, 1]}
+                style={styles.bannerGradient as ViewStyle}
+              />
+            </View>
+            <View style={styles.backContent as ViewStyle}>
+              {item.logo && !logoFailed ? (
+                <FastImage
+                  source={{ uri: item.logo, priority: FastImage.priority.normal, cache: FastImage.cacheControl.immutable }}
+                  style={styles.logo as any}
+                  resizeMode={FastImage.resizeMode.contain}
+                />
+              ) : (
+                <Text style={[styles.backTitle as TextStyle, { color: colors.highEmphasis }]} numberOfLines={1}>
+                  {item.name}
+                </Text>
+              )}
+              {item.year && (
+                <View style={styles.infoRow as ViewStyle}>
+                  <View style={styles.infoItem as ViewStyle}>
+                    <Ionicons name="calendar-outline" size={14} color={colors.mediumEmphasis} />
+                    <Text style={[styles.infoText as TextStyle, { color: colors.mediumEmphasis }]}>{item.year}</Text>
+                  </View>
+                </View>
+              )}
+              <ScrollView style={{ maxHeight: 120 }} showsVerticalScrollIndicator={false}>
+                <Text style={[styles.backDescription as TextStyle, { color: colors.mediumEmphasis }]}>
+                  {item.description || 'No description available'}
+                </Text>
+              </ScrollView>
+            </View>
+          </Animated.View>
+
+          {/* FLIP BUTTON */}
+          <View style={styles.flipButtonContainer as ViewStyle} pointerEvents="box-none">
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={onToggleFlip}
+              style={styles.flipButton as ViewStyle}
+            >
+              <Ionicons name={flipped ? 'close' : 'information-outline'} size={18} color={colors.white} />
+            </TouchableOpacity>
           </View>
         </Animated.View>
-        {/* Static genres positioned absolutely over the card */}
-        {item.genres && (
-          <View style={styles.genresOverlay as ViewStyle} pointerEvents="none">
-            <Animated.View entering={FadeIn.duration(400).delay(100)}>
-              <Animated.Text
-                style={[styles.genres as TextStyle, { color: colors.mediumEmphasis, textAlign: 'center' }, overlayAnimatedStyle]}
-                numberOfLines={1}
-              >
-                {item.genres.slice(0, 3).join(' • ')}
-              </Animated.Text>
-            </Animated.View>
-          </View>
-        )}
-        {/* Static logo positioned absolutely over the card */}
-        {item.logo && !logoFailed && (
-          <View style={styles.logoOverlay as ViewStyle} pointerEvents="none">
-            <Animated.View style={logoAnimatedStyle}>
-              <FastImage
-                source={{
-                  uri: item.logo,
-                  priority: FastImage.priority.high,
-                  cache: FastImage.cacheControl.immutable
-                }}
-                style={styles.logo as any}
-                resizeMode={FastImage.resizeMode.contain}
-                onLoad={() => setLogoLoaded(true)}
-                onError={onLogoError}
-              />
-            </Animated.View>
-          </View>
-        )}
-        {/* Static title when no logo */}
-        {!item.logo || logoFailed ? (
-          <View style={styles.titleOverlay as ViewStyle} pointerEvents="none">
-            <Animated.View entering={FadeIn.duration(300)}>
-              <Text style={[styles.title as TextStyle, { color: colors.highEmphasis, textAlign: 'center' }]} numberOfLines={1}>
-                {item.name}
-              </Text>
-            </Animated.View>
-          </View>
-        ) : null}
-      </TouchableOpacity>
+      </View>
     </View>
   );
 });
@@ -696,6 +780,21 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
+  },
+  flipFace: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backfaceVisibility: 'hidden',
+  },
+  frontFace: {
+    // front specific adjustments if needed
+  },
+  backFace: {
+    // back specific adjustments if needed
+    backfaceVisibility: 'hidden',
   },
   skeletonCard: {
     width: CARD_WIDTH,
@@ -756,6 +855,22 @@ const styles = StyleSheet.create({
     bottom: 0,
     top: 0,
   },
+  flipButtonContainer: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 10,
+  },
+  flipButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)'
+  },
   
   info: {
     position: 'absolute',
@@ -796,6 +911,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
     paddingBottom: 40, // Position above genres
+  },
+  backContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    gap: 8,
+  },
+  backTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  backDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    marginBottom: 6,
+  },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  infoText: {
+    fontSize: 13,
   },
   titleOverlay: {
     position: 'absolute',
