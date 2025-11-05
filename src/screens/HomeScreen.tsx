@@ -628,7 +628,7 @@ const HomeScreen = () => {
 
   // Memoize individual section components to prevent re-renders
   const memoizedFeaturedContent = useMemo(() => {
-    const heroStyleToUse = isTablet ? 'legacy' : settings.heroStyle;
+    const heroStyleToUse = settings.heroStyle;
     return heroStyleToUse === 'carousel' ? (
       <HeroCarousel
         items={allFeaturedContent || (featuredContent ? [featuredContent] : [])}

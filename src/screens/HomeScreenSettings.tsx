@@ -327,7 +327,7 @@ const HomeScreenSettings: React.FC = () => {
           )}
         </SettingsCard>
 
-        {settings.showHeroSection && !(Dimensions.get('window').width >= 768) && (
+        {settings.showHeroSection && (
           <>
             <View style={styles.segmentCard}>
               <Text style={[styles.segmentTitle, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Hero Layout</Text>

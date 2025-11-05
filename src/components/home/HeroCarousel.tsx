@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback, memo, useRef } from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ViewStyle, TextStyle, ImageStyle, ScrollView, StyleProp, Platform, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ViewStyle, TextStyle, ImageStyle, ScrollView, StyleProp, Platform, Image, useWindowDimensions } from 'react-native';
 import Animated, { FadeIn, FadeOut, Easing, useSharedValue, withTiming, useAnimatedStyle, useAnimatedScrollHandler, useAnimatedReaction, runOnJS, SharedValue, interpolate, Extrapolation } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -34,16 +34,39 @@ interface HeroCarouselProps {
   loading?: boolean;
 }
 
-const { width } = Dimensions.get('window');
-
-const CARD_WIDTH = Math.min(width * 0.8, 480);
-const CARD_HEIGHT = Math.round(CARD_WIDTH * 9 / 16) + 310; // increased for more vertical space
+// Offset to keep cards below a top tab navigator
+const TOP_TABS_OFFSET = Platform.OS === 'ios' ? 44 : 48;
 
 const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
   const { settings } = useSettings();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+
+  // Responsive sizing computed per-render so rotation updates layout
+  const isTablet = useMemo(
+    () => Math.min(windowWidth, windowHeight) >= 600 || (Platform.OS === 'ios' && (Platform as any).isPad),
+    [windowWidth, windowHeight]
+  );
+
+  // Keep height based on baseline phone width; widen only on tablets
+  const baseCardWidthForHeight = useMemo(
+    () => Math.min(windowWidth * 0.8, 480),
+    [windowWidth]
+  );
+
+  const cardWidth = useMemo(
+    () => (isTablet ? Math.max(560, windowWidth - 2 * Math.round(0.1 * windowWidth)) : Math.min(windowWidth * 0.8, 480)),
+    [isTablet, windowWidth]
+  );
+
+  const cardHeight = useMemo(
+    () => Math.round(baseCardWidthForHeight * 9 / 16) + 310,
+    [baseCardWidthForHeight]
+  );
+
+  const interval = useMemo(() => cardWidth + 16, [cardWidth]);
 
   const data = useMemo(() => (items && items.length ? items.slice(0, 10) : []), [items]);
   const loopingEnabled = data.length > 1;
@@ -68,7 +91,6 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
 
   // Optimized: update background as soon as scroll starts, without waiting for momentum end
   const scrollX = useSharedValue(0);
-  const interval = CARD_WIDTH + 16;
   const paginationProgress = useSharedValue(0);
   
   // Parallel image prefetch: start fetching banners and logos as soon as data arrives
@@ -124,6 +146,15 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
       return () => clearTimeout(timer);
     }
   }, [data.length]);
+
+  // Re-center on rotation using current interval and activeIndex
+  useEffect(() => {
+    if (!hasData) return;
+    const timer = setTimeout(() => {
+      scrollToLogicalIndex(activeIndex, false);
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [windowWidth, windowHeight, interval, loopingEnabled]);
   
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
@@ -178,7 +209,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
       // Align pagination progress with logical index space
       paginationProgress.value = loopingEnabled ? val - 1 : val;
     },
-    []
+    [interval, loopingEnabled]
   );
 
   // JS helper to jump without flicker when hitting clones
@@ -187,7 +218,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
     scrollViewRef.current?.scrollTo({ x: target, y: 0, animated });
   }, [interval, loopingEnabled]);
 
-  const contentPadding = useMemo(() => ({ paddingHorizontal: (width - CARD_WIDTH) / 2 }), []);
+  const contentPadding = useMemo(() => ({ paddingHorizontal: (windowWidth - cardWidth) / 2 }), [windowWidth, cardWidth]);
 
   const handleNavigateToMetadata = useCallback((id: string, type: any) => {
     navigation.navigate('Metadata', { id, type });
@@ -211,20 +242,22 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   if (loading) {
     return (
       <View style={[styles.container, { paddingVertical: 12 }] as StyleProp<ViewStyle>}>
-        <View style={{ height: CARD_HEIGHT }}>
+        <View style={{ height: cardHeight }}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: (width - CARD_WIDTH) / 2 }}
+            contentContainerStyle={{ paddingHorizontal: (windowWidth - cardWidth) / 2 }}
           >
             {[1, 2, 3].map((_, index) => (
-              <View key={index} style={{ width: CARD_WIDTH + 16 }}>
+              <View key={index} style={{ width: cardWidth + 16 }}>
                 <View style={[
                   styles.card,
                   {
                     backgroundColor: currentTheme.colors.elevation1,
                     borderWidth: 1,
                     borderColor: 'rgba(255,255,255,0.18)',
+                    width: cardWidth,
+                    height: cardHeight,
                   }
                 ] as StyleProp<ViewStyle>}>
                   <View style={styles.bannerContainer as ViewStyle}>
@@ -318,7 +351,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
 
   return (
     <Animated.View entering={FadeIn.duration(150).easing(Easing.out(Easing.cubic))}>
-      <Animated.View style={[styles.container as ViewStyle]}>
+      <Animated.View style={[styles.container as ViewStyle, { paddingTop: 12 + TOP_TABS_OFFSET }]}>
         {/* Removed preload images for performance - let FastImage cache handle it naturally */}
           {settings.enableHomeHeroBackground && data[activeIndex] && (
             <BackgroundImage
@@ -339,7 +372,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
           ref={scrollViewRef}
           horizontal
           showsHorizontalScrollIndicator={false}
-          snapToInterval={CARD_WIDTH + 16}
+          snapToInterval={interval}
           decelerationRate="fast"
           contentContainerStyle={contentPadding}
           onScroll={scrollHandler}
@@ -375,6 +408,10 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
               index={index}
               flipped={!!flippedMap[item.id]}
               onToggleFlip={() => toggleFlipById(item.id)}
+              interval={interval}
+              cardWidth={cardWidth}
+              cardHeight={cardHeight}
+              isTablet={isTablet}
             />
           ))}
         </Animated.ScrollView>
@@ -428,9 +465,13 @@ interface CarouselCardProps {
   index: number;
   flipped: boolean;
   onToggleFlip: () => void;
+  interval: number;
+  cardWidth: number;
+  cardHeight: number;
+  isTablet: boolean;
 }
 
-const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFailed, onLogoError, onPressInfo, scrollX, index, flipped, onToggleFlip }) => {
+const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFailed, onLogoError, onPressInfo, scrollX, index, flipped, onToggleFlip, interval, cardWidth, cardHeight, isTablet }) => {
   const [bannerLoaded, setBannerLoaded] = useState(false);
   const [logoLoaded, setLogoLoaded] = useState(false);
   
@@ -452,9 +493,9 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
   }, [item.id]);
   
   const inputRange = [
-    (index - 1) * (CARD_WIDTH + 16),
-    index * (CARD_WIDTH + 16),
-    (index + 1) * (CARD_WIDTH + 16),
+    (index - 1) * interval,
+    index * interval,
+    (index + 1) * interval,
   ];
   
   const bannerAnimatedStyle = useAnimatedStyle(() => ({
@@ -502,15 +543,15 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
   // Combined animation for genres and actions (same calculation)
   const overlayAnimatedStyle = useAnimatedStyle(() => {
     const translateX = scrollX.value;
-    const cardOffset = index * (CARD_WIDTH + 16);
+    const cardOffset = index * interval;
     const distance = Math.abs(translateX - cardOffset);
     
     // AGGRESSIVE early exit for cards far from center
-    if (distance > (CARD_WIDTH + 16) * 1.2) {
+    if (distance > interval * 1.2) {
       return { opacity: 0 };
     }
     
-    const maxDistance = (CARD_WIDTH + 16) * 0.5;
+    const maxDistance = interval * 0.5;
     const progress = Math.min(distance / maxDistance, 1);
     const opacity = 1 - progress;
     const clampedOpacity = Math.max(0, Math.min(1, opacity));
@@ -523,18 +564,18 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
   // ULTRA-OPTIMIZED: Only animate center card and ±1 neighbors
   const cardAnimatedStyle = useAnimatedStyle(() => {
     const translateX = scrollX.value;
-    const cardOffset = index * (CARD_WIDTH + 16);
+    const cardOffset = index * interval;
     const distance = Math.abs(translateX - cardOffset);
     
     // AGGRESSIVE early exit for cards far from center
-    if (distance > (CARD_WIDTH + 16) * 1.5) {
+    if (distance > interval * 1.5) {
       return { 
         transform: [{ scale: 0.9 }], 
         opacity: 0.7 
       };
     }
     
-    const maxDistance = CARD_WIDTH + 16;
+    const maxDistance = interval;
     
     // Scale animation based on distance from center
     const scale = 1 - (distance / maxDistance) * 0.1;
@@ -604,8 +645,8 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
   }, [logoLoaded]);
 
   return (
-    <View style={{ width: CARD_WIDTH + 16 }}>
-      <View style={{ width: CARD_WIDTH, height: CARD_HEIGHT }}>
+    <View style={{ width: cardWidth + 16 }}>
+      <View style={{ width: cardWidth, height: cardHeight }}>
         <Animated.View style={[
           styles.card,
           cardAnimatedStyle,
@@ -613,11 +654,12 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
             backgroundColor: colors.elevation1,
             borderWidth: 1,
             borderColor: 'rgba(255,255,255,0.18)',
+            width: cardWidth,
+            height: cardHeight,
           }
         ] as StyleProp<ViewStyle>}>
-          {/* FRONT FACE */}
-          <Animated.View style={[styles.flipFace as any, styles.frontFace as any, frontFlipStyle]} pointerEvents={flipped ? 'none' : 'auto'}>
-            <TouchableOpacity activeOpacity={0.9} onPress={onPressInfo} style={StyleSheet.absoluteFillObject as any}>
+          {isTablet ? (
+            <>
               <View style={styles.bannerContainer as ViewStyle}>
                 {!bannerLoaded && (
                   <View style={styles.skeletonBannerFull as ViewStyle} />
@@ -635,103 +677,159 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
                   />
                 </Animated.View>
                 <LinearGradient
-                  colors={["transparent", "rgba(0,0,0,0.2)", "rgba(0,0,0,0.6)"]}
-                  locations={[0.4, 0.7, 1]}
+                  colors={["rgba(0,0,0,0.25)", "rgba(0,0,0,0.85)"]}
+                  locations={[0.3, 1]}
                   style={styles.bannerGradient as ViewStyle}
                 />
               </View>
-              {item.logo && !logoFailed ? (
-                <View style={styles.logoOverlay as ViewStyle} pointerEvents="none">
-                  <Animated.View style={logoAnimatedStyle}>
-                    <FastImage
-                      source={{
-                        uri: item.logo,
-                        priority: FastImage.priority.high,
-                        cache: FastImage.cacheControl.immutable
-                      }}
-                      style={styles.logo as any}
-                      resizeMode={FastImage.resizeMode.contain}
-                      onLoad={() => setLogoLoaded(true)}
-                      onError={onLogoError}
+              <View style={styles.backContent as ViewStyle}>
+                {item.logo && !logoFailed ? (
+                  <FastImage
+                    source={{ uri: item.logo, priority: FastImage.priority.normal, cache: FastImage.cacheControl.immutable }}
+                    style={[styles.logo as any, { width: Math.round(cardWidth * 0.72) }]}
+                    resizeMode={FastImage.resizeMode.contain}
+                  />
+                ) : (
+                  <Text style={[styles.backTitle as TextStyle, { color: colors.highEmphasis }]} numberOfLines={1}>
+                    {item.name}
+                  </Text>
+                )}
+                {item.year && (
+                  <View style={styles.infoRow as ViewStyle}>
+                    <View style={styles.infoItem as ViewStyle}>
+                      <Ionicons name="calendar-outline" size={14} color={colors.mediumEmphasis} />
+                      <Text style={[styles.infoText as TextStyle, { color: colors.mediumEmphasis }]}>{item.year}</Text>
+                    </View>
+                  </View>
+                )}
+                <ScrollView style={{ maxHeight: 120, width: Math.round(cardWidth * 0.85), alignSelf: 'center' }} showsVerticalScrollIndicator={false}>
+                  <Text style={[styles.backDescription as TextStyle, { color: colors.mediumEmphasis, textAlign: 'center' }]}>
+                    {item.description || 'No description available'}
+                  </Text>
+                </ScrollView>
+              </View>
+            </>
+          ) : (
+            <>
+              {/* FRONT FACE */}
+              <Animated.View style={[styles.flipFace as any, styles.frontFace as any, frontFlipStyle]} pointerEvents={flipped ? 'none' : 'auto'}>
+                <TouchableOpacity activeOpacity={0.9} onPress={onPressInfo} style={StyleSheet.absoluteFillObject as any}>
+                  <View style={styles.bannerContainer as ViewStyle}>
+                    {!bannerLoaded && (
+                      <View style={styles.skeletonBannerFull as ViewStyle} />
+                    )}
+                    <Animated.View style={[bannerAnimatedStyle, { flex: 1 }]}>
+                      <FastImage
+                        source={{
+                          uri: item.banner || item.poster,
+                          priority: FastImage.priority.normal,
+                          cache: FastImage.cacheControl.immutable
+                        }}
+                        style={styles.banner as any}
+                        resizeMode={FastImage.resizeMode.cover}
+                        onLoad={() => setBannerLoaded(true)}
+                      />
+                    </Animated.View>
+                    <LinearGradient
+                      colors={["transparent", "rgba(0,0,0,0.2)", "rgba(0,0,0,0.6)"]}
+                      locations={[0.4, 0.7, 1]}
+                      style={styles.bannerGradient as ViewStyle}
                     />
-                  </Animated.View>
+                  </View>
+                  {item.logo && !logoFailed ? (
+                    <View style={styles.logoOverlay as ViewStyle} pointerEvents="none">
+                      <Animated.View style={logoAnimatedStyle}>
+                        <FastImage
+                          source={{
+                            uri: item.logo,
+                            priority: FastImage.priority.high,
+                            cache: FastImage.cacheControl.immutable
+                          }}
+                          style={[styles.logo as any, { width: Math.round(cardWidth * 0.72) }]}
+                          resizeMode={FastImage.resizeMode.contain}
+                          onLoad={() => setLogoLoaded(true)}
+                          onError={onLogoError}
+                        />
+                      </Animated.View>
+                    </View>
+                  ) : (
+                    <View style={styles.titleOverlay as ViewStyle} pointerEvents="none">
+                      <Animated.View entering={FadeIn.duration(300)}>
+                        <Text style={[styles.title as TextStyle, { color: colors.highEmphasis, textAlign: 'center' }]} numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                      </Animated.View>
+                    </View>
+                  )}
+                  {item.genres && (
+                    <View style={styles.genresOverlay as ViewStyle} pointerEvents="none">
+                      <Animated.View entering={FadeIn.duration(400).delay(100)}>
+                        <Animated.Text
+                          style={[styles.genres as TextStyle, { color: colors.mediumEmphasis, textAlign: 'center' }, overlayAnimatedStyle]}
+                          numberOfLines={1}
+                        >
+                          {item.genres.slice(0, 3).join(' • ')}
+                        </Animated.Text>
+                      </Animated.View>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
+
+              {/* BACK FACE */}
+              <Animated.View style={[styles.flipFace as any, styles.backFace as any, backFlipStyle]} pointerEvents={flipped ? 'auto' : 'none'}>
+                <View style={styles.bannerContainer as ViewStyle}>
+                  <FastImage
+                    source={{ uri: item.banner || item.poster, priority: FastImage.priority.low, cache: FastImage.cacheControl.immutable }}
+                    style={styles.banner as any}
+                    resizeMode={FastImage.resizeMode.cover}
+                  />
+                  <LinearGradient
+                    colors={["rgba(0,0,0,0.25)", "rgba(0,0,0,0.85)"]}
+                    locations={[0.3, 1]}
+                    style={styles.bannerGradient as ViewStyle}
+                  />
                 </View>
-              ) : (
-                <View style={styles.titleOverlay as ViewStyle} pointerEvents="none">
-                  <Animated.View entering={FadeIn.duration(300)}>
-                    <Text style={[styles.title as TextStyle, { color: colors.highEmphasis, textAlign: 'center' }]} numberOfLines={1}>
+                <View style={styles.backContent as ViewStyle}>
+                  {item.logo && !logoFailed ? (
+                    <FastImage
+                      source={{ uri: item.logo, priority: FastImage.priority.normal, cache: FastImage.cacheControl.immutable }}
+                      style={[styles.logo as any, { width: Math.round(cardWidth * 0.72) }]}
+                      resizeMode={FastImage.resizeMode.contain}
+                    />
+                  ) : (
+                    <Text style={[styles.backTitle as TextStyle, { color: colors.highEmphasis }]} numberOfLines={1}>
                       {item.name}
                     </Text>
-                  </Animated.View>
+                  )}
+                  {item.year && (
+                    <View style={styles.infoRow as ViewStyle}>
+                      <View style={styles.infoItem as ViewStyle}>
+                        <Ionicons name="calendar-outline" size={14} color={colors.mediumEmphasis} />
+                        <Text style={[styles.infoText as TextStyle, { color: colors.mediumEmphasis }]}>{item.year}</Text>
+                      </View>
+                    </View>
+                  )}
+                  <ScrollView style={{ maxHeight: 120 }} showsVerticalScrollIndicator={false}>
+                    <Text style={[styles.backDescription as TextStyle, { color: colors.mediumEmphasis }]}>
+                      {item.description || 'No description available'}
+                    </Text>
+                  </ScrollView>
                 </View>
-              )}
-              {item.genres && (
-                <View style={styles.genresOverlay as ViewStyle} pointerEvents="none">
-                  <Animated.View entering={FadeIn.duration(400).delay(100)}>
-                    <Animated.Text
-                      style={[styles.genres as TextStyle, { color: colors.mediumEmphasis, textAlign: 'center' }, overlayAnimatedStyle]}
-                      numberOfLines={1}
-                    >
-                      {item.genres.slice(0, 3).join(' • ')}
-                    </Animated.Text>
-                  </Animated.View>
-                </View>
-              )}
-            </TouchableOpacity>
-          </Animated.View>
+              </Animated.View>
 
-          {/* BACK FACE */}
-          <Animated.View style={[styles.flipFace as any, styles.backFace as any, backFlipStyle]} pointerEvents={flipped ? 'auto' : 'none'}>
-            <View style={styles.bannerContainer as ViewStyle}>
-              <FastImage
-                source={{ uri: item.banner || item.poster, priority: FastImage.priority.low, cache: FastImage.cacheControl.immutable }}
-                style={styles.banner as any}
-                resizeMode={FastImage.resizeMode.cover}
-              />
-              <LinearGradient
-                colors={["rgba(0,0,0,0.25)", "rgba(0,0,0,0.85)"]}
-                locations={[0.3, 1]}
-                style={styles.bannerGradient as ViewStyle}
-              />
-            </View>
-            <View style={styles.backContent as ViewStyle}>
-              {item.logo && !logoFailed ? (
-                <FastImage
-                  source={{ uri: item.logo, priority: FastImage.priority.normal, cache: FastImage.cacheControl.immutable }}
-                  style={styles.logo as any}
-                  resizeMode={FastImage.resizeMode.contain}
-                />
-              ) : (
-                <Text style={[styles.backTitle as TextStyle, { color: colors.highEmphasis }]} numberOfLines={1}>
-                  {item.name}
-                </Text>
-              )}
-              {item.year && (
-                <View style={styles.infoRow as ViewStyle}>
-                  <View style={styles.infoItem as ViewStyle}>
-                    <Ionicons name="calendar-outline" size={14} color={colors.mediumEmphasis} />
-                    <Text style={[styles.infoText as TextStyle, { color: colors.mediumEmphasis }]}>{item.year}</Text>
-                  </View>
-                </View>
-              )}
-              <ScrollView style={{ maxHeight: 120 }} showsVerticalScrollIndicator={false}>
-                <Text style={[styles.backDescription as TextStyle, { color: colors.mediumEmphasis }]}>
-                  {item.description || 'No description available'}
-                </Text>
-              </ScrollView>
-            </View>
-          </Animated.View>
-
-          {/* FLIP BUTTON */}
-          <View style={styles.flipButtonContainer as ViewStyle} pointerEvents="box-none">
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={onToggleFlip}
-              style={styles.flipButton as ViewStyle}
-            >
-              <Ionicons name={flipped ? 'close' : 'information-outline'} size={18} color={colors.white} />
-            </TouchableOpacity>
-          </View>
+              {/* FLIP BUTTON */}
+              <View style={styles.flipButtonContainer as ViewStyle} pointerEvents="box-none">
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={onToggleFlip}
+                  style={styles.flipButton as ViewStyle}
+                >
+                  <Ionicons name={flipped ? 'close' : 'information-outline'} size={18} color={colors.white} />
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
         </Animated.View>
       </View>
     </View>
@@ -771,8 +869,8 @@ const styles = StyleSheet.create({
     height: 160,
   },
   card: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
+    width: '100%',
+    height: '100%',
     borderRadius: 16,
     overflow: 'hidden',
     elevation: 2,
@@ -797,8 +895,8 @@ const styles = StyleSheet.create({
     backfaceVisibility: 'hidden',
   },
   skeletonCard: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
+    width: '100%',
+    height: '100%',
     borderRadius: 16,
     overflow: 'hidden',
   },
@@ -898,7 +996,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logo: {
-    width: Math.round(CARD_WIDTH * 0.72),
+    width: 200,
     height: 64,
     marginBottom: 6,
   },
