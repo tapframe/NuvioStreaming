@@ -475,35 +475,62 @@ export function useFeaturedContent() {
     return () => cleanup();
   }, [cleanup]);
 
-  const handleSaveToLibrary = useCallback(async () => {
-    if (!featuredContent) return;
-    
-    try {
-      const currentSavedStatus = isSaved;
-      setIsSaved(!currentSavedStatus);
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  const handleSaveToLibrary = useCallback(async (item?: StreamingContent) => {
+    const contentToUse = item || featuredContent;
+    if (!contentToUse) return;
 
-      if (currentSavedStatus) {
-        await catalogService.removeFromLibrary(featuredContent.type, featuredContent.id);
+    try {
+      // For the legacy single item behavior
+      if (!item) {
+        const currentSavedStatus = isSaved;
+        setIsSaved(!currentSavedStatus);
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+        if (currentSavedStatus) {
+          await catalogService.removeFromLibrary(contentToUse.type, contentToUse.id);
+        } else {
+          const itemToAdd = { ...contentToUse, inLibrary: true };
+          await catalogService.addToLibrary(itemToAdd);
+        }
       } else {
-        const itemToAdd = { ...featuredContent, inLibrary: true }; 
-        await catalogService.addToLibrary(itemToAdd);
+        // For carousel items - check if saved and toggle
+        const isItemSaved = await catalogService.isInLibrary(contentToUse.type, contentToUse.id);
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+        if (isItemSaved) {
+          await catalogService.removeFromLibrary(contentToUse.type, contentToUse.id);
+        } else {
+          const itemToAdd = { ...contentToUse, inLibrary: true };
+          await catalogService.addToLibrary(itemToAdd);
+        }
       }
     } catch (error) {
       logger.error('Error updating library:', error);
-      setIsSaved(prev => !prev); 
+      if (!item) {
+        setIsSaved(prev => !prev);
+      }
     }
   }, [featuredContent, isSaved]);
+
+  const isItemSaved = useCallback(async (item: StreamingContent) => {
+    try {
+      return await catalogService.isInLibrary(item.type, item.id);
+    } catch (error) {
+      logger.error('Error checking if item is saved:', error);
+      return false;
+    }
+  }, []);
 
   // Function to force a refresh if needed
   const refreshFeatured = useCallback(() => loadFeaturedContent(true), [loadFeaturedContent]);
 
-  return { 
-    featuredContent, 
+  return {
+    featuredContent,
     allFeaturedContent,
-    loading, 
-    isSaved, 
-    handleSaveToLibrary, 
+    loading,
+    isSaved,
+    handleSaveToLibrary,
+    isItemSaved,
     refreshFeatured
   };
 } 

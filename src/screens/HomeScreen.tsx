@@ -142,13 +142,14 @@ const HomeScreen = () => {
     return () => clearTimeout(timer);
   }, [insets.top]);
   
-  const { 
-    featuredContent, 
+  const {
+    featuredContent,
     allFeaturedContent,
-    loading: featuredLoading, 
-    isSaved, 
-    handleSaveToLibrary, 
-    refreshFeatured 
+    loading: featuredLoading,
+    isSaved,
+    handleSaveToLibrary,
+    isItemSaved,
+    refreshFeatured
   } = useFeaturedContent();
 
   // Progressive catalog loading function with performance optimizations
@@ -635,13 +636,13 @@ const HomeScreen = () => {
       />
     ) : (
       <FeaturedContent
-        featuredContent={featuredContent}
-        isSaved={isSaved}
+        featuredContent={allFeaturedContent || (featuredContent ? [featuredContent] : [])}
+        isSaved={isItemSaved}
         handleSaveToLibrary={handleSaveToLibrary}
         loading={featuredLoading}
       />
     );
-  }, [isTablet, settings.heroStyle, showHeroSection, featuredContentSource, allFeaturedContent, featuredContent, isSaved, handleSaveToLibrary, featuredLoading]);
+  }, [isTablet, settings.heroStyle, showHeroSection, featuredContentSource, allFeaturedContent, featuredContent, isItemSaved, handleSaveToLibrary, featuredLoading]);
 
   const memoizedThisWeekSection = useMemo(() => <ThisWeekSection />, []);
   const memoizedContinueWatchingSection = useMemo(() => <ContinueWatchingSection ref={continueWatchingRef} />, []);
