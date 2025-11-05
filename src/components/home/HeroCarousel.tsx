@@ -616,7 +616,7 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
           }
         ] as StyleProp<ViewStyle>}>
           {/* FRONT FACE */}
-          <Animated.View style={[styles.flipFace as any, styles.frontFace as any, frontFlipStyle]}>
+          <Animated.View style={[styles.flipFace as any, styles.frontFace as any, frontFlipStyle]} pointerEvents={flipped ? 'none' : 'auto'}>
             <TouchableOpacity activeOpacity={0.9} onPress={onPressInfo} style={StyleSheet.absoluteFillObject as any}>
               <View style={styles.bannerContainer as ViewStyle}>
                 {!bannerLoaded && (
@@ -681,7 +681,7 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
           </Animated.View>
 
           {/* BACK FACE */}
-          <Animated.View style={[styles.flipFace as any, styles.backFace as any, backFlipStyle]}>
+          <Animated.View style={[styles.flipFace as any, styles.backFace as any, backFlipStyle]} pointerEvents={flipped ? 'auto' : 'none'}>
             <View style={styles.bannerContainer as ViewStyle}>
               <FastImage
                 source={{ uri: item.banner || item.poster, priority: FastImage.priority.low, cache: FastImage.cacheControl.immutable }}

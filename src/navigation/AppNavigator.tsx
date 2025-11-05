@@ -1095,6 +1095,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             initialRouteName={initialRouteName || 'MainTabs'}
             screenOptions={{
               headerShown: false,
+              // Freeze non-focused stack screens to prevent background re-renders (e.g., SeriesContent behind player)
+              freezeOnBlur: true,
               // Use slide_from_right for consistency and smooth transitions
               animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
               animationDuration: Platform.OS === 'android' ? 250 : 300,

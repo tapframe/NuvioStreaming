@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo, memo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, useWindowDimensions, useColorScheme, FlatList } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -39,7 +39,7 @@ const EPISODE_PLACEHOLDER = 'https://via.placeholder.com/500x280/1a1a1a/666666?t
 const TMDB_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tmdb.new.logo.svg/512px-Tmdb.new.logo.svg.png?20200406190906';
 const IMDb_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/IMDB_Logo_2016.svg/575px-IMDB_Logo_2016.svg.png';
 
-export const SeriesContent: React.FC<SeriesContentProps> = ({
+const SeriesContentComponent: React.FC<SeriesContentProps> = ({
   episodes,
   selectedSeason,
   loadingSeasons,
@@ -1428,6 +1428,9 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
     </View>
   );
 };
+
+// Export memoized component to reduce unnecessary re-renders when focused
+export const SeriesContent = memo(SeriesContentComponent);
 
 const styles = StyleSheet.create({
   container: {

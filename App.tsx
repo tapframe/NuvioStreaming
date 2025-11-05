@@ -17,7 +17,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { Provider as PaperProvider } from 'react-native-paper';
-import { enableScreens } from 'react-native-screens';
+import { enableScreens, enableFreeze } from 'react-native-screens';
 import AppNavigator, { 
   CustomNavigationDarkTheme,
   CustomDarkTheme
@@ -71,6 +71,8 @@ LogBox.ignoreLogs([
 
 // This fixes many navigation layout issues by using native screen containers
 enableScreens(true);
+// Freeze non-focused screens to stop background re-renders
+enableFreeze(true);
 
 // Inner app component that uses the theme context
 const ThemedApp = () => {
