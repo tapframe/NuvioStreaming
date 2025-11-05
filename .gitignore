@@ -77,3 +77,4 @@ mmkv.md
 src/services/tmdbService.ts
 fix-android-scroll-lag-summary.md
 server/cache-server
+carousal.md

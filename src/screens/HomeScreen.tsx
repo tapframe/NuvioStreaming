@@ -635,12 +635,26 @@ const HomeScreen = () => {
         loading={featuredLoading}
       />
     ) : (
-      <FeaturedContent
-        featuredContent={allFeaturedContent || (featuredContent ? [featuredContent] : [])}
-        isSaved={isItemSaved}
-        handleSaveToLibrary={handleSaveToLibrary}
-        loading={featuredLoading}
-      />
+      <>
+        <FeaturedContent
+          featuredContent={allFeaturedContent || (featuredContent ? [featuredContent] : [])}
+          isSaved={isItemSaved}
+          handleSaveToLibrary={handleSaveToLibrary}
+          loading={featuredLoading}
+        />
+        <LinearGradient
+          colors={["transparent", currentTheme.colors.darkBackground]}
+          locations={[0, 1]}
+          style={{
+            height: isTablet ? 40 : 30,
+            width: '100%',
+            marginTop: -(isTablet ? 40 : 30),
+            position: 'relative',
+            zIndex: -1,
+          }}
+          pointerEvents="none"
+        />
+      </>
     );
   }, [isTablet, settings.heroStyle, showHeroSection, featuredContentSource, allFeaturedContent, featuredContent, isItemSaved, handleSaveToLibrary, featuredLoading]);
 

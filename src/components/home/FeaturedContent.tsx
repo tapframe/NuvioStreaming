@@ -668,7 +668,11 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
 
   // Render item function for the carousel
   const renderItem = useCallback(({ item }: { item: StreamingContent }) => {
-    return <CarouselItemWrapper item={item} />;
+    return (
+      <View style={{ paddingHorizontal: 6 }}>
+        <CarouselItemWrapper item={item} />
+      </View>
+    );
   }, [isSaved, handleSaveToLibrary, navigation]);
 
   // Pagination press handler
@@ -711,7 +715,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
         snapEnabled={true}
         pagingEnabled={true}
         autoPlay={items.length > 1}
-        autoPlayInterval={4000}
+        autoPlayInterval={10000}
         data={items}
         defaultScrollOffsetValue={scrollOffsetValue}
         onProgressChange={progress}
@@ -732,17 +736,6 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
         renderItem={renderItem}
       />
 
-      {/* Bottom fade to blend with background */}
-      <LinearGradient
-        colors={[
-          'transparent',
-          currentTheme.colors.darkBackground
-        ]}
-        locations={[0, 1]}
-        style={isTablet ? styles.tabletBottomFade as ViewStyle : styles.phoneBottomFade as ViewStyle}
-        pointerEvents="none"
-      />
-
     </Animated.View>
     {/* Pagination strictly below the hero container (not clipped by overflow) */}
     {items.length > 1 && (
@@ -751,6 +744,8 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
           alignItems: 'center',
           paddingTop: isTablet ? 10 : 8,
           paddingBottom: isTablet ? 10 : 8,
+          position: 'relative',
+          zIndex: 1,
         }}
         pointerEvents="auto"
       >
