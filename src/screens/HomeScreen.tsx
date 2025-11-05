@@ -637,8 +637,8 @@ const HomeScreen = () => {
     ) : (
       <>
         <FeaturedContent
-          featuredContent={allFeaturedContent || (featuredContent ? [featuredContent] : [])}
-          isSaved={isItemSaved}
+          featuredContent={featuredContent || null}
+          isSaved={isSaved}
           handleSaveToLibrary={handleSaveToLibrary}
           loading={featuredLoading}
         />
