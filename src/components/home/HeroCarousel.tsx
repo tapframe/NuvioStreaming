@@ -68,6 +68,9 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
 
   const interval = useMemo(() => cardWidth + 16, [cardWidth]);
 
+  // Reduce top padding on phones while keeping tablets unchanged
+  const effectiveTopOffset = useMemo(() => (isTablet ? TOP_TABS_OFFSET : 8), [isTablet]);
+
   const data = useMemo(() => (items && items.length ? items.slice(0, 10) : []), [items]);
   const loopingEnabled = data.length > 1;
   // Duplicate head/tail for seamless looping
@@ -241,7 +244,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
 
   if (loading) {
     return (
-      <View style={[styles.container, { paddingVertical: 12 }] as StyleProp<ViewStyle>}>
+      <View style={[styles.container, { paddingTop: 12 + effectiveTopOffset }] as StyleProp<ViewStyle>}>
         <View style={{ height: cardHeight }}>
           <ScrollView
             horizontal
@@ -302,7 +305,6 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
         pointerEvents="none"
       >
         <View
-          key={item.id}
           style={{ flex: 1 } as any}
         >
           {Platform.OS === 'android' ? (
@@ -351,7 +353,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
 
   return (
     <Animated.View entering={FadeIn.duration(150).easing(Easing.out(Easing.cubic))}>
-      <Animated.View style={[styles.container as ViewStyle, { paddingTop: 12 + TOP_TABS_OFFSET }]}>
+      <Animated.View style={[styles.container as ViewStyle, { paddingTop: 12 + effectiveTopOffset }]}>
         {/* Removed preload images for performance - let FastImage cache handle it naturally */}
           {settings.enableHomeHeroBackground && data[activeIndex] && (
             <BackgroundImage
@@ -381,10 +383,11 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
           pagingEnabled={false}
           bounces={false}
           overScrollMode="never"
-          onMomentumScrollEnd={() => {
+          onMomentumScrollEnd={(e) => {
             if (!loopingEnabled) return;
             // Determine current page index in cloned space
-            const page = Math.round(scrollX.value / interval);
+            const x = e?.nativeEvent?.contentOffset?.x ?? 0;
+            const page = Math.round(x / interval);
             // If at leading clone (0), jump to last real item
             if (page === 0) {
               scrollToLogicalIndex(data.length - 1, false);
@@ -398,7 +401,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
         >
           {(loopingEnabled ? loopData : data).map((item, index) => (
             <CarouselCard
-              key={item.id}
+              key={`${item.id}-${index}-${loopingEnabled ? 'loop' : 'base'}`}
               item={item}
               colors={currentTheme.colors}
               logoFailed={failedLogoIds.has(item.id)}
@@ -416,9 +419,9 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
           ))}
         </Animated.ScrollView>
       </Animated.View>
-      {/* Pagination below the card row (animated like FeaturedContent) */}
+      {/* Pagination below the card row (library-based, worklet-driven) */}
       <View style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 6, position: 'relative', zIndex: 1 }} pointerEvents="auto">
-        <Pagination.Custom
+        <Pagination.Basic
           progress={paginationProgress}
           data={data}
           size={10}
@@ -427,7 +430,6 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
             height: 8,
             borderRadius: 999,
             backgroundColor: currentTheme.colors.elevation3,
-            opacity: 0.9,
           }}
           activeDotStyle={{
             width: 10,
@@ -439,15 +441,6 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
           horizontal
           onPress={(index: number) => {
             scrollToLogicalIndex(index, true);
-          }}
-          customReanimatedStyle={(p: number, index: number, length: number) => {
-            'worklet';
-            let v = Math.abs(p - index);
-            if (index === 0 && p > length - 1) {
-              v = Math.abs(p - length);
-            }
-            const scale = interpolate(v, [0, 1], [1.2, 1], Extrapolation.CLAMP);
-            return { transform: [{ scale }] };
           }}
         />
       </View>
@@ -570,8 +563,8 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
     // AGGRESSIVE early exit for cards far from center
     if (distance > interval * 1.5) {
       return { 
-        transform: [{ scale: 0.9 }], 
-        opacity: 0.7 
+        transform: [{ scale: isTablet ? 0.95 : 0.9 }], 
+        opacity: isTablet ? 0.85 : 0.7 
       };
     }
     
@@ -579,11 +572,11 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
     
     // Scale animation based on distance from center
     const scale = 1 - (distance / maxDistance) * 0.1;
-    const clampedScale = Math.max(0.9, Math.min(1, scale));
+    const clampedScale = Math.max(isTablet ? 0.95 : 0.9, Math.min(1, scale));
     
     // Opacity animation for cards that are far from center
     const opacity = 1 - (distance / maxDistance) * 0.3;
-    const clampedOpacity = Math.max(0.7, Math.min(1, opacity));
+    const clampedOpacity = Math.max(isTablet ? 0.85 : 0.7, Math.min(1, opacity));
     
     return {
       transform: [{ scale: clampedScale }],
@@ -677,7 +670,7 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
                   />
                 </Animated.View>
                 <LinearGradient
-                  colors={["rgba(0,0,0,0.25)", "rgba(0,0,0,0.85)"]}
+                  colors={["rgba(0,0,0,0.18)", "rgba(0,0,0,0.72)"]}
                   locations={[0.3, 1]}
                   style={styles.bannerGradient as ViewStyle}
                 />
@@ -703,7 +696,16 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
                   </View>
                 )}
                 <ScrollView style={{ maxHeight: 120, width: Math.round(cardWidth * 0.85), alignSelf: 'center' }} showsVerticalScrollIndicator={false}>
-                  <Text style={[styles.backDescription as TextStyle, { color: colors.mediumEmphasis, textAlign: 'center' }]}>
+                  <Text style={[
+                    styles.backDescription as TextStyle,
+                    {
+                      color: colors.highEmphasis,
+                      textAlign: 'center',
+                      textShadowColor: 'rgba(0,0,0,0.6)',
+                      textShadowOffset: { width: 0, height: 1 },
+                      textShadowRadius: 2,
+                    }
+                  ]}>
                     {item.description || 'No description available'}
                   </Text>
                 </ScrollView>
@@ -811,7 +813,15 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
                     </View>
                   )}
                   <ScrollView style={{ maxHeight: 120 }} showsVerticalScrollIndicator={false}>
-                    <Text style={[styles.backDescription as TextStyle, { color: colors.mediumEmphasis }]}>
+                    <Text style={[
+                      styles.backDescription as TextStyle,
+                      {
+                        color: colors.highEmphasis,
+                        textShadowColor: 'rgba(0,0,0,0.6)',
+                        textShadowOffset: { width: 0, height: 1 },
+                        textShadowRadius: 2,
+                      }
+                    ]}>
                       {item.description || 'No description available'}
                     </Text>
                   </ScrollView>

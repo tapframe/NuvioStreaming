@@ -115,6 +115,7 @@ const HomeScreenSettings: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const [showSavedIndicator, setShowSavedIndicator] = useState(false);
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const isTabletDevice = Platform.OS !== 'web' && (Dimensions.get('window').width >= 768);
 
   // Prevent iOS entrance flicker by restoring a non-translucent StatusBar
   useFocusEffect(
@@ -161,6 +162,15 @@ const HomeScreenSettings: React.FC = () => {
     updateSetting(key, value);
     setShowSavedIndicator(true);
   }, [updateSetting]);
+
+  // Ensure carousel is the default hero layout on tablets for all users
+  useEffect(() => {
+    try {
+      if (isTabletDevice && settings.heroStyle !== 'carousel') {
+        updateSetting('heroStyle', 'carousel' as any);
+      }
+    } catch {}
+  }, [isTabletDevice, settings.heroStyle, updateSetting]);
 
   const CustomSwitch = ({ value, onValueChange }: { value: boolean, onValueChange: (value: boolean) => void }) => (
     <Switch
