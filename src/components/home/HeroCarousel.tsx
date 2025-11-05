@@ -1,9 +1,10 @@
 import React, { useMemo, useState, useEffect, useCallback, memo, useRef } from 'react';
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ViewStyle, TextStyle, ImageStyle, ScrollView, StyleProp, Platform, Image } from 'react-native';
-import Animated, { FadeIn, FadeOut, Easing, useSharedValue, withTiming, useAnimatedStyle, useAnimatedScrollHandler, useAnimatedReaction, runOnJS, SharedValue } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, Easing, useSharedValue, withTiming, useAnimatedStyle, useAnimatedScrollHandler, useAnimatedReaction, runOnJS, SharedValue, interpolate, Extrapolation } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import FastImage from '@d11/react-native-fast-image';
+import { Pagination } from 'react-native-reanimated-carousel';
 
 // Optional iOS Glass effect (expo-glass-effect) with safe fallback for HeroCarousel
 let GlassViewComp: any = null;
@@ -43,7 +44,15 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   const insets = useSafeAreaInsets();
   const { settings } = useSettings();
 
-  const data = useMemo(() => (items && items.length ? items.slice(0, 5) : []), [items]);
+  const data = useMemo(() => (items && items.length ? items.slice(0, 10) : []), [items]);
+  const loopingEnabled = data.length > 1;
+  // Duplicate head/tail for seamless looping
+  const loopData = useMemo(() => {
+    if (!loopingEnabled) return data;
+    const head = data[0];
+    const tail = data[data.length - 1];
+    return [tail, ...data, head];
+  }, [data, loopingEnabled]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [failedLogoIds, setFailedLogoIds] = useState<Set<string>>(new Set());
   const scrollViewRef = useRef<any>(null);
@@ -55,9 +64,10 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   // Optimized: update background as soon as scroll starts, without waiting for momentum end
   const scrollX = useSharedValue(0);
   const interval = CARD_WIDTH + 16;
+  const paginationProgress = useSharedValue(0);
   
   // Parallel image prefetch: start fetching banners and logos as soon as data arrives
-  const itemsToPreload = useMemo(() => data.slice(0, 8), [data]);
+  const itemsToPreload = useMemo(() => data.slice(0, 12), [data]);
   useEffect(() => {
     if (!itemsToPreload.length) return;
     try {
@@ -84,12 +94,13 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   
   // Comprehensive reset when component mounts/remounts to prevent glitching
   useEffect(() => {
-    scrollX.value = 0;
+    // Start at the first real item for looping
+    scrollX.value = loopingEnabled ? interval : 0;
     setActiveIndex(0);
 
     // Scroll to position 0 after a brief delay to ensure ScrollView is ready
     const timer = setTimeout(() => {
-      scrollViewRef.current?.scrollTo({ x: 0, y: 0, animated: false });
+      scrollViewRef.current?.scrollTo({ x: loopingEnabled ? interval : 0, y: 0, animated: false });
     }, 50);
 
     return () => clearTimeout(timer);
@@ -98,11 +109,11 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   // Reset scroll when data becomes available
   useEffect(() => {
     if (data.length > 0) {
-      scrollX.value = 0;
+      scrollX.value = loopingEnabled ? interval : 0;
       setActiveIndex(0);
 
       const timer = setTimeout(() => {
-        scrollViewRef.current?.scrollTo({ x: 0, y: 0, animated: false });
+        scrollViewRef.current?.scrollTo({ x: loopingEnabled ? interval : 0, y: 0, animated: false });
       }, 100);
 
       return () => clearTimeout(timer);
@@ -131,7 +142,13 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   const lastIndexUpdateRef = useRef(0);
   useAnimatedReaction(
     () => {
-      const idx = Math.round(scrollX.value / interval);
+      // Convert scroll position to logical data index (exclude duplicated items)
+      let idx = Math.round(scrollX.value / interval);
+      if (loopingEnabled) {
+        idx -= 1; // account for leading duplicate
+      }
+      if (idx < 0) idx = data.length - 1;
+      if (idx > data.length - 1) idx = 0;
       return idx;
     },
     (idx, prevIdx) => {
@@ -148,6 +165,22 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
     },
     [data.length]
   );
+
+  // Keep pagination progress in sync with scrollX so we can animate dots like FeaturedContent
+  useAnimatedReaction(
+    () => scrollX.value / interval,
+    (val) => {
+      // Align pagination progress with logical index space
+      paginationProgress.value = loopingEnabled ? val - 1 : val;
+    },
+    []
+  );
+
+  // JS helper to jump without flicker when hitting clones
+  const scrollToLogicalIndex = useCallback((logicalIndex: number, animated = true) => {
+    const target = loopingEnabled ? (logicalIndex + 1) * interval : logicalIndex * interval;
+    scrollViewRef.current?.scrollTo({ x: target, y: 0, animated });
+  }, [interval, loopingEnabled]);
 
   const contentPadding = useMemo(() => ({ paddingHorizontal: (width - CARD_WIDTH) / 2 }), []);
 
@@ -310,8 +343,22 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
           pagingEnabled={false}
           bounces={false}
           overScrollMode="never"
+          onMomentumScrollEnd={() => {
+            if (!loopingEnabled) return;
+            // Determine current page index in cloned space
+            const page = Math.round(scrollX.value / interval);
+            // If at leading clone (0), jump to last real item
+            if (page === 0) {
+              scrollToLogicalIndex(data.length - 1, false);
+            }
+            // If at trailing clone (last), jump to first real item
+            const lastPage = loopData.length - 1;
+            if (page === lastPage) {
+              scrollToLogicalIndex(0, false);
+            }
+          }}
         >
-          {data.map((item, index) => (
+          {(loopingEnabled ? loopData : data).map((item, index) => (
             <CarouselCard
               key={item.id}
               item={item}
@@ -325,6 +372,41 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
           ))}
         </Animated.ScrollView>
       </Animated.View>
+      {/* Pagination below the card row (animated like FeaturedContent) */}
+      <View style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 6, position: 'relative', zIndex: 1 }} pointerEvents="auto">
+        <Pagination.Custom
+          progress={paginationProgress}
+          data={data}
+          size={10}
+          dotStyle={{
+            width: 8,
+            height: 8,
+            borderRadius: 999,
+            backgroundColor: currentTheme.colors.elevation3,
+            opacity: 0.9,
+          }}
+          activeDotStyle={{
+            width: 10,
+            height: 10,
+            borderRadius: 999,
+            backgroundColor: currentTheme.colors.white,
+          }}
+          containerStyle={{ gap: 8 }}
+          horizontal
+          onPress={(index: number) => {
+            scrollToLogicalIndex(index, true);
+          }}
+          customReanimatedStyle={(p: number, index: number, length: number) => {
+            'worklet';
+            let v = Math.abs(p - index);
+            if (index === 0 && p > length - 1) {
+              v = Math.abs(p - length);
+            }
+            const scale = interpolate(v, [0, 1], [1.2, 1], Extrapolation.CLAMP);
+            return { transform: [{ scale }] };
+          }}
+        />
+      </View>
     </Animated.View>
   );
 };
