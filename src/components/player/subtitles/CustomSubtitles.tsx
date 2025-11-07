@@ -85,11 +85,6 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
   const displayFontSize = subtitleSize * inverseScale;
   const displayLineHeight = subtitleSize * lineHeightMultiplier * inverseScale;
   const svgHeight = lines.length * displayLineHeight;
-  // Roughly estimate text width to size SVG snugly (avoids overly wide background)
-  const charWidthFactor = 0.48; // even tighter average width per character
-  const estimatedLineWidths = lines.map(line => Math.max(1, line.length * displayFontSize * charWidthFactor));
-  const maxEstimatedLineWidth = estimatedLineWidths.length > 0 ? Math.max(...estimatedLineWidths) : displayFontSize * 2;
-  const svgWidth = Math.max(displayFontSize * 2, Math.ceil(maxEstimatedLineWidth + displayFontSize * 0.25));
 
   // Helper to render formatted segments
   const renderFormattedText = (segments: SubtitleSegment[], lineIndex: number, keyPrefix: string, isRTL?: boolean, customLetterSpacing?: number) => {
@@ -145,19 +140,14 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
           backgroundColor: bgColor,
           position: 'relative',
           alignItems: 'center',
-          alignSelf: 'center',
-          maxWidth: '90%',
-          paddingHorizontal: 4,
-          paddingVertical: 4,
-          transform: [{ scale: inverseScale }],
         }
       ]}>
         {useCrispSvgOutline ? (
           // Crisp outline using react-native-svg (stroke under, fill on top)
           <Svg
-            width={svgWidth}
+            width={800}
             height={svgHeight}
-            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+            viewBox={`0 0 1000 ${svgHeight}`}
             preserveAspectRatio="xMidYMax meet"
           >
             {(() => {
@@ -169,10 +159,10 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
               if (isRTL) {
                 // For RTL, always use 'end' anchor to position from right edge
                 anchor = 'end';
-                x = svgWidth;
+                x = 1000;
               } else {
                 anchor = align === 'center' ? 'middle' : align === 'left' ? 'start' : 'end';
-                x = align === 'center' ? svgWidth / 2 : (align === 'left' ? 0 : svgWidth);
+                x = align === 'center' ? 500 : (align === 'left' ? 0 : 1000);
               }
               
               const baseFontSize = displayFontSize;
@@ -258,6 +248,7 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
                     letterSpacing: effectiveLetterSpacing,
                     fontSize: subtitleSize * inverseScale,
                     lineHeight: subtitleSize * lineHeightMultiplier * inverseScale,
+                    transform: [{ scale: inverseScale }],
                   },
                   shadowStyle,
                 ]}>

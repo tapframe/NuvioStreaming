@@ -185,6 +185,8 @@ const styles = StyleSheet.create({
   poster: {
     borderRadius: 8, // overridden responsively
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   title: {
     fontSize: 13, // overridden responsively

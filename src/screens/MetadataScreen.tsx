@@ -1260,14 +1260,6 @@ const MetadataScreen: React.FC = () => {
                 />
               )}
 
-              {/* Recommendations Section with skeleton when loading - Lazy loaded */}
-              {type === 'movie' && shouldLoadSecondaryData && (
-                <MemoizedMoreLikeThisSection
-                  recommendations={recommendations}
-                  loadingRecommendations={loadingRecommendations}
-                />
-              )}
-
               {/* Series/Movie Content with episode skeleton when loading */}
               {Object.keys(groupedEpisodes).length > 0 ? (
                 <MemoizedSeriesContent
@@ -1393,6 +1385,14 @@ const MetadataScreen: React.FC = () => {
                     <MaterialIcons name="chevron-right" size={24} color={currentTheme.colors.highEmphasis} />
                   </TouchableOpacity>
                 </View>
+              )}
+
+              {/* Recommendations Section with skeleton when loading - Shown at bottom for shows */}
+              {shouldLoadSecondaryData && (
+                <MemoizedMoreLikeThisSection
+                  recommendations={recommendations}
+                  loadingRecommendations={loadingRecommendations}
+                />
               )}
             </Animated.View>
           </Animated.ScrollView>

@@ -710,6 +710,7 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
                   </Text>
                 </ScrollView>
               </View>
+              <TouchableOpacity activeOpacity={0.9} onPress={onPressInfo} style={StyleSheet.absoluteFillObject as any} />
             </>
           ) : (
             <>
