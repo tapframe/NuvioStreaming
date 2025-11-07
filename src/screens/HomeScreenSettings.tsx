@@ -342,11 +342,15 @@ const HomeScreenSettings: React.FC = () => {
             <View style={styles.segmentCard}>
               <Text style={[styles.segmentTitle, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Hero Layout</Text>
               <SegmentedControl
-                options={[{ label: 'Legacy', value: 'legacy' }, { label: 'Carousel', value: 'carousel' }]}
+                options={[
+                  { label: 'Legacy', value: 'legacy' }, 
+                  { label: 'Carousel', value: 'carousel' },
+                  { label: 'Apple TV', value: 'appletv' }
+                ]}
                 value={settings.heroStyle}
                 onChange={(val) => handleUpdateSetting('heroStyle', val as any)}
               />
-              <Text style={[styles.segmentHint, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Full-width banner or swipeable cards</Text>
+              <Text style={[styles.segmentHint, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Full-width banner, swipeable cards, or Apple TV style</Text>
             </View>
 
             <View style={styles.segmentCard}>

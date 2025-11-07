@@ -50,6 +50,7 @@ import { useFeaturedContent } from '../hooks/useFeaturedContent';
 import { useSettings, settingsEmitter } from '../hooks/useSettings';
 import FeaturedContent from '../components/home/FeaturedContent';
 import HeroCarousel from '../components/home/HeroCarousel';
+import AppleTVHero from '../components/home/AppleTVHero';
 import CatalogSection from '../components/home/CatalogSection';
 import { SkeletonFeatured } from '../components/home/SkeletonLoaders';
 import LoadingSpinner from '../components/common/LoadingSpinner';
@@ -629,34 +630,49 @@ const HomeScreen = () => {
   // Memoize individual section components to prevent re-renders
   const memoizedFeaturedContent = useMemo(() => {
     const heroStyleToUse = settings.heroStyle;
-    return heroStyleToUse === 'carousel' ? (
-      <HeroCarousel
-        items={allFeaturedContent || (featuredContent ? [featuredContent] : [])}
-        loading={featuredLoading}
-      />
-    ) : (
-      <>
-        <FeaturedContent
+    
+    if (heroStyleToUse === 'carousel') {
+      return (
+        <HeroCarousel
+          items={allFeaturedContent || (featuredContent ? [featuredContent] : [])}
+          loading={featuredLoading}
+        />
+      );
+    } else if (heroStyleToUse === 'appletv') {
+      return (
+        <AppleTVHero
           featuredContent={featuredContent || null}
+          allFeaturedContent={allFeaturedContent || []}
           isSaved={isSaved}
           handleSaveToLibrary={handleSaveToLibrary}
           loading={featuredLoading}
         />
-        <LinearGradient
-          colors={["transparent", currentTheme.colors.darkBackground]}
-          locations={[0, 1]}
-          style={{
-            height: isTablet ? 40 : 30,
-            width: '100%',
-            marginTop: -(isTablet ? 40 : 30),
-            position: 'relative',
-            zIndex: -1,
-          }}
-          pointerEvents="none"
-        />
-      </>
-    );
-  }, [isTablet, settings.heroStyle, showHeroSection, featuredContentSource, allFeaturedContent, featuredContent, isItemSaved, handleSaveToLibrary, featuredLoading]);
+      );
+    } else {
+      return (
+        <>
+          <FeaturedContent
+            featuredContent={featuredContent || null}
+            isSaved={isSaved}
+            handleSaveToLibrary={handleSaveToLibrary}
+            loading={featuredLoading}
+          />
+          <LinearGradient
+            colors={["transparent", currentTheme.colors.darkBackground]}
+            locations={[0, 1]}
+            style={{
+              height: isTablet ? 40 : 30,
+              width: '100%',
+              marginTop: -(isTablet ? 40 : 30),
+              position: 'relative',
+              zIndex: -1,
+            }}
+            pointerEvents="none"
+          />
+        </>
+      );
+    }
+  }, [isTablet, settings.heroStyle, showHeroSection, featuredContentSource, allFeaturedContent, featuredContent, isSaved, handleSaveToLibrary, featuredLoading]);
 
   const memoizedThisWeekSection = useMemo(() => <ThisWeekSection />, []);
   const memoizedContinueWatchingSection = useMemo(() => <ContinueWatchingSection ref={continueWatchingRef} />, []);

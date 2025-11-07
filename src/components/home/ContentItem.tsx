@@ -349,7 +349,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
             style={[
               styles.title, 
               { 
-                color: currentTheme.colors.text,
+                color: currentTheme.colors.mediumEmphasis,
                 fontSize: getDeviceType(width) === 'tv' ? 16 : getDeviceType(width) === 'largeTablet' ? 15 : getDeviceType(width) === 'tablet' ? 14 : 13
               }
             ]} 

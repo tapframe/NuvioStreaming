@@ -128,7 +128,7 @@ const TraktItem = React.memo(({ item, width, navigation, currentTheme }: { item:
             </View>
           )}
         </View>
-        <Text style={[styles.cardTitle, { color: currentTheme.colors.white }]}>
+        <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}>
           {item.name}
         </Text>
       </View>
@@ -425,7 +425,7 @@ const LibraryScreen = () => {
             </View>
           )}
         </View>
-        <Text style={[styles.cardTitle, { color: currentTheme.colors.white }]}> 
+        <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}> 
           {item.name}
         </Text>
       </View>
@@ -489,7 +489,7 @@ const LibraryScreen = () => {
             )}
           </View>
         </View>
-        <Text style={[styles.cardTitle, { color: currentTheme.colors.white }]}>
+        <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}>
           Trakt collections
         </Text>
       </View>

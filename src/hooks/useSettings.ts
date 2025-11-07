@@ -38,7 +38,7 @@ export interface AppSettings {
   preferredPlayer: 'internal' | 'vlc' | 'infuse' | 'outplayer' | 'vidhub' | 'infuse_livecontainer' | 'external';
   showHeroSection: boolean;
   featuredContentSource: 'tmdb' | 'catalogs';
-  heroStyle: 'legacy' | 'carousel';
+  heroStyle: 'legacy' | 'carousel' | 'appletv';
   selectedHeroCatalogs: string[]; // Array of catalog IDs to display in hero section
   logoSourcePreference: 'metahub' | 'tmdb'; // Preferred source for title logos
   tmdbLanguagePreference: string; // Preferred language for TMDB logos (ISO 639-1 code)

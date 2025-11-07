@@ -94,94 +94,49 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
   return (
     <Animated.View style={[styles.floatingHeader, headerAnimatedStyle]} pointerEvents={isHeaderInteractive ? 'auto' : 'none'}>
       {Platform.OS === 'ios' ? (
-        GlassViewComp && liquidGlassAvailable ? (
-          <GlassViewComp
-            style={[styles.blurContainer, { paddingTop: Math.max(safeAreaTop * 0.8, safeAreaTop - 6) }]}
-            glassEffectStyle="regular"
-          >
-            <Animated.View style={[styles.floatingHeaderContent, headerElementsStyle]}>
-              <TouchableOpacity
-                style={styles.backButton}
-                onPress={handleBack}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <MaterialIcons
-                  name="arrow-back"
-                  size={24}
-                  color={currentTheme.colors.highEmphasis}
+        <ExpoBlurView
+          intensity={50}
+          tint="dark"
+          style={[styles.blurContainer, { paddingTop: Math.max(safeAreaTop * 0.8, safeAreaTop - 6) }]}
+        >
+          <Animated.View style={[styles.floatingHeaderContent, headerElementsStyle]}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={handleBack}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <MaterialIcons
+                name="arrow-back"
+                size={24}
+                color={currentTheme.colors.highEmphasis}
+              />
+            </TouchableOpacity>
+
+            <View style={styles.headerTitleContainer}>
+              {(stableLogoUri || metadata.logo) && !logoLoadError ? (
+                <Image
+                  source={{ uri: stableLogoUri || metadata.logo }}
+                  style={styles.floatingHeaderLogo}
+                  resizeMode="contain"
+                  onError={() => {
+                    logger.warn(`[FloatingHeader] Logo failed to load: ${stableLogoUri || metadata.logo}`);
+                    setLogoLoadError(true);
+                  }}
                 />
-              </TouchableOpacity>
+              ) : (
+                <Text style={[styles.floatingHeaderTitle, { color: currentTheme.colors.highEmphasis }]} numberOfLines={1}>{metadata.name}</Text>
+              )}
+            </View>
 
-              <View style={styles.headerTitleContainer}>
-                {(stableLogoUri || metadata.logo) && !logoLoadError ? (
-                  <Image
-                    source={{ uri: stableLogoUri || metadata.logo }}
-                    style={styles.floatingHeaderLogo}
-                    resizeMode="contain"
-                    onError={() => {
-                      logger.warn(`[FloatingHeader] Logo failed to load: ${stableLogoUri || metadata.logo}`);
-                      setLogoLoadError(true);
-                    }}
-                  />
-                ) : (
-                  <Text style={[styles.floatingHeaderTitle, { color: currentTheme.colors.highEmphasis }]} numberOfLines={1}>{metadata.name}</Text>
-                )}
-              </View>
-
-              <TouchableOpacity
-                style={styles.headerActionButton}
-                onPress={handleToggleLibrary}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <MaterialIcons name={inLibrary ? "bookmark" : "bookmark-outline"} size={22} color={currentTheme.colors.highEmphasis} />
-              </TouchableOpacity>
-            </Animated.View>
-          </GlassViewComp>
-        ) : (
-          <ExpoBlurView
-            intensity={50}
-            tint="dark"
-            style={[styles.blurContainer, { paddingTop: Math.max(safeAreaTop * 0.8, safeAreaTop - 6) }]}
-          >
-            <Animated.View style={[styles.floatingHeaderContent, headerElementsStyle]}>
-              <TouchableOpacity
-                style={styles.backButton}
-                onPress={handleBack}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <MaterialIcons
-                  name="arrow-back"
-                  size={24}
-                  color={currentTheme.colors.highEmphasis}
-                />
-              </TouchableOpacity>
-
-              <View style={styles.headerTitleContainer}>
-                {(stableLogoUri || metadata.logo) && !logoLoadError ? (
-                  <Image
-                    source={{ uri: stableLogoUri || metadata.logo }}
-                    style={styles.floatingHeaderLogo}
-                    resizeMode="contain"
-                    onError={() => {
-                      logger.warn(`[FloatingHeader] Logo failed to load: ${stableLogoUri || metadata.logo}`);
-                      setLogoLoadError(true);
-                    }}
-                  />
-                ) : (
-                  <Text style={[styles.floatingHeaderTitle, { color: currentTheme.colors.highEmphasis }]} numberOfLines={1}>{metadata.name}</Text>
-                )}
-              </View>
-
-              <TouchableOpacity
-                style={styles.headerActionButton}
-                onPress={handleToggleLibrary}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <MaterialIcons name={inLibrary ? "bookmark" : "bookmark-outline"} size={22} color={currentTheme.colors.highEmphasis} />
-              </TouchableOpacity>
-            </Animated.View>
-          </ExpoBlurView>
-        )
+            <TouchableOpacity
+              style={styles.headerActionButton}
+              onPress={handleToggleLibrary}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <MaterialIcons name={inLibrary ? "bookmark" : "bookmark-outline"} size={22} color={currentTheme.colors.highEmphasis} />
+            </TouchableOpacity>
+          </Animated.View>
+        </ExpoBlurView>
       ) : (
         <View
           style={[
