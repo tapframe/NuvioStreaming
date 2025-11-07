@@ -15,7 +15,7 @@ import { RootStackParamList } from '../../navigation/AppNavigator';
 import { LinearGradient } from 'expo-linear-gradient';
 import FastImage from '@d11/react-native-fast-image';
 import { SvgUri } from 'react-native-svg';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, Entypo } from '@expo/vector-icons';
 import Animated, {
   FadeIn,
   FadeOut,
@@ -33,6 +33,10 @@ import { StreamingContent } from '../../services/catalogService';
 import { useTheme } from '../../contexts/ThemeContext';
 import { logger } from '../../utils/logger';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSettings } from '../../hooks/useSettings';
+import { useTrailer } from '../../contexts/TrailerContext';
+import TrailerService from '../../services/trailerService';
+import TrailerPlayer from '../video/TrailerPlayer';
 
 interface AppleTVHeroProps {
   featuredContent: StreamingContent | null;
@@ -86,6 +90,8 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
+  const { settings, updateSetting } = useSettings();
+  const { isTrailerPlaying: globalTrailerPlaying, setTrailerPlaying } = useTrailer();
   
   // Determine items to display
   const items = useMemo(() => {
@@ -102,12 +108,53 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
   const autoPlayTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastInteractionRef = useRef<number>(Date.now());
 
+  // Trailer state
+  const [trailerUrl, setTrailerUrl] = useState<string | null>(null);
+  const [trailerLoading, setTrailerLoading] = useState(false);
+  const [trailerError, setTrailerError] = useState(false);
+  const [trailerReady, setTrailerReady] = useState(false);
+  const [trailerPreloaded, setTrailerPreloaded] = useState(false);
+  const trailerVideoRef = useRef<any>(null);
+  
+  // Use ref to avoid re-fetching trailer when trailerMuted changes
+  const showTrailersEnabled = useRef(settings?.showTrailers ?? false);
+  
+  // Update ref when showTrailers setting changes
+  useEffect(() => {
+    showTrailersEnabled.current = settings?.showTrailers ?? false;
+  }, [settings?.showTrailers]);
+
   const currentItem = items[currentIndex] || null;
 
   // Animation values
   const dragProgress = useSharedValue(0);
   const logoOpacity = useSharedValue(1);
   const [nextIndex, setNextIndex] = useState(currentIndex);
+  const thumbnailOpacity = useSharedValue(1);
+  const trailerOpacity = useSharedValue(0);
+  const trailerMuted = settings?.trailerMuted ?? true;
+
+  // Animated style for trailer container - 60% height with zoom
+  const trailerContainerStyle = useAnimatedStyle(() => {
+    return {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: HERO_HEIGHT * 0.9, // 90% of hero height
+      overflow: 'hidden',
+      opacity: trailerOpacity.value,
+    };
+  });
+
+  // Animated style for trailer video - zoomed in 5%
+  const trailerVideoStyle = useAnimatedStyle(() => {
+    return {
+      width: '100%',
+      height: '100%',
+      transform: [{ scale: 1.05 }], // 5% zoom
+    };
+  });
 
   // Reset loaded states when items change
   useEffect(() => {
@@ -116,7 +163,144 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
     setLogoError({});
   }, [items.length]);
 
-  // Auto-advance timer
+  // Fetch trailer URL when current item changes
+  useEffect(() => {
+    let alive = true;
+
+    const fetchTrailer = async () => {
+      if (!currentItem || !showTrailersEnabled.current) {
+        setTrailerUrl(null);
+        return;
+      }
+
+      // Reset trailer state when item changes
+      setTrailerLoading(true);
+      setTrailerError(false);
+      setTrailerReady(false);
+      setTrailerPreloaded(false);
+      setTrailerPlaying(false);
+      
+      // Fade out any existing trailer
+      trailerOpacity.value = withTiming(0, { duration: 300 });
+      thumbnailOpacity.value = withTiming(1, { duration: 300 });
+
+      try {
+        // Extract year from metadata
+        const year = currentItem.releaseInfo 
+          ? parseInt(currentItem.releaseInfo.split('-')[0], 10) 
+          : new Date().getFullYear();
+
+        // Extract TMDB ID if available
+        const tmdbId = currentItem.id?.startsWith('tmdb:') 
+          ? currentItem.id.replace('tmdb:', '') 
+          : undefined;
+
+        const contentType = currentItem.type === 'series' ? 'tv' : 'movie';
+
+        logger.info('[AppleTVHero] Fetching trailer for:', currentItem.name, year, tmdbId);
+
+        const url = await TrailerService.getTrailerUrl(
+          currentItem.name, 
+          year, 
+          tmdbId, 
+          contentType
+        );
+
+        if (!alive) return;
+
+        if (url) {
+          const bestUrl = TrailerService.getBestFormatUrl(url);
+          setTrailerUrl(bestUrl);
+          logger.info('[AppleTVHero] Trailer URL loaded:', bestUrl);
+        } else {
+          logger.info('[AppleTVHero] No trailer found for:', currentItem.name);
+          setTrailerUrl(null);
+        }
+      } catch (error) {
+        if (!alive) return;
+        logger.error('[AppleTVHero] Error fetching trailer:', error);
+        setTrailerError(true);
+        setTrailerUrl(null);
+      } finally {
+        if (alive) {
+          setTrailerLoading(false);
+        }
+      }
+    };
+
+    fetchTrailer();
+
+    return () => {
+      alive = false;
+    };
+  }, [currentItem, currentIndex]); // Removed settings?.showTrailers from dependencies
+
+  // Handle trailer preloaded
+  const handleTrailerPreloaded = useCallback(() => {
+    setTrailerPreloaded(true);
+    logger.info('[AppleTVHero] Trailer preloaded successfully');
+  }, []);
+
+  // Handle trailer ready to play
+  const handleTrailerReady = useCallback(() => {
+    setTrailerReady(true);
+    
+    // Smooth crossfade: thumbnail out, trailer in
+    thumbnailOpacity.value = withTiming(0, { duration: 800 });
+    trailerOpacity.value = withTiming(1, { duration: 800 });
+    
+    logger.info('[AppleTVHero] Trailer ready - starting playback');
+    
+    // Auto-start trailer
+    setTrailerPlaying(true);
+  }, [thumbnailOpacity, trailerOpacity, setTrailerPlaying]);
+
+  // Handle trailer error
+  const handleTrailerError = useCallback(() => {
+    setTrailerError(true);
+    setTrailerReady(false);
+    setTrailerPlaying(false);
+    
+    // Fade back to thumbnail
+    trailerOpacity.value = withTiming(0, { duration: 300 });
+    thumbnailOpacity.value = withTiming(1, { duration: 300 });
+    
+    logger.error('[AppleTVHero] Trailer playback error');
+  }, [trailerOpacity, thumbnailOpacity, setTrailerPlaying]);
+
+  // Handle trailer end
+  const handleTrailerEnd = useCallback(() => {
+    logger.info('[AppleTVHero] Trailer ended');
+    setTrailerPlaying(false);
+    
+    // Reset trailer state
+    setTrailerReady(false);
+    setTrailerPreloaded(false);
+    
+    // Smooth fade back to thumbnail
+    trailerOpacity.value = withTiming(0, { duration: 500 });
+    thumbnailOpacity.value = withTiming(1, { duration: 500 });
+  }, [trailerOpacity, thumbnailOpacity, setTrailerPlaying]);
+
+  // Handle fullscreen toggle
+  const handleFullscreenToggle = useCallback(async () => {
+    try {
+      logger.info('[AppleTVHero] Fullscreen button pressed');
+      if (trailerVideoRef.current) {
+        await trailerVideoRef.current.presentFullscreenPlayer();
+      }
+    } catch (error) {
+      logger.error('[AppleTVHero] Error toggling fullscreen:', error);
+    }
+  }, []);
+
+  // Handle mute toggle
+  const handleMuteToggle = useCallback(() => {
+    logger.info('[AppleTVHero] Mute toggle pressed, current:', trailerMuted);
+    updateSetting('trailerMuted', !trailerMuted);
+  }, [trailerMuted, updateSetting]);
+
+  // Auto-advance timer - PAUSE when trailer is playing
   const startAutoPlay = useCallback(() => {
     if (autoPlayTimerRef.current) {
       clearTimeout(autoPlayTimerRef.current);
@@ -124,17 +308,23 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
 
     if (items.length <= 1) return;
 
+    // Don't auto-advance if trailer is playing
+    if (globalTrailerPlaying && trailerReady) {
+      logger.info('[AppleTVHero] Auto-rotation paused - trailer is playing');
+      return;
+    }
+
     autoPlayTimerRef.current = setTimeout(() => {
       const timeSinceInteraction = Date.now() - lastInteractionRef.current;
-      // Only auto-advance if user hasn't interacted recently (5 seconds)
-      if (timeSinceInteraction >= 5000) {
+      // Only auto-advance if user hasn't interacted recently (5 seconds) and no trailer playing
+      if (timeSinceInteraction >= 5000 && (!globalTrailerPlaying || !trailerReady)) {
         setCurrentIndex((prev) => (prev + 1) % items.length);
       } else {
         // Retry after remaining time
         startAutoPlay();
       }
     }, 25000); // Auto-advance every 25 seconds
-  }, [items.length]);
+  }, [items.length, globalTrailerPlaying, trailerReady]);
 
   useEffect(() => {
     startAutoPlay();
@@ -143,7 +333,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
         clearTimeout(autoPlayTimerRef.current);
       }
     };
-  }, [startAutoPlay, currentIndex]);
+  }, [startAutoPlay, currentIndex, globalTrailerPlaying, trailerReady]);
 
   // Reset drag progress and animate logo when index changes
   useEffect(() => {
@@ -181,10 +371,12 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
     setNextIndex(index);
   }, []);
 
-  // Swipe gesture handler with live preview
+  // Swipe gesture handler with live preview - only horizontal
   const panGesture = useMemo(
     () =>
       Gesture.Pan()
+        .activeOffsetX([-10, 10]) // Only activate on horizontal movement
+        .failOffsetY([-10, 10]) // Fail if vertical movement is detected
         .onStart(() => {
           // Determine which direction and set preview
           runOnJS(updateInteractionTime)();
@@ -274,7 +466,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
 
   if (loading) {
     return (
-      <View style={[styles.container, { height: HERO_HEIGHT }]}>
+      <View style={[styles.container, { height: HERO_HEIGHT, marginTop: -insets.top }]}>
         <View style={styles.skeletonContainer}>
           <LinearGradient
             colors={['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.08)', 'rgba(255,255,255,0.05)']}
@@ -289,7 +481,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
 
   if (!currentItem || items.length === 0) {
     return (
-      <View style={[styles.container, { height: HERO_HEIGHT }]}>
+      <View style={[styles.container, { height: HERO_HEIGHT, marginTop: -insets.top }]}>
         <View style={styles.noContentContainer}>
           <MaterialIcons name="theaters" size={48} color="rgba(255,255,255,0.5)" />
           <Text style={styles.noContentText}>No featured content available</Text>
@@ -314,8 +506,10 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
       >
         {/* Background Images with Crossfade */}
         <View style={styles.backgroundContainer}>
-          {/* Current Image */}
-          <Animated.View style={[StyleSheet.absoluteFillObject, currentImageStyle]}>
+          {/* Current Image - Thumbnail with fade */}
+          <Animated.View style={[StyleSheet.absoluteFillObject, currentImageStyle, {
+            opacity: thumbnailOpacity
+          }]}>
             <FastImage
               source={{
                 uri: bannerUrl,
@@ -344,6 +538,62 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
             </Animated.View>
           )}
 
+          {/* Hidden preload trailer player */}
+          {settings?.showTrailers && trailerUrl && !trailerLoading && !trailerError && !trailerPreloaded && (
+            <View style={[StyleSheet.absoluteFillObject, { opacity: 0, pointerEvents: 'none' }]}>
+              <TrailerPlayer
+                key={`preload-${trailerUrl}`}
+                trailerUrl={trailerUrl}
+                autoPlay={false}
+                muted={true}
+                style={StyleSheet.absoluteFillObject}
+                hideLoadingSpinner={true}
+                onLoad={handleTrailerPreloaded}
+                onError={handleTrailerError}
+              />
+            </View>
+          )}
+
+          {/* Visible trailer player - 60% height with 5% zoom and smooth fade */}
+          {settings?.showTrailers && trailerUrl && !trailerLoading && !trailerError && trailerPreloaded && (
+            <Animated.View style={trailerContainerStyle}>
+              <Animated.View style={trailerVideoStyle}>
+                <TrailerPlayer
+                  key={`visible-${trailerUrl}`}
+                  ref={trailerVideoRef}
+                  trailerUrl={trailerUrl}
+                  autoPlay={globalTrailerPlaying}
+                  muted={trailerMuted}
+                  style={StyleSheet.absoluteFillObject}
+                  hideLoadingSpinner={true}
+                  hideControls={true}
+                  onFullscreenToggle={handleFullscreenToggle}
+                  onLoad={handleTrailerReady}
+                  onError={handleTrailerError}
+                  onEnd={handleTrailerEnd}
+                  onPlaybackStatusUpdate={(status) => {
+                    if (status.isLoaded && !trailerReady) {
+                      handleTrailerReady();
+                    }
+                  }}
+                />
+              </Animated.View>
+              {/* Gradient blend at bottom of trailer */}
+              <LinearGradient
+                colors={['transparent', currentTheme.colors.darkBackground]}
+                locations={[0, 1]}
+                style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: 60,
+                }}
+                pointerEvents="none"
+              />
+            </Animated.View>
+          )}
+
           {/* Gradient Overlay - darker at bottom for text readability */}
           <LinearGradient
             colors={[
@@ -357,6 +607,63 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
             style={styles.gradientOverlay}
           />
         </View>
+
+        {/* Trailer control buttons (unmute and fullscreen) */}
+        {settings?.showTrailers && trailerReady && trailerUrl && (
+          <Animated.View style={{
+            position: 'absolute',
+            top: Platform.OS === 'android' ? 60 : 70,
+            right: 24,
+            zIndex: 1000,
+            opacity: trailerOpacity,
+            flexDirection: 'row',
+            gap: 8,
+          }}>
+            {/* Fullscreen button */}
+            <TouchableOpacity
+              onPress={(e) => {
+                e?.stopPropagation();
+                handleFullscreenToggle();
+              }}
+              activeOpacity={0.7}
+              onPressIn={(e) => e?.stopPropagation()}
+              onPressOut={(e) => e?.stopPropagation()}
+              style={{
+                padding: 8,
+                backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                borderRadius: 20,
+              }}
+            >
+              <MaterialIcons
+                name="fullscreen"
+                size={24}
+                color="white"
+              />
+            </TouchableOpacity>
+
+            {/* Unmute button */}
+            <TouchableOpacity
+              onPress={(e) => {
+                e?.stopPropagation();
+                handleMuteToggle();
+              }}
+              activeOpacity={0.7}
+              onPressIn={(e) => e?.stopPropagation()}
+              onPressOut={(e) => e?.stopPropagation()}
+              style={{
+                padding: 8,
+                backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                borderRadius: 20,
+              }}
+            >
+              <Entypo
+                name={trailerMuted ? 'sound-mute' : 'sound'}
+                size={24}
+                color="white"
+              />
+            </TouchableOpacity>
+          </Animated.View>
+        )}
 
         {/* Content Overlay */}
         <View style={[styles.contentContainer, { paddingBottom: 0 + insets.bottom }]}>
@@ -474,6 +781,7 @@ const styles = StyleSheet.create({
     width: '100%',
     position: 'relative',
     marginBottom: 0, // Remove margin to go full height
+    overflow: 'hidden', // Ensure trailer stays within bounds
   },
   backgroundContainer: {
     position: 'absolute',
@@ -481,6 +789,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    zIndex: 1,
   },
   backgroundImage: {
     width: '100%',
@@ -492,12 +801,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    zIndex: 10,
   },
   contentContainer: {
     flex: 1,
     justifyContent: 'flex-end',
     alignItems: 'center',
     paddingHorizontal: 24,
+    zIndex: 20, // Above background and trailer
     // paddingBottom will be set dynamically with insets
   },
   logoContainer: {
