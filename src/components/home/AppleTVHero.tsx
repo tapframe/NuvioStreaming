@@ -14,6 +14,7 @@ import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { LinearGradient } from 'expo-linear-gradient';
 import FastImage from '@d11/react-native-fast-image';
+import { SvgUri } from 'react-native-svg';
 import { MaterialIcons } from '@expo/vector-icons';
 import Animated, {
   FadeIn,
@@ -36,8 +37,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 interface AppleTVHeroProps {
   featuredContent: StreamingContent | null;
   allFeaturedContent?: StreamingContent[];
-  isSaved: boolean;
-  handleSaveToLibrary: () => void;
   loading?: boolean;
   onRetry?: () => void;
 }
@@ -50,11 +49,37 @@ const STATUS_BAR_HEIGHT = StatusBar.currentHeight || 0;
 // Calculate hero height - 65% of screen height
 const HERO_HEIGHT = height * 0.75;
 
+// Animated Pagination Dot Component
+const PaginationDot: React.FC<{ isActive: boolean; onPress: () => void }> = React.memo(
+  ({ isActive, onPress }) => {
+    const animatedStyle = useAnimatedStyle(() => {
+      return {
+        width: withTiming(isActive ? 32 : 8, {
+          duration: 300,
+          easing: Easing.out(Easing.cubic),
+        }),
+        opacity: withTiming(isActive ? 0.9 : 0.3, {
+          duration: 300,
+          easing: Easing.out(Easing.cubic),
+        }),
+      };
+    });
+
+    return (
+      <TouchableOpacity
+        onPress={onPress}
+        activeOpacity={0.7}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
+        <Animated.View style={[styles.paginationDot, animatedStyle]} />
+      </TouchableOpacity>
+    );
+  }
+);
+
 const AppleTVHero: React.FC<AppleTVHeroProps> = ({
   featuredContent,
   allFeaturedContent,
-  isSaved,
-  handleSaveToLibrary,
   loading,
   onRetry,
 }) => {
@@ -108,7 +133,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
         // Retry after remaining time
         startAutoPlay();
       }
-    }, 5000); // Auto-advance every 5 seconds
+    }, 25000); // Auto-advance every 25 seconds
   }, [items.length]);
 
   useEffect(() => {
@@ -334,7 +359,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
         </View>
 
         {/* Content Overlay */}
-        <View style={[styles.contentContainer, { paddingBottom: 40 + insets.bottom }]}>
+        <View style={[styles.contentContainer, { paddingBottom: 0 + insets.bottom }]}>
           {/* Logo or Title with Fade Animation */}
           <Animated.View
             key={`logo-${currentIndex}`}
@@ -342,20 +367,33 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
           >
             {currentItem.logo && !logoError[currentIndex] ? (
               <View style={styles.logoContainer}>
-                <FastImage
-                  source={{
-                    uri: currentItem.logo,
-                    priority: FastImage.priority.high,
-                    cache: FastImage.cacheControl.immutable,
-                  }}
-                  style={styles.logo}
-                  resizeMode={FastImage.resizeMode.contain}
-                  onLoad={() => setLogoLoaded((prev) => ({ ...prev, [currentIndex]: true }))}
-                  onError={() => {
-                    setLogoError((prev) => ({ ...prev, [currentIndex]: true }));
-                    logger.warn('[AppleTVHero] Logo load failed:', currentItem.logo);
-                  }}
-                />
+                {currentItem.logo.toLowerCase().endsWith('.svg') ? (
+                  <SvgUri
+                    uri={currentItem.logo}
+                    width="100%"
+                    height="100%"
+                    onLoad={() => setLogoLoaded((prev) => ({ ...prev, [currentIndex]: true }))}
+                    onError={() => {
+                      setLogoError((prev) => ({ ...prev, [currentIndex]: true }));
+                      logger.warn('[AppleTVHero] SVG Logo load failed:', currentItem.logo);
+                    }}
+                  />
+                ) : (
+                  <FastImage
+                    source={{
+                      uri: currentItem.logo,
+                      priority: FastImage.priority.high,
+                      cache: FastImage.cacheControl.immutable,
+                    }}
+                    style={styles.logo}
+                    resizeMode={FastImage.resizeMode.contain}
+                    onLoad={() => setLogoLoaded((prev) => ({ ...prev, [currentIndex]: true }))}
+                    onError={() => {
+                      setLogoError((prev) => ({ ...prev, [currentIndex]: true }));
+                      logger.warn('[AppleTVHero] Logo load failed:', currentItem.logo);
+                    }}
+                  />
+                )}
               </View>
             ) : (
               <View style={styles.titleContainer}>
@@ -389,32 +427,19 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
 
           {/* Action Buttons - Always Visible */}
           <View style={styles.buttonsContainer}>
-            {/* Play Button */}
+            {/* Info Button */}
             <TouchableOpacity
               style={styles.playButton}
               onPress={() => {
-                navigation.navigate('Streams', {
+                navigation.navigate('Metadata', {
                   id: currentItem.id,
                   type: currentItem.type,
                 });
               }}
               activeOpacity={0.8}
             >
-              <MaterialIcons name="play-arrow" size={28} color="#000" />
-              <Text style={styles.playButtonText}>Play</Text>
-            </TouchableOpacity>
-
-            {/* Add to List Button */}
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={handleSaveToLibrary}
-              activeOpacity={0.7}
-            >
-              <MaterialIcons
-                name={isSaved ? 'check' : 'add'}
-                size={24}
-                color="#fff"
-              />
+              <MaterialIcons name="info-outline" size={28} color="#000" />
+              <Text style={styles.playButtonText}>Info</Text>
             </TouchableOpacity>
           </View>
 
@@ -422,19 +447,11 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
           {items.length > 1 && (
             <View style={styles.paginationContainer}>
               {items.map((_, index) => (
-                <TouchableOpacity
+                <PaginationDot
                   key={index}
+                  isActive={index === currentIndex}
                   onPress={() => handleDotPress(index)}
-                  activeOpacity={0.7}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Animated.View
-                    style={[
-                      styles.paginationDot,
-                      index === currentIndex && styles.paginationDotActive,
-                    ]}
-                  />
-                </TouchableOpacity>
+                />
               ))}
             </View>
           )}
@@ -549,7 +566,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
-    marginBottom: 24,
+    marginBottom: 20,
   },
   playButton: {
     flexDirection: 'row',
@@ -558,7 +575,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     paddingVertical: 14,
     paddingHorizontal: 32,
-    borderRadius: 8,
+    borderRadius: 24,
     gap: 8,
     minWidth: 140,
   },
@@ -581,15 +598,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginTop: 12,
   },
   paginationDot: {
-    width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-  },
-  paginationDotActive: {
-    width: 32,
     backgroundColor: 'rgba(255,255,255,0.9)',
   },
   bottomBlend: {
@@ -597,7 +610,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 60,
+    height: 40,
     pointerEvents: 'none',
   },
   // Loading & Empty States

@@ -643,8 +643,6 @@ const HomeScreen = () => {
         <AppleTVHero
           featuredContent={featuredContent || null}
           allFeaturedContent={allFeaturedContent || []}
-          isSaved={isSaved}
-          handleSaveToLibrary={handleSaveToLibrary}
           loading={featuredLoading}
         />
       );
