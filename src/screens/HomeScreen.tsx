@@ -631,18 +631,19 @@ const HomeScreen = () => {
   const memoizedFeaturedContent = useMemo(() => {
     const heroStyleToUse = settings.heroStyle;
     
-    if (heroStyleToUse === 'carousel') {
-      return (
-        <HeroCarousel
-          items={allFeaturedContent || (featuredContent ? [featuredContent] : [])}
-          loading={featuredLoading}
-        />
-      );
-    } else if (heroStyleToUse === 'appletv') {
+    // AppleTVHero is only available on mobile devices (not tablets)
+    if (heroStyleToUse === 'appletv' && !isTablet) {
       return (
         <AppleTVHero
           featuredContent={featuredContent || null}
           allFeaturedContent={allFeaturedContent || []}
+          loading={featuredLoading}
+        />
+      );
+    } else if (heroStyleToUse === 'carousel') {
+      return (
+        <HeroCarousel
+          items={allFeaturedContent || (featuredContent ? [featuredContent] : [])}
           loading={featuredLoading}
         />
       );
