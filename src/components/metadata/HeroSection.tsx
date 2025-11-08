@@ -55,9 +55,9 @@ import { logger } from '../../utils/logger';
 import { TMDBService } from '../../services/tmdbService';
 import TrailerService from '../../services/trailerService';
 import TrailerPlayer from '../video/TrailerPlayer';
+import { HERO_HEIGHT, SCREEN_WIDTH as width, IS_TABLET as isTablet } from '../../constants/dimensions';
 
-const { width, height } = Dimensions.get('window');
-const isTablet = width >= 768;
+const { height } = Dimensions.get('window');
 
 // Ultra-optimized animation constants
 const SCALE_FACTOR = 1.02;
@@ -1540,7 +1540,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
         buttonsTranslateY.value = 0;
         logoOpacity.value = 1;
         heroOpacity.value = 1;
-        heroHeight.value = height * 0.6;
+        heroHeight.value = HERO_HEIGHT;
       } catch (error) {
         logger.error('HeroSection', 'Error cleaning up animation values:', error);
       }

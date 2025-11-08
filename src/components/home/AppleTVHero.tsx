@@ -57,15 +57,62 @@ const STATUS_BAR_HEIGHT = StatusBar.currentHeight || 0;
 const HERO_HEIGHT = height * 0.85;
 
 // Animated Pagination Dot Component
-const PaginationDot: React.FC<{ isActive: boolean; onPress: () => void }> = React.memo(
-  ({ isActive, onPress }) => {
+const PaginationDot: React.FC<{ 
+  isActive: boolean; 
+  isNext: boolean;
+  dragProgress: SharedValue<number>;
+  onPress: () => void;
+}> = React.memo(
+  ({ isActive, isNext, dragProgress, onPress }) => {
     const animatedStyle = useAnimatedStyle(() => {
+      // Base values
+      const activeWidth = 32;
+      const inactiveWidth = 8;
+      const activeOpacity = 0.9;
+      const inactiveOpacity = 0.3;
+      
+      // Calculate target width and opacity based on state
+      let targetWidth = isActive ? activeWidth : inactiveWidth;
+      let targetOpacity = isActive ? activeOpacity : inactiveOpacity;
+      
+      // If this is the next dot during drag, interpolate between inactive and active
+      if (isNext && dragProgress.value > 0) {
+        targetWidth = interpolate(
+          dragProgress.value,
+          [0, 1],
+          [inactiveWidth, activeWidth],
+          Extrapolation.CLAMP
+        );
+        targetOpacity = interpolate(
+          dragProgress.value,
+          [0, 1],
+          [inactiveOpacity, activeOpacity],
+          Extrapolation.CLAMP
+        );
+      }
+      
+      // If this is the current active dot during drag, interpolate from active to inactive
+      if (isActive && dragProgress.value > 0) {
+        targetWidth = interpolate(
+          dragProgress.value,
+          [0, 1],
+          [activeWidth, inactiveWidth],
+          Extrapolation.CLAMP
+        );
+        targetOpacity = interpolate(
+          dragProgress.value,
+          [0, 1],
+          [activeOpacity, inactiveOpacity],
+          Extrapolation.CLAMP
+        );
+      }
+      
       return {
-        width: withTiming(isActive ? 32 : 8, {
+        width: withTiming(targetWidth, {
           duration: 300,
           easing: Easing.out(Easing.cubic),
         }),
-        opacity: withTiming(isActive ? 0.9 : 0.3, {
+        opacity: withTiming(targetOpacity, {
           duration: 300,
           easing: Easing.out(Easing.cubic),
         }),
@@ -890,6 +937,8 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
                 <PaginationDot
                   key={index}
                   isActive={index === currentIndex}
+                  isNext={index === nextIndex && nextIndex !== currentIndex}
+                  dragProgress={dragProgress}
                   onPress={() => handleDotPress(index)}
                 />
               ))}

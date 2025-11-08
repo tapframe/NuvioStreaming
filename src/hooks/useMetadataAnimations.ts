@@ -9,6 +9,7 @@ import {
   runOnUI,
   cancelAnimation,
 } from 'react-native-reanimated';
+import { HERO_HEIGHT } from '../constants/dimensions';
 
 const { width, height } = Dimensions.get('window');
 
@@ -40,7 +41,7 @@ export const useMetadataAnimations = (safeAreaTop: number, watchProgress: any) =
   // Combined hero animations 
   const heroOpacity = useSharedValue(1);
   const heroScale = useSharedValue(1); // Start at 1 for Android compatibility
-  const heroHeightValue = useSharedValue(height * 0.55);
+  const heroHeightValue = useSharedValue(HERO_HEIGHT);
   
   // Combined UI element animations
   const uiElementsOpacity = useSharedValue(1);
@@ -154,8 +155,8 @@ export const useMetadataAnimations = (safeAreaTop: number, watchProgress: any) =
       const rawScrollY = event.contentOffset.y;
       scrollY.value = rawScrollY;
 
-      // Single calculation for header threshold
-      const threshold = height * 0.4 - safeAreaTop;
+      // Single calculation for header threshold - show only when hero is fully scrolled
+      const threshold = HERO_HEIGHT - safeAreaTop;
       const progress = rawScrollY > threshold ? 1 : 0;
       
       // Use single progress value for all header animations
