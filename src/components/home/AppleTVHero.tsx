@@ -128,6 +128,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
 
   // Animation values
   const dragProgress = useSharedValue(0);
+  const dragDirection = useSharedValue(0); // -1 for left, 1 for right
   const logoOpacity = useSharedValue(1);
   const [nextIndex, setNextIndex] = useState(currentIndex);
   const thumbnailOpacity = useSharedValue(1);
@@ -337,13 +338,14 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
 
   // Reset drag progress and animate logo when index changes
   useEffect(() => {
+    // Instant reset - no extra fade animation
     dragProgress.value = 0;
     setNextIndex(currentIndex);
     
-    // Fade out and fade in logo/title
+    // Quick logo fade
     logoOpacity.value = 0;
     logoOpacity.value = withDelay(
-      200,
+      150,
       withTiming(1, {
         duration: 400,
         easing: Easing.out(Easing.cubic),
@@ -375,18 +377,26 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
   const panGesture = useMemo(
     () =>
       Gesture.Pan()
-        .activeOffsetX([-10, 10]) // Only activate on horizontal movement
-        .failOffsetY([-10, 10]) // Fail if vertical movement is detected
+        .activeOffsetX([-5, 5]) // Smaller activation area - more sensitive
+        .failOffsetY([-15, 15]) // Fail if vertical movement is detected
         .onStart(() => {
           // Determine which direction and set preview
           runOnJS(updateInteractionTime)();
         })
         .onUpdate((event) => {
           const translationX = event.translationX;
-          const progress = Math.abs(translationX) / width;
+          // Use smaller width multiplier for easier drag
+          const progress = Math.abs(translationX) / (width * 0.6);
           
-          // Update drag progress (0 to 1)
+          // Update drag progress (0 to 1) with eased curve
           dragProgress.value = Math.min(progress, 1);
+          
+          // Track drag direction: positive = right (previous), negative = left (next)
+          if (translationX > 0) {
+            dragDirection.value = 1; // Swiping right - show previous
+          } else if (translationX < 0) {
+            dragDirection.value = -1; // Swiping left - show next
+          }
 
           // Determine preview index based on direction
           if (translationX > 0) {
@@ -402,55 +412,57 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
         .onEnd((event) => {
           const velocity = event.velocityX;
           const translationX = event.translationX;
-          const swipeThreshold = width * 0.25;
+          const swipeThreshold = width * 0.15; // Smaller threshold - easier to swipe
 
-          if (Math.abs(translationX) > swipeThreshold || Math.abs(velocity) > 800) {
-            // Complete the swipe
+          if (Math.abs(translationX) > swipeThreshold || Math.abs(velocity) > 600) {
+            // Complete the swipe - instant navigation
             if (translationX > 0) {
               runOnJS(goToPrevious)();
             } else {
               runOnJS(goToNext)();
             }
           } else {
-            // Cancel the swipe - animate back
+            // Cancel the swipe - animate back with ease
             dragProgress.value = withTiming(0, {
-              duration: 300,
-              easing: Easing.out(Easing.cubic),
+              duration: 250,
+              easing: Easing.bezier(0.4, 0.0, 0.2, 1), // Material design ease curve
             });
           }
         }),
     [goToPrevious, goToNext, updateInteractionTime, setPreviewIndex, currentIndex, items.length]
   );
 
-  // Animated styles for current and next images
-  const currentImageStyle = useAnimatedStyle(() => {
-    return {
-      opacity: interpolate(
-        dragProgress.value,
-        [0, 1],
-        [1, 0],
-        Extrapolate.CLAMP
-      ),
-    };
-  });
-
+  // Animated styles for next image only - smooth crossfade + slide during drag
   const nextImageStyle = useAnimatedStyle(() => {
+    // Enhanced 4-point curve for smoother crossfade
+    const opacity = interpolate(
+      dragProgress.value,
+      [0, 0.3, 0.7, 1],
+      [0, 0.4, 0.8, 1],
+      Extrapolate.CLAMP
+    );
+    
+    // Smoother slide effect with ease-out curve
+    const slideDistance = 20; // Subtle 20px movement
+    const slideProgress = interpolate(
+      dragProgress.value,
+      [0, 0.4, 0.8, 1], // 4-point for smoother acceleration
+      [-slideDistance * dragDirection.value, -slideDistance * 0.5 * dragDirection.value, -slideDistance * 0.15 * dragDirection.value, 0],
+      Extrapolate.CLAMP
+    );
+    
     return {
-      opacity: interpolate(
-        dragProgress.value,
-        [0, 1],
-        [0, 1],
-        Extrapolate.CLAMP
-      ),
+      opacity,
+      transform: [{ translateX: slideProgress }],
     };
   });
 
-  // Animated style for logo/title only - fades during drag
+  // Animated style for logo/title only - fades during drag with smoother curve
   const logoAnimatedStyle = useAnimatedStyle(() => {
     const dragFade = interpolate(
       dragProgress.value,
-      [0, 0.3],
-      [1, 0],
+      [0, 0.2, 0.4],
+      [1, 0.5, 0],
       Extrapolate.CLAMP
     );
     
@@ -506,10 +518,8 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
       >
         {/* Background Images with Crossfade */}
         <View style={styles.backgroundContainer}>
-          {/* Current Image - Thumbnail with fade */}
-          <Animated.View style={[StyleSheet.absoluteFillObject, currentImageStyle, {
-            opacity: thumbnailOpacity
-          }]}>
+          {/* Current Image - Always visible as base */}
+          <View style={styles.imageWrapper}>
             <FastImage
               source={{
                 uri: bannerUrl,
@@ -520,11 +530,11 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
               resizeMode={FastImage.resizeMode.cover}
               onLoad={() => setBannerLoaded((prev) => ({ ...prev, [currentIndex]: true }))}
             />
-          </Animated.View>
+          </View>
 
-          {/* Next/Preview Image */}
+          {/* Next/Preview Image - Animated overlay during drag */}
           {nextIndex !== currentIndex && (
-            <Animated.View style={[StyleSheet.absoluteFillObject, nextImageStyle]}>
+            <Animated.View style={[styles.imageWrapperAbsolute, nextImageStyle]}>
               <FastImage
                 source={{
                   uri: nextBannerUrl,
@@ -790,6 +800,20 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 1,
+  },
+  imageWrapper: {
+    position: 'absolute',
+    top: 0,
+    left: -50, // Extend 50px to left
+    right: -50, // Extend 50px to right
+    bottom: 0,
+  },
+  imageWrapperAbsolute: {
+    position: 'absolute',
+    top: 0,
+    left: -50, // Extend 50px to left
+    right: -50, // Extend 50px to right
+    bottom: 0,
   },
   backgroundImage: {
     width: '100%',
