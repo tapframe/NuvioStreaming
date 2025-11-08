@@ -100,7 +100,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   preferredPlayer: 'internal',
   showHeroSection: true,
   featuredContentSource: 'catalogs',
-  heroStyle: 'carousel',
+  heroStyle: 'appletv',
   selectedHeroCatalogs: [], // Empty array means all catalogs are selected
   logoSourcePreference: 'tmdb', // Default to TMDB as first source
   tmdbLanguagePreference: 'en', // Default to English

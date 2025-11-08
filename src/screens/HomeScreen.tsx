@@ -30,7 +30,7 @@ import { Stream } from '../types/metadata';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import FastImage from '@d11/react-native-fast-image';
-import Animated, { FadeIn, Layout } from 'react-native-reanimated';
+import Animated, { FadeIn, Layout, useSharedValue, useAnimatedScrollHandler } from 'react-native-reanimated';
 import { PanGestureHandler } from 'react-native-gesture-handler';
 import {
   Gesture,
@@ -125,6 +125,9 @@ const HomeScreen = () => {
   const [featuredContentSource, setFeaturedContentSource] = useState(settings.featuredContentSource);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [hasContinueWatching, setHasContinueWatching] = useState(false);
+
+  // Shared value for scroll position (for parallax effects)
+  const scrollY = useSharedValue(0);
 
   const [catalogs, setCatalogs] = useState<(CatalogContent | null)[]>([]);
   const [catalogsLoading, setCatalogsLoading] = useState(true);
@@ -642,6 +645,7 @@ const HomeScreen = () => {
           featuredContent={featuredContent || null}
           allFeaturedContent={allFeaturedContent || []}
           loading={featuredLoading}
+          scrollY={scrollY}
         />
       );
     } else if (heroStyleToUse === 'carousel') {
@@ -786,11 +790,14 @@ const HomeScreen = () => {
     }
     
     // Capture scroll values immediately before async operation
-    const scrollY = event.nativeEvent.contentOffset.y;
+    const scrollYValue = event.nativeEvent.contentOffset.y;
+    
+    // Update shared value for parallax (on UI thread)
+    scrollY.value = scrollYValue;
     
     // Use requestAnimationFrame to throttle scroll handling
     scrollAnimationFrameRef.current = requestAnimationFrame(() => {
-      const y = scrollY;
+      const y = scrollYValue;
       const dy = y - lastScrollYRef.current;
       lastScrollYRef.current = y;
       
@@ -812,10 +819,16 @@ const HomeScreen = () => {
   }, [toggleHeader]);
 
   // Memoize content container style - use stable insets to prevent iOS shifting
-  const contentContainerStyle = useMemo(() =>
-    StyleSheet.flatten([styles.scrollContent, { paddingTop: stableInsetsTop }]),
-    [stableInsetsTop]
-  );
+  // Don't add paddingTop when using AppleTVHero as it handles its own top spacing
+  const contentContainerStyle = useMemo(() => {
+    const heroStyleToUse = settings.heroStyle;
+    const isUsingAppleTVHero = heroStyleToUse === 'appletv' && !isTablet && showHeroSection;
+    
+    return StyleSheet.flatten([
+      styles.scrollContent, 
+      { paddingTop: isUsingAppleTVHero ? 0 : stableInsetsTop }
+    ]);
+  }, [stableInsetsTop, settings.heroStyle, isTablet, showHeroSection]);
 
   // Memoize the main content section
   const renderMainContent = useMemo(() => {

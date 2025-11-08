@@ -27,6 +27,8 @@ import Animated, {
   runOnJS,
   interpolate,
   Extrapolation,
+  useAnimatedScrollHandler,
+  SharedValue,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { StreamingContent } from '../../services/catalogService';
@@ -43,6 +45,7 @@ interface AppleTVHeroProps {
   allFeaturedContent?: StreamingContent[];
   loading?: boolean;
   onRetry?: () => void;
+  scrollY?: SharedValue<number>; // Optional scroll position for parallax
 }
 
 const { width, height } = Dimensions.get('window');
@@ -50,8 +53,8 @@ const { width, height } = Dimensions.get('window');
 // Get status bar height
 const STATUS_BAR_HEIGHT = StatusBar.currentHeight || 0;
 
-// Calculate hero height - 65% of screen height
-const HERO_HEIGHT = height * 0.75;
+// Calculate hero height - 85% of screen height
+const HERO_HEIGHT = height * 0.85;
 
 // Animated Pagination Dot Component
 const PaginationDot: React.FC<{ isActive: boolean; onPress: () => void }> = React.memo(
@@ -86,6 +89,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
   allFeaturedContent,
   loading,
   onRetry,
+  scrollY: externalScrollY,
 }) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const isFocused = useIsFocused();
@@ -93,6 +97,10 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
   const insets = useSafeAreaInsets();
   const { settings, updateSetting } = useSettings();
   const { isTrailerPlaying: globalTrailerPlaying, setTrailerPlaying } = useTrailer();
+  
+  // Create internal scrollY if not provided externally
+  const internalScrollY = useSharedValue(0);
+  const scrollY = externalScrollY || internalScrollY;
   
   // Determine items to display
   const items = useMemo(() => {
@@ -157,6 +165,62 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
       width: '100%',
       height: '100%',
       transform: [{ scale: 1.05 }], // 5% zoom
+    };
+  });
+
+  // Parallax style for background images
+  const backgroundParallaxStyle = useAnimatedStyle(() => {
+    'worklet';
+    const scrollYValue = scrollY.value;
+    
+    // Pre-calculated constants - start at 1.0 for normal size
+    const DEFAULT_ZOOM = 1.0;
+    const SCROLL_UP_MULTIPLIER = 0.002;
+    const SCROLL_DOWN_MULTIPLIER = 0.0001;
+    const MAX_SCALE = 1.3;
+    const PARALLAX_FACTOR = 0.3;
+    
+    // Optimized scale calculation with minimal branching
+    const scrollUpScale = DEFAULT_ZOOM + Math.abs(scrollYValue) * SCROLL_UP_MULTIPLIER;
+    const scrollDownScale = DEFAULT_ZOOM + scrollYValue * SCROLL_DOWN_MULTIPLIER;
+    const scale = Math.min(scrollYValue < 0 ? scrollUpScale : scrollDownScale, MAX_SCALE);
+    
+    // Single parallax calculation
+    const parallaxOffset = scrollYValue * PARALLAX_FACTOR;
+    
+    return {
+      transform: [
+        { scale },
+        { translateY: parallaxOffset }
+      ],
+    };
+  });
+
+  // Parallax style for trailer
+  const trailerParallaxStyle = useAnimatedStyle(() => {
+    'worklet';
+    const scrollYValue = scrollY.value;
+    
+    // Pre-calculated constants - start at 1.0 for normal size
+    const DEFAULT_ZOOM = 1.0;
+    const SCROLL_UP_MULTIPLIER = 0.0015;
+    const SCROLL_DOWN_MULTIPLIER = 0.0001;
+    const MAX_SCALE = 1.2;
+    const PARALLAX_FACTOR = 0.2; // Slower than background for depth
+    
+    // Optimized scale calculation with minimal branching
+    const scrollUpScale = DEFAULT_ZOOM + Math.abs(scrollYValue) * SCROLL_UP_MULTIPLIER;
+    const scrollDownScale = DEFAULT_ZOOM + scrollYValue * SCROLL_DOWN_MULTIPLIER;
+    const scale = Math.min(scrollYValue < 0 ? scrollUpScale : scrollDownScale, MAX_SCALE);
+    
+    // Single parallax calculation
+    const parallaxOffset = scrollYValue * PARALLAX_FACTOR;
+    
+    return {
+      transform: [
+        { scale },
+        { translateY: parallaxOffset }
+      ],
     };
   });
 
@@ -585,7 +649,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
         {/* Background Images with Crossfade */}
         <View style={styles.backgroundContainer}>
           {/* Current Image - Always visible as base */}
-          <View style={styles.imageWrapper}>
+          <Animated.View style={[styles.imageWrapper, backgroundParallaxStyle]}>
             <FastImage
               source={{
                 uri: bannerUrl,
@@ -596,11 +660,11 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
               resizeMode={FastImage.resizeMode.cover}
               onLoad={() => setBannerLoaded((prev) => ({ ...prev, [currentIndex]: true }))}
             />
-          </View>
+          </Animated.View>
 
           {/* Next/Preview Image - Animated overlay during drag */}
           {nextIndex !== currentIndex && (
-            <Animated.View style={[styles.imageWrapperAbsolute, nextImageStyle]}>
+            <Animated.View style={[styles.imageWrapperAbsolute, nextImageStyle, backgroundParallaxStyle]}>
               <FastImage
                 source={{
                   uri: nextBannerUrl,
@@ -634,7 +698,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
 
           {/* Visible trailer player - 60% height with 5% zoom and smooth fade */}
           {settings?.showTrailers && trailerUrl && !trailerLoading && !trailerError && trailerPreloaded && (
-            <Animated.View style={trailerContainerStyle}>
+            <Animated.View style={[trailerContainerStyle, trailerParallaxStyle]}>
               <Animated.View style={trailerVideoStyle}>
                 <TrailerPlayer
                   key={`visible-${trailerUrl}`}
@@ -692,7 +756,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
         {settings?.showTrailers && trailerReady && trailerUrl && (
           <Animated.View style={{
             position: 'absolute',
-            top: Platform.OS === 'android' ? 60 : 70,
+            top: (Platform.OS === 'android' ? 60 : 70) + insets.top,
             right: 24,
             zIndex: 1000,
             opacity: trailerOpacity,
