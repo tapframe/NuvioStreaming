@@ -64,6 +64,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useToast } from '../contexts/ToastContext';
 import FirstTimeWelcome from '../components/FirstTimeWelcome';
 import { HeaderVisibility } from '../contexts/HeaderVisibility';
+import { useTrailer } from '../contexts/TrailerContext';
 
 // Constants
 const CATALOG_SETTINGS_KEY = 'catalog_settings';
@@ -119,6 +120,7 @@ const HomeScreen = () => {
   const { settings } = useSettings();
   const { lastUpdate } = useCatalogContext(); // Add catalog context to listen for addon changes
   const { showInfo } = useToast();
+  const { setTrailerPlaying } = useTrailer();
   const [showHeroSection, setShowHeroSection] = useState(settings.showHeroSection);
   const [featuredContentSource, setFeaturedContentSource] = useState(settings.featuredContentSource);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -411,9 +413,11 @@ const HomeScreen = () => {
       ScreenOrientation.unlockAsync().catch(() => {});
       
       return () => {
-        // Keep translucent when unfocusing to prevent layout shifts
+        // Stop trailer when screen loses focus (navigating to other screens)
+        setTrailerPlaying(false);
+        logger.info('[HomeScreen] Screen blur - stopping trailer');
       };
-    }, [])
+    }, [setTrailerPlaying])
   );
 
   // Handle app state changes for smart cache management

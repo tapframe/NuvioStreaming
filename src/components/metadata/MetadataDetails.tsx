@@ -21,6 +21,7 @@ import Animated, {
 import { useTheme } from '../../contexts/ThemeContext';
 import { isMDBListEnabled } from '../../screens/MDBListSettingsScreen';
 import { getAgeRatingColor } from '../../utils/ageRatingColors';
+import AgeRatingBadge from '../common/AgeRatingBadge';
 
 // Enhanced responsive breakpoints for Metadata Details
 const BREAKPOINTS = {
@@ -215,14 +216,7 @@ function formatRuntime(runtime: string): string {
           </Text>
         )}
         {metadata.certification && (
-          <Text style={[
-            styles.metaText,
-            styles.premiumOutlinedText,
-            { 
-              color: getAgeRatingColor(metadata.certification, type === 'series' ? 'series' : 'movie'),
-              fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 15
-            }
-          ]}>{metadata.certification}</Text>
+          <AgeRatingBadge rating={metadata.certification} />
         )}
         {metadata.imdbRating && !isMDBEnabled && (
           <View style={styles.ratingContainer}>

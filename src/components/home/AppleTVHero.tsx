@@ -9,12 +9,12 @@ import {
   ViewStyle,
   TextStyle,
   StatusBar,
+  Image,
 } from 'react-native';
-import { NavigationProp, useNavigation } from '@react-navigation/native';
+import { NavigationProp, useNavigation, useIsFocused } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { LinearGradient } from 'expo-linear-gradient';
 import FastImage from '@d11/react-native-fast-image';
-import { SvgUri } from 'react-native-svg';
 import { MaterialIcons, Entypo } from '@expo/vector-icons';
 import Animated, {
   FadeIn,
@@ -26,7 +26,7 @@ import Animated, {
   withDelay,
   runOnJS,
   interpolate,
-  Extrapolate,
+  Extrapolation,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { StreamingContent } from '../../services/catalogService';
@@ -88,6 +88,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
   onRetry,
 }) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const isFocused = useIsFocused();
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
   const { settings, updateSetting } = useSettings();
@@ -105,6 +106,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
   const [bannerLoaded, setBannerLoaded] = useState<Record<number, boolean>>({});
   const [logoLoaded, setLogoLoaded] = useState<Record<number, boolean>>({});
   const [logoError, setLogoError] = useState<Record<number, boolean>>({});
+  const [logoHeights, setLogoHeights] = useState<Record<number, number>>({});
   const autoPlayTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastInteractionRef = useRef<number>(Date.now());
 
@@ -114,6 +116,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
   const [trailerError, setTrailerError] = useState(false);
   const [trailerReady, setTrailerReady] = useState(false);
   const [trailerPreloaded, setTrailerPreloaded] = useState(false);
+  const [trailerShouldBePaused, setTrailerShouldBePaused] = useState(false);
   const trailerVideoRef = useRef<any>(null);
   
   // Use ref to avoid re-fetching trailer when trailerMuted changes
@@ -162,7 +165,52 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
     setBannerLoaded({});
     setLogoLoaded({});
     setLogoError({});
+    setLogoHeights({});
   }, [items.length]);
+
+  // Stop trailer when screen loses focus
+  useEffect(() => {
+    if (!isFocused) {
+      // Pause this screen's trailer
+      setTrailerShouldBePaused(true);
+      setTrailerPlaying(false);
+      
+      // Fade out trailer
+      trailerOpacity.value = withTiming(0, { duration: 300 });
+      thumbnailOpacity.value = withTiming(1, { duration: 300 });
+      
+      logger.info('[AppleTVHero] Screen lost focus - pausing trailer');
+    } else {
+      // Screen gained focus - allow trailer to resume if it was ready
+      setTrailerShouldBePaused(false);
+      
+      // If trailer was ready and loaded, restore the video opacity
+      if (trailerReady && trailerUrl) {
+        logger.info('[AppleTVHero] Screen gained focus - restoring trailer');
+        thumbnailOpacity.value = withTiming(0, { duration: 800 });
+        trailerOpacity.value = withTiming(1, { duration: 800 });
+        setTrailerPlaying(true);
+      }
+    }
+  }, [isFocused, setTrailerPlaying, trailerOpacity, thumbnailOpacity, trailerReady, trailerUrl]);
+
+  // Listen to navigation events to stop trailer when navigating to other screens
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('blur', () => {
+      // Screen is blurred (navigated away)
+      setTrailerPlaying(false);
+      trailerOpacity.value = withTiming(0, { duration: 300 });
+      thumbnailOpacity.value = withTiming(1, { duration: 300 });
+      logger.info('[AppleTVHero] Navigation blur event - stopping trailer');
+    });
+
+    return () => {
+      unsubscribe();
+      // Stop trailer when component unmounts
+      setTrailerPlaying(false);
+      logger.info('[AppleTVHero] Component unmounting - stopping trailer');
+    };
+  }, [navigation, setTrailerPlaying, trailerOpacity, thumbnailOpacity]);
 
   // Fetch trailer URL when current item changes
   useEffect(() => {
@@ -342,12 +390,12 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
     dragProgress.value = 0;
     setNextIndex(currentIndex);
     
-    // Quick logo fade
+    // Faster logo fade
     logoOpacity.value = 0;
     logoOpacity.value = withDelay(
-      150,
+      80,
       withTiming(1, {
-        duration: 400,
+        duration: 250,
         easing: Easing.out(Easing.cubic),
       })
     );
@@ -385,8 +433,8 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
         })
         .onUpdate((event) => {
           const translationX = event.translationX;
-          // Use smaller width multiplier for easier drag
-          const progress = Math.abs(translationX) / (width * 0.6);
+          // Use larger width multiplier for smoother visual feedback on small swipes
+          const progress = Math.abs(translationX) / (width * 1.2);
           
           // Update drag progress (0 to 1) with eased curve
           dragProgress.value = Math.min(progress, 1);
@@ -412,20 +460,31 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
         .onEnd((event) => {
           const velocity = event.velocityX;
           const translationX = event.translationX;
-          const swipeThreshold = width * 0.15; // Smaller threshold - easier to swipe
+          const swipeThreshold = width * 0.05; // Very small threshold - minimal swipe needed
 
-          if (Math.abs(translationX) > swipeThreshold || Math.abs(velocity) > 600) {
-            // Complete the swipe - instant navigation
-            if (translationX > 0) {
-              runOnJS(goToPrevious)();
-            } else {
-              runOnJS(goToNext)();
-            }
+          if (Math.abs(translationX) > swipeThreshold || Math.abs(velocity) > 300) {
+            // Complete the swipe - animate to full opacity before navigation
+            dragProgress.value = withTiming(
+              1,
+              {
+                duration: 300,
+                easing: Easing.out(Easing.cubic),
+              },
+              (finished) => {
+                if (finished) {
+                  if (translationX > 0) {
+                    runOnJS(goToPrevious)();
+                  } else {
+                    runOnJS(goToNext)();
+                  }
+                }
+              }
+            );
           } else {
-            // Cancel the swipe - animate back with ease
+            // Cancel the swipe - animate back with smooth ease
             dragProgress.value = withTiming(0, {
-              duration: 250,
-              easing: Easing.bezier(0.4, 0.0, 0.2, 1), // Material design ease curve
+              duration: 450,
+              easing: Easing.bezier(0.25, 0.1, 0.25, 1), // Custom ease-out for buttery smooth return
             });
           }
         }),
@@ -434,21 +493,28 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
 
   // Animated styles for next image only - smooth crossfade + slide during drag
   const nextImageStyle = useAnimatedStyle(() => {
-    // Enhanced 4-point curve for smoother crossfade
+    // Silky-smooth 10-point ease curve for cinematic crossfade
     const opacity = interpolate(
       dragProgress.value,
-      [0, 0.3, 0.7, 1],
-      [0, 0.4, 0.8, 1],
-      Extrapolate.CLAMP
+      [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.85, 1],
+      [0, 0.05, 0.12, 0.22, 0.35, 0.5, 0.65, 0.78, 0.92, 1],
+      Extrapolation.CLAMP
     );
     
-    // Smoother slide effect with ease-out curve
-    const slideDistance = 20; // Subtle 20px movement
+    // Ultra-subtle slide effect with smooth ease-out curve
+    const slideDistance = 6; // Even more subtle 6px movement
     const slideProgress = interpolate(
       dragProgress.value,
-      [0, 0.4, 0.8, 1], // 4-point for smoother acceleration
-      [-slideDistance * dragDirection.value, -slideDistance * 0.5 * dragDirection.value, -slideDistance * 0.15 * dragDirection.value, 0],
-      Extrapolate.CLAMP
+      [0, 0.2, 0.4, 0.6, 0.8, 1], // 6-point for ultra-smooth acceleration
+      [
+        -slideDistance * dragDirection.value, 
+        -slideDistance * 0.8 * dragDirection.value, 
+        -slideDistance * 0.6 * dragDirection.value,
+        -slideDistance * 0.35 * dragDirection.value,
+        -slideDistance * 0.12 * dragDirection.value,
+        0
+      ],
+      Extrapolation.CLAMP
     );
     
     return {
@@ -463,7 +529,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
       dragProgress.value,
       [0, 0.2, 0.4],
       [1, 0.5, 0],
-      Extrapolate.CLAMP
+      Extrapolation.CLAMP
     );
     
     return {
@@ -560,6 +626,8 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
                 hideLoadingSpinner={true}
                 onLoad={handleTrailerPreloaded}
                 onError={handleTrailerError}
+                contentType={currentItem.type as 'movie' | 'series'}
+                paused={true}
               />
             </View>
           )}
@@ -581,6 +649,8 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
                   onLoad={handleTrailerReady}
                   onError={handleTrailerError}
                   onEnd={handleTrailerEnd}
+                  contentType={currentItem.type as 'movie' | 'series'}
+                  paused={trailerShouldBePaused}
                   onPlaybackStatusUpdate={(status) => {
                     if (status.isLoaded && !trailerReady) {
                       handleTrailerReady();
@@ -683,34 +753,28 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
             style={logoAnimatedStyle}
           >
             {currentItem.logo && !logoError[currentIndex] ? (
-              <View style={styles.logoContainer}>
-                {currentItem.logo.toLowerCase().endsWith('.svg') ? (
-                  <SvgUri
-                    uri={currentItem.logo}
-                    width="100%"
-                    height="100%"
-                    onLoad={() => setLogoLoaded((prev) => ({ ...prev, [currentIndex]: true }))}
-                    onError={() => {
-                      setLogoError((prev) => ({ ...prev, [currentIndex]: true }));
-                      logger.warn('[AppleTVHero] SVG Logo load failed:', currentItem.logo);
-                    }}
-                  />
-                ) : (
-                  <FastImage
-                    source={{
-                      uri: currentItem.logo,
-                      priority: FastImage.priority.high,
-                      cache: FastImage.cacheControl.immutable,
-                    }}
-                    style={styles.logo}
-                    resizeMode={FastImage.resizeMode.contain}
-                    onLoad={() => setLogoLoaded((prev) => ({ ...prev, [currentIndex]: true }))}
-                    onError={() => {
-                      setLogoError((prev) => ({ ...prev, [currentIndex]: true }));
-                      logger.warn('[AppleTVHero] Logo load failed:', currentItem.logo);
-                    }}
-                  />
-                )}
+              <View 
+                style={[
+                  styles.logoContainer,
+                  logoHeights[currentIndex] && logoHeights[currentIndex] < 80 
+                    ? { marginBottom: 4 } // Minimal spacing for small logos
+                    : { marginBottom: 8 } // Small spacing for normal logos
+                ]}
+                onLayout={(event) => {
+                  const { height } = event.nativeEvent.layout;
+                  setLogoHeights((prev) => ({ ...prev, [currentIndex]: height }));
+                }}
+              >
+                <Image
+                  source={{ uri: currentItem.logo }}
+                  style={styles.logo}
+                  resizeMode="contain"
+                  onLoad={() => setLogoLoaded((prev) => ({ ...prev, [currentIndex]: true }))}
+                  onError={() => {
+                    setLogoError((prev) => ({ ...prev, [currentIndex]: true }));
+                    logger.warn('[AppleTVHero] Logo load failed:', currentItem.logo);
+                  }}
+                />
               </View>
             ) : (
               <View style={styles.titleContainer}>
@@ -733,11 +797,6 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
                   <Text style={styles.metadataDot}>•</Text>
                   <Text style={styles.metadataText}>{currentItem.genres[0]}</Text>
                 </>
-              )}
-              {currentItem.certification && (
-                <View style={styles.ratingBadge}>
-                  <Text style={styles.ratingText}>{currentItem.certification}</Text>
-                </View>
               )}
             </View>
           </View>
@@ -837,8 +896,7 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     width: width * 0.6,
-    height: 120,
-    marginBottom: 20,
+    height: 100,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -847,7 +905,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   titleContainer: {
-    marginBottom: 20,
+    marginBottom: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -861,7 +919,7 @@ const styles = StyleSheet.create({
     textShadowRadius: 4,
   },
   metadataContainer: {
-    marginBottom: 24,
+    marginBottom: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -869,10 +927,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
     gap: 8,
   },
   metadataText: {
@@ -883,18 +937,6 @@ const styles = StyleSheet.create({
   metadataDot: {
     color: 'rgba(255,255,255,0.6)',
     fontSize: 14,
-  },
-  ratingBadge: {
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginLeft: 4,
-  },
-  ratingText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '700',
   },
   buttonsContainer: {
     flexDirection: 'row',

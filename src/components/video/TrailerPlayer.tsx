@@ -40,6 +40,8 @@ interface TrailerPlayerProps {
   hideLoadingSpinner?: boolean;
   onFullscreenToggle?: () => void;
   hideControls?: boolean;
+  contentType?: 'movie' | 'series';
+  paused?: boolean; // External control to pause/play
 }
 
 const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
@@ -56,6 +58,8 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
   hideLoadingSpinner = false,
   onFullscreenToggle,
   hideControls = false,
+  contentType = 'movie',
+  paused,
 }, ref) => {
   const { currentTheme } = useTheme();
   const { isTrailerPlaying: globalTrailerPlaying } = useTrailer();
@@ -142,27 +146,42 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
   }, [cleanupVideo]);
 
   // Handle autoPlay prop changes to keep internal state synchronized
+  // But only if no external paused prop is provided
   useEffect(() => {
-    if (isComponentMounted) {
+    if (isComponentMounted && paused === undefined) {
       setIsPlaying(autoPlay);
     }
-  }, [autoPlay, isComponentMounted]);
+  }, [autoPlay, isComponentMounted, paused]);
 
-  // Respond to global trailer state changes (e.g., when modal opens)
+  // Handle muted prop changes to keep internal state synchronized
   useEffect(() => {
     if (isComponentMounted) {
-      // If global trailer is paused, pause this trailer too
-      if (!globalTrailerPlaying && isPlaying) {
+      setIsMuted(muted);
+    }
+  }, [muted, isComponentMounted]);
+
+  // Handle external paused prop to override playing state (highest priority)
+  useEffect(() => {
+    if (paused !== undefined) {
+      setIsPlaying(!paused);
+      logger.info('TrailerPlayer', `External paused prop changed: ${paused}, setting isPlaying to ${!paused}`);
+    }
+  }, [paused]);
+
+  // Respond to global trailer state changes (e.g., when modal opens)
+  // Only apply if no external paused prop is controlling this
+  useEffect(() => {
+    if (isComponentMounted && paused === undefined) {
+      // Always sync with global trailer state when pausing
+      // This ensures all trailers pause when one screen loses focus
+      if (!globalTrailerPlaying) {
         logger.info('TrailerPlayer', 'Global trailer paused - pausing this trailer');
         setIsPlaying(false);
       }
-      // If global trailer is resumed and autoPlay is enabled, resume this trailer
-      else if (globalTrailerPlaying && !isPlaying && autoPlay) {
-        logger.info('TrailerPlayer', 'Global trailer resumed - resuming this trailer');
-        setIsPlaying(true);
-      }
+      // Don't automatically resume from global state
+      // Each trailer should manage its own resume logic based on its screen focus
     }
-  }, [globalTrailerPlaying, isPlaying, autoPlay, isComponentMounted]);
+  }, [globalTrailerPlaying, isComponentMounted, paused]);
 
   const showControlsWithTimeout = useCallback(() => {
     if (!isComponentMounted) return;
@@ -360,8 +379,11 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
           }
           return { uri: trailerUrl } as any;
         })()}
-        style={styles.video}
-        resizeMode={isFullscreen ? 'contain' : 'cover'}
+        style={[
+          styles.video,
+          contentType === 'movie' && styles.movieVideoScale,
+        ]}
+        resizeMode="cover"
         paused={!isPlaying}
         repeat={false}
         muted={isMuted}
@@ -490,6 +512,9 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     height: '100%',
+  },
+  movieVideoScale: {
+    transform: [{ scale: 1.30 }], // Custom scale for movies to crop black bars
   },
   videoOverlay: {
     position: 'absolute',

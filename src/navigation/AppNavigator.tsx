@@ -873,6 +873,7 @@ const MainTabs = () => {
             options={{
               title: 'Home',
               tabBarIcon: () => ({ sfSymbol: 'house' }),
+              freezeOnBlur: true,
             }}
           />
           <IOSTab.Screen
@@ -977,6 +978,7 @@ const MainTabs = () => {
             tabBarIcon: ({ color, size, focused }) => (
               <MaterialCommunityIcons name={focused ? 'home' : 'home-outline'} size={size} color={color} />
             ),
+            freezeOnBlur: true,
           }}
         />
         <Tab.Screen
