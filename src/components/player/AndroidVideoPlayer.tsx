@@ -495,6 +495,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const [currentStreamProvider, setCurrentStreamProvider] = useState<string | undefined>(streamProvider);
   const [currentStreamName, setCurrentStreamName] = useState<string | undefined>(streamName);
   const isMounted = useRef(true);
+  const isAppBackgrounded = useRef(false); // Track if app is backgrounded to prevent prop updates on detached views
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null);
   const [isSyncingBeforeClose, setIsSyncingBeforeClose] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -923,6 +924,7 @@ const AndroidVideoPlayer: React.FC = () => {
   useEffect(() => {
     const onAppStateChange = (state: string) => {
       if (state === 'active') {
+        isAppBackgrounded.current = false;
         enableImmersiveMode();
         if (useVLC) {
           // Force complete remount VLC view when app returns to foreground
@@ -949,6 +951,8 @@ const AndroidVideoPlayer: React.FC = () => {
           }, 300); // Slightly longer delay for iOS
         }
       } else if (state === 'background' || state === 'inactive') {
+        // Mark app as backgrounded to prevent prop updates on detached native views
+        isAppBackgrounded.current = true;
         // On iOS, when app goes inactive (like status bar pull), track if we were playing
         if (Platform.OS === 'ios') {
           wasPlayingBeforeIOSInterruptionRef.current = !paused;
@@ -1295,7 +1299,9 @@ const AndroidVideoPlayer: React.FC = () => {
   // Removed processProgressTouch - no longer needed with React Native Community Slider
 
   const handleProgress = (data: any) => {
-    if (isDragging || isSeeking.current) return;
+    // Prevent processing progress updates when component is unmounted or app is backgrounded
+    // This prevents Fabric from attempting to update props on detached native views
+    if (isDragging || isSeeking.current || !isMounted.current || isAppBackgrounded.current) return;
     
     const currentTimeInSeconds = data.currentTime;
     
@@ -2758,8 +2764,10 @@ const AndroidVideoPlayer: React.FC = () => {
 
   useEffect(() => {
     isMounted.current = true;
+    isAppBackgrounded.current = false;
     return () => {
       isMounted.current = false;
+      isAppBackgrounded.current = false;
       // Clear all timers and intervals
       if (seekDebounceTimer.current) {
         clearTimeout(seekDebounceTimer.current);
