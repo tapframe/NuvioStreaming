@@ -494,7 +494,8 @@ export function useFeaturedContent() {
         }
       } else {
         // For carousel items - check if saved and toggle
-        const isItemSaved = await catalogService.isInLibrary(contentToUse.type, contentToUse.id);
+        const libraryItems = await catalogService.getLibraryItems();
+        const isItemSaved = libraryItems.some(libItem => libItem.id === contentToUse.id && libItem.type === contentToUse.type);
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
         if (isItemSaved) {
@@ -514,7 +515,8 @@ export function useFeaturedContent() {
 
   const isItemSaved = useCallback(async (item: StreamingContent) => {
     try {
-      return await catalogService.isInLibrary(item.type, item.id);
+      const items = await catalogService.getLibraryItems();
+      return items.some(libItem => libItem.id === item.id && libItem.type === item.type);
     } catch (error) {
       logger.error('Error checking if item is saved:', error);
       return false;

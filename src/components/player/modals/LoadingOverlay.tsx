@@ -1,8 +1,17 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, TouchableOpacity, Animated, ActivityIndicator, StyleSheet, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import FastImage from '@d11/react-native-fast-image';
+import Reanimated, { 
+  useSharedValue, 
+  useAnimatedStyle, 
+  withTiming, 
+  withRepeat,
+  withSequence,
+  Easing,
+  withDelay
+} from 'react-native-reanimated';
 import { styles } from '../utils/playerStyles';
 
 interface LoadingOverlayProps {
@@ -12,9 +21,6 @@ interface LoadingOverlayProps {
   logo: string | null | undefined;
   backgroundFadeAnim: Animated.Value;
   backdropImageOpacityAnim: Animated.Value;
-  logoScaleAnim: Animated.Value;
-  logoOpacityAnim: Animated.Value;
-  pulseAnim: Animated.Value;
   onClose: () => void;
   width: number | string;
   height: number | string;
@@ -28,14 +34,54 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
   logo,
   backgroundFadeAnim,
   backdropImageOpacityAnim,
-  logoScaleAnim,
-  logoOpacityAnim,
-  pulseAnim,
   onClose,
   width,
   height,
   useFastImage = false,
 }) => {
+  const logoOpacity = useSharedValue(0);
+  const logoScale = useSharedValue(1);
+
+  useEffect(() => {
+    if (visible && hasLogo && logo) {
+      // Reset
+      logoOpacity.value = 0;
+      logoScale.value = 1;
+      
+      // Start animations after 1 second delay
+      logoOpacity.value = withDelay(
+        1000,
+        withTiming(1, {
+          duration: 800,
+          easing: Easing.out(Easing.cubic),
+        })
+      );
+      
+      logoScale.value = withDelay(
+        1000,
+        withRepeat(
+          withSequence(
+            withTiming(1.04, {
+              duration: 2000,
+              easing: Easing.inOut(Easing.ease),
+            }),
+            withTiming(1, {
+              duration: 2000,
+              easing: Easing.inOut(Easing.ease),
+            })
+          ),
+          -1,
+          false
+        )
+      );
+    }
+  }, [visible, hasLogo, logo]);
+
+  const logoAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: logoOpacity.value,
+    transform: [{ scale: logoScale.value }],
+  }));
+
   if (!visible) return null;
 
   return (
@@ -93,13 +139,12 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
       
       <View style={styles.openingContent}>
         {hasLogo && logo ? (
-          <Animated.View style={{
-            transform: [
-              { scale: Animated.multiply(logoScaleAnim, pulseAnim) }
-            ],
-            opacity: logoOpacityAnim,
-            alignItems: 'center',
-          }}>
+          <Reanimated.View style={[
+            {
+              alignItems: 'center',
+            },
+            logoAnimatedStyle
+          ]}>
             <FastImage
               source={{ uri: logo }}
               style={{
@@ -108,7 +153,7 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
               }}
               resizeMode={FastImage.resizeMode.contain}
             />
-          </Animated.View>
+          </Reanimated.View>
         ) : (
           <ActivityIndicator size="large" color="#E50914" />
         )}

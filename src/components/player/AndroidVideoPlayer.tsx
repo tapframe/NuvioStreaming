@@ -3105,9 +3105,6 @@ const AndroidVideoPlayer: React.FC = () => {
         logo={metadata?.logo}
         backgroundFadeAnim={backgroundFadeAnim}
         backdropImageOpacityAnim={backdropImageOpacityAnim}
-        logoScaleAnim={logoScaleAnim}
-        logoOpacityAnim={logoOpacityAnim}
-        pulseAnim={pulseAnim}
         onClose={handleClose}
         width={screenDimensions.width}
         height={screenDimensions.height}

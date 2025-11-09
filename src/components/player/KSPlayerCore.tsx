@@ -2486,9 +2486,6 @@ const KSPlayerCore: React.FC = () => {
           logo={metadata?.logo}
           backgroundFadeAnim={backgroundFadeAnim}
           backdropImageOpacityAnim={backdropImageOpacityAnim}
-          logoScaleAnim={logoScaleAnim}
-          logoOpacityAnim={logoOpacityAnim}
-          pulseAnim={pulseAnim}
           onClose={handleClose}
           width={shouldUseFullscreen ? effectiveDimensions.width : screenDimensions.width}
           height={shouldUseFullscreen ? effectiveDimensions.height : screenDimensions.height}

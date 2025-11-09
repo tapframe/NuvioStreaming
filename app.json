@@ -24,9 +24,11 @@
           "NSAllowsArbitraryLoads": true
         },
         "NSBonjourServices": [
-          "_http._tcp"
+          "_http._tcp",
+          "_googlecast._tcp",
+          "_CC1AD845._googlecast._tcp"
         ],
-        "NSLocalNetworkUsageDescription": "App uses the local network to discover and connect to devices.",
+        "NSLocalNetworkUsageDescription": "Nuvio uses the local network to discover Cast-enabled devices on your WiFi network and to connect to local media servers.",
         "NSMicrophoneUsageDescription": "This app does not require microphone access.",
         "UIBackgroundModes": [
           "audio"
@@ -59,7 +61,6 @@
       ],
       "jsEngine": "hermes"
     },
-
     "extra": {
       "eas": {
         "projectId": "909107b8-fe61-45ce-b02f-b02510d306a6"
@@ -89,7 +90,14 @@
           "supportsBackgroundPlayback": true
         }
       ],
-      "react-native-bottom-tabs"
+      "react-native-bottom-tabs",
+      [
+        "react-native-google-cast",
+        {
+          "receiverAppId": "CC1AD845",
+          "iosStartDiscoveryAfterFirstTapOnCastButton": true
+        }
+      ]
     ],
     "updates": {
       "enabled": true,

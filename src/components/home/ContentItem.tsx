@@ -145,7 +145,10 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
   }, []);
 
   const handlePress = useCallback(() => {
-    onPress(item.id, item.type);
+    // Validate ID before pressing to prevent errors with NaN/undefined IDs
+    if (item.id && item.id !== 'NaN' && item.id !== 'undefined') {
+      onPress(item.id, item.type);
+    }
   }, [item.id, item.type, onPress]);
 
   const handleOptionSelect = useCallback(async (option: string) => {

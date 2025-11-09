@@ -81,7 +81,7 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
   const sortedProviders = Object.entries(availableStreams);
 
   const handleStreamSelect = (stream: Stream) => {
-    if (stream.url !== currentStreamUrl && (!isChangingSource || isChangingSource === false)) {
+    if (stream.url !== currentStreamUrl && !isChangingSource) {
       onSelectStream(stream);
     }
   };
