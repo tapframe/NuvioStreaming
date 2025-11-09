@@ -15,7 +15,6 @@
     "@d11/react-native-fast-image": "^8.8.0",
     "@expo/env": "^2.0.7",
     "@expo/metro-runtime": "~6.1.2",
-    "@expo/ui": "~0.2.0-beta.7",
     "@expo/vector-icons": "^15.0.2",
     "@gorhom/bottom-sheet": "^5.2.6",
     "@legendapp/list": "^2.0.13",

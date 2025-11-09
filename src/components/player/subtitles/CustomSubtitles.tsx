@@ -152,7 +152,8 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
           >
             {(() => {
               // Determine alignment and anchor for RTL or LTR
-              const isRTL = lineRTLStatus[0] || lineRTLStatus.some(status => status);
+              // Only apply RTL styling if ALL lines are RTL, not just some
+              const isRTL = lineRTLStatus.every(status => status);
               let anchor: 'start' | 'middle' | 'end';
               let x: number;
               
@@ -231,7 +232,8 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
             })
           ) : (
             (() => {
-              const isRTL = lineRTLStatus.some(status => status);
+              // Only apply RTL styling if ALL lines are RTL, not just some
+              const isRTL = lineRTLStatus.every(status => status);
               // For RTL, use a very small negative letter spacing to stretch words slightly
               // This helps with proper diacritic spacing while maintaining ligatures
               const effectiveLetterSpacing = isRTL ? (subtitleSize * inverseScale * -0.02) : letterSpacing;

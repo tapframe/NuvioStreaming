@@ -646,18 +646,24 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
             snapToAlignment="start"
           >
             {trailers[selectedCategory].map((trailer, index) => (
-              <TouchableOpacity
+              <View
                 key={trailer.id}
                 style={[
-                  styles.trailerCard,
-                  {
-                    width: trailerCardWidth,
-                    borderRadius: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16
-                  }
+                  styles.trailerCardContainer,
+                  { width: trailerCardWidth }
                 ]}
-                onPress={() => handleTrailerPress(trailer)}
-                activeOpacity={0.9}
               >
+                <TouchableOpacity
+                  style={[
+                    styles.trailerCard,
+                    {
+                      width: trailerCardWidth,
+                      borderRadius: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16
+                    }
+                  ]}
+                  onPress={() => handleTrailerPress(trailer)}
+                  activeOpacity={0.9}
+                >
                   {/* Thumbnail with Gradient Overlay */}
                   <View style={styles.thumbnailWrapper}>
                     <FastImage
@@ -665,8 +671,7 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
                       style={[
                         styles.thumbnail,
                         {
-                          borderTopLeftRadius: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
-                          borderTopRightRadius: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16
+                          borderRadius: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16
                         }
                       ]}
                       resizeMode={FastImage.resizeMode.cover}
@@ -675,19 +680,14 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
                     <View style={[
                       styles.thumbnailGradient,
                       {
-                        borderTopLeftRadius: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
-                        borderTopRightRadius: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16
+                        borderRadius: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16
                       }
                     ]} />
                   </View>
+                </TouchableOpacity>
 
-                {/* Trailer Info */}
-                <View style={[
-                  styles.trailerInfo,
-                  {
-                    padding: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
-                  }
-                ]}>
+                {/* Trailer Info Below Card */}
+                <View style={styles.trailerInfoBelow}>
                   <Text
                     style={[
                       styles.trailerTitle, 
@@ -695,7 +695,8 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
                         color: currentTheme.colors.highEmphasis,
                         fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 12,
                         lineHeight: isTV ? 22 : isLargeTablet ? 20 : isTablet ? 18 : 16,
-                        marginBottom: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 4
+                        marginTop: isTV ? 10 : isLargeTablet ? 9 : isTablet ? 8 : 8,
+                        marginBottom: isTV ? 4 : isLargeTablet ? 3 : isTablet ? 2 : 2
                       }
                     ]}
                     numberOfLines={2}
@@ -712,7 +713,7 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
                     {new Date(trailer.published_at).getFullYear()}
                   </Text>
                 </View>
-              </TouchableOpacity>
+              </View>
             ))}
             {/* Scroll Indicator - shows when there are more items to scroll */}
             {trailers[selectedCategory].length > (isTV ? 5 : isLargeTablet ? 4 : isTablet ? 4 : 3) && (
@@ -886,7 +887,12 @@ const styles = StyleSheet.create({
     paddingRight: 20, // Extra padding at end for scroll indicator
   },
 
-  // Enhanced Trailer Card Styles
+  // Trailer Card Container (wraps card + info)
+  trailerCardContainer: {
+    alignItems: 'flex-start',
+  },
+
+  // Enhanced Trailer Card Styles (thumbnail only)
   trailerCard: {
     backgroundColor: 'rgba(255,255,255,0.03)',
     borderRadius: 16,
@@ -904,12 +910,12 @@ const styles = StyleSheet.create({
   thumbnailWrapper: {
     position: 'relative',
     aspectRatio: 16 / 9,
+    width: '100%',
   },
   thumbnail: {
     width: '100%',
     height: '100%',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    borderRadius: 16,
   },
   thumbnailGradient: {
     position: 'absolute',
@@ -918,21 +924,18 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.2)',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    borderRadius: 16,
   },
 
-
-
-  // Trailer Info Styles
-  trailerInfo: {
-    padding: 12,
+  // Trailer Info Below Card
+  trailerInfoBelow: {
+    width: '100%',
+    alignItems: 'flex-start',
   },
   trailerTitle: {
     fontSize: 12,
     fontWeight: '600',
     lineHeight: 16,
-    marginBottom: 4,
   },
   trailerMeta: {
     fontSize: 10,
