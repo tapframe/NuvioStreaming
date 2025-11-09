@@ -31,6 +31,14 @@
       ],
       "versions": [
         {
+          "version": "1.2.8",
+          "buildVersion": "23",
+          "date": "2025-11-09",
+          "localizedDescription": "# Nuvio Media Hub – v1.2.8  \n\n## Update Notes\n- Dependency updates for stability and performance  \n- Minor animation tweaks  \n- Backend fixes and optimizations  ",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/1.2.8/Stable_1-2-8.ipa",
+          "size": 25700000
+        },
+        {
           "version": "1.2.7",
           "buildVersion": "22",
           "date": "2025-10-26",
