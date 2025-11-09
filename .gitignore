@@ -74,7 +74,7 @@ build-and-publish-app-releases.sh
 bottomnav.md
 /TrailerServices
 mmkv.md
-src/services/tmdbService.ts
 fix-android-scroll-lag-summary.md
 server/cache-server
 carousal.md
+node_modules
