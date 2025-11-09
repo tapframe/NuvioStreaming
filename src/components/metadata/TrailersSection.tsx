@@ -107,13 +107,13 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
   const trailerCardWidth = useMemo(() => {
     switch (deviceType) {
       case 'tv':
-        return 240;
+        return 280;
       case 'largeTablet':
-        return 220;
+        return 260;
       case 'tablet':
-        return 200;
+        return 240;
       default:
-        return 170; // phone
+        return 200; // phone
     }
   }, [deviceType]);
   
@@ -695,8 +695,8 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
                         color: currentTheme.colors.highEmphasis,
                         fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 12,
                         lineHeight: isTV ? 22 : isLargeTablet ? 20 : isTablet ? 18 : 16,
-                        marginTop: isTV ? 10 : isLargeTablet ? 9 : isTablet ? 8 : 8,
-                        marginBottom: isTV ? 4 : isLargeTablet ? 3 : isTablet ? 2 : 2
+                        marginTop: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 10,
+                        marginBottom: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 3
                       }
                     ]}
                     numberOfLines={2}
@@ -931,6 +931,7 @@ const styles = StyleSheet.create({
   trailerInfoBelow: {
     width: '100%',
     alignItems: 'flex-start',
+    paddingLeft: 4,
   },
   trailerTitle: {
     fontSize: 12,

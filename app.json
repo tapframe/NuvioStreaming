@@ -46,7 +46,8 @@
       "icon": "./assets/android/mipmap-xxxhdpi/ic_launcher.png",
       "permissions": [
         "INTERNET",
-        "WAKE_LOCK"
+        "WAKE_LOCK",
+        "WRITE_SETTINGS"
       ],
       "package": "com.nuvio.app",
       "versionCode": 22,
