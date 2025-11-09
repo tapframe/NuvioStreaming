@@ -135,10 +135,12 @@ print_success "Updated Info.plist"
 
 # Update Android build.gradle
 print_status "Updating Android build.gradle..."
-# Update versionCode
+# Update versionCode in defaultConfig section
 sed -i '' "s/versionCode [0-9]*/versionCode $NEW_BUILD_NUMBER/g" "$ANDROID_BUILD_GRADLE"
-# Update versionName
+# Update versionName in defaultConfig section
 sed -i '' "s/versionName \"[^\"]*\"/versionName \"$NEW_VERSION\"/g" "$ANDROID_BUILD_GRADLE"
+# Update baseVersionCode in the split APK section (should match versionCode)
+sed -i '' "s/def baseVersionCode = [0-9]*/def baseVersionCode = $NEW_BUILD_NUMBER/g" "$ANDROID_BUILD_GRADLE"
 print_success "Updated Android build.gradle"
 
 # Update Android strings.xml (expo_runtime_version)
@@ -180,7 +182,8 @@ fi
 
 # Check Android build.gradle
 if grep -q "versionCode $NEW_BUILD_NUMBER" "$ANDROID_BUILD_GRADLE" && 
-   grep -q "versionName \"$NEW_VERSION\"" "$ANDROID_BUILD_GRADLE"; then
+   grep -q "versionName \"$NEW_VERSION\"" "$ANDROID_BUILD_GRADLE" &&
+   grep -q "def baseVersionCode = $NEW_BUILD_NUMBER" "$ANDROID_BUILD_GRADLE"; then
     print_success "Android build.gradle updated correctly"
 else
     print_error "Android build.gradle update verification failed"
