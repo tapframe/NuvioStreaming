@@ -28,6 +28,7 @@ import { useTraktContext } from '../contexts/TraktContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { catalogService } from '../services/catalogService';
 import { fetchTotalDownloads } from '../services/githubReleaseService';
+import * as WebBrowser from 'expo-web-browser';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
 import { getDisplayedAppVersion } from '../utils/version';
@@ -913,7 +914,9 @@ const SettingsScreen: React.FC = () => {
 
                       <TouchableOpacity
                         style={[styles.discordButton, { backgroundColor: 'transparent', paddingVertical: 0, paddingHorizontal: 0 }]}
-                        onPress={() => Linking.openURL('https://ko-fi.com/tapframe')}
+                        onPress={() => WebBrowser.openBrowserAsync('https://ko-fi.com/tapframe', {
+                          presentationStyle: Platform.OS === 'ios' ? WebBrowser.WebBrowserPresentationStyle.FORM_SHEET : WebBrowser.WebBrowserPresentationStyle.FORM_SHEET
+                        })}
                         activeOpacity={0.7}
                       >
                         <FastImage
@@ -1011,7 +1014,9 @@ const SettingsScreen: React.FC = () => {
 
                 <TouchableOpacity
                   style={[styles.discordButton, { backgroundColor: 'transparent', paddingVertical: 0, paddingHorizontal: 0 }]}
-                  onPress={() => Linking.openURL('https://ko-fi.com/tapframe')}
+                  onPress={() => WebBrowser.openBrowserAsync('https://ko-fi.com/tapframe', {
+                    presentationStyle: Platform.OS === 'ios' ? WebBrowser.WebBrowserPresentationStyle.FORM_SHEET : WebBrowser.WebBrowserPresentationStyle.FORM_SHEET
+                  })}
                   activeOpacity={0.7}
                 >
                   <FastImage

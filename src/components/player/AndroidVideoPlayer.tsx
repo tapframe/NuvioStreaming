@@ -3108,7 +3108,6 @@ const AndroidVideoPlayer: React.FC = () => {
         onClose={handleClose}
         width={screenDimensions.width}
         height={screenDimensions.height}
-        useFastImage={false}
       />
 
       <Animated.View 

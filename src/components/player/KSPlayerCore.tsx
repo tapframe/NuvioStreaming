@@ -2489,7 +2489,6 @@ const KSPlayerCore: React.FC = () => {
           onClose={handleClose}
           width={shouldUseFullscreen ? effectiveDimensions.width : screenDimensions.width}
           height={shouldUseFullscreen ? effectiveDimensions.height : screenDimensions.height}
-          useFastImage={true}
         />
       )}
 
