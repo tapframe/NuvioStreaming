@@ -176,6 +176,10 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
         getItemType={getItemType}
         horizontal
         showsHorizontalScrollIndicator={false}
+        scrollEventThrottle={16}
+        decelerationRate="fast"
+        scrollEnabled={true}
+        nestedScrollEnabled={true}
         contentContainerStyle={StyleSheet.flatten([
           styles.catalogList,
           {
@@ -186,7 +190,6 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
         ItemSeparatorComponent={ItemSeparator}
         onEndReachedThreshold={0.7}
         onEndReached={() => {}}
-        // FlashList v2 optimizations
         drawDistance={500}
       />
     </Animated.View>

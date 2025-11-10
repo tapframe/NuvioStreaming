@@ -2,11 +2,10 @@ import React, { useEffect } from 'react';
 import { View, TouchableOpacity, Animated, ActivityIndicator, StyleSheet, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import FastImage from '@d11/react-native-fast-image';
-import Reanimated, { 
-  useSharedValue, 
-  useAnimatedStyle, 
-  withTiming, 
+import Reanimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
   withRepeat,
   withSequence,
   Easing,
@@ -24,7 +23,6 @@ interface LoadingOverlayProps {
   onClose: () => void;
   width: number | string;
   height: number | string;
-  useFastImage?: boolean; // Platform-specific: iOS uses FastImage, Android uses Image
 }
 
 const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
@@ -37,7 +35,6 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
   onClose,
   width,
   height,
-  useFastImage = false,
 }) => {
   const logoOpacity = useSharedValue(0);
   const logoScale = useSharedValue(1);
@@ -103,19 +100,11 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
               opacity: backdropImageOpacityAnim
             }
           ]}>
-          {useFastImage ? (
-            <FastImage
-              source={{ uri: backdrop }}
-              style={StyleSheet.absoluteFillObject}
-              resizeMode={FastImage.resizeMode.cover}
-            />
-          ) : (
-            <Image
-              source={{ uri: backdrop }}
-              style={StyleSheet.absoluteFillObject}
-              resizeMode="cover"
-            />
-          )}
+          <Image
+            source={{ uri: backdrop }}
+            style={StyleSheet.absoluteFillObject}
+            resizeMode="cover"
+          />
         </Animated.View>
       )}
       <LinearGradient
@@ -145,13 +134,13 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
             },
             logoAnimatedStyle
           ]}>
-            <FastImage
+            <Image
               source={{ uri: logo }}
               style={{
                 width: 300,
                 height: 180,
               }}
-              resizeMode={FastImage.resizeMode.contain}
+              resizeMode="contain"
             />
           </Reanimated.View>
         ) : (

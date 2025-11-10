@@ -20,7 +20,7 @@ import {
   InteractionManager,
   AppState
 } from 'react-native';
-import { LegendList } from '@legendapp/list';
+import { FlashList } from '@shopify/flash-list';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -841,18 +841,18 @@ const HomeScreen = () => {
           backgroundColor="transparent"
           translucent
         />
-        <LegendList
+        <FlashList
           data={listData}
           renderItem={renderListItem}
           keyExtractor={keyExtractor}
           contentContainerStyle={contentContainerStyle}
           showsVerticalScrollIndicator={false}
+          scrollEventThrottle={16}
+          nestedScrollEnabled={true}
           ListHeaderComponent={memoizedHeader}
           ListFooterComponent={ListFooterComponent}
           onEndReached={handleLoadMoreCatalogs}
           onEndReachedThreshold={0.6}
-          recycleItems={true}
-          maintainVisibleContentPosition={Platform.OS !== 'ios'} // Disable on iOS to prevent shifting
           onScroll={handleScroll}
         />
         {/* Toasts are rendered globally at root */}

@@ -65,113 +65,194 @@ export const useMetadataAssets = (
   // For TMDB ID tracking
   const [foundTmdbId, setFoundTmdbId] = useState<string | null>(null);
   
+  
+  const isMountedRef = useRef(true);
+  
+  // CRITICAL: AbortController to cancel in-flight requests when component unmounts
+  const abortControllerRef = useRef(new AbortController());
+  
+  // Track pending requests to prevent duplicate concurrent API calls
+  const pendingFetchRef = useRef<Promise<void> | null>(null);
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      // Cancel any in-flight requests
+      abortControllerRef.current.abort();
+    };
+  }, []);
+  
+  
+  useEffect(() => {
+    abortControllerRef.current = new AbortController();
+  }, [id, type]);
+  
   // Force reset when preference changes
   useEffect(() => {
     // Reset all cached data when preference changes
-    setBannerImage(null);
-    setBannerSource(null);
-    forcedBannerRefreshDone.current = false;
+    if (isMountedRef.current) {
+      setBannerImage(null);
+      setBannerSource(null);
+      forcedBannerRefreshDone.current = false;
+    }
   }, [settings.logoSourcePreference]);
 
-  // Optimized banner fetching
+  // Optimized banner fetching with race condition fixes
   const fetchBanner = useCallback(async () => {
-    if (!metadata) return;
+    if (!metadata || !isMountedRef.current) return;
     
-    setLoadingBanner(true);
-    
-    
-    // If enrichment is disabled, use addon banner and don't fetch from external sources
-    if (!settings.enrichMetadataWithTMDB) {
-      const addonBanner = metadata?.banner || null;
-      if (addonBanner && addonBanner !== bannerImage) {
-        setBannerImage(addonBanner);
-        setBannerSource('default');
+    // Prevent concurrent fetch requests for the same metadata
+    if (pendingFetchRef.current) {
+      try {
+        await pendingFetchRef.current;
+      } catch (error) {
+        // Previous request failed, allow new attempt
       }
-      setLoadingBanner(false);
-      return;
     }
     
-    try {
-      const currentPreference = settings.logoSourcePreference || 'tmdb';
-      const preferredLanguage = settings.tmdbLanguagePreference || 'en';
-      const contentType = type === 'series' ? 'tv' : 'movie';
-      
-      // Try to get a banner from the preferred source
-      let finalBanner: string | null = null;
-      let bannerSourceType: 'tmdb' | 'default' = 'default';
-      
-      // TMDB path only
-      if (currentPreference === 'tmdb') {
-        let tmdbId = null;
-        if (id.startsWith('tmdb:')) {
-          tmdbId = id.split(':')[1];
-        } else if (foundTmdbId) {
-          tmdbId = foundTmdbId;
-        } else if ((metadata as any).tmdbId) {
-          tmdbId = (metadata as any).tmdbId;
-        } else if (imdbId && settings.enrichMetadataWithTMDB) {
-          try {
-            const tmdbService = TMDBService.getInstance();
-            const foundId = await tmdbService.findTMDBIdByIMDB(imdbId);
-            if (foundId) {
-              tmdbId = String(foundId);
-            }
-          } catch (error) {
-            // Handle error silently
-          }
+    // Create a promise to track this fetch operation
+    const fetchPromise = (async () => {
+      try {
+        if (!isMountedRef.current) return;
+        
+        if (isMountedRef.current) {
+          setLoadingBanner(true);
         }
         
-        if (tmdbId) {
-          try {
-            const tmdbService = TMDBService.getInstance();
-            const endpoint = contentType === 'tv' ? 'tv' : 'movie';
-            
-            const details = endpoint === 'movie' 
-              ? await tmdbService.getMovieDetails(tmdbId) 
-              : await tmdbService.getTVShowDetails(Number(tmdbId));
-            
-            if (details?.backdrop_path) {
-              finalBanner = tmdbService.getImageUrl(details.backdrop_path);
-              bannerSourceType = 'tmdb';
-              
-              // Preload the image
-              if (finalBanner) {
-                FastImage.preload([{ uri: finalBanner }]);
+        // If enrichment is disabled, use addon banner and don't fetch from external sources
+        if (!settings.enrichMetadataWithTMDB) {
+          const addonBanner = metadata?.banner || null;
+          if (isMountedRef.current && addonBanner && addonBanner !== bannerImage) {
+            setBannerImage(addonBanner);
+            setBannerSource('default');
+          }
+          if (isMountedRef.current) {
+            setLoadingBanner(false);
+          }
+          return;
+        }
+        
+        try {
+          const currentPreference = settings.logoSourcePreference || 'tmdb';
+          const contentType = type === 'series' ? 'tv' : 'movie';
+          
+          // Collect final state before updating to prevent intermediate null states
+          let finalBanner: string | null = bannerImage; // Start with current to prevent flicker
+          let bannerSourceType: 'tmdb' | 'default' = (bannerSource === 'tmdb' || bannerSource === 'default') ? bannerSource : 'default';
+          
+          // TMDB path only
+          if (currentPreference === 'tmdb') {
+            let tmdbId = null;
+            if (id.startsWith('tmdb:')) {
+              tmdbId = id.split(':')[1];
+            } else if (foundTmdbId) {
+              tmdbId = foundTmdbId;
+            } else if ((metadata as any).tmdbId) {
+              tmdbId = (metadata as any).tmdbId;
+            } else if (imdbId && settings.enrichMetadataWithTMDB) {
+              try {
+                const tmdbService = TMDBService.getInstance();
+                const foundId = await tmdbService.findTMDBIdByIMDB(imdbId);
+                if (foundId && isMountedRef.current) {
+                  tmdbId = String(foundId);
+                }
+              } catch (error) {
+                // CRITICAL: Don't update state on error if unmounted
+                if (!isMountedRef.current) return;
+                logger.debug('[useMetadataAssets] TMDB ID lookup failed:', error);
               }
             }
-          } catch (error) {
-            // Handle error silently
+            
+            if (tmdbId && isMountedRef.current) {
+              try {
+                const tmdbService = TMDBService.getInstance();
+                const endpoint = contentType === 'tv' ? 'tv' : 'movie';
+                
+                // Fetch details (AbortSignal will be used for future implementations)
+                const details = endpoint === 'movie' 
+                  ? await tmdbService.getMovieDetails(tmdbId) 
+                  : await tmdbService.getTVShowDetails(Number(tmdbId));
+                
+                // Only update if request wasn't aborted and component is still mounted
+                if (!isMountedRef.current) return;
+                
+                if (details?.backdrop_path) {
+                  finalBanner = tmdbService.getImageUrl(details.backdrop_path);
+                  bannerSourceType = 'tmdb';
+                  
+                  // Preload the image
+                  if (finalBanner) {
+                    FastImage.preload([{ uri: finalBanner }]);
+                  }
+                } else {
+                  // TMDB has no backdrop, gracefully fall back
+                  finalBanner = metadata?.banner || bannerImage || null;
+                  bannerSourceType = 'default';
+                }
+              } catch (error) {
+                // CRITICAL: Check if error is due to abort or actual network error
+                if (error instanceof Error && error.name === 'AbortError') {
+                  // Request was cancelled, don't update state
+                  return;
+                }
+                
+                // Only update state if still mounted after error
+                if (!isMountedRef.current) return;
+                
+                logger.debug('[useMetadataAssets] TMDB details fetch failed:', error);
+                // Keep current banner on error instead of setting to null
+                finalBanner = bannerImage || metadata?.banner || null;
+                bannerSourceType = 'default';
+              }
+            }
+          }
+          
+          // Final fallback to metadata banner only
+          if (!finalBanner) {
+            finalBanner = metadata?.banner || null;
+            bannerSourceType = 'default';
+          }
+          
+          // CRITICAL: Batch all state updates into a single call to prevent race conditions
+          // This ensures the native view hierarchy doesn't receive conflicting unmount/remount signals
+          if (isMountedRef.current && (finalBanner !== bannerImage || bannerSourceType !== bannerSource)) {
+            setBannerImage(finalBanner);
+            setBannerSource(bannerSourceType);
+          }
+          
+          if (isMountedRef.current) {
+            forcedBannerRefreshDone.current = true;
+          }
+        } catch (error) {
+          // Outer catch for any unexpected errors
+          if (!isMountedRef.current) return;
+          
+          logger.error('[useMetadataAssets] Unexpected error in banner fetch:', error);
+          // Use current banner on error, don't set to null
+          const defaultBanner = bannerImage || metadata?.banner || null;
+          if (defaultBanner !== bannerImage) {
+            setBannerImage(defaultBanner);
+            setBannerSource('default');
+          }
+        } finally {
+          if (isMountedRef.current) {
+            setLoadingBanner(false);
           }
         }
+      } finally {
+        pendingFetchRef.current = null;
       }
-      
-      // Final fallback to metadata banner only
-      if (!finalBanner) {
-        finalBanner = metadata?.banner || null;
-        bannerSourceType = 'default';
-      }
-      
-      // Update state if the banner changed
-      if (finalBanner !== bannerImage || bannerSourceType !== bannerSource) {
-        setBannerImage(finalBanner);
-        setBannerSource(bannerSourceType);
-      }
-      
-      forcedBannerRefreshDone.current = true;
-    } catch (error) {
-      // Use default banner on error (only addon banner)
-      const defaultBanner = metadata?.banner || null;
-      if (defaultBanner !== bannerImage) {
-        setBannerImage(defaultBanner);
-        setBannerSource('default');
-      }
-    } finally {
-      setLoadingBanner(false);
-    }
+    })();
+    
+    pendingFetchRef.current = fetchPromise;
+    return fetchPromise;
   }, [metadata, id, type, imdbId, settings.logoSourcePreference, settings.tmdbLanguagePreference, settings.enrichMetadataWithTMDB, foundTmdbId, bannerImage, bannerSource]);
 
   // Fetch banner when needed
   useEffect(() => {
+    if (!isMountedRef.current) return;
+    
     const currentPreference = settings.logoSourcePreference || 'tmdb';
     
     if (bannerSource !== currentPreference && !forcedBannerRefreshDone.current) {

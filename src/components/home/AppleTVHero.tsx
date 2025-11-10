@@ -164,6 +164,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
   const [logoHeights, setLogoHeights] = useState<Record<number, number>>({});
   const autoPlayTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastInteractionRef = useRef<number>(Date.now());
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   // Trailer state
   const [trailerUrl, setTrailerUrl] = useState<string | null>(null);
@@ -192,9 +193,18 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
   const thumbnailOpacity = useSharedValue(1);
   const trailerOpacity = useSharedValue(0);
   const trailerMuted = settings?.trailerMuted ?? true;
+  const heroOpacity = useSharedValue(0); // Start hidden for smooth fade-in
 
   // Animated style for trailer container - 60% height with zoom
   const trailerContainerStyle = useAnimatedStyle(() => {
+    // Fade out trailer during drag with smooth curve (inverse of next image fade)
+    const dragFade = interpolate(
+      dragProgress.value,
+      [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.85, 1],
+      [1, 0.95, 0.88, 0.78, 0.65, 0.5, 0.35, 0.22, 0.08, 0],
+      Extrapolation.CLAMP
+    );
+    
     return {
       position: 'absolute',
       top: 0,
@@ -202,7 +212,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
       right: 0,
       height: HERO_HEIGHT * 0.9, // 90% of hero height
       overflow: 'hidden',
-      opacity: trailerOpacity.value,
+      opacity: trailerOpacity.value * dragFade,
     };
   });
 
@@ -278,6 +288,27 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
     setLogoError({});
     setLogoHeights({});
   }, [items.length]);
+
+  // Mark initial load as complete after a short delay
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setInitialLoadComplete(true);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Smooth fade-in when content loads
+  useEffect(() => {
+    if (currentItem && !loading) {
+      heroOpacity.value = withDelay(
+        100,
+        withTiming(1, {
+          duration: 500,
+          easing: Easing.out(Easing.cubic),
+        })
+      );
+    }
+  }, [currentItem, loading, heroOpacity]);
 
   // Stop trailer when screen loses focus
   useEffect(() => {
@@ -501,6 +532,11 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
     dragProgress.value = 0;
     setNextIndex(currentIndex);
     
+    // Immediately hide trailer and show thumbnail when index changes
+    trailerOpacity.value = 0;
+    thumbnailOpacity.value = 1;
+    setTrailerPlaying(false);
+    
     // Faster logo fade
     logoOpacity.value = 0;
     logoOpacity.value = withDelay(
@@ -510,7 +546,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
         easing: Easing.out(Easing.cubic),
       })
     );
-  }, [currentIndex]);
+  }, [currentIndex, setTrailerPlaying, trailerOpacity, thumbnailOpacity]);
 
   // Callback for updating interaction time
   const updateInteractionTime = useCallback(() => {
@@ -532,6 +568,11 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
     setNextIndex(index);
   }, []);
 
+  // Callback to hide trailer when drag starts
+  const hideTrailerOnDrag = useCallback(() => {
+    setTrailerPlaying(false);
+  }, [setTrailerPlaying]);
+
   // Swipe gesture handler with live preview - only horizontal
   const panGesture = useMemo(
     () =>
@@ -541,6 +582,8 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
         .onStart(() => {
           // Determine which direction and set preview
           runOnJS(updateInteractionTime)();
+          // Immediately stop trailer playback when drag starts
+          runOnJS(hideTrailerOnDrag)();
         })
         .onUpdate((event) => {
           const translationX = event.translationX;
@@ -599,7 +642,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
             });
           }
         }),
-    [goToPrevious, goToNext, updateInteractionTime, setPreviewIndex, currentIndex, items.length]
+    [goToPrevious, goToNext, updateInteractionTime, setPreviewIndex, hideTrailerOnDrag, currentIndex, items.length]
   );
 
   // Animated styles for next image only - smooth crossfade + slide during drag
@@ -648,6 +691,13 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
     };
   });
 
+  // Animated style for hero container - smooth fade-in on load
+  const heroContainerStyle = useAnimatedStyle(() => {
+    return {
+      opacity: heroOpacity.value,
+    };
+  });
+
   const handleDotPress = useCallback((index: number) => {
     lastInteractionRef.current = Date.now();
     setCurrentIndex(index);
@@ -691,7 +741,8 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
   return (
     <GestureDetector gesture={panGesture}>
       <Animated.View
-        style={[styles.container, { height: HERO_HEIGHT, marginTop: -insets.top }]}
+        entering={initialLoadComplete ? undefined : FadeIn.duration(600).delay(150)}
+        style={[styles.container, heroContainerStyle, { height: HERO_HEIGHT, marginTop: -insets.top }]}
       >
         {/* Background Images with Crossfade */}
         <View style={styles.backgroundContainer}>
