@@ -40,7 +40,7 @@ import { useTrailer } from '../contexts/TrailerContext';
 import { Stream } from '../types/metadata';
 import { tmdbService, IMDbRatings } from '../services/tmdbService';
 import { stremioService } from '../services/stremioService';
-import { localScraperService } from '../services/localScraperService';
+import { localScraperService } from '../services/pluginService';
 import { VideoPlayerService } from '../services/videoPlayerService';
 import { useSettings } from '../hooks/useSettings';
 import QualityBadge from '../components/metadata/QualityBadge';

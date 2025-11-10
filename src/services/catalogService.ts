@@ -919,11 +919,11 @@ class CatalogService {
   }
 
   public async getLibraryItems(): Promise<StreamingContent[]> {
-    logger.log(`[CatalogService] getLibraryItems() called. Library contains ${Object.keys(this.library).length} items`);
-    await this.ensureInitialized();
-    const items = Object.values(this.library);
-    logger.log(`[CatalogService] getLibraryItems() returning ${items.length} items`);
-    return items;
+    // Only ensure initialization if not already done to avoid redundant calls
+    if (!this.isInitialized) {
+      await this.ensureInitialized();
+    }
+    return Object.values(this.library);
   }
 
   public subscribeToLibraryUpdates(callback: (items: StreamingContent[]) => void): () => void {

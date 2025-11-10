@@ -4,7 +4,7 @@ import { catalogService } from '../services/catalogService';
 import { stremioService } from '../services/stremioService';
 import { tmdbService } from '../services/tmdbService';
 import { cacheService } from '../services/cacheService';
-import { localScraperService, ScraperInfo } from '../services/localScraperService';
+import { localScraperService, ScraperInfo } from '../services/pluginService';
 import { Cast, Episode, GroupedEpisodes, GroupedStreams } from '../types/metadata';
 import { TMDBService } from '../services/tmdbService';
 import { logger } from '../utils/logger';

@@ -22,7 +22,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useSettings } from '../hooks/useSettings';
-import { localScraperService, ScraperInfo, RepositoryInfo } from '../services/localScraperService';
+import { localScraperService, pluginService, ScraperInfo, RepositoryInfo } from '../services/pluginService';
 import { logger } from '../utils/logger';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -934,7 +934,7 @@ const PluginsScreen: React.FC = () => {
     try {
       setIsRefreshing(true);
       const promises = filteredScrapers.map(scraper => 
-        localScraperService.setScraperEnabled(scraper.id, enabled)
+        pluginService.setScraperEnabled(scraper.id, enabled)
       );
       await Promise.all(promises);
       await loadScrapers();
@@ -988,7 +988,7 @@ const PluginsScreen: React.FC = () => {
 
     try {
       setIsLoading(true);
-      const repoId = await localScraperService.addRepository({
+      const repoId = await pluginService.addRepository({
         name: '', // Let the service fetch from manifest
         url: normalizedUrl, // Use normalized URL (without manifest.json)
         description: '',
@@ -998,7 +998,7 @@ const PluginsScreen: React.FC = () => {
       await loadRepositories();
       
       // Switch to the new repository and refresh it
-      await localScraperService.setCurrentRepository(repoId);
+      await pluginService.setCurrentRepository(repoId);
       await loadRepositories();
       await loadScrapers();
       
@@ -1016,7 +1016,7 @@ const PluginsScreen: React.FC = () => {
   const handleSwitchRepository = async (repoId: string) => {
     try {
       setSwitchingRepository(repoId);
-      await localScraperService.setCurrentRepository(repoId);
+      await pluginService.setCurrentRepository(repoId);
       await loadRepositories();
       await loadScrapers();
       openAlert('Success', 'Repository switched successfully');
@@ -1049,7 +1049,7 @@ const PluginsScreen: React.FC = () => {
           label: 'Remove',
           onPress: async () => {
             try {
-              await localScraperService.removeRepository(repoId);
+              await pluginService.removeRepository(repoId);
               await loadRepositories();
               await loadScrapers();
               const successMessage = isLastRepository 
@@ -1073,7 +1073,7 @@ const PluginsScreen: React.FC = () => {
 
   const loadScrapers = async () => {
     try {
-      const scrapers = await localScraperService.getAvailableScrapers();
+      const scrapers = await pluginService.getAvailableScrapers();
 
 
       setInstalledScrapers(scrapers);
@@ -1086,7 +1086,7 @@ const PluginsScreen: React.FC = () => {
       });
       if (sb) {
         setShowboxScraperId(sb.id);
-        const s = await localScraperService.getScraperSettings(sb.id);
+        const s = await pluginService.getScraperSettings(sb.id);
         setShowboxUiToken(s.uiToken || '');
         setShowboxSavedToken(s.uiToken || '');
         setShowboxTokenVisible(false);
@@ -1104,13 +1104,13 @@ const PluginsScreen: React.FC = () => {
   const loadRepositories = async () => {
     try {
       // First refresh repository names from manifests for existing repositories
-      await localScraperService.refreshRepositoryNamesFromManifests();
+      await pluginService.refreshRepositoryNamesFromManifests();
       
-      const repos = await localScraperService.getRepositories();
+      const repos = await pluginService.getRepositories();
       setRepositories(repos);
       setHasRepository(repos.length > 0);
       
-      const currentRepoId = localScraperService.getCurrentRepositoryId();
+      const currentRepoId = pluginService.getCurrentRepositoryId();
       setCurrentRepositoryId(currentRepoId);
       
       const currentRepo = repos.find(r => r.id === currentRepoId);
@@ -1124,7 +1124,7 @@ const PluginsScreen: React.FC = () => {
 
   const checkRepository = async () => {
     try {
-      const repoUrl = await localScraperService.getRepositoryUrl();
+      const repoUrl = await pluginService.getRepositoryUrl();
       setHasRepository(!!repoUrl);
       if (repoUrl && repoUrl !== repositoryUrl) {
         setRepositoryUrl(repoUrl);
@@ -1152,7 +1152,7 @@ const PluginsScreen: React.FC = () => {
 
     try {
       setIsLoading(true);
-      await localScraperService.setRepositoryUrl(url);
+      await pluginService.setRepositoryUrl(url);
       await updateSetting('scraperRepositoryUrl', url);
       setHasRepository(true);
       openAlert('Success', 'Repository URL saved successfully');
@@ -1175,7 +1175,7 @@ const PluginsScreen: React.FC = () => {
       logger.log('[PluginsScreen] Starting hard refresh of repository...');
 
       // Force a complete hard refresh by clearing any cached data first
-      await localScraperService.refreshRepository();
+      await pluginService.refreshRepository();
 
       // Load fresh scrapers from the updated repository
       await loadScrapers();
@@ -1197,18 +1197,18 @@ const PluginsScreen: React.FC = () => {
     try {
       if (enabled) {
         // If enabling a scraper, ensure it's installed first
-        const installedScrapers = await localScraperService.getInstalledScrapers();
+        const installedScrapers = await pluginService.getInstalledScrapers();
         const isInstalled = installedScrapers.some(scraper => scraper.id === scraperId);
         
         if (!isInstalled) {
           // Need to install the scraper first
           setIsRefreshing(true);
-          await localScraperService.refreshRepository();
+          await pluginService.refreshRepository();
           setIsRefreshing(false);
         }
       }
       
-      await localScraperService.setScraperEnabled(scraperId, enabled);
+      await pluginService.setScraperEnabled(scraperId, enabled);
       await loadScrapers();
     } catch (error) {
       logger.error('[ScraperSettings] Failed to toggle scraper:', error);
@@ -1227,7 +1227,7 @@ const PluginsScreen: React.FC = () => {
           label: 'Clear',
           onPress: async () => {
             try {
-              await localScraperService.clearScrapers();
+              await pluginService.clearScrapers();
               await loadScrapers();
               openAlert('Success', 'All scrapers have been removed');
             } catch (error) {
@@ -1250,8 +1250,8 @@ const PluginsScreen: React.FC = () => {
           label: 'Clear Cache',
           onPress: async () => {
             try {
-              await localScraperService.clearScrapers();
-              await localScraperService.setRepositoryUrl('');
+              await pluginService.clearScrapers();
+              await pluginService.setRepositoryUrl('');
               await updateSetting('scraperRepositoryUrl', '');
               setRepositoryUrl('');
               setHasRepository(false);
@@ -1275,21 +1275,21 @@ const PluginsScreen: React.FC = () => {
   const handleToggleLocalScrapers = async (enabled: boolean) => {
     await updateSetting('enableLocalScrapers', enabled);
     
-    // If enabling local scrapers, refresh repository and reload scrapers
+    // If enabling plugins, refresh repository and reload plugins
     if (enabled) {
       try {
         setIsRefreshing(true);
-        logger.log('[PluginsScreen] Enabling local scrapers - refreshing repository...');
+        logger.log('[PluginsScreen] Enabling plugins - refreshing repository...');
         
-        // Refresh repository to ensure scrapers are available
-        await localScraperService.refreshRepository();
+        // Refresh repository to ensure plugins are available
+        await pluginService.refreshRepository();
         
-        // Reload scrapers to get the latest state
+        // Reload plugins to get the latest state
         await loadScrapers();
         
-        logger.log('[PluginsScreen] Local scrapers enabled and repository refreshed');
+        logger.log('[PluginsScreen] Plugins enabled and repository refreshed');
       } catch (error) {
-        logger.error('[PluginsScreen] Failed to refresh repository when enabling local scrapers:', error);
+        logger.error('[PluginsScreen] Failed to refresh repository when enabling plugins:', error);
         // Don't show error to user as the toggle still succeeded
       } finally {
         setIsRefreshing(false);
@@ -1379,7 +1379,7 @@ const PluginsScreen: React.FC = () => {
                 logger.log('[PluginsScreen] Pull-to-refresh: Starting hard refresh...');
 
                 // Force hard refresh of repository
-                await localScraperService.refreshRepository();
+                await pluginService.refreshRepository();
                 await loadScrapers();
 
                 logger.log('[PluginsScreen] Pull-to-refresh completed');
@@ -1394,9 +1394,9 @@ const PluginsScreen: React.FC = () => {
       >
         {/* Quick Setup banner removed */}
 
-        {/* Enable Local Scrapers */}
+        {/* Enable Plugins */}
         <CollapsibleSection
-          title="Enable Local Scrapers"
+          title="Enable Plugins"
           isExpanded={expandedSections.repository}
           onToggle={() => toggleSection('repository')}
           colors={colors}
@@ -1404,9 +1404,9 @@ const PluginsScreen: React.FC = () => {
         >
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>Enable Local Scrapers</Text>
+              <Text style={styles.settingTitle}>Enable Plugins</Text>
               <Text style={styles.settingDescription}>
-                Allow the app to use locally installed scrapers for finding streams
+                Allow the app to use installed plugins for finding streams
               </Text>
             </View>
             <Switch
@@ -1434,7 +1434,7 @@ const PluginsScreen: React.FC = () => {
           {currentRepositoryId && (
             <View style={styles.currentRepoContainer}>
               <Text style={styles.currentRepoLabel}>Current Repository:</Text>
-              <Text style={styles.currentRepoUrl}>{localScraperService.getRepositoryName()}</Text>
+              <Text style={styles.currentRepoUrl}>{pluginService.getRepositoryName()}</Text>
               <Text style={[styles.currentRepoUrl, { fontSize: 12, opacity: 0.7, marginTop: 4 }]}>{repositoryUrl}</Text>
             </View>
           )}
@@ -1518,9 +1518,9 @@ const PluginsScreen: React.FC = () => {
           </TouchableOpacity>
         </CollapsibleSection>
 
-        {/* Available Scrapers */}
+        {/* Available Plugins */}
         <CollapsibleSection
-          title={`Available Scrapers (${filteredScrapers.length})`}
+          title={`Available Plugins (${filteredScrapers.length})`}
           isExpanded={expandedSections.scrapers}
           onToggle={() => toggleSection('scrapers')}
           colors={colors}
@@ -1710,7 +1710,7 @@ const PluginsScreen: React.FC = () => {
                                   style={[styles.button, styles.primaryButton]}
                                   onPress={async () => {
                                     if (showboxScraperId) {
-                                      await localScraperService.setScraperSettings(showboxScraperId, { uiToken: showboxUiToken });
+                                      await pluginService.setScraperSettings(showboxScraperId, { uiToken: showboxUiToken });
                                     }
                                     setShowboxSavedToken(showboxUiToken);
                                     openAlert('Saved', 'ShowBox settings updated');
@@ -1725,7 +1725,7 @@ const PluginsScreen: React.FC = () => {
                                   setShowboxUiToken('');
                                   setShowboxSavedToken('');
                                   if (showboxScraperId) {
-                                    await localScraperService.setScraperSettings(showboxScraperId, {});
+                                    await pluginService.setScraperSettings(showboxScraperId, {});
                                   }
                                 }}
                               >
@@ -1768,7 +1768,7 @@ const PluginsScreen: React.FC = () => {
             <View style={styles.settingInfo}>
               <Text style={styles.settingTitle}>Group Plugin Streams</Text>
               <Text style={styles.settingDescription}>
-                When enabled, all plugin streams are grouped under "{localScraperService.getRepositoryName()}". When disabled, each plugin shows as a separate provider.
+                When enabled, all plugin streams are grouped under "{pluginService.getRepositoryName()}". When disabled, each plugin shows as a separate provider.
               </Text>
             </View>
             <Switch
@@ -1938,7 +1938,7 @@ const PluginsScreen: React.FC = () => {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Getting Started with Plugins</Text>
             <Text style={styles.modalText}>
-              1. <Text style={{ fontWeight: '600' }}>Enable Local Scrapers</Text> - Turn on the main switch to allow plugins
+              1. <Text style={{ fontWeight: '600' }}>Enable Plugins</Text> - Turn on the main switch to allow plugins
             </Text>
             <Text style={styles.modalText}>
               2. <Text style={{ fontWeight: '600' }}>Add Repository</Text> - Add a GitHub raw URL or use the default repository

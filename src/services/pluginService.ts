@@ -632,8 +632,8 @@ class LocalScraperService {
         // Force disable if:
         // 1. Manifest says enabled: false (globally disabled)
         // 2. Platform incompatible
-        // Otherwise, preserve user's enabled state or default to false
-        enabled: scraperInfo.enabled && isPlatformCompatible ? (existingScraper?.enabled ?? false) : false
+        // Otherwise, preserve user's enabled state or default to true for new installations
+        enabled: scraperInfo.enabled && isPlatformCompatible ? (existingScraper?.enabled ?? true) : false
       };
       
       // Ensure contentLanguage is an array (migration for older scrapers)
@@ -786,8 +786,8 @@ class LocalScraperService {
             // Store the manifest's enabled state separately
             manifestEnabled: scraperInfo.enabled,
             // If manifest says enabled: false, scraper cannot be enabled
-            // If manifest says enabled: true, use installed state or default to false
-            enabled: scraperInfo.enabled ? (installedScraper?.enabled ?? false) : false
+            // If manifest says enabled: true, use installed state or default to true for new installs
+            enabled: scraperInfo.enabled ? (installedScraper?.enabled ?? true) : false
           };
 
 
@@ -1341,34 +1341,43 @@ class LocalScraperService {
     
     // Get user settings to check if local scrapers are enabled
     const userSettings = await this.getUserScraperSettings();
+    logger.log('[LocalScraperService.hasScrapers] enableLocalScrapers:', userSettings.enableLocalScrapers);
     if (!userSettings.enableLocalScrapers) {
+      logger.log('[LocalScraperService.hasScrapers] Returning false: local scrapers disabled');
       return false;
     }
     
     // If no repository is configured, return false
     if (!this.repositoryUrl) {
-      logger.log('[LocalScraperService] No repository URL configured');
+      logger.log('[LocalScraperService.hasScrapers] Returning false: no repository URL configured');
       return false;
     }
     
     // If no scrapers are installed, try to refresh repository
     if (this.installedScrapers.size === 0) {
-      logger.log('[LocalScraperService] No scrapers installed, attempting to refresh repository');
+      logger.log('[LocalScraperService.hasScrapers] No scrapers installed, attempting to refresh repository');
       try {
         await this.performRepositoryRefresh();
       } catch (error) {
-        logger.error('[LocalScraperService] Failed to refresh repository for hasScrapers check:', error);
+        logger.error('[LocalScraperService.hasScrapers] Failed to refresh repository:', error);
         return false;
       }
     }
     
+    logger.log('[LocalScraperService.hasScrapers] installedScrapers.size:', this.installedScrapers.size);
+    logger.log('[LocalScraperService.hasScrapers] enabledScrapers set size:', userSettings.enabledScrapers?.size);
+    
     // Check if there are any enabled scrapers based on user settings
     if (userSettings.enabledScrapers && userSettings.enabledScrapers.size > 0) {
+      logger.log('[LocalScraperService.hasScrapers] Returning true: enabledScrapers set has items');
       return true;
     }
     
     // Fallback: check if any scrapers are enabled in the internal state
-    return Array.from(this.installedScrapers.values()).some(scraper => scraper.enabled);
+    const hasEnabledScrapers = Array.from(this.installedScrapers.values()).some(scraper => scraper.enabled);
+    logger.log('[LocalScraperService.hasScrapers] Fallback check - hasEnabledScrapers:', hasEnabledScrapers);
+    logger.log('[LocalScraperService.hasScrapers] Scrapers state:', Array.from(this.installedScrapers.values()).map(s => ({ id: s.id, name: s.name, enabled: s.enabled })));
+    return hasEnabledScrapers;
   }
 
   // Get current user scraper settings for cache filtering
@@ -1394,18 +1403,21 @@ class LocalScraperService {
       const settingsData = scopedSettingsJson || legacySettingsJson;
       const settings = settingsData ? JSON.parse(settingsData) : {};
 
+      // Default to true if the setting is not yet saved
+      const enableLocalScrapers = settings.enableLocalScrapers !== false;
+
       // Get enabled scrapers based on current user settings
       const enabledScrapers = new Set<string>();
       const installedScrapers = Array.from(this.installedScrapers.values());
 
       for (const scraper of installedScrapers) {
-        if (scraper.enabled && settings.enableLocalScrapers) {
+        if (scraper.enabled && enableLocalScrapers) {
           enabledScrapers.add(scraper.id);
         }
       }
 
       return {
-        enableLocalScrapers: settings.enableLocalScrapers,
+        enableLocalScrapers: enableLocalScrapers,
         enabledScrapers: enabledScrapers.size > 0 ? enabledScrapers : undefined
       };
     } catch (error) {
@@ -1417,4 +1429,5 @@ class LocalScraperService {
 }
 
 export const localScraperService = LocalScraperService.getInstance();
+export const pluginService = localScraperService; // Alias for UI consistency
 export default localScraperService;

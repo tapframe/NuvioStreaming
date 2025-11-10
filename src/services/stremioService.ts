@@ -2,7 +2,7 @@ import axios from 'axios';
 import { mmkvStorage } from './mmkvStorage';
 import { logger } from '../utils/logger';
 import EventEmitter from 'eventemitter3';
-import { localScraperService } from './localScraperService';
+import { localScraperService } from './pluginService';
 import { DEFAULT_SETTINGS, AppSettings } from '../hooks/useSettings';
 import { TMDBService } from './tmdbService';
 
