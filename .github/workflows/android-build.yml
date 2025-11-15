@@ -32,14 +32,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Android APK (Debug)
+      - name: Build Android APK (Release - arm64-v8a only)
         working-directory: android
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: nuvio-android-debug-apk
-          path: android/app/build/outputs/apk/debug/*.apk
+          name: nuvio-android-release-apk-arm64-v8a
+          path: android/app/build/outputs/apk/release/**/*.apk
           retention-days: 7
 
