@@ -625,7 +625,9 @@ const KSPlayerCore: React.FC = () => {
       if (isOpeningAnimationComplete) {
         enableImmersiveMode();
       }
-      return () => {};
+      return () => {
+        disableImmersiveMode(); // Disable immersive mode when screen loses focus
+      };
     }, [isOpeningAnimationComplete])
   );
 

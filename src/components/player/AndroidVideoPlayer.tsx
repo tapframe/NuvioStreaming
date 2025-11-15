@@ -901,7 +901,9 @@ const AndroidVideoPlayer: React.FC = () => {
           setVlcKey(`vlc-focus-${Date.now()}`);
         }, 100);
       }
-      return () => {};
+      return () => {
+        disableImmersiveMode(); // Disable immersive mode when screen loses focus
+      };
     }, [useVLC])
   );
 
