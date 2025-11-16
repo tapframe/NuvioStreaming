@@ -100,9 +100,7 @@ android {
     splits {
         abi {
             reset()
-            enable true
-            universalApk false  // If true, also generate a universal APK
-            include "arm64-v8a", "armeabi-v7a", "x86", "x86_64"
+            enable false  // Disable splits - build single APK for specified architecture
         }
     }
     signingConfigs {
