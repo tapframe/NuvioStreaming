@@ -1,6 +1,5 @@
 import React, { useCallback, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, Dimensions } from 'react-native';
-import { FlashList } from '@shopify/flash-list';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Dimensions, FlatList } from 'react-native';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -97,11 +96,20 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
   // Memoize the keyExtractor to prevent re-creation
   const keyExtractor = useCallback((item: StreamingContent) => `${item.id}-${item.type}`, []);
 
-  // FlashList v2 optimization: getItemType for better performance
-  const getItemType = useCallback((item: StreamingContent) => {
-    // Return different types based on content for better recycling
-    return item.type === 'movie' ? 'movie' : 'series';
-  }, []);
+  // Calculate item width for getItemLayout - use base POSTER_WIDTH for consistent spacing
+  // Note: ContentItem may apply size multipliers based on settings, but base width ensures consistent layout
+  const itemWidth = useMemo(() => POSTER_WIDTH, []);
+
+  // getItemLayout for consistent spacing and better performance
+  const getItemLayout = useCallback((data: any, index: number) => {
+    const length = itemWidth + separatorWidth;
+    const paddingHorizontal = isTV ? 32 : isLargeTablet ? 28 : isTablet ? 24 : 16;
+    return {
+      length,
+      offset: paddingHorizontal + (length * index),
+      index,
+    };
+  }, [itemWidth, separatorWidth, isTV, isLargeTablet, isTablet]);
 
   return (
     <Animated.View
@@ -169,11 +177,10 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
         </TouchableOpacity>
       </View>
       
-      <FlashList
+      <FlatList
         data={catalog.items}
         renderItem={renderContentItem}
         keyExtractor={keyExtractor}
-        getItemType={getItemType}
         horizontal
         showsHorizontalScrollIndicator={false}
         scrollEventThrottle={16}
@@ -188,9 +195,12 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
           }
         ])}
         ItemSeparatorComponent={ItemSeparator}
-        onEndReachedThreshold={0.7}
-        onEndReached={() => {}}
-        drawDistance={500}
+        getItemLayout={getItemLayout}
+        removeClippedSubviews={true}
+        initialNumToRender={isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 3}
+        maxToRenderPerBatch={isTV ? 4 : isLargeTablet ? 4 : 3}
+        windowSize={isTV ? 4 : isLargeTablet ? 4 : 3}
+        updateCellsBatchingPeriod={50}
       />
     </Animated.View>
   );
