@@ -527,10 +527,11 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
         <LinearGradient
           colors={['transparent', 'rgba(0,0,0,0.7)']}
           style={styles.bottomGradient}
+          pointerEvents="box-none"
         >
-          <View style={styles.bottomControls}>
+          <View style={styles.bottomControls} pointerEvents="box-none">
             {/* Center Buttons Container with rounded background - wraps all buttons */}
-            <View style={styles.centerControlsContainer}>
+            <View style={styles.centerControlsContainer} pointerEvents="box-none">
               {/* Left Side: Aspect Ratio Button */}
               <TouchableOpacity style={styles.iconButton} onPress={cycleAspectRatio}>
                 <Ionicons name="expand-outline" size={24} color="white" />
