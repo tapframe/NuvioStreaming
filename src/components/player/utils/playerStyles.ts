@@ -79,6 +79,7 @@ export const styles = StyleSheet.create({
     paddingBottom: padV,
     paddingHorizontal: padH,
     paddingTop: padV,
+    zIndex: 1001,
   },
   header: {
     flexDirection: 'row',
@@ -245,7 +246,7 @@ export const styles = StyleSheet.create({
     left: 0,
     right: 0,
     paddingHorizontal: padH,
-    zIndex: 1000,
+    zIndex: 21,
   },
   progressTouchArea: {
     height: progressTouchHeight, // Increased touch area for larger displays
@@ -352,6 +353,7 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
     alignSelf: 'center',
+    zIndex: 1002,
   },
   modalOverlay: {
     flex: 1,
