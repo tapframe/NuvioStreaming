@@ -250,9 +250,20 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
       const traktService = TraktService.getInstance();
       const isAuthed = await traktService.isAuthenticated();
       if (isAuthed && metadata?.id) {
-        const historyItems = await traktService.getWatchedEpisodesHistory(1, 400);
+        // Fetch multiple pages to ensure we get all episodes for shows with many seasons
+        // Each page has up to 100 items by default, fetch enough to cover ~12+ seasons
+        let allHistoryItems: any[] = [];
+        const pageLimit = 10; // Fetch up to 10 pages (max 1000 items) to cover extensive libraries
+        
+        for (let page = 1; page <= pageLimit; page++) {
+          const historyItems = await traktService.getWatchedEpisodesHistory(page, 100);
+          if (!historyItems || historyItems.length === 0) {
+            break; // No more items to fetch
+          }
+          allHistoryItems = allHistoryItems.concat(historyItems);
+        }
 
-        historyItems.forEach(item => {
+        allHistoryItems.forEach(item => {
           if (item.type !== 'episode') return;
 
           const showImdb = item.show?.ids?.imdb ? `tt${item.show.ids.imdb.replace(/^tt/, '')}` : null;

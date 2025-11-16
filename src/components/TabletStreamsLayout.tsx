@@ -289,7 +289,7 @@ const TabletStreamsLayout: React.FC<TabletStreamsLayoutProps> = ({
     }
 
     if (streamsEmpty) {
-      if (showInitialLoading || showStillFetching) {
+      if (showInitialLoading || showStillFetching || isAutoplayWaiting) {
         return (
           <View style={[styles.loadingContainer, { paddingTop: 50 }]}>
             <ActivityIndicator size="large" color={colors.primary} />
@@ -411,7 +411,7 @@ const TabletStreamsLayout: React.FC<TabletStreamsLayoutProps> = ({
       
       {/* Left Panel: Movie Logo/Episode Info */}
       <Animated.View style={[styles.tabletLeftPanel, leftPanelAnimatedStyle]}>
-        {type === 'movie' && metadata && (
+        {type === 'movie' && metadata ? (
           <View style={styles.tabletMovieLogoContainer}>
             {metadata.logo && !movieLogoError ? (
               <FastImage
@@ -424,15 +424,17 @@ const TabletStreamsLayout: React.FC<TabletStreamsLayoutProps> = ({
               <Text style={styles.tabletMovieTitle}>{metadata.name}</Text>
             )}
           </View>
-        )}
-        
-        {type === 'series' && currentEpisode && (
+        ) : type === 'series' && currentEpisode ? (
           <View style={styles.tabletEpisodeInfo}>
             <Text style={[styles.streamsHeroEpisodeNumber, styles.tabletEpisodeText, styles.tabletEpisodeNumber]}>{currentEpisode.episodeString}</Text>
             <Text style={[styles.streamsHeroTitle, styles.tabletEpisodeText, styles.tabletEpisodeTitle]} numberOfLines={2}>{currentEpisode.name}</Text>
             {currentEpisode.overview && (
               <Text style={[styles.streamsHeroOverview, styles.tabletEpisodeText, styles.tabletEpisodeOverview]} numberOfLines={4}>{currentEpisode.overview}</Text>
             )}
+          </View>
+        ) : (
+          <View style={styles.tabletEmptyLeftPanel}>
+            <Text style={styles.tabletEmptyLeftPanelText}>No content information available</Text>
           </View>
         )}
       </Animated.View>
@@ -768,6 +770,17 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     opacity: 0.95,
+  },
+  tabletEmptyLeftPanel: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    height: '100%',
+  },
+  tabletEmptyLeftPanelText: {
+    color: colors.mediumEmphasis,
+    fontSize: 16,
+    fontStyle: 'italic',
   },
   tabletRightPanel: {
     width: '60%',
